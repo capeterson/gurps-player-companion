@@ -36,21 +36,21 @@ export function CharactersPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <header>
         <p className="label-eyebrow">Characters</p>
         <h1 className="font-display text-3xl">Your characters</h1>
       </header>
 
       <form
-        className="flex items-end gap-3 card bg-base-200 border border-base-300 p-4"
+        className="card grid gap-3 bg-base-200 border border-base-300 p-4 sm:grid-cols-[minmax(16rem,24rem)_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           if (!name.trim()) return;
           create.mutate({ name: name.trim(), nameRaw: name });
         }}
       >
-        <label className="form-control flex-1">
+        <label className="form-control">
           <span className="label-text">New character name</span>
           <input
             className="input input-bordered"
@@ -59,7 +59,7 @@ export function CharactersPage() {
             placeholder="Sir Lancelot"
           />
         </label>
-        <button type="submit" className="btn btn-primary" disabled={create.isPending}>
+        <button type="submit" className="btn btn-primary sm:w-fit" disabled={create.isPending}>
           {create.isPending ? 'Creating…' : 'Create'}
         </button>
       </form>
