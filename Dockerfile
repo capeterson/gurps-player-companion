@@ -12,8 +12,7 @@ FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN bun run build:client \
- && bun run build:server
+RUN bun run build
 
 FROM oven/bun:${BUN_VERSION} AS runtime
 WORKDIR /app
