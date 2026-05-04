@@ -18,25 +18,43 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Single in-flight refresh promise.  Concurrent 401s from parallel API
+ * calls all await the same refresh — without this, the second caller
+ * would re-send the now-consumed refresh token (the server's atomic
+ * one-time-use rotation rejects it) and blow away the freshly-issued
+ * tokens, logging the user out.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
 async function refreshTokens(): Promise<boolean> {
-  const tokens = tokenStore.read();
-  if (!tokens) return false;
-  const res = await fetch(`${API_ROOT}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-  });
-  if (!res.ok) {
-    tokenStore.clear();
-    return false;
-  }
-  const fresh = (await res.json()) as {
-    accessToken: string;
-    refreshToken: string;
-    accessTokenExpiresIn: number;
-  };
-  tokenStore.write(fresh);
-  return true;
+  if (refreshInFlight) return refreshInFlight;
+  const promise = (async () => {
+    try {
+      const tokens = tokenStore.read();
+      if (!tokens) return false;
+      const res = await fetch(`${API_ROOT}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+      });
+      if (!res.ok) {
+        tokenStore.clear();
+        return false;
+      }
+      const fresh = (await res.json()) as {
+        accessToken: string;
+        refreshToken: string;
+        accessTokenExpiresIn: number;
+      };
+      tokenStore.write(fresh);
+      return true;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  refreshInFlight = promise;
+  return promise;
 }
 
 export interface ApiOptions {

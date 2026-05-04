@@ -15,6 +15,7 @@ import { requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
 import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
 import { getDb } from '../db/client.ts';
+import { isUniqueViolation } from '../db/errors.ts';
 import { refreshTokens, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
@@ -76,20 +77,33 @@ router.openapi(
   async (c) => {
     const body = c.req.valid('json');
     const db = getDb();
+    // Fast-path pre-check so we don't burn argon2id work on a duplicate
+    // email.  The unique index on users.email is the authoritative
+    // arbiter — two concurrent registers can both pass this check, so
+    // we also catch the unique-violation on insert below.
     const existing = await db
       .select({ id: users.id })
       .from(users)
       .where(eq(users.email, body.email));
     if (existing[0]) throw new HTTPException(409, { message: 'email already in use' });
     const passwordHash = await hashPassword(body.password);
-    const [created] = await db
-      .insert(users)
-      .values({
-        email: body.email,
-        passwordHash,
-        displayName: body.displayName,
-      })
-      .returning({ id: users.id });
+    let created: { id: string } | undefined;
+    try {
+      const inserted = await db
+        .insert(users)
+        .values({
+          email: body.email,
+          passwordHash,
+          displayName: body.displayName,
+        })
+        .returning({ id: users.id });
+      created = inserted[0];
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new HTTPException(409, { message: 'email already in use' });
+      }
+      throw err;
+    }
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const tokens = await issueTokenPair(created.id);
     return c.json(tokens, 201);
