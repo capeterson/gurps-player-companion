@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { useDraftToggle } from '../../../hooks/useDraftToggle.ts';
 import { api } from '../../../lib/api.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { applyDetailToCache } from './useCharacterPatch.ts';
@@ -159,17 +160,19 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
     onSave: (v) => patchItem('weightLbs', v),
   });
 
-  const toggleWorn = useMutation({
-    mutationFn: () => patchItem('worn', !item.worn),
-    onError: (err) => {
-      toasts.push(`Couldn't toggle worn — ${(err as Error).message}`, { kind: 'error' });
-    },
+  // Use the same draft-with-queue pattern as text fields so rapid
+  // toggles (check, then immediately uncheck) serialize through the
+  // server with the latest click winning, instead of each click
+  // sending `!item.worn` against the original prop and racing.
+  const wornToggle = useDraftToggle({
+    name: `${item.name} worn`,
+    serverValue: item.worn,
+    onSave: (v) => patchItem('worn', v),
   });
-  const toggleEquipped = useMutation({
-    mutationFn: () => patchItem('equipped', !item.equipped),
-    onError: (err) => {
-      toasts.push(`Couldn't toggle equipped — ${(err as Error).message}`, { kind: 'error' });
-    },
+  const equippedToggle = useDraftToggle({
+    name: `${item.name} equipped`,
+    serverValue: item.equipped,
+    onSave: (v) => patchItem('equipped', v),
   });
 
   const remove = useMutation({
@@ -200,8 +203,8 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
             <input
               type="checkbox"
               className="checkbox checkbox-xs"
-              checked={item.worn}
-              onChange={() => canWrite && toggleWorn.mutate()}
+              checked={canWrite ? wornToggle.checked : item.worn}
+              onChange={() => canWrite && wornToggle.toggle()}
               disabled={!canWrite}
               aria-label={`${item.name} worn`}
             />
@@ -211,8 +214,8 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
             <input
               type="checkbox"
               className="checkbox checkbox-xs"
-              checked={item.equipped}
-              onChange={() => canWrite && toggleEquipped.mutate()}
+              checked={canWrite ? equippedToggle.checked : item.equipped}
+              onChange={() => canWrite && equippedToggle.toggle()}
               disabled={!canWrite}
               aria-label={`${item.name} equipped`}
             />

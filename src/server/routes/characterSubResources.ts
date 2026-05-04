@@ -349,17 +349,22 @@ router.openapi(
 
 // ===================== INVENTORY =====================
 
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
+
 /**
  * Reject a `parentId` that doesn't belong to this character.  Without
  * this check a write could create cross-character parent links and
  * later mutations on the parent would touch the other character's tree.
+ *
+ * Runs against the supplied tx so it can share locks with the
+ * surrounding transaction.
  */
 async function assertParentBelongsToCharacter(
+  tx: Tx,
   parentId: string,
   characterId: string,
 ): Promise<void> {
-  const db = getDb();
-  const [parent] = await db
+  const [parent] = await tx
     .select({ id: inventoryItems.id })
     .from(inventoryItems)
     .where(and(eq(inventoryItems.id, parentId), eq(inventoryItems.characterId, characterId)));
@@ -375,13 +380,18 @@ async function assertParentBelongsToCharacter(
  * change would create a cycle.  `computeWeights` only seeds roots
  * from rows whose `parentId` is null, so a cycle silently drops the
  * whole subtree out of encumbrance — must be caught at write time.
+ *
+ * MUST run inside a transaction that has already locked the character
+ * row FOR UPDATE.  Without that lock, two concurrent parent changes
+ * (e.g. set A.parent=B and B.parent=A) can each pass their check
+ * against pre-write state and then both commit a cycle.
  */
 async function assertNoParentCycle(
+  tx: Tx,
   proposedParentId: string,
   itemId: string,
   characterId: string,
 ): Promise<void> {
-  const db = getDb();
   const seen = new Set<string>();
   let current: string | null = proposedParentId;
   while (current !== null) {
@@ -395,7 +405,7 @@ async function assertNoParentCycle(
       throw new HTTPException(400, { message: 'detected existing inventory cycle' });
     }
     seen.add(current);
-    const [row] = await db
+    const [row] = await tx
       .select({ parentId: inventoryItems.parentId })
       .from(inventoryItems)
       .where(and(eq(inventoryItems.id, current), eq(inventoryItems.characterId, characterId)));
@@ -434,30 +444,44 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    if (body.parentId) await assertParentBelongsToCharacter(body.parentId, id);
     const db = getDb();
-    const [created] = await db
-      .insert(inventoryItems)
-      .values({
-        characterId: id,
-        name: body.name,
-        quantity: body.quantity ?? 1,
-        weightLbs: String(body.weightLbs ?? 0),
-        cost: String(body.cost ?? 0),
-        notes: body.notes ?? null,
-        parentId: body.parentId ?? null,
-        externalLocation: body.externalLocation ?? null,
-        worn: body.worn ?? false,
-        equipped: body.equipped ?? false,
-        isContainer: body.isContainer ?? false,
-        hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
-        weightReductionPercent: body.weightReductionPercent ?? 0,
-        isArmor: body.isArmor ?? false,
-        armor: body.armor ?? null,
-        weaponData: body.weaponData ?? null,
-        libraryItemId: body.libraryItemId ?? null,
-      })
-      .returning();
+    const created = await db.transaction(async (tx) => {
+      // Hold a row lock on the character so concurrent inventory tree
+      // changes for this character serialize.  Without it two parent
+      // changes can each pass their own pre-checks against pre-write
+      // state and then both commit a cycle.
+      await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(eq(characters.id, id))
+        .for('update');
+      if (body.parentId) await assertParentBelongsToCharacter(tx, body.parentId, id);
+      // POST has no descendants yet, so no cycle check is needed here —
+      // a fresh row's id can't appear in any existing parent chain.
+      const [row] = await tx
+        .insert(inventoryItems)
+        .values({
+          characterId: id,
+          name: body.name,
+          quantity: body.quantity ?? 1,
+          weightLbs: String(body.weightLbs ?? 0),
+          cost: String(body.cost ?? 0),
+          notes: body.notes ?? null,
+          parentId: body.parentId ?? null,
+          externalLocation: body.externalLocation ?? null,
+          worn: body.worn ?? false,
+          equipped: body.equipped ?? false,
+          isContainer: body.isContainer ?? false,
+          hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
+          weightReductionPercent: body.weightReductionPercent ?? 0,
+          isArmor: body.isArmor ?? false,
+          armor: body.armor ?? null,
+          weaponData: body.weaponData ?? null,
+          libraryItemId: body.libraryItemId ?? null,
+        })
+        .returning();
+      return row;
+    });
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const allItems = await db
       .select()
@@ -515,15 +539,8 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    if (body.parentId !== undefined && body.parentId !== null) {
-      if (body.parentId === itemId) {
-        throw new HTTPException(400, { message: 'an item cannot be its own parent' });
-      }
-      await assertParentBelongsToCharacter(body.parentId, id);
-      // Cycle check: walking up from the proposed parent must never hit
-      // the item being patched.  If it would, the subtree would be
-      // detached from any root and silently disappear from encumbrance.
-      await assertNoParentCycle(body.parentId, itemId, id);
+    if (body.parentId !== undefined && body.parentId !== null && body.parentId === itemId) {
+      throw new HTTPException(400, { message: 'an item cannot be its own parent' });
     }
     const db = getDb();
     const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -536,11 +553,28 @@ router.openapi(
       }
       updates[k] = v;
     }
-    const [updated] = await db
-      .update(inventoryItems)
-      .set(updates)
-      .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)))
-      .returning();
+    // Wrap parent-validation + cycle-check + update in one transaction
+    // with a pessimistic lock on the character row.  This serializes
+    // all parent changes for this character so two concurrent calls
+    // can't each pass their own pre-checks against pre-write state and
+    // then both commit a cycle.
+    const updated = await db.transaction(async (tx) => {
+      await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(eq(characters.id, id))
+        .for('update');
+      if (body.parentId !== undefined && body.parentId !== null) {
+        await assertParentBelongsToCharacter(tx, body.parentId, id);
+        await assertNoParentCycle(tx, body.parentId, itemId, id);
+      }
+      const [row] = await tx
+        .update(inventoryItems)
+        .set(updates)
+        .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)))
+        .returning();
+      return row;
+    });
     if (!updated) throw new HTTPException(404, { message: 'item not found' });
     const allItems = await db
       .select()
