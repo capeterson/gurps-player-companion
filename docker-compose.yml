@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gurps
+      POSTGRES_PASSWORD: gurps
+      POSTGRES_DB: gurps
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gurps -d gurps']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://gurps:gurps@db:5432/gurps
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for prod compose}
+      JWT_ACCESS_TTL_MINUTES: 15
+      JWT_REFRESH_TTL_DAYS: 14
+      CORS_ORIGINS: '[]'
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+
+volumes:
+  db_data:

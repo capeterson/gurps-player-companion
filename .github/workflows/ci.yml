@@ -1,0 +1,43 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: gurps
+          POSTGRES_PASSWORD: gurps
+          POSTGRES_DB: gurps
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gurps -d gurps"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgres://gurps:gurps@localhost:5432/gurps
+      JWT_SECRET: ci-secret-which-is-deliberately-very-long-and-not-a-placeholder
+      CORS_ORIGINS: '[]'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run db:migrate || echo "no migrations yet"
+      - run: bun run test
+      - run: bun run test:client || echo "no client tests yet"
+      - run: bun run openapi:check || echo "openapi:check not yet implemented"
+      - run: bun run build
