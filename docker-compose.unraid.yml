@@ -6,10 +6,18 @@
 # Setup (run once, from the project folder this file lives in):
 #   1. mkdir -p /mnt/user/appdata/gurps-companion/db
 #   2. echo "JWT_SECRET=$(openssl rand -hex 32)" > .env
-#      (optional, in same .env: TAG=v0.1.0, HOST_PORT=3030,
-#       POSTGRES_PASSWORD=<strong>, CORS_ORIGINS=["https://your.domain"])
+#      (optional, in same .env: TAG=v0.1.0, HOST_PORT=3030, CORS_ORIGINS=["https://your.domain"])
 #   3. docker compose -f docker-compose.unraid.yml pull
 #   4. docker compose -f docker-compose.unraid.yml up -d
+#
+# Postgres password:
+#   Default is `gurps`. To override, set POSTGRES_PASSWORD in .env using
+#   URL-safe characters only (alphanumerics and `-._~`). The simplest
+#   strong choice is `openssl rand -hex 32` — hex output is always URL-safe.
+#   If you must use a password containing URI-reserved characters
+#   (@ : / ? # [ ] %), set POSTGRES_PASSWORD to the raw value AND set
+#   DATABASE_URL to a hand-crafted URI with the password percent-encoded,
+#   e.g. DATABASE_URL=postgres://gurps:p%40ss@db:5432/gurps
 #
 # Update:  docker compose -f docker-compose.unraid.yml pull \
 #       && docker compose -f docker-compose.unraid.yml up -d
@@ -41,7 +49,7 @@ services:
     restart: 'no'
     command: ['bun', 'run', 'dist/server/migrate.js']
     environment:
-      DATABASE_URL: postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps
+      DATABASE_URL: ${DATABASE_URL:-postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps}
     depends_on:
       db:
         condition: service_healthy
@@ -54,8 +62,8 @@ services:
       ENVIRONMENT: production
       PORT: 3000
       HOST: 0.0.0.0
-      DATABASE_URL: postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>=32 chars). Generate with: openssl rand -hex 32}
+      DATABASE_URL: ${DATABASE_URL:-postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for prod compose; generate with `openssl rand -hex 32`}
       JWT_ACCESS_TTL_MINUTES: 15
       JWT_REFRESH_TTL_DAYS: 14
       CORS_ORIGINS: ${CORS_ORIGINS:-[]}
