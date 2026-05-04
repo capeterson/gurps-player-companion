@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # Multi-stage build: install -> client build -> server bundle -> runtime image.
 
-ARG BUN_VERSION=1.1-alpine
+ARG BUN_VERSION=1.2-alpine
 
 FROM oven/bun:${BUN_VERSION} AS deps
 WORKDIR /app

@@ -22,13 +22,8 @@
    as a color-cast.
    ============================================================ */
 
-/* Fonts are self-hosted via @fontsource so the PWA stays functional
-   offline (AGENTS.md "local-first always"). Variable fonts are used
-   where available (Cinzel + Work Sans -- single woff2 covers all
-   weights); IM Fell English has no variable cut, so we ship its two
-   static faces (regular + italic). vite-plugin-pwa's workbox glob
-   patterns include the woff2 extension, so these files are
-   precached on install and served from the cache when offline. */
+/* Fonts: variable cuts of Cinzel and Work Sans; two static faces of IM Fell English.
+   Self-hosted via @fontsource; woff2 files are precached by the PWA workbox manifest. */
 @import "@fontsource-variable/cinzel/wght.css";
 @import "@fontsource-variable/work-sans/wght.css";
 @import "@fontsource/im-fell-english/400.css";
