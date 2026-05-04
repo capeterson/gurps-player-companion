@@ -195,4 +195,113 @@ describe('useDraftField', () => {
     expect(calls).toEqual([12, 13]);
     await waitFor(() => expect(input.value).toBe('13'));
   });
+
+  it('queued same-field edit fires even when the in-flight save fails', async () => {
+    // AGENTS.md: queued same-field edits "fire when the in-flight save
+    // settles" — settle is success OR failure.  Dropping the queue on
+    // failure would silently lose the user's freshest intent.
+    const calls: number[] = [];
+    let rejectFirst: ((err: Error) => void) | null = null;
+    const onSave = vi.fn().mockImplementation((v: number) => {
+      calls.push(v);
+      if (calls.length === 1) {
+        return new Promise<void>((_res, rej) => {
+          rejectFirst = rej;
+        });
+      }
+      return Promise.resolve();
+    });
+
+    render(
+      <Wrap>
+        <NumericField name="ST" initial={10} onSave={onSave} />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    // Queue a follow-up while save 1 is still pending.
+    fireEvent.change(input, { target: { value: '13' } });
+    fireEvent.blur(input);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    // First save rejects — queued save MUST still fire.
+    await act(async () => {
+      rejectFirst?.(new Error('server hated 12'));
+    });
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(calls).toEqual([12, 13]);
+    // Failure surfaces a toast for save 1's rejection.
+    expect(screen.getByText(/Couldn't save ST — server hated 12/)).toBeInTheDocument();
+    // Final input value reflects the queued (and successful) save.
+    await waitFor(() => expect(input.value).toBe('13'));
+  });
+
+  it('serializes nullable saves: null in flight does not bypass the queue', async () => {
+    // Regression: when V can be null (nullable fields like player name),
+    // setting `inflightRef.current = null` to mean "saving null" used to
+    // collide with `=== null` meaning "no save in flight", letting a
+    // second commit slip through as a parallel PATCH.  The wrapper
+    // sentinel keeps the in-flight flag distinct from the value.
+    const calls: Array<string | null> = [];
+    let resolveFirst: (() => void) | null = null;
+    const onSave = vi.fn().mockImplementation((v: string | null) => {
+      calls.push(v);
+      if (calls.length === 1) {
+        return new Promise<void>((res) => {
+          resolveFirst = res;
+        });
+      }
+      return Promise.resolve();
+    });
+
+    function NullableField() {
+      const [serverValue, setServerValue] = useState<string | null>('Alice');
+      const wrappedSave = async (v: string | null) => {
+        await onSave(v);
+        setServerValue(v);
+      };
+      const field = useDraftField<string | null>({
+        name: 'player',
+        serverValue,
+        parse: (s) => (s.trim().length === 0 ? null : s.trim()),
+        format: (v) => v ?? '',
+        onSave: wrappedSave,
+      });
+      return <input aria-label="player" className={DRAFT_FIELD_CLASS} {...field.inputProps} />;
+    }
+
+    render(
+      <Wrap>
+        <NullableField />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('player') as HTMLInputElement;
+
+    // First commit: clear the field — saves null (slow).
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(calls).toEqual([null]);
+
+    // Second commit on same field while the null save is still pending.
+    // With a buggy null-as-sentinel the second commit would bypass the
+    // queue and fire a parallel PATCH; with the wrapper sentinel it
+    // stays queued.
+    fireEvent.change(input, { target: { value: 'Bob' } });
+    fireEvent.blur(input);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirst?.();
+    });
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(calls).toEqual([null, 'Bob']);
+    await waitFor(() => expect(input.value).toBe('Bob'));
+  });
 });

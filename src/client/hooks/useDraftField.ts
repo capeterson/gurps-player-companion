@@ -109,8 +109,13 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   const serverValueRef = useRef(serverValue);
   serverValueRef.current = serverValue;
   const dirtyRef = useRef(false);
-  const inflightRef = useRef<V | null>(null);
-  const queuedRef = useRef<V | null>(null);
+  // `null` here means "no save in flight / nothing queued".  We wrap the
+  // value in `{ value }` so the outer null check is unambiguous even
+  // when `V` itself includes null (e.g. a nullable text field whose
+  // empty draft saves as null).  Comparing the *reference* against
+  // null can never confuse `null` with a legitimate null payload.
+  const inflightRef = useRef<{ value: V } | null>(null);
+  const queuedRef = useRef<{ value: V } | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
 
@@ -159,6 +164,13 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     }, FLASH_MS);
   }, []);
 
+  /**
+   * Used for parse / validate failures only — these never start an
+   * onSave call, so they don't interact with the inflight/queue state
+   * machine.  `performSave`'s server-rejection branch handles its own
+   * toast + flash + draft revert because it has to reason about the
+   * queue too.
+   */
   const rollback = useCallback(
     (msg: string) => {
       const formatted = formatRef.current(serverValueRef.current);
@@ -174,7 +186,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
 
   const performSave = useCallback(
     async (value: V): Promise<void> => {
-      inflightRef.current = value;
+      inflightRef.current = { value };
       setIsSaving(true);
       let succeeded = false;
       try {
@@ -182,23 +194,37 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
         succeeded = true;
       } catch (err) {
         const msg = onErrorRef.current(err);
-        rollback(msg);
+        setError(msg);
+        flashRollback();
+        toasts.push(`Couldn't save ${nameRef.current} — ${msg}`, { kind: 'error' });
+      }
+      inflightRef.current = null;
+
+      // The queue holds the user's most recent commit on this field — they
+      // typed it AFTER `value`, so it's their freshest intent and per
+      // AGENTS.md ("fire when the in-flight save settles") it must run
+      // regardless of whether THIS save succeeded or failed.  Dropping the
+      // queue on failure would silently lose that newer edit.
+      const queued = queuedRef.current;
+      if (queued !== null) {
         queuedRef.current = null;
-      } finally {
-        inflightRef.current = null;
+        if (!succeeded) {
+          // The failed save left draft on the rejected value.  Move it
+          // to the queued value so the input shows the user's later
+          // edit while the replay save runs.  The flash already fired
+          // for the failure; we don't re-flash on the carry-over.
+          const formatted = formatRef.current(queued.value);
+          setDraft(formatted);
+          draftRef.current = formatted;
+        }
+        await performSave(queued.value);
+        return;
       }
 
       if (succeeded) {
-        // Drain queue, if any.  This must run before clearing isSaving so
-        // the UI shows continuous "saving" state across the chain.
-        if (queuedRef.current !== null) {
-          const next = queuedRef.current;
-          queuedRef.current = null;
-          await performSave(next);
-          return;
-        }
-        // No queue: if the live draft still matches the value we just
-        // saved, mark clean so future server syncs can update us.
+        // No queue, save succeeded: if the live draft still matches the
+        // value we just saved, mark clean so future server syncs can
+        // update us.
         try {
           const parsedDraft = parseRef.current(draftRef.current);
           if (equalsRef.current(parsedDraft, value)) {
@@ -208,11 +234,18 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
         } catch {
           /* user is mid-edit with an unparsable draft — keep dirty */
         }
+      } else {
+        // No queue, save failed: revert draft to the last-known server
+        // value so we don't strand the input on the rejected text.
+        const formatted = formatRef.current(serverValueRef.current);
+        setDraft(formatted);
+        draftRef.current = formatted;
+        dirtyRef.current = false;
       }
 
       if (isMountedRef.current) setIsSaving(false);
     },
-    [rollback],
+    [flashRollback, toasts],
   );
 
   const setValue = useCallback((raw: string) => {
@@ -251,7 +284,9 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
 
     if (inflightRef.current !== null) {
       // Queue the latest value for after the current save settles.
-      queuedRef.current = parsed;
+      // Wrapping in `{ value }` keeps the null-vs-not-null check on
+      // queuedRef unambiguous when V itself includes null.
+      queuedRef.current = { value: parsed };
       return;
     }
 
