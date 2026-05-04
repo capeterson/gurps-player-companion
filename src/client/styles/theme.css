@@ -49,21 +49,21 @@
   color-scheme: dark;
 
   /* base = surfaces (faint violet cast, hue 305 ↔ primary) */
-  --color-base-100: oklch(0.235 0.014 305);  /* surface (cards, panels) */
-  --color-base-200: oklch(0.20 0.015 305);   /* page bg (canvas) */
-  --color-base-300: oklch(0.165 0.020 305);  /* deep bg + default borders */
+  --color-base-100: oklch(0.235 0.014 305); /* surface (cards, panels) */
+  --color-base-200: oklch(0.2 0.015 305); /* page bg (canvas) */
+  --color-base-300: oklch(0.165 0.02 305); /* deep bg + default borders */
   --color-base-content: oklch(0.86 0.008 300);
 
   /* primary = violet (accent) */
-  --color-primary: oklch(0.70 0.13 305);
+  --color-primary: oklch(0.7 0.13 305);
   --color-primary-content: oklch(0.16 0.005 300);
 
   /* secondary = teal (HP-full / second accent) */
-  --color-secondary: oklch(0.72 0.10 195);
+  --color-secondary: oklch(0.72 0.1 195);
   --color-secondary-content: oklch(0.16 0.005 300);
 
   /* accent = same as primary (kept for DaisyUI components that use it) */
-  --color-accent: oklch(0.70 0.13 305);
+  --color-accent: oklch(0.7 0.13 305);
   --color-accent-content: oklch(0.16 0.005 300);
 
   /* neutral = surface-2 (muted card backs, chip rests) */
@@ -73,7 +73,7 @@
   /* semantic */
   --color-info: oklch(0.72 0.09 195);
   --color-info-content: oklch(0.16 0.005 300);
-  --color-success: oklch(0.74 0.10 150);
+  --color-success: oklch(0.74 0.1 150);
   --color-success-content: oklch(0.16 0.005 300);
   --color-warning: oklch(0.76 0.12 90);
   --color-warning-content: oklch(0.16 0.005 300);
@@ -98,9 +98,9 @@
   prefersdark: false;
   color-scheme: light;
 
-  --color-base-100: oklch(1.00 0 0);
+  --color-base-100: oklch(1.0 0 0);
   --color-base-200: oklch(0.97 0.008 90);
-  --color-base-300: oklch(0.91 0.016 90);    /* darker + more chroma → visible borders */
+  --color-base-300: oklch(0.91 0.016 90); /* darker + more chroma → visible borders */
   --color-base-content: oklch(0.24 0.008 300);
 
   --color-primary: oklch(0.48 0.16 305);
@@ -115,7 +115,7 @@
   --color-neutral: oklch(0.94 0.008 90);
   --color-neutral-content: oklch(0.24 0.008 300);
 
-  --color-info: oklch(0.50 0.10 195);
+  --color-info: oklch(0.5 0.1 195);
   --color-info-content: oklch(1 0 0);
   --color-success: oklch(0.52 0.12 150);
   --color-success-content: oklch(1 0 0);
@@ -150,42 +150,42 @@
 
 [data-theme="arcane-dark"] {
   --text-muted: oklch(0.66 0.01 300);
-  --text-dim: oklch(0.50 0.012 300);
-  --border-strong: oklch(0.48 0.030 305);
+  --text-dim: oklch(0.5 0.012 300);
+  --border-strong: oklch(0.48 0.03 305);
   --accent-soft: oklch(0.34 0.06 305 / 0.45);
 
   /* HP severity ramp — full → critical → unconscious */
-  --hp-full: oklch(0.74 0.10 195);
-  --hp-good: oklch(0.74 0.10 150);
+  --hp-full: oklch(0.74 0.1 195);
+  --hp-good: oklch(0.74 0.1 150);
   --hp-warn: oklch(0.76 0.12 90);
-  --hp-low: oklch(0.70 0.13 50);
+  --hp-low: oklch(0.7 0.13 50);
   --hp-crit: oklch(0.62 0.16 25);
   --hp-out: oklch(0.46 0.09 320);
 
   /* atmospheric vignette — warm candle in the top-right, deep violet
      in the bottom-left. Tuned for dark mode where the etched + lit
      chrome adds depth. */
-  --arcane-edge-warm: oklch(0.42 0.10 35 / 0.22);
-  --arcane-edge-violet: oklch(0.30 0.08 305 / 0.28);
+  --arcane-edge-warm: oklch(0.42 0.1 35 / 0.22);
+  --arcane-edge-violet: oklch(0.3 0.08 305 / 0.28);
 }
 
 [data-theme="arcane-light"] {
   --text-muted: oklch(0.46 0.01 300);
   --text-dim: oklch(0.62 0.012 300);
   --border-strong: oklch(0.72 0.028 305);
-  --accent-soft: oklch(0.90 0.05 305 / 0.6);
+  --accent-soft: oklch(0.9 0.05 305 / 0.6);
 
   --hp-full: oklch(0.55 0.13 195);
   --hp-good: oklch(0.55 0.13 150);
-  --hp-warn: oklch(0.60 0.14 85);
+  --hp-warn: oklch(0.6 0.14 85);
   --hp-low: oklch(0.55 0.16 50);
-  --hp-crit: oklch(0.50 0.18 25);
-  --hp-out: oklch(0.40 0.10 320);
+  --hp-crit: oklch(0.5 0.18 25);
+  --hp-out: oklch(0.4 0.1 320);
 
   /* Light mode — same dual-source vignette, paler so the paper-tone
      surface keeps reading flat under prolonged use. */
   --arcane-edge-warm: oklch(0.92 0.06 60 / 0.5);
-  --arcane-edge-violet: oklch(0.90 0.04 305 / 0.5);
+  --arcane-edge-violet: oklch(0.9 0.04 305 / 0.5);
 }
 
 /* Surface Tailwind utilities for the app-level tokens. */
@@ -279,17 +279,12 @@ body {
   position: fixed;
   pointer-events: none;
   inset: 0;
-  background:
-    radial-gradient(
+  background: radial-gradient(
       ellipse 700px 360px at 88% 6%,
       var(--arcane-edge-warm) 0%,
       transparent 60%
     ),
-    radial-gradient(
-      ellipse 600px 300px at 8% 100%,
-      var(--arcane-edge-violet) 0%,
-      transparent 65%
-    );
+    radial-gradient(ellipse 600px 300px at 8% 100%, var(--arcane-edge-violet) 0%, transparent 65%);
   z-index: 0;
 }
 
@@ -402,11 +397,7 @@ body {
    layers on top of whatever bg-base utility a card carries. */
 .card {
   position: relative;
-  background-image: linear-gradient(
-    180deg,
-    oklch(0.72 0.13 305 / 0.06) 0%,
-    transparent 35%
-  );
+  background-image: linear-gradient(180deg, oklch(0.72 0.13 305 / 0.06) 0%, transparent 35%);
 }
 [data-theme="arcane-light"] .card {
   background-image: linear-gradient(180deg, oklch(1 0 0 / 0.55) 0%, transparent 35%);
@@ -424,7 +415,7 @@ body {
   pointer-events: none;
 }
 [data-theme="arcane-light"] .card::before {
-  border-color: oklch(0.50 0.12 305 / 0.08);
+  border-color: oklch(0.5 0.12 305 / 0.08);
 }
 
 /* Drop-cap — first letter of any display heading reads in the accent
