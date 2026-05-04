@@ -14,15 +14,24 @@ export function CharactersPage() {
 
   const [name, setName] = useState('');
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (snap: { name: string; nameRaw: string }) =>
       api<CharacterDetail>('/characters', {
         method: 'POST',
-        body: { name, st: 10, dx: 10, iq: 10, ht: 10 },
+        body: { name: snap.name, st: 10, dx: 10, iq: 10, ht: 10 },
       }),
-    onSuccess: (created) => {
-      setName('');
+    onSuccess: (created, snap) => {
       qc.invalidateQueries({ queryKey: ['characters'] });
-      navigate(`/characters/${created.id}`);
+      // Per AGENTS.md rule 1 (never silently discard user edits): if
+      // the user has started typing the next character's name while
+      // the POST was in flight, leave that draft alone — and don't
+      // navigate away from the page either, since the auto-navigate
+      // would unmount the form and lose the draft entirely.  Only
+      // when the input still matches what we submitted do we treat
+      // this as the natural "submit, view the new sheet" flow.
+      if (name === snap.nameRaw) {
+        setName('');
+        navigate(`/characters/${created.id}`);
+      }
     },
   });
 
@@ -38,7 +47,7 @@ export function CharactersPage() {
         onSubmit={(e) => {
           e.preventDefault();
           if (!name.trim()) return;
-          create.mutate();
+          create.mutate({ name: name.trim(), nameRaw: name });
         }}
       >
         <label className="form-control flex-1">

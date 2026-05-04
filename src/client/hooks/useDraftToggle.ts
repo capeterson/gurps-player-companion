@@ -119,6 +119,16 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
       }
       inflightRef.current = null;
 
+      if (succeeded) {
+        // Record this successful save's value as the new authoritative
+        // committed state BEFORE draining the queue.  If the queued
+        // follow-up save then fails, its no-queue rollback branch
+        // reverts to THIS value rather than the pre-save state, so a
+        // durable toggle that already landed can't be erased from the
+        // UI by a later rejection.
+        lastCommittedRef.current = value;
+      }
+
       // Drain queue regardless of success / failure — same rule as
       // useDraftField: queued same-field edits fire when the in-flight
       // save settles.
@@ -135,11 +145,10 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
         return;
       }
 
-      if (succeeded) {
-        lastCommittedRef.current = value;
-      } else {
-        // No queue, save failed: revert local to the last-known server
-        // value so the checkbox doesn't show a stale optimistic state.
+      if (!succeeded) {
+        // No queue, save failed: revert local to the last-known
+        // committed value so the checkbox doesn't show a stale
+        // optimistic state.
         setChecked(lastCommittedRef.current);
       }
 

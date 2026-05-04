@@ -349,6 +349,72 @@ describe('useDraftField', () => {
     expect(screen.getByText(/Couldn't save ST — server hated 13/)).toBeInTheDocument();
   });
 
+  it('queued save failing after a successful save rolls back to the successful value, not the pre-save value', async () => {
+    // Regression: when an in-flight save succeeds and a queued
+    // same-field save then fails, the rollback target must be the
+    // value we just durably saved — not the value committed BEFORE
+    // that save.  Otherwise the durable save gets visually erased
+    // even though the server still has it.
+    const calls: number[] = [];
+    let resolveFirst: (() => void) | null = null;
+    const onSave = vi.fn().mockImplementation((v: number) => {
+      calls.push(v);
+      if (calls.length === 1) {
+        return new Promise<void>((res) => {
+          resolveFirst = res;
+        });
+      }
+      // The queued save (13) gets rejected.
+      return Promise.reject(new Error(`server hated ${v}`));
+    });
+
+    function StaticServerField() {
+      const [serverValue] = useState(10);
+      const field = useDraftField<number>({
+        name: 'ST',
+        serverValue,
+        parse: (s) => {
+          const n = Number(s);
+          if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
+          return n;
+        },
+        format: (v) => String(v),
+        onSave,
+      });
+      return <input aria-label="ST" className={DRAFT_FIELD_CLASS} {...field.inputProps} />;
+    }
+
+    render(
+      <Wrap>
+        <StaticServerField />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST') as HTMLInputElement;
+
+    // First save (slow): 10 -> 12.
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    // Queue 13 while 12 is still in flight.
+    fireEvent.change(input, { target: { value: '13' } });
+    fireEvent.blur(input);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    // Release the first save (12 succeeds), queued 13 fires next and
+    // is rejected.
+    await act(async () => {
+      resolveFirst?.();
+    });
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(calls).toEqual([12, 13]);
+    // Rollback target MUST be 12 (the durably saved value), NOT 10
+    // (the pre-save committed value).
+    await waitFor(() => expect(input.value).toBe('12'));
+    expect(screen.getByText(/Couldn't save ST — server hated 13/)).toBeInTheDocument();
+  });
+
   it('serializes nullable saves: null in flight does not bypass the queue', async () => {
     // Regression: when V can be null (nullable fields like player name),
     // setting `inflightRef.current = null` to mean "saving null" used to

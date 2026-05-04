@@ -114,6 +114,52 @@ describe('useDraftToggle', () => {
     await waitFor(() => expect(cb.dataset.flashing).toBe('true'));
   });
 
+  it('queued click failing after a successful click rolls back to the successful value, not the pre-save value', async () => {
+    // Regression: when an in-flight save succeeds and the queued
+    // follow-up fails, rollback target must be the value just
+    // committed (true) — not the value that was server before either
+    // save (false).  Otherwise a durable persisted toggle gets
+    // visually erased.
+    const calls: boolean[] = [];
+    let resolveFirst: (() => void) | null = null;
+    const onSave = vi.fn().mockImplementation((v: boolean) => {
+      calls.push(v);
+      if (calls.length === 1) {
+        return new Promise<void>((res) => {
+          resolveFirst = res;
+        });
+      }
+      return Promise.reject(new Error('server hated this'));
+    });
+
+    render(
+      <Wrap>
+        <Toggle name="worn" initial={false} onSave={onSave} syncOnSave={false} />
+      </Wrap>,
+    );
+    const cb = screen.getByLabelText('worn') as HTMLInputElement;
+
+    // First click (slow): false -> true.
+    fireEvent.click(cb);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    // Queue another click while save 1 is still pending: true -> false.
+    fireEvent.click(cb);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    // Release first save: true persists.  Then queued (false) fires
+    // and is rejected.
+    await act(async () => {
+      resolveFirst?.();
+    });
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(calls).toEqual([true, false]);
+    // Rollback to the value the FIRST save committed (true), not the
+    // initial server value (false).
+    await waitFor(() => expect(cb.checked).toBe(true));
+  });
+
   it('queued click fires even when in-flight save fails', async () => {
     const calls: boolean[] = [];
     let rejectFirst: ((err: Error) => void) | null = null;

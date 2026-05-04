@@ -216,6 +216,19 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       }
       inflightRef.current = null;
 
+      if (succeeded) {
+        // The server has just persisted `value`.  Treat it as the new
+        // authoritative committed value immediately — BEFORE draining
+        // the queue, not after.  If a queued follow-up fails, its
+        // rollback path needs to revert to THIS save's value, not the
+        // pre-save committed value (otherwise the durable save we just
+        // landed gets erased from the UI).  Also handles the
+        // "save 12, then edit back to 10" race where the no-op check
+        // would otherwise see a stale 10 prop while the refetch is in
+        // flight.
+        lastCommittedRef.current = value;
+      }
+
       // The queue holds the user's most recent commit on this field — they
       // typed it AFTER `value`, so it's their freshest intent and per
       // AGENTS.md ("fire when the in-flight save settles") it must run
@@ -238,13 +251,6 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       }
 
       if (succeeded) {
-        // The server has just persisted `value`.  Treat it as the new
-        // authoritative committed value immediately, even though the
-        // `serverValue` prop won't catch up until the refetch lands.
-        // Without this, a quick "save 12, then edit back to 10" would
-        // see the no-op check pass against the stale 10 prop and drop
-        // the second edit.
-        lastCommittedRef.current = value;
         // No queue, save succeeded: if the live draft still matches the
         // value we just saved, mark clean so future server syncs can
         // update us.
