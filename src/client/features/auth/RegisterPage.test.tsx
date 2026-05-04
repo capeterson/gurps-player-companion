@@ -41,7 +41,11 @@ function renderRegister() {
   );
 }
 
-const fakeTokens = { accessToken: 'access-abc', refreshToken: 'refresh-xyz', accessTokenExpiresIn: 3600 };
+const fakeTokens = {
+  accessToken: 'access-abc',
+  refreshToken: 'refresh-xyz',
+  accessTokenExpiresIn: 3600,
+};
 
 async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/email/i), 'new@example.com');
@@ -100,9 +104,7 @@ describe('RegisterPage', () => {
     await waitFor(() => expect(screen.getByText('email already in use')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: /create account/i }));
-    await waitFor(() =>
-      expect(screen.queryByText('email already in use')).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByText('email already in use')).not.toBeInTheDocument());
   });
 
   it('stores tokens and navigates to / on successful registration', async () => {

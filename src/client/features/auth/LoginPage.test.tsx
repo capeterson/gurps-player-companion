@@ -41,7 +41,11 @@ function renderLogin() {
   );
 }
 
-const fakeTokens = { accessToken: 'access-abc', refreshToken: 'refresh-xyz', accessTokenExpiresIn: 3600 };
+const fakeTokens = {
+  accessToken: 'access-abc',
+  refreshToken: 'refresh-xyz',
+  accessTokenExpiresIn: 3600,
+};
 
 describe('LoginPage', () => {
   beforeEach(() => {
