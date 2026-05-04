@@ -33,7 +33,13 @@ function Toggle({ name, initial, onSave, syncOnSave = true }: ToggleProps) {
   };
   const t = useDraftToggle({ name, serverValue: server, onSave: wrapped });
   return (
-    <input type="checkbox" aria-label={name} checked={t.checked} onChange={() => t.toggle()} />
+    <input
+      type="checkbox"
+      aria-label={name}
+      checked={t.checked}
+      onChange={() => t.toggle()}
+      {...t.flashProps}
+    />
   );
 }
 
@@ -91,7 +97,7 @@ describe('useDraftToggle', () => {
     await waitFor(() => expect(cb.checked).toBe(false));
   });
 
-  it('save failure with no queue rolls back local + toasts', async () => {
+  it('save failure with no queue rolls back local, toasts, and flashes', async () => {
     const onSave = vi.fn().mockRejectedValue(new Error('server hated this'));
     render(
       <Wrap>
@@ -104,6 +110,8 @@ describe('useDraftToggle', () => {
     // Local rolled back to server value (false).
     await waitFor(() => expect(cb.checked).toBe(false));
     expect(screen.getByText(/Couldn't save worn — server hated this/)).toBeInTheDocument();
+    // Per AGENTS.md rule 2: rollback drives the flash too.
+    await waitFor(() => expect(cb.dataset.flashing).toBe('true'));
   });
 
   it('queued click fires even when in-flight save fails', async () => {

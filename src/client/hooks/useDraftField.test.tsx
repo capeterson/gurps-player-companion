@@ -295,6 +295,60 @@ describe('useDraftField', () => {
     expect(input.value).toBe('10');
   });
 
+  it('failed save rolls back to last committed value, not the stale prop', async () => {
+    // Regression for the rollback-target race: if a save succeeds and
+    // a later save on the same field fails before the post-save
+    // refetch lands, we must roll back to the value we just durably
+    // saved — not to the still-stale `serverValue` prop, which would
+    // erase the prior successful save.
+    const calls: number[] = [];
+    const onSave = vi.fn().mockImplementation((v: number) => {
+      calls.push(v);
+      // Accept 12, reject 13.
+      if (v === 13) return Promise.reject(new Error('server hated 13'));
+      return Promise.resolve();
+    });
+
+    function StaticServerField() {
+      // serverValue intentionally stays at 10 — simulates a refetch
+      // that hasn't returned by the time the user tries 13.
+      const [serverValue] = useState(10);
+      const field = useDraftField<number>({
+        name: 'ST',
+        serverValue,
+        parse: (s) => {
+          const n = Number(s);
+          if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
+          return n;
+        },
+        format: (v) => String(v),
+        onSave,
+      });
+      return <input aria-label="ST" className={DRAFT_FIELD_CLASS} {...field.inputProps} />;
+    }
+
+    render(
+      <Wrap>
+        <StaticServerField />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST') as HTMLInputElement;
+
+    // Save 1: 10 -> 12 succeeds.
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(calls).toEqual([12]));
+    await waitFor(() => expect(input.value).toBe('12'));
+
+    // Save 2: 12 -> 13 fails.  Rollback target should be 12 (the
+    // last committed value), NOT 10 (the still-stale prop).
+    fireEvent.change(input, { target: { value: '13' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(calls).toEqual([12, 13]));
+    await waitFor(() => expect(input.value).toBe('12'));
+    expect(screen.getByText(/Couldn't save ST — server hated 13/)).toBeInTheDocument();
+  });
+
   it('serializes nullable saves: null in flight does not bypass the queue', async () => {
     // Regression: when V can be null (nullable fields like player name),
     // setting `inflightRef.current = null` to mean "saving null" used to

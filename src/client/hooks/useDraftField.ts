@@ -181,10 +181,15 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
    * machine.  `performSave`'s server-rejection branch handles its own
    * toast + flash + draft revert because it has to reason about the
    * queue too.
+   *
+   * We revert to `lastCommittedRef`, not the `serverValue` prop: a
+   * recent successful save may have advanced the authoritative value
+   * past what the prop reflects (the refetch might still be in flight),
+   * and rolling back to the stale prop would erase that durable save.
    */
   const rollback = useCallback(
     (msg: string) => {
-      const formatted = formatRef.current(serverValueRef.current);
+      const formatted = formatRef.current(lastCommittedRef.current);
       setDraft(formatted);
       draftRef.current = formatted;
       dirtyRef.current = false;
@@ -253,9 +258,12 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
           /* user is mid-edit with an unparsable draft — keep dirty */
         }
       } else {
-        // No queue, save failed: revert draft to the last-known server
-        // value so we don't strand the input on the rejected text.
-        const formatted = formatRef.current(serverValueRef.current);
+        // No queue, save failed: revert draft to the last authoritative
+        // committed value.  Using the `serverValue` prop here would
+        // erase a prior successful save whose refetch hasn't landed yet
+        // (e.g. ST 10→12 succeeds, then 13 fails — we must roll back
+        // to 12, not the stale 10 prop).
+        const formatted = formatRef.current(lastCommittedRef.current);
         setDraft(formatted);
         draftRef.current = formatted;
         dirtyRef.current = false;

@@ -27,7 +27,20 @@ export interface UseDraftToggleReturn {
   readonly checked: boolean;
   readonly toggle: () => void;
   readonly isSaving: boolean;
+  /** True while the rollback flash keyframe is animating. */
+  readonly flashing: boolean;
+  /**
+   * Spread these onto the underlying `<input type="checkbox">` so the
+   * shared `field-rollback-flash` keyframe in theme.css fires on
+   * server / network rejection.  Apply DRAFT_FIELD_CLASS yourself.
+   */
+  readonly flashProps: {
+    readonly 'data-flashing': 'true' | 'false';
+    readonly 'data-flash-parity': '0' | '1';
+  };
 }
+
+const FLASH_MS = 1400;
 
 function defaultOnError(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -40,6 +53,8 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
   const toasts = useToasts();
   const [checked, setChecked] = useState(serverValue);
   const [isSaving, setIsSaving] = useState(false);
+  const [flashing, setFlashing] = useState(false);
+  const [flashParity, setFlashParity] = useState<'0' | '1'>('0');
 
   // The most recently CONFIRMED authoritative value.  Updated by an
   // incoming server prop change OR a successful save.  Mirrors the
@@ -49,6 +64,7 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
   const lastCommittedRef = useRef(serverValue);
   const inflightRef = useRef<{ value: boolean } | null>(null);
   const queuedRef = useRef<{ value: boolean } | null>(null);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
 
   const onSaveRef = useRef(onSave);
@@ -72,7 +88,17 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     };
+  }, []);
+
+  const flashRollback = useCallback(() => {
+    setFlashing(true);
+    setFlashParity((p) => (p === '0' ? '1' : '0'));
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) setFlashing(false);
+    }, FLASH_MS);
   }, []);
 
   const performSave = useCallback(
@@ -85,6 +111,10 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
         succeeded = true;
       } catch (err) {
         const msg = onErrorRef.current(err);
+        // Per AGENTS.md rule 2 ("rollback is a UX event"): both toast
+        // AND flash on rejection.  The flash class on the consumer's
+        // input drives the keyframe.
+        flashRollback();
         toasts.push(`Couldn't save ${nameRef.current} — ${msg}`, { kind: 'error' });
       }
       inflightRef.current = null;
@@ -115,7 +145,7 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
 
       if (isMountedRef.current) setIsSaving(false);
     },
-    [toasts],
+    [toasts, flashRollback],
   );
 
   const toggle = useCallback(() => {
@@ -129,5 +159,14 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
     void performSave(next);
   }, [checked, performSave]);
 
-  return { checked, toggle, isSaving };
+  return {
+    checked,
+    toggle,
+    isSaving,
+    flashing,
+    flashProps: {
+      'data-flashing': flashing ? 'true' : 'false',
+      'data-flash-parity': flashParity,
+    },
+  };
 }

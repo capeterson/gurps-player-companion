@@ -202,22 +202,24 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
           <label className="flex items-center gap-1">
             <input
               type="checkbox"
-              className="checkbox checkbox-xs"
+              className={`${DRAFT_FIELD_CLASS} checkbox checkbox-xs`}
               checked={canWrite ? wornToggle.checked : item.worn}
               onChange={() => canWrite && wornToggle.toggle()}
               disabled={!canWrite}
               aria-label={`${item.name} worn`}
+              {...wornToggle.flashProps}
             />
             worn
           </label>
           <label className="flex items-center gap-1">
             <input
               type="checkbox"
-              className="checkbox checkbox-xs"
+              className={`${DRAFT_FIELD_CLASS} checkbox checkbox-xs`}
               checked={canWrite ? equippedToggle.checked : item.equipped}
               onChange={() => canWrite && equippedToggle.toggle()}
               disabled={!canWrite}
               aria-label={`${item.name} equipped`}
+              {...equippedToggle.flashProps}
             />
             equipped
           </label>
