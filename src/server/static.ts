@@ -38,15 +38,19 @@ export function safeJoin(base: string, requestPath: string): string | null {
 
 export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEnv> {
   app.get('*', async (c) => {
+    const url = new URL(c.req.url);
+    // API routes that didn't match anything earlier are 404s, regardless
+    // of whether the static bundle has been built.  This must run BEFORE
+    // the missing-bundle 503 check so tests and API consumers see a
+    // proper JSON 404 even in environments without `dist/client/`.
+    if (url.pathname.startsWith('/api/')) {
+      return c.json({ error: 'not_found' }, 404);
+    }
     if (!existsSync(ROOT)) {
       return c.text(
         'client bundle missing — run `bun run build:client` (or use the Vite dev server on :5173)',
         503,
       );
-    }
-    const url = new URL(c.req.url);
-    if (url.pathname.startsWith('/api/')) {
-      return c.json({ error: 'not_found' }, 404);
     }
     const asFile = safeJoin(ROOT, url.pathname);
     if (asFile) {
