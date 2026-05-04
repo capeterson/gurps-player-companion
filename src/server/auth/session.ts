@@ -130,18 +130,28 @@ export async function verifyAndConsumeRefreshToken(rawToken: string): Promise<{
   } catch (err) {
     throw new AuthError('invalid_token', `invalid refresh token: ${(err as Error).message}`);
   }
-  const tokenRow = await findActiveRefreshToken(payload.jti);
-  if (!tokenRow) throw new AuthError('expired_token', 'refresh token revoked or expired');
   const db = getDb();
+
+  // Atomic check-and-revoke: a single row at most is updated.  Two
+  // concurrent refresh requests with the same token can't both win
+  // because Postgres serializes the UPDATE on (jti, revoked_at IS NULL).
+  const consumed = await db
+    .update(refreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(refreshTokens.jti, payload.jti),
+        isNull(refreshTokens.revokedAt),
+        gt(refreshTokens.expiresAt, new Date()),
+      ),
+    )
+    .returning();
+  const tokenRow = consumed[0];
+  if (!tokenRow) throw new AuthError('expired_token', 'refresh token revoked or expired');
+
   const userRows = await db.select().from(users).where(eq(users.id, payload.sub));
   const user = userRows[0];
   if (!user) throw new AuthError('unknown_user', 'user not found');
-
-  // One-time use: revoke now so a replayed refresh fails.
-  await db
-    .update(refreshTokens)
-    .set({ revokedAt: new Date() })
-    .where(eq(refreshTokens.id, tokenRow.id));
 
   return {
     user: {

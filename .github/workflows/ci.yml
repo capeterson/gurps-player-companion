@@ -36,8 +36,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
       - run: bun run typecheck
-      - run: bun run db:migrate || echo "no migrations yet"
+      - run: bun run db:migrate
       - run: bun run test
-      - run: bun run test:client || echo "no client tests yet"
-      - run: bun run openapi:check || echo "openapi:check not yet implemented"
+      - run: bun run test:client
+      - run: bun run openapi:check
       - run: bun run build

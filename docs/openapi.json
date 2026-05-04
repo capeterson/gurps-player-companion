@@ -1,0 +1,3930 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "GURPS Player Companion API",
+    "version": "0.1.0",
+    "description": "Local-first GURPS character + campaign companion."
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT or gpc_-prefixed API key"
+      }
+    },
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/api/v1/healthz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness probe",
+        "responses": {
+          "200": {
+            "description": "Server is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create a new user account",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 256
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "email",
+                  "password",
+                  "displayName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New user created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "accessTokenExpiresIn": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "accessTokenExpiresIn"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange credentials for a token pair",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "accessTokenExpiresIn": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "accessTokenExpiresIn"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Rotate a refresh token for a fresh access + refresh pair",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "accessTokenExpiresIn": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "accessTokenExpiresIn"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke a refresh token (idempotent)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Refresh token revoked (or already invalid)"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Return the authenticated user profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "email": {
+                      "type": "string",
+                      "maxLength": 255,
+                      "format": "email"
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "suspendedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "displayName",
+                    "createdAt",
+                    "suspendedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/api-keys": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List active API keys for the current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "API keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "lastUsedAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "createdAt",
+                      "lastUsedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create a new API key (plaintext returned once)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "API key created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "apiKey": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "lastUsedAt": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "createdAt",
+                        "lastUsedAt"
+                      ]
+                    },
+                    "plaintextKey": {
+                      "type": "string",
+                      "pattern": "^gpc_[A-Za-z0-9_-]+$"
+                    }
+                  },
+                  "required": [
+                    "apiKey",
+                    "plaintextKey"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/api-keys/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke an API key",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "API key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "List campaigns the user owns or is a member of",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaign list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "description": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 20000
+                      },
+                      "ownerId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "pointTarget": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "disadvantageCap": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "quirkCap": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "members": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "email": {
+                              "type": "string",
+                              "maxLength": 255,
+                              "format": "email"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "owner",
+                                "member"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "userId",
+                            "email",
+                            "displayName",
+                            "role"
+                          ]
+                        }
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "description",
+                      "ownerId",
+                      "pointTarget",
+                      "disadvantageCap",
+                      "quirkCap",
+                      "members",
+                      "createdAt",
+                      "updatedAt",
+                      "revision"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Create a new campaign (the creator becomes owner)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "pointTarget": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "disadvantageCap": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "quirkCap": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 50
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Campaign created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "pointTarget": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "disadvantageCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "quirkCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "email": {
+                            "type": "string",
+                            "maxLength": 255,
+                            "format": "email"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "member"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "email",
+                          "displayName",
+                          "role"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "ownerId",
+                    "pointTarget",
+                    "disadvantageCap",
+                    "quirkCap",
+                    "members",
+                    "createdAt",
+                    "updatedAt",
+                    "revision"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Get a campaign (member or owner only)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "pointTarget": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "disadvantageCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "quirkCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "email": {
+                            "type": "string",
+                            "maxLength": 255,
+                            "format": "email"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "member"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "email",
+                          "displayName",
+                          "role"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "ownerId",
+                    "pointTarget",
+                    "disadvantageCap",
+                    "quirkCap",
+                    "members",
+                    "createdAt",
+                    "updatedAt",
+                    "revision"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Update campaign metadata (owner only)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "pointTarget": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "disadvantageCap": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "quirkCap": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 50
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated campaign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "pointTarget": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "disadvantageCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "quirkCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "email": {
+                            "type": "string",
+                            "maxLength": 255,
+                            "format": "email"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "member"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "email",
+                          "displayName",
+                          "role"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "ownerId",
+                    "pointTarget",
+                    "disadvantageCap",
+                    "quirkCap",
+                    "members",
+                    "createdAt",
+                    "updatedAt",
+                    "revision"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Delete a campaign (owner only). Cascades to memberships, library, log.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/members": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Add a member by email lookup (owner only)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated campaign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "pointTarget": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "disadvantageCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "quirkCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "email": {
+                            "type": "string",
+                            "maxLength": 255,
+                            "format": "email"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "member"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "email",
+                          "displayName",
+                          "role"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "ownerId",
+                    "pointTarget",
+                    "disadvantageCap",
+                    "quirkCap",
+                    "members",
+                    "createdAt",
+                    "updatedAt",
+                    "revision"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already a member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/members/{userId}": {
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Remove a member (owner only). Cannot remove the owner.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "description": "Cannot remove owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/transfer": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Transfer ownership to an existing member (owner only)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "newOwnerId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "newOwnerId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated campaign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "pointTarget": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "disadvantageCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "quirkCap": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "email": {
+                            "type": "string",
+                            "maxLength": 255,
+                            "format": "email"
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "owner",
+                              "member"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "email",
+                          "displayName",
+                          "role"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "ownerId",
+                    "pointTarget",
+                    "disadvantageCap",
+                    "quirkCap",
+                    "members",
+                    "createdAt",
+                    "updatedAt",
+                    "revision"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "New owner is not a member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/characters": {
+      "get": {
+        "tags": [
+          "characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List the user’s characters and characters in their campaigns",
+        "responses": {
+          "200": {
+            "description": "List",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "ownerId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "campaignId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "playerName": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "techLevel": {
+                        "type": "integer",
+                        "nullable": true
+                      },
+                      "st": {
+                        "type": "integer"
+                      },
+                      "dx": {
+                        "type": "integer"
+                      },
+                      "iq": {
+                        "type": "integer"
+                      },
+                      "ht": {
+                        "type": "integer"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "ownerId",
+                      "campaignId",
+                      "name",
+                      "playerName",
+                      "techLevel",
+                      "st",
+                      "dx",
+                      "iq",
+                      "ht",
+                      "updatedAt",
+                      "revision"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a character",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "playerName": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 120
+                  },
+                  "height": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "weight": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "age": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "appearance": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "techLevel": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 12
+                  },
+                  "campaignId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  },
+                  "st": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "dx": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "iq": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "ht": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "hpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "willMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "perMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "fpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "speedQuarterMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "moveMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempSt": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempDx": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempIq": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempHt": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempHpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempWillMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempPerMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempFpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempSpeedQuarterMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempMoveMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Character created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "playerName": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 120
+                    },
+                    "height": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "weight": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "age": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "appearance": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "st": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "dx": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "iq": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "ht": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "hpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "willMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "perMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "fpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "speedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "moveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempDx": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempIq": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempWillMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempPerMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempFpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSpeedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempMoveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "dismissedWarnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "derived": {
+                      "type": "object",
+                      "properties": {
+                        "effectiveSt": {
+                          "type": "integer"
+                        },
+                        "effectiveDx": {
+                          "type": "integer"
+                        },
+                        "effectiveIq": {
+                          "type": "integer"
+                        },
+                        "effectiveHt": {
+                          "type": "integer"
+                        },
+                        "hp": {
+                          "type": "integer"
+                        },
+                        "will": {
+                          "type": "integer"
+                        },
+                        "per": {
+                          "type": "integer"
+                        },
+                        "fp": {
+                          "type": "integer"
+                        },
+                        "basicSpeedQuarters": {
+                          "type": "integer"
+                        },
+                        "basicSpeed": {
+                          "type": "number"
+                        },
+                        "basicMove": {
+                          "type": "integer"
+                        },
+                        "dodge": {
+                          "type": "integer"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "effectiveSt",
+                        "effectiveDx",
+                        "effectiveIq",
+                        "effectiveHt",
+                        "hp",
+                        "will",
+                        "per",
+                        "fp",
+                        "basicSpeedQuarters",
+                        "basicSpeed",
+                        "basicMove",
+                        "dodge",
+                        "basicLift"
+                      ]
+                    },
+                    "points": {
+                      "type": "object",
+                      "properties": {
+                        "attributes": {
+                          "type": "integer"
+                        },
+                        "secondary": {
+                          "type": "integer"
+                        },
+                        "advantages": {
+                          "type": "integer"
+                        },
+                        "disadvantages": {
+                          "type": "integer"
+                        },
+                        "quirks": {
+                          "type": "integer"
+                        },
+                        "skills": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "attributes",
+                        "secondary",
+                        "advantages",
+                        "disadvantages",
+                        "quirks",
+                        "skills",
+                        "total"
+                      ]
+                    },
+                    "encumbrance": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4
+                        },
+                        "label": {
+                          "type": "string",
+                          "enum": [
+                            "None",
+                            "Light",
+                            "Medium",
+                            "Heavy",
+                            "X-Heavy"
+                          ]
+                        },
+                        "speedDivisor": {
+                          "type": "number"
+                        },
+                        "dodgePenalty": {
+                          "type": "integer"
+                        },
+                        "playerWeightLbs": {
+                          "type": "number"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        },
+                        "ratio": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "label",
+                        "speedDivisor",
+                        "dodgePenalty",
+                        "playerWeightLbs",
+                        "basicLift",
+                        "ratio"
+                      ]
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "warn",
+                              "note"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ownerId",
+                    "name",
+                    "dismissedWarnings",
+                    "createdAt",
+                    "updatedAt",
+                    "revision",
+                    "derived",
+                    "points",
+                    "encumbrance",
+                    "warnings"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/characters/{id}": {
+      "get": {
+        "tags": [
+          "characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Character detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "playerName": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 120
+                    },
+                    "height": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "weight": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "age": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "appearance": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "st": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "dx": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "iq": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "ht": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "hpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "willMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "perMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "fpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "speedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "moveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempDx": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempIq": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempWillMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempPerMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempFpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSpeedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempMoveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "dismissedWarnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "derived": {
+                      "type": "object",
+                      "properties": {
+                        "effectiveSt": {
+                          "type": "integer"
+                        },
+                        "effectiveDx": {
+                          "type": "integer"
+                        },
+                        "effectiveIq": {
+                          "type": "integer"
+                        },
+                        "effectiveHt": {
+                          "type": "integer"
+                        },
+                        "hp": {
+                          "type": "integer"
+                        },
+                        "will": {
+                          "type": "integer"
+                        },
+                        "per": {
+                          "type": "integer"
+                        },
+                        "fp": {
+                          "type": "integer"
+                        },
+                        "basicSpeedQuarters": {
+                          "type": "integer"
+                        },
+                        "basicSpeed": {
+                          "type": "number"
+                        },
+                        "basicMove": {
+                          "type": "integer"
+                        },
+                        "dodge": {
+                          "type": "integer"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "effectiveSt",
+                        "effectiveDx",
+                        "effectiveIq",
+                        "effectiveHt",
+                        "hp",
+                        "will",
+                        "per",
+                        "fp",
+                        "basicSpeedQuarters",
+                        "basicSpeed",
+                        "basicMove",
+                        "dodge",
+                        "basicLift"
+                      ]
+                    },
+                    "points": {
+                      "type": "object",
+                      "properties": {
+                        "attributes": {
+                          "type": "integer"
+                        },
+                        "secondary": {
+                          "type": "integer"
+                        },
+                        "advantages": {
+                          "type": "integer"
+                        },
+                        "disadvantages": {
+                          "type": "integer"
+                        },
+                        "quirks": {
+                          "type": "integer"
+                        },
+                        "skills": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "attributes",
+                        "secondary",
+                        "advantages",
+                        "disadvantages",
+                        "quirks",
+                        "skills",
+                        "total"
+                      ]
+                    },
+                    "encumbrance": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4
+                        },
+                        "label": {
+                          "type": "string",
+                          "enum": [
+                            "None",
+                            "Light",
+                            "Medium",
+                            "Heavy",
+                            "X-Heavy"
+                          ]
+                        },
+                        "speedDivisor": {
+                          "type": "number"
+                        },
+                        "dodgePenalty": {
+                          "type": "integer"
+                        },
+                        "playerWeightLbs": {
+                          "type": "number"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        },
+                        "ratio": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "label",
+                        "speedDivisor",
+                        "dodgePenalty",
+                        "playerWeightLbs",
+                        "basicLift",
+                        "ratio"
+                      ]
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "warn",
+                              "note"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ownerId",
+                    "name",
+                    "dismissedWarnings",
+                    "createdAt",
+                    "updatedAt",
+                    "revision",
+                    "derived",
+                    "points",
+                    "encumbrance",
+                    "warnings"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update character (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "playerName": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 120
+                  },
+                  "height": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "weight": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "age": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "appearance": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "techLevel": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 12
+                  },
+                  "campaignId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  },
+                  "st": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "dx": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "iq": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "ht": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 99,
+                    "default": 10
+                  },
+                  "hpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "willMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "perMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "fpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "speedQuarterMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "moveMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempSt": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempDx": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempIq": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempHt": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempHpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempWillMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempPerMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempFpMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempSpeedQuarterMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  },
+                  "tempMoveMod": {
+                    "type": "integer",
+                    "minimum": -50,
+                    "maximum": 50,
+                    "default": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "playerName": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 120
+                    },
+                    "height": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "weight": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "age": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "appearance": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "st": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "dx": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "iq": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "ht": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "hpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "willMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "perMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "fpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "speedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "moveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempDx": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempIq": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempWillMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempPerMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempFpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSpeedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempMoveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "dismissedWarnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "derived": {
+                      "type": "object",
+                      "properties": {
+                        "effectiveSt": {
+                          "type": "integer"
+                        },
+                        "effectiveDx": {
+                          "type": "integer"
+                        },
+                        "effectiveIq": {
+                          "type": "integer"
+                        },
+                        "effectiveHt": {
+                          "type": "integer"
+                        },
+                        "hp": {
+                          "type": "integer"
+                        },
+                        "will": {
+                          "type": "integer"
+                        },
+                        "per": {
+                          "type": "integer"
+                        },
+                        "fp": {
+                          "type": "integer"
+                        },
+                        "basicSpeedQuarters": {
+                          "type": "integer"
+                        },
+                        "basicSpeed": {
+                          "type": "number"
+                        },
+                        "basicMove": {
+                          "type": "integer"
+                        },
+                        "dodge": {
+                          "type": "integer"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "effectiveSt",
+                        "effectiveDx",
+                        "effectiveIq",
+                        "effectiveHt",
+                        "hp",
+                        "will",
+                        "per",
+                        "fp",
+                        "basicSpeedQuarters",
+                        "basicSpeed",
+                        "basicMove",
+                        "dodge",
+                        "basicLift"
+                      ]
+                    },
+                    "points": {
+                      "type": "object",
+                      "properties": {
+                        "attributes": {
+                          "type": "integer"
+                        },
+                        "secondary": {
+                          "type": "integer"
+                        },
+                        "advantages": {
+                          "type": "integer"
+                        },
+                        "disadvantages": {
+                          "type": "integer"
+                        },
+                        "quirks": {
+                          "type": "integer"
+                        },
+                        "skills": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "attributes",
+                        "secondary",
+                        "advantages",
+                        "disadvantages",
+                        "quirks",
+                        "skills",
+                        "total"
+                      ]
+                    },
+                    "encumbrance": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4
+                        },
+                        "label": {
+                          "type": "string",
+                          "enum": [
+                            "None",
+                            "Light",
+                            "Medium",
+                            "Heavy",
+                            "X-Heavy"
+                          ]
+                        },
+                        "speedDivisor": {
+                          "type": "number"
+                        },
+                        "dodgePenalty": {
+                          "type": "integer"
+                        },
+                        "playerWeightLbs": {
+                          "type": "number"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        },
+                        "ratio": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "label",
+                        "speedDivisor",
+                        "dodgePenalty",
+                        "playerWeightLbs",
+                        "basicLift",
+                        "ratio"
+                      ]
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "warn",
+                              "note"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ownerId",
+                    "name",
+                    "dismissedWarnings",
+                    "createdAt",
+                    "updatedAt",
+                    "revision",
+                    "derived",
+                    "points",
+                    "encumbrance",
+                    "warnings"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/characters/{id}/warnings/dismiss": {
+      "post": {
+        "tags": [
+          "characters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Dismiss or restore a warning code",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "dismissed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "code",
+                  "dismissed"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "ownerId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "playerName": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 120
+                    },
+                    "height": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "weight": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "age": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 10000
+                    },
+                    "appearance": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "st": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "dx": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "iq": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "ht": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 99,
+                      "default": 10
+                    },
+                    "hpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "willMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "perMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "fpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "speedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "moveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempDx": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempIq": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHt": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempHpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempWillMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempPerMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempFpMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempSpeedQuarterMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "tempMoveMod": {
+                      "type": "integer",
+                      "minimum": -50,
+                      "maximum": 50,
+                      "default": 0
+                    },
+                    "dismissedWarnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "revision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "derived": {
+                      "type": "object",
+                      "properties": {
+                        "effectiveSt": {
+                          "type": "integer"
+                        },
+                        "effectiveDx": {
+                          "type": "integer"
+                        },
+                        "effectiveIq": {
+                          "type": "integer"
+                        },
+                        "effectiveHt": {
+                          "type": "integer"
+                        },
+                        "hp": {
+                          "type": "integer"
+                        },
+                        "will": {
+                          "type": "integer"
+                        },
+                        "per": {
+                          "type": "integer"
+                        },
+                        "fp": {
+                          "type": "integer"
+                        },
+                        "basicSpeedQuarters": {
+                          "type": "integer"
+                        },
+                        "basicSpeed": {
+                          "type": "number"
+                        },
+                        "basicMove": {
+                          "type": "integer"
+                        },
+                        "dodge": {
+                          "type": "integer"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "effectiveSt",
+                        "effectiveDx",
+                        "effectiveIq",
+                        "effectiveHt",
+                        "hp",
+                        "will",
+                        "per",
+                        "fp",
+                        "basicSpeedQuarters",
+                        "basicSpeed",
+                        "basicMove",
+                        "dodge",
+                        "basicLift"
+                      ]
+                    },
+                    "points": {
+                      "type": "object",
+                      "properties": {
+                        "attributes": {
+                          "type": "integer"
+                        },
+                        "secondary": {
+                          "type": "integer"
+                        },
+                        "advantages": {
+                          "type": "integer"
+                        },
+                        "disadvantages": {
+                          "type": "integer"
+                        },
+                        "quirks": {
+                          "type": "integer"
+                        },
+                        "skills": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "attributes",
+                        "secondary",
+                        "advantages",
+                        "disadvantages",
+                        "quirks",
+                        "skills",
+                        "total"
+                      ]
+                    },
+                    "encumbrance": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 4
+                        },
+                        "label": {
+                          "type": "string",
+                          "enum": [
+                            "None",
+                            "Light",
+                            "Medium",
+                            "Heavy",
+                            "X-Heavy"
+                          ]
+                        },
+                        "speedDivisor": {
+                          "type": "number"
+                        },
+                        "dodgePenalty": {
+                          "type": "integer"
+                        },
+                        "playerWeightLbs": {
+                          "type": "number"
+                        },
+                        "basicLift": {
+                          "type": "number"
+                        },
+                        "ratio": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "label",
+                        "speedDivisor",
+                        "dodgePenalty",
+                        "playerWeightLbs",
+                        "basicLift",
+                        "ratio"
+                      ]
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "warn",
+                              "note"
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "severity",
+                          "message"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ownerId",
+                    "name",
+                    "dismissedWarnings",
+                    "createdAt",
+                    "updatedAt",
+                    "revision",
+                    "derived",
+                    "points",
+                    "encumbrance",
+                    "warnings"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

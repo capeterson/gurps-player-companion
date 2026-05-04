@@ -11,7 +11,7 @@
     "build:server": "bun build src/server/index.ts --outdir dist/server --target bun",
     "start": "bun run dist/server/index.js",
     "test": "bun test src/server src/shared",
-    "test:client": "vitest run",
+    "test:client": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:server": "bun test src/server",
     "test:shared": "bun test src/shared",

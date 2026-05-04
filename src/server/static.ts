@@ -10,16 +10,29 @@
 
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { join, normalize, resolve } from 'node:path';
+import { isAbsolute, join, normalize, relative, resolve } from 'node:path';
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { AppEnv } from './openapi/app.ts';
 
 const ROOT = resolve('dist/client');
 
-function safeJoin(base: string, requestPath: string): string | null {
-  const decoded = decodeURIComponent(requestPath);
+/**
+ * Resolve a request path under `base`, rejecting anything that escapes
+ * the directory.  Uses `path.relative` rather than `startsWith` so a
+ * sibling like `dist/client-private/` cannot match `dist/client`.
+ */
+export function safeJoin(base: string, requestPath: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(requestPath);
+  } catch {
+    return null;
+  }
+  if (decoded.includes('\0')) return null;
   const joined = normalize(join(base, decoded));
-  if (!joined.startsWith(base)) return null;
+  const rel = relative(base, joined);
+  if (rel === '') return joined;
+  if (rel.startsWith('..') || isAbsolute(rel)) return null;
   return joined;
 }
 
