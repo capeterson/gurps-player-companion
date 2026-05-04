@@ -56,7 +56,7 @@ export function HomePage() {
         >
           <p className="label-eyebrow">Account</p>
           <p className="font-display text-3xl">Settings</p>
-          <p className="text-sm text-muted">Password and browser-local Dexie status.</p>
+          <p className="text-sm text-muted">Password and browser-local sync status.</p>
         </Link>
       </section>
     </div>

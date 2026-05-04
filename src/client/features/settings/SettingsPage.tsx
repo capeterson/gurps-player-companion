@@ -46,7 +46,7 @@ export function SettingsPage() {
         <p className="label-eyebrow">Account</p>
         <h1 className="font-display text-3xl">Settings</h1>
         <p className="max-w-2xl text-sm text-muted">
-          Manage your sign-in credentials and inspect the browser-local Dexie/IndexedDB cache.
+          Manage your sign-in credentials and inspect browser-local sync storage.
         </p>
       </header>
 
@@ -63,32 +63,32 @@ export function SettingsPage() {
             <p className="label-eyebrow">Security</p>
             <h2 className="font-display text-2xl">Change password</h2>
           </div>
-          <label className="form-control">
+          <label className="form-control flex flex-col gap-1">
             <span className="label-text">Current password</span>
             <input
               type="password"
-              className="input input-bordered"
+              className="input input-bordered w-full max-w-md"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
             />
           </label>
-          <label className="form-control">
+          <label className="form-control flex flex-col gap-1">
             <span className="label-text">New password</span>
             <input
               type="password"
-              className="input input-bordered"
+              className="input input-bordered w-full max-w-md"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               minLength={8}
               required
             />
           </label>
-          <label className="form-control">
+          <label className="form-control flex flex-col gap-1">
             <span className="label-text">Confirm new password</span>
             <input
               type="password"
-              className="input input-bordered"
+              className="input input-bordered w-full max-w-md"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={8}
@@ -109,7 +109,7 @@ export function SettingsPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="label-eyebrow">Local data</p>
-              <h2 className="font-display text-2xl">Dexie status</h2>
+              <h2 className="font-display text-2xl">Sync Status</h2>
             </div>
             <button
               type="button"
@@ -128,12 +128,31 @@ export function SettingsPage() {
           ) : (
             <dl className="space-y-3 text-sm">
               <div>
-                <dt className="text-dim">Sync state</dt>
+                <dt className="flex items-center gap-2 text-dim">
+                  <span>Sync state</span>
+                  {localDb.data?.isFullySynced && (
+                    <span
+                      className="tooltip tooltip-right"
+                      data-tip="offline ready"
+                      title="offline ready"
+                    >
+                      <svg
+                        aria-label="Offline ready"
+                        className="h-4 w-4 text-success"
+                        fill="none"
+                        role="img"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="3"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    </span>
+                  )}
+                </dt>
                 <dd>{localDb.data?.syncState ?? 'Checking…'}</dd>
-              </div>
-              <div>
-                <dt className="text-dim">Dexie / IndexedDB state</dt>
-                <dd>{localDb.data?.dexieState ?? 'Checking…'}</dd>
               </div>
               <div>
                 <dt className="text-dim">Local storage used</dt>
@@ -144,15 +163,7 @@ export function SettingsPage() {
                 <dd className="num">{formatBytes(localDb.data?.storageQuotaBytes ?? null)}</dd>
               </div>
               <div>
-                <dt className="text-dim">Databases</dt>
-                <dd>
-                  {localDb.data?.databaseNames.length
-                    ? localDb.data.databaseNames.join(', ')
-                    : 'None detected'}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-dim">Last checked</dt>
+                <dt className="text-dim">Last synchronized</dt>
                 <dd>{localDb.data?.refreshedAt.toLocaleTimeString() ?? '—'}</dd>
               </div>
             </dl>
