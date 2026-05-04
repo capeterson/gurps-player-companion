@@ -12,6 +12,7 @@ import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { loadCampaignOr403, requireCampaignOwner } from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
+import { isUniqueViolation } from '../db/errors.ts';
 import {
   type DbCampaign,
   type DbCampaignMembership,
@@ -294,6 +295,10 @@ router.openapi(
     const found = await db.select().from(users).where(eq(users.email, body.email));
     const target = found[0];
     if (!target) throw new HTTPException(404, { message: 'user not found' });
+    // Fast-path pre-check; the unique index on (campaign_id, user_id)
+    // is the authoritative arbiter — two concurrent add-member requests
+    // can both pass this check, so we also catch the unique-violation
+    // on insert below.
     const existing = await db
       .select()
       .from(campaignMemberships)
@@ -301,11 +306,18 @@ router.openapi(
         and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, target.id)),
       );
     if (existing[0]) throw new HTTPException(409, { message: 'already a member' });
-    await db.insert(campaignMemberships).values({
-      campaignId: campaign.id,
-      userId: target.id,
-      role: 'member',
-    });
+    try {
+      await db.insert(campaignMemberships).values({
+        campaignId: campaign.id,
+        userId: target.id,
+        role: 'member',
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        throw new HTTPException(409, { message: 'already a member' });
+      }
+      throw err;
+    }
     const members = await loadMembers(campaign.id);
     return c.json(campaignToOut(campaign, members), 200);
   },

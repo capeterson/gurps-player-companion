@@ -15,6 +15,13 @@
       "when": 1777863799000,
       "tag": "0001_inventory_self_fk",
       "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777863899000,
+      "tag": "0002_revision_triggers",
+      "breakpoints": true
     }
   ]
 }
