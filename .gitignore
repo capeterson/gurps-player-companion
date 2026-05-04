@@ -111,3 +111,6 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Claude Code local config (preview launch configs, worktrees, etc.)
+.claude/
