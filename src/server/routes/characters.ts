@@ -32,7 +32,7 @@ async function loadFullCharacter(id: string) {
   const db = getDb();
   const [c] = await db.select().from(characters).where(eq(characters.id, id));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, inventory, campaign] = await Promise.all([
+  const [traits, skills, inventory, combat, campaign] = await Promise.all([
     db
       .select()
       .from(characterTraits)
@@ -48,6 +48,11 @@ async function loadFullCharacter(id: string) {
       .from(inventoryItems)
       .where(eq(inventoryItems.characterId, id))
       .orderBy(asc(inventoryItems.name)),
+    db
+      .select()
+      .from(combatStates)
+      .where(eq(combatStates.characterId, id))
+      .then((r) => r[0] ?? null),
     c.campaignId
       ? db
           .select()
@@ -56,7 +61,7 @@ async function loadFullCharacter(id: string) {
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
   ]);
-  return buildCharacterDetail({ character: c, traits, skills, inventory, campaign });
+  return buildCharacterDetail({ character: c, traits, skills, inventory, combat, campaign });
 }
 
 router.openapi(

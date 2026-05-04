@@ -5,8 +5,10 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { App } from './App.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
+import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
+import { ToastProvider } from './lib/toast.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
 import './styles/theme.css';
 
@@ -31,6 +33,7 @@ const router = createBrowserRouter([
         children: [
           { path: '/', element: <HomePage /> },
           { path: '/characters', element: <CharactersPage /> },
+          { path: '/characters/:id', element: <CharacterSheetPage /> },
         ],
       },
     ],
@@ -43,7 +46,9 @@ if (!rootEl) throw new Error('root element missing');
 createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

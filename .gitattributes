@@ -1,0 +1,25 @@
+# Normalise line endings to LF in the repo on every platform.
+# Text files are detected by Git, then stored with LF and checked out as-is.
+# Without this, Windows' core.autocrlf=true checks files out as CRLF and
+# `bun run lint:fix` (biome, configured to LF) rewrites them on every save —
+# producing endless phantom diffs.
+* text=auto eol=lf
+
+# Keep binary assets byte-identical.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.zip binary
+*.tar binary
+*.tar.gz binary
+*.tgz binary
+*.lockb binary
