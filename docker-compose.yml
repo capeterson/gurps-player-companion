@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: gurps
       POSTGRES_DB: gurps
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U gurps -d gurps']
       interval: 5s
