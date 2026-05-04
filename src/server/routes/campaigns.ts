@@ -1,16 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { requireActiveUser } from '../auth/middleware.ts';
-import { loadCampaignOr403, requireCampaignOwner } from '../auth/permissions.ts';
-import { getDb } from '../db/client.ts';
-import {
-  campaignMemberships,
-  campaigns,
-  type DbCampaign,
-  type DbCampaignMembership,
-  users,
-} from '../db/schema.ts';
 import {
   addMemberRequest,
   campaignCreate,
@@ -19,6 +9,16 @@ import {
   transferOwnershipRequest,
 } from '../../shared/schemas/campaign.ts';
 import { uuid } from '../../shared/schemas/common.ts';
+import { requireActiveUser } from '../auth/middleware.ts';
+import { loadCampaignOr403, requireCampaignOwner } from '../auth/permissions.ts';
+import { getDb } from '../db/client.ts';
+import {
+  type DbCampaign,
+  type DbCampaignMembership,
+  campaignMemberships,
+  campaigns,
+  users,
+} from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();
@@ -140,7 +140,10 @@ router.openapi(
       body: { required: true, content: { 'application/json': { schema: campaignCreate } } },
     },
     responses: {
-      201: { description: 'Campaign created', content: { 'application/json': { schema: campaignOut } } },
+      201: {
+        description: 'Campaign created',
+        content: { 'application/json': { schema: campaignOut } },
+      },
       401: errorResponse('Unauthorized'),
       422: errorResponse('Validation error'),
     },
@@ -206,7 +209,10 @@ router.openapi(
       body: { required: true, content: { 'application/json': { schema: campaignUpdate } } },
     },
     responses: {
-      200: { description: 'Updated campaign', content: { 'application/json': { schema: campaignOut } } },
+      200: {
+        description: 'Updated campaign',
+        content: { 'application/json': { schema: campaignOut } },
+      },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
     },
@@ -270,7 +276,10 @@ router.openapi(
       body: { required: true, content: { 'application/json': { schema: addMemberRequest } } },
     },
     responses: {
-      200: { description: 'Updated campaign', content: { 'application/json': { schema: campaignOut } } },
+      200: {
+        description: 'Updated campaign',
+        content: { 'application/json': { schema: campaignOut } },
+      },
       400: errorResponse('Invalid'),
       404: errorResponse('User not found'),
       409: errorResponse('Already a member'),
@@ -288,7 +297,9 @@ router.openapi(
     const existing = await db
       .select()
       .from(campaignMemberships)
-      .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, target.id)));
+      .where(
+        and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, target.id)),
+      );
     if (existing[0]) throw new HTTPException(409, { message: 'already a member' });
     await db.insert(campaignMemberships).values({
       campaignId: campaign.id,
@@ -324,9 +335,7 @@ router.openapi(
     }
     const result = await getDb()
       .delete(campaignMemberships)
-      .where(
-        and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)),
-      )
+      .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
       .returning({ id: campaignMemberships.id });
     if (result.length === 0) throw new HTTPException(404, { message: 'membership not found' });
     return c.body(null, 204);
@@ -342,10 +351,16 @@ router.openapi(
     security: [{ bearerAuth: [] }],
     request: {
       params: z.object({ id: uuid }),
-      body: { required: true, content: { 'application/json': { schema: transferOwnershipRequest } } },
+      body: {
+        required: true,
+        content: { 'application/json': { schema: transferOwnershipRequest } },
+      },
     },
     responses: {
-      200: { description: 'Updated campaign', content: { 'application/json': { schema: campaignOut } } },
+      200: {
+        description: 'Updated campaign',
+        content: { 'application/json': { schema: campaignOut } },
+      },
       400: errorResponse('New owner is not a member'),
       403: errorResponse('Forbidden'),
     },
@@ -363,10 +378,7 @@ router.openapi(
       .select()
       .from(campaignMemberships)
       .where(
-        and(
-          eq(campaignMemberships.campaignId, id),
-          eq(campaignMemberships.userId, newOwnerId),
-        ),
+        and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, newOwnerId)),
       );
     if (!memberships[0]) {
       throw new HTTPException(400, { message: 'new owner must be a campaign member' });
@@ -389,10 +401,7 @@ router.openapi(
         .update(campaignMemberships)
         .set({ role: 'owner' })
         .where(
-          and(
-            eq(campaignMemberships.campaignId, id),
-            eq(campaignMemberships.userId, newOwnerId),
-          ),
+          and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, newOwnerId)),
         );
     });
     const refreshed = await db.select().from(campaigns).where(eq(campaigns.id, id));

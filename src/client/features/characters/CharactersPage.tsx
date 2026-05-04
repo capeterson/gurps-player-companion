@@ -1,10 +1,7 @@
-import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
 import { api } from '../../lib/api.ts';
-import type {
-  CharacterDetail,
-  CharacterListItem,
-} from '../../../shared/schemas/character.ts';
 
 export function CharactersPage() {
   const qc = useQueryClient();
@@ -56,9 +53,7 @@ export function CharactersPage() {
       </form>
 
       {create.isError && (
-        <p className="text-error text-sm">
-          Couldn’t create — {(create.error as Error).message}
-        </p>
+        <p className="text-error text-sm">Couldn’t create — {(create.error as Error).message}</p>
       )}
 
       <ul className="grid md:grid-cols-2 gap-3">
@@ -69,10 +64,8 @@ export function CharactersPage() {
               <span className="label-eyebrow">TL {c.techLevel ?? '—'}</span>
             </div>
             <p className="text-sm text-base-content/70">
-              <span className="num">ST {c.st}</span> ·{' '}
-              <span className="num">DX {c.dx}</span> ·{' '}
-              <span className="num">IQ {c.iq}</span> ·{' '}
-              <span className="num">HT {c.ht}</span>
+              <span className="num">ST {c.st}</span> · <span className="num">DX {c.dx}</span> ·{' '}
+              <span className="num">IQ {c.iq}</span> · <span className="num">HT {c.ht}</span>
             </p>
           </li>
         ))}

@@ -1,16 +1,16 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { generatePlaintextKey, hashApiKey } from '../auth/apiKey.ts';
-import { requireActiveUser } from '../auth/middleware.ts';
-import { getDb } from '../db/client.ts';
-import { apiKeys } from '../db/schema.ts';
 import {
   apiKeyCreateRequest,
   apiKeyCreatedResponse,
   apiKeyOut,
 } from '../../shared/schemas/apiKey.ts';
+import { generatePlaintextKey, hashApiKey } from '../auth/apiKey.ts';
+import { requireActiveUser } from '../auth/middleware.ts';
 import type { AuthenticatedUser } from '../auth/session.ts';
+import { getDb } from '../db/client.ts';
+import { apiKeys } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();

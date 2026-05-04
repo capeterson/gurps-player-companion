@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { computeDerived, type CharacterAttrs } from './characterCalc.ts';
+import { type CharacterAttrs, computeDerived } from './characterCalc.ts';
 import { attributeLevelFor, computeSkillLevel, skillOffset } from './skillCalc.ts';
 
 const baseAttrs: CharacterAttrs = {

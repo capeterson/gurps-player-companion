@@ -11,18 +11,18 @@
  */
 
 import {
-  ADVANTAGE_KINDS,
-  DISADVANTAGE_KINDS,
-  QUIRK_KINDS,
-  type TraitKind,
-} from '../constants/traits.ts';
-import {
   ATTRIBUTE_BASE,
   PRIMARY_ATTRIBUTES,
   PRIMARY_COST_PER_LEVEL,
   SECONDARY_COST_PER_LEVEL,
   SPEED_COST_PER_QUARTER,
 } from '../constants/attributes.ts';
+import {
+  ADVANTAGE_KINDS,
+  DISADVANTAGE_KINDS,
+  QUIRK_KINDS,
+  type TraitKind,
+} from '../constants/traits.ts';
 
 export interface CharacterAttrs {
   readonly st: number;
@@ -86,7 +86,7 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
   const fp = effectiveHt + attrs.fpMod + attrs.tempFpMod;
 
   const basicSpeedQuarters =
-    (effectiveDx + effectiveHt) + attrs.speedQuarterMod + attrs.tempSpeedQuarterMod;
+    effectiveDx + effectiveHt + attrs.speedQuarterMod + attrs.tempSpeedQuarterMod;
   const basicSpeed = basicSpeedQuarters / 4;
   const basicMove = Math.floor(basicSpeed) + attrs.moveMod + attrs.tempMoveMod;
   const dodge = Math.floor(basicSpeed) + 3;

@@ -1,4 +1,4 @@
-import { jwtVerify, SignJWT } from 'jose';
+import { SignJWT, jwtVerify } from 'jose';
 import { loadConfig } from '../config.ts';
 
 export interface AccessTokenPayload {
@@ -19,7 +19,9 @@ function secretKey(): Uint8Array {
   return new TextEncoder().encode(jwtSecret);
 }
 
-export async function signAccessToken(userId: string): Promise<{ token: string; expiresInSeconds: number }> {
+export async function signAccessToken(
+  userId: string,
+): Promise<{ token: string; expiresInSeconds: number }> {
   const { jwtAccessTtlMinutes } = loadConfig();
   const expiresInSeconds = jwtAccessTtlMinutes * 60;
   const token = await new SignJWT({ type: 'access' })

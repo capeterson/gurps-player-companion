@@ -1,12 +1,12 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { App } from './App.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
-import { HomePage } from './features/home/HomePage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
+import { HomePage } from './features/home/HomePage.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
 import './styles/theme.css';
 

@@ -40,6 +40,18 @@
       }
     }
   },
+  "overrides": [
+    {
+      "include": ["**/*.css"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnknownProperty": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

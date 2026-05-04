@@ -168,10 +168,7 @@ const LEVEL_TABLE = [
   },
 ];
 
-export function computeEncumbrance(
-  playerWeightLbs: number,
-  basicLift: number,
-): EncumbranceResult {
+export function computeEncumbrance(playerWeightLbs: number, basicLift: number): EncumbranceResult {
   const ratio = basicLift <= 0 ? Number.POSITIVE_INFINITY : playerWeightLbs / basicLift;
   for (const tier of LEVEL_TABLE) {
     if (ratio <= tier.maxRatio) {

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { api } from '../../lib/api.ts';
 import type { CharacterListItem } from '../../../shared/schemas/character.ts';
+import { api } from '../../lib/api.ts';
 
 interface MeResponse {
   id: string;
@@ -27,7 +27,10 @@ export function HomePage() {
         <p className="text-sm text-base-content/70">{me.data?.email}</p>
       </section>
       <section className="grid md:grid-cols-2 gap-4">
-        <Link to="/characters" className="card bg-base-200 border border-base-300 p-5 hover:bg-base-300">
+        <Link
+          to="/characters"
+          className="card bg-base-200 border border-base-300 p-5 hover:bg-base-300"
+        >
           <p className="label-eyebrow">Your characters</p>
           <p className="font-display text-2xl num">{characters.data?.length ?? '—'}</p>
         </Link>

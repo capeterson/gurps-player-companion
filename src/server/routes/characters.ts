@@ -1,12 +1,16 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { requireActiveUser } from '../auth/middleware.ts';
 import {
-  assertWrite,
-  loadCampaignOr403,
-  loadCharacterOr403,
-} from '../auth/permissions.ts';
+  characterCreate,
+  characterDetail,
+  characterListItem,
+  characterUpdate,
+  dismissWarningRequest,
+} from '../../shared/schemas/character.ts';
+import { uuid } from '../../shared/schemas/common.ts';
+import { requireActiveUser } from '../auth/middleware.ts';
+import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
 import {
   campaignMemberships,
@@ -17,14 +21,6 @@ import {
   combatStates,
   inventoryItems,
 } from '../db/schema.ts';
-import {
-  characterCreate,
-  characterDetail,
-  characterListItem,
-  characterUpdate,
-  dismissWarningRequest,
-} from '../../shared/schemas/character.ts';
-import { uuid } from '../../shared/schemas/common.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { buildCharacterDetail } from '../services/characterSummary.ts';
 
@@ -42,10 +38,22 @@ async function loadFullCharacter(id: string) {
       .from(characterTraits)
       .where(eq(characterTraits.characterId, id))
       .orderBy(asc(characterTraits.kind), asc(characterTraits.name)),
-    db.select().from(characterSkills).where(eq(characterSkills.characterId, id)).orderBy(asc(characterSkills.name)),
-    db.select().from(inventoryItems).where(eq(inventoryItems.characterId, id)).orderBy(asc(inventoryItems.name)),
+    db
+      .select()
+      .from(characterSkills)
+      .where(eq(characterSkills.characterId, id))
+      .orderBy(asc(characterSkills.name)),
+    db
+      .select()
+      .from(inventoryItems)
+      .where(eq(inventoryItems.characterId, id))
+      .orderBy(asc(inventoryItems.name)),
     c.campaignId
-      ? db.select().from(campaigns).where(eq(campaigns.id, c.campaignId)).then((r) => r[0] ?? null)
+      ? db
+          .select()
+          .from(campaigns)
+          .where(eq(campaigns.id, c.campaignId))
+          .then((r) => r[0] ?? null)
       : Promise.resolve(null),
   ]);
   return buildCharacterDetail({ character: c, traits, skills, inventory, campaign });
@@ -59,7 +67,10 @@ router.openapi(
     security: [{ bearerAuth: [] }],
     summary: 'List the user’s characters and characters in their campaigns',
     responses: {
-      200: { description: 'List', content: { 'application/json': { schema: z.array(characterListItem) } } },
+      200: {
+        description: 'List',
+        content: { 'application/json': { schema: z.array(characterListItem) } },
+      },
       401: errorResponse('Unauthorized'),
     },
   }),
@@ -111,7 +122,10 @@ router.openapi(
       body: { required: true, content: { 'application/json': { schema: characterCreate } } },
     },
     responses: {
-      201: { description: 'Character created', content: { 'application/json': { schema: characterDetail } } },
+      201: {
+        description: 'Character created',
+        content: { 'application/json': { schema: characterDetail } },
+      },
       401: errorResponse('Unauthorized'),
       422: errorResponse('Validation error'),
     },
@@ -171,7 +185,10 @@ router.openapi(
     security: [{ bearerAuth: [] }],
     request: { params: z.object({ id: uuid }) },
     responses: {
-      200: { description: 'Character detail', content: { 'application/json': { schema: characterDetail } } },
+      200: {
+        description: 'Character detail',
+        content: { 'application/json': { schema: characterDetail } },
+      },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
     },

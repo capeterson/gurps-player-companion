@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  computeEncumbrance,
-  computeWeights,
-  type InventoryItemRow,
-} from './encumbrance.ts';
+import { type InventoryItemRow, computeEncumbrance, computeWeights } from './encumbrance.ts';
 
-function row(overrides: Partial<InventoryItemRow> & Pick<InventoryItemRow, 'id'>): InventoryItemRow {
+function row(
+  overrides: Partial<InventoryItemRow> & Pick<InventoryItemRow, 'id'>,
+): InventoryItemRow {
   return {
     parentId: null,
     weightLbs: 0,

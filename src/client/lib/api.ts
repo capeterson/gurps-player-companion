@@ -52,7 +52,7 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   const tokens = tokenStore.read();
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
   if (options.authenticated !== false && tokens) {
-    headers['authorization'] = `Bearer ${tokens.accessToken}`;
+    headers.authorization = `Bearer ${tokens.accessToken}`;
   }
   if (options.body !== undefined) {
     headers['content-type'] = headers['content-type'] ?? 'application/json';

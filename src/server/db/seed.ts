@@ -8,6 +8,8 @@
 
 import { readFile } from 'node:fs/promises';
 import { eq } from 'drizzle-orm';
+import { parseLibraryYaml } from '../../shared/yaml/library.ts';
+import { hashPassword } from '../auth/password.ts';
 import { closeDb, getDb } from './client.ts';
 import {
   campaignLibraryItems,
@@ -17,8 +19,6 @@ import {
   campaigns,
   users,
 } from './schema.ts';
-import { parseLibraryYaml } from '../../shared/yaml/library.ts';
-import { hashPassword } from '../auth/password.ts';
 
 const SAMPLE_CAMPAIGN_NAME = 'Sample';
 const SEED_USER_EMAIL = 'seed@example.invalid';
@@ -43,7 +43,10 @@ async function seedUser(db: ReturnType<typeof getDb>): Promise<string> {
 }
 
 async function seedCampaign(db: ReturnType<typeof getDb>, ownerId: string): Promise<string> {
-  const existing = await db.select().from(campaigns).where(eq(campaigns.name, SAMPLE_CAMPAIGN_NAME));
+  const existing = await db
+    .select()
+    .from(campaigns)
+    .where(eq(campaigns.name, SAMPLE_CAMPAIGN_NAME));
   const existingCampaign = existing[0];
   if (existingCampaign) return existingCampaign.id;
   const [created] = await db
@@ -84,7 +87,11 @@ async function seedLibrary(db: ReturnType<typeof getDb>, campaignId: string): Pr
         tags: t.tags ?? [],
       })
       .onConflictDoUpdate({
-        target: [campaignLibraryTraits.campaignId, campaignLibraryTraits.name, campaignLibraryTraits.kind],
+        target: [
+          campaignLibraryTraits.campaignId,
+          campaignLibraryTraits.name,
+          campaignLibraryTraits.kind,
+        ],
         set: {
           basePoints: t.basePoints,
           description: t.description ?? null,

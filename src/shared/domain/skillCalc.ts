@@ -43,10 +43,7 @@ export function skillOffset(difficulty: SkillDifficulty, points: number): number
 }
 
 /** Resolve which attribute level a skill uses. */
-export function attributeLevelFor(
-  attribute: SkillAttribute,
-  derived: DerivedStats,
-): number {
+export function attributeLevelFor(attribute: SkillAttribute, derived: DerivedStats): number {
   switch (attribute) {
     case 'ST':
       return derived.effectiveSt;

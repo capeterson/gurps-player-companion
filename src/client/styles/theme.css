@@ -7,8 +7,8 @@
    gurps-player-web design handoff.  Tweak via DaisyUI plugin config later. */
 
 :root {
-  --font-display: 'Fraunces', ui-serif, Georgia, serif;
-  --font-body: 'Work Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "Work Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 html,
@@ -27,7 +27,7 @@ body {
 }
 
 .num {
-  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-feature-settings: "tnum" 1, "lnum" 1;
   font-variant-numeric: tabular-nums lining-nums;
 }
 
@@ -42,7 +42,7 @@ body {
 /* Rule #2 from AGENTS.md: rolled-back inputs flash so the user can see
    what reverted.  `data-flashing="true"` triggers the keyframe; flip
    `data-flash-parity` to retrigger when a second rollback lands quickly. */
-.field-rollback-flash[data-flashing='true'] {
+.field-rollback-flash[data-flashing="true"] {
   animation: gpc-flash 1.4s ease-out;
 }
 
@@ -58,7 +58,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .field-rollback-flash[data-flashing='true'] {
+  .field-rollback-flash[data-flashing="true"] {
     animation: none;
     background-color: oklch(98% 0.04 25 / 0.4);
   }

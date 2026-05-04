@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
-import { api, ApiError } from '../../lib/api.ts';
-import { tokenStore, type Tokens } from '../../lib/tokenStore.ts';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ApiError, api } from '../../lib/api.ts';
+import { type Tokens, tokenStore } from '../../lib/tokenStore.ts';
 
 export function RegisterPage() {
   const [email, setEmail] = useState('');

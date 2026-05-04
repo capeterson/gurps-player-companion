@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  computeTraitCost,
-  findGroupConflicts,
-  type TraitModifier,
-} from './modifierMath.ts';
+import { type TraitModifier, computeTraitCost, findGroupConflicts } from './modifierMath.ts';
 
 const enh = (name: string, costValue: number, group?: string): TraitModifier => ({
   name,

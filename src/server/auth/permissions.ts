@@ -9,17 +9,20 @@ import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { getDb } from '../db/client.ts';
 import {
-  campaignMemberships,
-  campaigns,
-  characters,
   type DbCampaign,
   type DbCampaignMembership,
   type DbCharacter,
+  campaignMemberships,
+  campaigns,
+  characters,
 } from '../db/schema.ts';
 
 export type CampaignRole = DbCampaignMembership['role'];
 
-export async function loadCampaignOr403(campaignId: string, userId: string): Promise<{
+export async function loadCampaignOr403(
+  campaignId: string,
+  userId: string,
+): Promise<{
   campaign: DbCampaign;
   role: CampaignRole;
 }> {
@@ -29,10 +32,7 @@ export async function loadCampaignOr403(campaignId: string, userId: string): Pro
     .from(campaigns)
     .leftJoin(
       campaignMemberships,
-      and(
-        eq(campaignMemberships.campaignId, campaigns.id),
-        eq(campaignMemberships.userId, userId),
-      ),
+      and(eq(campaignMemberships.campaignId, campaigns.id), eq(campaignMemberships.userId, userId)),
     )
     .where(eq(campaigns.id, campaignId));
   const row = rows[0];

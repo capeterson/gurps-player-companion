@@ -6,6 +6,22 @@
  * derived stats / points / warnings from the same source.
  */
 
+import {
+  type CharacterAttrs,
+  type CharacterSkillInput,
+  type CharacterTraitInput,
+  computeDerived,
+  computePointBreakdown,
+} from '../../shared/domain/characterCalc.ts';
+import {
+  type InventoryItemRow,
+  computeEncumbrance,
+  computeWeights,
+} from '../../shared/domain/encumbrance.ts';
+import { computeSkillLevel } from '../../shared/domain/skillCalc.ts';
+import { type CampaignCaps, evaluateWarnings } from '../../shared/domain/warnings.ts';
+import type { CharacterDetail } from '../../shared/schemas/character.ts';
+import type { SkillOut } from '../../shared/schemas/skill.ts';
 import type {
   DbCampaign,
   DbCharacter,
@@ -13,22 +29,6 @@ import type {
   DbCharacterTrait,
   DbInventoryItem,
 } from '../db/schema.ts';
-import {
-  computeDerived,
-  computePointBreakdown,
-  type CharacterAttrs,
-  type CharacterTraitInput,
-  type CharacterSkillInput,
-} from '../../shared/domain/characterCalc.ts';
-import {
-  computeEncumbrance,
-  computeWeights,
-  type InventoryItemRow,
-} from '../../shared/domain/encumbrance.ts';
-import { evaluateWarnings, type CampaignCaps } from '../../shared/domain/warnings.ts';
-import { computeSkillLevel } from '../../shared/domain/skillCalc.ts';
-import type { CharacterDetail } from '../../shared/schemas/character.ts';
-import type { SkillOut } from '../../shared/schemas/skill.ts';
 
 export function characterAttrsFromRow(c: DbCharacter): CharacterAttrs {
   return {
@@ -102,7 +102,12 @@ export function buildCharacterDetail(input: SummaryInput): CharacterDetail {
   };
   const dismissed = new Set(character.dismissedWarnings);
   const warnings = evaluateWarnings(
-    { attrs: { st: character.st, dx: character.dx, iq: character.iq, ht: character.ht }, points, encumbrance, campaign: caps },
+    {
+      attrs: { st: character.st, dx: character.dx, iq: character.iq, ht: character.ht },
+      points,
+      encumbrance,
+      campaign: caps,
+    },
     dismissed,
   );
 
@@ -148,7 +153,10 @@ export function buildCharacterDetail(input: SummaryInput): CharacterDetail {
   };
 }
 
-export function buildSkillOut(skill: DbCharacterSkill, derived: ReturnType<typeof computeDerived>): SkillOut {
+export function buildSkillOut(
+  skill: DbCharacterSkill,
+  derived: ReturnType<typeof computeDerived>,
+): SkillOut {
   return {
     id: skill.id,
     characterId: skill.characterId,

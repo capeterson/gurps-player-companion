@@ -26,5 +26,11 @@
       "@sw/*": ["src/sw/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "drizzle.config.ts", "vite.config.ts", "vitest.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "drizzle.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }

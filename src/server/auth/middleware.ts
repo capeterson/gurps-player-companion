@@ -5,7 +5,7 @@
  */
 
 import type { MiddlewareHandler } from 'hono';
-import { AuthError, resolveAuthHeader, type AuthenticatedUser } from './session.ts';
+import { AuthError, type AuthenticatedUser, resolveAuthHeader } from './session.ts';
 
 export type AuthVariables = { user: AuthenticatedUser };
 

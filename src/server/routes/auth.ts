@@ -3,20 +3,6 @@ import { createRoute } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
-  getDummyPasswordHash,
-  hashPassword,
-  verifyPassword,
-} from '../auth/password.ts';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
-import {
-  AuthError,
-  resolveAuthHeader,
-  verifyAndConsumeRefreshToken,
-} from '../auth/session.ts';
-import { requireUser } from '../auth/middleware.ts';
-import { getDb } from '../db/client.ts';
-import { refreshTokens, users } from '../db/schema.ts';
-import {
   loginRequest,
   logoutRequest,
   refreshRequest,
@@ -24,6 +10,12 @@ import {
   tokenPair,
   userOut,
 } from '../../shared/schemas/auth.ts';
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
+import { requireUser } from '../auth/middleware.ts';
+import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
+import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
+import { getDb } from '../db/client.ts';
+import { refreshTokens, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();
@@ -84,7 +76,10 @@ router.openapi(
   async (c) => {
     const body = c.req.valid('json');
     const db = getDb();
-    const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, body.email));
+    const existing = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, body.email));
     if (existing[0]) throw new HTTPException(409, { message: 'email already in use' });
     const passwordHash = await hashPassword(body.password);
     const [created] = await db
@@ -145,7 +140,10 @@ router.openapi(
       body: { required: true, content: { 'application/json': { schema: refreshRequest } } },
     },
     responses: {
-      200: { description: 'Token pair issued', content: { 'application/json': { schema: tokenPair } } },
+      200: {
+        description: 'Token pair issued',
+        content: { 'application/json': { schema: tokenPair } },
+      },
       401: errorResponse('Invalid or expired refresh token'),
     },
   }),

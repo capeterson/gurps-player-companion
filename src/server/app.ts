@@ -1,14 +1,14 @@
+import type { OpenAPIHono } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
+import type { AppConfig } from './config.ts';
+import { type AppEnv, createOpenApiApp } from './openapi/app.ts';
 import { apiKeysRouter } from './routes/apiKeys.ts';
 import { authRouter } from './routes/auth.ts';
 import { campaignsRouter } from './routes/campaigns.ts';
 import { charactersRouter } from './routes/characters.ts';
 import { healthRouter } from './routes/health.ts';
 import { attachStaticHandler } from './static.ts';
-import type { AppConfig } from './config.ts';
-import { createOpenApiApp, type AppEnv } from './openapi/app.ts';
-import type { OpenAPIHono } from '@hono/zod-openapi';
 
 export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   const app = createOpenApiApp();

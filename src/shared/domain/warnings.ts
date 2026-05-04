@@ -7,8 +7,8 @@
  * so renaming a code requires a migration.
  */
 
-import type { EncumbranceResult } from './encumbrance.ts';
 import type { PointBreakdown } from './characterCalc.ts';
+import type { EncumbranceResult } from './encumbrance.ts';
 
 export type WarningSeverity = 'warn' | 'note';
 
@@ -42,10 +42,7 @@ function rule(code: string, evaluate: Rule['evaluate']): void {
   RULES.push({ code, evaluate });
 }
 
-function attrRule(
-  attrName: 'st' | 'dx' | 'iq' | 'ht',
-  display: 'ST' | 'DX' | 'IQ' | 'HT',
-): void {
+function attrRule(attrName: 'st' | 'dx' | 'iq' | 'ht', display: 'ST' | 'DX' | 'IQ' | 'HT'): void {
   rule(`attr.${attrName}.below_minimum`, ({ attrs }) =>
     attrs[attrName] < 1
       ? {

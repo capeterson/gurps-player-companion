@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  emitLibraryYaml,
-  LibraryYamlError,
-  parseLibraryYaml,
-} from './library.ts';
+import { LibraryYamlError, emitLibraryYaml, parseLibraryYaml } from './library.ts';
 
 const SAMPLE = `version: 1
 campaign:

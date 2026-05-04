@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { traitKindEnum, traitModifier } from './trait.ts';
-import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
-import { armorData, weaponData } from './inventory.ts';
 import { isoTimestamp, uuid } from './common.ts';
+import { armorData, weaponData } from './inventory.ts';
+import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
+import { traitKindEnum, traitModifier } from './trait.ts';
 
 const tagList = z.array(z.string().min(1).max(40)).default([]);
 

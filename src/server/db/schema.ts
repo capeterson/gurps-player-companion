@@ -4,6 +4,7 @@
  * server bumps on write — clients use it for the sync cursor.
  */
 
+import { sql } from 'drizzle-orm';
 import {
   bigserial,
   boolean,
@@ -22,7 +23,6 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 
 // ---------- enums ----------
 // We let Postgres enforce these at the column level via CHECK / ENUM.
@@ -67,12 +67,9 @@ export const campaignRoleEnum = pgEnum('campaign_role', ['owner', 'member']);
 // ---------- columns helpers ----------
 
 const id = () => uuid('id').primaryKey().default(sql`uuidv7()`);
-const createdAt = () =>
-  timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
-const updatedAt = () =>
-  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow();
-const revision = () =>
-  bigserial('revision', { mode: 'number' }).notNull();
+const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
+const updatedAt = () => timestamp('updated_at', { withTimezone: true }).notNull().defaultNow();
+const revision = () => bigserial('revision', { mode: 'number' }).notNull();
 
 // ---------- users / auth ----------
 
@@ -166,10 +163,7 @@ export const campaignMemberships = pgTable(
     revision: revision(),
   },
   (t) => ({
-    membershipKey: uniqueIndex('campaign_memberships_campaign_user_key').on(
-      t.campaignId,
-      t.userId,
-    ),
+    membershipKey: uniqueIndex('campaign_memberships_campaign_user_key').on(t.campaignId, t.userId),
   }),
 );
 
@@ -403,10 +397,7 @@ export const campaignLibrarySkills = pgTable(
     source: varchar('source', { length: 40 }),
     defaultSpecialization: varchar('default_specialization', { length: 160 }),
     prerequisites: text('prerequisites'),
-    situationalModifiers: jsonb('situational_modifiers')
-      .$type<unknown[]>()
-      .notNull()
-      .default([]),
+    situationalModifiers: jsonb('situational_modifiers').$type<unknown[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),

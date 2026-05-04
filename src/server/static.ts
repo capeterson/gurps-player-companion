@@ -11,7 +11,8 @@
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join, normalize, resolve } from 'node:path';
-import type { Hono } from 'hono';
+import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { AppEnv } from './openapi/app.ts';
 
 const ROOT = resolve('dist/client');
 
@@ -22,7 +23,7 @@ function safeJoin(base: string, requestPath: string): string | null {
   return joined;
 }
 
-export function attachStaticHandler<T extends Hono<any, any, any>>(app: T): T {
+export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEnv> {
   app.get('*', async (c) => {
     if (!existsSync(ROOT)) {
       return c.text(

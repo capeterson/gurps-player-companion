@@ -56,8 +56,7 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
   const traitKeys = new Set<string>();
   for (const t of doc.library.traits) {
     const k = `${t.kind}::${t.name.toLowerCase()}`;
-    if (traitKeys.has(k))
-      throw new LibraryYamlError(`duplicate trait (${t.kind}, ${t.name})`);
+    if (traitKeys.has(k)) throw new LibraryYamlError(`duplicate trait (${t.kind}, ${t.name})`);
     traitKeys.add(k);
   }
   const skillKeys = new Set<string>();
