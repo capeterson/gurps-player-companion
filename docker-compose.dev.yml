@@ -17,7 +17,7 @@ services:
       retries: 20
 
   migrate:
-    image: oven/bun:1.1-alpine
+    image: oven/bun:1.2-alpine
     working_dir: /app
     restart: 'no'
     command:
@@ -35,7 +35,7 @@ services:
         condition: service_healthy
 
   app:
-    image: oven/bun:1.1-alpine
+    image: oven/bun:1.2-alpine
     working_dir: /app
     command: ['bun', 'run', 'dev']
     environment:

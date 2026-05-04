@@ -1,5 +1,6 @@
 import { useIsMutating } from '@tanstack/react-query';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { api } from './lib/api.ts';
 import { tokenStore } from './lib/tokenStore.ts';
 
 export function App() {
@@ -7,6 +8,15 @@ export function App() {
   const isMutating = useIsMutating();
 
   function signOut() {
+    const tokens = tokenStore.read();
+    if (tokens) {
+      // Best-effort: revoke the refresh token server-side so it can't be reused.
+      api('/auth/logout', {
+        method: 'POST',
+        body: { refreshToken: tokens.refreshToken },
+        authenticated: false,
+      }).catch(() => {});
+    }
     tokenStore.clear();
     navigate('/login');
   }
