@@ -8,9 +8,13 @@ import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
+import { SettingsPage } from './features/settings/SettingsPage.tsx';
+import { applyTheme, readStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
 import './styles/theme.css';
+
+applyTheme(readStoredTheme());
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +37,7 @@ const router = createBrowserRouter([
         children: [
           { path: '/', element: <HomePage /> },
           { path: '/characters', element: <CharactersPage /> },
+          { path: '/settings', element: <SettingsPage /> },
           { path: '/characters/:id', element: <CharacterSheetPage /> },
         ],
       },

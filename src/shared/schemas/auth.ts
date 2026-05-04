@@ -44,9 +44,20 @@ export const logoutRequest = z.object({
   refreshToken: z.string().min(1),
 });
 
+export const changePasswordRequest = z
+  .object({
+    currentPassword: password,
+    newPassword: password,
+  })
+  .refine((body) => body.currentPassword !== body.newPassword, {
+    path: ['newPassword'],
+    message: 'New password must be different from current password',
+  });
+
 export type UserOut = z.infer<typeof userOut>;
 export type RegisterRequest = z.infer<typeof registerRequest>;
 export type LoginRequest = z.infer<typeof loginRequest>;
 export type TokenPair = z.infer<typeof tokenPair>;
 export type RefreshRequest = z.infer<typeof refreshRequest>;
 export type LogoutRequest = z.infer<typeof logoutRequest>;
+export type ChangePasswordRequest = z.infer<typeof changePasswordRequest>;

@@ -3,6 +3,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
+  changePasswordRequest,
   loginRequest,
   logoutRequest,
   refreshRequest,
@@ -200,6 +201,42 @@ router.openapi(
     } catch {
       // ignore — logout is idempotent.
     }
+    return c.body(null, 204);
+  },
+);
+
+router.use('/auth/password', requireUser);
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/auth/password',
+    tags: ['auth'],
+    summary: 'Change the authenticated user password',
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: { required: true, content: { 'application/json': { schema: changePasswordRequest } } },
+    },
+    responses: {
+      204: { description: 'Password changed' },
+      401: errorResponse('Unauthorized'),
+      403: errorResponse('Current password is incorrect'),
+      422: errorResponse('Validation error'),
+    },
+  }),
+  async (c) => {
+    const body = c.req.valid('json');
+    const principal = c.get('user');
+    const rows = await getDb().select().from(users).where(eq(users.id, principal.id));
+    const user = rows[0];
+    if (!user) throw new HTTPException(401, { message: 'unknown_user' });
+
+    const ok = await verifyPassword(body.currentPassword, user.passwordHash);
+    if (!ok) throw new HTTPException(403, { message: 'current password is incorrect' });
+
+    await getDb()
+      .update(users)
+      .set({ passwordHash: await hashPassword(body.newPassword), updatedAt: new Date() })
+      .where(eq(users.id, user.id));
     return c.body(null, 204);
   },
 );
