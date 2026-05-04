@@ -1,0 +1,129 @@
+version: 1
+campaign:
+  name: Sample
+  description: |
+    A small starter library that demonstrates every shape: traits with
+    modifiers, skills with situational modifiers, items with armor and
+    weapon data.  Suitable as a smoke-test fixture and a starting point
+    for new campaigns.
+  pointTarget: 150
+  disadvantageCap: 50
+  quirkCap: 5
+library:
+  traits:
+    - name: Combat Reflexes
+      kind: advantage
+      basePoints: 15
+      description: |
+        +1 to all active defenses, +2 to fast-draw, +6 to wake up or
+        recover from surprise.  Never freezes on a critical failure.
+      source: B-43
+      tags: [combat]
+    - name: Bad Temper
+      kind: disadvantage
+      basePoints: -10
+      description: Frequent self-control rolls when provoked.
+      source: B-124
+      availableModifiers:
+        - name: Mitigator (-50%)
+          category: limitation
+          costType: percent
+          costValue: -50
+          description: Reduce social impact through training, ritual, or medication.
+    - name: Honesty
+      kind: disadvantage
+      basePoints: -10
+      source: B-138
+      availableModifiers:
+        - name: Self-Control 12
+          category: limitation
+          costType: percent
+          costValue: 0
+          group: self-control
+        - name: Self-Control 9
+          category: limitation
+          costType: percent
+          costValue: 50
+          group: self-control
+        - name: Self-Control 6
+          category: limitation
+          costType: percent
+          costValue: 100
+          group: self-control
+    - name: Curious
+      kind: quirk
+      basePoints: -1
+      source: B-162
+    - name: Native Tongue (Common)
+      kind: language
+      basePoints: 0
+      source: B-23
+  skills:
+    - name: Stealth
+      attribute: DX
+      difficulty: A
+      source: B-222
+      situationalModifiers:
+        - name: Vs. blind opponent
+          modifier: 4
+          description: Apply when target cannot see.
+        - name: Crowded street
+          modifier: 2
+    - name: Acrobatics
+      attribute: DX
+      difficulty: H
+      source: B-174
+    - name: First Aid
+      attribute: IQ
+      difficulty: E
+      techLevel: 5
+      source: B-195
+      defaultSpecialization: Human
+    - name: Riding
+      attribute: DX
+      difficulty: A
+      source: B-217
+      defaultSpecialization: Equine
+  items:
+    - name: Mail Hauberk
+      category: armor
+      weightLbs: 25
+      cost: 230
+      description: Heavy chain hauberk covering the torso and shoulders.
+      source: LT-110
+      isArmor: true
+      armor:
+        locations: [torso]
+        dr: 4
+        drCrushing: 2
+        flexible: true
+        notes: Counts as flexible armor for blunt-trauma rules.
+    - name: Steel Breastplate
+      category: armor
+      weightLbs: 18
+      cost: 700
+      description: Front-only steel breastplate, often worn over mail.
+      source: LT-110
+      isArmor: true
+      armor:
+        locations: [torso]
+        dr: 5
+        flexible: false
+        frontOnly: true
+    - name: Backpack
+      category: general
+      weightLbs: 3
+      cost: 60
+      description: Sturdy backpack worn on the shoulders.  20 lb capacity.
+      source: B-288
+    - name: Broadsword
+      category: weapon
+      weightLbs: 3
+      cost: 600
+      description: A sturdy steel cut-and-thrust sword.
+      source: B-273
+      weaponData:
+        damage: sw cut / thr+1 imp
+        reach: '1'
+        parry: '0'
+        stRequired: 10

@@ -1,0 +1,17 @@
+node_modules
+dist
+.bun
+.git
+.github
+.claude
+.codex
+.vscode
+.idea
+*.log
+.env
+.env.*
+!.env.example
+coverage
+.nyc_output
+playwright-report
+test-results
