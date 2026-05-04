@@ -1,65 +1,446 @@
+/* ============================================================
+   GURPS Companion · Arcane theme
+   1:1 mapping of the design handoff (.design-tmp/project/styles.css)
+   to DaisyUI 5 themes "arcane-dark" + "arcane-light".
+
+   Source of design intent:
+     docs/design-handoff/project/GURPS Companion - Arcane Prototype.html
+     docs/design-handoff/project/styles.css
+   The design assistant explicitly tuned the palette twice for
+   "stare at this for hours" comfort:
+     - body text 0.86L on a ~0.22L surface (still ~11:1 contrast)
+     - chroma kept off the surfaces; only the accent fires
+   Don't crank the saturation or shrink the surface contrast.
+
+   Owner-tuned 2026-04: dark surfaces given a faint violet cast
+   (hue 305 to align with the primary accent) and lifted ~0.02 L
+   so the canvas reads "deep violet study" instead of "pitch
+   black". Borders carry a touch more chroma in both modes for
+   visibility on light grey surfaces and faint definition on the
+   dark ones. The "stare for hours" budget is preserved: surface
+   chroma is still well under 0.025 — perceptible as a tint, not
+   as a color-cast.
+   ============================================================ */
+
+/* Fonts are self-hosted via @fontsource so the PWA stays functional
+   offline (AGENTS.md "local-first always"). Variable fonts are used
+   where available (Cinzel + Work Sans -- single woff2 covers all
+   weights); IM Fell English has no variable cut, so we ship its two
+   static faces (regular + italic). vite-plugin-pwa's workbox glob
+   patterns include the woff2 extension, so these files are
+   precached on install and served from the cache when offline. */
+@import "@fontsource-variable/cinzel/wght.css";
+@import "@fontsource-variable/work-sans/wght.css";
+@import "@fontsource/im-fell-english/400.css";
+@import "@fontsource/im-fell-english/400-italic.css";
+
 @import "tailwindcss";
+
 @plugin "daisyui" {
-  themes: arcane-dark --default, arcane-light;
+  themes: false;
+  logs: false;
 }
 
-/* Arcane theme — dark + light variants.  Tokens derived from the legacy
-   gurps-player-web design handoff.  Tweak via DaisyUI plugin config later. */
+/* ----- Arcane Dark (default) ---------------------------------- */
+@plugin "daisyui/theme" {
+  name: "arcane-dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
 
-:root {
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
-  --font-body: "Work Sans", ui-sans-serif, system-ui, sans-serif;
+  /* base = surfaces (faint violet cast, hue 305 ↔ primary) */
+  --color-base-100: oklch(0.235 0.014 305);  /* surface (cards, panels) */
+  --color-base-200: oklch(0.20 0.015 305);   /* page bg (canvas) */
+  --color-base-300: oklch(0.165 0.020 305);  /* deep bg + default borders */
+  --color-base-content: oklch(0.86 0.008 300);
+
+  /* primary = violet (accent) */
+  --color-primary: oklch(0.70 0.13 305);
+  --color-primary-content: oklch(0.16 0.005 300);
+
+  /* secondary = teal (HP-full / second accent) */
+  --color-secondary: oklch(0.72 0.10 195);
+  --color-secondary-content: oklch(0.16 0.005 300);
+
+  /* accent = same as primary (kept for DaisyUI components that use it) */
+  --color-accent: oklch(0.70 0.13 305);
+  --color-accent-content: oklch(0.16 0.005 300);
+
+  /* neutral = surface-2 (muted card backs, chip rests) */
+  --color-neutral: oklch(0.275 0.015 305);
+  --color-neutral-content: oklch(0.86 0.008 300);
+
+  /* semantic */
+  --color-info: oklch(0.72 0.09 195);
+  --color-info-content: oklch(0.16 0.005 300);
+  --color-success: oklch(0.74 0.10 150);
+  --color-success-content: oklch(0.16 0.005 300);
+  --color-warning: oklch(0.76 0.12 90);
+  --color-warning-content: oklch(0.16 0.005 300);
+  --color-error: oklch(0.62 0.16 25);
+  --color-error-content: oklch(0.16 0.005 300);
+
+  /* shape */
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1.125rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
 }
+
+/* ----- Arcane Light ------------------------------------------- */
+@plugin "daisyui/theme" {
+  name: "arcane-light";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: oklch(1.00 0 0);
+  --color-base-200: oklch(0.97 0.008 90);
+  --color-base-300: oklch(0.91 0.016 90);    /* darker + more chroma → visible borders */
+  --color-base-content: oklch(0.24 0.008 300);
+
+  --color-primary: oklch(0.48 0.16 305);
+  --color-primary-content: oklch(1 0 0);
+
+  --color-secondary: oklch(0.52 0.13 195);
+  --color-secondary-content: oklch(1 0 0);
+
+  --color-accent: oklch(0.48 0.16 305);
+  --color-accent-content: oklch(1 0 0);
+
+  --color-neutral: oklch(0.94 0.008 90);
+  --color-neutral-content: oklch(0.24 0.008 300);
+
+  --color-info: oklch(0.50 0.10 195);
+  --color-info-content: oklch(1 0 0);
+  --color-success: oklch(0.52 0.12 150);
+  --color-success-content: oklch(1 0 0);
+  --color-warning: oklch(0.62 0.14 90);
+  --color-warning-content: oklch(0.16 0.005 300);
+  --color-error: oklch(0.55 0.18 25);
+  --color-error-content: oklch(1 0 0);
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1.125rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+/* ============================================================
+   App-level tokens not covered by DaisyUI semantics.
+
+   These map to:
+     - text-muted / text-dim   : the prose-secondary / prose-tertiary
+       distinctions the design uses for label/value pairs
+     - hp-*                    : the severity ramp on HP bars and
+       large pool numerals
+     - font-display / font-num : Cinzel for headings, Work Sans
+       w/ tabular-nums for pool numbers
+   They live as plain CSS vars and are surfaced as Tailwind utilities
+   in the @theme block below.
+   ============================================================ */
+
+[data-theme="arcane-dark"] {
+  --text-muted: oklch(0.66 0.01 300);
+  --text-dim: oklch(0.50 0.012 300);
+  --border-strong: oklch(0.48 0.030 305);
+  --accent-soft: oklch(0.34 0.06 305 / 0.45);
+
+  /* HP severity ramp — full → critical → unconscious */
+  --hp-full: oklch(0.74 0.10 195);
+  --hp-good: oklch(0.74 0.10 150);
+  --hp-warn: oklch(0.76 0.12 90);
+  --hp-low: oklch(0.70 0.13 50);
+  --hp-crit: oklch(0.62 0.16 25);
+  --hp-out: oklch(0.46 0.09 320);
+
+  /* atmospheric vignette — warm candle in the top-right, deep violet
+     in the bottom-left. Tuned for dark mode where the etched + lit
+     chrome adds depth. */
+  --arcane-edge-warm: oklch(0.42 0.10 35 / 0.22);
+  --arcane-edge-violet: oklch(0.30 0.08 305 / 0.28);
+}
+
+[data-theme="arcane-light"] {
+  --text-muted: oklch(0.46 0.01 300);
+  --text-dim: oklch(0.62 0.012 300);
+  --border-strong: oklch(0.72 0.028 305);
+  --accent-soft: oklch(0.90 0.05 305 / 0.6);
+
+  --hp-full: oklch(0.55 0.13 195);
+  --hp-good: oklch(0.55 0.13 150);
+  --hp-warn: oklch(0.60 0.14 85);
+  --hp-low: oklch(0.55 0.16 50);
+  --hp-crit: oklch(0.50 0.18 25);
+  --hp-out: oklch(0.40 0.10 320);
+
+  /* Light mode — same dual-source vignette, paler so the paper-tone
+     surface keeps reading flat under prolonged use. */
+  --arcane-edge-warm: oklch(0.92 0.06 60 / 0.5);
+  --arcane-edge-violet: oklch(0.90 0.04 305 / 0.5);
+}
+
+/* Surface Tailwind utilities for the app-level tokens. */
+@theme inline {
+  --color-muted: var(--text-muted);
+  --color-dim: var(--text-dim);
+  --color-border-strong: var(--border-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-hp-full: var(--hp-full);
+  --color-hp-good: var(--hp-good);
+  --color-hp-warn: var(--hp-warn);
+  --color-hp-low: var(--hp-low);
+  --color-hp-crit: var(--hp-crit);
+  --color-hp-out: var(--hp-out);
+
+  /* "Cinzel Variable" / "Work Sans Variable" are the family names
+     registered by @fontsource-variable; IM Fell English ships as
+     a static face under its plain name. */
+  --font-display: "Cinzel Variable", "Cinzel", "Trajan Pro", "Times New Roman", serif;
+  --font-name: "IM Fell English", "Cinzel Variable", "Cinzel", "Times New Roman", serif;
+  --font-sans: "Work Sans Variable", "Work Sans", system-ui, sans-serif;
+  --font-num: "Work Sans Variable", "Work Sans", system-ui, sans-serif;
+}
+
+/* ============================================================
+   Body + numeric typography
+   ============================================================ */
 
 html,
 body,
 #root {
-  min-height: 100%;
+  min-height: 100vh;
 }
 
 body {
-  font-family: var(--font-body);
+  font-family: "Work Sans Variable", "Work Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The .num class: tabular numerics for any number that needs to
+   line up vertically (HP, points, costs, weights, levels). The
+   design's prototype uses var(--font-num) — we route through the
+   font-num utility instead so future Claude doesn't reach for
+   font-mono and break the rhythm. */
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
 }
 
 .font-display {
   font-family: var(--font-display);
+  letter-spacing: 0;
 }
 
-.num {
-  font-feature-settings: "tnum" 1, "lnum" 1;
-  font-variant-numeric: tabular-nums lining-nums;
+/* Character-name face: IM Fell English. Antique manuscript serif used
+   only on the character-sheet identity hero. Has just regular + italic,
+   so callers should avoid Tailwind weight utilities here — synthesised
+   bold on this face is ugly. */
+.font-name {
+  font-family: var(--font-name);
+}
+.font-name::first-letter {
+  color: var(--color-primary);
+}
+.font-name.no-cap::first-letter,
+.no-cap .font-name::first-letter {
+  color: inherit;
 }
 
+/* Eyebrow / kicker label — used above big headings. */
 .label-eyebrow {
-  font-size: 0.7rem;
+  font-size: 0.625rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: oklch(70% 0.04 240);
+  color: var(--text-dim);
 }
 
-/* Rule #2 from AGENTS.md: rolled-back inputs flash so the user can see
-   what reverted.  `data-flashing="true"` triggers the keyframe; flip
-   `data-flash-parity` to retrigger when a second rollback lands quickly. */
-.field-rollback-flash[data-flashing="true"] {
-  animation: gpc-flash 1.4s ease-out;
+/* ============================================================
+   Atmospheric vignette — top-right radial glow, fixed to the
+   viewport. Apply .arcane-edge to the app shell (positioned
+   relative). The actual app content sits at z-index 1.
+   ============================================================ */
+
+.arcane-edge {
+  position: relative;
+}
+.arcane-edge::before {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 700px 360px at 88% 6%,
+      var(--arcane-edge-warm) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 600px 300px at 8% 100%,
+      var(--arcane-edge-violet) 0%,
+      transparent 65%
+    );
+  z-index: 0;
 }
 
-@keyframes gpc-flash {
+/* ============================================================
+   HP-pool flash and number-tween animations
+   (mirrors the design prototype's keyframes)
+   ============================================================ */
+
+@keyframes hp-flash {
   0% {
-    box-shadow: 0 0 0 0 oklch(80% 0.18 25 / 0.7);
-    background-color: oklch(98% 0.04 25 / 0.4);
+    background: var(--hp-crit);
+    transform: scale(1);
+  }
+  40% {
+    background: var(--hp-crit);
+    transform: scale(1.04);
   }
   100% {
-    box-shadow: 0 0 0 8px oklch(80% 0.18 25 / 0);
+    transform: scale(1);
+  }
+}
+.flash {
+  animation: hp-flash 0.5s ease-out;
+}
+
+@keyframes num-pop {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-3px);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.num-tween {
+  animation: num-pop 0.25s ease-out;
+}
+
+/* Reduce motion if the user has asked for it. */
+@media (prefers-reduced-motion: reduce) {
+  .flash,
+  .num-tween {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   Field rollback flash — applied when a save fails (server
+   rejection or other client error) and we revert the user's
+   draft value. The brief outline + tinted backdrop is the
+   visual half of the rollback signal; the toast carries the
+   words.
+
+   `data-flash-parity` alternates between two animation names so
+   that two rejections in quick succession on the same field
+   actually re-trigger the keyframe, instead of CSS treating the
+   second one as the same animation already playing.
+   ============================================================ */
+
+@keyframes field-rollback-flash-a {
+  0% {
+    box-shadow: 0 0 0 2px var(--color-error);
+    background-color: color-mix(in oklch, var(--color-error) 18%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
     background-color: transparent;
   }
 }
-
+@keyframes field-rollback-flash-b {
+  0% {
+    box-shadow: 0 0 0 2px var(--color-error);
+    background-color: color-mix(in oklch, var(--color-error) 18%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+.field-rollback-flash[data-flashing="true"][data-flash-parity="0"] {
+  animation: field-rollback-flash-a 1.4s ease-out;
+}
+.field-rollback-flash[data-flashing="true"][data-flash-parity="1"] {
+  animation: field-rollback-flash-b 1.4s ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
   .field-rollback-flash[data-flashing="true"] {
     animation: none;
-    background-color: oklch(98% 0.04 25 / 0.4);
+    box-shadow: 0 0 0 2px var(--color-error);
   }
+}
+
+/* ============================================================
+   Arcane identity — "Plain" flourish (etched + lit base)
+
+   Per the design handoff chat, this is the new intrinsic chrome
+   for Arcane: a warm sheen at the top of every card (lit) and a
+   thin violet inner stroke set 4px in (etched plate), plus a
+   drop-cap on display headings. Each piece is dialed stronger
+   in dark mode where it adds depth, gentler in light where the
+   sheen would otherwise feel washed-out.
+   ============================================================ */
+
+/* Lit — gradient sheen on every card. Uses background-image so it
+   layers on top of whatever bg-base utility a card carries. */
+.card {
+  position: relative;
+  background-image: linear-gradient(
+    180deg,
+    oklch(0.72 0.13 305 / 0.06) 0%,
+    transparent 35%
+  );
+}
+[data-theme="arcane-light"] .card {
+  background-image: linear-gradient(180deg, oklch(1 0 0 / 0.55) 0%, transparent 35%);
+}
+
+/* Etched — inner accent stroke set 4px inside the card border, like a
+   stamped metal plate. Pseudo-element so it can't fight Tailwind's
+   shadow utilities. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid oklch(0.72 0.13 305 / 0.08);
+  border-radius: calc(var(--radius-box) - 4px);
+  pointer-events: none;
+}
+[data-theme="arcane-light"] .card::before {
+  border-color: oklch(0.50 0.12 305 / 0.08);
+}
+
+/* Drop-cap — first letter of any display heading reads in the accent
+   colour, matching the prototype's Branwen/Ashweaver treatment. The
+   ::first-letter pseudo only matches block containers, so inline
+   spans with .font-display (like the topnav wordmark) are unaffected.
+
+   Opt out per-element with .no-cap — used when an element only has
+   one character (e.g. the "G" logo) where the cap collapses to the
+   whole word, or when accent-on-accent would be invisible. */
+.font-display::first-letter {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.font-display.no-cap::first-letter,
+.no-cap .font-display::first-letter {
+  color: inherit;
+  font-weight: inherit;
 }

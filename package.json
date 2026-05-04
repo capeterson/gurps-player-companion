@@ -30,6 +30,9 @@
     "check": "bun run lint && bun run typecheck && bun run test && bun run openapi:check"
   },
   "dependencies": {
+    "@fontsource-variable/cinzel": "^5.2.8",
+    "@fontsource-variable/work-sans": "^5.2.8",
+    "@fontsource/im-fell-english": "^5.2.6",
     "@hono/zod-openapi": "^0.18.0",
     "@tanstack/react-query": "^5.62.0",
     "dexie": "^4.0.10",

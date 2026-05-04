@@ -9,7 +9,7 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - db_data_dev:/var/lib/postgresql/data
+      - db_data_dev:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U gurps -d gurps']
       interval: 5s
@@ -26,6 +26,7 @@ services:
       - 'bun install --frozen-lockfile || bun install; bun run db:migrate'
     environment:
       DATABASE_URL: postgres://gurps:gurps@db:5432/gurps
+      JWT_SECRET: dev-only-secret-replace-me-replace-me-replace-me
     volumes:
       - ./:/app
       - bun_modules:/app/node_modules
