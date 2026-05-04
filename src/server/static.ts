@@ -1,11 +1,12 @@
 /**
- * Static asset + SPA fallback served by the Bun process.
+ * Static asset + SPA fallback served by the Bun process in production.
  *
  * - Files in `dist/client/` (Vite build output) are served verbatim.
  * - Any non-/api/* request that doesn't match a file falls back to the
  *   client `index.html` so React Router can take over.
- * - In development mode the dev server runs Vite directly on :5173 and
- *   proxies /api/* to Bun on :3000, so this static handler isn't used.
+ * - In development this handler isn't attached at all: Vite owns the
+ *   dev server and mounts the Hono app via `@hono/vite-dev-server`
+ *   (see `vite.config.ts` + `dev-entry.ts`).
  */
 
 import { existsSync } from 'node:fs';
@@ -48,7 +49,7 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
     }
     if (!existsSync(ROOT)) {
       return c.text(
-        'client bundle missing — run `bun run build:client` (or use the Vite dev server on :5173)',
+        'client bundle missing — run `bun run build:client` (or use `bun run dev` for the Vite dev server)',
         503,
       );
     }

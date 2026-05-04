@@ -1,3 +1,5 @@
+import devServer from '@hono/vite-dev-server';
+import bunAdapter from '@hono/vite-dev-server/bun';
 import tailwind from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
@@ -18,14 +20,21 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
-    proxy: {
-      '/api': 'http://localhost:3000',
-    },
+    port: 3000,
+    host: true,
+    strictPort: true,
   },
   plugins: [
     react(),
     tailwind(),
+    // Mount the Hono API into the Vite dev server: requests to `/api/*`
+    // are dispatched to `src/server/dev-entry.ts`; everything else falls
+    // through to Vite for SPA serving + HMR. Single port, single process.
+    devServer({
+      adapter: bunAdapter,
+      entry: 'src/server/dev-entry.ts',
+      exclude: [/^\/(?!api(\/|$)).*/],
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],

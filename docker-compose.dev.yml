@@ -16,10 +16,27 @@ services:
       timeout: 3s
       retries: 20
 
+  migrate:
+    image: oven/bun:1.1-alpine
+    working_dir: /app
+    restart: 'no'
+    command:
+      - sh
+      - -c
+      - 'bun install --frozen-lockfile || bun install; bun run db:migrate'
+    environment:
+      DATABASE_URL: postgres://gurps:gurps@db:5432/gurps
+    volumes:
+      - ./:/app
+      - bun_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     image: oven/bun:1.1-alpine
     working_dir: /app
-    command: ['sh', '-c', 'bun install --frozen-lockfile || bun install; bun run dev']
+    command: ['bun', 'run', 'dev']
     environment:
       ENVIRONMENT: development
       PORT: 3000
@@ -28,13 +45,15 @@ services:
       JWT_SECRET: dev-only-secret-replace-me-replace-me-replace-me
       JWT_ACCESS_TTL_MINUTES: 15
       JWT_REFRESH_TTL_DAYS: 14
-      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+      CORS_ORIGINS: '[]'
     volumes:
       - ./:/app
       - bun_modules:/app/node_modules
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - '3000:3000'
 
