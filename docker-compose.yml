@@ -14,6 +14,18 @@ services:
       timeout: 3s
       retries: 20
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
+    command: ['bun', 'run', 'db:migrate']
+    environment:
+      DATABASE_URL: postgres://gurps:gurps@db:5432/gurps
+    depends_on:
+      db:
+        condition: service_healthy
+
   app:
     build:
       context: .
@@ -31,6 +43,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - '3000:3000'
 
