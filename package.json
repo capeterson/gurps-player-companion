@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run --hot src/server/index.ts",
-    "dev:client": "vite",
+    "dev": "bunx --bun vite",
+    "dev:server-only": "bun run --hot src/server/index.ts",
     "build": "bun run build:client && bun run build:server",
     "build:client": "vite build",
     "build:server": "bun build src/server/index.ts --outdir dist/server --target bun",
@@ -46,6 +46,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
+    "@hono/vite-dev-server": "^0.25.3",
     "@playwright/test": "^1.49.0",
     "@tailwindcss/vite": "^4.0.0",
     "@testing-library/jest-dom": "^6.6.0",

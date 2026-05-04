@@ -58,10 +58,18 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     return c.json({ error: 'internal_error' }, 500);
   });
 
-  // Static + SPA fallback — must be the last route so it doesn't shadow
-  // the /api/* handlers above.  In dev (Vite on :5173 proxying /api), the
-  // `dist/client` folder will be empty and the fallback emits a 503.
-  attachStaticHandler(app);
+  // Static + SPA fallback. Skipped in dev — Vite owns the SPA there
+  // (see `dev-entry.ts` + the `@hono/vite-dev-server` plugin in
+  // `vite.config.ts`). In prod this serves the built `dist/client/`.
+  // Must remain the last route so it doesn't shadow `/api/*` handlers.
+  if (config.environment !== 'development') {
+    attachStaticHandler(app);
+  } else {
+    // In dev, Hono only sees `/api/*` (the Vite plugin's exclude regex
+    // diverts everything else). Make the API 404 a JSON response to
+    // match the prod static handler's contract.
+    app.notFound((c) => c.json({ error: 'not_found' }, 404));
+  }
 
   return app;
 }

@@ -39,28 +39,27 @@ no-lost-edits rules.
 
 ## Quick start (dev)
 
-Bun, Postgres, and the dev servers all run in Docker — nothing is
+Bun, Postgres, and the dev server all run in Docker — nothing is
 required on the host except Docker itself.
 
 ```sh
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-This starts four services:
+This starts three services:
 
 | Service  | Port | What it does                                              |
 |----------|------|-----------------------------------------------------------|
 | `db`     | 5432 | Postgres 18 with a persistent `db_data_dev` volume.       |
 | `migrate`| —    | One-shot: `bun install` + `bun run db:migrate`, then exits. |
-| `app`    | 3000 | Bun HTTP/WebSocket API (waits on `migrate`).              |
-| `client` | 5173 | Vite dev server with HMR; proxies `/api` to `app:3000`.   |
+| `app`    | 3000 | Vite dev server (with HMR) hosting the Hono API via `@hono/vite-dev-server`. Single port, single process. |
 
-Open the UI at **<http://localhost:5173>**. The API is reachable at
-`http://localhost:3000/api/v1/...` (e.g.
+Open **<http://localhost:3000>** for the UI; the API is on the same
+origin at `/api/v1/...` (e.g.
 [`/api/v1/healthz`](http://localhost:3000/api/v1/healthz)).
 
-The `app` and `client` services share a `bun_modules` volume populated
-by `migrate` on first boot — subsequent starts skip the install.
+The `migrate` service populates a shared `bun_modules` volume on first
+boot — subsequent `up` runs reuse it and skip the install.
 
 ## Common operations
 
