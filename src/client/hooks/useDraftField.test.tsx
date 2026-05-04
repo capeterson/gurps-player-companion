@@ -241,6 +241,60 @@ describe('useDraftField', () => {
     await waitFor(() => expect(input.value).toBe('13'));
   });
 
+  it('re-edit back to prior value after a save is not silently dropped', async () => {
+    // Regression for the stale-serverValue race: in production the
+    // `serverValue` prop comes from a TanStack Query cache that only
+    // updates after the post-save refetch lands.  If the user saves
+    // 12 and immediately edits back to 10 before that refetch
+    // returns, comparing against the still-10 prop would short-circuit
+    // the no-op branch and silently drop the edit.  The hook tracks
+    // its own "last committed" value to avoid that.
+    const calls: number[] = [];
+    const onSave = vi.fn().mockImplementation((v: number) => {
+      calls.push(v);
+      return Promise.resolve();
+    });
+
+    function DelayedSyncField() {
+      // Note: serverValue is NOT bumped on save.  Simulates a cache
+      // whose refetch hasn't completed yet.
+      const [serverValue] = useState(10);
+      const field = useDraftField<number>({
+        name: 'ST',
+        serverValue,
+        parse: (s) => {
+          const n = Number(s);
+          if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
+          return n;
+        },
+        format: (v) => String(v),
+        onSave,
+      });
+      return <input aria-label="ST" className={DRAFT_FIELD_CLASS} {...field.inputProps} />;
+    }
+
+    render(
+      <Wrap>
+        <DelayedSyncField />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST') as HTMLInputElement;
+
+    // First save: 10 -> 12.
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(calls).toEqual([12]));
+
+    // serverValue prop is STILL 10 (refetch hasn't landed).  User
+    // edits back to 10.  Without the lastCommittedRef, this would
+    // see parsed=10 === serverValue=10 and short-circuit.  With the
+    // ref, it sees parsed=10 !== lastCommitted=12 and saves.
+    fireEvent.change(input, { target: { value: '10' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(calls).toEqual([12, 10]));
+    expect(input.value).toBe('10');
+  });
+
   it('serializes nullable saves: null in flight does not bypass the queue', async () => {
     // Regression: when V can be null (nullable fields like player name),
     // setting `inflightRef.current = null` to mean "saving null" used to

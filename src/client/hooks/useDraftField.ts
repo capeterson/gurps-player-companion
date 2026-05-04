@@ -116,6 +116,14 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   // null can never confuse `null` with a legitimate null payload.
   const inflightRef = useRef<{ value: V } | null>(null);
   const queuedRef = useRef<{ value: V } | null>(null);
+  // The most recently CONFIRMED authoritative value, updated by either
+  // an incoming server prop change or the success branch of a save.
+  // We compare against this for the commit() no-op short-circuit
+  // instead of using the raw `serverValue` prop, because the prop can
+  // lag a successful save until the refetch lands — meanwhile the user
+  // might re-edit back to the prior value, and a stale comparison
+  // would skip the PATCH and drop the edit silently.
+  const lastCommittedRef = useRef<V>(serverValue);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
 
@@ -142,6 +150,9 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   useEffect(() => {
     if (dirtyRef.current) return;
     if (inflightRef.current !== null) return;
+    // Server prop is now the authoritative committed value.  Future
+    // commit() short-circuits compare against this.
+    lastCommittedRef.current = serverValue;
     const formatted = formatRef.current(serverValue);
     setDraft(formatted);
     draftRef.current = formatted;
@@ -222,6 +233,13 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       }
 
       if (succeeded) {
+        // The server has just persisted `value`.  Treat it as the new
+        // authoritative committed value immediately, even though the
+        // `serverValue` prop won't catch up until the refetch lands.
+        // Without this, a quick "save 12, then edit back to 10" would
+        // see the no-op check pass against the stale 10 prop and drop
+        // the second edit.
+        lastCommittedRef.current = value;
         // No queue, save succeeded: if the live draft still matches the
         // value we just saved, mark clean so future server syncs can
         // update us.
@@ -275,8 +293,11 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       }
     }
 
-    if (equalsRef.current(parsed, serverValueRef.current) && inflightRef.current === null) {
-      // No-op: the typed value already matches the server.
+    if (equalsRef.current(parsed, lastCommittedRef.current) && inflightRef.current === null) {
+      // No-op: the typed value already matches the last value we
+      // committed (either confirmed by a prior save or arrived via
+      // the server prop).  Comparing against the prop directly would
+      // miss recent same-tab saves that haven't been refetched yet.
       dirtyRef.current = false;
       setError(null);
       return;

@@ -368,6 +368,42 @@ async function assertParentBelongsToCharacter(
   }
 }
 
+/**
+ * Reject a parent change that would form a cycle.  Walking ancestors
+ * up from the proposed parent: if we ever reach `itemId`, the new
+ * parent is a descendant of the item being patched, so applying the
+ * change would create a cycle.  `computeWeights` only seeds roots
+ * from rows whose `parentId` is null, so a cycle silently drops the
+ * whole subtree out of encumbrance — must be caught at write time.
+ */
+async function assertNoParentCycle(
+  proposedParentId: string,
+  itemId: string,
+  characterId: string,
+): Promise<void> {
+  const db = getDb();
+  const seen = new Set<string>();
+  let current: string | null = proposedParentId;
+  while (current !== null) {
+    if (current === itemId) {
+      throw new HTTPException(400, {
+        message: 'parent change would create an inventory cycle',
+      });
+    }
+    if (seen.has(current)) {
+      // Pre-existing cycle in the data; don't loop forever.
+      throw new HTTPException(400, { message: 'detected existing inventory cycle' });
+    }
+    seen.add(current);
+    const [row] = await db
+      .select({ parentId: inventoryItems.parentId })
+      .from(inventoryItems)
+      .where(and(eq(inventoryItems.id, current), eq(inventoryItems.characterId, characterId)));
+    if (!row) break;
+    current = row.parentId;
+  }
+}
+
 router.openapi(
   createRoute({
     method: 'post',
@@ -484,6 +520,10 @@ router.openapi(
         throw new HTTPException(400, { message: 'an item cannot be its own parent' });
       }
       await assertParentBelongsToCharacter(body.parentId, id);
+      // Cycle check: walking up from the proposed parent must never hit
+      // the item being patched.  If it would, the subtree would be
+      // detached from any root and silently disappear from encumbrance.
+      await assertNoParentCycle(body.parentId, itemId, id);
     }
     const db = getDb();
     const updates: Record<string, unknown> = { updatedAt: new Date() };
