@@ -1,7 +1,15 @@
 /**
  * Shared helpers for PATCHing the parent character.  Returns a save
- * factory: each call produces an `onSave` for one field that updates
- * the TanStack Query cache with the server's recomputed detail.
+ * factory: each call produces an `onSave` for one field that triggers
+ * a refetch of the canonical character detail.
+ *
+ * We deliberately do NOT `setQueryData` with the mutation response.
+ * Two saves in flight on different fields each return a full
+ * `CharacterDetail`; if the older response arrives last, an unconditional
+ * cache write would overwrite the newer field's value, which
+ * `useDraftField` would then silently sync back into the input.  Letting
+ * TanStack Query refetch instead serializes through the query client and
+ * always pulls the latest committed state.
  */
 
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
@@ -13,26 +21,13 @@ export function characterDetailKey(id: string) {
   return ['characters', id, 'detail'] as const;
 }
 
-export function applyDetailToCache(qc: QueryClient, id: string, detail: CharacterDetail) {
-  qc.setQueryData(characterDetailKey(id), detail);
-  // Also invalidate the list query so name/attr edits show up immediately
-  // when the user navigates back.
+/**
+ * Mark the character detail (and the list query) as stale so TanStack
+ * Query refetches.  `_detail` is accepted but ignored — see file header.
+ */
+export function applyDetailToCache(qc: QueryClient, id: string, _detail: CharacterDetail): void {
+  qc.invalidateQueries({ queryKey: characterDetailKey(id) });
   qc.invalidateQueries({ queryKey: ['characters'], exact: true });
-}
-
-export function useCharacterPatch(id: string) {
-  const qc = useQueryClient();
-  return useCallback(
-    <V>(field: string, value: V) =>
-      async () => {
-        const detail = await api<CharacterDetail>(`/characters/${id}`, {
-          method: 'PATCH',
-          body: { [field]: value },
-        });
-        applyDetailToCache(qc, id, detail);
-      },
-    [id, qc],
-  );
 }
 
 export function useFieldSaver(id: string) {

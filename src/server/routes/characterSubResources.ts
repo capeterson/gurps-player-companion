@@ -349,6 +349,25 @@ router.openapi(
 
 // ===================== INVENTORY =====================
 
+/**
+ * Reject a `parentId` that doesn't belong to this character.  Without
+ * this check a write could create cross-character parent links and
+ * later mutations on the parent would touch the other character's tree.
+ */
+async function assertParentBelongsToCharacter(
+  parentId: string,
+  characterId: string,
+): Promise<void> {
+  const db = getDb();
+  const [parent] = await db
+    .select({ id: inventoryItems.id })
+    .from(inventoryItems)
+    .where(and(eq(inventoryItems.id, parentId), eq(inventoryItems.characterId, characterId)));
+  if (!parent) {
+    throw new HTTPException(400, { message: 'parentId must reference an item on this character' });
+  }
+}
+
 router.openapi(
   createRoute({
     method: 'post',
@@ -379,6 +398,7 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
+    if (body.parentId) await assertParentBelongsToCharacter(body.parentId, id);
     const db = getDb();
     const [created] = await db
       .insert(inventoryItems)
@@ -459,6 +479,12 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
+    if (body.parentId !== undefined && body.parentId !== null) {
+      if (body.parentId === itemId) {
+        throw new HTTPException(400, { message: 'an item cannot be its own parent' });
+      }
+      await assertParentBelongsToCharacter(body.parentId, id);
+    }
     const db = getDb();
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries(body)) {
@@ -530,11 +556,15 @@ router.openapi(
       .from(inventoryItems)
       .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)));
     if (!doomed) throw new HTTPException(404, { message: 'item not found' });
-    // Reparent children up one level so we don't strand them.
+    // Reparent children up one level so we don't strand them.  Always
+    // scope to this character's items: even though create/patch validate
+    // `parentId`, defence in depth means a stray cross-character link
+    // (e.g. from an older record) can't pull a sibling character's row
+    // along on delete.
     await db
       .update(inventoryItems)
       .set({ parentId: doomed.parentId, updatedAt: new Date() })
-      .where(eq(inventoryItems.parentId, itemId));
+      .where(and(eq(inventoryItems.parentId, itemId), eq(inventoryItems.characterId, id)));
     await db
       .delete(inventoryItems)
       .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)));
@@ -580,35 +610,32 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const db = getDb();
-    const [existing] = await db.select().from(combatStates).where(eq(combatStates.characterId, id));
-    let row: typeof combatStates.$inferSelect | undefined;
-    if (!existing) {
-      const derived = computeDerived(characterAttrsFromRow(access.character));
-      const [created] = await db
-        .insert(combatStates)
-        .values({
-          characterId: id,
-          currentHp: body.currentHp ?? derived.hp,
-          currentFp: body.currentFp ?? derived.fp,
-          conditions: body.conditions ?? [],
-          maneuver: body.maneuver ?? null,
-          posture: body.posture ?? 'standing',
-        })
-        .returning();
-      row = created;
-    } else {
-      const updates: Record<string, unknown> = { updatedAt: new Date() };
-      for (const [k, v] of Object.entries(body)) {
-        if (v === undefined) continue;
-        updates[k] = v;
-      }
-      const [updated] = await db
-        .update(combatStates)
-        .set(updates)
-        .where(eq(combatStates.characterId, id))
-        .returning();
-      row = updated;
+
+    // Atomic upsert keyed on the unique (character_id) index. Doing this
+    // as a single statement is essential: the previous select-then-insert
+    // sequence let two parallel first-time edits both observe `!existing`
+    // and then collide on the unique constraint, rolling one save back.
+    const derived = computeDerived(characterAttrsFromRow(access.character));
+    const setOnUpdate: Record<string, unknown> = { updatedAt: new Date() };
+    for (const [k, v] of Object.entries(body)) {
+      if (v === undefined) continue;
+      setOnUpdate[k] = v;
     }
+    const [row] = await db
+      .insert(combatStates)
+      .values({
+        characterId: id,
+        currentHp: body.currentHp ?? derived.hp,
+        currentFp: body.currentFp ?? derived.fp,
+        conditions: body.conditions ?? [],
+        maneuver: body.maneuver ?? null,
+        posture: body.posture ?? 'standing',
+      })
+      .onConflictDoUpdate({
+        target: combatStates.characterId,
+        set: setOnUpdate,
+      })
+      .returning();
     if (!row) throw new HTTPException(500, { message: 'combat upsert failed' });
     return c.json({ combat: buildCombatStateOut(row), character: await refreshDetail(id) }, 200);
   },
