@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
 import { api } from '../../lib/api.ts';
 
 export function CharactersPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const characters = useQuery({
     queryKey: ['characters'],
     queryFn: () => api<CharacterListItem[]>('/characters'),
@@ -17,9 +19,10 @@ export function CharactersPage() {
         method: 'POST',
         body: { name, st: 10, dx: 10, iq: 10, ht: 10 },
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       setName('');
       qc.invalidateQueries({ queryKey: ['characters'] });
+      navigate(`/characters/${created.id}`);
     },
   });
 
@@ -58,15 +61,20 @@ export function CharactersPage() {
 
       <ul className="grid md:grid-cols-2 gap-3">
         {(characters.data ?? []).map((c) => (
-          <li key={c.id} className="card bg-base-200 border border-base-300 p-4">
-            <div className="flex items-baseline justify-between">
-              <p className="font-display text-xl">{c.name}</p>
-              <span className="label-eyebrow">TL {c.techLevel ?? '—'}</span>
-            </div>
-            <p className="text-sm text-base-content/70">
-              <span className="num">ST {c.st}</span> · <span className="num">DX {c.dx}</span> ·{' '}
-              <span className="num">IQ {c.iq}</span> · <span className="num">HT {c.ht}</span>
-            </p>
+          <li key={c.id}>
+            <Link
+              to={`/characters/${c.id}`}
+              className="card bg-base-200 border border-base-300 p-4 block hover:bg-base-300 transition-colors"
+            >
+              <div className="flex items-baseline justify-between">
+                <p className="font-display text-xl">{c.name}</p>
+                <span className="label-eyebrow">TL {c.techLevel ?? '—'}</span>
+              </div>
+              <p className="text-sm text-base-content/70">
+                <span className="num">ST {c.st}</span> · <span className="num">DX {c.dx}</span> ·{' '}
+                <span className="num">IQ {c.iq}</span> · <span className="num">HT {c.ht}</span>
+              </p>
+            </Link>
           </li>
         ))}
         {characters.data?.length === 0 && (

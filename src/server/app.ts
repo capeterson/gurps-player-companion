@@ -6,6 +6,7 @@ import { type AppEnv, createOpenApiApp } from './openapi/app.ts';
 import { apiKeysRouter } from './routes/apiKeys.ts';
 import { authRouter } from './routes/auth.ts';
 import { campaignsRouter } from './routes/campaigns.ts';
+import { characterSubResourcesRouter } from './routes/characterSubResources.ts';
 import { charactersRouter } from './routes/characters.ts';
 import { healthRouter } from './routes/health.ts';
 import { attachStaticHandler } from './static.ts';
@@ -30,6 +31,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', apiKeysRouter);
   app.route('/api/v1', campaignsRouter);
   app.route('/api/v1', charactersRouter);
+  app.route('/api/v1', characterSubResourcesRouter);
 
   // Register the bearer security scheme so /api/v1/openapi.json describes it.
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {

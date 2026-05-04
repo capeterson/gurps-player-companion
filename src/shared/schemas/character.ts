@@ -1,5 +1,9 @@
 import { z } from 'zod';
+import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, uuid } from './common.ts';
+import { inventoryItemOut } from './inventory.ts';
+import { skillOut } from './skill.ts';
+import { traitOut } from './trait.ts';
 
 const attr = z.number().int().min(1).max(99);
 const mod = z.number().int().min(-50).max(50);
@@ -122,6 +126,10 @@ export const characterDetail = z.object({
   points: pointBreakdownOut,
   encumbrance: encumbranceOut,
   warnings: z.array(warningOut),
+  traits: z.array(traitOut),
+  skills: z.array(skillOut),
+  inventory: z.array(inventoryItemOut),
+  combat: combatStateOut.nullable(),
 });
 
 export type CharacterCreate = z.infer<typeof characterCreate>;
