@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "bunx --bun vite",
     "dev:server-only": "bun run --hot src/server/index.ts",
-    "build": "bun run build:client && bun run build:server",
+    "build": "bun run build:client && bun run build:server && bun run build:migrate",
     "build:client": "vite build",
     "build:server": "bun build src/server/index.ts --outdir dist/server --target bun",
+    "build:migrate": "bun build src/server/db/migrate.ts --outdir dist/server --target bun",
     "start": "bun run dist/server/index.js",
     "test": "bun test src/server src/shared",
     "test:client": "vitest run --passWithNoTests",

@@ -19,7 +19,7 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: 'no'
-    command: ['bun', 'run', 'db:migrate']
+    command: ['bun', 'run', 'dist/server/migrate.js']
     environment:
       DATABASE_URL: postgres://gurps:gurps@db:5432/gurps
     depends_on:

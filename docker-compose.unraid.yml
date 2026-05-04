@@ -1,0 +1,68 @@
+# GURPS Player Companion — Unraid production compose
+#
+# Pulls a prebuilt image from GHCR (published by .github/workflows/publish-image.yml).
+# No source on the server, no on-server build, no `context:` paths to get wrong.
+#
+# Setup (run once, from the project folder this file lives in):
+#   1. mkdir -p /mnt/user/appdata/gurps-companion/db
+#   2. echo "JWT_SECRET=$(openssl rand -hex 32)" > .env
+#      (optional, in same .env: TAG=v0.1.0, HOST_PORT=3030,
+#       POSTGRES_PASSWORD=<strong>, CORS_ORIGINS=["https://your.domain"])
+#   3. docker compose -f docker-compose.unraid.yml pull
+#   4. docker compose -f docker-compose.unraid.yml up -d
+#
+# Update:  docker compose -f docker-compose.unraid.yml pull \
+#       && docker compose -f docker-compose.unraid.yml up -d
+# Logs:    docker logs -f gurps-app
+#
+# When running under the Compose Manager plugin, copy this file into the
+# project folder as `compose.yml` so the plugin's Up/Pull buttons just work.
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: gurps-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gurps
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gurps}
+      POSTGRES_DB: gurps
+    volumes:
+      - /mnt/user/appdata/gurps-companion/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gurps -d gurps']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: ghcr.io/capeterson/gurps-player-companion:${TAG:-latest}
+    container_name: gurps-migrate
+    restart: 'no'
+    command: ['bun', 'run', 'dist/server/migrate.js']
+    environment:
+      DATABASE_URL: postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    image: ghcr.io/capeterson/gurps-player-companion:${TAG:-latest}
+    container_name: gurps-app
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (>=32 chars). Generate with: openssl rand -hex 32}
+      JWT_ACCESS_TTL_MINUTES: 15
+      JWT_REFRESH_TTL_DAYS: 14
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - '${HOST_PORT:-3030}:3000'
