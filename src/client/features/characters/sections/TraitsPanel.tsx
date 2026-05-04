@@ -23,6 +23,14 @@ interface AddTraitFormProps {
   canWrite: boolean;
 }
 
+interface TraitSnapshot {
+  name: string;
+  nameRaw: string;
+  kind: TraitKind;
+  points: number;
+  pointsRaw: string;
+}
+
 function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
   const qc = useQueryClient();
   const toasts = useToasts();
@@ -31,24 +39,19 @@ function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
   const [points, setPoints] = useState('0');
 
   const create = useMutation({
-    mutationFn: async () => {
-      const res = await api<{ trait: TraitOut; character: CharacterDetail }>(
-        `/characters/${characterId}/traits`,
-        {
-          method: 'POST',
-          body: {
-            name: name.trim(),
-            kind,
-            points: Number(points) || 0,
-          },
-        },
-      );
-      return res;
-    },
-    onSuccess: (res) => {
+    mutationFn: (snap: TraitSnapshot) =>
+      api<{ trait: TraitOut; character: CharacterDetail }>(`/characters/${characterId}/traits`, {
+        method: 'POST',
+        body: { name: snap.name, kind: snap.kind, points: snap.points },
+      }),
+    onSuccess: (res, snap) => {
       applyDetailToCache(qc, characterId, res.character);
-      setName('');
-      setPoints('0');
+      // Per AGENTS.md (rule 1: never silently discard user edits): only
+      // clear fields whose current value still matches the snapshot we
+      // submitted.  If the user has started typing the next trait while
+      // this POST was in flight, leave that draft alone.
+      if (name === snap.nameRaw) setName('');
+      if (points === snap.pointsRaw) setPoints('0');
     },
     onError: (err) => {
       toasts.push(`Couldn't add trait — ${(err as Error).message}`, { kind: 'error' });
@@ -63,7 +66,18 @@ function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        create.mutate();
+        // `Number.isFinite` keeps both 0 and negative values (a -10
+        // disadvantage) intact.  `Number(...) || 0` would already
+        // preserve 0 here but breaks if the user clears the field —
+        // make the parse explicit and let invalid input fall to 0.
+        const pParsed = Number(points);
+        create.mutate({
+          name: name.trim(),
+          nameRaw: name,
+          kind,
+          points: Number.isFinite(pParsed) ? pParsed : 0,
+          pointsRaw: points,
+        });
       }}
     >
       <label className="form-control flex-1 min-w-[10rem]">

@@ -16,6 +16,15 @@ interface AddItemFormProps {
   canWrite: boolean;
 }
 
+interface ItemSnapshot {
+  name: string;
+  nameRaw: string;
+  quantity: number;
+  quantityRaw: string;
+  weightLbs: number;
+  weightRaw: string;
+}
+
 function AddItemForm({ characterId, canWrite }: AddItemFormProps) {
   const qc = useQueryClient();
   const toasts = useToasts();
@@ -24,23 +33,23 @@ function AddItemForm({ characterId, canWrite }: AddItemFormProps) {
   const [weight, setWeight] = useState('0');
 
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (snap: ItemSnapshot) =>
       api<{ item: InventoryItemOut; character: CharacterDetail }>(
         `/characters/${characterId}/inventory`,
         {
           method: 'POST',
-          body: {
-            name: name.trim(),
-            quantity: Number(quantity) || 1,
-            weightLbs: Number(weight) || 0,
-          },
+          body: { name: snap.name, quantity: snap.quantity, weightLbs: snap.weightLbs },
         },
       ),
-    onSuccess: (res) => {
+    onSuccess: (res, snap) => {
       applyDetailToCache(qc, characterId, res.character);
-      setName('');
-      setQuantity('1');
-      setWeight('0');
+      // Per AGENTS.md (rule 1: never silently discard user edits): only
+      // reset fields whose current value still matches what we
+      // submitted.  If the user has started typing the next item while
+      // this POST was in flight, leave that draft in place.
+      if (name === snap.nameRaw) setName('');
+      if (quantity === snap.quantityRaw) setQuantity('1');
+      if (weight === snap.weightRaw) setWeight('0');
     },
     onError: (err) => {
       toasts.push(`Couldn't add item — ${(err as Error).message}`, { kind: 'error' });
@@ -55,7 +64,19 @@ function AddItemForm({ characterId, canWrite }: AddItemFormProps) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        create.mutate();
+        // `Number.isFinite` preserves valid 0 (e.g. a quest token with
+        // 0 weight or a quantity-tracked stack at 0).  `Number(...) || 1`
+        // would silently coerce 0 to 1.
+        const qParsed = Number(quantity);
+        const wParsed = Number(weight);
+        create.mutate({
+          name: name.trim(),
+          nameRaw: name,
+          quantity: Number.isFinite(qParsed) ? qParsed : 1,
+          quantityRaw: quantity,
+          weightLbs: Number.isFinite(wParsed) ? wParsed : 0,
+          weightRaw: weight,
+        });
       }}
     >
       <label className="form-control flex-1 min-w-[10rem]">

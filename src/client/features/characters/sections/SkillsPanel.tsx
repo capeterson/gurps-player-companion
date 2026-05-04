@@ -17,6 +17,15 @@ interface AddSkillFormProps {
   canWrite: boolean;
 }
 
+interface SkillSnapshot {
+  name: string;
+  nameRaw: string;
+  attribute: SkillAttribute;
+  difficulty: SkillDifficulty;
+  points: number;
+  pointsRaw: string;
+}
+
 function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
   const qc = useQueryClient();
   const toasts = useToasts();
@@ -26,20 +35,24 @@ function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
   const [points, setPoints] = useState('1');
 
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (snap: SkillSnapshot) =>
       api<{ skill: SkillOut; character: CharacterDetail }>(`/characters/${characterId}/skills`, {
         method: 'POST',
         body: {
-          name: name.trim(),
-          attribute,
-          difficulty,
-          points: Number(points) || 1,
+          name: snap.name,
+          attribute: snap.attribute,
+          difficulty: snap.difficulty,
+          points: snap.points,
         },
       }),
-    onSuccess: (res) => {
+    onSuccess: (res, snap) => {
       applyDetailToCache(qc, characterId, res.character);
-      setName('');
-      setPoints('1');
+      // Per AGENTS.md (rule 1: never silently discard user edits): only
+      // clear fields whose current value still matches the snapshot we
+      // submitted.  If the user has started typing the next skill while
+      // this POST was in flight, leave that draft alone.
+      if (name === snap.nameRaw) setName('');
+      if (points === snap.pointsRaw) setPoints('1');
     },
     onError: (err) => {
       toasts.push(`Couldn't add skill — ${(err as Error).message}`, { kind: 'error' });
@@ -54,7 +67,18 @@ function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        create.mutate();
+        // Use Number.isFinite so a valid `0` survives (zero-point
+        // skills are accepted by the schema and the edit path);
+        // `Number(...) || 1` would silently rewrite 0 to 1.
+        const pParsed = Number(points);
+        create.mutate({
+          name: name.trim(),
+          nameRaw: name,
+          attribute,
+          difficulty,
+          points: Number.isFinite(pParsed) && pParsed >= 0 ? pParsed : 1,
+          pointsRaw: points,
+        });
       }}
     >
       <label className="form-control flex-1 min-w-[10rem]">
