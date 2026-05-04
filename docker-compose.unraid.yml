@@ -25,6 +25,17 @@
 #
 # When running under the Compose Manager plugin, copy this file into the
 # project folder as `compose.yml` so the plugin's Up/Pull buttons just work.
+#
+# Upgrading from a pre-PG18 layout:
+#   Earlier versions of this file mounted /mnt/user/appdata/gurps-companion/db
+#   at /var/lib/postgresql/data. Postgres 18 refuses that layout (PGDATA now
+#   lives under /var/lib/postgresql/<MAJOR>/docker), so the host path moved to
+#   .../postgres and the mount target moved up one level. Stale data at the
+#   old `.../db` path is left untouched on disk — it is NOT auto-migrated.
+#   - Aborted/empty PG18 init: `rm -rf /mnt/user/appdata/gurps-companion/db`.
+#   - Real PG17 (or older) data: run `pg_upgrade --link` against a transient
+#     17+18 image pair before pulling this compose, or dump+restore. See
+#     https://www.postgresql.org/docs/18/pgupgrade.html.
 
 services:
   db:
@@ -53,6 +64,9 @@ services:
     command: ['bun', 'run', 'dist/server/migrate.js']
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps}
+      # Migrate shares the server config loader, which validates JWT_SECRET
+      # even though migrations don't use it. Pass it through.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for prod compose; generate with `openssl rand -hex 32`}
     depends_on:
       db:
         condition: service_healthy
