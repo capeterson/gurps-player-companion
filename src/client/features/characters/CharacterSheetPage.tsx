@@ -8,6 +8,7 @@ import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
 import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
+import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
@@ -194,7 +195,12 @@ function TempCell({
   canWrite: boolean;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
-  const { onSave } = buildSave(field, { humanName: `${label} temp` });
+  const { onSave, flashKey } = buildSave(field, { humanName: `${label} temp` });
+  // Subscribe to async outbox rejections on this field's flash key so
+  // the chip pulses (AGENTS.md rule 2). Without this the chip would
+  // silently snap back to the reverted value when the orchestrator
+  // rolls a rejected patch back in Dexie — only the toast would show.
+  const flash = useFieldFlash(flashKey);
   const [open, setOpen] = useState(false);
   const display = tempValue === 0 ? '—' : tempValue > 0 ? `+${tempValue}` : String(tempValue);
 
@@ -212,7 +218,9 @@ function TempCell({
         onClick={() => setOpen((v) => !v)}
         aria-label={`${label} temporary modifier`}
         aria-expanded={open}
-        className={`chip num min-w-[3rem] justify-center ${tempValue !== 0 ? 'on' : ''}`}
+        className={`${DRAFT_FIELD_CLASS} chip num min-w-[3rem] justify-center ${tempValue !== 0 ? 'on' : ''}`}
+        data-flashing={flash['data-flashing']}
+        data-flash-parity={flash['data-flash-parity']}
       >
         {display}
       </button>
