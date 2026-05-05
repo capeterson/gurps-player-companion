@@ -126,7 +126,6 @@ function AddItemForm({
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
-            getOptionLabel={(o) => o.name}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">
                 <span className="truncate">

@@ -18,15 +18,33 @@ export interface InventoryTree {
   readonly byId: Map<string, InventoryItemOut>;
 }
 
-/** Build a parent→children index. Children are sorted by name (stable). */
+/**
+ * Build a parent→children index. Children are sorted by name (stable).
+ *
+ * Items whose `parentId` doesn't resolve to any other row in `items`
+ * are treated as roots (added to the `null` bucket). This handles the
+ * "deleted container" race: after an optimistic delete of a container
+ * the children still carry a stale `parentId`, but until the server's
+ * reparent-then-delete patch syncs back, the renderer would otherwise
+ * lose them entirely. Surfacing them as roots keeps them visible and
+ * editable; the next sync will move them under the correct new parent
+ * (the deleted container's own parent, per the server's policy).
+ */
 export function buildTree(items: readonly InventoryItemOut[]): InventoryTree {
   const byParent = new Map<string | null, InventoryItemOut[]>();
   const byId = new Map<string, InventoryItemOut>();
   for (const item of items) {
     byId.set(item.id, item);
-    const bucket = byParent.get(item.parentId);
+  }
+  for (const item of items) {
+    // Items pointing at a parent that doesn't exist in this set are
+    // orphans; promote them to roots.  The original `parentId` is left
+    // alone — the next sync will fix it.
+    const effectiveParent =
+      item.parentId === null || byId.has(item.parentId) ? item.parentId : null;
+    const bucket = byParent.get(effectiveParent);
     if (bucket) bucket.push(item);
-    else byParent.set(item.parentId, [item]);
+    else byParent.set(effectiveParent, [item]);
   }
   for (const bucket of byParent.values()) {
     bucket.sort((a, b) => a.name.localeCompare(b.name));

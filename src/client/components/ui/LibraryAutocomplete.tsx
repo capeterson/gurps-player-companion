@@ -35,8 +35,6 @@ interface Props<T> {
   renderOption: (option: T, highlighted: boolean) => ReactNode;
   /** Stable key for an option (used as React key). */
   getOptionKey: (option: T) => string;
-  /** Stable label for an option (also written into the input on pick). */
-  getOptionLabel: (option: T) => string;
   /** Min characters before fetching. Default 1. */
   minChars?: number;
   /** Debounce in milliseconds. Default 200. */
@@ -57,7 +55,6 @@ export function LibraryAutocomplete<T>({
   fetchOptions,
   renderOption,
   getOptionKey,
-  getOptionLabel,
   minChars = 1,
   debounceMs = 200,
   placeholder,
@@ -123,11 +120,18 @@ export function LibraryAutocomplete<T>({
 
   const pick = useCallback(
     (opt: T) => {
+      // Only `onPick` fires here. Calling `onChange` after `onPick` would
+      // race with the caller's typical "clear pickedLibraryId on free-text
+      // edit" handler — both run in the same React event, the clear wins,
+      // and the parent ends up with the option value but no library FK
+      // (and, for traits, no captured catalogue entry → modifier picker
+      // disappears). The contract is now: parents that want the input to
+      // reflect the pick must call their own `setName(opt.name)` inside
+      // `onPick` (all current callers already do).
       onPick(opt);
-      onChange(getOptionLabel(opt));
       setOpen(false);
     },
-    [onPick, onChange, getOptionLabel],
+    [onPick],
   );
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {

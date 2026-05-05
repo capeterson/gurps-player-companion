@@ -52,6 +52,33 @@ describe('buildTree', () => {
     expect(byParent.get(null)?.map((i) => i.name)).toEqual(['Backpack', 'Sword']);
     expect(byParent.get('2')?.map((i) => i.name)).toEqual(['Apple', 'Bedroll']);
   });
+
+  it('promotes orphans to roots when their parent is missing from the set', () => {
+    // Codex review on PR #22: deleting a container optimistically leaves
+    // its children with a parentId that no longer resolves. Without
+    // orphan recovery the children would vanish from the rendered tree
+    // until the next sync. Surfacing them as roots keeps them visible
+    // and editable in the meantime.
+    const items = [
+      item('a', null, 'Apple'),
+      item('orphan', 'gone', 'Bedroll'),
+      item('also-orphan', 'gone-too', 'Coin', true),
+      item('child-of-orphan', 'also-orphan', 'Spike'),
+    ];
+    const { byParent } = buildTree(items);
+    // Both orphans show up in the null bucket alongside the actual root.
+    expect(
+      byParent
+        .get(null)
+        ?.map((i) => i.id)
+        .sort(),
+    ).toEqual(['a', 'also-orphan', 'orphan']);
+    // The orphan-with-children keeps its children attached.
+    expect(byParent.get('also-orphan')?.map((i) => i.id)).toEqual(['child-of-orphan']);
+    // The original (broken) parentIds are NOT in byParent.
+    expect(byParent.get('gone')).toBeUndefined();
+    expect(byParent.get('gone-too')).toBeUndefined();
+  });
 });
 
 describe('flattenDFS', () => {
