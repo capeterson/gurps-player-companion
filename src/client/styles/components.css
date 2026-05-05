@@ -1,0 +1,195 @@
+/* ============================================================
+   Arcane component primitives
+
+   Ports of the design handoff's reusable surface classes (`.chip`,
+   `.row`, `.panel-tabs`, `.combat-fab`, `.hp-bar`) so that callers
+   in Tailwind/JSX get the design's exact spacing, radius, and
+   colour rules without re-declaring them in every component.
+
+   Tokens consumed (defined in theme.css):
+     --color-base-100/200/300, --color-base-content, --color-primary,
+     --color-warning, --text-muted, --text-dim, --border-strong,
+     --accent-soft, --surface-deep, --hp-* ramp, --shadow-glow,
+     --spacing-card, --spacing-row, --radius-field, --radius-box.
+   ============================================================ */
+
+/* ---- Chip --------------------------------------------------- */
+/* Compact pill, used for posture/condition toggles, role badges,
+   filter tabs on the adventure log. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chip:hover {
+  color: var(--color-base-content);
+}
+.chip.on {
+  background: var(--accent-soft);
+  border-color: var(--color-primary);
+  color: var(--color-base-content);
+}
+.chip-dot {
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border-radius: 9999px;
+  background: var(--color-primary);
+}
+
+/* ---- Row + Row.head ---------------------------------------- */
+/* Grid-aligned table row. Callers set `gridTemplateColumns` per
+   table layout. Header row uses uppercase eyebrow styling. */
+.row {
+  display: grid;
+  align-items: center;
+  min-height: var(--spacing-row);
+  padding: 0.25rem 0.875rem;
+  border-bottom: 1px solid var(--color-base-300);
+  font-size: 0.8125rem;
+  color: var(--color-base-content);
+  font-family: var(--font-sans);
+}
+.row:last-child {
+  border-bottom: none;
+}
+.row .num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+.row.head {
+  color: var(--text-dim);
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: var(--color-base-200);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+/* ---- Panel tabs (in-card tab bar) -------------------------- */
+.panel-tabs {
+  display: flex;
+  gap: 0.125rem;
+  border-bottom: 1px solid var(--color-base-300);
+}
+.panel-tab {
+  padding: 0.625rem 1.125rem;
+  font-size: 0.8125rem;
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.panel-tab:hover {
+  color: var(--color-base-content);
+}
+.panel-tab.active {
+  color: var(--color-base-content);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ---- HP bar ------------------------------------------------- */
+/* Fill colour set inline by the caller via `style={{ background:
+   hpColor }}`. Background uses the recessed surface so the bar
+   reads as a well punched into the card. */
+.hp-bar {
+  position: relative;
+  width: 100%;
+  background: var(--surface-deep);
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 1px solid var(--color-base-300);
+}
+.hp-bar > div {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.35s cubic-bezier(0.2, 0.7, 0.3, 1), background 0.25s;
+}
+
+/* ---- Combat FAB -------------------------------------------- */
+/* Sticky pill anchored bottom-right of the character sheet. Lives
+   above content (z 20) but below the modal backdrop (z 50). */
+.combat-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 20;
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  border-radius: 9999px;
+  padding: 0.75rem 1.375rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: var(--shadow-glow);
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.08s;
+}
+.combat-fab:hover {
+  transform: translateY(-1px);
+}
+.combat-fab .num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Modal backdrop ---------------------------------------- */
+.modal-back {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+/* ---- Bumper button (combat HP/FP +/- pad) ------------------ */
+.bumper {
+  flex: 1;
+  height: 3.5rem;
+  background: var(--color-base-200);
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 1.125rem;
+  cursor: pointer;
+  color: var(--hp-good);
+  transition: background 0.15s, border-color 0.15s;
+}
+.bumper:hover {
+  background: var(--color-base-100);
+  border-color: var(--border-strong);
+}
+.bumper.dmg {
+  color: var(--hp-crit);
+}
