@@ -1,10 +1,16 @@
 import { useIsMutating, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { api } from './lib/api.ts';
 import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
 import type { ThemeName } from './lib/theme.ts';
 import { tokenStore } from './lib/tokenStore.ts';
+
+const NAV_TABS = [
+  { to: '/characters', label: 'Sheet' },
+  { to: '/log', label: 'Log' },
+  { to: '/campaigns', label: 'Campaign' },
+] as const;
 
 interface MeResponse {
   id: string;
@@ -45,19 +51,37 @@ export function App() {
   }
 
   return (
-    <div className="arcane-edge min-h-screen bg-base-100 text-base-content">
-      <header className="navbar relative z-50 bg-base-200/95 border-b border-base-300 backdrop-blur">
-        <div className="flex-1 flex items-center gap-4 px-4">
-          <Link to="/" className="font-display text-xl">
-            GURPS Player Companion
+    <div className="arcane-edge min-h-screen bg-base-200 text-base-content">
+      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-base-300 bg-base-100/95 px-4 py-3 backdrop-blur sm:px-7">
+        <div className="flex items-center gap-6">
+          <Link to="/" className="flex items-center gap-3 no-cap">
+            <span
+              aria-hidden="true"
+              className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-primary font-display text-base font-bold text-primary-content"
+            >
+              G
+            </span>
+            <span className="font-display text-base font-semibold">Player Companion</span>
           </Link>
-          <nav className="flex gap-2">
-            <Link to="/characters" className="btn btn-ghost btn-sm">
-              Characters
-            </Link>
+          <nav className="flex gap-1">
+            {NAV_TABS.map((tab) => (
+              <NavLink
+                key={tab.to}
+                to={tab.to}
+                className={({ isActive }) =>
+                  `rounded-field px-3.5 py-2 text-sm font-medium transition ${
+                    isActive
+                      ? 'bg-base-200 text-base-content'
+                      : 'text-muted hover:bg-base-200 hover:text-base-content'
+                  }`
+                }
+              >
+                {tab.label}
+              </NavLink>
+            ))}
           </nav>
         </div>
-        <div className="flex-none flex items-center gap-3 px-4">
+        <div className="flex items-center gap-3">
           {isMutating > 0 && (
             <span className="badge badge-primary badge-sm" aria-live="polite" aria-label="Saving">
               <span className="inline-block w-2 h-2 bg-current rounded-full animate-pulse mr-1" />
@@ -73,7 +97,7 @@ export function App() {
               <span>{me.data?.displayName ?? 'Account'}</span>
               <span aria-hidden="true">▾</span>
             </summary>
-            <ul className="menu dropdown-content z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-200 p-2 shadow-xl">
+            <ul className="menu dropdown-content z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg">
               <li className="menu-title px-3 py-2">
                 <span>{me.data?.email ?? 'Loading account…'}</span>
               </li>
@@ -89,7 +113,7 @@ export function App() {
           </details>
         </div>
       </header>
-      <main className="relative z-0 container mx-auto p-4 sm:p-6">
+      <main className="relative z-0 mx-auto w-full max-w-[80rem] p-4 sm:p-7">
         <Outlet />
       </main>
     </div>
