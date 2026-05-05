@@ -778,13 +778,20 @@ function SecondaryModsPanel({
           canWrite={canWrite}
         />
         <SecondaryModCell
-          label="Basic Speed"
+          // The underlying field is in quarter-units of Basic Speed, so
+          // the row is labelled "Speed (¼)" — Codex review on PR #21
+          // flagged the previous "Basic Speed" label as misleading
+          // because the inline temp caption and the TempBoostPopover
+          // preview are quarters-arithmetic (e.g. "20 + (+1) = 21").
+          // The decimal headline stays via `derivedDisplay` with a
+          // "(×4)" hint, matching the legacy gurps-player-web pattern.
+          label="Speed (¼)"
           modField="speedQuarterMod"
           modValue={character.speedQuarterMod}
           tempField="tempSpeedQuarterMod"
           tempValue={character.tempSpeedQuarterMod}
           derived={character.derived.basicSpeedQuarters}
-          derivedDisplay={character.derived.basicSpeed.toFixed(2)}
+          derivedDisplay={`${character.derived.basicSpeed.toFixed(2)} (×4)`}
           infoKey="speed"
           characterId={character.id}
           canWrite={canWrite}

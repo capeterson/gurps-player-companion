@@ -91,7 +91,14 @@ export const SECONDARY_INFO: Record<SecondaryModKey, SecondaryModInfo> = {
     influences: ['Fatigue points only — does not change HT'],
   },
   speed: {
-    label: 'Basic Speed',
+    // The underlying field is `speedQuarterMod` (integer quarters of
+    // Basic Speed). The "(¼)" suffix on the label is how the row tells
+    // the reader that the input, the temp delta, and the popover math
+    // are all in quarter-step units, while the headline still surfaces
+    // the decimal Basic Speed value via `derivedDisplay`. Mirrors the
+    // legacy gurps-player-web convention so a `+1` temp clearly reads
+    // as "+1 quarter (= +0.25 Basic Speed)" instead of "+1.0".
+    label: 'Speed (¼)',
     nextCostLabel: `+0.25 = ${SPEED_COST_PER_QUARTER} pts`,
     influences: [
       'Basic Speed (in 0.25 increments)',
