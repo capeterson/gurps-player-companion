@@ -1,20 +1,18 @@
 /**
  * Combat modal — the prototype's bottom-right FAB target.
- * Reuses the existing `/characters/:id/combat` PATCH endpoint, so
- * edits made here flow through the same query cache + warnings
- * regeneration path as the in-sheet CombatPanel. Posture/conditions
+ * Edits flow through the local Dexie outbox (same path as the in-sheet
+ * CombatPanel): each bumper / chip toggle calls `enqueueFieldPatch`,
+ * which the orchestrator drains to the server. Posture/conditions
  * toggles update live; HP damage triggers the `flash` keyframe and
  * the `num-tween` pop on the big HP number.
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import type { CombatStateOut } from '../../../../shared/schemas/combat.ts';
-import { api } from '../../../lib/api.ts';
-import { useToasts } from '../../../lib/toast.tsx';
+import { getLocalDb } from '../../../db/dexie.ts';
+import { makeFlashKey } from '../../../sync/flashBus.ts';
+import { enqueueFieldPatch } from '../../../sync/outbox.ts';
 import { hpVarFor } from './hpColor.ts';
-import { applyDetailToCache } from './useCharacterPatch.ts';
 
 const POSTURES = [
   'standing',
@@ -35,8 +33,6 @@ interface CombatModalProps {
 }
 
 export function CombatModal({ character, canWrite, onClose }: CombatModalProps) {
-  const qc = useQueryClient();
-  const toasts = useToasts();
   const combat = character.combat;
   const hp = combat?.currentHp ?? character.derived.hp;
   const fp = combat?.currentFp ?? character.derived.fp;
@@ -63,24 +59,42 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const patch = useMutation({
-    mutationFn: async (body: Record<string, unknown>) => {
-      const res = await api<{ combat: CombatStateOut; character: CharacterDetail }>(
-        `/characters/${character.id}/combat`,
-        { method: 'PATCH', body },
-      );
-      applyDetailToCache(qc, character.id, res.character);
-      return res;
-    },
-    onError: (err) => {
-      toasts.push(`Combat update failed — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+  // Combat is 1:1 keyed by characterId. If a local row doesn't exist
+  // yet, materialize a default in Dexie so the per-field patch has a
+  // row to update; the orchestrator's whole-body upsert handles the
+  // server side. Mirrors CharacterSheetPage's CombatPanel.patchCombat.
+  async function patchCombat(field: string, value: unknown) {
+    const db = getLocalDb();
+    const existing = await db.characterCombat.get(character.id);
+    if (!existing) {
+      await db.characterCombat.put({
+        id: character.id,
+        characterId: character.id,
+        currentHp: character.derived.hp,
+        currentFp: character.derived.fp,
+        conditions: [],
+        maneuver: null,
+        posture: 'standing',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        revision: -1,
+      });
+    }
+    await enqueueFieldPatch({
+      entityClass: 'character_combat',
+      entityId: character.id,
+      fieldPath: field,
+      attemptedValue: value,
+      humanName: field,
+      flashKey: makeFlashKey('character_combat', character.id, field),
+      characterId: character.id,
+    });
+  }
 
   function bumpHp(d: number) {
     if (!canWrite || hpMax <= 0) return;
     const next = Math.max(-hpMax * 4, Math.min(hpMax, hp + d));
-    patch.mutate({ currentHp: next });
+    void patchCombat('currentHp', next);
     if (d < 0) {
       setFlashHp(true);
       if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -91,12 +105,12 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
   function bumpFp(d: number) {
     if (!canWrite || fpMax <= 0) return;
     const next = Math.max(-fpMax, Math.min(fpMax, fp + d));
-    patch.mutate({ currentFp: next });
+    void patchCombat('currentFp', next);
   }
 
   function setPosture(p: (typeof POSTURES)[number]) {
     if (!canWrite) return;
-    patch.mutate({ posture: p });
+    void patchCombat('posture', p);
   }
 
   function toggleCondition(c: string) {
@@ -104,7 +118,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
     const next = conditions.includes(c)
       ? conditions.filter((x: string) => x !== c)
       : [...conditions, c];
-    patch.mutate({ conditions: next });
+    void patchCombat('conditions', next);
   }
 
   const hpRatio = hpMax > 0 ? hp / hpMax : 0;
@@ -187,7 +201,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               <button
                 type="button"
                 className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                onClick={() => patch.mutate({ currentHp: hpMax })}
+                onClick={() => void patchCombat('currentHp', hpMax)}
               >
                 Reset to {hpMax}
               </button>

@@ -17049,6 +17049,429 @@
           }
         }
       }
+    },
+    "/api/v1/sync/operations": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Replay a batch of client outbox operations against the server",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "clientOpId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "entityClass": {
+                          "type": "string",
+                          "enum": [
+                            "character",
+                            "character_trait",
+                            "character_skill",
+                            "character_inventory",
+                            "character_combat",
+                            "campaign",
+                            "campaign_membership",
+                            "campaign_library_trait",
+                            "campaign_library_skill",
+                            "campaign_library_item",
+                            "adventure_log"
+                          ]
+                        },
+                        "entityId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "command": {
+                          "type": "string",
+                          "enum": [
+                            "create",
+                            "patch",
+                            "delete"
+                          ]
+                        },
+                        "fieldPath": {
+                          "type": "string",
+                          "maxLength": 160
+                        },
+                        "attemptedValue": {
+                          "nullable": true
+                        },
+                        "prevValue": {
+                          "nullable": true
+                        },
+                        "baseRevision": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "parentId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "validationVersion": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 1
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "clientOpId",
+                        "entityClass",
+                        "entityId",
+                        "command",
+                        "createdAt"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 50
+                  }
+                },
+                "required": [
+                  "operations"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-op outcomes (in input order)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "outcomes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "clientOpId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "applied",
+                              "rejected",
+                              "conflict",
+                              "unauthorized",
+                              "suspended",
+                              "stale_base",
+                              "transient"
+                            ]
+                          },
+                          "newRevision": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "latestEntity": {
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "clientOpId",
+                          "status"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "outcomes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/cursor": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Pull rows + tombstones since the per-class cursor positions",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cursors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "entityClass": {
+                          "type": "string",
+                          "enum": [
+                            "character",
+                            "character_trait",
+                            "character_skill",
+                            "character_inventory",
+                            "character_combat",
+                            "campaign",
+                            "campaign_membership",
+                            "campaign_library_trait",
+                            "campaign_library_skill",
+                            "campaign_library_item",
+                            "adventure_log"
+                          ]
+                        },
+                        "sinceRevision": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "entityClass",
+                        "sinceRevision"
+                      ]
+                    }
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  }
+                },
+                "required": [
+                  "cursors"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-class changes since cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "entityClass": {
+                            "type": "string",
+                            "enum": [
+                              "character",
+                              "character_trait",
+                              "character_skill",
+                              "character_inventory",
+                              "character_combat",
+                              "campaign",
+                              "campaign_membership",
+                              "campaign_library_trait",
+                              "campaign_library_skill",
+                              "campaign_library_item",
+                              "adventure_log"
+                            ]
+                          },
+                          "entityId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "command": {
+                            "type": "string",
+                            "enum": [
+                              "create",
+                              "patch",
+                              "delete"
+                            ]
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "data": {
+                            "nullable": true
+                          },
+                          "deletedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "entityClass",
+                          "entityId",
+                          "command",
+                          "revision"
+                        ]
+                      }
+                    },
+                    "hasMore": {
+                      "type": "object",
+                      "properties": {
+                        "character": {
+                          "type": "boolean"
+                        },
+                        "character_trait": {
+                          "type": "boolean"
+                        },
+                        "character_skill": {
+                          "type": "boolean"
+                        },
+                        "character_inventory": {
+                          "type": "boolean"
+                        },
+                        "character_combat": {
+                          "type": "boolean"
+                        },
+                        "campaign": {
+                          "type": "boolean"
+                        },
+                        "campaign_membership": {
+                          "type": "boolean"
+                        },
+                        "campaign_library_trait": {
+                          "type": "boolean"
+                        },
+                        "campaign_library_skill": {
+                          "type": "boolean"
+                        },
+                        "campaign_library_item": {
+                          "type": "boolean"
+                        },
+                        "adventure_log": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "object",
+                      "properties": {
+                        "character": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "character_trait": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "character_skill": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "character_inventory": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "character_combat": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "campaign": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "campaign_membership": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "campaign_library_trait": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "campaign_library_skill": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "campaign_library_item": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "adventure_log": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "changes",
+                    "hasMore",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

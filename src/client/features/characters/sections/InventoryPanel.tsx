@@ -1,12 +1,16 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useDraftToggle } from '../../../hooks/useDraftToggle.ts';
-import { api } from '../../../lib/api.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { applyDetailToCache } from './useCharacterPatch.ts';
+import { makeFlashKey } from '../../../sync/flashBus.ts';
+import {
+  enqueueCreate,
+  enqueueDelete,
+  enqueueFieldPatch,
+  newClientId,
+} from '../../../sync/outbox.ts';
 
 function fmtWeight(n: number): string {
   return n.toFixed(2).replace(/\.?0+$/, '');
@@ -27,35 +31,40 @@ interface ItemSnapshot {
 }
 
 function AddItemForm({ characterId, canWrite }: AddItemFormProps) {
-  const qc = useQueryClient();
   const toasts = useToasts();
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [weight, setWeight] = useState('0');
+  const [creating, setCreating] = useState(false);
 
-  const create = useMutation({
-    mutationFn: (snap: ItemSnapshot) =>
-      api<{ item: InventoryItemOut; character: CharacterDetail }>(
-        `/characters/${characterId}/inventory`,
-        {
-          method: 'POST',
-          body: { name: snap.name, quantity: snap.quantity, weightLbs: snap.weightLbs },
+  async function submit(snap: ItemSnapshot) {
+    setCreating(true);
+    try {
+      await enqueueCreate({
+        entityClass: 'character_inventory',
+        entityId: newClientId(),
+        humanName: 'item',
+        characterId,
+        attemptedValue: {
+          name: snap.name,
+          quantity: snap.quantity,
+          weightLbs: snap.weightLbs,
+          characterId,
         },
-      ),
-    onSuccess: (res, snap) => {
-      applyDetailToCache(qc, characterId, res.character);
+      });
       // Per AGENTS.md (rule 1: never silently discard user edits): only
       // reset fields whose current value still matches what we
       // submitted.  If the user has started typing the next item while
-      // this POST was in flight, leave that draft in place.
+      // this enqueue was in flight, leave that draft in place.
       if (name === snap.nameRaw) setName('');
       if (quantity === snap.quantityRaw) setQuantity('1');
       if (weight === snap.weightRaw) setWeight('0');
-    },
-    onError: (err) => {
+    } catch (err) {
       toasts.push(`Couldn't add item — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+    } finally {
+      setCreating(false);
+    }
+  }
 
   if (!canWrite) return null;
 
@@ -70,7 +79,7 @@ function AddItemForm({ characterId, canWrite }: AddItemFormProps) {
         // would silently coerce 0 to 1.
         const qParsed = Number(quantity);
         const wParsed = Number(weight);
-        create.mutate({
+        void submit({
           name: name.trim(),
           nameRaw: name,
           quantity: Number.isFinite(qParsed) ? qParsed : 1,
@@ -105,8 +114,8 @@ function AddItemForm({ characterId, canWrite }: AddItemFormProps) {
           onChange={(e) => setWeight(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary" disabled={create.isPending}>
-        {create.isPending ? 'Adding…' : 'Add'}
+      <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+        {creating ? 'Adding…' : 'Add'}
       </button>
     </form>
   );
@@ -119,16 +128,18 @@ interface ItemRowProps {
 }
 
 function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
-  const qc = useQueryClient();
   const toasts = useToasts();
 
-  const patchItem = async (field: string, value: unknown) => {
-    const res = await api<{ item: InventoryItemOut; character: CharacterDetail }>(
-      `/characters/${characterId}/inventory/${item.id}`,
-      { method: 'PATCH', body: { [field]: value } },
-    );
-    applyDetailToCache(qc, characterId, res.character);
-  };
+  const patchItem = (field: string, value: unknown) =>
+    enqueueFieldPatch({
+      entityClass: 'character_inventory',
+      entityId: item.id,
+      fieldPath: field,
+      attemptedValue: value,
+      humanName: `${item.name} ${field}`,
+      flashKey: makeFlashKey('character_inventory', item.id, field),
+      characterId,
+    });
 
   const nameField = useDraftField<string>({
     name: `${item.name} name`,
@@ -136,6 +147,7 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
     onSave: (v) => patchItem('name', v),
+    flashKey: makeFlashKey('character_inventory', item.id, 'name'),
   });
   const qtyField = useDraftField<number>({
     name: `${item.name} quantity`,
@@ -147,6 +159,7 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
       return n;
     },
     onSave: (v) => patchItem('quantity', v),
+    flashKey: makeFlashKey('character_inventory', item.id, 'quantity'),
   });
   const weightField = useDraftField<number>({
     name: `${item.name} weight`,
@@ -158,33 +171,39 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
     },
     format: (v) => fmtWeight(v),
     onSave: (v) => patchItem('weightLbs', v),
+    flashKey: makeFlashKey('character_inventory', item.id, 'weightLbs'),
   });
 
   // Use the same draft-with-queue pattern as text fields so rapid
   // toggles (check, then immediately uncheck) serialize through the
-  // server with the latest click winning, instead of each click
+  // outbox with the latest click winning, instead of each click
   // sending `!item.worn` against the original prop and racing.
   const wornToggle = useDraftToggle({
     name: `${item.name} worn`,
     serverValue: item.worn,
     onSave: (v) => patchItem('worn', v),
+    flashKey: makeFlashKey('character_inventory', item.id, 'worn'),
   });
   const equippedToggle = useDraftToggle({
     name: `${item.name} equipped`,
     serverValue: item.equipped,
     onSave: (v) => patchItem('equipped', v),
+    flashKey: makeFlashKey('character_inventory', item.id, 'equipped'),
   });
 
-  const remove = useMutation({
-    mutationFn: () =>
-      api<CharacterDetail>(`/characters/${characterId}/inventory/${item.id}`, {
-        method: 'DELETE',
-      }),
-    onSuccess: (detail) => applyDetailToCache(qc, characterId, detail),
-    onError: (err) => {
+  const removeItem = async () => {
+    try {
+      await enqueueDelete({
+        entityClass: 'character_inventory',
+        entityId: item.id,
+        humanName: `item "${item.name}"`,
+        characterId,
+        prevValue: item,
+      });
+    } catch (err) {
       toasts.push(`Couldn't delete item — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+    }
+  };
 
   return (
     <li className="grid grid-cols-[1fr_4rem_5rem_5rem_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
@@ -257,9 +276,8 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
           type="button"
           className="btn btn-ghost btn-xs"
           onClick={() => {
-            if (confirm(`Delete item "${item.name}"?`)) remove.mutate();
+            if (confirm(`Delete item "${item.name}"?`)) void removeItem();
           }}
-          disabled={remove.isPending}
           aria-label={`Delete item ${item.name}`}
         >
           ✕

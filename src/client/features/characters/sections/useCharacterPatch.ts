@@ -1,45 +1,67 @@
 /**
- * Shared helpers for PATCHing the parent character.  Returns a save
- * factory: each call produces an `onSave` for one field that triggers
- * a refetch of the canonical character detail.
+ * Character / sub-resource save factory backed by the local Dexie
+ * outbox.
  *
- * We deliberately do NOT `setQueryData` with the mutation response.
- * Two saves in flight on different fields each return a full
- * `CharacterDetail`; if the older response arrives last, an unconditional
- * cache write would overwrite the newer field's value, which
- * `useDraftField` would then silently sync back into the input.  Letting
- * TanStack Query refetch instead serializes through the query client and
- * always pulls the latest committed state.
+ * Replaces the prior fetch-on-blur pattern: every per-field save now
+ * enqueues an outbox patch op that the orchestrator drains
+ * asynchronously to /sync/operations.  The promise returned to
+ * `useDraftField.onSave` resolves as soon as the local Dexie write +
+ * outbox insert commit -- the user's edit is durable from that point
+ * even if the network is offline or the server later rejects it.
+ *
+ * The orchestrator handles server rejections by:
+ *   - reverting the local row to `prevValue` (captured by enqueue),
+ *   - emitting a `flashBus` event keyed by entityId+fieldPath, and
+ *   - pushing a persistent toast naming the field.
+ *
+ * `useCharacterFieldSave(id)` returns a factory; each invocation
+ * yields a `{ onSave, flashKey }` pair to spread into a useDraftField
+ * call.  Callers wire `flashKey` so the input animates back to the
+ * authoritative value when the orchestrator reverts.
  */
 
-import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { api } from '../../../lib/api.ts';
+import type { EntityClass } from '../../../../shared/schemas/sync.ts';
+import { makeFlashKey } from '../../../sync/flashBus.ts';
+import { enqueueFieldPatch } from '../../../sync/outbox.ts';
 
-export function characterDetailKey(id: string) {
-  return ['characters', id, 'detail'] as const;
+export interface FieldSaver {
+  readonly onSave: (value: unknown) => Promise<void>;
+  readonly flashKey: string;
 }
 
 /**
- * Mark the character detail (and the list query) as stale so TanStack
- * Query refetches.  `_detail` is accepted but ignored — see file header.
+ * Build a saver for the given parent character.  The optional
+ * `entityClass` and `entityId` overrides let trait/skill/inventory
+ * panels route per-field patches to their own row (where entityId is
+ * the trait/skill/item id, not the character id).
  */
-export function applyDetailToCache(qc: QueryClient, id: string, _detail: CharacterDetail): void {
-  qc.invalidateQueries({ queryKey: characterDetailKey(id) });
-  qc.invalidateQueries({ queryKey: ['characters'], exact: true });
-}
-
-export function useFieldSaver(id: string) {
-  const qc = useQueryClient();
+export function useCharacterFieldSave(characterId: string) {
   return useCallback(
-    (field: string) => async (value: unknown) => {
-      const detail = await api<CharacterDetail>(`/characters/${id}`, {
-        method: 'PATCH',
-        body: { [field]: value },
-      });
-      applyDetailToCache(qc, id, detail);
+    (
+      field: string,
+      opts?: {
+        entityClass?: EntityClass | undefined;
+        entityId?: string | undefined;
+        humanName?: string | undefined;
+      },
+    ): FieldSaver => {
+      const entityClass: EntityClass = opts?.entityClass ?? 'character';
+      const entityId = opts?.entityId ?? characterId;
+      const flashKey = makeFlashKey(entityClass, entityId, field);
+      const onSave = async (value: unknown) => {
+        await enqueueFieldPatch({
+          entityClass,
+          entityId,
+          fieldPath: field,
+          attemptedValue: value,
+          humanName: opts?.humanName ?? field,
+          flashKey,
+          characterId: entityClass === 'character' ? undefined : characterId,
+        });
+      };
+      return { onSave, flashKey };
     },
-    [id, qc],
+    [characterId],
   );
 }

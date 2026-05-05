@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import type { CharacterListItem } from '../../../shared/schemas/character.ts';
 import { api } from '../../lib/api.ts';
+import { useCharactersList } from '../characters/useCharacterDetail.ts';
 
 interface MeResponse {
   id: string;
@@ -10,16 +10,16 @@ interface MeResponse {
 }
 
 export function HomePage() {
+  // /auth/me stays on the API: account identity is server-issued and
+  // can't be served from Dexie.  Everything below it reads from the
+  // local store via useLiveQuery.
   const me = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api<MeResponse>('/auth/me'),
   });
-  const characters = useQuery({
-    queryKey: ['characters'],
-    queryFn: () => api<CharacterListItem[]>('/characters'),
-  });
+  const characters = useCharactersList();
 
-  const recent = (characters.data ?? []).slice(0, 4);
+  const recent = (characters ?? []).slice(0, 4);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -49,9 +49,7 @@ export function HomePage() {
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link to="/characters" className="card p-card transition hover:border-border-strong">
           <p className="label-eyebrow">Your characters</p>
-          <p className="font-display num text-3xl font-semibold">
-            {characters.data?.length ?? '—'}
-          </p>
+          <p className="font-display num text-3xl font-semibold">{characters?.length ?? '—'}</p>
           <p className="text-sm text-muted">Open sheets, create heroes, track advancement.</p>
         </Link>
         <Link to="/log" className="card p-card transition hover:border-border-strong">

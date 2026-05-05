@@ -1,10 +1,12 @@
-import { useIsMutating, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { api } from './lib/api.ts';
 import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
 import type { ThemeName } from './lib/theme.ts';
 import { tokenStore } from './lib/tokenStore.ts';
+import { getSyncOrchestrator } from './sync/orchestrator.ts';
 
 const NAV_TABS = [
   { to: '/characters', label: 'Sheet' },
@@ -20,7 +22,6 @@ interface MeResponse {
 
 export function App() {
   const navigate = useNavigate();
-  const isMutating = useIsMutating();
   const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -32,7 +33,7 @@ export function App() {
     storeTheme(theme);
   }, [theme]);
 
-  function signOut() {
+  async function signOut() {
     const tokens = tokenStore.read();
     if (tokens) {
       // Best-effort: revoke the refresh token server-side so it can't be reused.
@@ -43,6 +44,10 @@ export function App() {
       }).catch(() => {});
     }
     tokenStore.clear();
+    // Wipe the local Dexie before navigating so account switching on
+    // the same device never leaks the previous user's rows into a
+    // useLiveQuery render.
+    await getSyncOrchestrator().purge();
     navigate('/login');
   }
 
@@ -82,12 +87,7 @@ export function App() {
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          {isMutating > 0 && (
-            <span className="badge badge-primary badge-sm" aria-live="polite" aria-label="Saving">
-              <span className="inline-block w-2 h-2 bg-current rounded-full animate-pulse mr-1" />
-              saving · {isMutating}
-            </span>
-          )}
+          <SyncStatusIndicator />
           <button type="button" className="btn btn-ghost btn-sm" onClick={toggleTheme}>
             {themeLabel(theme)} mode
           </button>
@@ -105,7 +105,7 @@ export function App() {
                 <Link to="/settings">Settings</Link>
               </li>
               <li>
-                <button type="button" onClick={signOut}>
+                <button type="button" onClick={() => void signOut()}>
                   Logout
                 </button>
               </li>

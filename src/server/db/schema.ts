@@ -6,6 +6,7 @@
 
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   bigserial,
   boolean,
   date,
@@ -455,3 +456,33 @@ export type DbRefreshToken = typeof refreshTokens.$inferSelect;
 // Drizzle warns to keep `bigserial` to avoid a separate sequence; we lean
 // on the global sequence to give monotonic ordering across all tables.
 export const _ensureBigserial = bigserial;
+
+// ---------- sync tombstones ----------
+//
+// Records every delete on a syncable table so /sync/cursor can return
+// the deletions to clients.  Populated by AFTER DELETE triggers (see
+// migration 0004_shared_revision_sequence.sql).  `revision` uses the
+// shared `revisions_seq` so it interleaves with live-row revisions in
+// the same monotonic per-class order clients consume.
+
+export const entityTombstones = pgTable(
+  'entity_tombstones',
+  {
+    entityClass: text('entity_class').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    campaignId: uuid('campaign_id'),
+    revision: bigint('revision', { mode: 'number' }).notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.entityClass, t.entityId] }),
+    ownerRevisionIdx: index('entity_tombstones_owner_revision_idx').on(t.ownerUserId, t.revision),
+    campaignRevisionIdx: index('entity_tombstones_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
+  }),
+);
+
+export type DbEntityTombstone = typeof entityTombstones.$inferSelect;

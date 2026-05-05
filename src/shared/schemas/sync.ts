@@ -44,6 +44,19 @@ export const operationEnvelope = z.object({
   attemptedValue: z.unknown(),
   prevValue: z.unknown().optional(),
   baseRevision: revision.optional(),
+  /**
+   * Parent character id for child entity classes
+   * (`character_trait`, `character_skill`, `character_inventory`,
+   * `character_combat`).  The dispatcher's `requireParentId` reads
+   * this first; legacy creates that put `characterId` inside
+   * `attemptedValue` still work as a fallback.  Including it as a
+   * top-level field on the envelope keeps `attemptedValue` /
+   * `prevValue` as the raw field values for per-field patches, so
+   * orchestrator rollback (which writes `prevValue` back into the
+   * Dexie row) doesn't accidentally store a wrapped `{ characterId,
+   * value }` object as the field.
+   */
+  parentId: uuid.optional(),
   /** Validation schema version the client used.  Bumped on breaking changes. */
   validationVersion: z.number().int().nonnegative().default(1),
   createdAt: isoTimestamp,
@@ -67,22 +80,45 @@ export const syncCursorRequest = z.object({
       sinceRevision: revision,
     }),
   ),
+  /**
+   * Per-class cap on rows returned in this response.  Server clamps to
+   * its own internal max (default 500).  Clients keep calling with the
+   * advanced cursor until `hasMore[class]` is false for every class.
+   */
+  pageSize: z.number().int().min(1).max(1000).optional(),
+});
+
+export const syncCursorChange = z.object({
+  entityClass,
+  entityId: uuid,
+  command: operationCommand,
+  revision,
+  data: z.unknown().optional(),
+  deletedAt: isoTimestamp.optional(),
 });
 
 export const syncCursorResponse = z.object({
-  changes: z.array(
-    z.object({
-      entityClass,
-      entityId: uuid,
-      command: operationCommand,
-      revision,
-      data: z.unknown().optional(),
-      deletedAt: isoTimestamp.optional(),
-    }),
-  ),
+  changes: z.array(syncCursorChange),
+  /** entityClass → has-more flag.  When true, call again with the new cursor. */
+  hasMore: z.record(entityClass, z.boolean()),
+  /** entityClass → highest revision returned in this batch.  Use as the next cursor. */
+  nextCursor: z.record(entityClass, revision),
+});
+
+/** /api/v1/sync/operations request: a batch of envelopes (max 50). */
+export const syncOperationsRequest = z.object({
+  operations: z.array(operationEnvelope).min(1).max(50),
+});
+
+/** /api/v1/sync/operations response: per-op outcomes in the same order. */
+export const syncOperationsResponse = z.object({
+  outcomes: z.array(operationOutcome),
 });
 
 export type OperationEnvelope = z.infer<typeof operationEnvelope>;
 export type OperationOutcome = z.infer<typeof operationOutcome>;
 export type SyncCursorRequest = z.infer<typeof syncCursorRequest>;
 export type SyncCursorResponse = z.infer<typeof syncCursorResponse>;
+export type SyncCursorChange = z.infer<typeof syncCursorChange>;
+export type SyncOperationsRequest = z.infer<typeof syncOperationsRequest>;
+export type SyncOperationsResponse = z.infer<typeof syncOperationsResponse>;

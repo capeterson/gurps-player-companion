@@ -1,21 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
-import type { CombatStateOut } from '../../../shared/schemas/combat.ts';
+import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
-import { ApiError, api } from '../../lib/api.ts';
-import { useToasts } from '../../lib/toast.tsx';
+import { api } from '../../lib/api.ts';
+import { makeFlashKey } from '../../sync/flashBus.ts';
+import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CombatModal } from './sections/CombatModal.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
-import {
-  applyDetailToCache,
-  characterDetailKey,
-  useFieldSaver,
-} from './sections/useCharacterPatch.ts';
+import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
+import { useCharacterDetail } from './useCharacterDetail.ts';
 
 type SheetTab = 'Combat' | 'Identity' | 'Traits' | 'Skills' | 'Inventory' | 'Notes';
 const SHEET_TABS: readonly SheetTab[] = [
@@ -117,12 +115,16 @@ function AttrInput({
   max,
   width,
 }: AttrInputProps) {
-  const saver = useFieldSaver(characterId);
+  // Use the bundled saver so the input subscribes to the flashBus on
+  // its own key.  Without `flashKey` an async server rejection would
+  // toast but never visually flash this input.
+  const buildSave = useCharacterFieldSave(characterId);
+  const fieldSave = buildSave(field, { humanName: label });
   const draft = useDraftField<number>({
     name: label,
     serverValue: value,
     parse: intParser(min, max),
-    onSave: saver(field),
+    ...fieldSave,
   });
   if (!canWrite) {
     return (
@@ -171,51 +173,54 @@ function IdentityPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const saver = useFieldSaver(character.id);
+  // Bundled saver -- spreading `{ onSave, flashKey }` into useDraftField
+  // wires the field to the flashBus so async server rejections trigger
+  // the rollback animation on the offending input.
+  const buildSave = useCharacterFieldSave(character.id);
   const nameField = useDraftField<string>({
     name: 'name',
     serverValue: character.name,
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: saver('name'),
+    ...buildSave('name', { humanName: 'name' }),
   });
   const playerField = useDraftField<string | null>({
     name: 'player name',
     serverValue: character.playerName ?? '',
     parse: nullableTextParser,
-    onSave: saver('playerName'),
+    ...buildSave('playerName', { humanName: 'player name' }),
   });
   const heightField = useDraftField<string | null>({
     name: 'height',
     serverValue: character.height ?? '',
     parse: nullableTextParser,
-    onSave: saver('height'),
+    ...buildSave('height', { humanName: 'height' }),
   });
   const weightField = useDraftField<string | null>({
     name: 'weight',
     serverValue: character.weight ?? '',
     parse: nullableTextParser,
-    onSave: saver('weight'),
+    ...buildSave('weight', { humanName: 'weight' }),
   });
   const ageField = useDraftField<number | null>({
     name: 'age',
     serverValue: character.age ?? null,
     format: (v) => (v === null ? '' : String(v)),
     parse: nullableIntParser(0, 10000),
-    onSave: saver('age'),
+    ...buildSave('age', { humanName: 'age' }),
   });
   const tlField = useDraftField<number | null>({
     name: 'tech level',
     serverValue: character.techLevel ?? null,
     format: (v) => (v === null ? '' : String(v)),
     parse: nullableIntParser(0, 12),
-    onSave: saver('techLevel'),
+    ...buildSave('techLevel', { humanName: 'tech level' }),
   });
   const appearanceField = useDraftField<string | null>({
     name: 'appearance',
     serverValue: character.appearance ?? '',
     parse: nullableTextParser,
-    onSave: saver('appearance'),
+    ...buildSave('appearance', { humanName: 'appearance' }),
   });
 
   return (
@@ -619,19 +624,27 @@ function WarningsPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const qc = useQueryClient();
-  const toasts = useToasts();
-  const dismiss = useMutation({
-    mutationFn: ({ code, dismissed }: { code: string; dismissed: boolean }) =>
-      api<CharacterDetail>(`/characters/${character.id}/warnings/dismiss`, {
-        method: 'POST',
-        body: { code, dismissed },
-      }),
-    onSuccess: (detail) => applyDetailToCache(qc, character.id, detail),
-    onError: (err) => {
-      toasts.push(`Couldn't update warning — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+  // Outbox-routed: changing dismissedWarnings is just a patch on the
+  // character's dismissedWarnings array.  The orchestrator pushes it
+  // through /sync/operations and the persistent toast covers any
+  // server rejection.
+  const dismissCode = (code: string, dismissed: boolean) => {
+    const current = new Set(character.dismissedWarnings);
+    if (dismissed) current.add(code);
+    else current.delete(code);
+    void enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: character.id,
+      fieldPath: 'dismissedWarnings',
+      attemptedValue: [...current],
+      humanName: 'dismissed warnings',
+      flashKey: makeFlashKey('character', character.id, 'dismissedWarnings'),
+    });
+  };
+  const dismiss = {
+    mutate: ({ code, dismissed }: { code: string; dismissed: boolean }) =>
+      dismissCode(code, dismissed),
+  };
 
   if (character.warnings.length === 0 && character.dismissedWarnings.length === 0) return null;
 
@@ -699,47 +712,72 @@ function CombatPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const qc = useQueryClient();
-  const toasts = useToasts();
   const combat = character.combat;
   const currentHp = combat?.currentHp ?? character.derived.hp;
   const currentFp = combat?.currentFp ?? character.derived.fp;
   const posture = combat?.posture ?? 'standing';
   const maneuver = combat?.maneuver ?? '';
 
-  const patchCombat = async (body: Record<string, unknown>) => {
-    const res = await api<{ combat: CombatStateOut; character: CharacterDetail }>(
-      `/characters/${character.id}/combat`,
-      { method: 'PATCH', body },
-    );
-    applyDetailToCache(qc, character.id, res.character);
+  // Combat is 1:1 keyed by characterId.  If a local row doesn't exist
+  // yet (first edit on this device) we materialize a default row in
+  // Dexie so the per-field patch has something to update; the
+  // orchestrator's whole-body upsert handles the server side.
+  const patchCombat = async (field: string, value: unknown) => {
+    const db = getLocalDb();
+    const existing = await db.characterCombat.get(character.id);
+    if (!existing) {
+      await db.characterCombat.put({
+        id: character.id,
+        characterId: character.id,
+        currentHp: character.derived.hp,
+        currentFp: character.derived.fp,
+        conditions: [],
+        maneuver: null,
+        posture: 'standing',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        revision: -1,
+      });
+    }
+    await enqueueFieldPatch({
+      entityClass: 'character_combat',
+      entityId: character.id,
+      fieldPath: field,
+      attemptedValue: value,
+      humanName: field,
+      flashKey: makeFlashKey('character_combat', character.id, field),
+      characterId: character.id,
+    });
   };
 
   const hpField = useDraftField<number>({
     name: 'current HP',
     serverValue: currentHp,
     parse: intParser(-1000, 1000),
-    onSave: (v) => patchCombat({ currentHp: v }),
+    onSave: (v) => patchCombat('currentHp', v),
+    flashKey: makeFlashKey('character_combat', character.id, 'currentHp'),
   });
   const fpField = useDraftField<number>({
     name: 'current FP',
     serverValue: currentFp,
     parse: intParser(-1000, 1000),
-    onSave: (v) => patchCombat({ currentFp: v }),
+    onSave: (v) => patchCombat('currentFp', v),
+    flashKey: makeFlashKey('character_combat', character.id, 'currentFp'),
   });
   const maneuverField = useDraftField<string | null>({
     name: 'maneuver',
     serverValue: maneuver,
     parse: nullableTextParser,
-    onSave: (v) => patchCombat({ maneuver: v }),
+    onSave: (v) => patchCombat('maneuver', v),
+    flashKey: makeFlashKey('character_combat', character.id, 'maneuver'),
   });
 
-  const setPosture = useMutation({
-    mutationFn: (p: (typeof POSTURES)[number]) => patchCombat({ posture: p }),
-    onError: (err) => {
-      toasts.push(`Couldn't change posture — ${(err as Error).message}`, { kind: 'error' });
+  const setPosture = {
+    isPending: false,
+    mutate: (p: (typeof POSTURES)[number]) => {
+      void patchCombat('posture', p);
     },
-  });
+  };
 
   const hpRatio = character.derived.hp > 0 ? currentHp / character.derived.hp : 0;
   const fpRatio = character.derived.fp > 0 ? currentFp / character.derived.fp : 0;
@@ -849,13 +887,13 @@ function IdentityHero({
   pointTarget: number | null;
   canWrite: boolean;
 }) {
-  const saver = useFieldSaver(character.id);
+  const buildSave = useCharacterFieldSave(character.id);
   const nameField = useDraftField<string>({
     name: 'name',
     serverValue: character.name,
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: saver('name'),
+    ...buildSave('name', { humanName: 'name' }),
   });
 
   const chips: Array<[string, string]> = [
@@ -925,7 +963,6 @@ interface CampaignSummary {
 
 export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const qc = useQueryClient();
   const [tab, setTab] = useState<SheetTab>('Combat');
   const [combatOpen, setCombatOpen] = useState(false);
 
@@ -934,45 +971,36 @@ export function CharacterSheetPage() {
     queryFn: () => api<MeResponse>('/auth/me'),
   });
 
-  const characterQuery = useQuery({
-    queryKey: characterDetailKey(id),
-    queryFn: () => api<CharacterDetail>(`/characters/${id}`),
-    enabled: id.length > 0,
-  });
+  // Local-first: read from Dexie via useLiveQuery.  The orchestrator
+  // pulls /sync/cursor in the background to keep this fresh; we never
+  // hit /characters/{id} directly anymore.
+  const character = useCharacterDetail(id);
 
   // Fetch the character's campaign (if any) so the hero can show
-  // a `Points / Target` ratio. Campaigns endpoint is cheap; we let
-  // it fail silently — missing target just collapses the second card.
-  const campaignsQuery = useQuery({
+  // a `Points / Target` ratio. Campaigns are cheap to read from Dexie;
+  // missing target just collapses the second card.
+  const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignSummary[]>('/campaigns'),
-    enabled: !!characterQuery.data?.campaignId,
+    enabled: !!character?.campaignId,
   });
 
-  if (characterQuery.isLoading) {
+  if (character === undefined) {
     return <p className="text-muted">Loading…</p>;
   }
-  if (characterQuery.error) {
-    const err = characterQuery.error as ApiError | Error;
-    const status = err instanceof ApiError ? err.status : 0;
+  if (character === null) {
     return (
       <div className="space-y-3">
-        <p className="text-error">
-          Couldn't load character — {err.message}
-          {status === 404 && ' (not found)'}
-          {status === 403 && ' (forbidden)'}
-        </p>
+        <p className="text-error">Couldn't load character — not found locally.</p>
         <Link to="/characters" className="btn btn-sm btn-ghost">
           ← Back to characters
         </Link>
       </div>
     );
   }
-  const character = characterQuery.data;
-  if (!character) return null;
   const canWrite = me.data ? me.data.id === character.ownerId : false;
 
-  const campaign = campaignsQuery.data?.find((c) => c.id === character.campaignId);
+  const campaign = campaigns.data?.find((c) => c.id === character.campaignId);
   const pointTarget = campaign?.pointTarget ?? null;
 
   const counts: CountByTab = {
@@ -1001,13 +1029,6 @@ export function CharacterSheetPage() {
             read-only
           </span>
         )}
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs ml-auto"
-          onClick={() => qc.invalidateQueries({ queryKey: characterDetailKey(id) })}
-        >
-          Refresh
-        </button>
       </nav>
 
       <IdentityHero character={character} pointTarget={pointTarget} canWrite={canWrite} />
@@ -1089,12 +1110,12 @@ function NotesPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const saver = useFieldSaver(character.id);
+  const buildSave = useCharacterFieldSave(character.id);
   const notesField = useDraftField<string | null>({
     name: 'notes',
     serverValue: character.appearance ?? '',
     parse: nullableTextParser,
-    onSave: saver('appearance'),
+    ...buildSave('appearance', { humanName: 'notes' }),
   });
   return (
     <section className="card p-card">
