@@ -5,9 +5,11 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { App } from './App.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
+import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
+import { LogPage } from './features/log/LogPage.tsx';
 import { SettingsPage } from './features/settings/SettingsPage.tsx';
 import { applyTheme, readStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
@@ -37,8 +39,10 @@ const router = createBrowserRouter([
         children: [
           { path: '/', element: <HomePage /> },
           { path: '/characters', element: <CharactersPage /> },
-          { path: '/settings', element: <SettingsPage /> },
           { path: '/characters/:id', element: <CharacterSheetPage /> },
+          { path: '/campaigns', element: <CampaignsPage /> },
+          { path: '/log', element: <LogPage /> },
+          { path: '/settings', element: <SettingsPage /> },
         ],
       },
     ],
