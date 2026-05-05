@@ -522,51 +522,55 @@ async function dispatchCombat(
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
   const db = getDb();
-  // PATCH on combat is upsert-on-character.  attemptedValue is the
-  // partial update body (not field-path style) for create+patch — the
-  // client always sends a structured body.
-  if (op.command === 'create' || (op.command === 'patch' && !op.fieldPath)) {
-    const body = combatStateUpdate.parse(op.attemptedValue);
-    const setOnUpdate: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      setOnUpdate[k] = v;
+
+  // Combat state is 1:1 keyed on character_id.  Whether the client
+  // sends `(command='patch', fieldPath='currentHp', attemptedValue=10)`
+  // or `(command='create', attemptedValue={ currentHp: 10, ... })`,
+  // we treat both as upserts: the legacy CRUD route was always an
+  // upsert (PATCH /characters/{id}/combat created on first call), and
+  // a field-path patch hitting a missing row should not 404 just
+  // because no combat row has been persisted yet.
+  let body: Record<string, unknown>;
+  if (op.command === 'patch' && op.fieldPath) {
+    // Validate the single field through the partial schema so it
+    // gets the same constraints as a whole-body patch (e.g. posture
+    // enum, hp/fp range), then build a one-key body.
+    const fieldShape = (combatStateUpdate.shape as Record<string, z.ZodTypeAny>)[op.fieldPath];
+    if (!fieldShape) {
+      return {
+        clientOpId: op.clientOpId,
+        status: 'rejected',
+        reason: `field "${op.fieldPath}" not writable on character_combat`,
+      };
     }
-    const [row] = await db
-      .insert(combatStates)
-      .values({
-        characterId,
-        currentHp: body.currentHp ?? 10,
-        currentFp: body.currentFp ?? 10,
-        conditions: body.conditions ?? [],
-        maneuver: body.maneuver ?? null,
-        posture: body.posture ?? 'standing',
-      })
-      .onConflictDoUpdate({
-        target: combatStates.characterId,
-        set: setOnUpdate,
-      })
-      .returning();
-    if (!row) throw new HTTPException(500, { message: 'combat upsert failed' });
-    return appliedOutcome(op, Number(row.revision));
+    const parsed = fieldShape.parse(op.attemptedValue);
+    body = { [op.fieldPath]: parsed };
+  } else {
+    body = combatStateUpdate.parse(op.attemptedValue) as Record<string, unknown>;
   }
 
-  // Field-path patch on combat
-  return await patchEntity({
-    op,
-    userId: ctx.userId,
-    entityClass: 'character_combat',
-    table: combatStates,
-    parentLookup: async () => {
-      const [row] = await db
-        .select()
-        .from(combatStates)
-        .where(eq(combatStates.characterId, characterId));
-      if (!row) throw new HTTPException(404, { message: 'combat state not found' });
-      return row;
-    },
-    childWhere: () => eq(combatStates.characterId, characterId),
-  });
+  const setOnUpdate: Record<string, unknown> = { updatedAt: new Date() };
+  for (const [k, v] of Object.entries(body)) {
+    if (v === undefined) continue;
+    setOnUpdate[k] = v;
+  }
+  const [row] = await db
+    .insert(combatStates)
+    .values({
+      characterId,
+      currentHp: (body.currentHp as number | undefined) ?? 10,
+      currentFp: (body.currentFp as number | undefined) ?? 10,
+      conditions: (body.conditions as string[] | undefined) ?? [],
+      maneuver: (body.maneuver as string | null | undefined) ?? null,
+      posture: (body.posture as 'standing' | undefined) ?? 'standing',
+    })
+    .onConflictDoUpdate({
+      target: combatStates.characterId,
+      set: setOnUpdate,
+    })
+    .returning();
+  if (!row) throw new HTTPException(500, { message: 'combat upsert failed' });
+  return appliedOutcome(op, Number(row.revision));
 }
 
 // ---------- shared patch helper ----------

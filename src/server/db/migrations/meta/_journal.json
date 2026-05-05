@@ -36,6 +36,13 @@
       "when": 1777864099000,
       "tag": "0004_shared_revision_sequence",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777864199000,
+      "tag": "0005_combat_tombstone_by_character",
+      "breakpoints": true
     }
   ]
 }

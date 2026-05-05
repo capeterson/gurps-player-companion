@@ -308,12 +308,19 @@ async function fetchClassUpserts(args: {
         limit,
       });
     case 'character_combat':
+      // Combat is 1:1 with its character.  We emit the row keyed by
+      // characterId (not combat_states.id) so the client's local
+      // store -- which uses characterId as the primary key -- can
+      // apply upserts and tombstones with a single lookup.  Tombstone
+      // emission for combat also uses characterId (see migration
+      // 0005); the two halves stay in sync.
       return await fetchChildClass({
         entityClass,
         table: combatStates,
         idCol: combatStates.id,
         revisionCol: combatStates.revision,
         characterIdCol: combatStates.characterId,
+        entityIdField: 'characterId',
         accessibleCharacterIds,
         sinceRevision,
         limit,
@@ -337,6 +344,14 @@ interface ChildFetchArgs {
   revisionCol: any;
   // biome-ignore lint/suspicious/noExplicitAny: drizzle column runtime object
   characterIdCol: any;
+  /**
+   * Field on the returned row to use as the sync `entityId`.  Defaults
+   * to `'id'`.  `character_combat` overrides this to `'characterId'`
+   * because its local store is keyed on the parent character (1:1
+   * relationship); using `combat_states.id` would mean upserts and
+   * tombstones never match the local row.
+   */
+  entityIdField?: 'id' | 'characterId';
   accessibleCharacterIds: string[];
   sinceRevision: number;
   limit: number;
@@ -355,8 +370,16 @@ async function fetchChildClass(args: ChildFetchArgs): Promise<SyncCursorChange[]
       ),
     )
     .orderBy(asc(args.revisionCol))
-    .limit(args.limit)) as Array<{ id: string; revision: number | bigint }>;
-  return rows.map((row) => upsertChange(args.entityClass, row.id, Number(row.revision), row));
+    .limit(args.limit)) as Array<{
+    id: string;
+    characterId?: string;
+    revision: number | bigint;
+  }>;
+  const idField = args.entityIdField ?? 'id';
+  return rows.map((row) => {
+    const entityId = idField === 'characterId' ? (row.characterId ?? row.id) : row.id;
+    return upsertChange(args.entityClass, entityId, Number(row.revision), row);
+  });
 }
 
 function upsertChange(
