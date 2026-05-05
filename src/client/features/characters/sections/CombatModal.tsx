@@ -8,9 +8,11 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { bumpPool } from '../../../../shared/domain/poolBump.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
+import { OverflowBadge } from '../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
 import { getLocalDb } from '../../../db/dexie.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
@@ -57,6 +59,13 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
   useEffect(() => {
     fpRef.current = fp;
   }, [fp]);
+
+  // Soft-cap "double-press to override" state for HP and FP. The
+  // helper returns `lastBlockedAt` we feed back on the next call —
+  // a second press within 2 s allows the overflow to land. See
+  // src/shared/domain/poolBump.ts.
+  const hpBlockedAtRef = useRef<number | null>(null);
+  const fpBlockedAtRef = useRef<number | null>(null);
 
   const [flashHp, setFlashHp] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,8 +121,13 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
     if (!canWrite || hpMax <= 0) return;
     // Compose against the latest-intended value (hpRef), not the
     // render snapshot, so rapid same-frame taps each compound
-    // instead of overwriting the prior tap.
-    const next = Math.max(-hpMax * 4, Math.min(hpMax, hpRef.current + d));
+    // instead of overwriting the prior tap.  bumpPool gives us the
+    // soft-cap "double-press to override" rule for free; we still
+    // clamp the lower bound at 4×max death-check zone.
+    const result = bumpPool(hpRef.current, d, hpMax, hpBlockedAtRef.current);
+    const next = Math.max(-hpMax * 4, result.next);
+    hpBlockedAtRef.current = result.lastBlockedAt;
+    if (next === hpRef.current) return; // pure block, no patch needed
     hpRef.current = next;
     void patchCombat('currentHp', next);
     if (d < 0) {
@@ -125,7 +139,10 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
 
   function bumpFp(d: number) {
     if (!canWrite || fpMax <= 0) return;
-    const next = Math.max(-fpMax, Math.min(fpMax, fpRef.current + d));
+    const result = bumpPool(fpRef.current, d, fpMax, fpBlockedAtRef.current);
+    const next = Math.max(-fpMax, result.next);
+    fpBlockedAtRef.current = result.lastBlockedAt;
+    if (next === fpRef.current) return;
     fpRef.current = next;
     void patchCombat('currentFp', next);
   }
@@ -184,8 +201,11 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
         </div>
 
         <div className={`card mb-3 p-4 ${flashHp ? 'flash' : ''}`}>
-          <div className="mb-2 flex items-baseline justify-between">
-            <span className="label-eyebrow">Hit Points</span>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <span className="label-eyebrow">Hit Points</span>
+              {hp > hpMax && <OverflowBadge amount={hp - hpMax} />}
+            </span>
             <span className="num text-xs text-dim">
               max {hpMax} · reeling at {Math.ceil(hpMax / 3)}
             </span>
@@ -232,7 +252,10 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
 
         <div className="card mb-3 p-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="label-eyebrow">Fatigue</span>
+            <span className="flex items-center gap-2">
+              <span className="label-eyebrow">Fatigue</span>
+              {fp > fpMax && <OverflowBadge amount={fp - fpMax} />}
+            </span>
             <div className="flex items-baseline gap-1">
               <span
                 className="num font-bold leading-none"

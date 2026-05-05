@@ -2,27 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { CampaignCreate, CampaignOut } from '../../../shared/schemas/campaign.ts';
+import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 
 interface MeResponse {
   id: string;
   email: string;
   displayName: string;
-}
-
-const AVATAR_PALETTE = [
-  'bg-base-200',
-  'bg-base-300/40',
-  'bg-base-200',
-  'bg-base-300/40',
-  'bg-base-200',
-  'bg-base-300/40',
-];
-
-function initialFor(name: string) {
-  const trimmed = name.trim();
-  if (!trimmed) return '?';
-  return trimmed.charAt(0).toUpperCase();
 }
 
 export function CampaignsPage() {
@@ -148,20 +134,7 @@ export function CampaignsPage() {
                   {c.description ? <> · {c.description}</> : null}
                 </div>
               </div>
-              <div className="flex items-center" aria-label="Members">
-                {c.members.slice(0, 6).map((m, j) => (
-                  <div
-                    key={m.userId}
-                    title={m.displayName}
-                    className={`flex h-6 w-6 items-center justify-center rounded-full border border-base-300 text-[10px] text-muted ${
-                      AVATAR_PALETTE[j % AVATAR_PALETTE.length]
-                    }`}
-                    style={{ marginLeft: j === 0 ? 0 : '-0.5rem' }}
-                  >
-                    {initialFor(m.displayName)}
-                  </div>
-                ))}
-              </div>
+              <AvatarStack names={c.members.map((m) => m.displayName)} max={6} />
               <span className={`chip ${isOwner ? 'on' : ''}`}>{isOwner ? 'Owner' : 'Player'}</span>
             </Link>
           );
