@@ -22,6 +22,20 @@
       "when": 1777863899000,
       "tag": "0002_revision_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777863999000,
+      "tag": "0003_entity_tombstones",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777864099000,
+      "tag": "0004_shared_revision_sequence",
+      "breakpoints": true
     }
   ]
 }

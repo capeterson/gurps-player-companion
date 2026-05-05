@@ -27,8 +27,23 @@ export interface Toast {
   message: string;
 }
 
+export interface ToastPushOpts {
+  kind?: ToastKind;
+  durationMs?: number;
+  /**
+   * When true, the toast does not auto-dismiss -- it remains until the
+   * user clicks ✕ or `dismiss(id)` is called explicitly.  Used for
+   * sync rejections per issue #12: failed-to-sync toasts must persist
+   * so the user can't miss them.  Caller may pass an explicit `id` so
+   * dedup against a saved Dexie record (rejectionToasts) is possible.
+   */
+  persistent?: boolean;
+  /** Caller-provided id; if omitted a fresh one is generated. */
+  id?: string;
+}
+
 export interface ToastApi {
-  push(message: string, opts?: { kind?: ToastKind; durationMs?: number }): string;
+  push(message: string, opts?: ToastPushOpts): string;
   dismiss(id: string): void;
 }
 
@@ -56,9 +71,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback<ToastApi['push']>(
     (message, opts) => {
       const kind = opts?.kind ?? 'info';
+      const id = opts?.id ?? `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      setToasts((prev) => {
+        // Dedup: if a toast with this id is already on screen (re-emit
+        // from bootstrap, repeated rejection of the same op) replace
+        // the existing entry rather than stacking.
+        if (prev.some((t) => t.id === id)) {
+          return prev.map((t) => (t.id === id ? { id, kind, message } : t));
+        }
+        return [...prev, { id, kind, message }];
+      });
+      if (opts?.persistent) {
+        // Caller will call dismiss() (e.g. when the user clicks ✕ or
+        // when the underlying rejection record is cleared).  No timer.
+        return id;
+      }
       const durationMs = opts?.durationMs ?? (kind === 'error' ? 6000 : 3500);
-      const id = `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      setToasts((prev) => [...prev, { id, kind, message }]);
       const handle = setTimeout(() => dismiss(id), durationMs);
       timers.current.set(id, handle);
       return id;

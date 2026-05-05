@@ -1,11 +1,15 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { TraitOut } from '../../../../shared/schemas/trait.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
-import { api } from '../../../lib/api.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { applyDetailToCache, characterDetailKey } from './useCharacterPatch.ts';
+import { makeFlashKey } from '../../../sync/flashBus.ts';
+import {
+  enqueueCreate,
+  enqueueDelete,
+  enqueueFieldPatch,
+  newClientId,
+} from '../../../sync/outbox.ts';
 
 const TRAIT_KINDS = [
   'advantage',
@@ -32,31 +36,39 @@ interface TraitSnapshot {
 }
 
 function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
-  const qc = useQueryClient();
   const toasts = useToasts();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<TraitKind>('advantage');
   const [points, setPoints] = useState('0');
+  const [creating, setCreating] = useState(false);
 
-  const create = useMutation({
-    mutationFn: (snap: TraitSnapshot) =>
-      api<{ trait: TraitOut; character: CharacterDetail }>(`/characters/${characterId}/traits`, {
-        method: 'POST',
-        body: { name: snap.name, kind: snap.kind, points: snap.points },
-      }),
-    onSuccess: (res, snap) => {
-      applyDetailToCache(qc, characterId, res.character);
+  async function submit(snap: TraitSnapshot) {
+    setCreating(true);
+    try {
+      await enqueueCreate({
+        entityClass: 'character_trait',
+        entityId: newClientId(),
+        humanName: 'trait',
+        characterId,
+        attemptedValue: {
+          name: snap.name,
+          kind: snap.kind,
+          points: snap.points,
+          characterId,
+        },
+      });
       // Per AGENTS.md (rule 1: never silently discard user edits): only
       // clear fields whose current value still matches the snapshot we
       // submitted.  If the user has started typing the next trait while
-      // this POST was in flight, leave that draft alone.
+      // this enqueue was in flight, leave that draft alone.
       if (name === snap.nameRaw) setName('');
       if (points === snap.pointsRaw) setPoints('0');
-    },
-    onError: (err) => {
+    } catch (err) {
       toasts.push(`Couldn't add trait — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+    } finally {
+      setCreating(false);
+    }
+  }
 
   if (!canWrite) return null;
 
@@ -66,12 +78,8 @@ function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        // `Number.isFinite` keeps both 0 and negative values (a -10
-        // disadvantage) intact.  `Number(...) || 0` would already
-        // preserve 0 here but breaks if the user clears the field —
-        // make the parse explicit and let invalid input fall to 0.
         const pParsed = Number(points);
-        create.mutate({
+        void submit({
           name: name.trim(),
           nameRaw: name,
           kind,
@@ -111,8 +119,8 @@ function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
           onChange={(e) => setPoints(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary" disabled={create.isPending}>
-        {create.isPending ? 'Adding…' : 'Add'}
+      <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+        {creating ? 'Adding…' : 'Add'}
       </button>
     </form>
   );
@@ -125,19 +133,18 @@ interface TraitRowProps {
 }
 
 function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
-  const qc = useQueryClient();
   const toasts = useToasts();
 
-  const patchTrait = async (field: string, value: unknown) => {
-    const res = await api<{ trait: TraitOut; character: CharacterDetail }>(
-      `/characters/${characterId}/traits/${trait.id}`,
-      {
-        method: 'PATCH',
-        body: { [field]: value },
-      },
-    );
-    applyDetailToCache(qc, characterId, res.character);
-  };
+  const patchTrait = (field: string, value: unknown) =>
+    enqueueFieldPatch({
+      entityClass: 'character_trait',
+      entityId: trait.id,
+      fieldPath: field,
+      attemptedValue: value,
+      humanName: `${trait.name} ${field}`,
+      flashKey: makeFlashKey('character_trait', trait.id, field),
+      characterId,
+    });
 
   const nameField = useDraftField<string>({
     name: `${trait.name} name`,
@@ -145,6 +152,7 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
     onSave: (v) => patchTrait('name', v),
+    flashKey: makeFlashKey('character_trait', trait.id, 'name'),
   });
   const pointsField = useDraftField<number>({
     name: `${trait.name} points`,
@@ -155,24 +163,29 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
       return n;
     },
     onSave: (v) => patchTrait('points', v),
+    flashKey: makeFlashKey('character_trait', trait.id, 'points'),
   });
   const notesField = useDraftField<string | null>({
     name: `${trait.name} notes`,
     serverValue: trait.notes ?? '',
     parse: (s) => (s.trim().length === 0 ? null : s),
     onSave: (v) => patchTrait('notes', v),
+    flashKey: makeFlashKey('character_trait', trait.id, 'notes'),
   });
 
-  const remove = useMutation({
-    mutationFn: () =>
-      api<CharacterDetail>(`/characters/${characterId}/traits/${trait.id}`, {
-        method: 'DELETE',
-      }),
-    onSuccess: (detail) => applyDetailToCache(qc, characterId, detail),
-    onError: (err) => {
+  const removeTrait = async () => {
+    try {
+      await enqueueDelete({
+        entityClass: 'character_trait',
+        entityId: trait.id,
+        humanName: `trait "${trait.name}"`,
+        characterId,
+        prevValue: trait,
+      });
+    } catch (err) {
       toasts.push(`Couldn't delete trait — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+    }
+  };
 
   return (
     <li className="grid grid-cols-[1fr_auto_auto] gap-2 items-start py-2 border-b border-base-300 last:border-0">
@@ -228,9 +241,8 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
           type="button"
           className="btn btn-ghost btn-xs"
           onClick={() => {
-            if (confirm(`Delete trait "${trait.name}"?`)) remove.mutate();
+            if (confirm(`Delete trait "${trait.name}"?`)) void removeTrait();
           }}
-          disabled={remove.isPending}
           aria-label={`Delete trait ${trait.name}`}
         >
           ✕

@@ -1,19 +1,21 @@
-import Dexie from 'dexie';
+/**
+ * Surface for the Settings page's "local sync" panel.  Pulls live
+ * counts from the real Dexie database (outbox + character stores)
+ * rather than the older "are there any indexedDB databases at all?"
+ * stub it replaced.
+ */
+
+import { getLocalDb } from '../db/dexie.ts';
+import { countPending } from '../sync/outbox.ts';
 
 export interface LocalDbStatus {
   syncState: string;
   isFullySynced: boolean;
+  pendingOps: number;
+  characters: number;
   storageUsageBytes: number | null;
   storageQuotaBytes: number | null;
   refreshedAt: Date;
-}
-
-async function getDatabaseNames(): Promise<string[]> {
-  if (typeof indexedDB !== 'undefined' && 'databases' in indexedDB) {
-    const databases = await indexedDB.databases();
-    return databases.map((db) => db.name).filter((name): name is string => Boolean(name));
-  }
-  return Dexie.getDatabaseNames();
 }
 
 async function getStorageEstimate(): Promise<{ usage: number | null; quota: number | null }> {
@@ -25,13 +27,20 @@ async function getStorageEstimate(): Promise<{ usage: number | null; quota: numb
 }
 
 export async function readLocalDbStatus(): Promise<LocalDbStatus> {
-  const [databaseNames, storage] = await Promise.all([getDatabaseNames(), getStorageEstimate()]);
+  const db = getLocalDb();
+  const [pendingOps, characterCount, storage] = await Promise.all([
+    countPending(),
+    db.characters.count(),
+    getStorageEstimate(),
+  ]);
+  const isFullySynced = pendingOps === 0;
   return {
-    syncState:
-      databaseNames.length > 0
-        ? 'Fully synced — local sync storage is available'
-        : 'Fully synced — no local data is waiting to upload',
-    isFullySynced: true,
+    syncState: isFullySynced
+      ? 'Fully synced — no pending operations'
+      : `${pendingOps} pending operation${pendingOps === 1 ? '' : 's'}`,
+    isFullySynced,
+    pendingOps,
+    characters: characterCount,
     storageUsageBytes: storage.usage,
     storageQuotaBytes: storage.quota,
     refreshedAt: new Date(),

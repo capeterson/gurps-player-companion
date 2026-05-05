@@ -1,0 +1,335 @@
+/**
+ * Local Dexie database — the source of truth for the UI.
+ *
+ * Per AGENTS.md: every UI mutation writes here first and appends an
+ * outbox row; reads use `useLiveQuery`/`liveQuery` against these
+ * stores; the sync orchestrator drains the outbox to the server and
+ * pulls cursor changes back into the same stores.
+ *
+ * Stores at version 1:
+ *
+ *   characters         pk=id
+ *   characterTraits    pk=id
+ *   characterSkills    pk=id
+ *   characterInventory pk=id
+ *   characterCombat    pk=characterId  (1:1 with characters)
+ *   campaigns          pk=id
+ *   outbox             pk=clientOpId
+ *   syncCursors        pk=entityClass
+ *   syncMeta           pk=key
+ *   tombstones         pk=[entityClass+entityId]
+ *   rejectionToasts    pk=id
+ *
+ * The `[entityId+fieldPath]` compound index on `outbox` is what
+ * the coalescing path uses to find a pending op for the same field
+ * and replace it (latest-wins) per AGENTS.md rule 1.
+ */
+
+import Dexie, { type Table } from 'dexie';
+import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
+
+/**
+ * Local mirror of the server's character row.  Fields match the
+ * server's Drizzle row shape so /sync/cursor responses can be written
+ * verbatim.  Numbers are stored as numbers; ISO strings remain strings.
+ */
+export interface LocalCharacter {
+  id: string;
+  ownerId: string;
+  campaignId: string | null;
+  name: string;
+  playerName: string | null;
+  height: string | null;
+  weight: string | null;
+  age: number | null;
+  appearance: string | null;
+  techLevel: number | null;
+  st: number;
+  dx: number;
+  iq: number;
+  ht: number;
+  hpMod: number;
+  willMod: number;
+  perMod: number;
+  fpMod: number;
+  speedQuarterMod: number;
+  moveMod: number;
+  tempSt: number;
+  tempDx: number;
+  tempIq: number;
+  tempHt: number;
+  tempHpMod: number;
+  tempWillMod: number;
+  tempPerMod: number;
+  tempFpMod: number;
+  tempSpeedQuarterMod: number;
+  tempMoveMod: number;
+  dismissedWarnings: string[];
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCharacterTrait {
+  id: string;
+  characterId: string;
+  kind: 'advantage' | 'disadvantage' | 'perk' | 'quirk' | 'language' | 'cultural_familiarity';
+  name: string;
+  points: number;
+  level: number | null;
+  notes: string | null;
+  modifiers: unknown[];
+  libraryTraitId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCharacterSkill {
+  id: string;
+  characterId: string;
+  name: string;
+  attribute: 'ST' | 'DX' | 'IQ' | 'HT' | 'Will' | 'Per' | 'Other';
+  difficulty: 'E' | 'A' | 'H' | 'VH';
+  points: number;
+  techLevel: number | null;
+  specialization: string | null;
+  notes: string | null;
+  librarySkillId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCharacterInventory {
+  id: string;
+  characterId: string;
+  name: string;
+  quantity: number;
+  weightLbs: number;
+  cost: number;
+  notes: string | null;
+  parentId: string | null;
+  externalLocation: string | null;
+  worn: boolean;
+  equipped: boolean;
+  isContainer: boolean;
+  hideawayCapacityLbs: number;
+  weightReductionPercent: number;
+  isArmor: boolean;
+  armor: unknown | null;
+  weaponData: unknown | null;
+  libraryItemId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCharacterCombat {
+  id: string;
+  characterId: string;
+  currentHp: number;
+  currentFp: number;
+  conditions: string[];
+  maneuver: string | null;
+  posture: 'standing' | 'prone' | 'kneeling' | 'crawling' | 'sitting' | 'crouching' | 'lying';
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCampaign {
+  id: string;
+  name: string;
+  description: string | null;
+  ownerId: string;
+  pointTarget: number | null;
+  disadvantageCap: number | null;
+  quirkCap: number | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+/**
+ * One row per pending mutation.  Lifecycle:
+ *   pending → in_flight → applied (deleted)
+ *                         | rejected (kept for audit, drives toast)
+ *                         | failed_permanent (idem; surfaces error)
+ *                         | transient_retry → pending (after backoff)
+ */
+export type OutboxStatus =
+  | 'pending'
+  | 'in_flight'
+  | 'applied'
+  | 'rejected'
+  | 'failed_permanent'
+  | 'transient_retry';
+
+export interface OutboxEntry {
+  clientOpId: string;
+  entityClass: EntityClass;
+  entityId: string;
+  command: OperationCommand;
+  /**
+   * Composite indexed string `${entityId}|${fieldPath ?? ''}` used by
+   * the coalescing path.  Stored explicitly (not derived) so Dexie
+   * can index it as a single column without compound-index gymnastics.
+   */
+  coalesceKey: string;
+  fieldPath?: string | undefined;
+  attemptedValue: unknown;
+  prevValue?: unknown;
+  baseRevision?: number | undefined;
+  validationVersion: number;
+  status: OutboxStatus;
+  enqueuedAt: string;
+  lastAttemptAt?: string | undefined;
+  attemptCount: number;
+  /** ISO timestamp; orchestrator only drains rows whose nextEarliestAttemptAt is in the past. */
+  nextEarliestAttemptAt?: string | undefined;
+  serverReason?: string | undefined;
+  serverNewRevision?: number | undefined;
+  /**
+   * Stable label used in toasts ("Couldn't save ${humanName}").  Filled
+   * in by the enqueue site so the orchestrator doesn't have to know
+   * field-display conventions.
+   */
+  humanName?: string | undefined;
+  /** Optional flash key so the orchestrator can target a specific input on rollback. */
+  flashKey?: string | undefined;
+}
+
+export interface SyncCursor {
+  entityClass: EntityClass;
+  /** Highest revision seen for this entity class.  Sent as `sinceRevision` in /sync/cursor. */
+  revision: number;
+}
+
+export interface SyncMetaRow {
+  key: string;
+  value: unknown;
+}
+
+export interface TombstoneRow {
+  entityClass: EntityClass;
+  entityId: string;
+  revision: number;
+  deletedAt: string;
+}
+
+/**
+ * Persistent toast metadata.  The toast UI re-emits these on bootstrap
+ * so async failures survive a page reload.  `dismissedAt` flips the
+ * row out of the active set without losing the audit trail.
+ */
+export interface RejectionRecord {
+  id: string;
+  clientOpId: string;
+  entityClass: EntityClass;
+  entityId: string;
+  fieldPath?: string | undefined;
+  humanName?: string | undefined;
+  reason: string;
+  status: 'rejected' | 'unauthorized' | 'failed_permanent' | 'conflict';
+  createdAt: string;
+  dismissedAt?: string | undefined;
+}
+
+class LocalDb extends Dexie {
+  characters!: Table<LocalCharacter, string>;
+  characterTraits!: Table<LocalCharacterTrait, string>;
+  characterSkills!: Table<LocalCharacterSkill, string>;
+  characterInventory!: Table<LocalCharacterInventory, string>;
+  characterCombat!: Table<LocalCharacterCombat, string>;
+  campaigns!: Table<LocalCampaign, string>;
+  outbox!: Table<OutboxEntry, string>;
+  syncCursors!: Table<SyncCursor, string>;
+  syncMeta!: Table<SyncMetaRow, string>;
+  tombstones!: Table<TombstoneRow, [string, string]>;
+  rejectionToasts!: Table<RejectionRecord, string>;
+
+  constructor() {
+    super('gurps-pc-local');
+    this.version(1).stores({
+      characters: 'id, ownerId, campaignId, updatedAt, revision',
+      characterTraits: 'id, characterId, [characterId+kind], updatedAt, revision',
+      characterSkills: 'id, characterId, updatedAt, revision',
+      characterInventory: 'id, characterId, parentId, updatedAt, revision',
+      // characterCombat is 1:1 with character; pk=characterId.
+      characterCombat: 'characterId, revision',
+      campaigns: 'id, ownerId, revision',
+      outbox: 'clientOpId, status, coalesceKey, enqueuedAt, [status+enqueuedAt]',
+      syncCursors: 'entityClass',
+      syncMeta: 'key',
+      tombstones: '[entityClass+entityId], revision',
+      rejectionToasts: 'id, entityId, dismissedAt',
+    });
+  }
+}
+
+let dbInstance: LocalDb | null = null;
+
+/**
+ * Lazy singleton — Dexie opens the connection on first table access.
+ * Tests reset it via `resetLocalDb()`.
+ */
+export function getLocalDb(): LocalDb {
+  if (!dbInstance) dbInstance = new LocalDb();
+  return dbInstance;
+}
+
+/**
+ * Wipe and re-open the local DB.  Used by:
+ *   - test cleanup (afterEach in setup.ts)
+ *   - logout (orchestrator.purge) so account switching never leaks
+ *     the previous user's rows into a `useLiveQuery`.
+ */
+export async function resetLocalDb(): Promise<void> {
+  if (!dbInstance) return;
+  await dbInstance.delete();
+  dbInstance = null;
+}
+
+/** All store names — handy for transactions that touch every table. */
+export const ALL_STORE_NAMES = [
+  'characters',
+  'characterTraits',
+  'characterSkills',
+  'characterInventory',
+  'characterCombat',
+  'campaigns',
+  'outbox',
+  'syncCursors',
+  'syncMeta',
+  'tombstones',
+  'rejectionToasts',
+] as const;
+
+/**
+ * Map an EntityClass to the corresponding Dexie store name.  Used by
+ * the orchestrator when applying /sync/cursor responses.
+ */
+export function storeForEntityClass(entityClass: EntityClass): keyof LocalDb | null {
+  switch (entityClass) {
+    case 'character':
+      return 'characters';
+    case 'character_trait':
+      return 'characterTraits';
+    case 'character_skill':
+      return 'characterSkills';
+    case 'character_inventory':
+      return 'characterInventory';
+    case 'character_combat':
+      return 'characterCombat';
+    case 'campaign':
+      return 'campaigns';
+    default:
+      return null;
+  }
+}
+
+/** Build the outbox coalesce key.  Empty fieldPath collapses to bare entityId. */
+export function coalesceKey(entityId: string, fieldPath?: string): string {
+  return `${entityId}|${fieldPath ?? ''}`;
+}
