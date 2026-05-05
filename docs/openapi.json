@@ -1805,6 +1805,602 @@
         }
       }
     },
+    "/api/v1/campaigns/{id}/log": {
+      "get": {
+        "tags": [
+          "adventure-log"
+        ],
+        "summary": "List log entries (members see campaign-visible + their own private)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Adventure log entries (newest first)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "campaignId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "authorId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "authorDisplayName": {
+                        "type": "string"
+                      },
+                      "sessionDate": {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      "body": {
+                        "type": "string",
+                        "default": ""
+                      },
+                      "visibility": {
+                        "type": "string",
+                        "enum": [
+                          "campaign",
+                          "private"
+                        ]
+                      },
+                      "xpAwards": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "characterId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": -1000,
+                              "maximum": 1000
+                            }
+                          },
+                          "required": [
+                            "characterId",
+                            "amount"
+                          ]
+                        },
+                        "default": []
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "campaignId",
+                      "authorId",
+                      "authorDisplayName",
+                      "sessionDate",
+                      "title",
+                      "visibility",
+                      "createdAt",
+                      "updatedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "adventure-log"
+        ],
+        "summary": "Create a log entry (author = current user)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionDate": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "body": {
+                    "type": "string",
+                    "maxLength": 200000,
+                    "default": ""
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "campaign",
+                      "private"
+                    ],
+                    "default": "campaign"
+                  },
+                  "xpAwards": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "characterId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "minimum": -1000,
+                          "maximum": 1000
+                        }
+                      },
+                      "required": [
+                        "characterId",
+                        "amount"
+                      ]
+                    },
+                    "maxItems": 50,
+                    "default": []
+                  }
+                },
+                "required": [
+                  "sessionDate",
+                  "title"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "authorId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "authorDisplayName": {
+                      "type": "string"
+                    },
+                    "sessionDate": {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "body": {
+                      "type": "string",
+                      "default": ""
+                    },
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "campaign",
+                        "private"
+                      ]
+                    },
+                    "xpAwards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "characterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": -1000,
+                            "maximum": 1000
+                          }
+                        },
+                        "required": [
+                          "characterId",
+                          "amount"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "authorId",
+                    "authorDisplayName",
+                    "sessionDate",
+                    "title",
+                    "visibility",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/log/{entryId}": {
+      "patch": {
+        "tags": [
+          "adventure-log"
+        ],
+        "summary": "Edit a log entry (author or campaign owner)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "entryId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sessionDate": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "body": {
+                    "type": "string",
+                    "maxLength": 200000,
+                    "default": ""
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "campaign",
+                      "private"
+                    ],
+                    "default": "campaign"
+                  },
+                  "xpAwards": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "characterId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "amount": {
+                          "type": "integer",
+                          "minimum": -1000,
+                          "maximum": 1000
+                        }
+                      },
+                      "required": [
+                        "characterId",
+                        "amount"
+                      ]
+                    },
+                    "maxItems": 50,
+                    "default": []
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "authorId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "authorDisplayName": {
+                      "type": "string"
+                    },
+                    "sessionDate": {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "body": {
+                      "type": "string",
+                      "default": ""
+                    },
+                    "visibility": {
+                      "type": "string",
+                      "enum": [
+                        "campaign",
+                        "private"
+                      ]
+                    },
+                    "xpAwards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "characterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": -1000,
+                            "maximum": 1000
+                          }
+                        },
+                        "required": [
+                          "characterId",
+                          "amount"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "authorId",
+                    "authorDisplayName",
+                    "sessionDate",
+                    "title",
+                    "visibility",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "adventure-log"
+        ],
+        "summary": "Delete a log entry (author or campaign owner)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "entryId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/characters": {
       "get": {
         "tags": [

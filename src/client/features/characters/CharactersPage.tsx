@@ -74,7 +74,7 @@ export function CharactersPage() {
       </header>
 
       <form
-        className="card grid gap-3 bg-base-200 border border-base-300 p-4 sm:grid-cols-[minmax(16rem,24rem)_auto] sm:items-end"
+        className="card grid gap-3 p-4 sm:grid-cols-[minmax(16rem,24rem)_auto] sm:items-end"
         onSubmit={submit}
       >
         <label className="form-control">
@@ -98,7 +98,7 @@ export function CharactersPage() {
           <li key={c.id}>
             <Link
               to={`/characters/${c.id}`}
-              className="card bg-base-200 border border-base-300 p-4 block hover:bg-base-300 transition-colors"
+              className="card block p-4 transition hover:border-border-strong"
             >
               <div className="flex items-baseline justify-between">
                 <p className="font-display text-xl">{c.name}</p>

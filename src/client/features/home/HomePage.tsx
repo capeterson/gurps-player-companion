@@ -19,46 +19,72 @@ export function HomePage() {
   });
   const characters = useCharactersList();
 
+  const recent = (characters ?? []).slice(0, 4);
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <section className="card overflow-hidden bg-base-200 border border-base-300 p-6 sm:p-8">
+      <section className="card overflow-hidden p-card sm:p-8">
         <div className="max-w-2xl space-y-3">
           <p className="label-eyebrow">Welcome</p>
-          <h1 className="font-display text-4xl sm:text-5xl leading-tight">
+          <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
             {me.data?.displayName ?? 'Adventurer'}
           </h1>
           <p className="text-sm text-muted">
-            Jump back into your campaign tools without the old wall of empty space.
+            Sheets, the adventure log, and your campaigns — all one tab away.
           </p>
-          <div className="flex flex-wrap gap-3 pt-2">
+          <div className="flex flex-wrap gap-2.5 pt-2">
             <Link to="/characters" className="btn btn-primary">
-              View characters
+              Open Sheet
             </Link>
-            <Link to="/settings" className="btn btn-ghost">
-              Settings
+            <Link to="/log" className="btn">
+              Adventure Log
+            </Link>
+            <Link to="/campaigns" className="btn btn-ghost">
+              Campaigns
             </Link>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
-          to="/characters"
-          className="card bg-base-200 border border-base-300 p-5 hover:bg-base-300 transition-colors"
-        >
+        <Link to="/characters" className="card p-card transition hover:border-border-strong">
           <p className="label-eyebrow">Your characters</p>
-          <p className="font-display text-3xl num">{characters?.length ?? '—'}</p>
-          <p className="text-sm text-muted">Open sheets, create heroes, and track advancement.</p>
+          <p className="font-display num text-3xl font-semibold">{characters?.length ?? '—'}</p>
+          <p className="text-sm text-muted">Open sheets, create heroes, track advancement.</p>
         </Link>
-        <Link
-          to="/settings"
-          className="card bg-base-200 border border-base-300 p-5 hover:bg-base-300 transition-colors"
-        >
-          <p className="label-eyebrow">Account</p>
-          <p className="font-display text-3xl">Settings</p>
-          <p className="text-sm text-muted">Password and browser-local sync status.</p>
+        <Link to="/log" className="card p-card transition hover:border-border-strong">
+          <p className="label-eyebrow">Adventure Log</p>
+          <p className="font-display text-3xl font-semibold">Latest</p>
+          <p className="text-sm text-muted">Session notes, private threads, and shared recaps.</p>
+        </Link>
+        <Link to="/campaigns" className="card p-card transition hover:border-border-strong">
+          <p className="label-eyebrow">Campaigns</p>
+          <p className="font-display text-3xl font-semibold">Workspaces</p>
+          <p className="text-sm text-muted">Members, point targets, and shared libraries.</p>
         </Link>
       </section>
+
+      {recent.length > 0 && (
+        <section className="space-y-3">
+          <p className="label-eyebrow">Recent characters</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {recent.map((c) => (
+              <Link
+                key={c.id}
+                to={`/characters/${c.id}`}
+                className="card flex flex-col gap-1 p-card transition hover:border-border-strong"
+              >
+                <p className="font-display text-lg font-semibold leading-tight truncate">
+                  {c.name}
+                </p>
+                <p className="text-xs text-muted">
+                  ST {c.st} · DX {c.dx} · IQ {c.iq} · HT {c.ht}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

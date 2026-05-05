@@ -27,16 +27,17 @@ export function LoginPage() {
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-base-100">
+    <div className="arcane-edge flex min-h-screen items-center justify-center bg-base-200 p-6">
       <form
-        className="card w-96 bg-base-200 border border-base-300 p-6 gap-3"
+        className="card relative z-10 flex w-full max-w-sm flex-col gap-3 p-card"
         onSubmit={(e) => {
           e.preventDefault();
           setError(null);
           login.mutate();
         }}
       >
-        <h1 className="font-display text-2xl">Sign in</h1>
+        <p className="label-eyebrow">Player Companion</p>
+        <h1 className="font-display text-3xl font-semibold">Sign in</h1>
         <label className="form-control">
           <span className="label-text">Email</span>
           <input
@@ -57,13 +58,13 @@ export function LoginPage() {
             required
           />
         </label>
-        {error && <p className="text-error text-sm">{error}</p>}
+        {error && <p className="alert alert-error text-sm">{error}</p>}
         <button type="submit" className="btn btn-primary" disabled={login.isPending}>
           {login.isPending ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="text-sm">
+        <p className="text-sm text-muted">
           New here?{' '}
-          <Link to="/register" className="link">
+          <Link to="/register" className="link link-primary">
             Create an account
           </Link>
         </p>

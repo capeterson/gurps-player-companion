@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import type { AppConfig } from './config.ts';
 import { type AppEnv, createOpenApiApp } from './openapi/app.ts';
+import { adventureLogRouter } from './routes/adventureLog.ts';
 import { apiKeysRouter } from './routes/apiKeys.ts';
 import { authRouter } from './routes/auth.ts';
 import { campaignsRouter } from './routes/campaigns.ts';
@@ -31,6 +32,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', authRouter);
   app.route('/api/v1', apiKeysRouter);
   app.route('/api/v1', campaignsRouter);
+  app.route('/api/v1', adventureLogRouter);
   app.route('/api/v1', charactersRouter);
   app.route('/api/v1', characterSubResourcesRouter);
   app.route('/api/v1', syncRouter);
