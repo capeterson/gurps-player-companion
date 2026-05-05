@@ -52,7 +52,7 @@ export function SettingsPage() {
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
         <form
-          className="card gap-4 bg-base-200 p-5 border border-base-300"
+          className="card gap-4 p-card"
           onSubmit={(e) => {
             e.preventDefault();
             setError(null);
@@ -105,7 +105,7 @@ export function SettingsPage() {
           </button>
         </form>
 
-        <section className="card gap-4 bg-base-200 p-5 border border-base-300">
+        <section className="card gap-4 p-card">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="label-eyebrow">Local data</p>
