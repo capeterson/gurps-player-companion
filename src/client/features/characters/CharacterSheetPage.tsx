@@ -2,8 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
+import { ConditionChip } from '../../components/ui/ConditionChip.tsx';
+import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
+import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
+import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
 import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
+import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
@@ -163,6 +168,74 @@ function AttrCell(props: {
       max={props.max ?? 99}
       width={props.width ?? 'w-16'}
     />
+  );
+}
+
+/**
+ * Temp-modifier cell. Renders a chip showing the current Δ
+ * (or `—` when zero); clicking opens a popover that lets the
+ * player dial in the value with a stepper or raw input and
+ * commits only on Apply. Replaces the prior raw `<input>` so a
+ * keystroke can't accidentally fire a sync mutation while the
+ * player is mid-typing a rolled value like "1d3".
+ */
+function TempCell({
+  label,
+  field,
+  baseValue,
+  tempValue,
+  characterId,
+  canWrite,
+}: {
+  label: string;
+  field: AttrField;
+  baseValue: number;
+  tempValue: number;
+  characterId: string;
+  canWrite: boolean;
+}) {
+  const buildSave = useCharacterFieldSave(characterId);
+  const { onSave, flashKey } = buildSave(field, { humanName: `${label} temp` });
+  // Subscribe to async outbox rejections on this field's flash key so
+  // the chip pulses (AGENTS.md rule 2). Without this the chip would
+  // silently snap back to the reverted value when the orchestrator
+  // rolls a rejected patch back in Dexie — only the toast would show.
+  const flash = useFieldFlash(flashKey);
+  const [open, setOpen] = useState(false);
+  const display = tempValue === 0 ? '—' : tempValue > 0 ? `+${tempValue}` : String(tempValue);
+
+  if (!canWrite) {
+    return (
+      <span className="num text-dim" aria-label={`${label} temp`}>
+        {display}
+      </span>
+    );
+  }
+  return (
+    <span className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={`${label} temporary modifier`}
+        aria-expanded={open}
+        className={`${DRAFT_FIELD_CLASS} chip num min-w-[3rem] justify-center ${tempValue !== 0 ? 'on' : ''}`}
+        data-flashing={flash['data-flashing']}
+        data-flash-parity={flash['data-flash-parity']}
+      >
+        {display}
+      </button>
+      {open && (
+        <TempBoostPopover
+          label={label}
+          baseValue={baseValue}
+          currentTemp={tempValue}
+          onApply={(v) => {
+            void onSave(v);
+          }}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </span>
   );
 }
 
@@ -397,10 +470,11 @@ function AttributesPanel({
               />
             </div>
             <div className="text-center">
-              <AttrCell
-                label={`${r.label} temp`}
+              <TempCell
+                label={r.label}
                 field={r.temp}
-                value={r.tempValue}
+                baseValue={r.baseValue}
+                tempValue={r.tempValue}
                 characterId={character.id}
                 canWrite={canWrite}
               />
@@ -502,10 +576,11 @@ function SecondaryModsPanel({
               />
             </div>
             <div className="text-center">
-              <AttrCell
-                label={`${r.label} temp`}
+              <TempCell
+                label={r.label}
                 field={r.temp}
-                value={r.tempValue}
+                baseValue={r.derived - r.tempValue}
+                tempValue={r.tempValue}
                 characterId={character.id}
                 canWrite={canWrite}
               />
@@ -649,34 +724,19 @@ function WarningsPanel({
   if (character.warnings.length === 0 && character.dismissedWarnings.length === 0) return null;
 
   return (
-    <section className="card p-5 space-y-2">
-      <p className="label-eyebrow">Warnings</p>
-      {character.warnings.length === 0 && (
-        <p className="text-sm text-base-content/60">No active warnings.</p>
-      )}
-      <ul className="space-y-1">
+    <section className="space-y-2">
+      <ul className="space-y-2">
         {character.warnings.map((w) => (
-          <li
-            key={w.code}
-            className={`flex items-start justify-between gap-3 p-2 rounded border ${
-              w.severity === 'warn'
-                ? 'border-warning/40 bg-warning/10'
-                : 'border-info/40 bg-info/10'
-            }`}
-          >
-            <div className="text-sm">
-              <p className="label-eyebrow">{w.severity}</p>
-              <p>{w.message}</p>
-            </div>
-            {canWrite && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs"
-                onClick={() => dismiss.mutate({ code: w.code, dismissed: true })}
-              >
-                Dismiss
-              </button>
-            )}
+          <li key={w.code}>
+            <WarningBanner
+              severity={w.severity === 'warn' ? 'warn' : 'info'}
+              title={w.code}
+              onDismiss={
+                canWrite ? () => dismiss.mutate({ code: w.code, dismissed: true }) : undefined
+              }
+            >
+              {w.message}
+            </WarningBanner>
           </li>
         ))}
       </ul>
@@ -805,7 +865,7 @@ function CombatPanel({
       <p className="label-eyebrow">Combat</p>
       <h2 className="font-display text-2xl">Current state</h2>
       <div className="grid grid-cols-2 gap-4">
-        <div>
+        <div className="space-y-1.5">
           <p className="label-eyebrow">HP</p>
           <div className="flex items-baseline gap-1">
             {canWrite ? (
@@ -819,8 +879,14 @@ function CombatPanel({
             )}
             <span className="text-base-content/60 num">/ {character.derived.hp}</span>
           </div>
+          <PoolMeter
+            current={currentHp}
+            max={character.derived.hp}
+            tone="hp"
+            ariaLabel="Hit points"
+          />
         </div>
-        <div>
+        <div className="space-y-1.5">
           <p className="label-eyebrow">FP</p>
           <div className="flex items-baseline gap-1">
             {canWrite ? (
@@ -834,21 +900,26 @@ function CombatPanel({
             )}
             <span className="text-base-content/60 num">/ {character.derived.fp}</span>
           </div>
+          <PoolMeter
+            current={currentFp}
+            max={character.derived.fp}
+            tone="fp"
+            ariaLabel="Fatigue points"
+          />
         </div>
       </div>
       <div>
         <p className="label-eyebrow">Posture</p>
         <div className="flex flex-wrap gap-1">
           {POSTURES.map((p) => (
-            <button
+            <ConditionChip
               key={p}
-              type="button"
-              className={`btn btn-xs ${posture === p ? 'btn-primary' : 'btn-ghost'} capitalize`}
+              label={p}
+              active={posture === p}
               onClick={() => canWrite && setPosture.mutate(p)}
               disabled={!canWrite || setPosture.isPending}
-            >
-              {p}
-            </button>
+              className="capitalize"
+            />
           ))}
         </div>
       </div>

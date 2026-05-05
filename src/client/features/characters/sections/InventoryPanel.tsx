@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useDraftToggle } from '../../../hooks/useDraftToggle.ts';
 import { useToasts } from '../../../lib/toast.tsx';
@@ -129,6 +130,7 @@ interface ItemRowProps {
 
 function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
   const toasts = useToasts();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const patchItem = (field: string, value: unknown) =>
     enqueueFieldPatch({
@@ -275,13 +277,26 @@ function ItemRow({ characterId, item, canWrite }: ItemRowProps) {
         <button
           type="button"
           className="btn btn-ghost btn-xs"
-          onClick={() => {
-            if (confirm(`Delete item "${item.name}"?`)) void removeItem();
-          }}
+          onClick={() => setConfirmOpen(true)}
           aria-label={`Delete item ${item.name}`}
         >
           ✕
         </button>
+      )}
+      {canWrite && (
+        <ConfirmDialog
+          open={confirmOpen}
+          title="Delete item?"
+          confirmLabel="Delete"
+          tone="error"
+          onConfirm={() => {
+            setConfirmOpen(false);
+            void removeItem();
+          }}
+          onCancel={() => setConfirmOpen(false)}
+        >
+          Permanently remove <strong>{item.name}</strong> from this character's inventory.
+        </ConfirmDialog>
       )}
     </li>
   );
