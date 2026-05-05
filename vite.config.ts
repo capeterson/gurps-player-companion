@@ -54,6 +54,15 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/index.html',
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // The SW deliberately does NOT runtime-cache any /api/v1/*
+        // responses.  Workbox cache keys are URL-only, but every API
+        // response is authenticated and user-specific, so a cache hit
+        // across an account switch on a shared device would leak the
+        // previous user's data.  Local-first reads go through Dexie,
+        // which is purged on signOut(); the SW only owns app-shell
+        // caching plus the SPA navigation fallback below.  See
+        // `src/sw/registerSW.ts` for the offline-replay strategy.
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],

@@ -1,4 +1,5 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
+import { upgradeWebSocket, websocket } from 'hono/bun';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import type { AppConfig } from './config.ts';
@@ -6,11 +7,13 @@ import { type AppEnv, createOpenApiApp } from './openapi/app.ts';
 import { adventureLogRouter } from './routes/adventureLog.ts';
 import { apiKeysRouter } from './routes/apiKeys.ts';
 import { authRouter } from './routes/auth.ts';
+import { campaignLibraryRouter } from './routes/campaignLibrary.ts';
 import { campaignsRouter } from './routes/campaigns.ts';
 import { characterSubResourcesRouter } from './routes/characterSubResources.ts';
 import { charactersRouter } from './routes/characters.ts';
 import { healthRouter } from './routes/health.ts';
 import { syncRouter } from './routes/sync.ts';
+import { createSyncWsHandler } from './routes/syncWs.ts';
 import { attachStaticHandler } from './static.ts';
 
 export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
@@ -32,9 +35,22 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', authRouter);
   app.route('/api/v1', apiKeysRouter);
   app.route('/api/v1', campaignsRouter);
+  app.route('/api/v1', campaignLibraryRouter);
   app.route('/api/v1', adventureLogRouter);
   app.route('/api/v1', charactersRouter);
   app.route('/api/v1', characterSubResourcesRouter);
+
+  // WebSocket push channel.  Auth via query-string token because the
+  // browser WebSocket API can't set Authorization headers.  See
+  // `routes/syncWs.ts` for the protocol.  MUST be registered BEFORE
+  // `syncRouter` is mounted: that router installs
+  // `use('/sync/*', requireActiveUser)`, which would otherwise reject
+  // the handshake before our handler can read `?token=`.
+  app.get(
+    '/api/v1/sync/ws',
+    createSyncWsHandler(upgradeWebSocket as Parameters<typeof createSyncWsHandler>[0]),
+  );
+
   app.route('/api/v1', syncRouter);
 
   // Register the bearer security scheme so /api/v1/openapi.json describes it.

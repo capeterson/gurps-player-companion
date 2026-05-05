@@ -114,3 +114,8 @@ dist
 
 # Claude Code local config (preview launch configs, worktrees, etc.)
 .claude/
+
+# Playwright artifacts
+/test-results/
+/playwright-report/
+/playwright/.cache/

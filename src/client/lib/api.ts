@@ -66,6 +66,20 @@ export interface ApiOptions {
 }
 
 export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  const res = await apiFetch(path, options);
+  return parse<T>(res);
+}
+
+/**
+ * Like `api()` but returns the raw `Response` instead of parsing JSON.
+ * Use for non-JSON downloads (file exports, blobs) so they still get
+ * the shared refresh-on-401 retry; a direct `fetch()` would 401 once
+ * the access token expires.
+ *
+ * Non-2xx responses are NOT thrown — the caller decides how to handle
+ * them (e.g. show a download error vs. a parse error).
+ */
+export async function apiFetch(path: string, options: ApiOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
   const tokens = tokenStore.read();
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
@@ -88,12 +102,11 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
           headers: { ...headers, authorization: `Bearer ${next.accessToken}` },
         };
         if (options.body !== undefined) retryInit.body = JSON.stringify(options.body);
-        const retry = await fetch(`${API_ROOT}${path}`, retryInit);
-        return parse<T>(retry);
+        return await fetch(`${API_ROOT}${path}`, retryInit);
       }
     }
   }
-  return parse<T>(res);
+  return res;
 }
 
 async function parse<T>(res: Response): Promise<T> {
