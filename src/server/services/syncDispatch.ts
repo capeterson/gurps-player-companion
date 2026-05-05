@@ -37,6 +37,7 @@ import {
   combatStates,
   inventoryItems,
 } from '../db/schema.ts';
+import { publish as wsPublish } from './wsBus.ts';
 
 /**
  * Per-entity field whitelist.  Each entry is the partial Zod object
@@ -87,7 +88,17 @@ export async function dispatchOperation(
   op: OperationEnvelope,
 ): Promise<OperationOutcome> {
   try {
-    return await dispatchOperationInner(ctx, op);
+    const outcome = await dispatchOperationInner(ctx, op);
+    if (outcome.status === 'applied') {
+      // Wake any other tabs/devices for this user.  WS messages carry
+      // no row data — the client always reconciles via /sync/cursor.
+      wsPublish(ctx.userId, {
+        kind: 'sync_invalidate',
+        entityClasses: [op.entityClass],
+        emittedAt: new Date().toISOString(),
+      });
+    }
+    return outcome;
   } catch (err) {
     if (err instanceof HTTPException) {
       // 403 / 404 → unauthorized (the client doesn't get to see the

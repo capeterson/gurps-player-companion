@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
@@ -9,6 +10,7 @@ import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
+import { LibraryPage } from './features/library/LibraryPage.tsx';
 import { LogPage } from './features/log/LogPage.tsx';
 import { SettingsPage } from './features/settings/SettingsPage.tsx';
 import { applyTheme, readStoredTheme } from './lib/theme.ts';
@@ -17,6 +19,7 @@ import { RequireAuth } from './routes/RequireAuth.tsx';
 import './styles/theme.css';
 
 applyTheme(readStoredTheme());
+registerSwLifecycle();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +45,7 @@ const router = createBrowserRouter([
           { path: '/characters/:id', element: <CharacterSheetPage /> },
           { path: '/campaigns', element: <CampaignsPage /> },
           { path: '/log', element: <LogPage /> },
+          { path: '/library', element: <LibraryPage /> },
           { path: '/settings', element: <SettingsPage /> },
         ],
       },

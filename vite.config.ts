@@ -54,6 +54,39 @@ export default defineConfig({
       workbox: {
         navigateFallback: '/index.html',
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Treat sync POSTs as opaque; they're handled by the page-side
+        // orchestrator (`src/client/sync/orchestrator.ts`).  The SW
+        // only owns app-shell caching and read-side fallback for
+        // reference data.  See `src/sw/registerSW.ts` for the registration
+        // glue and the offline-replay strategy summary.
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          // Read-only campaign/library lookups are large but stable;
+          // serve cached copies first to keep the UI snappy and to
+          // give offline launches something useful to render.  The
+          // SW never caches mutating verbs.
+          {
+            urlPattern: ({ url, request }) =>
+              request.method === 'GET' &&
+              url.pathname.startsWith('/api/v1/campaigns/') &&
+              url.pathname.endsWith('/library'),
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'gpc-library-v1',
+              expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            },
+          },
+          {
+            urlPattern: ({ url, request }) =>
+              request.method === 'GET' && url.pathname === '/api/v1/auth/me',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'gpc-me-v1',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 },
+            },
+          },
+        ],
       },
     }),
   ],

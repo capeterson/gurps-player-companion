@@ -1805,6 +1805,2579 @@
         }
       }
     },
+    "/api/v1/campaigns/{id}/library": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get the campaign library (member or owner)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Library payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "traits": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "campaignId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "advantage",
+                              "disadvantage",
+                              "perk",
+                              "quirk",
+                              "language",
+                              "cultural_familiarity"
+                            ]
+                          },
+                          "basePoints": {
+                            "type": "integer"
+                          },
+                          "description": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20000
+                          },
+                          "source": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "availableModifiers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "enum": [
+                                    "enhancement",
+                                    "limitation"
+                                  ]
+                                },
+                                "costType": {
+                                  "type": "string",
+                                  "enum": [
+                                    "percent",
+                                    "flat"
+                                  ]
+                                },
+                                "costValue": {
+                                  "type": "integer",
+                                  "minimum": -200,
+                                  "maximum": 500
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                },
+                                "group": {
+                                  "type": "string",
+                                  "maxLength": 80
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "category",
+                                "costType",
+                                "costValue"
+                              ]
+                            },
+                            "default": []
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 40
+                            },
+                            "default": []
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "campaignId",
+                          "name",
+                          "kind",
+                          "basePoints",
+                          "description",
+                          "source",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "skills": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "campaignId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "attribute": {
+                            "type": "string",
+                            "enum": [
+                              "ST",
+                              "DX",
+                              "IQ",
+                              "HT",
+                              "Will",
+                              "Per",
+                              "Other"
+                            ]
+                          },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "E",
+                              "A",
+                              "H",
+                              "VH"
+                            ]
+                          },
+                          "techLevel": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 12
+                          },
+                          "description": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20000
+                          },
+                          "source": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "defaultSpecialization": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 160
+                          },
+                          "prerequisites": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20000
+                          },
+                          "situationalModifiers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "modifier": {
+                                  "type": "integer",
+                                  "minimum": -50,
+                                  "maximum": 50
+                                },
+                                "description": {
+                                  "type": "string",
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "modifier"
+                              ]
+                            },
+                            "default": []
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "campaignId",
+                          "name",
+                          "attribute",
+                          "difficulty",
+                          "techLevel",
+                          "description",
+                          "source",
+                          "defaultSpecialization",
+                          "prerequisites",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "campaignId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "category": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "defaultQuantity": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000
+                          },
+                          "weightLbs": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1000000
+                          },
+                          "cost": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100000000000
+                          },
+                          "description": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20000
+                          },
+                          "source": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "isArmor": {
+                            "type": "boolean"
+                          },
+                          "armor": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "locations": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 40
+                                },
+                                "default": []
+                              },
+                              "dr": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000,
+                                "default": 0
+                              },
+                              "drCrushing": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 1000
+                              },
+                              "flexible": {
+                                "type": "boolean",
+                                "default": false
+                              },
+                              "frontOnly": {
+                                "type": "boolean",
+                                "default": false
+                              },
+                              "backOnly": {
+                                "type": "boolean",
+                                "default": false
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            }
+                          },
+                          "weaponData": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "damage": {
+                                "type": "string",
+                                "maxLength": 160
+                              },
+                              "reach": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 40
+                              },
+                              "parry": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 40
+                              },
+                              "stRequired": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 99
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "campaignId",
+                          "name",
+                          "category",
+                          "defaultQuantity",
+                          "weightLbs",
+                          "cost",
+                          "description",
+                          "source",
+                          "isArmor",
+                          "armor",
+                          "weaponData",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "traits",
+                    "skills",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/traits": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a library trait (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "advantage",
+                      "disadvantage",
+                      "perk",
+                      "quirk",
+                      "language",
+                      "cultural_familiarity"
+                    ]
+                  },
+                  "basePoints": {
+                    "type": "integer",
+                    "minimum": -1000,
+                    "maximum": 1000,
+                    "default": 0
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "availableModifiers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "enhancement",
+                            "limitation"
+                          ]
+                        },
+                        "costType": {
+                          "type": "string",
+                          "enum": [
+                            "percent",
+                            "flat"
+                          ]
+                        },
+                        "costValue": {
+                          "type": "integer",
+                          "minimum": -200,
+                          "maximum": 500
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "group": {
+                          "type": "string",
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "category",
+                        "costType",
+                        "costValue"
+                      ]
+                    },
+                    "default": []
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "advantage",
+                        "disadvantage",
+                        "perk",
+                        "quirk",
+                        "language",
+                        "cultural_familiarity"
+                      ]
+                    },
+                    "basePoints": {
+                      "type": "integer"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "availableModifiers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "enhancement",
+                              "limitation"
+                            ]
+                          },
+                          "costType": {
+                            "type": "string",
+                            "enum": [
+                              "percent",
+                              "flat"
+                            ]
+                          },
+                          "costValue": {
+                            "type": "integer",
+                            "minimum": -200,
+                            "maximum": 500
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "group": {
+                            "type": "string",
+                            "maxLength": 80
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "category",
+                          "costType",
+                          "costValue"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "default": []
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "kind",
+                    "basePoints",
+                    "description",
+                    "source",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/traits/{traitId}": {
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a library trait (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "traitId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "advantage",
+                      "disadvantage",
+                      "perk",
+                      "quirk",
+                      "language",
+                      "cultural_familiarity"
+                    ]
+                  },
+                  "basePoints": {
+                    "type": "integer",
+                    "minimum": -1000,
+                    "maximum": 1000,
+                    "default": 0
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "availableModifiers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "category": {
+                          "type": "string",
+                          "enum": [
+                            "enhancement",
+                            "limitation"
+                          ]
+                        },
+                        "costType": {
+                          "type": "string",
+                          "enum": [
+                            "percent",
+                            "flat"
+                          ]
+                        },
+                        "costValue": {
+                          "type": "integer",
+                          "minimum": -200,
+                          "maximum": 500
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 2000
+                        },
+                        "group": {
+                          "type": "string",
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "category",
+                        "costType",
+                        "costValue"
+                      ]
+                    },
+                    "default": []
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    },
+                    "default": []
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "advantage",
+                        "disadvantage",
+                        "perk",
+                        "quirk",
+                        "language",
+                        "cultural_familiarity"
+                      ]
+                    },
+                    "basePoints": {
+                      "type": "integer"
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "availableModifiers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": [
+                              "enhancement",
+                              "limitation"
+                            ]
+                          },
+                          "costType": {
+                            "type": "string",
+                            "enum": [
+                              "percent",
+                              "flat"
+                            ]
+                          },
+                          "costValue": {
+                            "type": "integer",
+                            "minimum": -200,
+                            "maximum": 500
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "group": {
+                            "type": "string",
+                            "maxLength": 80
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "category",
+                          "costType",
+                          "costValue"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40
+                      },
+                      "default": []
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "kind",
+                    "basePoints",
+                    "description",
+                    "source",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a library trait (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "traitId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/skills": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a library skill (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "attribute": {
+                    "type": "string",
+                    "enum": [
+                      "ST",
+                      "DX",
+                      "IQ",
+                      "HT",
+                      "Will",
+                      "Per",
+                      "Other"
+                    ]
+                  },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "E",
+                      "A",
+                      "H",
+                      "VH"
+                    ]
+                  },
+                  "techLevel": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 12
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "defaultSpecialization": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 160
+                  },
+                  "prerequisites": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "situationalModifiers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modifier": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "modifier"
+                      ]
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "name",
+                  "attribute",
+                  "difficulty"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "attribute": {
+                      "type": "string",
+                      "enum": [
+                        "ST",
+                        "DX",
+                        "IQ",
+                        "HT",
+                        "Will",
+                        "Per",
+                        "Other"
+                      ]
+                    },
+                    "difficulty": {
+                      "type": "string",
+                      "enum": [
+                        "E",
+                        "A",
+                        "H",
+                        "VH"
+                      ]
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "defaultSpecialization": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 160
+                    },
+                    "prerequisites": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "situationalModifiers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "modifier": {
+                            "type": "integer",
+                            "minimum": -50,
+                            "maximum": 50
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 2000
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "modifier"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "attribute",
+                    "difficulty",
+                    "techLevel",
+                    "description",
+                    "source",
+                    "defaultSpecialization",
+                    "prerequisites",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/skills/{skillId}": {
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a library skill (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "skillId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "attribute": {
+                    "type": "string",
+                    "enum": [
+                      "ST",
+                      "DX",
+                      "IQ",
+                      "HT",
+                      "Will",
+                      "Per",
+                      "Other"
+                    ]
+                  },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "E",
+                      "A",
+                      "H",
+                      "VH"
+                    ]
+                  },
+                  "techLevel": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 12
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "defaultSpecialization": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 160
+                  },
+                  "prerequisites": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "situationalModifiers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modifier": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "modifier"
+                      ]
+                    },
+                    "default": []
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "attribute": {
+                      "type": "string",
+                      "enum": [
+                        "ST",
+                        "DX",
+                        "IQ",
+                        "HT",
+                        "Will",
+                        "Per",
+                        "Other"
+                      ]
+                    },
+                    "difficulty": {
+                      "type": "string",
+                      "enum": [
+                        "E",
+                        "A",
+                        "H",
+                        "VH"
+                      ]
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "defaultSpecialization": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 160
+                    },
+                    "prerequisites": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "situationalModifiers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "modifier": {
+                            "type": "integer",
+                            "minimum": -50,
+                            "maximum": 50
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 2000
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "modifier"
+                        ]
+                      },
+                      "default": []
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "attribute",
+                    "difficulty",
+                    "techLevel",
+                    "description",
+                    "source",
+                    "defaultSpecialization",
+                    "prerequisites",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a library skill (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "skillId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/items": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a library item (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "default": "general"
+                  },
+                  "defaultQuantity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 1
+                  },
+                  "weightLbs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0
+                  },
+                  "cost": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000000000,
+                    "default": 0
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "isArmor": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "armor": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "locations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "default": []
+                      },
+                      "dr": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000,
+                        "default": 0
+                      },
+                      "drCrushing": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "flexible": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "frontOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "backOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    }
+                  },
+                  "weaponData": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "damage": {
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "reach": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 40
+                      },
+                      "parry": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 40
+                      },
+                      "stRequired": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 99
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "category": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "defaultQuantity": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    "weightLbs": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    "cost": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100000000000
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "isArmor": {
+                      "type": "boolean"
+                    },
+                    "armor": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "locations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "default": []
+                        },
+                        "dr": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000,
+                          "default": 0
+                        },
+                        "drCrushing": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "flexible": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "frontOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "backOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      }
+                    },
+                    "weaponData": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "damage": {
+                          "type": "string",
+                          "maxLength": 160
+                        },
+                        "reach": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
+                        "parry": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
+                        "stRequired": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 99
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "category",
+                    "defaultQuantity",
+                    "weightLbs",
+                    "cost",
+                    "description",
+                    "source",
+                    "isArmor",
+                    "armor",
+                    "weaponData",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/items/{itemId}": {
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a library item (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "category": {
+                    "type": "string",
+                    "maxLength": 40,
+                    "default": "general"
+                  },
+                  "defaultQuantity": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 1
+                  },
+                  "weightLbs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0
+                  },
+                  "cost": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000000000,
+                    "default": 0
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "isArmor": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "armor": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "locations": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "default": []
+                      },
+                      "dr": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000,
+                        "default": 0
+                      },
+                      "drCrushing": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "flexible": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "frontOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "backOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    }
+                  },
+                  "weaponData": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "damage": {
+                        "type": "string",
+                        "maxLength": 160
+                      },
+                      "reach": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 40
+                      },
+                      "parry": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 40
+                      },
+                      "stRequired": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 99
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "category": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "defaultQuantity": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    "weightLbs": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    "cost": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100000000000
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "isArmor": {
+                      "type": "boolean"
+                    },
+                    "armor": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "locations": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 40
+                          },
+                          "default": []
+                        },
+                        "dr": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000,
+                          "default": 0
+                        },
+                        "drCrushing": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "flexible": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "frontOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "backOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      }
+                    },
+                    "weaponData": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "damage": {
+                          "type": "string",
+                          "maxLength": 160
+                        },
+                        "reach": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
+                        "parry": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
+                        "stRequired": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 99
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "category",
+                    "defaultQuantity",
+                    "weightLbs",
+                    "cost",
+                    "description",
+                    "source",
+                    "isArmor",
+                    "armor",
+                    "weaponData",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a library item (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/export": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Export the library as YAML (member or owner)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "YAML document",
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/import": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Import a library YAML document (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "yaml": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20971520
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "merge",
+                      "replace"
+                    ],
+                    "default": "merge"
+                  }
+                },
+                "required": [
+                  "yaml"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-section counts of created / updated / deleted rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "merge",
+                        "replace"
+                      ]
+                    },
+                    "traits": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "updated": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "created",
+                        "updated",
+                        "deleted"
+                      ]
+                    },
+                    "skills": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "updated": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "created",
+                        "updated",
+                        "deleted"
+                      ]
+                    },
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "updated": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "created",
+                        "updated",
+                        "deleted"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "traits",
+                    "skills",
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid YAML",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/campaigns/{id}/log": {
       "get": {
         "tags": [

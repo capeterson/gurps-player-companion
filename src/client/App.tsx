@@ -11,6 +11,7 @@ import { getSyncOrchestrator } from './sync/orchestrator.ts';
 const NAV_TABS = [
   { to: '/characters', label: 'Sheet' },
   { to: '/log', label: 'Log' },
+  { to: '/library', label: 'Library' },
   { to: '/campaigns', label: 'Campaign' },
 ] as const;
 

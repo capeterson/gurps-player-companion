@@ -11,12 +11,14 @@ import { type ReactNode, useEffect } from 'react';
 import { getLocalDb } from '../db/dexie.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { getSyncOrchestrator, setRejectionNotifier } from './orchestrator.ts';
+import { getSyncWsSubscriber } from './wsSubscriber.ts';
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const toasts = useToasts();
   useEffect(() => {
     const orch = getSyncOrchestrator();
     orch.start();
+    getSyncWsSubscriber().start();
     setRejectionNotifier((rec) => {
       // Persistent toast naming the field + reason.  The id is the
       // outbox clientOpId so re-emitting the same rejection (e.g. on
@@ -30,6 +32,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       orch.stop();
+      getSyncWsSubscriber().stop();
       setRejectionNotifier(null);
     };
   }, [toasts]);
