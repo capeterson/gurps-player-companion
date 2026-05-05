@@ -14,8 +14,7 @@ import type {
   LibrarySkillOut,
   LibraryTraitOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
-import { ApiError, api } from '../../lib/api.ts';
-import { tokenStore } from '../../lib/tokenStore.ts';
+import { ApiError, api, apiFetch } from '../../lib/api.ts';
 
 interface LibraryPayload {
   traits: LibraryTraitOut[];
@@ -110,15 +109,14 @@ export function LibraryPage() {
 
   function downloadExport() {
     if (!campaignId) return;
-    const tokens = tokenStore.read();
-    if (!tokens) return;
-    // Use fetch + blob so the Authorization header rides along; a raw
-    // anchor click would not include the bearer token.
+    // Route through `apiFetch` so the export inherits the shared
+    // refresh-on-401 retry; a raw `fetch` would 401 the first time
+    // after the 15-minute access-token TTL expires.  An anchor-click
+    // download would also drop the Authorization header, so we still
+    // need to pull the bytes via fetch and synthesize a blob URL.
     void (async () => {
       try {
-        const res = await fetch(`/api/v1/campaigns/${campaignId}/library/export`, {
-          headers: { authorization: `Bearer ${tokens.accessToken}` },
-        });
+        const res = await apiFetch(`/campaigns/${campaignId}/library/export`);
         if (!res.ok) {
           setImportError(`Export failed: HTTP ${res.status}`);
           return;
