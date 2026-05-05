@@ -46,7 +46,7 @@ export function App() {
 
   return (
     <div className="arcane-edge min-h-screen bg-base-100 text-base-content">
-      <header className="navbar relative z-10 bg-base-200/95 border-b border-base-300 backdrop-blur">
+      <header className="navbar relative z-50 bg-base-200/95 border-b border-base-300 backdrop-blur">
         <div className="flex-1 flex items-center gap-4 px-4">
           <Link to="/" className="font-display text-xl">
             GURPS Player Companion
@@ -67,13 +67,13 @@ export function App() {
           <button type="button" className="btn btn-ghost btn-sm" onClick={toggleTheme}>
             {themeLabel(theme)} mode
           </button>
-          <details className="dropdown dropdown-end">
+          <details className="dropdown dropdown-end relative z-50">
             <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
               <span className="hidden sm:inline text-muted">Signed in as</span>
               <span>{me.data?.displayName ?? 'Account'}</span>
               <span aria-hidden="true">▾</span>
             </summary>
-            <ul className="menu dropdown-content z-20 mt-2 w-56 rounded-box border border-base-300 bg-base-200 p-2 shadow-xl">
+            <ul className="menu dropdown-content z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-200 p-2 shadow-xl">
               <li className="menu-title px-3 py-2">
                 <span>{me.data?.email ?? 'Loading account…'}</span>
               </li>
@@ -89,7 +89,7 @@ export function App() {
           </details>
         </div>
       </header>
-      <main className="relative z-10 container mx-auto p-4 sm:p-6">
+      <main className="relative z-0 container mx-auto p-4 sm:p-6">
         <Outlet />
       </main>
     </div>

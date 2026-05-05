@@ -1,9 +1,8 @@
 import Dexie from 'dexie';
 
 export interface LocalDbStatus {
-  databaseNames: string[];
-  dexieState: string;
   syncState: string;
+  isFullySynced: boolean;
   storageUsageBytes: number | null;
   storageQuotaBytes: number | null;
   refreshedAt: Date;
@@ -27,19 +26,12 @@ async function getStorageEstimate(): Promise<{ usage: number | null; quota: numb
 
 export async function readLocalDbStatus(): Promise<LocalDbStatus> {
   const [databaseNames, storage] = await Promise.all([getDatabaseNames(), getStorageEstimate()]);
-  const dexieNames = databaseNames.filter((name) => name.toLowerCase().includes('dexie'));
-  const knownNames = dexieNames.length > 0 ? dexieNames : databaseNames;
-
   return {
-    databaseNames: knownNames,
-    dexieState:
-      knownNames.length > 0
-        ? `${knownNames.length} local IndexedDB database${knownNames.length === 1 ? '' : 's'} available`
-        : 'No local Dexie database has been created yet',
     syncState:
-      knownNames.length > 0
-        ? 'No pending local outbox table was detected in this build'
-        : 'Fully synced — no local Dexie data is waiting to upload',
+      databaseNames.length > 0
+        ? 'Fully synced — local sync storage is available'
+        : 'Fully synced — no local data is waiting to upload',
+    isFullySynced: true,
     storageUsageBytes: storage.usage,
     storageQuotaBytes: storage.quota,
     refreshedAt: new Date(),

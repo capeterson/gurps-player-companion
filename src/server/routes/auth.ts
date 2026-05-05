@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createRoute } from '@hono/zod-openapi';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   changePasswordRequest,
@@ -233,10 +233,23 @@ router.openapi(
     const ok = await verifyPassword(body.currentPassword, user.passwordHash);
     if (!ok) throw new HTTPException(403, { message: 'current password is incorrect' });
 
-    await getDb()
-      .update(users)
-      .set({ passwordHash: await hashPassword(body.newPassword), updatedAt: new Date() })
-      .where(eq(users.id, user.id));
+    const db = getDb();
+    const now = new Date();
+    const passwordHash = await hashPassword(body.newPassword);
+
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ passwordHash, updatedAt: now }).where(eq(users.id, user.id));
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: now })
+        .where(
+          and(
+            eq(refreshTokens.userId, user.id),
+            isNull(refreshTokens.revokedAt),
+            gt(refreshTokens.expiresAt, now),
+          ),
+        );
+    });
     return c.body(null, 204);
   },
 );
