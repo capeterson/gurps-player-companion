@@ -39,15 +39,19 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', adventureLogRouter);
   app.route('/api/v1', charactersRouter);
   app.route('/api/v1', characterSubResourcesRouter);
-  app.route('/api/v1', syncRouter);
 
   // WebSocket push channel.  Auth via query-string token because the
   // browser WebSocket API can't set Authorization headers.  See
-  // `routes/syncWs.ts` for the protocol.
+  // `routes/syncWs.ts` for the protocol.  MUST be registered BEFORE
+  // `syncRouter` is mounted: that router installs
+  // `use('/sync/*', requireActiveUser)`, which would otherwise reject
+  // the handshake before our handler can read `?token=`.
   app.get(
     '/api/v1/sync/ws',
     createSyncWsHandler(upgradeWebSocket as Parameters<typeof createSyncWsHandler>[0]),
   );
+
+  app.route('/api/v1', syncRouter);
 
   // Register the bearer security scheme so /api/v1/openapi.json describes it.
   app.openAPIRegistry.registerComponent('securitySchemes', 'bearerAuth', {
