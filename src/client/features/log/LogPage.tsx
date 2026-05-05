@@ -7,14 +7,29 @@ import { ApiError, api } from '../../lib/api.ts';
 
 type FilterKind = 'all' | 'shared' | 'private';
 
+/** Today as 'YYYY-MM-DD' in the user's local calendar. `toISOString()`
+ * is UTC, which during local evening hours pushes the default forward
+ * a day in U.S. time zones — assemble from local date parts instead. */
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
+/** Render a 'YYYY-MM-DD' session date as a friendly local string.
+ * Parsing as `new Date('YYYY-MM-DDT00:00:00Z')` would shift the day
+ * for west-of-UTC users (May 5 entry shows as May 4); construct the
+ * Date from numeric parts so it lives at local midnight on the right
+ * calendar day regardless of zone. */
 function formatDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, {
+  const parts = iso.split('-').map(Number);
+  const [y, m, d] = parts;
+  if (parts.length !== 3 || !y || !m || !d) return iso;
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

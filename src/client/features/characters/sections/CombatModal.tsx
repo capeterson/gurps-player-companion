@@ -41,6 +41,20 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
   const posture = combat?.posture ?? 'standing';
   const conditions = combat?.conditions ?? [];
 
+  // Latest-intended values for HP/FP, updated synchronously on every
+  // bumper tap. Without these refs, two taps that fire before React
+  // commits a new `combat` prop would read the same render-time `hp`
+  // and enqueue duplicate patches, dropping the second tap. The refs
+  // resync from the prop whenever Dexie surfaces a new value.
+  const hpRef = useRef(hp);
+  const fpRef = useRef(fp);
+  useEffect(() => {
+    hpRef.current = hp;
+  }, [hp]);
+  useEffect(() => {
+    fpRef.current = fp;
+  }, [fp]);
+
   const [flashHp, setFlashHp] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -93,7 +107,11 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
 
   function bumpHp(d: number) {
     if (!canWrite || hpMax <= 0) return;
-    const next = Math.max(-hpMax * 4, Math.min(hpMax, hp + d));
+    // Compose against the latest-intended value (hpRef), not the
+    // render snapshot, so rapid same-frame taps each compound
+    // instead of overwriting the prior tap.
+    const next = Math.max(-hpMax * 4, Math.min(hpMax, hpRef.current + d));
+    hpRef.current = next;
     void patchCombat('currentHp', next);
     if (d < 0) {
       setFlashHp(true);
@@ -104,7 +122,8 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
 
   function bumpFp(d: number) {
     if (!canWrite || fpMax <= 0) return;
-    const next = Math.max(-fpMax, Math.min(fpMax, fp + d));
+    const next = Math.max(-fpMax, Math.min(fpMax, fpRef.current + d));
+    fpRef.current = next;
     void patchCombat('currentFp', next);
   }
 
@@ -201,7 +220,10 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               <button
                 type="button"
                 className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                onClick={() => void patchCombat('currentHp', hpMax)}
+                onClick={() => {
+                  hpRef.current = hpMax;
+                  void patchCombat('currentHp', hpMax);
+                }}
               >
                 Reset to {hpMax}
               </button>
