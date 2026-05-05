@@ -1,18 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import type { CombatStateOut } from '../../../shared/schemas/combat.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { CombatModal } from './sections/CombatModal.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
+import { hpVarFor } from './sections/hpColor.ts';
 import {
   applyDetailToCache,
   characterDetailKey,
   useFieldSaver,
 } from './sections/useCharacterPatch.ts';
+
+type SheetTab = 'Combat' | 'Identity' | 'Traits' | 'Skills' | 'Inventory' | 'Notes';
+const SHEET_TABS: readonly SheetTab[] = [
+  'Combat',
+  'Identity',
+  'Traits',
+  'Skills',
+  'Inventory',
+  'Notes',
+] as const;
+
+interface CountByTab {
+  Skills?: number;
+  Inventory?: number;
+  Traits?: number;
+}
 
 const POSTURES = [
   'standing',
@@ -200,7 +219,7 @@ function IdentityPanel({
   });
 
   return (
-    <section className="card bg-base-200 border border-base-300 p-5 space-y-3">
+    <section className="card p-5 space-y-3">
       <p className="label-eyebrow">Identity</p>
       {canWrite ? (
         <input
@@ -350,7 +369,7 @@ function AttributesPanel({
   ];
 
   return (
-    <section className="card bg-base-200 border border-base-300 p-5">
+    <section className="card p-5">
       <p className="label-eyebrow">Attributes</p>
       <h2 className="font-display text-2xl mb-3">Primary</h2>
       <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-3 gap-y-2 items-center">
@@ -457,7 +476,7 @@ function SecondaryModsPanel({
   ];
 
   return (
-    <section className="card bg-base-200 border border-base-300 p-5">
+    <section className="card p-5">
       <p className="label-eyebrow">Secondary attributes</p>
       <h2 className="font-display text-2xl mb-3">Modifiers</h2>
       <div className="grid grid-cols-[auto_1fr_1fr_1.4fr] gap-x-3 gap-y-2 items-center">
@@ -506,7 +525,7 @@ function DerivedPanel({ character }: { character: CharacterDetail }) {
     { label: 'Basic Lift', value: character.derived.basicLift.toFixed(1) },
   ];
   return (
-    <section className="card bg-base-200 border border-base-300 p-5">
+    <section className="card p-5">
       <p className="label-eyebrow">Derived</p>
       <h2 className="font-display text-2xl mb-3">Computed values</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -524,7 +543,7 @@ function DerivedPanel({ character }: { character: CharacterDetail }) {
 function PointsPanel({ character }: { character: CharacterDetail }) {
   const p = character.points;
   return (
-    <section className="card bg-base-200 border border-base-300 p-5">
+    <section className="card p-5">
       <p className="label-eyebrow">Point ledger</p>
       <h2 className="font-display text-2xl mb-3">Spend</h2>
       <ul className="text-sm space-y-1">
@@ -564,7 +583,7 @@ function PointsPanel({ character }: { character: CharacterDetail }) {
 function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const e = character.encumbrance;
   return (
-    <section className="card bg-base-200 border border-base-300 p-5">
+    <section className="card p-5">
       <p className="label-eyebrow">Encumbrance</p>
       <h2 className="font-display text-2xl mb-3">{e.label}</h2>
       <ul className="text-sm space-y-1">
@@ -617,7 +636,7 @@ function WarningsPanel({
   if (character.warnings.length === 0 && character.dismissedWarnings.length === 0) return null;
 
   return (
-    <section className="card bg-base-200 border border-base-300 p-5 space-y-2">
+    <section className="card p-5 space-y-2">
       <p className="label-eyebrow">Warnings</p>
       {character.warnings.length === 0 && (
         <p className="text-sm text-base-content/60">No active warnings.</p>
@@ -744,7 +763,7 @@ function CombatPanel({
           : 'text-hp-low';
 
   return (
-    <section className="card bg-base-200 border border-base-300 p-5 space-y-3">
+    <section className="card p-5 space-y-3">
       <p className="label-eyebrow">Combat</p>
       <h2 className="font-display text-2xl">Current state</h2>
       <div className="grid grid-cols-2 gap-4">
@@ -812,9 +831,103 @@ function CombatPanel({
   );
 }
 
+/**
+ * Identity hero — the design's full-width header on the sheet view:
+ * eyebrow kicker → big display-font name (drop-cap fires automatically)
+ * → a horizontal row of read-only Race/TL/Age/Height/Weight pairs →
+ * Points / Unspent badges on the right.
+ *
+ * The detail editors for each of those fields live in the "Identity"
+ * tab below; this hero is presentational + holds the inline name editor.
+ */
+function IdentityHero({
+  character,
+  pointTarget,
+  canWrite,
+}: {
+  character: CharacterDetail;
+  pointTarget: number | null;
+  canWrite: boolean;
+}) {
+  const saver = useFieldSaver(character.id);
+  const nameField = useDraftField<string>({
+    name: 'name',
+    serverValue: character.name,
+    parse: (s) => s.trim(),
+    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
+    onSave: saver('name'),
+  });
+
+  const chips: Array<[string, string]> = [
+    ['Player', character.playerName ?? '—'],
+    ['TL', character.techLevel != null ? String(character.techLevel) : '—'],
+    ['Age', character.age != null ? String(character.age) : '—'],
+    ['Height', character.height ?? '—'],
+    ['Weight', character.weight ?? '—'],
+  ];
+
+  const total = character.points.total;
+  const remaining = pointTarget != null ? pointTarget - total : null;
+
+  return (
+    <div className="grid items-end gap-6 sm:grid-cols-[1fr_auto]">
+      <div className="min-w-0">
+        <p className="label-eyebrow">Player Character · 4e</p>
+        {canWrite ? (
+          <input
+            aria-label="character name"
+            className={`${DRAFT_FIELD_CLASS} font-name w-full bg-transparent border-0 outline-0 px-0 text-5xl leading-tight focus:ring-2 focus:ring-primary/40 rounded`}
+            {...nameField.inputProps}
+          />
+        ) : (
+          <h1 className="font-name text-5xl leading-tight">{character.name}</h1>
+        )}
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted">
+          {chips.map(([k, v]) => (
+            <span key={k}>
+              <span className="label-eyebrow mr-1.5 inline">{k}</span>
+              <span>{v}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-2.5">
+        <div className="card min-w-[6rem] px-4 py-2.5 text-center">
+          <p className="label-eyebrow">Points</p>
+          <p className="num mt-0.5 text-2xl font-semibold">
+            {total}
+            {pointTarget != null && <span className="text-sm text-dim"> / {pointTarget}</span>}
+          </p>
+        </div>
+        {remaining != null && (
+          <div className="card min-w-[6rem] px-4 py-2.5 text-center">
+            <p className="label-eyebrow">{remaining < 0 ? 'Over' : 'Unspent'}</p>
+            <p
+              className="num mt-0.5 text-2xl font-semibold"
+              style={{
+                color: remaining < 0 ? 'var(--color-error)' : 'var(--color-primary)',
+              }}
+            >
+              {remaining}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface CampaignSummary {
+  id: string;
+  name: string;
+  pointTarget: number | null;
+}
+
 export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
   const qc = useQueryClient();
+  const [tab, setTab] = useState<SheetTab>('Combat');
+  const [combatOpen, setCombatOpen] = useState(false);
 
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -827,8 +940,17 @@ export function CharacterSheetPage() {
     enabled: id.length > 0,
   });
 
+  // Fetch the character's campaign (if any) so the hero can show
+  // a `Points / Target` ratio. Campaigns endpoint is cheap; we let
+  // it fail silently — missing target just collapses the second card.
+  const campaignsQuery = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: () => api<CampaignSummary[]>('/campaigns'),
+    enabled: !!characterQuery.data?.campaignId,
+  });
+
   if (characterQuery.isLoading) {
-    return <p className="text-base-content/60">Loading…</p>;
+    return <p className="text-muted">Loading…</p>;
   }
   if (characterQuery.error) {
     const err = characterQuery.error as ApiError | Error;
@@ -850,10 +972,25 @@ export function CharacterSheetPage() {
   if (!character) return null;
   const canWrite = me.data ? me.data.id === character.ownerId : false;
 
+  const campaign = campaignsQuery.data?.find((c) => c.id === character.campaignId);
+  const pointTarget = campaign?.pointTarget ?? null;
+
+  const counts: CountByTab = {
+    Traits: character.traits.length,
+    Skills: character.skills.length,
+    Inventory: character.inventory.length,
+  };
+
+  const hpRatio =
+    character.derived.hp > 0
+      ? (character.combat?.currentHp ?? character.derived.hp) / character.derived.hp
+      : 0;
+  const fabHpColor = hpVarFor(hpRatio);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <nav className="flex items-center gap-2 text-sm">
-        <Link to="/characters" className="link link-hover text-base-content/60">
+        <Link to="/characters" className="link link-hover text-muted">
           ← All characters
         </Link>
         {!canWrite && (
@@ -873,26 +1010,112 @@ export function CharacterSheetPage() {
         </button>
       </nav>
 
-      <IdentityPanel character={character} canWrite={canWrite} />
-
-      <div className="grid lg:grid-cols-2 gap-4">
-        <AttributesPanel character={character} canWrite={canWrite} />
-        <SecondaryModsPanel character={character} canWrite={canWrite} />
-      </div>
-
-      <DerivedPanel character={character} />
-
-      <div className="grid lg:grid-cols-3 gap-4">
-        <PointsPanel character={character} />
-        <EncumbrancePanel character={character} />
-        <CombatPanel character={character} canWrite={canWrite} />
-      </div>
+      <IdentityHero character={character} pointTarget={pointTarget} canWrite={canWrite} />
 
       <WarningsPanel character={character} canWrite={canWrite} />
 
-      <TraitsPanel character={character} canWrite={canWrite} />
-      <SkillsPanel character={character} canWrite={canWrite} />
-      <InventoryPanel character={character} canWrite={canWrite} />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AttributesPanel character={character} canWrite={canWrite} />
+        <SecondaryModsPanel character={character} canWrite={canWrite} />
+        <DerivedPanel character={character} />
+        <div className="grid grid-cols-1 gap-4">
+          <PointsPanel character={character} />
+          <EncumbrancePanel character={character} />
+        </div>
+      </div>
+
+      <div className="panel-tabs">
+        {SHEET_TABS.map((t) => {
+          const count = counts[t as keyof CountByTab];
+          return (
+            <button
+              key={t}
+              type="button"
+              className={`panel-tab ${tab === t ? 'active' : ''}`}
+              onClick={() => setTab(t)}
+            >
+              {t}
+              {count !== undefined && <span className="num text-dim text-[11px]">{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div>
+        {tab === 'Combat' && <CombatPanel character={character} canWrite={canWrite} />}
+        {tab === 'Identity' && <IdentityPanel character={character} canWrite={canWrite} />}
+        {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
+        {tab === 'Skills' && <SkillsPanel character={character} canWrite={canWrite} />}
+        {tab === 'Inventory' && <InventoryPanel character={character} canWrite={canWrite} />}
+        {tab === 'Notes' && <NotesPanel character={character} canWrite={canWrite} />}
+      </div>
+
+      <button
+        type="button"
+        className="combat-fab"
+        onClick={() => setCombatOpen(true)}
+        aria-label="Open combat tracker"
+      >
+        <span aria-hidden="true">⚔</span>
+        <span>Combat</span>
+        <span aria-hidden="true" className="text-primary-content/60">
+          ·
+        </span>
+        <span className="num" style={{ color: fabHpColor }}>
+          {character.combat?.currentHp ?? character.derived.hp}
+        </span>
+        <span className="num text-primary-content/60">/ {character.derived.hp}</span>
+      </button>
+
+      {combatOpen && (
+        <CombatModal
+          character={character}
+          canWrite={canWrite}
+          onClose={() => setCombatOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Notes tab — for now a thin shim around the existing `appearance`
+ * field on the character. The design's prototype shows a free-form
+ * textarea under a Notes tab; rather than introduce a new column we
+ * surface the existing field here. */
+function NotesPanel({
+  character,
+  canWrite,
+}: {
+  character: CharacterDetail;
+  canWrite: boolean;
+}) {
+  const saver = useFieldSaver(character.id);
+  const notesField = useDraftField<string | null>({
+    name: 'notes',
+    serverValue: character.appearance ?? '',
+    parse: nullableTextParser,
+    onSave: saver('appearance'),
+  });
+  return (
+    <section className="card p-card">
+      <p className="label-eyebrow mb-2">Notes</p>
+      {canWrite ? (
+        <textarea
+          aria-label="notes"
+          rows={10}
+          className={`${DRAFT_FIELD_CLASS} w-full resize-y bg-transparent text-base leading-relaxed focus:outline-none`}
+          value={notesField.value}
+          onChange={(e) => notesField.setValue(e.target.value)}
+          onBlur={notesField.inputProps.onBlur}
+          data-flashing={notesField.inputProps['data-flashing']}
+          data-flash-parity={notesField.inputProps['data-flash-parity']}
+          placeholder="Session notes, NPC names, things to remember…"
+        />
+      ) : (
+        <p className="whitespace-pre-line text-base leading-relaxed">
+          {character.appearance ?? '—'}
+        </p>
+      )}
+    </section>
   );
 }

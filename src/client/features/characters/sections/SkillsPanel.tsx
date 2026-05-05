@@ -229,7 +229,7 @@ export function SkillsPanel({
   canWrite: boolean;
 }) {
   return (
-    <section className="card bg-base-200 border border-base-300 p-5 space-y-3">
+    <section className="card space-y-3 p-5">
       <header className="flex items-baseline justify-between">
         <div>
           <p className="label-eyebrow">Skills</p>
