@@ -2,9 +2,12 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
+  type CharacterMinimalOut,
   characterCreate,
   characterDetail,
+  characterDetailEnvelope,
   characterListItem,
+  characterMinimalOut,
   characterUpdate,
   dismissWarningRequest,
 } from '../../shared/schemas/character.ts';
@@ -62,6 +65,58 @@ async function loadFullCharacter(id: string) {
       : Promise.resolve(null),
   ]);
   return buildCharacterDetail({ character: c, traits, skills, inventory, combat, campaign });
+}
+
+/**
+ * Project the row + parent campaign down to the minimal "readily
+ * apparent" view. Used when a campaign has shareCharacterSheets=false
+ * and the requester is neither the owner nor the character's author.
+ */
+async function loadMinimalCharacter(id: string): Promise<CharacterMinimalOut> {
+  const db = getDb();
+  const [c] = await db.select().from(characters).where(eq(characters.id, id));
+  if (!c) throw new HTTPException(404, { message: 'character not found' });
+  return {
+    view: 'minimal',
+    id: c.id,
+    ownerId: c.ownerId,
+    campaignId: c.campaignId,
+    name: c.name,
+    playerName: c.playerName,
+    height: c.height,
+    weight: c.weight,
+    age: c.age,
+    appearance: c.appearance,
+    techLevel: c.techLevel,
+    updatedAt: c.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Decide whether `userId` should see the full sheet or the minimal
+ * view of the given character.  Owners always see full; non-owner
+ * members of a campaign see minimal iff the campaign has flipped
+ * `shareCharacterSheets` to false.  Characters not attached to any
+ * campaign always render full to anyone with read access (the
+ * non-campaign access path is "owner only" anyway, gated upstream).
+ */
+async function shouldUseMinimalView(
+  characterRow: { ownerId: string; campaignId: string | null },
+  userId: string,
+): Promise<boolean> {
+  if (characterRow.ownerId === userId) return false;
+  if (!characterRow.campaignId) return false;
+  const db = getDb();
+  const [camp] = await db
+    .select({ share: campaigns.shareCharacterSheets, ownerId: campaigns.ownerId })
+    .from(campaigns)
+    .where(eq(campaigns.id, characterRow.campaignId));
+  if (!camp) return false;
+  // The campaign owner sees the full sheet too — they're the GM and
+  // need every detail to run encounters.  Other members see minimal
+  // when the campaign has share-sheets off.
+  if (camp.ownerId === userId) return false;
+  return camp.share === false;
 }
 
 router.openapi(
@@ -191,8 +246,11 @@ router.openapi(
     request: { params: z.object({ id: uuid }) },
     responses: {
       200: {
-        description: 'Character detail',
-        content: { 'application/json': { schema: characterDetail } },
+        description:
+          'Character detail. Returns the full sheet to the owner and to GM/campaign owners; ' +
+          'returns the minimal "readily apparent" payload to fellow members when the parent ' +
+          'campaign has shareCharacterSheets=false. Discriminated by the `view` field.',
+        content: { 'application/json': { schema: characterDetailEnvelope } },
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
@@ -201,7 +259,10 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    await loadCharacterOr403(id, user.id);
+    const access = await loadCharacterOr403(id, user.id);
+    if (await shouldUseMinimalView(access.character, user.id)) {
+      return c.json(await loadMinimalCharacter(id), 200);
+    }
     return c.json(await loadFullCharacter(id), 200);
   },
 );

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { CampaignCreate, CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { ApiError, api } from '../../lib/api.ts';
+import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 
 interface MeResponse {
   id: string;
@@ -25,6 +26,11 @@ export function CampaignsPage() {
   const [name, setName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  // Holds the campaign whose settings dialog is open, or null. Keyed
+  // by id so we can rebuild from the live `campaigns.data` and stay
+  // in sync when the cache invalidates after a save.
+  const [settingsId, setSettingsId] = useState<string | null>(null);
+  const settingsCampaign = campaigns.data?.find((c) => c.id === settingsId) ?? null;
 
   const create = useMutation({
     mutationFn: (snap: { name: string }) =>
@@ -116,7 +122,7 @@ export function CampaignsPage() {
             <Link
               key={c.id}
               to={`/log?campaign=${c.id}`}
-              className={`card flex items-center gap-4 px-5 py-4 transition hover:border-border-strong ${
+              className={`card relative flex items-center gap-4 px-5 py-4 transition hover:border-border-strong ${
                 isOwner ? 'border-l-[3px] border-l-primary' : ''
               }`}
             >
@@ -136,10 +142,37 @@ export function CampaignsPage() {
               </div>
               <AvatarStack names={c.members.map((m) => m.displayName)} max={6} />
               <span className={`chip ${isOwner ? 'on' : ''}`}>{isOwner ? 'Owner' : 'Player'}</span>
+              {isOwner && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  // Stop the wrapping Link from navigating when the
+                  // settings button is clicked. preventDefault catches the
+                  // anchor's default behaviour; stopPropagation prevents
+                  // the click from reaching the Link's React handler.
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSettingsId(c.id);
+                  }}
+                  aria-label={`Settings for ${c.name}`}
+                  title="Campaign settings"
+                >
+                  ⚙
+                </button>
+              )}
             </Link>
           );
         })}
       </div>
+
+      {settingsCampaign && (
+        <CampaignSettingsDialog
+          open={true}
+          campaign={settingsCampaign}
+          onClose={() => setSettingsId(null)}
+        />
+      )}
     </div>
   );
 }

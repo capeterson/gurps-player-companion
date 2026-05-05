@@ -114,6 +114,8 @@ export const characterListItem = z.object({
 });
 
 export const characterDetail = z.object({
+  /** Discriminator so the client can switch between full and minimal views. */
+  view: z.literal('full').default('full'),
   id: uuid,
   ownerId: uuid,
   ...characterIdentityShape,
@@ -132,9 +134,38 @@ export const characterDetail = z.object({
   combat: combatStateOut.nullable(),
 });
 
+/**
+ * Minimal "readily apparent" view of a character. Returned to non-owner
+ * non-author members of campaigns where `share_character_sheets=false`,
+ * so other players can still see the public-facing identity bits without
+ * accessing private stats / inventory / log entries.
+ */
+export const characterMinimalOut = z.object({
+  view: z.literal('minimal'),
+  id: uuid,
+  ownerId: uuid,
+  campaignId: uuid.nullable(),
+  name: z.string().min(1),
+  playerName: z.string().nullable(),
+  height: z.string().nullable(),
+  weight: z.string().nullable(),
+  age: z.number().int().nullable(),
+  appearance: z.string().nullable(),
+  techLevel: z.number().int().nullable(),
+  updatedAt: isoTimestamp,
+});
+
+/** Discriminated union of the two character payloads. */
+export const characterDetailEnvelope = z.discriminatedUnion('view', [
+  characterDetail,
+  characterMinimalOut,
+]);
+
 export type CharacterCreate = z.infer<typeof characterCreate>;
 export type CharacterUpdate = z.infer<typeof characterUpdate>;
 export type CharacterDetail = z.infer<typeof characterDetail>;
+export type CharacterMinimalOut = z.infer<typeof characterMinimalOut>;
+export type CharacterDetailEnvelope = z.infer<typeof characterDetailEnvelope>;
 export type CharacterListItem = z.infer<typeof characterListItem>;
 export type DerivedStatsOut = z.infer<typeof derivedStatsOut>;
 export type PointBreakdownOut = z.infer<typeof pointBreakdownOut>;

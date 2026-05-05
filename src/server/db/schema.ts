@@ -143,6 +143,14 @@ export const campaigns = pgTable('campaigns', {
   pointTarget: integer('point_target'),
   disadvantageCap: integer('disadvantage_cap'),
   quirkCap: integer('quirk_cap').default(5),
+  /**
+   * When false, non-owner members fetching `/characters/{id}` get the
+   * minimal "readily apparent" view (race / height / weight / age /
+   * appearance / TL) instead of the full sheet. Owner and the author
+   * always see the full sheet.  Defaults to true so existing campaigns
+   * keep their previous behaviour.
+   */
+  shareCharacterSheets: boolean('share_character_sheets').notNull().default(true),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   revision: revision(),

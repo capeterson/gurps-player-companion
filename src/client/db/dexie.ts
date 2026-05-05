@@ -146,6 +146,14 @@ export interface LocalCampaign {
   pointTarget: number | null;
   disadvantageCap: number | null;
   quirkCap: number | null;
+  /**
+   * When false, non-owner members see the minimal "readily apparent"
+   * view of other players' character sheets instead of the full
+   * sheet.  Optional in the schema for backwards compatibility with
+   * Dexie rows written before this column landed; treat absent as
+   * `true` (the safe default = full sharing on).
+   */
+  shareCharacterSheets?: boolean;
   createdAt: string;
   updatedAt: string;
   revision: number;

@@ -1,6 +1,13 @@
 import { useState } from 'react';
+import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
+import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { TraitOut } from '../../../../shared/schemas/trait.ts';
+import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
+import {
+  LibraryModifierPicker,
+  applyModifierToggle,
+} from '../../../components/ui/LibraryModifierPicker.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
@@ -10,6 +17,7 @@ import {
   enqueueFieldPatch,
   newClientId,
 } from '../../../sync/outbox.ts';
+import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const TRAIT_KINDS = [
   'advantage',
@@ -24,6 +32,7 @@ type TraitKind = (typeof TRAIT_KINDS)[number];
 
 interface AddTraitFormProps {
   characterId: string;
+  campaignId: string | null;
   canWrite: boolean;
 }
 
@@ -33,18 +42,50 @@ interface TraitSnapshot {
   kind: TraitKind;
   points: number;
   pointsRaw: string;
+  libraryTraitId: string | null;
+  /** When non-empty, list of selected library modifier names to write into trait.modifiers. */
+  selectedModifierNames: readonly string[];
+  /** Snapshot of the picked trait's catalogue entry (for resolving modifier metadata at create time). */
+  pickedTrait: LibraryTraitOut | null;
 }
 
-function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
+function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) {
   const toasts = useToasts();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<TraitKind>('advantage');
   const [points, setPoints] = useState('0');
   const [creating, setCreating] = useState(false);
+  // When the user picks a library entry both the id (for the FK) and
+  // the full entry (for the modifier picker) are captured here.  The
+  // entry is dropped whenever the user types past the prefilled name.
+  const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
+  const [pickedTrait, setPickedTrait] = useState<LibraryTraitOut | null>(null);
+  const [selectedModifiers, setSelectedModifiers] = useState<readonly string[]>([]);
+
+  const { fetchOptions } = useLibraryFetcher<LibraryTraitOut>('traits', campaignId);
+
+  // Live cost preview when the picker is open: re-derives points from
+  // the selected modifier names, so the form's `points` field stays in
+  // sync with what the user is toggling.
+  const livePoints =
+    pickedTrait !== null
+      ? computeTraitCost(
+          pickedTrait.basePoints,
+          pickedTrait.availableModifiers
+            .filter((m) => selectedModifiers.includes(m.name))
+            .map((m) => ({ costType: m.costType, costValue: m.costValue })),
+        )
+      : null;
 
   async function submit(snap: TraitSnapshot) {
     setCreating(true);
     try {
+      const modifiers =
+        snap.pickedTrait !== null
+          ? snap.pickedTrait.availableModifiers.filter((m) =>
+              snap.selectedModifierNames.includes(m.name),
+            )
+          : [];
       await enqueueCreate({
         entityClass: 'character_trait',
         entityId: newClientId(),
@@ -55,6 +96,8 @@ function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
           kind: snap.kind,
           points: snap.points,
           characterId,
+          ...(snap.libraryTraitId ? { libraryTraitId: snap.libraryTraitId } : {}),
+          ...(modifiers.length > 0 ? { modifiers } : {}),
         },
       });
       // Per AGENTS.md (rule 1: never silently discard user edits): only
@@ -63,6 +106,9 @@ function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
       // this enqueue was in flight, leave that draft alone.
       if (name === snap.nameRaw) setName('');
       if (points === snap.pointsRaw) setPoints('0');
+      setPickedLibraryId(null);
+      setPickedTrait(null);
+      setSelectedModifiers([]);
     } catch (err) {
       toasts.push(`Couldn't add trait — ${(err as Error).message}`, { kind: 'error' });
     } finally {
@@ -74,54 +120,125 @@ function AddTraitForm({ characterId, canWrite }: AddTraitFormProps) {
 
   return (
     <form
-      className="flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      className="flex flex-col gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
+        // When the modifier picker is active, prefer the live cost
+        // preview over whatever's in the points input — the user's
+        // intent is "what the picker says" once they've toggled
+        // anything.  If they haven't (livePoints === pickedTrait.basePoints
+        // and selectedModifiers is empty), the field still works.
         const pParsed = Number(points);
+        const submittedPoints =
+          livePoints !== null && selectedModifiers.length > 0
+            ? livePoints
+            : Number.isFinite(pParsed)
+              ? pParsed
+              : 0;
         void submit({
           name: name.trim(),
           nameRaw: name,
           kind,
-          points: Number.isFinite(pParsed) ? pParsed : 0,
+          points: submittedPoints,
           pointsRaw: points,
+          libraryTraitId: pickedLibraryId,
+          selectedModifierNames: selectedModifiers,
+          pickedTrait,
         });
       }}
     >
-      <label className="form-control flex-1 min-w-[10rem]">
-        <span className="label-text text-xs">Trait name</span>
-        <input
-          className="input input-bordered input-sm"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Combat Reflexes"
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="form-control flex-1 min-w-[10rem]">
+          <span className="label-text text-xs" id="add-trait-name-label">
+            Trait name
+          </span>
+          {campaignId ? (
+            <LibraryAutocomplete<LibraryTraitOut>
+              value={name}
+              onChange={(v) => {
+                setName(v);
+                // Picking a library entry sets `pickedLibraryId`; if the
+                // user then edits the name, drop the link AND the
+                // captured catalogue entry so we don't claim the create
+                // came from the library when it didn't.
+                setPickedLibraryId(null);
+                setPickedTrait(null);
+                setSelectedModifiers([]);
+              }}
+              onPick={(opt) => {
+                setName(opt.name);
+                setKind(opt.kind);
+                setPoints(String(opt.basePoints));
+                setPickedLibraryId(opt.id);
+                setPickedTrait(opt);
+                setSelectedModifiers([]);
+              }}
+              fetchOptions={fetchOptions}
+              getOptionKey={(o) => o.id}
+              getOptionLabel={(o) => o.name}
+              renderOption={(o) => (
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="truncate">
+                    {o.name}
+                    <span className="ml-1 text-[10px] uppercase tracking-wider text-base-content/50">
+                      {o.kind.replace('_', ' ')}
+                    </span>
+                  </span>
+                  <span className="num text-xs text-base-content/70">{o.basePoints} pts</span>
+                </span>
+              )}
+              placeholder="e.g. Combat Reflexes"
+              inputProps={{ 'aria-labelledby': 'add-trait-name-label' }}
+            />
+          ) : (
+            <input
+              aria-labelledby="add-trait-name-label"
+              className="input input-bordered input-sm"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Combat Reflexes"
+            />
+          )}
+        </div>
+        <label className="form-control">
+          <span className="label-text text-xs">Kind</span>
+          <select
+            className="select select-bordered select-sm"
+            value={kind}
+            onChange={(e) => setKind(e.target.value as TraitKind)}
+          >
+            {TRAIT_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k.replace('_', ' ')}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="form-control w-20">
+          <span className="label-text text-xs">Pts</span>
+          <input
+            className="input input-bordered input-sm num"
+            value={points}
+            onChange={(e) => setPoints(e.target.value)}
+          />
+        </label>
+        <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+          {creating ? 'Adding…' : 'Add'}
+        </button>
+      </div>
+      {pickedTrait !== null && pickedTrait.availableModifiers.length > 0 && (
+        <LibraryModifierPicker
+          basePoints={pickedTrait.basePoints}
+          available={pickedTrait.availableModifiers}
+          selectedNames={selectedModifiers}
+          onToggle={(modName) =>
+            setSelectedModifiers((prev) =>
+              applyModifierToggle(pickedTrait.availableModifiers, prev, modName),
+            )
+          }
         />
-      </label>
-      <label className="form-control">
-        <span className="label-text text-xs">Kind</span>
-        <select
-          className="select select-bordered select-sm"
-          value={kind}
-          onChange={(e) => setKind(e.target.value as TraitKind)}
-        >
-          {TRAIT_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {k.replace('_', ' ')}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="form-control w-20">
-        <span className="label-text text-xs">Pts</span>
-        <input
-          className="input input-bordered input-sm num"
-          value={points}
-          onChange={(e) => setPoints(e.target.value)}
-        />
-      </label>
-      <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
-        {creating ? 'Adding…' : 'Add'}
-      </button>
+      )}
     </form>
   );
 }
@@ -278,7 +395,11 @@ export function TraitsPanel({
         </p>
       </header>
 
-      <AddTraitForm characterId={character.id} canWrite={canWrite} />
+      <AddTraitForm
+        characterId={character.id}
+        campaignId={character.campaignId ?? null}
+        canWrite={canWrite}
+      />
 
       {character.traits.length === 0 ? (
         <p className="text-sm text-base-content/60">No traits yet.</p>

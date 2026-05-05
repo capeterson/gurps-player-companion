@@ -310,6 +310,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   );
 
   return {
+    view: 'full',
     id: character.id,
     ownerId: character.ownerId,
     campaignId: character.campaignId,
