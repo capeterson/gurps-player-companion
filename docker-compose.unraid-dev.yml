@@ -1,0 +1,81 @@
+# GURPS Player Companion — Unraid DEV (bleeding-edge) compose
+#
+# Pulls the `dev` tag from GHCR, which is rebuilt on every push to `main`
+# by .github/workflows/publish-image.yml. This stack is intentionally
+# unstable — schema migrations may run ahead of the most recent release.
+#
+# This file is a sibling of docker-compose.unraid.yml and is namespaced
+# (different container names, host volume path, and host port) so both
+# stacks can run on the same Unraid host without colliding.
+#
+# Setup (run once, from the project folder this file lives in):
+#   1. mkdir -p /mnt/user/appdata/gurps-companion-dev/postgres
+#   2. echo "JWT_SECRET=$(openssl rand -hex 32)" > .env.dev
+#      (optional, in same .env.dev: TAG=sha-abcdef0, HOST_PORT=3031,
+#       CORS_ORIGINS=["https://dev.your.domain"])
+#   3. docker compose --env-file .env.dev -f docker-compose.unraid-dev.yml pull
+#   4. docker compose --env-file .env.dev -f docker-compose.unraid-dev.yml up -d
+#
+# Use a JWT_SECRET different from the prod stack's so a leaked dev secret
+# can't issue tokens against prod.
+#
+# Postgres password: same rules as docker-compose.unraid.yml — see the
+# header of that file for the URL-safe-character guidance.
+#
+# Update:  docker compose --env-file .env.dev -f docker-compose.unraid-dev.yml pull \
+#       && docker compose --env-file .env.dev -f docker-compose.unraid-dev.yml up -d
+# Logs:    docker logs -f gurps-dev-app
+#
+# When running under the Compose Manager plugin, copy this file into a
+# SEPARATE project folder as `compose.yml` (do not co-locate with the
+# prod stack — the plugin uses the parent folder name as the project).
+
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: gurps-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gurps
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gurps}
+      POSTGRES_DB: gurps
+    volumes:
+      - /mnt/user/appdata/gurps-companion-dev/postgres:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U gurps -d gurps']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: ghcr.io/capeterson/gurps-player-companion:${TAG:-dev}
+    container_name: gurps-dev-migrate
+    restart: 'no'
+    command: ['bun', 'run', 'dist/server/migrate.js']
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for dev compose; generate with `openssl rand -hex 32`}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    image: ghcr.io/capeterson/gurps-player-companion:${TAG:-dev}
+    container_name: gurps-dev-app
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL:-postgres://gurps:${POSTGRES_PASSWORD:-gurps}@db:5432/gurps}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required for dev compose; generate with `openssl rand -hex 32`}
+      JWT_ACCESS_TTL_MINUTES: 15
+      JWT_REFRESH_TTL_DAYS: 14
+      CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - '${HOST_PORT:-3031}:3000'

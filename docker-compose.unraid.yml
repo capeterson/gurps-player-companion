@@ -1,7 +1,16 @@
-# GURPS Player Companion — Unraid production compose
+# GURPS Player Companion — Unraid production (released versions) compose
 #
 # Pulls a prebuilt image from GHCR (published by .github/workflows/publish-image.yml).
 # No source on the server, no on-server build, no `context:` paths to get wrong.
+#
+# Tag channels published to ghcr.io/capeterson/gurps-player-companion:
+#   - `latest`           — most recent non-prerelease semver release (default here)
+#   - `vX.Y.Z` / `X.Y.Z` — pin to a specific release
+#   - `X.Y`              — track a minor series (e.g. `0.1`)
+#   - `dev`              — bleeding-edge build of `main`; use the sibling
+#                          `docker-compose.unraid-dev.yml` to run it as an
+#                          independent stack with its own DB and ports.
+#   - `sha-<short>`      — pin to an exact commit
 #
 # Setup (run once, from the project folder this file lives in):
 #   1. mkdir -p /mnt/user/appdata/gurps-companion/postgres
