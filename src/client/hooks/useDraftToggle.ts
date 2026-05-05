@@ -15,12 +15,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToasts } from '../lib/toast.tsx';
+import { flashBus } from '../sync/flashBus.ts';
 
 export interface UseDraftToggleOptions {
   readonly name: string;
   readonly serverValue: boolean;
   readonly onSave: (v: boolean) => Promise<unknown>;
   readonly onError?: (err: unknown) => string;
+  /** See useDraftField.flashKey -- async rollback subscription. */
+  readonly flashKey?: string;
 }
 
 export interface UseDraftToggleReturn {
@@ -49,7 +52,7 @@ function defaultOnError(err: unknown): string {
 }
 
 export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleReturn {
-  const { name, serverValue, onSave, onError = defaultOnError } = opts;
+  const { name, serverValue, onSave, onError = defaultOnError, flashKey } = opts;
   const toasts = useToasts();
   const [checked, setChecked] = useState(serverValue);
   const [isSaving, setIsSaving] = useState(false);
@@ -91,6 +94,23 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     };
   }, []);
+
+  // Async rollback subscription (orchestrator → flashBus → here).  See
+  // useDraftField for the full reasoning; for the toggle we just
+  // re-snap to the last committed value and pulse the flash class.
+  useEffect(() => {
+    if (!flashKey) return;
+    return flashBus.subscribe(flashKey, () => {
+      if (!isMountedRef.current) return;
+      setChecked(lastCommittedRef.current);
+      setFlashing(true);
+      setFlashParity((p) => (p === '0' ? '1' : '0'));
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) setFlashing(false);
+      }, FLASH_MS);
+    });
+  }, [flashKey]);
 
   const flashRollback = useCallback(() => {
     setFlashing(true);

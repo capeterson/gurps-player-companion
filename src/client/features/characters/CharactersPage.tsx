@@ -1,39 +1,70 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
-import { api } from '../../lib/api.ts';
+import { enqueueCreate, newClientId } from '../../sync/outbox.ts';
+import { useCharactersList } from './useCharacterDetail.ts';
 
 export function CharactersPage() {
-  const qc = useQueryClient();
   const navigate = useNavigate();
-  const characters = useQuery({
-    queryKey: ['characters'],
-    queryFn: () => api<CharacterListItem[]>('/characters'),
-  });
+  const characters = useCharactersList();
 
   const [name, setName] = useState('');
-  const create = useMutation({
-    mutationFn: (snap: { name: string; nameRaw: string }) =>
-      api<CharacterDetail>('/characters', {
-        method: 'POST',
-        body: { name: snap.name, st: 10, dx: 10, iq: 10, ht: 10 },
-      }),
-    onSuccess: (created, snap) => {
-      qc.invalidateQueries({ queryKey: ['characters'] });
-      // Per AGENTS.md rule 1 (never silently discard user edits): if
-      // the user has started typing the next character's name while
-      // the POST was in flight, leave that draft alone — and don't
-      // navigate away from the page either, since the auto-navigate
-      // would unmount the form and lose the draft entirely.  Only
-      // when the input still matches what we submitted do we treat
-      // this as the natural "submit, view the new sheet" flow.
-      if (name === snap.nameRaw) {
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    const trimmed = name.trim();
+    const localId = newClientId();
+    setCreating(true);
+    setCreateError(null);
+    try {
+      // Local-first: write to Dexie + enqueue outbox; the orchestrator
+      // pushes to /sync/operations in the background.  We can navigate
+      // immediately because the sheet reads from Dexie via useLiveQuery,
+      // not from the server.
+      await enqueueCreate({
+        entityClass: 'character',
+        entityId: localId,
+        humanName: 'character',
+        attemptedValue: {
+          name: trimmed,
+          st: 10,
+          dx: 10,
+          iq: 10,
+          ht: 10,
+          hpMod: 0,
+          willMod: 0,
+          perMod: 0,
+          fpMod: 0,
+          speedQuarterMod: 0,
+          moveMod: 0,
+          tempSt: 0,
+          tempDx: 0,
+          tempIq: 0,
+          tempHt: 0,
+          tempHpMod: 0,
+          tempWillMod: 0,
+          tempPerMod: 0,
+          tempFpMod: 0,
+          tempSpeedQuarterMod: 0,
+          tempMoveMod: 0,
+          dismissedWarnings: [],
+        },
+      });
+      // Per AGENTS.md rule 1: only navigate / clear if the input still
+      // matches what we submitted.  If the user has started typing the
+      // next character's name, leave it alone.
+      if (name === trimmed) {
         setName('');
-        navigate(`/characters/${created.id}`);
+        navigate(`/characters/${localId}`);
       }
-    },
-  });
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'create failed');
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -44,11 +75,7 @@ export function CharactersPage() {
 
       <form
         className="card grid gap-3 bg-base-200 border border-base-300 p-4 sm:grid-cols-[minmax(16rem,24rem)_auto] sm:items-end"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!name.trim()) return;
-          create.mutate({ name: name.trim(), nameRaw: name });
-        }}
+        onSubmit={submit}
       >
         <label className="form-control">
           <span className="label-text">New character name</span>
@@ -59,17 +86,15 @@ export function CharactersPage() {
             placeholder="Sir Lancelot"
           />
         </label>
-        <button type="submit" className="btn btn-primary sm:w-fit" disabled={create.isPending}>
-          {create.isPending ? 'Creating…' : 'Create'}
+        <button type="submit" className="btn btn-primary sm:w-fit" disabled={creating}>
+          {creating ? 'Creating…' : 'Create'}
         </button>
       </form>
 
-      {create.isError && (
-        <p className="text-error text-sm">Couldn’t create — {(create.error as Error).message}</p>
-      )}
+      {createError && <p className="text-error text-sm">Couldn’t create — {createError}</p>}
 
       <ul className="grid md:grid-cols-2 gap-3">
-        {(characters.data ?? []).map((c) => (
+        {(characters ?? []).map((c) => (
           <li key={c.id}>
             <Link
               to={`/characters/${c.id}`}
@@ -86,7 +111,7 @@ export function CharactersPage() {
             </Link>
           </li>
         ))}
-        {characters.data?.length === 0 && (
+        {characters && characters.length === 0 && (
           <li className="text-base-content/60 text-sm">No characters yet.</li>
         )}
       </ul>

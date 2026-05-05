@@ -1,11 +1,15 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
-import { api } from '../../../lib/api.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { applyDetailToCache } from './useCharacterPatch.ts';
+import { makeFlashKey } from '../../../sync/flashBus.ts';
+import {
+  enqueueCreate,
+  enqueueDelete,
+  enqueueFieldPatch,
+  newClientId,
+} from '../../../sync/outbox.ts';
 
 const ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per', 'Other'] as const;
 const DIFFICULTIES = ['E', 'A', 'H', 'VH'] as const;
@@ -27,37 +31,41 @@ interface SkillSnapshot {
 }
 
 function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
-  const qc = useQueryClient();
   const toasts = useToasts();
   const [name, setName] = useState('');
   const [attribute, setAttribute] = useState<SkillAttribute>('DX');
   const [difficulty, setDifficulty] = useState<SkillDifficulty>('A');
   const [points, setPoints] = useState('1');
+  const [creating, setCreating] = useState(false);
 
-  const create = useMutation({
-    mutationFn: (snap: SkillSnapshot) =>
-      api<{ skill: SkillOut; character: CharacterDetail }>(`/characters/${characterId}/skills`, {
-        method: 'POST',
-        body: {
+  async function submit(snap: SkillSnapshot) {
+    setCreating(true);
+    try {
+      await enqueueCreate({
+        entityClass: 'character_skill',
+        entityId: newClientId(),
+        humanName: 'skill',
+        characterId,
+        attemptedValue: {
           name: snap.name,
           attribute: snap.attribute,
           difficulty: snap.difficulty,
           points: snap.points,
+          characterId,
         },
-      }),
-    onSuccess: (res, snap) => {
-      applyDetailToCache(qc, characterId, res.character);
+      });
       // Per AGENTS.md (rule 1: never silently discard user edits): only
       // clear fields whose current value still matches the snapshot we
       // submitted.  If the user has started typing the next skill while
-      // this POST was in flight, leave that draft alone.
+      // this enqueue was in flight, leave that draft alone.
       if (name === snap.nameRaw) setName('');
       if (points === snap.pointsRaw) setPoints('1');
-    },
-    onError: (err) => {
+    } catch (err) {
       toasts.push(`Couldn't add skill — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+    } finally {
+      setCreating(false);
+    }
+  }
 
   if (!canWrite) return null;
 
@@ -67,11 +75,8 @@ function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        // Use Number.isFinite so a valid `0` survives (zero-point
-        // skills are accepted by the schema and the edit path);
-        // `Number(...) || 1` would silently rewrite 0 to 1.
         const pParsed = Number(points);
-        create.mutate({
+        void submit({
           name: name.trim(),
           nameRaw: name,
           attribute,
@@ -122,8 +127,8 @@ function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
           onChange={(e) => setPoints(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary" disabled={create.isPending}>
-        {create.isPending ? 'Adding…' : 'Add'}
+      <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+        {creating ? 'Adding…' : 'Add'}
       </button>
     </form>
   );
@@ -136,16 +141,18 @@ interface SkillRowProps {
 }
 
 function SkillRow({ characterId, skill, canWrite }: SkillRowProps) {
-  const qc = useQueryClient();
   const toasts = useToasts();
 
-  const patchSkill = async (field: string, value: unknown) => {
-    const res = await api<{ skill: SkillOut; character: CharacterDetail }>(
-      `/characters/${characterId}/skills/${skill.id}`,
-      { method: 'PATCH', body: { [field]: value } },
-    );
-    applyDetailToCache(qc, characterId, res.character);
-  };
+  const patchSkill = (field: string, value: unknown) =>
+    enqueueFieldPatch({
+      entityClass: 'character_skill',
+      entityId: skill.id,
+      fieldPath: field,
+      attemptedValue: value,
+      humanName: `${skill.name} ${field}`,
+      flashKey: makeFlashKey('character_skill', skill.id, field),
+      characterId,
+    });
 
   const nameField = useDraftField<string>({
     name: `${skill.name} name`,
@@ -153,6 +160,7 @@ function SkillRow({ characterId, skill, canWrite }: SkillRowProps) {
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
     onSave: (v) => patchSkill('name', v),
+    flashKey: makeFlashKey('character_skill', skill.id, 'name'),
   });
   const pointsField = useDraftField<number>({
     name: `${skill.name} points`,
@@ -165,18 +173,22 @@ function SkillRow({ characterId, skill, canWrite }: SkillRowProps) {
       return n;
     },
     onSave: (v) => patchSkill('points', v),
+    flashKey: makeFlashKey('character_skill', skill.id, 'points'),
   });
 
-  const remove = useMutation({
-    mutationFn: () =>
-      api<CharacterDetail>(`/characters/${characterId}/skills/${skill.id}`, {
-        method: 'DELETE',
-      }),
-    onSuccess: (detail) => applyDetailToCache(qc, characterId, detail),
-    onError: (err) => {
+  const removeSkill = async () => {
+    try {
+      await enqueueDelete({
+        entityClass: 'character_skill',
+        entityId: skill.id,
+        humanName: `skill "${skill.name}"`,
+        characterId,
+        prevValue: skill,
+      });
+    } catch (err) {
       toasts.push(`Couldn't delete skill — ${(err as Error).message}`, { kind: 'error' });
-    },
-  });
+    }
+  };
 
   return (
     <li className="grid grid-cols-[1fr_4rem_4rem_4rem_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
@@ -209,9 +221,8 @@ function SkillRow({ characterId, skill, canWrite }: SkillRowProps) {
           type="button"
           className="btn btn-ghost btn-xs"
           onClick={() => {
-            if (confirm(`Delete skill "${skill.name}"?`)) remove.mutate();
+            if (confirm(`Delete skill "${skill.name}"?`)) void removeSkill();
           }}
-          disabled={remove.isPending}
           aria-label={`Delete skill ${skill.name}`}
         >
           ✕

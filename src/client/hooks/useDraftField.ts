@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToasts } from '../lib/toast.tsx';
+import { flashBus } from '../sync/flashBus.ts';
 
 export interface UseDraftFieldOptions<V> {
   /** Human-readable field name used in toast messages, e.g. "ST". */
@@ -39,6 +40,19 @@ export interface UseDraftFieldOptions<V> {
   readonly onSave: (v: V) => Promise<unknown>;
   /** Map an unknown rejection into a user-facing message.  Defaults to the Error message. */
   readonly onError?: (err: unknown) => string;
+  /**
+   * When provided, the hook subscribes to the flash bus on this key and
+   * triggers the rollback animation if an async event arrives.  Used
+   * by the offline-first outbox: server rejections happen long after
+   * `onSave` has resolved (the enqueue completed instantly), so the
+   * orchestrator emits a flash event keyed by
+   * `${entityClass}:${entityId}:${fieldPath}` that rolls the input
+   * back to the latest authoritative value.
+   *
+   * The orchestrator also pushes a persistent toast naming the field;
+   * the flash bus only handles the *visual* part of AGENTS.md rule 2.
+   */
+  readonly flashKey?: string;
 }
 
 /**
@@ -94,6 +108,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     validate,
     onSave,
     onError = defaultOnError,
+    flashKey,
   } = opts;
 
   const toasts = useToasts();
@@ -165,6 +180,29 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     };
   }, []);
+
+  // Subscribe to async rollback events from the orchestrator.  When
+  // the server rejects an outbox op for THIS field, the orchestrator
+  // has already reverted the underlying Dexie row to the prior value;
+  // we just need to surface the visual rollback (revert the draft +
+  // flash).  The accompanying persistent toast comes from the
+  // orchestrator, so we don't push one here.
+  useEffect(() => {
+    if (!flashKey) return;
+    return flashBus.subscribe(flashKey, () => {
+      if (!isMountedRef.current) return;
+      const formatted = formatRef.current(lastCommittedRef.current);
+      setDraft(formatted);
+      draftRef.current = formatted;
+      dirtyRef.current = false;
+      setFlashing(true);
+      setFlashParity((p) => (p === '0' ? '1' : '0'));
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      flashTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) setFlashing(false);
+      }, FLASH_MS);
+    });
+  }, [flashKey]);
 
   const flashRollback = useCallback(() => {
     setFlashing(true);
