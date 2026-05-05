@@ -1,9 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import {
+  ATTR_INFLUENCE,
+  SECONDARY_INFO,
+  type SecondaryModKey,
+  attrNextCost,
+  attrSpent,
+  secondarySpent,
+} from '../../../shared/domain/attributeTooltips.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { ConditionChip } from '../../components/ui/ConditionChip.tsx';
+import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
+import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
 import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
 import { getLocalDb } from '../../db/dexie.ts';
@@ -108,6 +118,8 @@ interface AttrInputProps {
   min: number;
   max: number;
   width: string;
+  /** "lg" renders a bordered input; "sm" renders a borderless inline number. */
+  size?: 'lg' | 'sm';
 }
 
 function AttrInput({
@@ -119,6 +131,7 @@ function AttrInput({
   min,
   max,
   width,
+  size = 'lg',
 }: AttrInputProps) {
   // Use the bundled saver so the input subscribes to the flashBus on
   // its own key.  Without `flashKey` an async server rejection would
@@ -132,97 +145,87 @@ function AttrInput({
     ...fieldSave,
   });
   if (!canWrite) {
+    if (size === 'sm') {
+      return (
+        <span className="num" aria-label={label}>
+          {value}
+        </span>
+      );
+    }
     return (
-      <span className="num font-medium" aria-label={label}>
+      <span className="num text-xl font-semibold" aria-label={label}>
         {value}
       </span>
     );
   }
+  if (size === 'sm') {
+    // Borderless inline number used inside the "base ±temp" caption.
+    return (
+      <input
+        aria-label={label}
+        className={`${DRAFT_FIELD_CLASS} num text-[11px] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded ${width}`}
+        {...draft.inputProps}
+      />
+    );
+  }
+  // Larger primary number: bordered, semibold.
   return (
     <input
       aria-label={label}
-      className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right ${width}`}
+      className={`${DRAFT_FIELD_CLASS} num text-xl font-semibold bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded ${width}`}
       {...draft.inputProps}
     />
   );
 }
 
-function AttrCell(props: {
-  label: string;
-  field: AttrField;
-  value: number;
-  characterId: string;
-  canWrite: boolean;
-  min?: number;
-  max?: number;
-  width?: string;
-}) {
-  return (
-    <AttrInput
-      label={props.label}
-      field={props.field}
-      value={props.value}
-      characterId={props.characterId}
-      canWrite={props.canWrite}
-      min={props.min ?? -50}
-      max={props.max ?? 99}
-      width={props.width ?? 'w-16'}
-    />
-  );
-}
-
 /**
- * Temp-modifier cell. Renders a chip showing the current Δ
- * (or `—` when zero); clicking opens a popover that lets the
- * player dial in the value with a stepper or raw input and
- * commits only on Apply. Replaces the prior raw `<input>` so a
- * keystroke can't accidentally fire a sync mutation while the
- * player is mid-typing a rolled value like "1d3".
+ * Compact ✦ button used inline beside an attribute input. Click to
+ * open the existing TempBoostPopover for that attribute. Renders
+ * `border-warning text-warning` when the temp is non-zero so a
+ * glance at the row tells the player "this is currently boosted."
+ *
+ * Subscribes to the flashBus for the temp field so an async server
+ * rejection visually pulses the button (AGENTS.md rule 2) — without
+ * this the button would silently snap back to the reverted value.
  */
-function TempCell({
+function TempBoostButton({
   label,
   field,
   baseValue,
   tempValue,
   characterId,
-  canWrite,
 }: {
   label: string;
   field: AttrField;
   baseValue: number;
   tempValue: number;
   characterId: string;
-  canWrite: boolean;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
   const { onSave, flashKey } = buildSave(field, { humanName: `${label} temp` });
-  // Subscribe to async outbox rejections on this field's flash key so
-  // the chip pulses (AGENTS.md rule 2). Without this the chip would
-  // silently snap back to the reverted value when the orchestrator
-  // rolls a rejected patch back in Dexie — only the toast would show.
   const flash = useFieldFlash(flashKey);
   const [open, setOpen] = useState(false);
-  const display = tempValue === 0 ? '—' : tempValue > 0 ? `+${tempValue}` : String(tempValue);
-
-  if (!canWrite) {
-    return (
-      <span className="num text-dim" aria-label={`${label} temp`}>
-        {display}
-      </span>
-    );
-  }
+  const active = tempValue !== 0;
   return (
     <span className="relative inline-block">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={`${label} temporary modifier`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        aria-label={`Set temporary ${label}`}
         aria-expanded={open}
-        className={`${DRAFT_FIELD_CLASS} chip num min-w-[3rem] justify-center ${tempValue !== 0 ? 'on' : ''}`}
+        title="Add temporary buff"
+        className={`${DRAFT_FIELD_CLASS} num text-[10px] rounded px-1 border transition-colors ${
+          active
+            ? 'border-warning text-warning'
+            : 'border-base-content/20 text-base-content/60 hover:text-base-content hover:border-base-content/40'
+        }`}
         data-flashing={flash['data-flashing']}
         data-flash-parity={flash['data-flash-parity']}
       >
-        {display}
+        ✦
       </button>
       {open && (
         <TempBoostPopover
@@ -236,6 +239,227 @@ function TempCell({
         />
       )}
     </span>
+  );
+}
+
+/**
+ * Single primary-attribute cell. When `tempValue` is non-zero, the
+ * effective value reads as the big number and the input shrinks to a
+ * small "base ±temp" line beneath it (mirroring the legacy gurps-player-web
+ * pattern). Tooltip on the label shows points spent / next +1 cost / what
+ * the attribute influences.
+ */
+function PrimaryAttrCell({
+  label,
+  base,
+  baseValue,
+  temp,
+  tempValue,
+  effective,
+  min,
+  characterId,
+  canWrite,
+}: {
+  label: 'ST' | 'DX' | 'IQ' | 'HT';
+  base: AttrField;
+  baseValue: number;
+  temp: AttrField;
+  tempValue: number;
+  effective: number;
+  min: number;
+  characterId: string;
+  canWrite: boolean;
+}) {
+  const tooltip = (
+    <div className="grid gap-1.5">
+      <div className="font-semibold text-base-content">{label}</div>
+      <div className="num">
+        Spent: <span className="text-base-content">{attrSpent(label, baseValue)} pts</span>
+        {' · '}
+        Next: <span className="text-base-content">+1 = {attrNextCost(label)} pts</span>
+      </div>
+      <div>
+        <div className="label-eyebrow">Influences</div>
+        <ul className="mt-1 list-disc pl-4 space-y-0.5 text-base-content/70">
+          {ATTR_INFLUENCE[label].map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <InfoTooltip content={tooltip}>
+        <span className="label-eyebrow">{label}</span>
+      </InfoTooltip>
+      <span className="flex items-baseline gap-2">
+        {tempValue !== 0 ? (
+          <>
+            <span
+              className="num text-2xl font-semibold text-warning"
+              title={`Effective ${effective} (base ${baseValue} ${tempValue >= 0 ? '+' : ''}${tempValue})`}
+            >
+              {effective}
+            </span>
+            <span className="num text-[11px] text-base-content/60 flex items-baseline gap-0.5">
+              <AttrInput
+                label={`${label} base`}
+                field={base}
+                value={baseValue}
+                characterId={characterId}
+                canWrite={canWrite}
+                min={min}
+                max={99}
+                width="w-9"
+                size="sm"
+              />
+              <span className="text-warning">
+                {tempValue >= 0 ? '+' : ''}
+                {tempValue}
+              </span>
+            </span>
+          </>
+        ) : (
+          <AttrInput
+            label={`${label} base`}
+            field={base}
+            value={baseValue}
+            characterId={characterId}
+            canWrite={canWrite}
+            min={min}
+            max={99}
+            width="w-14"
+            size="lg"
+          />
+        )}
+        {canWrite && (
+          <TempBoostButton
+            label={label}
+            field={temp}
+            baseValue={baseValue}
+            tempValue={tempValue}
+            characterId={characterId}
+          />
+        )}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Secondary-mod cell (HP / Will / Per / FP / Speed / Move). Same
+ * inline pattern as PrimaryAttrCell but displays the derived value
+ * (mod offset from the calculated base) rather than the raw mod.
+ */
+function SecondaryModCell({
+  label,
+  modField,
+  modValue,
+  tempField,
+  tempValue,
+  derived,
+  derivedDisplay,
+  infoKey,
+  characterId,
+  canWrite,
+}: {
+  label: string;
+  modField: AttrField;
+  modValue: number;
+  tempField: AttrField;
+  tempValue: number;
+  derived: number;
+  /** Optional override for the derived display (e.g. "5.50 (×4)" for Speed). */
+  derivedDisplay?: string;
+  infoKey: SecondaryModKey;
+  characterId: string;
+  canWrite: boolean;
+}) {
+  const info = SECONDARY_INFO[infoKey];
+  const tooltip = (
+    <div className="grid gap-1.5">
+      <div className="font-semibold text-base-content">{info.label}</div>
+      <div className="num">
+        Spent: <span className="text-base-content">{secondarySpent(infoKey, modValue)} pts</span>
+        {' · '}
+        Next: <span className="text-base-content">{info.nextCostLabel}</span>
+      </div>
+      <div>
+        <div className="label-eyebrow">Influences</div>
+        <ul className="mt-1 list-disc pl-4 space-y-0.5 text-base-content/70">
+          {info.influences.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+  const baseDerived = derived - tempValue;
+
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <InfoTooltip content={tooltip}>
+        <span className="label-eyebrow">{label}</span>
+      </InfoTooltip>
+      <span className="flex items-baseline gap-2">
+        {tempValue !== 0 ? (
+          <>
+            <span
+              className="num text-xl font-semibold text-warning"
+              title={`Effective ${derivedDisplay ?? derived} (base ${baseDerived} ${tempValue >= 0 ? '+' : ''}${tempValue})`}
+            >
+              {derivedDisplay ?? derived}
+            </span>
+            <span className="num text-[11px] text-base-content/60 flex items-baseline gap-0.5">
+              <AttrInput
+                label={`${label} mod`}
+                field={modField}
+                value={modValue}
+                characterId={characterId}
+                canWrite={canWrite}
+                min={-50}
+                max={50}
+                width="w-9"
+                size="sm"
+              />
+              <span className="text-warning">
+                {tempValue >= 0 ? '+' : ''}
+                {tempValue}
+              </span>
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="num text-xl font-semibold">{derivedDisplay ?? derived}</span>
+            <span className="num text-[11px] text-base-content/60 flex items-baseline gap-1">
+              <span>mod</span>
+              <AttrInput
+                label={`${label} mod`}
+                field={modField}
+                value={modValue}
+                characterId={characterId}
+                canWrite={canWrite}
+                min={-50}
+                max={50}
+                width="w-9"
+                size="sm"
+              />
+            </span>
+          </>
+        )}
+        {canWrite && (
+          <TempBoostButton
+            label={label}
+            field={tempField}
+            baseValue={baseDerived}
+            tempValue={tempValue}
+            characterId={characterId}
+          />
+        )}
+      </span>
+    </div>
   );
 }
 
@@ -391,6 +615,45 @@ function IdentityPanel({
   );
 }
 
+/** All temp-modifier fields on a character. Used for the "Revert all" bulk action. */
+const TEMP_FIELDS: readonly AttrField[] = [
+  'tempSt',
+  'tempDx',
+  'tempIq',
+  'tempHt',
+  'tempHpMod',
+  'tempWillMod',
+  'tempPerMod',
+  'tempFpMod',
+  'tempSpeedQuarterMod',
+  'tempMoveMod',
+];
+
+/** True when any temporary modifier on the character is non-zero. */
+function anyTempActive(c: CharacterDetail): boolean {
+  return TEMP_FIELDS.some((f) => (c as unknown as Record<AttrField, number>)[f] !== 0);
+}
+
+/**
+ * Enqueue a per-field patch for every temp field that's currently
+ * non-zero, setting it back to 0. Each goes through the standard
+ * outbox path so an offline bulk-revert is durable.
+ */
+function revertAllTemps(c: CharacterDetail): void {
+  for (const f of TEMP_FIELDS) {
+    const value = (c as unknown as Record<AttrField, number>)[f];
+    if (value === 0) continue;
+    void enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: c.id,
+      fieldPath: f,
+      attemptedValue: 0,
+      humanName: `${f} temp`,
+      flashKey: makeFlashKey('character', c.id, f),
+    });
+  }
+}
+
 function AttributesPanel({
   character,
   canWrite,
@@ -398,92 +661,65 @@ function AttributesPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const rows: Array<{
-    label: string;
-    base: AttrInputProps['field'];
-    baseValue: number;
-    temp: AttrInputProps['field'];
-    tempValue: number;
-    effective: number;
-    min?: number;
-    max?: number;
-  }> = [
-    {
-      label: 'ST',
-      base: 'st',
-      baseValue: character.st,
-      temp: 'tempSt',
-      tempValue: character.tempSt,
-      effective: character.derived.effectiveSt,
-      min: 1,
-    },
-    {
-      label: 'DX',
-      base: 'dx',
-      baseValue: character.dx,
-      temp: 'tempDx',
-      tempValue: character.tempDx,
-      effective: character.derived.effectiveDx,
-      min: 1,
-    },
-    {
-      label: 'IQ',
-      base: 'iq',
-      baseValue: character.iq,
-      temp: 'tempIq',
-      tempValue: character.tempIq,
-      effective: character.derived.effectiveIq,
-      min: 1,
-    },
-    {
-      label: 'HT',
-      base: 'ht',
-      baseValue: character.ht,
-      temp: 'tempHt',
-      tempValue: character.tempHt,
-      effective: character.derived.effectiveHt,
-      min: 1,
-    },
-  ];
-
+  const tempActive = canWrite && anyTempActive(character);
   return (
-    <section className="card p-5">
-      <p className="label-eyebrow">Attributes</p>
-      <h2 className="font-display text-2xl mb-3">Primary</h2>
-      <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-3 gap-y-2 items-center">
-        <span className="label-eyebrow" />
-        <span className="label-eyebrow text-center">Base</span>
-        <span className="label-eyebrow text-center">Temp</span>
-        <span className="label-eyebrow text-center">Effective</span>
-        {rows.map((r) => (
-          <div key={r.label} className="contents">
-            <span className="label-eyebrow text-base font-display tracking-wider">{r.label}</span>
-            <div className="text-center">
-              <AttrCell
-                label={`${r.label} base`}
-                field={r.base}
-                value={r.baseValue}
-                characterId={character.id}
-                canWrite={canWrite}
-                {...(r.min !== undefined ? { min: r.min } : {})}
-                {...(r.max !== undefined ? { max: r.max } : {})}
-              />
-            </div>
-            <div className="text-center">
-              <TempCell
-                label={r.label}
-                field={r.temp}
-                baseValue={r.baseValue}
-                tempValue={r.tempValue}
-                characterId={character.id}
-                canWrite={canWrite}
-              />
-            </div>
-            <div className="text-center num font-medium text-lg">{r.effective}</div>
-          </div>
-        ))}
+    <StatCard title="Attributes" points={character.points.attributes}>
+      <div className="grid grid-cols-2 gap-3.5">
+        <PrimaryAttrCell
+          label="ST"
+          base="st"
+          baseValue={character.st}
+          temp="tempSt"
+          tempValue={character.tempSt}
+          effective={character.derived.effectiveSt}
+          min={1}
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <PrimaryAttrCell
+          label="DX"
+          base="dx"
+          baseValue={character.dx}
+          temp="tempDx"
+          tempValue={character.tempDx}
+          effective={character.derived.effectiveDx}
+          min={1}
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <PrimaryAttrCell
+          label="IQ"
+          base="iq"
+          baseValue={character.iq}
+          temp="tempIq"
+          tempValue={character.tempIq}
+          effective={character.derived.effectiveIq}
+          min={1}
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <PrimaryAttrCell
+          label="HT"
+          base="ht"
+          baseValue={character.ht}
+          temp="tempHt"
+          tempValue={character.tempHt}
+          effective={character.derived.effectiveHt}
+          min={1}
+          characterId={character.id}
+          canWrite={canWrite}
+        />
       </div>
-    </section>
+      {tempActive && (
+        <button
+          type="button"
+          onClick={() => revertAllTemps(character)}
+          className="num mt-3 h-7 w-full rounded-lg border border-dashed border-warning/60 text-[11px] text-warning hover:bg-warning/10 transition-colors"
+        >
+          Revert all temporary buffs
+        </button>
+      )}
+    </StatCard>
   );
 }
 
@@ -494,138 +730,209 @@ function SecondaryModsPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const rows: Array<{
-    label: string;
-    mod: AttrInputProps['field'];
-    modValue: number;
-    temp: AttrInputProps['field'];
-    tempValue: number;
-    derived: number;
-    derivedDisplay?: string;
-  }> = [
-    {
-      label: 'HP',
-      mod: 'hpMod',
-      modValue: character.hpMod,
-      temp: 'tempHpMod',
-      tempValue: character.tempHpMod,
-      derived: character.derived.hp,
-    },
-    {
-      label: 'Will',
-      mod: 'willMod',
-      modValue: character.willMod,
-      temp: 'tempWillMod',
-      tempValue: character.tempWillMod,
-      derived: character.derived.will,
-    },
-    {
-      label: 'Per',
-      mod: 'perMod',
-      modValue: character.perMod,
-      temp: 'tempPerMod',
-      tempValue: character.tempPerMod,
-      derived: character.derived.per,
-    },
-    {
-      label: 'FP',
-      mod: 'fpMod',
-      modValue: character.fpMod,
-      temp: 'tempFpMod',
-      tempValue: character.tempFpMod,
-      derived: character.derived.fp,
-    },
-    {
-      label: 'Speed (¼)',
-      mod: 'speedQuarterMod',
-      modValue: character.speedQuarterMod,
-      temp: 'tempSpeedQuarterMod',
-      tempValue: character.tempSpeedQuarterMod,
-      derived: character.derived.basicSpeedQuarters,
-      derivedDisplay: `${character.derived.basicSpeed.toFixed(2)} (×4)`,
-    },
-    {
-      label: 'Move',
-      mod: 'moveMod',
-      modValue: character.moveMod,
-      temp: 'tempMoveMod',
-      tempValue: character.tempMoveMod,
-      derived: character.derived.basicMove,
-    },
-  ];
-
   return (
-    <section className="card p-5">
-      <p className="label-eyebrow">Secondary attributes</p>
-      <h2 className="font-display text-2xl mb-3">Modifiers</h2>
-      <div className="grid grid-cols-[auto_1fr_1fr_1.4fr] gap-x-3 gap-y-2 items-center">
-        <span className="label-eyebrow" />
-        <span className="label-eyebrow text-center">Mod</span>
-        <span className="label-eyebrow text-center">Temp</span>
-        <span className="label-eyebrow text-center">Derived</span>
-        {rows.map((r) => (
-          <div key={r.label} className="contents">
-            <span className="label-eyebrow text-sm font-display tracking-wider">{r.label}</span>
-            <div className="text-center">
-              <AttrCell
-                label={`${r.label} mod`}
-                field={r.mod}
-                value={r.modValue}
-                characterId={character.id}
-                canWrite={canWrite}
-              />
-            </div>
-            <div className="text-center">
-              <TempCell
-                label={r.label}
-                field={r.temp}
-                baseValue={r.derived - r.tempValue}
-                tempValue={r.tempValue}
-                characterId={character.id}
-                canWrite={canWrite}
-              />
-            </div>
-            <div className="text-center num font-medium">{r.derivedDisplay ?? r.derived}</div>
-          </div>
-        ))}
+    <StatCard title="Secondary" points={character.points.secondary}>
+      <div className="grid grid-cols-2 gap-3.5">
+        <SecondaryModCell
+          label="HP"
+          modField="hpMod"
+          modValue={character.hpMod}
+          tempField="tempHpMod"
+          tempValue={character.tempHpMod}
+          derived={character.derived.hp}
+          infoKey="hp"
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <SecondaryModCell
+          label="Will"
+          modField="willMod"
+          modValue={character.willMod}
+          tempField="tempWillMod"
+          tempValue={character.tempWillMod}
+          derived={character.derived.will}
+          infoKey="will"
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <SecondaryModCell
+          label="Per"
+          modField="perMod"
+          modValue={character.perMod}
+          tempField="tempPerMod"
+          tempValue={character.tempPerMod}
+          derived={character.derived.per}
+          infoKey="per"
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <SecondaryModCell
+          label="FP"
+          modField="fpMod"
+          modValue={character.fpMod}
+          tempField="tempFpMod"
+          tempValue={character.tempFpMod}
+          derived={character.derived.fp}
+          infoKey="fp"
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <SecondaryModCell
+          label="Basic Speed"
+          modField="speedQuarterMod"
+          modValue={character.speedQuarterMod}
+          tempField="tempSpeedQuarterMod"
+          tempValue={character.tempSpeedQuarterMod}
+          derived={character.derived.basicSpeedQuarters}
+          derivedDisplay={character.derived.basicSpeed.toFixed(2)}
+          infoKey="speed"
+          characterId={character.id}
+          canWrite={canWrite}
+        />
+        <SecondaryModCell
+          label="Move"
+          modField="moveMod"
+          modValue={character.moveMod}
+          tempField="tempMoveMod"
+          tempValue={character.tempMoveMod}
+          derived={character.derived.basicMove}
+          infoKey="move"
+          characterId={character.id}
+          canWrite={canWrite}
+        />
       </div>
-    </section>
+    </StatCard>
   );
 }
 
 function DerivedPanel({ character }: { character: CharacterDetail }) {
-  const cells: Array<{ label: string; value: string | number }> = [
-    { label: 'HP', value: character.derived.hp },
-    { label: 'Will', value: character.derived.will },
-    { label: 'Per', value: character.derived.per },
-    { label: 'FP', value: character.derived.fp },
-    { label: 'Basic Speed', value: character.derived.basicSpeed.toFixed(2) },
-    { label: 'Basic Move', value: character.derived.basicMove },
-    { label: 'Dodge', value: character.derived.dodge },
-    { label: 'Basic Lift', value: character.derived.basicLift.toFixed(1) },
-  ];
+  const d = character.derived;
   return (
-    <section className="card p-5">
-      <p className="label-eyebrow">Derived</p>
-      <h2 className="font-display text-2xl mb-3">Computed values</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {cells.map((c) => (
-          <div key={c.label} className="bg-base-100/40 border border-base-300 rounded p-2">
-            <p className="label-eyebrow">{c.label}</p>
-            <p className="num font-display text-2xl">{c.value}</p>
-          </div>
-        ))}
+    <StatCard title="Derived">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>HP</strong> defaults to ST. The current pool can be pushed past max with
+                  the double-press override in the combat panel.
+                </span>
+              }
+            >
+              <span>HP</span>
+            </InfoTooltip>
+          }
+          value={d.hp}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Will</strong> defaults to IQ; the secondary mod shifts it independently.
+                </span>
+              }
+            >
+              <span>Will</span>
+            </InfoTooltip>
+          }
+          value={d.will}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Per</strong> defaults to IQ; sense rolls use this, not raw IQ.
+                </span>
+              }
+            >
+              <span>Per</span>
+            </InfoTooltip>
+          }
+          value={d.per}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>FP</strong> defaults to HT. Spent on running, spellcasting, extra-effort.
+                </span>
+              }
+            >
+              <span>FP</span>
+            </InfoTooltip>
+          }
+          value={d.fp}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Basic Speed</strong> = (DX + HT)/4. Drives Dodge and Basic Move.
+                </span>
+              }
+            >
+              <span>Basic Speed</span>
+            </InfoTooltip>
+          }
+          value={d.basicSpeed.toFixed(2)}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Basic Move</strong> drops the fractional part of Basic Speed, then applies
+                  any secondary +Move.
+                </span>
+              }
+            >
+              <span>Basic Move</span>
+            </InfoTooltip>
+          }
+          value={d.basicMove}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Dodge</strong> = Basic Speed + 3, then encumbrance penalty applies.
+                </span>
+              }
+            >
+              <span>Dodge</span>
+            </InfoTooltip>
+          }
+          value={d.dodge}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Basic Lift</strong> = ST²/5 lbs. Encumbrance levels are multiples of this.
+                </span>
+              }
+            >
+              <span>Basic Lift</span>
+            </InfoTooltip>
+          }
+          value={`${d.basicLift.toFixed(1)} lb`}
+        />
       </div>
-    </section>
+    </StatCard>
   );
 }
 
 function PointsPanel({ character }: { character: CharacterDetail }) {
   const p = character.points;
   return (
-    <section className="card p-5">
-      <p className="label-eyebrow">Point ledger</p>
-      <h2 className="font-display text-2xl mb-3">Spend</h2>
+    <StatCard title="Point ledger" points={p.total}>
       <ul className="text-sm space-y-1">
         <li className="flex justify-between">
           <span>Attributes</span>
@@ -656,16 +963,17 @@ function PointsPanel({ character }: { character: CharacterDetail }) {
           <span className="num">{p.total}</span>
         </li>
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
 function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const e = character.encumbrance;
   return (
-    <section className="card p-5">
-      <p className="label-eyebrow">Encumbrance</p>
-      <h2 className="font-display text-2xl mb-3">{e.label}</h2>
+    <StatCard
+      title="Encumbrance"
+      headerExtra={<span className="badge badge-ghost">{e.label}</span>}
+    >
       <ul className="text-sm space-y-1">
         <li className="flex justify-between">
           <span>Worn weight</span>
@@ -688,7 +996,7 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
           <span className="num">{e.dodgePenalty}</span>
         </li>
       </ul>
-    </section>
+    </StatCard>
   );
 }
 
