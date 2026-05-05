@@ -9,6 +9,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { Bumper } from '../../../components/ui/Bumper.tsx';
+import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
+import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
 import { getLocalDb } from '../../../db/dexie.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../../sync/outbox.ts';
@@ -144,8 +147,6 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
   const fpRatio = fpMax > 0 ? fp / fpMax : 0;
   const hpColor = hpVarFor(hpRatio);
   const fpColor = hpVarFor(fpRatio);
-  const hpPct = Math.max(0, Math.min(1, hpRatio)) * 100;
-  const fpPct = Math.max(0, Math.min(1, fpRatio)) * 100;
 
   return (
     <div
@@ -198,24 +199,22 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
             </span>
             <span className="num text-2xl text-dim">/ {hpMax}</span>
           </div>
-          <div className="hp-bar h-3.5">
-            <div style={{ width: `${hpPct}%`, background: hpColor }} />
-          </div>
+          <PoolMeter current={hp} max={hpMax} tone="hp" height="lg" ariaLabel="Hit points" />
           {canWrite && (
             <>
               <div className="mt-3 flex gap-1.5">
-                <button type="button" className="bumper dmg" onClick={() => bumpHp(-5)}>
+                <Bumper tone="dmg" onClick={() => bumpHp(-5)} ariaLabel="HP -5">
                   −5
-                </button>
-                <button type="button" className="bumper dmg" onClick={() => bumpHp(-1)}>
+                </Bumper>
+                <Bumper tone="dmg" onClick={() => bumpHp(-1)} ariaLabel="HP -1">
                   −1
-                </button>
-                <button type="button" className="bumper" onClick={() => bumpHp(+1)}>
+                </Bumper>
+                <Bumper tone="heal" onClick={() => bumpHp(+1)} ariaLabel="HP +1">
                   +1
-                </button>
-                <button type="button" className="bumper" onClick={() => bumpHp(+5)}>
+                </Bumper>
+                <Bumper tone="heal" onClick={() => bumpHp(+5)} ariaLabel="HP +5">
                   +5
-                </button>
+                </Bumper>
               </div>
               <button
                 type="button"
@@ -244,9 +243,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               <span className="num text-sm text-dim">/ {fpMax}</span>
             </div>
           </div>
-          <div className="hp-bar h-2.5">
-            <div style={{ width: `${fpPct}%`, background: fpColor }} />
-          </div>
+          <PoolMeter current={fp} max={fpMax} tone="fp" height="md" ariaLabel="Fatigue points" />
           {canWrite && (
             <div className="mt-2.5 flex gap-1.5">
               <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-5)}>
@@ -269,15 +266,14 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
           <p className="label-eyebrow mb-2">Posture</p>
           <div className="flex flex-wrap gap-1">
             {POSTURES.map((p) => (
-              <button
+              <ConditionChip
                 key={p}
-                type="button"
-                className={`chip capitalize ${posture === p ? 'on' : ''}`}
+                label={p}
+                active={posture === p}
                 onClick={() => setPosture(p)}
                 disabled={!canWrite}
-              >
-                {p}
-              </button>
+                className="capitalize"
+              />
             ))}
           </div>
         </div>
@@ -288,21 +284,15 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
             <span className="num text-[10px] text-dim">{conditions.length} active</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {CONDITIONS.map((c) => {
-              const active = conditions.includes(c);
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  className={`chip ${active ? 'on' : ''}`}
-                  onClick={() => toggleCondition(c)}
-                  disabled={!canWrite}
-                >
-                  {active && <span className="chip-dot" aria-hidden="true" />}
-                  {c}
-                </button>
-              );
-            })}
+            {CONDITIONS.map((c) => (
+              <ConditionChip
+                key={c}
+                label={c}
+                active={conditions.includes(c)}
+                onClick={() => toggleCondition(c)}
+                disabled={!canWrite}
+              />
+            ))}
           </div>
         </div>
       </div>
