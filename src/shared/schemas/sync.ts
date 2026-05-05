@@ -44,6 +44,19 @@ export const operationEnvelope = z.object({
   attemptedValue: z.unknown(),
   prevValue: z.unknown().optional(),
   baseRevision: revision.optional(),
+  /**
+   * Parent character id for child entity classes
+   * (`character_trait`, `character_skill`, `character_inventory`,
+   * `character_combat`).  The dispatcher's `requireParentId` reads
+   * this first; legacy creates that put `characterId` inside
+   * `attemptedValue` still work as a fallback.  Including it as a
+   * top-level field on the envelope keeps `attemptedValue` /
+   * `prevValue` as the raw field values for per-field patches, so
+   * orchestrator rollback (which writes `prevValue` back into the
+   * Dexie row) doesn't accidentally store a wrapped `{ characterId,
+   * value }` object as the field.
+   */
+  parentId: uuid.optional(),
   /** Validation schema version the client used.  Bumped on breaking changes. */
   validationVersion: z.number().int().nonnegative().default(1),
   createdAt: isoTimestamp,

@@ -65,35 +65,3 @@ export function useCharacterFieldSave(characterId: string) {
     [characterId],
   );
 }
-
-// ---------- legacy compat ----------
-//
-// The character sheet still imports `useFieldSaver` and
-// `applyDetailToCache` / `characterDetailKey` from this module.  We
-// keep the old names so existing call sites compile during the
-// migration; callers should switch to the explicit
-// `useCharacterFieldSave` flow which surfaces the flashKey.
-
-/** @deprecated use {@link useCharacterFieldSave} which also returns a flashKey. */
-export function useFieldSaver(id: string) {
-  const build = useCharacterFieldSave(id);
-  return useCallback(
-    (field: string) => {
-      const saver = build(field);
-      return saver.onSave;
-    },
-    [build],
-  );
-}
-
-// `applyDetailToCache` and `characterDetailKey` are no longer needed
-// (TanStack Query no longer caches character detail -- Dexie does).
-// Export shims so any straggling import compiles, but they are no-ops.
-
-export function characterDetailKey(id: string) {
-  return ['characters', id, 'detail'] as const;
-}
-
-export function applyDetailToCache(_qc: unknown, _id: string, _detail: unknown): void {
-  /* no-op: Dexie + useLiveQuery is the source of truth now. */
-}

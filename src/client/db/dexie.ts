@@ -181,6 +181,16 @@ export interface OutboxEntry {
   attemptedValue: unknown;
   prevValue?: unknown;
   baseRevision?: number | undefined;
+  /**
+   * Parent character id for child entity classes
+   * (`character_trait`, `character_skill`, `character_inventory`,
+   * `character_combat`).  Stored separately from `attemptedValue` /
+   * `prevValue` so per-field patches keep those fields as the raw
+   * primitive value -- the orchestrator's rollback path writes
+   * `prevValue` straight back into the local row, so wrapping it as
+   * `{ characterId, value }` would corrupt the field on revert.
+   */
+  parentId?: string | undefined;
   validationVersion: number;
   status: OutboxStatus;
   enqueuedAt: string;

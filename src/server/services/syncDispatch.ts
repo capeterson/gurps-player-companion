@@ -665,12 +665,12 @@ function appliedOutcome(op: OperationEnvelope, newRevision: number): OperationOu
 }
 
 function requireParentId(op: OperationEnvelope): string {
-  // For child entities (trait/skill/inventory/combat) the client puts
-  // the parent characterId in fieldPath when needed.  We standardize
-  // on `attemptedValue.characterId` for create ops AND on a parent
-  // hint stored in `prevValue.characterId` for patch/delete ops.
-  // Simpler protocol: always include `characterId` on the envelope's
-  // attemptedValue (creates) or prevValue (patch/delete).
+  // Prefer the top-level `parentId` field on the envelope -- it's the
+  // canonical home for child-entity routing.  We still fall back to
+  // `attemptedValue.characterId` / `prevValue.characterId` so legacy
+  // create envelopes (which include the parent on the body itself)
+  // continue to work.
+  if (typeof op.parentId === 'string') return op.parentId;
   const fromAttempted = (op.attemptedValue as { characterId?: string } | undefined)?.characterId;
   if (typeof fromAttempted === 'string') return fromAttempted;
   const fromPrev = (op.prevValue as { characterId?: string } | undefined)?.characterId;

@@ -714,6 +714,7 @@ function toEnvelope(op: OutboxEntry): OperationEnvelope {
     attemptedValue: op.attemptedValue,
     prevValue: op.prevValue,
     baseRevision: op.baseRevision,
+    parentId: op.parentId,
     validationVersion: op.validationVersion,
     createdAt: op.enqueuedAt,
   };

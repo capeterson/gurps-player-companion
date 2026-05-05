@@ -100,9 +100,15 @@ export async function enqueueFieldPatch(args: EnqueueFieldPatchArgs): Promise<vo
       command: 'patch',
       coalesceKey: ckey,
       fieldPath: args.fieldPath,
-      attemptedValue: wrapAttemptedForChild(args),
+      // attemptedValue is the raw new field value -- wrapping it with
+      // a parent hint here would mean the orchestrator's rollback
+      // path (which writes prevValue back into the local row) would
+      // need to know to unwrap.  Carry the parent on `parentId`
+      // instead so attemptedValue / prevValue stay primitive.
+      attemptedValue: args.attemptedValue,
       prevValue: prev,
       baseRevision: baseRev,
+      parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
       validationVersion: 1,
       status: 'pending',
       enqueuedAt: now,
@@ -112,6 +118,23 @@ export async function enqueueFieldPatch(args: EnqueueFieldPatchArgs): Promise<vo
     };
     await db.outbox.add(op);
   });
+}
+
+/**
+ * Resolve the canonical parent character id for an outbox row.  For
+ * combat the entityId IS the characterId (1:1 keyed), so we fall back
+ * to it when the caller didn't pass `characterId` explicitly.  For
+ * character / campaign rows the parent concept doesn't apply.
+ */
+function parentIdFor(
+  entityClass: EntityClass,
+  characterId: string | undefined,
+  entityId: string,
+): string | undefined {
+  if (entityClass === 'character' || entityClass === 'campaign') return undefined;
+  if (characterId) return characterId;
+  if (entityClass === 'character_combat') return entityId;
+  return undefined;
 }
 
 async function readFieldValue(args: EnqueueFieldPatchArgs): Promise<unknown> {
@@ -184,9 +207,14 @@ export async function enqueueCreate<T extends Record<string, unknown>>(
     entityId: args.entityId,
     command: 'create',
     coalesceKey: `${coalesceKey(args.entityId, undefined)}:create`,
+    // For creates we also include `characterId` on the body so the
+    // server can read the parent off `attemptedValue` (the legacy
+    // path); the new top-level `parentId` is the canonical lookup
+    // but we keep both for forward compatibility with older servers.
     attemptedValue: args.characterId
       ? { ...args.attemptedValue, characterId: args.characterId }
       : args.attemptedValue,
+    parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
     validationVersion: 1,
     status: 'pending',
     enqueuedAt: now,
@@ -218,6 +246,7 @@ export async function enqueueDelete(args: EnqueueDeleteArgs): Promise<void> {
     coalesceKey: `${coalesceKey(args.entityId, undefined)}:delete`,
     attemptedValue: args.characterId ? { characterId: args.characterId } : null,
     prevValue: args.prevValue,
+    parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
     validationVersion: 1,
     status: 'pending',
     enqueuedAt: now,
@@ -250,18 +279,6 @@ function storesForOp(entityClass: EntityClass) {
     default:
       return [];
   }
-}
-
-/** Tag the outbound payload with characterId for child entities so the dispatcher can resolve the parent. */
-function wrapAttemptedForChild(args: EnqueueFieldPatchArgs): unknown {
-  if (args.characterId && args.entityClass !== 'character' && args.entityClass !== 'campaign') {
-    // The dispatcher's `requireParentId` looks for `characterId` in
-    // either `attemptedValue` or `prevValue`.  For a per-field patch
-    // the attemptedValue is the raw new value, so we put the parent
-    // hint on `prevValue` instead -- non-destructive.
-    return args.attemptedValue;
-  }
-  return args.attemptedValue;
 }
 
 async function applyLocalPatch(args: EnqueueFieldPatchArgs): Promise<void> {
@@ -364,16 +381,28 @@ async function applyLocalDelete(entityClass: EntityClass, entityId: string): Pro
 
 // ---------- queries used by the orchestrator ----------
 
-/** Pending ops eligible to drain right now (status pending and no future retry-after). */
+/**
+ * Ops eligible to drain right now.
+ *
+ * Includes BOTH `pending` (never tried) AND `transient_retry`
+ * (previous attempt failed transiently, waiting for backoff to elapse)
+ * rows.  Without the second status, an op that hits a single network
+ * blip would get stuck in `transient_retry` forever -- the orchestrator
+ * never re-promotes them to `pending`, so a status filter that only
+ * matches `pending` would silently drop them.
+ *
+ * Rows with a future `nextEarliestAttemptAt` are filtered out post-query
+ * so the backoff window is honored.
+ */
 export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   const db = getLocalDb();
   const now = new Date().toISOString();
   const all = await db.outbox
-    .where('[status+enqueuedAt]')
-    .between(['pending', ''], ['pending', '￿'])
-    .limit(limit)
-    .toArray();
-  return all.filter((op) => !op.nextEarliestAttemptAt || op.nextEarliestAttemptAt <= now);
+    .where('status')
+    .anyOf(['pending', 'transient_retry'])
+    .sortBy('enqueuedAt');
+  const ready = all.filter((op) => !op.nextEarliestAttemptAt || op.nextEarliestAttemptAt <= now);
+  return ready.slice(0, limit);
 }
 
 export async function countPending(): Promise<number> {

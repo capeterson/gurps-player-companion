@@ -16523,6 +16523,10 @@
                           "type": "integer",
                           "minimum": 0
                         },
+                        "parentId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
                         "validationVersion": {
                           "type": "integer",
                           "minimum": 0,

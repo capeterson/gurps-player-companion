@@ -9,7 +9,7 @@ import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
-import { useFieldSaver } from './sections/useCharacterPatch.ts';
+import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
 const POSTURES = [
@@ -96,12 +96,16 @@ function AttrInput({
   max,
   width,
 }: AttrInputProps) {
-  const saver = useFieldSaver(characterId);
+  // Use the bundled saver so the input subscribes to the flashBus on
+  // its own key.  Without `flashKey` an async server rejection would
+  // toast but never visually flash this input.
+  const buildSave = useCharacterFieldSave(characterId);
+  const fieldSave = buildSave(field, { humanName: label });
   const draft = useDraftField<number>({
     name: label,
     serverValue: value,
     parse: intParser(min, max),
-    onSave: saver(field),
+    ...fieldSave,
   });
   if (!canWrite) {
     return (
@@ -150,51 +154,54 @@ function IdentityPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const saver = useFieldSaver(character.id);
+  // Bundled saver -- spreading `{ onSave, flashKey }` into useDraftField
+  // wires the field to the flashBus so async server rejections trigger
+  // the rollback animation on the offending input.
+  const buildSave = useCharacterFieldSave(character.id);
   const nameField = useDraftField<string>({
     name: 'name',
     serverValue: character.name,
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: saver('name'),
+    ...buildSave('name', { humanName: 'name' }),
   });
   const playerField = useDraftField<string | null>({
     name: 'player name',
     serverValue: character.playerName ?? '',
     parse: nullableTextParser,
-    onSave: saver('playerName'),
+    ...buildSave('playerName', { humanName: 'player name' }),
   });
   const heightField = useDraftField<string | null>({
     name: 'height',
     serverValue: character.height ?? '',
     parse: nullableTextParser,
-    onSave: saver('height'),
+    ...buildSave('height', { humanName: 'height' }),
   });
   const weightField = useDraftField<string | null>({
     name: 'weight',
     serverValue: character.weight ?? '',
     parse: nullableTextParser,
-    onSave: saver('weight'),
+    ...buildSave('weight', { humanName: 'weight' }),
   });
   const ageField = useDraftField<number | null>({
     name: 'age',
     serverValue: character.age ?? null,
     format: (v) => (v === null ? '' : String(v)),
     parse: nullableIntParser(0, 10000),
-    onSave: saver('age'),
+    ...buildSave('age', { humanName: 'age' }),
   });
   const tlField = useDraftField<number | null>({
     name: 'tech level',
     serverValue: character.techLevel ?? null,
     format: (v) => (v === null ? '' : String(v)),
     parse: nullableIntParser(0, 12),
-    onSave: saver('techLevel'),
+    ...buildSave('techLevel', { humanName: 'tech level' }),
   });
   const appearanceField = useDraftField<string | null>({
     name: 'appearance',
     serverValue: character.appearance ?? '',
     parse: nullableTextParser,
-    onSave: saver('appearance'),
+    ...buildSave('appearance', { humanName: 'appearance' }),
   });
 
   return (
