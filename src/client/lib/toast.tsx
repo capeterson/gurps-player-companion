@@ -28,7 +28,7 @@ export interface Toast {
 }
 
 export interface ToastApi {
-  push(message: string, opts?: { kind?: ToastKind; durationMs?: number }): string;
+  push(message: string, opts?: { kind?: ToastKind; durationMs?: number | null }): string;
   dismiss(id: string): void;
 }
 
@@ -59,8 +59,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const durationMs = opts?.durationMs ?? (kind === 'error' ? 6000 : 3500);
       const id = `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       setToasts((prev) => [...prev, { id, kind, message }]);
-      const handle = setTimeout(() => dismiss(id), durationMs);
-      timers.current.set(id, handle);
+      if (durationMs !== null) {
+        const handle = setTimeout(() => dismiss(id), durationMs);
+        timers.current.set(id, handle);
+      }
       return id;
     },
     [dismiss],

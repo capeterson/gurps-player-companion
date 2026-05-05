@@ -1,7 +1,12 @@
 import { useIsMutating, useQuery } from '@tanstack/react-query';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { useSyncIndicatorState } from './hooks/useSyncIndicatorState.ts';
 import { api } from './lib/api.ts';
+import { offlineDb } from './lib/offlineDb.ts';
+import { startOfflineSyncLoop } from './lib/offlineSync.ts';
+import { useToasts } from './lib/toast.tsx';
 import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
 import type { ThemeName } from './lib/theme.ts';
 import { tokenStore } from './lib/tokenStore.ts';
@@ -14,12 +19,25 @@ interface MeResponse {
 
 export function App() {
   const navigate = useNavigate();
+  const toasts = useToasts();
   const isMutating = useIsMutating();
   const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
   const me = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api<MeResponse>('/auth/me'),
   });
+  const syncMeta = useLiveQuery(() => offlineDb.syncMeta.get('state'));
+  const outboxCount = useLiveQuery(() => offlineDb.outbox.count(), []);
+  const syncStatus = useSyncIndicatorState({
+    hasSyncWork: isMutating > 0 || (syncMeta?.status === 'syncing' ?? false) || (outboxCount ?? 0) > 0,
+    hasSyncError: syncMeta?.status === 'failed',
+  });
+
+  useEffect(() => {
+    startOfflineSyncLoop((message) => {
+      toasts.push(`Couldn't sync pending change — ${message}`, { kind: 'error', durationMs: null });
+    });
+  }, [toasts]);
 
   useEffect(() => {
     applyTheme(theme);
@@ -70,6 +88,18 @@ export function App() {
           <details className="dropdown dropdown-end relative z-50">
             <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
               <span className="hidden sm:inline text-muted">Signed in as</span>
+              <span
+                aria-label={`Sync status: ${syncStatus}`}
+                title={
+                  syncStatus === 'failed'
+                    ? 'Sync failed — check connection and retry'
+                    : syncStatus === 'syncing'
+                      ? 'Sync in progress'
+                      : 'Fully synced'
+                }
+              >
+                {syncStatus === 'failed' ? '⚠️' : syncStatus === 'syncing' ? '🔄' : '✅'}
+              </span>
               <span>{me.data?.displayName ?? 'Account'}</span>
               <span aria-hidden="true">▾</span>
             </summary>

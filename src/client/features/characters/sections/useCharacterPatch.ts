@@ -15,7 +15,7 @@
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { api } from '../../../lib/api.ts';
+import { enqueueCharacterPatch } from '../../../lib/offlineSync.ts';
 
 export function characterDetailKey(id: string) {
   return ['characters', id, 'detail'] as const;
@@ -34,11 +34,13 @@ export function useFieldSaver(id: string) {
   const qc = useQueryClient();
   return useCallback(
     (field: string) => async (value: unknown) => {
-      const detail = await api<CharacterDetail>(`/characters/${id}`, {
-        method: 'PATCH',
-        body: { [field]: value },
-      });
-      applyDetailToCache(qc, id, detail);
+      const key = characterDetailKey(id);
+      const prev = qc.getQueryData<CharacterDetail>(key);
+      if (prev) {
+        qc.setQueryData<CharacterDetail>(key, { ...prev, [field]: value });
+      }
+      await enqueueCharacterPatch(id, { [field]: value });
+      qc.invalidateQueries({ queryKey: ['characters'], exact: true });
     },
     [id, qc],
   );
