@@ -766,6 +766,9 @@
                         "type": "integer",
                         "nullable": true
                       },
+                      "shareCharacterSheets": {
+                        "type": "boolean"
+                      },
                       "members": {
                         "type": "array",
                         "items": {
@@ -820,6 +823,7 @@
                       "pointTarget",
                       "disadvantageCap",
                       "quirkCap",
+                      "shareCharacterSheets",
                       "members",
                       "createdAt",
                       "updatedAt",
@@ -886,6 +890,9 @@
                     "nullable": true,
                     "minimum": 0,
                     "maximum": 50
+                  },
+                  "shareCharacterSheets": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -932,6 +939,9 @@
                     "quirkCap": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "shareCharacterSheets": {
+                      "type": "boolean"
                     },
                     "members": {
                       "type": "array",
@@ -987,6 +997,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "shareCharacterSheets",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -1079,6 +1090,9 @@
                       "type": "integer",
                       "nullable": true
                     },
+                    "shareCharacterSheets": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -1133,6 +1147,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "shareCharacterSheets",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -1219,6 +1234,9 @@
                     "nullable": true,
                     "minimum": 0,
                     "maximum": 50
+                  },
+                  "shareCharacterSheets": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -1262,6 +1280,9 @@
                     "quirkCap": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "shareCharacterSheets": {
+                      "type": "boolean"
                     },
                     "members": {
                       "type": "array",
@@ -1317,6 +1338,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "shareCharacterSheets",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -1476,6 +1498,9 @@
                       "type": "integer",
                       "nullable": true
                     },
+                    "shareCharacterSheets": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -1530,6 +1555,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "shareCharacterSheets",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -1719,6 +1745,9 @@
                       "type": "integer",
                       "nullable": true
                     },
+                    "shareCharacterSheets": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -1773,6 +1802,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "shareCharacterSheets",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -5266,6 +5296,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "view": {
+                      "type": "string",
+                      "enum": [
+                        "full"
+                      ],
+                      "default": "full"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -6151,807 +6188,196 @@
         ],
         "responses": {
           "200": {
-            "description": "Character detail",
+            "description": "Character detail. Returns the full sheet to the owner and to GM/campaign owners; returns the minimal \"readily apparent\" payload to fellow members when the parent campaign has shareCharacterSheets=false. Discriminated by the `view` field.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "ownerId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "name": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 120
-                    },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
-                    "height": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 40
-                    },
-                    "weight": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 40
-                    },
-                    "age": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 10000
-                    },
-                    "appearance": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
-                    },
-                    "campaignId": {
-                      "type": "string",
-                      "nullable": true,
-                      "format": "uuid"
-                    },
-                    "st": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 99,
-                      "default": 10
-                    },
-                    "dx": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 99,
-                      "default": 10
-                    },
-                    "iq": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 99,
-                      "default": 10
-                    },
-                    "ht": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 99,
-                      "default": 10
-                    },
-                    "hpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "willMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "perMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "fpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "speedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "moveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "dismissedWarnings": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "revision": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "derived": {
+                  "oneOf": [
+                    {
                       "type": "object",
                       "properties": {
-                        "effectiveSt": {
-                          "type": "integer"
-                        },
-                        "effectiveDx": {
-                          "type": "integer"
-                        },
-                        "effectiveIq": {
-                          "type": "integer"
-                        },
-                        "effectiveHt": {
-                          "type": "integer"
-                        },
-                        "hp": {
-                          "type": "integer"
-                        },
-                        "will": {
-                          "type": "integer"
-                        },
-                        "per": {
-                          "type": "integer"
-                        },
-                        "fp": {
-                          "type": "integer"
-                        },
-                        "basicSpeedQuarters": {
-                          "type": "integer"
-                        },
-                        "basicSpeed": {
-                          "type": "number"
-                        },
-                        "basicMove": {
-                          "type": "integer"
-                        },
-                        "dodge": {
-                          "type": "integer"
-                        },
-                        "basicLift": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "effectiveSt",
-                        "effectiveDx",
-                        "effectiveIq",
-                        "effectiveHt",
-                        "hp",
-                        "will",
-                        "per",
-                        "fp",
-                        "basicSpeedQuarters",
-                        "basicSpeed",
-                        "basicMove",
-                        "dodge",
-                        "basicLift"
-                      ]
-                    },
-                    "points": {
-                      "type": "object",
-                      "properties": {
-                        "attributes": {
-                          "type": "integer"
-                        },
-                        "secondary": {
-                          "type": "integer"
-                        },
-                        "advantages": {
-                          "type": "integer"
-                        },
-                        "disadvantages": {
-                          "type": "integer"
-                        },
-                        "quirks": {
-                          "type": "integer"
-                        },
-                        "skills": {
-                          "type": "integer"
-                        },
-                        "total": {
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "attributes",
-                        "secondary",
-                        "advantages",
-                        "disadvantages",
-                        "quirks",
-                        "skills",
-                        "total"
-                      ]
-                    },
-                    "encumbrance": {
-                      "type": "object",
-                      "properties": {
-                        "level": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 4
-                        },
-                        "label": {
+                        "view": {
                           "type": "string",
                           "enum": [
-                            "None",
-                            "Light",
-                            "Medium",
-                            "Heavy",
-                            "X-Heavy"
-                          ]
+                            "full"
+                          ],
+                          "default": "full"
                         },
-                        "speedDivisor": {
-                          "type": "number"
-                        },
-                        "dodgePenalty": {
-                          "type": "integer"
-                        },
-                        "playerWeightLbs": {
-                          "type": "number"
-                        },
-                        "basicLift": {
-                          "type": "number"
-                        },
-                        "ratio": {
-                          "type": "number"
-                        }
-                      },
-                      "required": [
-                        "level",
-                        "label",
-                        "speedDivisor",
-                        "dodgePenalty",
-                        "playerWeightLbs",
-                        "basicLift",
-                        "ratio"
-                      ]
-                    },
-                    "warnings": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "severity": {
-                            "type": "string",
-                            "enum": [
-                              "warn",
-                              "note"
-                            ]
-                          },
-                          "message": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "code",
-                          "severity",
-                          "message"
-                        ]
-                      }
-                    },
-                    "traits": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "characterId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": [
-                              "advantage",
-                              "disadvantage",
-                              "perk",
-                              "quirk",
-                              "language",
-                              "cultural_familiarity"
-                            ]
-                          },
-                          "name": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 160
-                          },
-                          "points": {
-                            "type": "integer",
-                            "minimum": -1000,
-                            "maximum": 1000
-                          },
-                          "level": {
-                            "type": "integer",
-                            "nullable": true,
-                            "minimum": 1,
-                            "maximum": 99
-                          },
-                          "notes": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 20000
-                          },
-                          "modifiers": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "name": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 160
-                                },
-                                "category": {
-                                  "type": "string",
-                                  "enum": [
-                                    "enhancement",
-                                    "limitation"
-                                  ]
-                                },
-                                "costType": {
-                                  "type": "string",
-                                  "enum": [
-                                    "percent",
-                                    "flat"
-                                  ]
-                                },
-                                "costValue": {
-                                  "type": "integer",
-                                  "minimum": -200,
-                                  "maximum": 500
-                                },
-                                "description": {
-                                  "type": "string",
-                                  "maxLength": 2000
-                                },
-                                "group": {
-                                  "type": "string",
-                                  "maxLength": 80
-                                }
-                              },
-                              "required": [
-                                "name",
-                                "category",
-                                "costType",
-                                "costValue"
-                              ]
-                            },
-                            "default": []
-                          },
-                          "libraryTraitId": {
-                            "type": "string",
-                            "nullable": true,
-                            "format": "uuid"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "characterId",
-                          "kind",
-                          "name",
-                          "points",
-                          "level",
-                          "notes",
-                          "libraryTraitId",
-                          "createdAt",
-                          "updatedAt"
-                        ]
-                      }
-                    },
-                    "skills": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "characterId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "name": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 160
-                          },
-                          "attribute": {
-                            "type": "string",
-                            "enum": [
-                              "ST",
-                              "DX",
-                              "IQ",
-                              "HT",
-                              "Will",
-                              "Per",
-                              "Other"
-                            ]
-                          },
-                          "difficulty": {
-                            "type": "string",
-                            "enum": [
-                              "E",
-                              "A",
-                              "H",
-                              "VH"
-                            ]
-                          },
-                          "points": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 1000
-                          },
-                          "techLevel": {
-                            "type": "integer",
-                            "nullable": true,
-                            "minimum": 0,
-                            "maximum": 12
-                          },
-                          "specialization": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 160
-                          },
-                          "notes": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 20000
-                          },
-                          "librarySkillId": {
-                            "type": "string",
-                            "nullable": true,
-                            "format": "uuid"
-                          },
-                          "level": {
-                            "type": "integer"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "characterId",
-                          "name",
-                          "attribute",
-                          "difficulty",
-                          "points",
-                          "techLevel",
-                          "specialization",
-                          "notes",
-                          "librarySkillId",
-                          "level",
-                          "createdAt",
-                          "updatedAt"
-                        ]
-                      }
-                    },
-                    "inventory": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "characterId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "name": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 160
-                          },
-                          "quantity": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 1000000
-                          },
-                          "weightLbs": {
-                            "type": "number",
-                            "minimum": 0,
-                            "maximum": 1000000
-                          },
-                          "cost": {
-                            "type": "number",
-                            "minimum": 0,
-                            "maximum": 100000000000
-                          },
-                          "notes": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 20000
-                          },
-                          "parentId": {
-                            "type": "string",
-                            "nullable": true,
-                            "format": "uuid"
-                          },
-                          "externalLocation": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 160
-                          },
-                          "worn": {
-                            "type": "boolean"
-                          },
-                          "equipped": {
-                            "type": "boolean"
-                          },
-                          "isContainer": {
-                            "type": "boolean"
-                          },
-                          "hideawayCapacityLbs": {
-                            "type": "number",
-                            "minimum": 0,
-                            "maximum": 1000000
-                          },
-                          "weightReductionPercent": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 100
-                          },
-                          "isArmor": {
-                            "type": "boolean"
-                          },
-                          "armor": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "locations": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 40
-                                },
-                                "default": []
-                              },
-                              "dr": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000,
-                                "default": 0
-                              },
-                              "drCrushing": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "flexible": {
-                                "type": "boolean",
-                                "default": false
-                              },
-                              "frontOnly": {
-                                "type": "boolean",
-                                "default": false
-                              },
-                              "backOnly": {
-                                "type": "boolean",
-                                "default": false
-                              },
-                              "notes": {
-                                "type": "string",
-                                "nullable": true,
-                                "maxLength": 2000
-                              }
-                            }
-                          },
-                          "weaponData": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "damage": {
-                                "type": "string",
-                                "maxLength": 160
-                              },
-                              "reach": {
-                                "type": "string",
-                                "nullable": true,
-                                "maxLength": 40
-                              },
-                              "parry": {
-                                "type": "string",
-                                "nullable": true,
-                                "maxLength": 40
-                              },
-                              "stRequired": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 99
-                              },
-                              "notes": {
-                                "type": "string",
-                                "nullable": true,
-                                "maxLength": 2000
-                              }
-                            }
-                          },
-                          "libraryItemId": {
-                            "type": "string",
-                            "nullable": true,
-                            "format": "uuid"
-                          },
-                          "effectiveWeightLbs": {
-                            "type": "number"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "characterId",
-                          "name",
-                          "quantity",
-                          "weightLbs",
-                          "cost",
-                          "notes",
-                          "parentId",
-                          "externalLocation",
-                          "worn",
-                          "equipped",
-                          "isContainer",
-                          "hideawayCapacityLbs",
-                          "weightReductionPercent",
-                          "isArmor",
-                          "armor",
-                          "weaponData",
-                          "libraryItemId",
-                          "effectiveWeightLbs",
-                          "createdAt",
-                          "updatedAt"
-                        ]
-                      }
-                    },
-                    "combat": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
                         "id": {
                           "type": "string",
                           "format": "uuid"
                         },
-                        "characterId": {
+                        "ownerId": {
                           "type": "string",
                           "format": "uuid"
                         },
-                        "currentHp": {
-                          "type": "integer"
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
                         },
-                        "currentFp": {
-                          "type": "integer"
-                        },
-                        "conditions": {
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 80
-                          }
-                        },
-                        "maneuver": {
+                        "playerName": {
                           "type": "string",
                           "nullable": true,
-                          "maxLength": 80
+                          "maxLength": 120
                         },
-                        "posture": {
+                        "height": {
                           "type": "string",
-                          "enum": [
-                            "standing",
-                            "prone",
-                            "kneeling",
-                            "crawling",
-                            "sitting",
-                            "crouching",
-                            "lying"
-                          ]
+                          "nullable": true,
+                          "maxLength": 40
+                        },
+                        "weight": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
+                        "age": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 10000
+                        },
+                        "appearance": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 20000
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 12
+                        },
+                        "campaignId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
+                        "st": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 99,
+                          "default": 10
+                        },
+                        "dx": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 99,
+                          "default": 10
+                        },
+                        "iq": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 99,
+                          "default": 10
+                        },
+                        "ht": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 99,
+                          "default": 10
+                        },
+                        "hpMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "willMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "perMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "fpMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "speedQuarterMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "moveMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempSt": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempDx": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempIq": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempHt": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempHpMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempWillMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempPerMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempFpMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempSpeedQuarterMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "tempMoveMod": {
+                          "type": "integer",
+                          "minimum": -50,
+                          "maximum": 50,
+                          "default": 0
+                        },
+                        "dismissedWarnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         },
                         "createdAt": {
                           "type": "string",
@@ -6960,37 +6386,729 @@
                         "updatedAt": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "derived": {
+                          "type": "object",
+                          "properties": {
+                            "effectiveSt": {
+                              "type": "integer"
+                            },
+                            "effectiveDx": {
+                              "type": "integer"
+                            },
+                            "effectiveIq": {
+                              "type": "integer"
+                            },
+                            "effectiveHt": {
+                              "type": "integer"
+                            },
+                            "hp": {
+                              "type": "integer"
+                            },
+                            "will": {
+                              "type": "integer"
+                            },
+                            "per": {
+                              "type": "integer"
+                            },
+                            "fp": {
+                              "type": "integer"
+                            },
+                            "basicSpeedQuarters": {
+                              "type": "integer"
+                            },
+                            "basicSpeed": {
+                              "type": "number"
+                            },
+                            "basicMove": {
+                              "type": "integer"
+                            },
+                            "dodge": {
+                              "type": "integer"
+                            },
+                            "basicLift": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "effectiveSt",
+                            "effectiveDx",
+                            "effectiveIq",
+                            "effectiveHt",
+                            "hp",
+                            "will",
+                            "per",
+                            "fp",
+                            "basicSpeedQuarters",
+                            "basicSpeed",
+                            "basicMove",
+                            "dodge",
+                            "basicLift"
+                          ]
+                        },
+                        "points": {
+                          "type": "object",
+                          "properties": {
+                            "attributes": {
+                              "type": "integer"
+                            },
+                            "secondary": {
+                              "type": "integer"
+                            },
+                            "advantages": {
+                              "type": "integer"
+                            },
+                            "disadvantages": {
+                              "type": "integer"
+                            },
+                            "quirks": {
+                              "type": "integer"
+                            },
+                            "skills": {
+                              "type": "integer"
+                            },
+                            "total": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "attributes",
+                            "secondary",
+                            "advantages",
+                            "disadvantages",
+                            "quirks",
+                            "skills",
+                            "total"
+                          ]
+                        },
+                        "encumbrance": {
+                          "type": "object",
+                          "properties": {
+                            "level": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 4
+                            },
+                            "label": {
+                              "type": "string",
+                              "enum": [
+                                "None",
+                                "Light",
+                                "Medium",
+                                "Heavy",
+                                "X-Heavy"
+                              ]
+                            },
+                            "speedDivisor": {
+                              "type": "number"
+                            },
+                            "dodgePenalty": {
+                              "type": "integer"
+                            },
+                            "playerWeightLbs": {
+                              "type": "number"
+                            },
+                            "basicLift": {
+                              "type": "number"
+                            },
+                            "ratio": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "level",
+                            "label",
+                            "speedDivisor",
+                            "dodgePenalty",
+                            "playerWeightLbs",
+                            "basicLift",
+                            "ratio"
+                          ]
+                        },
+                        "warnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "warn",
+                                  "note"
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "severity",
+                              "message"
+                            ]
+                          }
+                        },
+                        "traits": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "characterId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "advantage",
+                                  "disadvantage",
+                                  "perk",
+                                  "quirk",
+                                  "language",
+                                  "cultural_familiarity"
+                                ]
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "points": {
+                                "type": "integer",
+                                "minimum": -1000,
+                                "maximum": 1000
+                              },
+                              "level": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 1,
+                                "maximum": 99
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 20000
+                              },
+                              "modifiers": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "enum": [
+                                        "enhancement",
+                                        "limitation"
+                                      ]
+                                    },
+                                    "costType": {
+                                      "type": "string",
+                                      "enum": [
+                                        "percent",
+                                        "flat"
+                                      ]
+                                    },
+                                    "costValue": {
+                                      "type": "integer",
+                                      "minimum": -200,
+                                      "maximum": 500
+                                    },
+                                    "description": {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    "group": {
+                                      "type": "string",
+                                      "maxLength": 80
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "category",
+                                    "costType",
+                                    "costValue"
+                                  ]
+                                },
+                                "default": []
+                              },
+                              "libraryTraitId": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uuid"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "characterId",
+                              "kind",
+                              "name",
+                              "points",
+                              "level",
+                              "notes",
+                              "libraryTraitId",
+                              "createdAt",
+                              "updatedAt"
+                            ]
+                          }
+                        },
+                        "skills": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "characterId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "attribute": {
+                                "type": "string",
+                                "enum": [
+                                  "ST",
+                                  "DX",
+                                  "IQ",
+                                  "HT",
+                                  "Will",
+                                  "Per",
+                                  "Other"
+                                ]
+                              },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "E",
+                                  "A",
+                                  "H",
+                                  "VH"
+                                ]
+                              },
+                              "points": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000
+                              },
+                              "techLevel": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 12
+                              },
+                              "specialization": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 20000
+                              },
+                              "librarySkillId": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uuid"
+                              },
+                              "level": {
+                                "type": "integer"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "characterId",
+                              "name",
+                              "attribute",
+                              "difficulty",
+                              "points",
+                              "techLevel",
+                              "specialization",
+                              "notes",
+                              "librarySkillId",
+                              "level",
+                              "createdAt",
+                              "updatedAt"
+                            ]
+                          }
+                        },
+                        "inventory": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "characterId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000
+                              },
+                              "weightLbs": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1000000
+                              },
+                              "cost": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100000000000
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 20000
+                              },
+                              "parentId": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uuid"
+                              },
+                              "externalLocation": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "worn": {
+                                "type": "boolean"
+                              },
+                              "equipped": {
+                                "type": "boolean"
+                              },
+                              "isContainer": {
+                                "type": "boolean"
+                              },
+                              "hideawayCapacityLbs": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 1000000
+                              },
+                              "weightReductionPercent": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100
+                              },
+                              "isArmor": {
+                                "type": "boolean"
+                              },
+                              "armor": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "locations": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "default": []
+                                  },
+                                  "dr": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000,
+                                    "default": 0
+                                  },
+                                  "drCrushing": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "flexible": {
+                                    "type": "boolean",
+                                    "default": false
+                                  },
+                                  "frontOnly": {
+                                    "type": "boolean",
+                                    "default": false
+                                  },
+                                  "backOnly": {
+                                    "type": "boolean",
+                                    "default": false
+                                  },
+                                  "notes": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 2000
+                                  }
+                                }
+                              },
+                              "weaponData": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "damage": {
+                                    "type": "string",
+                                    "maxLength": 160
+                                  },
+                                  "reach": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "parry": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "stRequired": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 99
+                                  },
+                                  "notes": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 2000
+                                  }
+                                }
+                              },
+                              "libraryItemId": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uuid"
+                              },
+                              "effectiveWeightLbs": {
+                                "type": "number"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "characterId",
+                              "name",
+                              "quantity",
+                              "weightLbs",
+                              "cost",
+                              "notes",
+                              "parentId",
+                              "externalLocation",
+                              "worn",
+                              "equipped",
+                              "isContainer",
+                              "hideawayCapacityLbs",
+                              "weightReductionPercent",
+                              "isArmor",
+                              "armor",
+                              "weaponData",
+                              "libraryItemId",
+                              "effectiveWeightLbs",
+                              "createdAt",
+                              "updatedAt"
+                            ]
+                          }
+                        },
+                        "combat": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "characterId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "currentHp": {
+                              "type": "integer"
+                            },
+                            "currentFp": {
+                              "type": "integer"
+                            },
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              }
+                            },
+                            "maneuver": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 80
+                            },
+                            "posture": {
+                              "type": "string",
+                              "enum": [
+                                "standing",
+                                "prone",
+                                "kneeling",
+                                "crawling",
+                                "sitting",
+                                "crouching",
+                                "lying"
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "characterId",
+                            "currentHp",
+                            "currentFp",
+                            "conditions",
+                            "maneuver",
+                            "posture",
+                            "createdAt",
+                            "updatedAt"
+                          ]
                         }
                       },
                       "required": [
                         "id",
-                        "characterId",
-                        "currentHp",
-                        "currentFp",
-                        "conditions",
-                        "maneuver",
-                        "posture",
+                        "ownerId",
+                        "name",
+                        "dismissedWarnings",
                         "createdAt",
+                        "updatedAt",
+                        "revision",
+                        "derived",
+                        "points",
+                        "encumbrance",
+                        "warnings",
+                        "traits",
+                        "skills",
+                        "inventory",
+                        "combat"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "minimal"
+                          ]
+                        },
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "ownerId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "campaignId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "playerName": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "height": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "weight": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "age": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "appearance": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "view",
+                        "id",
+                        "ownerId",
+                        "campaignId",
+                        "name",
+                        "playerName",
+                        "height",
+                        "weight",
+                        "age",
+                        "appearance",
+                        "techLevel",
                         "updatedAt"
                       ]
                     }
-                  },
-                  "required": [
-                    "id",
-                    "ownerId",
-                    "name",
-                    "dismissedWarnings",
-                    "createdAt",
-                    "updatedAt",
-                    "revision",
-                    "derived",
-                    "points",
-                    "encumbrance",
-                    "warnings",
-                    "traits",
-                    "skills",
-                    "inventory",
-                    "combat"
                   ]
                 }
               }
@@ -7221,6 +7339,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "view": {
+                      "type": "string",
+                      "enum": [
+                        "full"
+                      ],
+                      "default": "full"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -8183,6 +8308,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "view": {
+                      "type": "string",
+                      "enum": [
+                        "full"
+                      ],
+                      "default": "full"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -9296,6 +9428,13 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "full"
+                          ],
+                          "default": "full"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -10420,6 +10559,13 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "full"
+                          ],
+                          "default": "full"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -11325,6 +11471,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "view": {
+                      "type": "string",
+                      "enum": [
+                        "full"
+                      ],
+                      "default": "full"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -12381,6 +12534,13 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "full"
+                          ],
+                          "default": "full"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -13447,6 +13607,13 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "full"
+                          ],
+                          "default": "full"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -14352,6 +14519,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "view": {
+                      "type": "string",
+                      "enum": [
+                        "full"
+                      ],
+                      "default": "full"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -15592,6 +15766,13 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "full"
+                          ],
+                          "default": "full"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -16844,6 +17025,13 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "full"
+                          ],
+                          "default": "full"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -17749,6 +17937,13 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "view": {
+                      "type": "string",
+                      "enum": [
+                        "full"
+                      ],
+                      "default": "full"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -18755,6 +18950,13 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "view": {
+                          "type": "string",
+                          "enum": [
+                            "full"
+                          ],
+                          "default": "full"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"

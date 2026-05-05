@@ -39,6 +39,7 @@ import {
 import { api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
+import { characterIdsToMinimize } from './minimalViewSweep.ts';
 import {
   MAX_ATTEMPTS,
   backoffMs,
@@ -72,6 +73,14 @@ class SyncOrchestrator {
   private outboxLiveSub: { unsubscribe(): void } | null = null;
   private listeners = new Set<keyof OrchestratorEvents>();
   private cycleListeners = new Set<() => void>();
+  /**
+   * The viewer's user id, captured at bootstrap. Used by
+   * `enforceMinimalViewLocally` to figure out which campaign-shared
+   * characters the viewer is allowed to see in detail. Null until
+   * bootstrap runs (the orchestrator is a singleton; periodic pulls
+   * before bootstrap are no-ops anyway).
+   */
+  private currentUserId: string | null = null;
 
   /** Idempotent.  Wires online/offline + outbox liveQuery + drain loop. */
   start(): void {
@@ -145,6 +154,12 @@ class SyncOrchestrator {
         await this.applyCursorResponse(res);
         hasMore = Object.values(res.hasMore ?? {}).some((v) => v);
       }
+      // After every successful pull, drop any private child rows that
+      // were synced earlier but the viewer is no longer allowed to see
+      // (campaign was just flipped to shareCharacterSheets=false). The
+      // server stops emitting them as upserts; this sweep cleans up
+      // what's already in Dexie.
+      await this.enforceMinimalViewLocally();
       this.fireCycleDone();
       const pending = await countPending();
       this.refreshIndicator(pending);
@@ -160,6 +175,9 @@ class SyncOrchestrator {
    * straight away on subsequent loads.
    */
   async bootstrap(userId: string): Promise<void> {
+    // Captured for `enforceMinimalViewLocally` — the periodic
+    // cursor-pull doesn't otherwise know who's logged in.
+    this.currentUserId = userId;
     const db = getLocalDb();
     const flagKey = `bootstrap:${userId}`;
     const flag = await db.syncMeta.get(flagKey);
@@ -177,6 +195,7 @@ class SyncOrchestrator {
 
   /** Wipe Dexie and reset state -- called on logout. */
   async purge(): Promise<void> {
+    this.currentUserId = null;
     const db = getLocalDb();
     await db.transaction(
       'rw',
@@ -689,6 +708,45 @@ class SyncOrchestrator {
       .toArray()
       .catch(() => [] as RejectionRecord[]);
     for (const r of open) notifyRejection(r);
+  }
+
+  /**
+   * Walk local Dexie state and drop private child rows for any
+   * character the viewer is now restricted to seeing in minimal form.
+   * See `minimalViewSweep.ts` for the pure decision and the rationale
+   * (Codex review on PR #22 — without this, share=false flips leave
+   * already-cached private data reachable in IndexedDB).
+   *
+   * No-op when the orchestrator hasn't captured a user id yet (i.e.
+   * before bootstrap finishes) — the periodic timer races with that
+   * window and we don't want to mis-classify the empty user as
+   * "non-owner non-GM of every campaign."
+   */
+  private async enforceMinimalViewLocally(): Promise<void> {
+    const viewerId = this.currentUserId;
+    if (!viewerId) return;
+    const db = getLocalDb();
+    const [chars, camps] = await Promise.all([db.characters.toArray(), db.campaigns.toArray()]);
+    const ids = characterIdsToMinimize({
+      viewerId,
+      characters: chars,
+      campaigns: camps,
+    });
+    if (ids.size === 0) return;
+    const idArray = [...ids];
+    // One transaction across the four child tables so the purge is
+    // atomic — can't have skills present and traits gone halfway.
+    await db.transaction(
+      'rw',
+      [db.characterTraits, db.characterSkills, db.characterInventory, db.characterCombat],
+      async () => {
+        await db.characterTraits.where('characterId').anyOf(idArray).delete();
+        await db.characterSkills.where('characterId').anyOf(idArray).delete();
+        await db.characterInventory.where('characterId').anyOf(idArray).delete();
+        // Combat is keyed by characterId (1:1).
+        await db.characterCombat.where('id').anyOf(idArray).delete();
+      },
+    );
   }
 
   private fireCycleDone(): void {

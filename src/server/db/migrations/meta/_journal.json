@@ -43,6 +43,13 @@
       "when": 1777864199000,
       "tag": "0005_combat_tombstone_by_character",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778015800298,
+      "tag": "0006_chief_gladiator",
+      "breakpoints": true
     }
   ]
 }

@@ -22,6 +22,7 @@ import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
+import { CharacterMinimalView } from './CharacterMinimalView.tsx';
 import { CombatModal } from './sections/CombatModal.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
@@ -1344,7 +1345,9 @@ function IdentityHero({
 interface CampaignSummary {
   id: string;
   name: string;
+  ownerId: string;
   pointTarget: number | null;
+  shareCharacterSheets: boolean;
 }
 
 export function CharacterSheetPage() {
@@ -1388,6 +1391,40 @@ export function CharacterSheetPage() {
 
   const campaign = campaigns.data?.find((c) => c.id === character.campaignId);
   const pointTarget = campaign?.pointTarget ?? null;
+
+  // Minimal-view gate: when the character belongs to a campaign that
+  // has flipped `shareCharacterSheets` off, members other than the
+  // character's owner and the campaign GM see only the "readily
+  // apparent" identity bits. Owners and GMs always see the full sheet.
+  // Mirrors the server-side gate in `shouldUseMinimalView` so the
+  // local-first path renders consistently with the API contract.
+  const myId = me.data?.id ?? null;
+  const isOwner = myId !== null && myId === character.ownerId;
+  const isGm = myId !== null && campaign != null && myId === campaign.ownerId;
+  const sharesSheets = campaign?.shareCharacterSheets !== false; // undefined → default true
+  if (!isOwner && !isGm && campaign != null && !sharesSheets) {
+    return (
+      <CharacterMinimalView
+        data={{
+          view: 'minimal',
+          id: character.id,
+          ownerId: character.ownerId,
+          // The schema marks `campaignId` optional+nullable, so coerce
+          // `undefined` to null for the minimal-view props (which only
+          // allow string|null).  Same coercion applies to the rest.
+          campaignId: character.campaignId ?? null,
+          name: character.name,
+          playerName: character.playerName ?? null,
+          height: character.height ?? null,
+          weight: character.weight ?? null,
+          age: character.age ?? null,
+          appearance: character.appearance ?? null,
+          techLevel: character.techLevel ?? null,
+          updatedAt: character.updatedAt,
+        }}
+      />
+    );
+  }
 
   const counts: CountByTab = {
     Traits: character.traits.length,

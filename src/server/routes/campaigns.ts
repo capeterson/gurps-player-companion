@@ -58,6 +58,7 @@ function campaignToOut(row: DbCampaign, members: readonly MemberRow[]) {
     pointTarget: row.pointTarget,
     disadvantageCap: row.disadvantageCap,
     quirkCap: row.quirkCap,
+    shareCharacterSheets: row.shareCharacterSheets,
     members: members.map((m) => ({
       userId: m.userId,
       email: m.email,
@@ -162,6 +163,9 @@ router.openapi(
         pointTarget: body.pointTarget ?? null,
         disadvantageCap: body.disadvantageCap ?? null,
         quirkCap: body.quirkCap ?? 5,
+        ...(body.shareCharacterSheets !== undefined
+          ? { shareCharacterSheets: body.shareCharacterSheets }
+          : {}),
       })
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -232,6 +236,9 @@ router.openapi(
         ...(body.pointTarget !== undefined ? { pointTarget: body.pointTarget } : {}),
         ...(body.disadvantageCap !== undefined ? { disadvantageCap: body.disadvantageCap } : {}),
         ...(body.quirkCap !== undefined ? { quirkCap: body.quirkCap } : {}),
+        ...(body.shareCharacterSheets !== undefined
+          ? { shareCharacterSheets: body.shareCharacterSheets }
+          : {}),
         updatedAt: new Date(),
       })
       .where(eq(campaigns.id, id))

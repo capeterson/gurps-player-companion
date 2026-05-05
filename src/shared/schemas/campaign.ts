@@ -23,6 +23,13 @@ export const campaignOut = z.object({
   pointTarget: z.number().int().nullable(),
   disadvantageCap: z.number().int().nullable(),
   quirkCap: z.number().int().nullable(),
+  /**
+   * When false, non-owner members get the minimal "readily apparent"
+   * view of other players' character sheets instead of the full
+   * sheet. Owners and the character's author always see the full
+   * sheet regardless.
+   */
+  shareCharacterSheets: z.boolean(),
   members: z.array(campaignMemberOut),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
@@ -35,6 +42,7 @@ export const campaignCreate = z.object({
   pointTarget: z.number().int().min(0).max(10_000).nullable().optional(),
   disadvantageCap: z.number().int().min(0).max(10_000).nullable().optional(),
   quirkCap: z.number().int().min(0).max(50).nullable().optional(),
+  shareCharacterSheets: z.boolean().optional(),
 });
 
 export const campaignUpdate = campaignCreate.partial();

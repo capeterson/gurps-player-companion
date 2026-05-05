@@ -105,10 +105,18 @@ router.openapi(
     const limit = Math.min(pageSize ?? DEFAULT_CURSOR_PAGE_SIZE, MAX_CURSOR_PAGE_SIZE);
 
     const accessibleCampaignIds: string[] = await listAccessibleCampaignIds(user.id);
-    const accessibleCharacterIds: string[] = await listAccessibleCharacterIds(
-      user.id,
-      accessibleCampaignIds,
-    );
+    const characterAccess = await loadCharacterAccess(user.id, accessibleCampaignIds);
+    // Every character the viewer can see at all (full or minimal). Used
+    // for the `character` upsert query — minimal rows are projected to
+    // public-only columns before being emitted (see `projectCharacterRow`).
+    const accessibleCharacterIds: string[] = [...characterAccess.keys()];
+    // Subset that the viewer is allowed to see in detail. Child entity
+    // classes (traits / skills / inventory / combat) are scoped to this
+    // list so a non-GM member of a campaign with shareCharacterSheets=false
+    // doesn't pull other players' private rows down to IndexedDB.
+    const fullAccessCharacterIds: string[] = [...characterAccess.entries()]
+      .filter(([, mode]) => mode === 'full')
+      .map(([id]) => id);
 
     const changes: SyncCursorChange[] = [];
     const hasMore: Partial<Record<EntityClass, boolean>> = {};
@@ -121,6 +129,8 @@ router.openapi(
         limit,
         userId: user.id,
         accessibleCharacterIds,
+        fullAccessCharacterIds,
+        characterAccess,
         accessibleCampaignIds,
       });
       for (const change of slice.changes) changes.push(change);
@@ -159,17 +169,100 @@ async function listAccessibleCampaignIds(userId: string): Promise<string[]> {
   return rows.map((r) => r.id);
 }
 
-async function listAccessibleCharacterIds(
+export type CharacterAccessMode = 'full' | 'minimal';
+
+export interface CharacterAccessInputCharacter {
+  readonly id: string;
+  readonly ownerId: string;
+  readonly campaignId: string | null;
+}
+
+export interface CharacterAccessInputCampaign {
+  readonly id: string;
+  readonly ownerId: string;
+  readonly shareCharacterSheets: boolean;
+}
+
+/**
+ * Pure decision for "what level of detail can `viewerId` pull for
+ * each character via /sync/cursor?"  Extracted so the sync gate is
+ * unit-testable without standing up Postgres.
+ *
+ *   `full`    — owner, campaign GM (campaign owner), or member of a
+ *               campaign with shareCharacterSheets=true.
+ *   `minimal` — non-GM member of a campaign with shareCharacterSheets=false.
+ *
+ * Owner and GM checks short-circuit `share`, so toggling the campaign
+ * flag never restricts the GM's own visibility.  Mirrors the
+ * `shouldUseMinimalView` gate on `GET /characters/{id}`.
+ *
+ * Characters whose campaignId is null and aren't owned by the viewer
+ * are NOT included in the result — `listAccessibleCampaignIds` should
+ * never have surfaced them in the first place, but we defend anyway.
+ */
+export function decideCharacterAccess(args: {
+  viewerId: string;
+  characters: readonly CharacterAccessInputCharacter[];
+  campaigns: readonly CharacterAccessInputCampaign[];
+}): Map<string, CharacterAccessMode> {
+  const campaignById = new Map<string, CharacterAccessInputCampaign>();
+  for (const c of args.campaigns) campaignById.set(c.id, c);
+
+  const out = new Map<string, CharacterAccessMode>();
+  for (const r of args.characters) {
+    if (r.ownerId === args.viewerId) {
+      out.set(r.id, 'full');
+      continue;
+    }
+    if (r.campaignId === null) continue;
+    const camp = campaignById.get(r.campaignId);
+    if (!camp) continue;
+    if (camp.ownerId === args.viewerId) {
+      out.set(r.id, 'full');
+      continue;
+    }
+    out.set(r.id, camp.shareCharacterSheets ? 'full' : 'minimal');
+  }
+  return out;
+}
+
+async function loadCharacterAccess(
   userId: string,
   campaignIds: string[],
-): Promise<string[]> {
+): Promise<Map<string, CharacterAccessMode>> {
   const db = getDb();
   const where =
     campaignIds.length === 0
       ? eq(characters.ownerId, userId)
       : or(eq(characters.ownerId, userId), inArray(characters.campaignId, [...campaignIds]));
-  const rows = await db.select({ id: characters.id }).from(characters).where(where);
-  return rows.map((r) => r.id);
+  const rows = await db
+    .select({
+      id: characters.id,
+      ownerId: characters.ownerId,
+      campaignId: characters.campaignId,
+    })
+    .from(characters)
+    .where(where);
+
+  const relevantCampaignIds = [
+    ...new Set(rows.map((r) => r.campaignId).filter((id): id is string => id !== null)),
+  ];
+  let campaignRows: CharacterAccessInputCampaign[] = [];
+  if (relevantCampaignIds.length > 0) {
+    campaignRows = await db
+      .select({
+        id: campaigns.id,
+        ownerId: campaigns.ownerId,
+        shareCharacterSheets: campaigns.shareCharacterSheets,
+      })
+      .from(campaigns)
+      .where(inArray(campaigns.id, relevantCampaignIds));
+  }
+  return decideCharacterAccess({
+    viewerId: userId,
+    characters: rows,
+    campaigns: campaignRows,
+  });
 }
 
 interface FetchArgs {
@@ -177,7 +270,11 @@ interface FetchArgs {
   readonly sinceRevision: number;
   readonly limit: number;
   readonly userId: string;
+  /** Every character the viewer can see (full + minimal). */
   readonly accessibleCharacterIds: string[];
+  /** Subset where the viewer can see private child rows. */
+  readonly fullAccessCharacterIds: string[];
+  readonly characterAccess: Map<string, CharacterAccessMode>;
   readonly accessibleCampaignIds: string[];
 }
 
@@ -188,7 +285,15 @@ interface FetchResult {
 }
 
 async function fetchClassChanges(args: FetchArgs): Promise<FetchResult> {
-  const { entityClass, sinceRevision, limit, userId, accessibleCharacterIds } = args;
+  const {
+    entityClass,
+    sinceRevision,
+    limit,
+    userId,
+    accessibleCharacterIds,
+    fullAccessCharacterIds,
+    characterAccess,
+  } = args;
   const db = getDb();
 
   // Always pull tombstones for this class first so the merged result
@@ -224,6 +329,8 @@ async function fetchClassChanges(args: FetchArgs): Promise<FetchResult> {
     limit,
     userId,
     accessibleCharacterIds,
+    fullAccessCharacterIds,
+    characterAccess,
   });
 
   const merged: SyncCursorChange[] = [
@@ -253,8 +360,18 @@ async function fetchClassUpserts(args: {
   limit: number;
   userId: string;
   accessibleCharacterIds: string[];
+  fullAccessCharacterIds: string[];
+  characterAccess: Map<string, CharacterAccessMode>;
 }): Promise<SyncCursorChange[]> {
-  const { entityClass, sinceRevision, limit, userId, accessibleCharacterIds } = args;
+  const {
+    entityClass,
+    sinceRevision,
+    limit,
+    userId,
+    accessibleCharacterIds,
+    fullAccessCharacterIds,
+    characterAccess,
+  } = args;
   const db = getDb();
 
   switch (entityClass) {
@@ -272,7 +389,16 @@ async function fetchClassUpserts(args: {
         )
         .orderBy(asc(characters.revision))
         .limit(limit);
-      return rows.map((row) => upsertChange('character', row.id, Number(row.revision), row));
+      return rows.map((row) => {
+        // For characters the viewer is only allowed to see in minimal
+        // form, blank out every private column before emission so the
+        // viewer's IndexedDB can't be used to recover hidden stats /
+        // notes / dismissed warnings.  The owner column stays so the
+        // client's `shouldUseMinimalView`-equivalent gate works.
+        const access = characterAccess.get(row.id) ?? 'full';
+        const projected = access === 'minimal' ? projectCharacterRow(row) : row;
+        return upsertChange('character', row.id, Number(row.revision), projected);
+      });
     }
     case 'character_trait':
       return await fetchChildClass({
@@ -281,7 +407,7 @@ async function fetchClassUpserts(args: {
         idCol: characterTraits.id,
         revisionCol: characterTraits.revision,
         characterIdCol: characterTraits.characterId,
-        accessibleCharacterIds,
+        accessibleCharacterIds: fullAccessCharacterIds,
         sinceRevision,
         limit,
       });
@@ -292,7 +418,7 @@ async function fetchClassUpserts(args: {
         idCol: characterSkills.id,
         revisionCol: characterSkills.revision,
         characterIdCol: characterSkills.characterId,
-        accessibleCharacterIds,
+        accessibleCharacterIds: fullAccessCharacterIds,
         sinceRevision,
         limit,
       });
@@ -303,7 +429,7 @@ async function fetchClassUpserts(args: {
         idCol: inventoryItems.id,
         revisionCol: inventoryItems.revision,
         characterIdCol: inventoryItems.characterId,
-        accessibleCharacterIds,
+        accessibleCharacterIds: fullAccessCharacterIds,
         sinceRevision,
         limit,
       });
@@ -321,7 +447,7 @@ async function fetchClassUpserts(args: {
         revisionCol: combatStates.revision,
         characterIdCol: combatStates.characterId,
         entityIdField: 'characterId',
-        accessibleCharacterIds,
+        accessibleCharacterIds: fullAccessCharacterIds,
         sinceRevision,
         limit,
       });
@@ -394,6 +520,50 @@ function upsertChange(
     command: 'patch',
     revision,
     data: serializeRow(data),
+  };
+}
+
+/**
+ * Project a character row down to the public "readily apparent" columns
+ * for sync emission to a non-GM viewer of a campaign with
+ * shareCharacterSheets=false. The viewer's IndexedDB will receive a row
+ * with the right id / ownerId / campaignId / public identity bits, but
+ * with private fields blanked to safe defaults so derived stats and
+ * personal notes can't be reconstructed locally.
+ *
+ * Owner+ownerId stays so the client-side gate (`shouldUseMinimalView`
+ * mirror in CharacterSheetPage) recognises this as someone else's
+ * character and renders the minimal view instead of the full sheet.
+ */
+function projectCharacterRow(row: DbCharacter): DbCharacter {
+  return {
+    ...row,
+    // Stat defaults so the row stays schema-valid (notNull columns).
+    // The minimal view never reads these, but if a future code path
+    // ever falls through to buildCharacterDetail with this row it
+    // produces a "10/10/10/10 baseline character" rather than leaking
+    // the real numbers.
+    st: 10,
+    dx: 10,
+    iq: 10,
+    ht: 10,
+    hpMod: 0,
+    willMod: 0,
+    perMod: 0,
+    fpMod: 0,
+    speedQuarterMod: 0,
+    moveMod: 0,
+    tempSt: 0,
+    tempDx: 0,
+    tempIq: 0,
+    tempHt: 0,
+    tempHpMod: 0,
+    tempWillMod: 0,
+    tempPerMod: 0,
+    tempFpMod: 0,
+    tempSpeedQuarterMod: 0,
+    tempMoveMod: 0,
+    dismissedWarnings: [],
   };
 }
 

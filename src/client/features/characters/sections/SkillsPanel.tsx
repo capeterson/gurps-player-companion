@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
+import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
@@ -10,6 +12,7 @@ import {
   enqueueFieldPatch,
   newClientId,
 } from '../../../sync/outbox.ts';
+import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per', 'Other'] as const;
 const DIFFICULTIES = ['E', 'A', 'H', 'VH'] as const;
@@ -18,6 +21,7 @@ type SkillDifficulty = (typeof DIFFICULTIES)[number];
 
 interface AddSkillFormProps {
   characterId: string;
+  campaignId: string | null;
   canWrite: boolean;
 }
 
@@ -28,15 +32,19 @@ interface SkillSnapshot {
   difficulty: SkillDifficulty;
   points: number;
   pointsRaw: string;
+  librarySkillId: string | null;
 }
 
-function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
+function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) {
   const toasts = useToasts();
   const [name, setName] = useState('');
   const [attribute, setAttribute] = useState<SkillAttribute>('DX');
   const [difficulty, setDifficulty] = useState<SkillDifficulty>('A');
   const [points, setPoints] = useState('1');
   const [creating, setCreating] = useState(false);
+  const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
+
+  const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
 
   async function submit(snap: SkillSnapshot) {
     setCreating(true);
@@ -52,6 +60,7 @@ function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
           difficulty: snap.difficulty,
           points: snap.points,
           characterId,
+          ...(snap.librarySkillId ? { librarySkillId: snap.librarySkillId } : {}),
         },
       });
       // Per AGENTS.md (rule 1: never silently discard user edits): only
@@ -60,6 +69,7 @@ function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
       // this enqueue was in flight, leave that draft alone.
       if (name === snap.nameRaw) setName('');
       if (points === snap.pointsRaw) setPoints('1');
+      setPickedLibraryId(null);
     } catch (err) {
       toasts.push(`Couldn't add skill — ${(err as Error).message}`, { kind: 'error' });
     } finally {
@@ -83,18 +93,50 @@ function AddSkillForm({ characterId, canWrite }: AddSkillFormProps) {
           difficulty,
           points: Number.isFinite(pParsed) && pParsed >= 0 ? pParsed : 1,
           pointsRaw: points,
+          librarySkillId: pickedLibraryId,
         });
       }}
     >
-      <label className="form-control flex-1 min-w-[10rem]">
-        <span className="label-text text-xs">Skill</span>
-        <input
-          className="input input-bordered input-sm"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Broadsword"
-        />
-      </label>
+      <div className="form-control flex-1 min-w-[10rem]">
+        <span className="label-text text-xs" id="add-skill-name-label">
+          Skill
+        </span>
+        {campaignId ? (
+          <LibraryAutocomplete<LibrarySkillOut>
+            value={name}
+            onChange={(v) => {
+              setName(v);
+              setPickedLibraryId(null);
+            }}
+            onPick={(opt) => {
+              setName(opt.name);
+              setAttribute(opt.attribute as SkillAttribute);
+              setDifficulty(opt.difficulty as SkillDifficulty);
+              setPickedLibraryId(opt.id);
+            }}
+            fetchOptions={fetchOptions}
+            getOptionKey={(o) => o.id}
+            renderOption={(o) => (
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="truncate">{o.name}</span>
+                <span className="num text-xs text-base-content/70">
+                  {o.attribute}/{o.difficulty}
+                </span>
+              </span>
+            )}
+            placeholder="e.g. Broadsword"
+            inputProps={{ 'aria-labelledby': 'add-skill-name-label' }}
+          />
+        ) : (
+          <input
+            aria-labelledby="add-skill-name-label"
+            className="input input-bordered input-sm"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Broadsword"
+          />
+        )}
+      </div>
       <label className="form-control">
         <span className="label-text text-xs">Attr</span>
         <select
@@ -251,7 +293,11 @@ export function SkillsPanel({
         </p>
       </header>
 
-      <AddSkillForm characterId={character.id} canWrite={canWrite} />
+      <AddSkillForm
+        characterId={character.id}
+        campaignId={character.campaignId ?? null}
+        canWrite={canWrite}
+      />
 
       {character.skills.length === 0 ? (
         <p className="text-sm text-base-content/60">No skills yet.</p>
