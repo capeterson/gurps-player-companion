@@ -79,7 +79,7 @@ function intParser(min: number, max: number) {
  */
 function scaledIntParser(scale: number, min: number, max: number) {
   return (s: string): number => {
-    const f = parseFloat(s);
+    const f = Number.parseFloat(s);
     if (!Number.isFinite(f)) throw new Error('number only');
     const n = Math.round(f / scale);
     const lo = (min * scale).toFixed(2);
