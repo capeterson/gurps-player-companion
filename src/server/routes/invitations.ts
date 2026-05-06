@@ -317,10 +317,20 @@ router.openapi(
     if (row.status !== 'pending') {
       throw new HTTPException(409, { message: `invitation is ${row.status}, not pending` });
     }
-    await db
+    // Conditional update: another decider (accept / reject / a parallel
+    // cancel) may have flipped the row between the read above and this
+    // write. Including `status='pending'` in the predicate makes the
+    // update atomic; a zero-row result means we lost the race.
+    const updated = await db
       .update(campaignInvitations)
       .set({ status: 'cancelled', decidedAt: new Date(), updatedAt: new Date() })
-      .where(eq(campaignInvitations.id, invitationId));
+      .where(
+        and(eq(campaignInvitations.id, invitationId), eq(campaignInvitations.status, 'pending')),
+      )
+      .returning({ id: campaignInvitations.id });
+    if (updated.length === 0) {
+      throw new HTTPException(409, { message: 'invitation already decided' });
+    }
     await markInvitationNotificationsRead(invitationId);
     return c.body(null, 204);
   },
@@ -400,7 +410,26 @@ router.openapi(
         message: `invitation is ${invitation.status}, not pending`,
       });
     }
-    await db.transaction(async (tx) => {
+    // Wrap the whole accept flow in a transaction.  We start with
+    // SELECT ... FOR UPDATE to acquire a row-level write lock — any
+    // concurrent decider (accept / reject / cancel) blocks until we
+    // commit, then re-reads and observes the new terminal status.
+    // The conditional UPDATE on top is belt-and-braces (and lets the
+    // 0-rows return short-circuit cleanly if a writer somehow snuck in).
+    const flipped = await db.transaction(async (tx) => {
+      const lockedRows = await tx
+        .select()
+        .from(campaignInvitations)
+        .where(eq(campaignInvitations.id, invitationId))
+        .for('update');
+      const locked = lockedRows[0];
+      if (!locked || locked.status !== 'pending') return false;
+
+      await tx
+        .update(campaignInvitations)
+        .set({ status: 'accepted', decidedAt: new Date(), updatedAt: new Date() })
+        .where(eq(campaignInvitations.id, invitationId));
+
       // Existing membership wins on conflict — we patch its role to the
       // invited role if they differ.
       const existingMember = await tx
@@ -426,11 +455,11 @@ router.openapi(
           role: invitation.role,
         });
       }
-      await tx
-        .update(campaignInvitations)
-        .set({ status: 'accepted', decidedAt: new Date(), updatedAt: new Date() })
-        .where(eq(campaignInvitations.id, invitationId));
+      return true;
     });
+    if (!flipped) {
+      throw new HTTPException(409, { message: 'invitation already decided' });
+    }
     await markInvitationNotificationsRead(invitationId);
     const out = await loadInvitationOut(invitationId);
     if (!out) throw new HTTPException(500, { message: 'invitation vanished' });
@@ -474,10 +503,18 @@ router.openapi(
         message: `invitation is ${invitation.status}, not pending`,
       });
     }
-    await db
+    // Same conditional-update pattern as cancel/accept: zero rows means
+    // a parallel decision already terminated the invitation.
+    const updated = await db
       .update(campaignInvitations)
       .set({ status: 'rejected', decidedAt: new Date(), updatedAt: new Date() })
-      .where(eq(campaignInvitations.id, invitationId));
+      .where(
+        and(eq(campaignInvitations.id, invitationId), eq(campaignInvitations.status, 'pending')),
+      )
+      .returning({ id: campaignInvitations.id });
+    if (updated.length === 0) {
+      throw new HTTPException(409, { message: 'invitation already decided' });
+    }
     await markInvitationNotificationsRead(invitationId);
     const out = await loadInvitationOut(invitationId);
     if (!out) throw new HTTPException(500, { message: 'invitation vanished' });
