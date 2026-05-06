@@ -11,7 +11,7 @@ import { adminApi } from '../../lib/admin.ts';
 
 const PAGE_SIZE = 50;
 
-export function AdminCampaignsPage() {
+export function CampaignsPage() {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(0);
   const offset = page * PAGE_SIZE;

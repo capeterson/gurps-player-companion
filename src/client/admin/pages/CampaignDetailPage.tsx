@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { adminApi } from '../../lib/admin.ts';
 
-export function AdminCampaignDetailPage() {
+export function CampaignDetailPage() {
   const { id } = useParams<{ id: string }>();
   const detail = useQuery({
     queryKey: ['admin', 'campaign', id],
@@ -106,9 +106,10 @@ export function AdminCampaignDetailPage() {
           <ul className="space-y-1 text-sm">
             {c.characters.map((ch) => (
               <li key={ch.id} className="flex justify-between gap-3">
-                <Link to={`/characters/${ch.id}`} className="link link-primary truncate">
+                {/* Cross-bundle: character sheets live in the player app. */}
+                <a href={`/characters/${ch.id}`} className="link link-primary truncate">
                   {ch.name}
-                </Link>
+                </a>
                 <span className="text-base-content/40">
                   {new Date(ch.createdAt).toLocaleDateString()}
                 </span>

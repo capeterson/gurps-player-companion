@@ -11,7 +11,7 @@ import { adminApi } from '../../lib/admin.ts';
 import { ApiError } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
 
-export function AdminUserDetailPage() {
+export function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const toasts = useToasts();
@@ -158,9 +158,10 @@ export function AdminUserDetailPage() {
           <ul className="space-y-1 text-sm">
             {u.characters.map((ch) => (
               <li key={ch.id} className="flex justify-between gap-3">
-                <Link to={`/characters/${ch.id}`} className="link link-primary truncate">
+                {/* Cross-bundle: character sheets live in the player app. */}
+                <a href={`/characters/${ch.id}`} className="link link-primary truncate">
                   {ch.name}
-                </Link>
+                </a>
                 <span className="text-base-content/40">
                   {new Date(ch.createdAt).toLocaleDateString()}
                 </span>

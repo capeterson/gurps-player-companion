@@ -4,10 +4,6 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
-import { AdminCampaignDetailPage } from './features/admin/AdminCampaignDetailPage.tsx';
-import { AdminCampaignsPage } from './features/admin/AdminCampaignsPage.tsx';
-import { AdminUserDetailPage } from './features/admin/AdminUserDetailPage.tsx';
-import { AdminUsersPage } from './features/admin/AdminUsersPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
@@ -57,10 +53,6 @@ const router = createBrowserRouter([
           { path: '/log', element: <LogPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/settings', element: <SettingsPage /> },
-          { path: '/admin/users', element: <AdminUsersPage /> },
-          { path: '/admin/users/:id', element: <AdminUserDetailPage /> },
-          { path: '/admin/campaigns', element: <AdminCampaignsPage /> },
-          { path: '/admin/campaigns/:id', element: <AdminCampaignDetailPage /> },
         ],
       },
     ],

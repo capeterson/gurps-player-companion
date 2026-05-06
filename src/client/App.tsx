@@ -198,11 +198,14 @@ export function App() {
                   <li className="menu-title px-3 pt-2">
                     <span>Admin</span>
                   </li>
+                  {/* Hard-anchor: admin lives in a separate Vite entry
+                      (see src/client/admin/main.tsx) so SPA Link won't
+                      cross the bundle boundary. */}
                   <li>
-                    <Link to="/admin/users">Users</Link>
+                    <a href="/admin/users">Users</a>
                   </li>
                   <li>
-                    <Link to="/admin/campaigns">Campaigns</Link>
+                    <a href="/admin/campaigns">Campaigns</a>
                   </li>
                 </>
               )}
