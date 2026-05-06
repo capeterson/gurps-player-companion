@@ -79,6 +79,172 @@ The `useDraftField` test file is the working reference.
 - **WebSockets are acceleration, not correctness.** The HTTP sync
   cursor + outbox replay is the source of truth.
 
+## Offline sync — extension rules
+
+The offline sync system (Dexie + outbox + orchestrator + `/sync/*`) is
+load-bearing for the entire UX promise: edits never disappear, the
+indicator is honest, and rollbacks are visible. Future code that adds
+or modifies sync behaviour MUST follow these rules. Each rule has been
+broken at least once; assume the comment in the file already warns you.
+
+### S0. Know what's actually sync-backed.
+
+The outbox + cursor system currently covers only the character
+classes: `character`, `character_trait`, `character_skill`,
+`character_inventory`, `character_combat`. Campaigns, the campaign
+library (traits/skills/items), adventure log entries, invitations,
+and notifications are still online-only HTTP/React-Query surfaces.
+The `entityClass` enum lists more values than the orchestrator
+currently pulls — that's intentional headroom for future migration,
+not a claim of current coverage. The authoritative list is
+`ALL_ENTITY_CLASSES` in
+[src/client/sync/orchestrator.ts](src/client/sync/orchestrator.ts).
+
+When working on an existing surface, check whether it's sync-backed
+before assuming offline behaviour. When migrating a surface onto the
+outbox, follow the S6 checklist end-to-end.
+
+### S1. Mutations on sync-backed classes go through the outbox. Always.
+
+For any sync-backed class (S0), UI handlers MUST call
+`enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in
+[src/client/sync/outbox.ts](src/client/sync/outbox.ts). Direct
+`fetch('/api/v1/...')` for mutations on those classes is forbidden.
+The orchestrator is the only module allowed to talk to `/sync/*`.
+This is what guarantees:
+
+- the local row and the queued op land in one Dexie transaction,
+- the indicator counts the work,
+- offline mode and online mode use the same code path,
+- coalescing applies (rule S3).
+
+If you find yourself wanting to write a new fetch in a mutation
+handler for a sync-backed class, you are on the wrong path — extend
+the outbox helpers instead. Surfaces that have not yet been migrated
+(see S0) keep using React Query for now.
+
+### S2. Patches carry raw field values, never wrapped objects.
+
+`attemptedValue` and `prevValue` on a `patch` op are the *bare value*
+of `fieldPath`. The orchestrator's rollback path writes `prevValue`
+straight back into the local row, so wrapping it as
+`{ characterId, value }` corrupts the field on revert. Parent
+character ids belong on the top-level `parentId` field of the
+envelope, not nested inside the value.
+
+### S3. Same-field commits coalesce; never stack pending patches.
+
+The outbox has a `coalesceKey` index of `${entityId}|${fieldPath}`.
+When a `pending` or `transient_retry` op already exists for that key,
+`enqueueFieldPatch` deletes it and inserts the latest. Do not
+introduce a code path that appends a second pending patch for the same
+field — it would replay an old value over a newer one.
+
+`create` and `delete` ops are never coalesced. Don't add a "merge two
+creates" code path; it doesn't compose with parent/child ordering.
+
+### S4. The server cursor never overwrites local intent.
+
+`applyServerRow` skips any field that has a `pending` or `in_flight`
+outbox op for the same `(entityId, fieldPath)`. If you add a new
+write-back path (a new entity class, a new bulk-apply path, a hot-path
+optimisation), it MUST honour the same skip. The local user's typed
+value wins until the server formally rejects it. Re-syncing a whole
+draft state from a server cache on every refetch is the bug this rule
+exists to prevent.
+
+### S5. Rollbacks must fire **both** a toast and a flash.
+
+When an op is rejected, conflicted, stale-based, or unauthorized:
+
+1. Persist a `RejectionRecord` in `rejectionToasts` and call the
+   `RejectionNotifier` so the toast survives a reload, AND
+2. Emit a `flashBus` event keyed by
+   `${entityClass}:${entityId}:${fieldPath}` so the input that caused
+   it pulses.
+
+A toast without the flash leaves the user hunting for the field; a
+flash without the toast leaves them guessing why. Inputs subscribe to
+the flash bus through `useDraftField`'s `flashKey` option — pass it
+whenever you build a new draft-on-blur input.
+
+### S6. Adding an entity class is a multi-site change.
+
+A new sync-participating entity class MUST be added to **all** of:
+
+1. `entityClass` enum in [src/shared/schemas/sync.ts](src/shared/schemas/sync.ts).
+2. A Dexie store + `LocalFoo` interface in
+   [src/client/db/dexie.ts](src/client/db/dexie.ts), with `id` and
+   `revision` columns. Add it to `ALL_STORE_NAMES` and
+   `storeForEntityClass`.
+3. The orchestrator's per-class switches:
+   `applyServerRow`, `revertField`, `deleteLocal`, `reinsertLocal`,
+   `stampRevision`, and `ALL_ENTITY_CLASSES`.
+4. The outbox helpers' switches: `storesForOp`, `applyLocalPatch`,
+   `applyLocalCreate`, `applyLocalDelete`, `readFieldValue`,
+   `readEntityRevision`, and `parentIdFor` if the new class is a
+   child entity.
+5. The server dispatcher in
+   [src/server/services/syncDispatch.ts](src/server/services/syncDispatch.ts)
+   and the cursor reader in
+   [src/server/routes/sync.ts](src/server/routes/sync.ts).
+6. The purge list in `orchestrator.purge` so logout wipes it.
+
+A class registered in the schema but missing from any of these is a
+silent data-loss bug. There is no automatic registry; review the
+checklist.
+
+### S7. Speculative creates use client-generated UUIDs and `revision: -1`.
+
+Optimistic creates write a Dexie row with the client's uuid and
+`revision: -1`, post that same id to `/sync/operations`, and let the
+server adopt it. Do not generate ids server-side and round-trip to get
+them — the UI must render the new row immediately. The orchestrator
+overwrites the sentinel revision when the server returns `applied`.
+
+### S8. WebSocket frames carry no row data.
+
+The WS push channel is invalidation-only — frames are
+`sync_invalidate` nudges that prompt the orchestrator to drain or
+pull. Do not add a path that streams entity payloads over WS, and do
+not let the UI react to a WS frame except by triggering the standard
+sync cycle. Correctness comes from the cursor pull and the outbox; WS
+is performance only.
+
+### S9. Logout purges every local store. New tables MUST be added.
+
+`orchestrator.purge` clears Dexie on logout so account switching never
+leaks rows into a `useLiveQuery`. Any new table you add MUST be
+included in the purge transaction. The same applies to any new
+per-user metadata key in `syncMeta`.
+
+### S10. Use `useDraftField` for editable inputs. Don't reinvent.
+
+[src/client/hooks/useDraftField.ts](src/client/hooks/useDraftField.ts)
+is the canonical draft-on-blur pattern. It implements interaction
+rules 1 and 2 (queue same-field commits, sync per-field from the
+server only when clean, fire toast + flash on rollback, subscribe to
+the flash bus). New editable inputs reuse it — do not write a second
+draft pattern, and do not bypass it for "just this one place." If
+the hook is missing a feature you need, extend it; do not fork.
+
+### S11. Tests for any new sync surface.
+
+A new outbox path, entity class, or draft input MUST have tests for:
+
+- success (op applies, indicator returns to `synced`),
+- server rejection (Dexie reverts, toast persisted, flash fired),
+- a slow same-field follow-up (queues and fires after the first
+  settles, with the user's later value winning),
+- a slow different-field follow-up (lands without being clobbered
+  when the first save returns),
+- and for cursor-pull paths: a server row with a stale field for
+  which the client has a pending outbox op (local value MUST be
+  preserved).
+
+The `useDraftField`, `outbox`, and orchestrator test files are the
+working references.
+
 ## Dev environment
 
 - Bun is run inside Docker (see `docker-compose.dev.yml`). There is no
