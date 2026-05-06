@@ -21,7 +21,7 @@ interface TempBoostPopoverProps {
   onApply: (next: number) => void;
   onClose: () => void;
   /** Multiply stored integer values by this scale for display (e.g. 0.25 for Speed quarter-units). */
-  displayScale?: number;
+  displayScale?: number | undefined;
 }
 
 export function TempBoostPopover({

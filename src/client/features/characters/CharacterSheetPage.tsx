@@ -202,7 +202,7 @@ function TempBoostButton({
   baseValue: number;
   tempValue: number;
   characterId: string;
-  displayScale?: number;
+  displayScale?: number | undefined;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
   const { onSave, flashKey } = buildSave(field, { humanName: `${label} temp` });
