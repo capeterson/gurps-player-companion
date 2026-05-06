@@ -72,6 +72,23 @@ function intParser(min: number, max: number) {
   };
 }
 
+/**
+ * Like intParser but the underlying value is stored in raw integer units
+ * while the user-facing input shows values multiplied by `scale`.
+ * e.g. scale=0.25 lets the user type "1.25" while storing the integer 5.
+ */
+function scaledIntParser(scale: number, min: number, max: number) {
+  return (s: string): number => {
+    const f = parseFloat(s);
+    if (!Number.isFinite(f)) throw new Error('number only');
+    const n = Math.round(f / scale);
+    const lo = (min * scale).toFixed(2);
+    const hi = (max * scale).toFixed(2);
+    if (n < min || n > max) throw new Error(`must be between ${lo} and ${hi}`);
+    return n;
+  };
+}
+
 function nullableTextParser(s: string): string | null {
   const t = s.trim();
   return t.length === 0 ? null : t;
@@ -121,6 +138,8 @@ interface AttrInputProps {
   width: string;
   /** "lg" renders a bordered input; "sm" renders a borderless inline number. */
   size?: 'lg' | 'sm';
+  /** Scale factor for display (e.g. 0.25 converts stored quarter-units to decimal). */
+  displayScale?: number | undefined;
 }
 
 function AttrInput({
@@ -133,6 +152,7 @@ function AttrInput({
   max,
   width,
   size = 'lg',
+  displayScale = 1,
 }: AttrInputProps) {
   // Use the bundled saver so the input subscribes to the flashBus on
   // its own key.  Without `flashKey` an async server rejection would
@@ -142,20 +162,22 @@ function AttrInput({
   const draft = useDraftField<number>({
     name: label,
     serverValue: value,
-    parse: intParser(min, max),
+    format: (v) => (displayScale !== 1 ? (v * displayScale).toFixed(2) : String(v)),
+    parse: displayScale !== 1 ? scaledIntParser(displayScale, min, max) : intParser(min, max),
     ...fieldSave,
   });
   if (!canWrite) {
+    const display = displayScale !== 1 ? (value * displayScale).toFixed(2) : String(value);
     if (size === 'sm') {
       return (
         <span className="num" aria-label={label}>
-          {value}
+          {display}
         </span>
       );
     }
     return (
       <span className="num text-xl font-semibold" aria-label={label}>
-        {value}
+        {display}
       </span>
     );
   }
@@ -425,23 +447,18 @@ function SecondaryModCell({
               {derivedDisplay ?? derived}
             </span>
             <span className="num text-[11px] text-base-content/60 flex items-baseline gap-0.5">
-              {!canWrite && modScale ? (
-                <span className="num" aria-label={`${label} mod`}>
-                  {fmtMod(modValue)}
-                </span>
-              ) : (
-                <AttrInput
-                  label={`${label} mod`}
-                  field={modField}
-                  value={modValue}
-                  characterId={characterId}
-                  canWrite={canWrite}
-                  min={-50}
-                  max={50}
-                  width="w-9"
-                  size="sm"
-                />
-              )}
+              <AttrInput
+                label={`${label} mod`}
+                field={modField}
+                value={modValue}
+                characterId={characterId}
+                canWrite={canWrite}
+                min={-50}
+                max={50}
+                width="w-9"
+                size="sm"
+                displayScale={modScale}
+              />
               <span className="text-warning">{fmtDelta(tempValue)}</span>
             </span>
           </>
@@ -450,23 +467,18 @@ function SecondaryModCell({
             <span className="num text-xl font-semibold">{derivedDisplay ?? derived}</span>
             <span className="num text-[11px] text-base-content/60 flex items-baseline gap-1">
               <span>mod</span>
-              {!canWrite && modScale ? (
-                <span className="num" aria-label={`${label} mod`}>
-                  {fmtMod(modValue)}
-                </span>
-              ) : (
-                <AttrInput
-                  label={`${label} mod`}
-                  field={modField}
-                  value={modValue}
-                  characterId={characterId}
-                  canWrite={canWrite}
-                  min={-50}
-                  max={50}
-                  width="w-9"
-                  size="sm"
-                />
-              )}
+              <AttrInput
+                label={`${label} mod`}
+                field={modField}
+                value={modValue}
+                characterId={characterId}
+                canWrite={canWrite}
+                min={-50}
+                max={50}
+                width="w-9"
+                size="sm"
+                displayScale={modScale}
+              />
             </span>
           </>
         )}

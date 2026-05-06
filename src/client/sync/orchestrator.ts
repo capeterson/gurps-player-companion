@@ -425,6 +425,14 @@ class SyncOrchestrator {
                   flashKey: op.flashKey,
                   characterId: op.parentId ?? undefined,
                 });
+              } else {
+                // Refresh the superseding op so Guard 1 passes on its next
+                // drain: its prevValue was captured against an intermediate
+                // optimistic Dexie state, not the server's current value.
+                await db.outbox.update(newerPending.clientOpId, {
+                  baseRevision: newRevision,
+                  prevValue: entity[op.fieldPath],
+                });
               }
               break;
             }
