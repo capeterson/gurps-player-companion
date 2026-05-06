@@ -71,7 +71,7 @@ export function CampaignsPage() {
 
       {showCreate && (
         <form
-          className="card grid gap-3 p-card sm:grid-cols-[minmax(16rem,28rem)_auto] sm:items-end"
+          className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             const trimmed = name.trim();
@@ -79,27 +79,32 @@ export function CampaignsPage() {
             create.mutate({ name: trimmed });
           }}
         >
-          <label className="form-control">
-            <span className="label-text">Campaign name</span>
+          <div className="flex flex-col gap-1 flex-1 min-w-[200px] max-w-sm">
+            <label className="label-text text-xs" htmlFor="new-campaign-name">
+              Campaign name
+            </label>
             <input
+              id="new-campaign-name"
               type="text"
-              className="input input-bordered"
+              className="input input-sm input-bordered"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
                 if (createError) setCreateError(null);
               }}
               placeholder="Ashes of the Vale"
+              // biome-ignore lint/a11y/noAutofocus: user just clicked "+ New campaign"
+              autoFocus
             />
-          </label>
+          </div>
           <button
             type="submit"
-            className="btn btn-primary"
+            className="btn btn-primary btn-sm"
             disabled={create.isPending || !name.trim()}
           >
             {create.isPending ? 'Creating…' : 'Create'}
           </button>
-          {createError && <p className="alert alert-error sm:col-span-2 text-sm">{createError}</p>}
+          {createError && <p className="alert alert-error w-full text-sm mt-1">{createError}</p>}
         </form>
       )}
 

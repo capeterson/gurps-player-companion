@@ -91,24 +91,22 @@ export const SECONDARY_INFO: Record<SecondaryModKey, SecondaryModInfo> = {
     influences: ['Fatigue points only — does not change HT'],
   },
   speed: {
-    // The underlying field is `speedQuarterMod` (integer quarters of
-    // Basic Speed). The "(¼)" suffix on the label is how the row tells
-    // the reader that the input, the temp delta, and the popover math
-    // are all in quarter-step units, while the headline still surfaces
-    // the decimal Basic Speed value via `derivedDisplay`. Mirrors the
-    // legacy gurps-player-web convention so a `+1` temp clearly reads
-    // as "+1 quarter (= +0.25 Basic Speed)" instead of "+1.0".
-    label: 'Speed (¼)',
+    label: 'Basic Speed',
     nextCostLabel: `+0.25 = ${SPEED_COST_PER_QUARTER} pts`,
     influences: [
-      'Basic Speed (in 0.25 increments)',
-      'Knock-on: Basic Move (drop fractions) and Dodge (Speed + 3)',
+      'Basic Speed = (DX + HT) / 4, raised in +0.25 steps',
+      'Sets the Move baseline: floor(Speed) — a +0.25 that crosses a whole number also raises Move',
+      'Sets Dodge: floor(Speed) + 3 — same whole-number threshold applies',
     ],
   },
   move: {
     label: 'Basic Move',
     nextCostLabel: `+1 = ${SECONDARY_COST_PER_LEVEL.move} pts`,
-    influences: ['Basic Move only (yards/second) — does not change Speed'],
+    influences: [
+      'Yards per second in combat and travel',
+      'Baseline is floor(Basic Speed); this mod stacks on top independently',
+      'Does not affect Dodge (Dodge comes from floor(Speed) + 3 only)',
+    ],
   },
 };
 

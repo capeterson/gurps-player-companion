@@ -1,7 +1,6 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError, api } from '../../lib/api.ts';
-import { formatBytes, readLocalDbStatus } from '../../lib/localDbStatus.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { ApiKeysSection } from './ApiKeysSection.tsx';
 
@@ -11,12 +10,6 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-
-  const localDb = useQuery({
-    queryKey: ['settings', 'local-db-status'],
-    queryFn: readLocalDbStatus,
-    staleTime: 5_000,
-  });
 
   const changePassword = useMutation({
     mutationFn: () => {
@@ -46,12 +39,10 @@ export function SettingsPage() {
       <header className="space-y-2">
         <p className="label-eyebrow">Account</p>
         <h1 className="font-display text-3xl">Settings</h1>
-        <p className="max-w-2xl text-sm text-muted">
-          Manage your sign-in credentials and inspect browser-local sync storage.
-        </p>
+        <p className="max-w-2xl text-sm text-muted">Manage your sign-in credentials.</p>
       </header>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)]">
+      <section className="max-w-lg">
         <form
           className="card gap-4 p-card"
           onSubmit={(e) => {
@@ -105,71 +96,6 @@ export function SettingsPage() {
             {changePassword.isPending ? 'Changing…' : 'Change password'}
           </button>
         </form>
-
-        <section className="card gap-4 p-card">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="label-eyebrow">Local data</p>
-              <h2 className="font-display text-2xl">Sync Status</h2>
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => localDb.refetch()}
-              disabled={localDb.isFetching}
-            >
-              {localDb.isFetching ? 'Refreshing…' : 'Refresh'}
-            </button>
-          </div>
-
-          {localDb.isError ? (
-            <p className="text-sm text-error">
-              Couldn’t inspect local DB — {(localDb.error as Error).message}
-            </p>
-          ) : (
-            <dl className="space-y-3 text-sm">
-              <div>
-                <dt className="flex items-center gap-2 text-dim">
-                  <span>Sync state</span>
-                  {localDb.data?.isFullySynced && (
-                    <span
-                      className="tooltip tooltip-right"
-                      data-tip="offline ready"
-                      title="offline ready"
-                    >
-                      <svg
-                        aria-label="Offline ready"
-                        className="h-4 w-4 text-success"
-                        fill="none"
-                        role="img"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="3"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
-                    </span>
-                  )}
-                </dt>
-                <dd>{localDb.data?.syncState ?? 'Checking…'}</dd>
-              </div>
-              <div>
-                <dt className="text-dim">Local storage used</dt>
-                <dd className="num">{formatBytes(localDb.data?.storageUsageBytes ?? null)}</dd>
-              </div>
-              <div>
-                <dt className="text-dim">Browser quota</dt>
-                <dd className="num">{formatBytes(localDb.data?.storageQuotaBytes ?? null)}</dd>
-              </div>
-              <div>
-                <dt className="text-dim">Last synchronized</dt>
-                <dd>{localDb.data?.refreshedAt.toLocaleTimeString() ?? '—'}</dd>
-              </div>
-            </dl>
-          )}
-        </section>
       </section>
 
       <ApiKeysSection />

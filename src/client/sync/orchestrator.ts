@@ -34,6 +34,7 @@ import {
   type LocalCharacterTrait,
   type OutboxEntry,
   type RejectionRecord,
+  coalesceKey,
   getLocalDb,
 } from '../db/dexie.ts';
 import { api } from '../lib/api.ts';
@@ -44,6 +45,7 @@ import {
   MAX_ATTEMPTS,
   backoffMs,
   countPending,
+  enqueueFieldPatch,
   readDrainableOps,
   setOutboxStatus,
 } from './outbox.ts';
@@ -59,6 +61,29 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
 
 const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
+
+/**
+ * Compare a server field value with the locally-stored prevValue.
+ *
+ * Drizzle returns DECIMAL/NUMERIC columns as strings (e.g. "2.5") while
+ * Dexie stores them as numbers.  We coerce *only* when there is a
+ * string↔number type mismatch so plain text fields (height, name, notes,
+ * etc.) are still compared verbatim — changing "6" to "06" must not look
+ * equal and trigger a silent overwrite instead of a conflict rollback.
+ */
+function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
+  if (serverVal === storedVal) return true;
+  // Coerce only on string↔number mismatch (Drizzle decimal string vs. Dexie number).
+  if (typeof serverVal === 'string' && typeof storedVal === 'number') {
+    const n = Number(serverVal);
+    return Number.isFinite(n) && n === storedVal;
+  }
+  if (typeof serverVal === 'number' && typeof storedVal === 'string') {
+    const n = Number(storedVal);
+    return Number.isFinite(n) && n === serverVal;
+  }
+  return false;
+}
 
 interface OrchestratorEvents {
   /** Notified after a drain or pull cycle completes (success or partial failure). */
@@ -377,7 +402,75 @@ class SyncOrchestrator {
         case 'rejected':
         case 'unauthorized':
         case 'conflict':
+          await this.rollbackLocally(op, outcome);
+          break;
         case 'stale_base': {
+          // For patch ops: if the server returned the current entity, re-enqueue
+          // with the updated revision rather than rolling back. This avoids error
+          // toasts when patchMany enqueues multiple fields with the same snapshot
+          // revision — the first op advances the server, making later ops stale
+          // even though they are valid changes that haven't been applied yet.
+          //
+          // Two guards before re-enqueueing:
+          //
+          // 1. Only retry if `latestEntity[fieldPath] === op.prevValue` — i.e.
+          //    the server hasn't independently changed *this* field (another
+          //    tab or device). If someone else changed it we treat it as a real
+          //    conflict and roll back normally.
+          //
+          // 2. Only retry if no newer pending op for the same coalesce key
+          //    already exists. If the user queued a follow-up edit to the same
+          //    field while this one was in-flight, re-enqueueing the older
+          //    attemptedValue would clobber that newer pending op via the
+          //    same-field coalescing in enqueueFieldPatch. Instead, just stamp
+          //    the revision and delete our stale op; the newer op will cycle
+          //    through this handler on the next drain with the updated revision.
+          if (
+            op.command === 'patch' &&
+            op.fieldPath !== undefined &&
+            outcome.latestEntity &&
+            typeof outcome.latestEntity === 'object'
+          ) {
+            const entity = outcome.latestEntity as Record<string, unknown>;
+            const newRevision = typeof entity.revision === 'number' ? entity.revision : undefined;
+            // Guard 1: field not independently changed by another source.
+            // fieldValuesEqual handles the Drizzle string↔Dexie number mismatch
+            // for DECIMAL columns without false-equating text fields like "6"/"06".
+            const fieldUnchanged = fieldValuesEqual(entity[op.fieldPath], op.prevValue);
+            if (newRevision !== undefined && fieldUnchanged) {
+              await this.stampRevision(op.entityClass, op.entityId, newRevision);
+              await db.outbox.delete(op.clientOpId);
+              // Guard 2: no newer pending op for this field already queued.
+              const ckey = coalesceKey(op.entityId, op.fieldPath);
+              const newerPending = await db.outbox
+                .where('coalesceKey')
+                .equals(ckey)
+                .filter((row) => row.status === 'pending' || row.status === 'transient_retry')
+                .first();
+              if (!newerPending) {
+                await enqueueFieldPatch({
+                  entityClass: op.entityClass,
+                  entityId: op.entityId,
+                  fieldPath: op.fieldPath,
+                  attemptedValue: op.attemptedValue,
+                  prevValue: entity[op.fieldPath],
+                  baseRevision: newRevision,
+                  humanName: op.humanName,
+                  flashKey: op.flashKey,
+                  characterId: op.parentId ?? undefined,
+                });
+              } else {
+                // Refresh the superseding op so Guard 1 passes on its next
+                // drain: its prevValue was captured against an intermediate
+                // optimistic Dexie state, not the server's current value.
+                await db.outbox.update(newerPending.clientOpId, {
+                  baseRevision: newRevision,
+                  prevValue: entity[op.fieldPath],
+                });
+              }
+              break;
+            }
+          }
           await this.rollbackLocally(op, outcome);
           break;
         }

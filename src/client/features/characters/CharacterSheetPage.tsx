@@ -72,6 +72,26 @@ function intParser(min: number, max: number) {
   };
 }
 
+/**
+ * Like intParser but the underlying value is stored in raw integer units
+ * while the user-facing input shows values multiplied by `scale`.
+ * e.g. scale=0.25 lets the user type "1.25" while storing the integer 5.
+ */
+function scaledIntParser(scale: number, min: number, max: number) {
+  return (s: string): number => {
+    const f = Number.parseFloat(s);
+    if (!Number.isFinite(f)) throw new Error('number only');
+    const quotient = f / scale;
+    const n = Math.round(quotient);
+    // Reject values that aren't exact multiples of scale (e.g. 0.13 when scale=0.25).
+    if (Math.abs(n - quotient) > 1e-9) throw new Error(`must be a multiple of ${scale.toFixed(2)}`);
+    const lo = (min * scale).toFixed(2);
+    const hi = (max * scale).toFixed(2);
+    if (n < min || n > max) throw new Error(`must be between ${lo} and ${hi}`);
+    return n;
+  };
+}
+
 function nullableTextParser(s: string): string | null {
   const t = s.trim();
   return t.length === 0 ? null : t;
@@ -121,6 +141,8 @@ interface AttrInputProps {
   width: string;
   /** "lg" renders a bordered input; "sm" renders a borderless inline number. */
   size?: 'lg' | 'sm';
+  /** Scale factor for display (e.g. 0.25 converts stored quarter-units to decimal). */
+  displayScale?: number | undefined;
 }
 
 function AttrInput({
@@ -133,6 +155,7 @@ function AttrInput({
   max,
   width,
   size = 'lg',
+  displayScale = 1,
 }: AttrInputProps) {
   // Use the bundled saver so the input subscribes to the flashBus on
   // its own key.  Without `flashKey` an async server rejection would
@@ -142,20 +165,22 @@ function AttrInput({
   const draft = useDraftField<number>({
     name: label,
     serverValue: value,
-    parse: intParser(min, max),
+    format: (v) => (displayScale !== 1 ? (v * displayScale).toFixed(2) : String(v)),
+    parse: displayScale !== 1 ? scaledIntParser(displayScale, min, max) : intParser(min, max),
     ...fieldSave,
   });
   if (!canWrite) {
+    const display = displayScale !== 1 ? (value * displayScale).toFixed(2) : String(value);
     if (size === 'sm') {
       return (
         <span className="num" aria-label={label}>
-          {value}
+          {display}
         </span>
       );
     }
     return (
       <span className="num text-xl font-semibold" aria-label={label}>
-        {value}
+        {display}
       </span>
     );
   }
@@ -195,12 +220,14 @@ function TempBoostButton({
   baseValue,
   tempValue,
   characterId,
+  displayScale,
 }: {
   label: string;
   field: AttrField;
   baseValue: number;
   tempValue: number;
   characterId: string;
+  displayScale?: number | undefined;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
   const { onSave, flashKey } = buildSave(field, { humanName: `${label} temp` });
@@ -237,6 +264,7 @@ function TempBoostButton({
             void onSave(v);
           }}
           onClose={() => setOpen(false)}
+          displayScale={displayScale}
         />
       )}
     </span>
@@ -362,6 +390,7 @@ function SecondaryModCell({
   tempValue,
   derived,
   derivedDisplay,
+  modScale,
   infoKey,
   characterId,
   canWrite,
@@ -372,13 +401,20 @@ function SecondaryModCell({
   tempField: AttrField;
   tempValue: number;
   derived: number;
-  /** Optional override for the derived display (e.g. "5.50 (×4)" for Speed). */
+  /** Optional override for the derived display (e.g. "5.50" for Speed). */
   derivedDisplay?: string;
+  /** Scale factor for displaying mod/temp values (e.g. 0.25 converts quarter-units to decimal). */
+  modScale?: number;
   infoKey: SecondaryModKey;
   characterId: string;
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
+  const fmtMod = (v: number) => (modScale ? (v * modScale).toFixed(2) : String(v));
+  const fmtDelta = (v: number) => {
+    const s = fmtMod(Math.abs(v));
+    return v >= 0 ? `+${s}` : `-${s}`;
+  };
   const tooltip = (
     <div className="grid gap-1.5">
       <div className="font-semibold text-base-content">{info.label}</div>
@@ -409,7 +445,7 @@ function SecondaryModCell({
           <>
             <span
               className="num text-xl font-semibold text-warning"
-              title={`Effective ${derivedDisplay ?? derived} (base ${baseDerived} ${tempValue >= 0 ? '+' : ''}${tempValue})`}
+              title={`Effective ${derivedDisplay ?? derived} (base ${fmtMod(baseDerived)} ${fmtDelta(tempValue)})`}
             >
               {derivedDisplay ?? derived}
             </span>
@@ -424,11 +460,9 @@ function SecondaryModCell({
                 max={50}
                 width="w-9"
                 size="sm"
+                displayScale={modScale}
               />
-              <span className="text-warning">
-                {tempValue >= 0 ? '+' : ''}
-                {tempValue}
-              </span>
+              <span className="text-warning">{fmtDelta(tempValue)}</span>
             </span>
           </>
         ) : (
@@ -446,6 +480,7 @@ function SecondaryModCell({
                 max={50}
                 width="w-9"
                 size="sm"
+                displayScale={modScale}
               />
             </span>
           </>
@@ -457,6 +492,7 @@ function SecondaryModCell({
             baseValue={baseDerived}
             tempValue={tempValue}
             characterId={characterId}
+            displayScale={modScale}
           />
         )}
       </span>
@@ -467,9 +503,11 @@ function SecondaryModCell({
 function IdentityPanel({
   character,
   canWrite,
+  campaigns,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
+  campaigns: CampaignSummary[];
 }) {
   // Bundled saver -- spreading `{ onSave, flashKey }` into useDraftField
   // wires the field to the flashBus so async server rejections trigger
@@ -520,6 +558,8 @@ function IdentityPanel({
     parse: nullableTextParser,
     ...buildSave('appearance', { humanName: 'appearance' }),
   });
+  const campaignFlashKey = makeFlashKey('character', character.id, 'campaignId');
+  const campaignFlash = useFieldFlash(campaignFlashKey);
 
   return (
     <section className="card p-5 space-y-3">
@@ -592,6 +632,38 @@ function IdentityPanel({
             />
           ) : (
             <span>{character.weight ?? '—'}</span>
+          )}
+        </div>
+        <div className="form-control">
+          <span className="label-text-alt label-eyebrow">Campaign</span>
+          {canWrite ? (
+            <select
+              aria-label="campaign"
+              className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm`}
+              value={character.campaignId ?? ''}
+              data-flashing={campaignFlash['data-flashing']}
+              data-flash-parity={campaignFlash['data-flash-parity']}
+              onChange={(e) => {
+                const next = e.target.value || null;
+                void enqueueFieldPatch({
+                  entityClass: 'character',
+                  entityId: character.id,
+                  fieldPath: 'campaignId',
+                  attemptedValue: next,
+                  humanName: 'campaign',
+                  flashKey: campaignFlashKey,
+                });
+              }}
+            >
+              <option value="">No campaign</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{campaigns.find((c) => c.id === character.campaignId)?.name ?? '—'}</span>
           )}
         </div>
       </div>
@@ -779,20 +851,14 @@ function SecondaryModsPanel({
           canWrite={canWrite}
         />
         <SecondaryModCell
-          // The underlying field is in quarter-units of Basic Speed, so
-          // the row is labelled "Speed (¼)" — Codex review on PR #21
-          // flagged the previous "Basic Speed" label as misleading
-          // because the inline temp caption and the TempBoostPopover
-          // preview are quarters-arithmetic (e.g. "20 + (+1) = 21").
-          // The decimal headline stays via `derivedDisplay` with a
-          // "(×4)" hint, matching the legacy gurps-player-web pattern.
-          label="Speed (¼)"
+          label="Speed"
           modField="speedQuarterMod"
           modValue={character.speedQuarterMod}
           tempField="tempSpeedQuarterMod"
           tempValue={character.tempSpeedQuarterMod}
           derived={character.derived.basicSpeedQuarters}
-          derivedDisplay={`${character.derived.basicSpeed.toFixed(2)} (×4)`}
+          derivedDisplay={character.derived.basicSpeed.toFixed(2)}
+          modScale={0.25}
           infoKey="speed"
           characterId={character.id}
           canWrite={canWrite}
@@ -1371,7 +1437,9 @@ export function CharacterSheetPage() {
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignSummary[]>('/campaigns'),
-    enabled: !!character?.campaignId,
+    // Always fetch when the user is known so the Identity panel can offer
+    // the full campaign list — even for characters not yet in a campaign.
+    enabled: !!me.data,
   });
 
   if (character === undefined) {
@@ -1487,7 +1555,13 @@ export function CharacterSheetPage() {
 
       <div>
         {tab === 'Combat' && <CombatPanel character={character} canWrite={canWrite} />}
-        {tab === 'Identity' && <IdentityPanel character={character} canWrite={canWrite} />}
+        {tab === 'Identity' && (
+          <IdentityPanel
+            character={character}
+            canWrite={canWrite}
+            campaigns={campaigns.data ?? []}
+          />
+        )}
         {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
         {tab === 'Skills' && <SkillsPanel character={character} canWrite={canWrite} />}
         {tab === 'Inventory' && <InventoryPanel character={character} canWrite={canWrite} />}

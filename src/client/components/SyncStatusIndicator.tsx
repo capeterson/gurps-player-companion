@@ -1,56 +1,94 @@
 /**
- * Toolbar sync indicator -- the visual half of issue #12.
+ * Toolbar sync indicator.
  *
- * Three states (mapped from `SyncStateStore`):
- *   - 'syncing'  spinning sync icon, "Saving…" tooltip
- *   - 'error'    warning triangle, "Some changes couldn't save" tooltip
- *   - 'synced'   checkmark, "All changes saved"
+ * Icon-only badge with a DaisyUI tooltip that surfaces:
+ *   - Current sync state (synced / syncing / error / offline)
+ *   - Local IndexedDB storage usage & percentage of browser quota
  *
- * Min-1-second visibility is enforced inside the store (see
+ * Min-1-second state visibility is enforced inside the store (see
  * src/client/sync/state.ts) so transient states are perceptible even
  * when the underlying sync resolves before the next repaint.
  *
- * Inline SVGs (no lucide-react / heroicons dep) keep the bundle slim.
+ * Storage is sampled lazily (staleTime 30s) so the badge doesn't
+ * hammer navigator.storage.estimate() on every render.
  */
 
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { formatBytes, readLocalDbStatus } from '../lib/localDbStatus.ts';
 import { useSyncIndicatorState } from '../sync/useSyncIndicatorState.ts';
 
 export function SyncStatusIndicator() {
   const state = useSyncIndicatorState();
   const meta = STATE_META[state];
+
+  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+
+  const storage = useQuery({
+    queryKey: ['sync-indicator', 'storage'],
+    queryFn: readLocalDbStatus,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  // Build a single-line tooltip: state message · storage info
+  const statusMsg = !online ? '⚠ Offline — changes will sync when reconnected' : meta.tooltip;
+
+  let storageMsg = '';
+  if (storage.data) {
+    const { storageUsageBytes: used, storageQuotaBytes: quota } = storage.data;
+    if (used !== null) {
+      if (quota !== null && quota > 0) {
+        const pct = ((used / quota) * 100).toFixed(1);
+        storageMsg = `Local storage: ${formatBytes(used)} / ${formatBytes(quota)} (${pct}%)`;
+      } else {
+        storageMsg = `Local storage: ${formatBytes(used)}`;
+      }
+    }
+  }
+
+  const tip = storageMsg ? `${statusMsg}  ·  ${storageMsg}` : statusMsg;
+
   return (
-    <output
-      className={`badge ${meta.badgeClass} badge-sm gap-1`}
-      aria-live="polite"
-      aria-label={meta.ariaLabel}
-      title={meta.tooltip}
-    >
-      {meta.icon}
-      <span className="hidden sm:inline">{meta.label}</span>
-    </output>
+    <span className="tooltip tooltip-bottom" data-tip={tip}>
+      <output
+        className={`badge ${meta.badgeClass} badge-sm`}
+        aria-live="polite"
+        aria-label={online ? meta.ariaLabel : `${meta.ariaLabel} (offline)`}
+      >
+        {meta.icon}
+      </output>
+    </span>
   );
 }
 
 const STATE_META = {
   syncing: {
     badgeClass: 'badge-info',
-    label: 'Syncing',
     ariaLabel: 'Syncing changes',
     tooltip: 'Saving local changes to the server…',
     icon: <SpinnerIcon />,
   },
   error: {
     badgeClass: 'badge-warning',
-    label: 'Sync failed',
     ariaLabel: 'Some changes failed to sync',
-    tooltip: "Some changes couldn't sync — see toast for details",
+    tooltip: "⚠ Some changes couldn't sync — see toast for details",
     icon: <WarningIcon />,
   },
   synced: {
     badgeClass: 'badge-success',
-    label: 'Synced',
     ariaLabel: 'All changes saved',
-    tooltip: 'All changes saved',
+    tooltip: '✓ All changes saved',
     icon: <CheckIcon />,
   },
 } as const;
