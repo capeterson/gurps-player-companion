@@ -692,7 +692,6 @@ function TraitForm({ initial, isPending, onSubmit, onCancel }: TraitFormProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={160}
-            autoFocus
           />
         </label>
         <label className="form-control">
@@ -820,7 +819,6 @@ function ModifierSubEditor({
               onChange={(e) => setNewMod((m) => ({ ...m, name: e.target.value }))}
               maxLength={160}
               placeholder="Aspected"
-              autoFocus
             />
           </label>
           <label className="form-control">
@@ -974,7 +972,6 @@ function SkillForm({ initial, isPending, onSubmit, onCancel }: SkillFormProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={160}
-            autoFocus
           />
         </label>
         <label className="form-control">
@@ -1116,7 +1113,6 @@ function ItemForm({ initial, isPending, onSubmit, onCancel }: ItemFormProps) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={160}
-            autoFocus
           />
         </label>
         <label className="form-control w-28">

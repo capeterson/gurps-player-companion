@@ -178,8 +178,13 @@ describe('emitLibraryYaml', () => {
 // GURPS modifier cost formula (B102): percentages sum first, then apply
 // once, rounded up.  +50% and −50% cancel to base — NOT base × 1.5 × 0.5.
 describe('GURPS modifier cost formula', () => {
-  function computeFinal(base: number, mods: Array<{ costType: 'percent' | 'flat'; costValue: number }>) {
-    const sumPercent = mods.filter((m) => m.costType === 'percent').reduce((s, m) => s + m.costValue, 0);
+  function computeFinal(
+    base: number,
+    mods: Array<{ costType: 'percent' | 'flat'; costValue: number }>,
+  ) {
+    const sumPercent = mods
+      .filter((m) => m.costType === 'percent')
+      .reduce((s, m) => s + m.costValue, 0);
     const sumFlat = mods.filter((m) => m.costType === 'flat').reduce((s, m) => s + m.costValue, 0);
     return Math.ceil(base * (1 + sumPercent / 100)) + sumFlat;
   }
