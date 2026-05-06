@@ -6,6 +6,7 @@ import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
+import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
 import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
@@ -34,6 +35,7 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/suspended', element: <SuspendedPage /> },
   {
     element: <RequireAuth />,
     children: [

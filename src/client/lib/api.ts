@@ -125,6 +125,15 @@ async function parse<T>(res: Response): Promise<T> {
       typeof body === 'object' && body !== null && 'error' in body
         ? String((body as { error: unknown }).error)
         : `HTTP ${res.status}`;
+    // Suspended-account responses redirect the SPA to a dedicated dead-end
+    // page so the user sees a friendly message instead of every query in
+    // the app silently throwing 403s. Skipping when already there avoids a
+    // redirect loop.
+    if (res.status === 403 && message === 'suspended' && typeof window !== 'undefined') {
+      if (!window.location.pathname.startsWith('/suspended')) {
+        window.location.assign('/suspended?reason=disabled');
+      }
+    }
     throw new ApiError(res.status, message, body);
   }
   return body as T;
