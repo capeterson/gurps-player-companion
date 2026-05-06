@@ -838,7 +838,7 @@ function ModifierSubEditor({
       <span className="label-text">Modifiers</span>
       {modifiers.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {modifiers.map((m) => (
+          {modifiers.map((m, i) => (
             <span key={`${m.name}-${m.costValue}`} className="chip flex items-center gap-1 text-xs">
               {m.name}{' '}
               {m.costType === 'percent'
