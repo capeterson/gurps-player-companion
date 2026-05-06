@@ -63,19 +63,26 @@ const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
 
 /**
- * Coerce a server field value to a comparable primitive.
- * Drizzle returns DECIMAL/NUMERIC columns as strings (e.g. "2.5"), while
- * Dexie stores the same field as a number.  Normalising both sides before
- * comparing avoids false "field changed" guard-1 failures on inventory
- * decimal fields (weightLbs, costGp) when another field on the same row
- * advanced the entity revision first.
+ * Compare a server field value with the locally-stored prevValue.
+ *
+ * Drizzle returns DECIMAL/NUMERIC columns as strings (e.g. "2.5") while
+ * Dexie stores them as numbers.  We coerce *only* when there is a
+ * string↔number type mismatch so plain text fields (height, name, notes,
+ * etc.) are still compared verbatim — changing "6" to "06" must not look
+ * equal and trigger a silent overwrite instead of a conflict rollback.
  */
-function normalizeFieldValue(v: unknown): unknown {
-  if (typeof v === 'string' && v.trim() !== '') {
-    const n = Number(v);
-    if (Number.isFinite(n)) return n;
+function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
+  if (serverVal === storedVal) return true;
+  // Coerce only on string↔number mismatch (Drizzle decimal string vs. Dexie number).
+  if (typeof serverVal === 'string' && typeof storedVal === 'number') {
+    const n = Number(serverVal);
+    return Number.isFinite(n) && n === storedVal;
   }
-  return v;
+  if (typeof serverVal === 'number' && typeof storedVal === 'string') {
+    const n = Number(storedVal);
+    return Number.isFinite(n) && n === serverVal;
+  }
+  return false;
 }
 
 interface OrchestratorEvents {
@@ -418,10 +425,9 @@ class SyncOrchestrator {
             const entity = outcome.latestEntity as Record<string, unknown>;
             const newRevision = typeof entity.revision === 'number' ? entity.revision : undefined;
             // Guard 1: field not independently changed by another source.
-            // normalizeFieldValue coerces Drizzle decimal strings ("2.5") to
-            // numbers so the comparison is type-safe across Drizzle↔Dexie.
-            const fieldUnchanged =
-              normalizeFieldValue(entity[op.fieldPath]) === normalizeFieldValue(op.prevValue);
+            // fieldValuesEqual handles the Drizzle string↔Dexie number mismatch
+            // for DECIMAL columns without false-equating text fields like "6"/"06".
+            const fieldUnchanged = fieldValuesEqual(entity[op.fieldPath], op.prevValue);
             if (newRevision !== undefined && fieldUnchanged) {
               await this.stampRevision(op.entityClass, op.entityId, newRevision);
               await db.outbox.delete(op.clientOpId);
@@ -432,16 +438,13 @@ class SyncOrchestrator {
                 .equals(ckey)
                 .filter((row) => row.status === 'pending' || row.status === 'transient_retry')
                 .first();
-              // Normalize the server's field value so stored prevValues are
-              // always the same type Dexie uses (number, not Drizzle string).
-              const serverFieldValue = normalizeFieldValue(entity[op.fieldPath]);
               if (!newerPending) {
                 await enqueueFieldPatch({
                   entityClass: op.entityClass,
                   entityId: op.entityId,
                   fieldPath: op.fieldPath,
                   attemptedValue: op.attemptedValue,
-                  prevValue: serverFieldValue,
+                  prevValue: entity[op.fieldPath],
                   baseRevision: newRevision,
                   humanName: op.humanName,
                   flashKey: op.flashKey,
@@ -453,7 +456,7 @@ class SyncOrchestrator {
                 // optimistic Dexie state, not the server's current value.
                 await db.outbox.update(newerPending.clientOpId, {
                   baseRevision: newRevision,
-                  prevValue: serverFieldValue,
+                  prevValue: entity[op.fieldPath],
                 });
               }
               break;
