@@ -543,6 +543,8 @@ function IdentityPanel({
     parse: nullableTextParser,
     ...buildSave('appearance', { humanName: 'appearance' }),
   });
+  const campaignFlashKey = makeFlashKey('character', character.id, 'campaignId');
+  const campaignFlash = useFieldFlash(campaignFlashKey);
 
   return (
     <section className="card p-5 space-y-3">
@@ -622,8 +624,10 @@ function IdentityPanel({
           {canWrite ? (
             <select
               aria-label="campaign"
-              className="select select-bordered select-sm"
+              className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm`}
               value={character.campaignId ?? ''}
+              data-flashing={campaignFlash['data-flashing']}
+              data-flash-parity={campaignFlash['data-flash-parity']}
               onChange={(e) => {
                 const next = e.target.value || null;
                 void enqueueFieldPatch({
@@ -632,7 +636,7 @@ function IdentityPanel({
                   fieldPath: 'campaignId',
                   attemptedValue: next,
                   humanName: 'campaign',
-                  flashKey: makeFlashKey('character', character.id, 'campaignId'),
+                  flashKey: campaignFlashKey,
                 });
               }}
             >

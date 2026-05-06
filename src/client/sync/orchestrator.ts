@@ -34,6 +34,7 @@ import {
   type LocalCharacterTrait,
   type OutboxEntry,
   type RejectionRecord,
+  coalesceKey,
   getLocalDb,
 } from '../db/dexie.ts';
 import { api } from '../lib/api.ts';
@@ -377,6 +378,21 @@ class SyncOrchestrator {
           // toasts when patchMany enqueues multiple fields with the same snapshot
           // revision — the first op advances the server, making later ops stale
           // even though they are valid changes that haven't been applied yet.
+          //
+          // Two guards before re-enqueueing:
+          //
+          // 1. Only retry if `latestEntity[fieldPath] === op.prevValue` — i.e.
+          //    the server hasn't independently changed *this* field (another
+          //    tab or device). If someone else changed it we treat it as a real
+          //    conflict and roll back normally.
+          //
+          // 2. Only retry if no newer pending op for the same coalesce key
+          //    already exists. If the user queued a follow-up edit to the same
+          //    field while this one was in-flight, re-enqueueing the older
+          //    attemptedValue would clobber that newer pending op via the
+          //    same-field coalescing in enqueueFieldPatch. Instead, just stamp
+          //    the revision and delete our stale op; the newer op will cycle
+          //    through this handler on the next drain with the updated revision.
           if (
             op.command === 'patch' &&
             op.fieldPath !== undefined &&
@@ -385,20 +401,33 @@ class SyncOrchestrator {
           ) {
             const entity = outcome.latestEntity as Record<string, unknown>;
             const newRevision = typeof entity.revision === 'number' ? entity.revision : undefined;
-            if (newRevision !== undefined) {
+            // Guard 1: field not independently changed by another source.
+            const fieldUnchanged = entity[op.fieldPath] === op.prevValue;
+            if (newRevision !== undefined && fieldUnchanged) {
               await this.stampRevision(op.entityClass, op.entityId, newRevision);
               await db.outbox.delete(op.clientOpId);
-              await enqueueFieldPatch({
-                entityClass: op.entityClass,
-                entityId: op.entityId,
-                fieldPath: op.fieldPath,
-                attemptedValue: op.attemptedValue,
-                prevValue: entity[op.fieldPath],
-                baseRevision: newRevision,
-                humanName: op.humanName,
-                flashKey: op.flashKey,
-                characterId: op.parentId ?? undefined,
-              });
+              // Guard 2: no newer pending op for this field already queued.
+              const ckey = coalesceKey(op.entityId, op.fieldPath);
+              const newerPending = await db.outbox
+                .where('coalesceKey')
+                .equals(ckey)
+                .filter(
+                  (row) => row.status === 'pending' || row.status === 'transient_retry',
+                )
+                .first();
+              if (!newerPending) {
+                await enqueueFieldPatch({
+                  entityClass: op.entityClass,
+                  entityId: op.entityId,
+                  fieldPath: op.fieldPath,
+                  attemptedValue: op.attemptedValue,
+                  prevValue: entity[op.fieldPath],
+                  baseRevision: newRevision,
+                  humanName: op.humanName,
+                  flashKey: op.flashKey,
+                  characterId: op.parentId ?? undefined,
+                });
+              }
               break;
             }
           }
