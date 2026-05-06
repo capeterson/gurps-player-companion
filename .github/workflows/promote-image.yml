@@ -1,0 +1,90 @@
+name: Promote image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Source image tag in GHCR to promote (e.g. dev, sha-abc1234)"
+        required: true
+        default: dev
+      version:
+        description: "Semver to apply, no leading v (e.g. 1.2.3 or 1.2.3-rc.1)"
+        required: true
+      ref:
+        description: "Git ref/SHA to tag and release from (defaults to the workflow ref)"
+        required: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - name: Validate semver input
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          printf '%s\n' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
+            || { echo "version must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-PRERELEASE"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure version is unused
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VER" >/dev/null 2>&1; then
+            echo "::error::git tag v$VER already exists"
+            exit 1
+          fi
+          if docker buildx imagetools inspect "$IMAGE:v$VER" >/dev/null 2>&1; then
+            echo "::error::image tag v$VER already exists in $IMAGE"
+            exit 1
+          fi
+
+      - name: Create and push git tag
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "v$VER" -m "Release v$VER"
+          git push origin "v$VER"
+
+      - name: Re-tag image in GHCR
+        id: retag
+        env:
+          SRC: ${{ inputs.source }}
+          VER: ${{ inputs.version }}
+        run: |
+          TAGS=( -t "$IMAGE:v$VER" -t "$IMAGE:$VER" )
+          if [[ "$VER" != *-* ]]; then
+            MM="${VER%.*}"
+            TAGS+=( -t "$IMAGE:latest" -t "$IMAGE:$MM" )
+            echo "prerelease=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >>"$GITHUB_OUTPUT"
+          fi
+          docker buildx imagetools create "${TAGS[@]}" "$IMAGE:$SRC"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          generate_release_notes: true
+          prerelease: ${{ steps.retag.outputs.prerelease == 'true' }}
