@@ -33,9 +33,11 @@ import {
   type DbCampaign,
   type DbCampaignInvitation,
   type DbUser,
+  NOTIFICATION_TYPE_CAMPAIGN_INVITATION,
   campaignInvitations,
   campaignMemberships,
   campaigns,
+  notifications,
   users,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
@@ -178,19 +180,36 @@ router.openapi(
 
     let insertedId: string;
     try {
-      const inserted = await getDb()
-        .insert(campaignInvitations)
-        .values({
-          campaignId,
-          inviterId: user.id,
-          inviteeId: target.id,
-          role: requestedRole,
-          status: 'pending',
-        })
-        .returning({ id: campaignInvitations.id });
-      const row = inserted[0];
-      if (!row) throw new HTTPException(500, { message: 'invitation insert returned no row' });
-      insertedId = row.id;
+      insertedId = await getDb().transaction(async (tx) => {
+        const inserted = await tx
+          .insert(campaignInvitations)
+          .values({
+            campaignId,
+            inviterId: user.id,
+            inviteeId: target.id,
+            role: requestedRole,
+            status: 'pending',
+          })
+          .returning({ id: campaignInvitations.id });
+        const row = inserted[0];
+        if (!row) throw new HTTPException(500, { message: 'invitation insert returned no row' });
+        // Emit a notification for the invitee in the same transaction so
+        // a half-applied invitation can never leave a stranded
+        // notification (and vice versa).
+        await tx.insert(notifications).values({
+          userId: target.id,
+          type: NOTIFICATION_TYPE_CAMPAIGN_INVITATION,
+          relatedId: row.id,
+          payload: {
+            campaign_id: campaignId,
+            campaign_name: campaign.name,
+            inviter_id: user.id,
+            inviter_display_name: user.displayName,
+            role: requestedRole,
+          },
+        });
+        return row.id;
+      });
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new HTTPException(409, {
@@ -205,6 +224,18 @@ router.openapi(
     return c.json(out, 201);
   },
 );
+
+/**
+ * Mark every still-unread notification tied to this invitation as read.
+ * Called when an invitation is cancelled, accepted, or rejected so the
+ * invitee's bell doesn't keep showing a stale Accept/Decline pair.
+ */
+async function markInvitationNotificationsRead(invitationId: string): Promise<void> {
+  await getDb()
+    .update(notifications)
+    .set({ readAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(notifications.relatedId, invitationId), isNull(notifications.readAt)));
+}
 
 router.openapi(
   createRoute({
@@ -290,6 +321,7 @@ router.openapi(
       .update(campaignInvitations)
       .set({ status: 'cancelled', decidedAt: new Date(), updatedAt: new Date() })
       .where(eq(campaignInvitations.id, invitationId));
+    await markInvitationNotificationsRead(invitationId);
     return c.body(null, 204);
   },
 );
@@ -399,6 +431,7 @@ router.openapi(
         .set({ status: 'accepted', decidedAt: new Date(), updatedAt: new Date() })
         .where(eq(campaignInvitations.id, invitationId));
     });
+    await markInvitationNotificationsRead(invitationId);
     const out = await loadInvitationOut(invitationId);
     if (!out) throw new HTTPException(500, { message: 'invitation vanished' });
     return c.json(out, 200);
@@ -445,6 +478,7 @@ router.openapi(
       .update(campaignInvitations)
       .set({ status: 'rejected', decidedAt: new Date(), updatedAt: new Date() })
       .where(eq(campaignInvitations.id, invitationId));
+    await markInvitationNotificationsRead(invitationId);
     const out = await loadInvitationOut(invitationId);
     if (!out) throw new HTTPException(500, { message: 'invitation vanished' });
     return c.json(out, 200);
@@ -452,6 +486,6 @@ router.openapi(
 );
 
 // Touch unused imports so biome doesn't trip on them once the file
-// stabilises (or, isNull, sql are used inside helper queries below).
-export const _ = { isNull, or };
+// stabilises (`or` reserved for future or-of-status filters).
+export const _ = { or };
 export const invitationsRouter = router;

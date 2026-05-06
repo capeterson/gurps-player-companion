@@ -183,6 +183,32 @@ export const campaignMemberships = pgTable(
   }),
 );
 
+// Generic per-user notifications. The discriminator is `type`; the payload
+// shape is owned by whoever emits the row.  See NOTIFICATION_TYPES below
+// for the values currently in use.
+export const NOTIFICATION_TYPE_CAMPAIGN_INVITATION = 'campaign_invitation' as const;
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: varchar('type', { length: 40 }).notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+    relatedId: uuid('related_id'),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    userIdx: index('notifications_user_idx').on(t.userId),
+    relatedIdx: index('notifications_related_idx').on(t.relatedId),
+    readIdx: index('notifications_read_idx').on(t.readAt),
+  }),
+);
+
 export const campaignInvitations = pgTable(
   'campaign_invitations',
   {
@@ -486,6 +512,7 @@ export type DbCombatState = typeof combatStates.$inferSelect;
 export type DbCampaign = typeof campaigns.$inferSelect;
 export type DbCampaignMembership = typeof campaignMemberships.$inferSelect;
 export type DbCampaignInvitation = typeof campaignInvitations.$inferSelect;
+export type DbNotification = typeof notifications.$inferSelect;
 export type DbAdventureLogEntry = typeof adventureLogEntries.$inferSelect;
 export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;

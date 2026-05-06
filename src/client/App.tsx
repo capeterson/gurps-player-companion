@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { api } from './lib/api.ts';
 import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
@@ -165,6 +166,7 @@ export function App() {
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           <SyncStatusIndicator />
+          <NotificationsBell />
           <button
             type="button"
             className="btn btn-ghost btn-sm gap-2 px-2 sm:px-3"
