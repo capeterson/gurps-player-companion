@@ -135,3 +135,103 @@ docs/
 bootstrap/
   sample_library.yaml    seeded into the "Sample" campaign
 ```
+
+## Offline sync
+
+The app is **local-first**: every UI read renders from IndexedDB
+(Dexie) and every UI write commits to IndexedDB before anything leaves
+the browser. Online mode adds active sync and WebSocket nudges on top
+of the same data path; going offline simply pauses sync. The user
+should never be able to tell the difference except for the indicator in
+the header.
+
+### Tenets
+
+1. **The local store is the UI's source of truth.** React reads from
+   Dexie via `useLiveQuery`. The server is a durable mirror, not the
+   render path. A user with a stale browser tab and no network can
+   keep editing indefinitely.
+2. **No edit is silently dropped.** Each mutation is journaled into a
+   durable outbox row in the same Dexie transaction as the local
+   write — it is either fully applied locally *and* queued for
+   replay, or neither. See [AGENTS.md](AGENTS.md) interaction rule 1
+   and [src/client/hooks/useDraftField.ts](src/client/hooks/useDraftField.ts).
+3. **Per-field coalescing, latest wins.** While a save is in flight
+   for field `X`, additional commits to `X` queue (latest value wins);
+   commits to other fields proceed in parallel. Pending outbox rows
+   for the same `(entityId, fieldPath)` are replaced rather than
+   stacked.
+4. **A rollback is a visible UX event.** When the server rejects an
+   op (validation, conflict, stale base, unauthorized), the
+   orchestrator reverts the local row, emits a persistent toast that
+   names the field and the reason, and fires a flash event so the
+   input pulses. Toast + flash are both required.
+5. **Server pulls never clobber local intent.** `/sync/cursor`
+   responses are merged into Dexie, but any field with a `pending`
+   or `in_flight` outbox row for the same `(entityId, fieldPath)` is
+   skipped — the local value wins until the server formally rejects
+   it.
+6. **WebSockets are acceleration, not correctness.** The HTTP cursor
+   pull plus the outbox replay is the source of truth. WS frames
+   carry no row data; they only invalidate so the client pulls
+   sooner. A client that loses WS forever still converges via the
+   periodic pull.
+7. **Bootstrap before UI.** A fresh login pulls the full snapshot
+   into Dexie before the app renders, so the first paint already
+   reflects the user's data. A `bootstrap:<userId>` flag in
+   `syncMeta` short-circuits this on subsequent loads.
+8. **Logout purges.** Switching accounts wipes every Dexie table so
+   a previous user's rows can't leak into a `useLiveQuery`.
+
+### Flow
+
+```
+  ┌──────────┐   write     ┌────────────┐   drain    ┌──────────────┐
+  │  React   │────────────▶│   Dexie    │──────────▶│ /sync/       │
+  │  + Zod   │   (1 txn:   │  (stores + │           │  operations  │
+  │          │   row + op) │   outbox)  │◀──────────│              │
+  └──────────┘             └────────────┘   pull    └──────┬───────┘
+       ▲                          ▲     /sync/cursor       │
+       │ useLiveQuery             │                        │
+       │                          └────────────────────────┘
+       │                            WS sync_invalidate
+       │                                     │
+       └─────────────────────── flashBus ◀───┘
+                  (rollback toast + flash)
+```
+
+- **Mutation handlers** call `enqueueFieldPatch`, `enqueueCreate`, or
+  `enqueueDelete` from [src/client/sync/outbox.ts](src/client/sync/outbox.ts).
+  They never `fetch` directly. The enqueue writes the local row and
+  the outbox entry in one Dexie transaction.
+- **The orchestrator** ([src/client/sync/orchestrator.ts](src/client/sync/orchestrator.ts))
+  is a long-lived singleton. It drains the outbox into
+  `POST /sync/operations`, pulls fresh state via
+  `POST /sync/cursor`, applies outcomes (stamping the new revision
+  on success, rolling back on rejection), and emits sync state to
+  the indicator. A `navigator.locks` lease serializes the drain
+  across tabs.
+- **The server** treats each op in a batch independently — one bad
+  op never poisons the rest. HTTP status is always 200; per-op
+  outcomes (`applied` / `rejected` / `conflict` / `unauthorized` /
+  `suspended` / `stale_base` / `transient`) live in
+  `outcomes[].status`. Optimistic concurrency is enforced via
+  `baseRevision`; a mismatch returns `stale_base` plus the latest
+  entity so the client can reconcile.
+- **The protocol** ([src/shared/schemas/sync.ts](src/shared/schemas/sync.ts))
+  is a closed set of entity classes plus three operation commands
+  (`create`, `patch`, `delete`). Both sides validate every envelope
+  with the same Zod schemas.
+
+### Failure modes
+
+| Outcome          | Local effect                                                   |
+|------------------|----------------------------------------------------------------|
+| `applied`        | Stamp `newRevision` onto the row, drop the outbox op.          |
+| `rejected`       | Revert the field/row, persistent toast + input flash.          |
+| `unauthorized`   | Same as rejected; toast names the permission failure.          |
+| `conflict`       | Server returns `latestEntity`; client adopts it, then flashes. |
+| `stale_base`     | Same as conflict — `baseRevision` was behind the server.       |
+| `transient`      | Backoff with jitter, retry up to `MAX_ATTEMPTS` (8).           |
+| `suspended`      | Permanent fail; toast surfaces the reason.                     |
+| network error    | Whole batch reverts to `transient_retry`; loop retries.        |
