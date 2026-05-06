@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { api } from './lib/api.ts';
@@ -10,13 +10,13 @@ import { getSyncOrchestrator } from './sync/orchestrator.ts';
 
 const NAV_TABS = [{ to: '/characters', label: 'Sheet' }] as const;
 
-const CAMPAIGN_TABS = [
-  { to: '/campaigns', label: 'Campaigns' },
+const CAMPAIGN_ROOT = '/campaigns';
+const CAMPAIGN_SUBNAV = [
   { to: '/log', label: 'Log' },
   { to: '/library', label: 'Library' },
 ] as const;
 
-const CAMPAIGN_PATHS = new Set<string>(CAMPAIGN_TABS.map((t) => t.to));
+const CAMPAIGN_PATHS = new Set<string>([CAMPAIGN_ROOT, ...CAMPAIGN_SUBNAV.map((t) => t.to)]);
 
 interface MeResponse {
   id: string;
@@ -29,6 +29,8 @@ export function App() {
   const location = useLocation();
   const campaignActive = CAMPAIGN_PATHS.has(location.pathname);
   const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
+  const campaignMenuRef = useRef<HTMLDetailsElement>(null);
+  const userMenuRef = useRef<HTMLDetailsElement>(null);
   const me = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api<MeResponse>('/auth/me'),
@@ -38,6 +40,30 @@ export function App() {
     applyTheme(theme);
     storeTheme(theme);
   }, [theme]);
+
+  // Close header dropdowns when the route changes — the <details> element
+  // doesn't auto-close, so navigating from a menu item leaves it open otherwise.
+  const pathname = location.pathname;
+  useEffect(() => {
+    void pathname;
+    if (campaignMenuRef.current) campaignMenuRef.current.open = false;
+    if (userMenuRef.current) userMenuRef.current.open = false;
+  }, [pathname]);
+
+  // Close header dropdowns on outside click, matching standard menu UX.
+  useEffect(() => {
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (campaignMenuRef.current?.open && !campaignMenuRef.current.contains(target)) {
+        campaignMenuRef.current.open = false;
+      }
+      if (userMenuRef.current?.open && !userMenuRef.current.contains(target)) {
+        userMenuRef.current.open = false;
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, []);
 
   async function signOut() {
     const tokens = tokenStore.read();
@@ -92,45 +118,64 @@ export function App() {
                 {tab.label}
               </NavLink>
             ))}
-            <details className="dropdown relative z-50">
-              <summary
-                className={`flex cursor-pointer list-none items-center gap-1 rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
-                  campaignActive
-                    ? 'bg-base-200 text-base-content'
-                    : 'text-muted hover:bg-base-200 hover:text-base-content'
-                }`}
-                aria-label="Campaign menu"
+            <div
+              className={`flex items-center rounded-field transition ${
+                campaignActive ? 'bg-base-200' : ''
+              }`}
+            >
+              <NavLink
+                to={CAMPAIGN_ROOT}
+                end
+                className={({ isActive }) =>
+                  `rounded-l-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                    isActive || campaignActive
+                      ? 'text-base-content'
+                      : 'text-muted hover:bg-base-200 hover:text-base-content'
+                  }`
+                }
               >
                 Campaign
-                <span aria-hidden="true">▾</span>
-              </summary>
-              <ul className="menu dropdown-content z-50 mt-2 w-44 rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg">
-                {CAMPAIGN_TABS.map((tab) => (
-                  <li key={tab.to}>
-                    <NavLink
-                      to={tab.to}
-                      className={({ isActive }) => (isActive ? 'active' : undefined)}
-                    >
-                      {tab.label}
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
-            </details>
+              </NavLink>
+              <details ref={campaignMenuRef} className="dropdown relative z-50">
+                <summary
+                  className={`flex cursor-pointer list-none items-center rounded-r-field px-2 py-2 text-sm transition ${
+                    campaignActive
+                      ? 'text-base-content'
+                      : 'text-muted hover:bg-base-200 hover:text-base-content'
+                  }`}
+                  aria-label="Campaign sub-menu"
+                >
+                  <span aria-hidden="true">▾</span>
+                </summary>
+                <ul className="menu dropdown-content z-50 mt-2 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg">
+                  {CAMPAIGN_SUBNAV.map((tab) => (
+                    <li key={tab.to}>
+                      <NavLink
+                        to={tab.to}
+                        className={({ isActive }) => (isActive ? 'active' : undefined)}
+                      >
+                        {tab.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </div>
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           <SyncStatusIndicator />
           <button
             type="button"
-            className="btn btn-ghost btn-sm btn-square"
+            className="btn btn-ghost btn-sm gap-2 px-2 sm:px-3"
             onClick={toggleTheme}
             aria-label={`Switch to ${themeLabel(oppositeTheme(theme))} mode`}
             title={`Switch to ${themeLabel(oppositeTheme(theme))} mode`}
           >
             {themeLabel(theme) === 'Dark' ? <SunIcon /> : <MoonIcon />}
+            <span className="hidden sm:inline">{themeLabel(theme)} mode</span>
           </button>
-          <details className="dropdown dropdown-end relative z-50">
+          <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
             <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
               <span className="hidden sm:inline text-muted">Signed in as</span>
               <span className="max-w-[8rem] truncate sm:max-w-none">

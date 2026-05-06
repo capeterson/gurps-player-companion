@@ -28,17 +28,30 @@ interface WsMessage {
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30_000;
 const PING_INTERVAL_MS = 25_000;
+// Cap reconnect attempts that never reach `open` (e.g. a dev server
+// that doesn't proxy WS upgrades, or a permanently misconfigured edge
+// proxy in prod). Without this, the client logs a fresh handshake
+// failure every backoff tick. The orchestrator's periodic /sync/cursor
+// pull keeps state fresh without WS push.
+const MAX_HANDSHAKE_FAILURES = 4;
 
 class SyncWsSubscriber {
   private socket: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private attempts = 0;
+  private handshakeFailures = 0;
   private running = false;
+  private gaveUp = false;
 
   start(): void {
     if (this.running) return;
     this.running = true;
+    // Re-arm after a previous give-up: a fresh `start()` (e.g. login,
+    // token refresh) means the caller wants us to try again.
+    this.gaveUp = false;
+    this.handshakeFailures = 0;
+    this.attempts = 0;
     this.connect();
   }
 
@@ -60,6 +73,7 @@ class SyncWsSubscriber {
 
   private connect(): void {
     if (!this.running) return;
+    if (this.gaveUp) return;
     if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return;
     const tokens = tokenStore.read();
     if (!tokens) {
@@ -75,13 +89,17 @@ class SyncWsSubscriber {
     try {
       socket = new WebSocket(url);
     } catch {
+      this.handshakeFailures += 1;
       this.scheduleReconnect();
       return;
     }
     this.socket = socket;
+    let opened = false;
 
     socket.addEventListener('open', () => {
+      opened = true;
       this.attempts = 0;
+      this.handshakeFailures = 0;
       // Server-driven invalidation only — but we ping periodically so
       // load balancers / proxies don't idle-close the channel.
       if (this.pingTimer) clearInterval(this.pingTimer);
@@ -114,6 +132,17 @@ class SyncWsSubscriber {
       if (this.pingTimer) clearInterval(this.pingTimer);
       this.pingTimer = null;
       if (this.socket === socket) this.socket = null;
+      // A close before `open` means the handshake never succeeded —
+      // commonly the dev server (no WS upgrade support) or a misconfigured
+      // proxy. After a few of those in a row, stop spamming reconnects;
+      // periodic /sync/cursor pulls remain in effect.
+      if (!opened) {
+        this.handshakeFailures += 1;
+        if (this.handshakeFailures >= MAX_HANDSHAKE_FAILURES) {
+          this.gaveUp = true;
+          return;
+        }
+      }
       this.scheduleReconnect();
     });
 
