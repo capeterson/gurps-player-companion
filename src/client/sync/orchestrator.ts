@@ -142,7 +142,12 @@ class SyncOrchestrator {
   async triggerCursorPull(): Promise<void> {
     if (!tokenStore.read()) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-    syncStateStore.set('syncing');
+    // Don't flip the indicator to 'syncing' just to *check* for changes —
+    // the periodic loop polls every 5s and would otherwise leave the
+    // badge perpetually flickering between 'syncing' and 'synced' even
+    // when nothing is actually moving. Defer the flip until we see a
+    // response that actually carries rows to apply.
+    let appliedAnything = false;
     try {
       let hasMore = true;
       while (hasMore) {
@@ -151,6 +156,10 @@ class SyncOrchestrator {
           method: 'POST',
           body: { cursors, pageSize: 200 },
         });
+        if (!appliedAnything && res.changes && res.changes.length > 0) {
+          syncStateStore.set('syncing');
+          appliedAnything = true;
+        }
         await this.applyCursorResponse(res);
         hasMore = Object.values(res.hasMore ?? {}).some((v) => v);
       }
