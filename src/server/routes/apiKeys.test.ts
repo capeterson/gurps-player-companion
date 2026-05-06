@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import { createApp } from '../app.ts';
-import { resetConfigCache, type AppConfig } from '../config.ts';
+import { type AppConfig, resetConfigCache } from '../config.ts';
 
 const testConfig: AppConfig = {
   environment: 'test',
