@@ -71,6 +71,13 @@
       "when": 1778042500000,
       "tag": "0009_admin_user_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778045417883,
+      "tag": "0010_late_yellow_claw",
+      "breakpoints": true
     }
   ]
 }
