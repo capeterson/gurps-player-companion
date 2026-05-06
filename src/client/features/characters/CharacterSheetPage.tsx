@@ -84,8 +84,7 @@ function scaledIntParser(scale: number, min: number, max: number) {
     const quotient = f / scale;
     const n = Math.round(quotient);
     // Reject values that aren't exact multiples of scale (e.g. 0.13 when scale=0.25).
-    if (Math.abs(n - quotient) > 1e-9)
-      throw new Error(`must be a multiple of ${scale.toFixed(2)}`);
+    if (Math.abs(n - quotient) > 1e-9) throw new Error(`must be a multiple of ${scale.toFixed(2)}`);
     const lo = (min * scale).toFixed(2);
     const hi = (max * scale).toFixed(2);
     if (n < min || n > max) throw new Error(`must be between ${lo} and ${hi}`);

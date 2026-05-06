@@ -62,6 +62,22 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
 const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
 
+/**
+ * Coerce a server field value to a comparable primitive.
+ * Drizzle returns DECIMAL/NUMERIC columns as strings (e.g. "2.5"), while
+ * Dexie stores the same field as a number.  Normalising both sides before
+ * comparing avoids false "field changed" guard-1 failures on inventory
+ * decimal fields (weightLbs, costGp) when another field on the same row
+ * advanced the entity revision first.
+ */
+function normalizeFieldValue(v: unknown): unknown {
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return v;
+}
+
 interface OrchestratorEvents {
   /** Notified after a drain or pull cycle completes (success or partial failure). */
   cycleDone(): void;
@@ -402,7 +418,10 @@ class SyncOrchestrator {
             const entity = outcome.latestEntity as Record<string, unknown>;
             const newRevision = typeof entity.revision === 'number' ? entity.revision : undefined;
             // Guard 1: field not independently changed by another source.
-            const fieldUnchanged = entity[op.fieldPath] === op.prevValue;
+            // normalizeFieldValue coerces Drizzle decimal strings ("2.5") to
+            // numbers so the comparison is type-safe across Drizzle↔Dexie.
+            const fieldUnchanged =
+              normalizeFieldValue(entity[op.fieldPath]) === normalizeFieldValue(op.prevValue);
             if (newRevision !== undefined && fieldUnchanged) {
               await this.stampRevision(op.entityClass, op.entityId, newRevision);
               await db.outbox.delete(op.clientOpId);
@@ -413,13 +432,16 @@ class SyncOrchestrator {
                 .equals(ckey)
                 .filter((row) => row.status === 'pending' || row.status === 'transient_retry')
                 .first();
+              // Normalize the server's field value so stored prevValues are
+              // always the same type Dexie uses (number, not Drizzle string).
+              const serverFieldValue = normalizeFieldValue(entity[op.fieldPath]);
               if (!newerPending) {
                 await enqueueFieldPatch({
                   entityClass: op.entityClass,
                   entityId: op.entityId,
                   fieldPath: op.fieldPath,
                   attemptedValue: op.attemptedValue,
-                  prevValue: entity[op.fieldPath],
+                  prevValue: serverFieldValue,
                   baseRevision: newRevision,
                   humanName: op.humanName,
                   flashKey: op.flashKey,
@@ -431,7 +453,7 @@ class SyncOrchestrator {
                 // optimistic Dexie state, not the server's current value.
                 await db.outbox.update(newerPending.clientOpId, {
                   baseRevision: newRevision,
-                  prevValue: entity[op.fieldPath],
+                  prevValue: serverFieldValue,
                 });
               }
               break;
