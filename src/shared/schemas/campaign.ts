@@ -58,6 +58,12 @@ export const transferOwnershipRequest = z.object({
   newOwnerId: uuid,
 });
 
+// Promote/demote between member ↔ manager. Owner transitions go through
+// transfer-ownership instead, so this enum deliberately omits 'owner'.
+export const setMemberRoleRequest = z.object({
+  role: z.enum(['member', 'manager']),
+});
+
 // Invite handle: an email address OR a display-name match. The server
 // resolves it via the same case-insensitive lookup gurps-player-web
 // uses (email exact-match first, then displayName exact-match).
@@ -87,6 +93,7 @@ export type CampaignCreate = z.infer<typeof campaignCreate>;
 export type CampaignUpdate = z.infer<typeof campaignUpdate>;
 export type AddMemberRequest = z.infer<typeof addMemberRequest>;
 export type TransferOwnershipRequest = z.infer<typeof transferOwnershipRequest>;
+export type SetMemberRoleRequest = z.infer<typeof setMemberRoleRequest>;
 export type CampaignMemberOut = z.infer<typeof campaignMemberOut>;
 export type InviteRequest = z.infer<typeof inviteRequest>;
 export type InvitationOut = z.infer<typeof invitationOut>;

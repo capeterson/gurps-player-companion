@@ -20,6 +20,7 @@ import { useDialogState } from '../../hooks/useDialogState.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { CampaignInvitePanel } from './CampaignInvitePanel.tsx';
+import { CampaignMembersPanel } from './CampaignMembersPanel.tsx';
 
 interface Props {
   open: boolean;
@@ -178,7 +179,10 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
         {error && <p className="alert alert-error text-sm">{error}</p>}
 
         {(viewerRole === 'owner' || viewerRole === 'manager') && (
-          <CampaignInvitePanel campaignId={campaign.id} viewerRole={viewerRole} />
+          <>
+            <CampaignMembersPanel campaign={campaign} viewerRole={viewerRole} />
+            <CampaignInvitePanel campaignId={campaign.id} viewerRole={viewerRole} />
+          </>
         )}
 
         <div className="flex justify-end gap-2 pt-1">
