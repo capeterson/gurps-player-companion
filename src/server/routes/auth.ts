@@ -44,6 +44,7 @@ function userToOut(user: {
   displayName: string;
   createdAt: Date;
   suspendedAt: Date | null;
+  isSuperuser?: boolean;
 }) {
   return {
     id: user.id,
@@ -51,6 +52,11 @@ function userToOut(user: {
     displayName: user.displayName,
     createdAt: user.createdAt.toISOString(),
     suspendedAt: user.suspendedAt ? user.suspendedAt.toISOString() : null,
+    // The `users` table column has a NOT NULL default of false, so any
+    // direct DB read carries the flag.  When called from older paths
+    // that don't pass it (registration response uses the user just
+    // inserted), default to false.
+    isSuperuser: user.isSuperuser ?? false,
   };
 }
 

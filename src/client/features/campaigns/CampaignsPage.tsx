@@ -5,6 +5,7 @@ import type { CampaignCreate, CampaignOut } from '../../../shared/schemas/campai
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
+import { InvitationsInbox } from './InvitationsInbox.tsx';
 
 interface MeResponse {
   id: string;
@@ -53,6 +54,7 @@ export function CampaignsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <InvitationsInbox />
       <header className="flex items-end justify-between gap-4">
         <div>
           <p className="label-eyebrow">Workspace · {me.data?.displayName ?? '…'}</p>
@@ -118,10 +120,13 @@ export function CampaignsPage() {
       <div className="flex flex-col gap-3">
         {(campaigns.data ?? []).map((c) => {
           const isOwner = myId === c.ownerId;
+          const myMembership = c.members.find((m) => m.userId === myId);
+          const isManager = !isOwner && myMembership?.role === 'manager';
+          const canManage = isOwner || isManager;
           return (
             <Link
               key={c.id}
-              to={`/log?campaign=${c.id}`}
+              to={`/campaigns/${c.id}`}
               className={`card relative flex items-center gap-4 px-5 py-4 transition hover:border-border-strong ${
                 isOwner ? 'border-l-[3px] border-l-primary' : ''
               }`}
@@ -141,8 +146,10 @@ export function CampaignsPage() {
                 </div>
               </div>
               <AvatarStack names={c.members.map((m) => m.displayName)} max={6} />
-              <span className={`chip ${isOwner ? 'on' : ''}`}>{isOwner ? 'Owner' : 'Player'}</span>
-              {isOwner && (
+              <span className={`chip ${isOwner ? 'on' : ''}`}>
+                {isOwner ? 'Owner' : isManager ? 'Manager' : 'Player'}
+              </span>
+              {canManage && (
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs"
@@ -166,13 +173,20 @@ export function CampaignsPage() {
         })}
       </div>
 
-      {settingsCampaign && (
-        <CampaignSettingsDialog
-          open={true}
-          campaign={settingsCampaign}
-          onClose={() => setSettingsId(null)}
-        />
-      )}
+      {settingsCampaign &&
+        (() => {
+          const myMembership = settingsCampaign.members.find((m) => m.userId === myId);
+          const viewerRole =
+            myId === settingsCampaign.ownerId ? 'owner' : (myMembership?.role ?? 'member');
+          return (
+            <CampaignSettingsDialog
+              open={true}
+              campaign={settingsCampaign}
+              viewerRole={viewerRole}
+              onClose={() => setSettingsId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
