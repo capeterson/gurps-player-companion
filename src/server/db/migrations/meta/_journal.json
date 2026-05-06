@@ -50,6 +50,13 @@
       "when": 1778015800298,
       "tag": "0006_chief_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778039000000,
+      "tag": "0007_campaign_invitations",
+      "breakpoints": true
     }
   ]
 }

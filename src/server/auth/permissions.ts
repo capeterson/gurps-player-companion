@@ -53,6 +53,21 @@ export async function requireCampaignOwner(
   return campaign;
 }
 
+/**
+ * Either an owner or a manager — used by the invitations API where
+ * managers can invite members but only the owner can promote to manager.
+ */
+export async function requireCampaignAdmin(
+  campaignId: string,
+  userId: string,
+): Promise<{ campaign: DbCampaign; role: CampaignRole }> {
+  const result = await loadCampaignOr403(campaignId, userId);
+  if (result.role !== 'owner' && result.role !== 'manager') {
+    throw new HTTPException(403, { message: 'owner or manager required' });
+  }
+  return result;
+}
+
 export async function requireCampaignMember(
   campaignId: string,
   userId: string,

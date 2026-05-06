@@ -11,14 +11,21 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import type { CampaignOut, CampaignUpdate } from '../../../shared/schemas/campaign.ts';
+import type {
+  CampaignOut,
+  CampaignRole,
+  CampaignUpdate,
+} from '../../../shared/schemas/campaign.ts';
 import { useDialogState } from '../../hooks/useDialogState.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { CampaignInvitePanel } from './CampaignInvitePanel.tsx';
 
 interface Props {
   open: boolean;
   campaign: CampaignOut;
+  /** Role of the viewer in this campaign — owner or manager unlocks invitations. */
+  viewerRole: CampaignRole;
   onClose: () => void;
 }
 
@@ -30,7 +37,7 @@ function nullableIntFromInput(s: string): number | null | 'invalid' {
   return n;
 }
 
-export function CampaignSettingsDialog({ open, campaign, onClose }: Props) {
+export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: Props) {
   const ref = useDialogState(open);
   const toasts = useToasts();
   const qc = useQueryClient();
@@ -169,6 +176,10 @@ export function CampaignSettingsDialog({ open, campaign, onClose }: Props) {
         </label>
 
         {error && <p className="alert alert-error text-sm">{error}</p>}
+
+        {(viewerRole === 'owner' || viewerRole === 'manager') && (
+          <CampaignInvitePanel campaignId={campaign.id} viewerRole={viewerRole} />
+        )}
 
         <div className="flex justify-end gap-2 pt-1">
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>

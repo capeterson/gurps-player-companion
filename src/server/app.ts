@@ -12,6 +12,7 @@ import { campaignsRouter } from './routes/campaigns.ts';
 import { characterSubResourcesRouter } from './routes/characterSubResources.ts';
 import { charactersRouter } from './routes/characters.ts';
 import { healthRouter } from './routes/health.ts';
+import { invitationsRouter } from './routes/invitations.ts';
 import { syncRouter } from './routes/sync.ts';
 import { createSyncWsHandler } from './routes/syncWs.ts';
 import { attachStaticHandler } from './static.ts';
@@ -35,6 +36,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', authRouter);
   app.route('/api/v1', apiKeysRouter);
   app.route('/api/v1', campaignsRouter);
+  app.route('/api/v1', invitationsRouter);
   app.route('/api/v1', campaignLibraryRouter);
   app.route('/api/v1', adventureLogRouter);
   app.route('/api/v1', charactersRouter);

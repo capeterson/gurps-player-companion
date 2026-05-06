@@ -5,8 +5,11 @@ import { isoTimestamp, revision, uuid } from './common.ts';
 export const campaignName = z.string().min(1).max(120).trim();
 export const campaignDescription = z.string().max(20_000).nullable();
 
-export const campaignRole = z.enum(['owner', 'member']);
+export const campaignRole = z.enum(['owner', 'member', 'manager']);
 export type CampaignRole = z.infer<typeof campaignRole>;
+
+export const campaignInvitationStatus = z.enum(['pending', 'accepted', 'rejected', 'cancelled']);
+export type CampaignInvitationStatus = z.infer<typeof campaignInvitationStatus>;
 
 export const campaignMemberOut = z.object({
   userId: uuid,
@@ -55,9 +58,35 @@ export const transferOwnershipRequest = z.object({
   newOwnerId: uuid,
 });
 
+// Invite handle: an email address OR a display-name match. The server
+// resolves it via the same case-insensitive lookup gurps-player-web
+// uses (email exact-match first, then displayName exact-match).
+export const inviteRequest = z.object({
+  handle: z.string().min(1).max(255).trim(),
+  /** Defaults to 'member'. Only owners may invite at the manager tier. */
+  role: campaignRole.optional(),
+});
+
+export const invitationOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  campaignName: z.string(),
+  inviterId: uuid,
+  inviterDisplayName: z.string(),
+  inviteeId: uuid,
+  inviteeDisplayName: z.string(),
+  inviteeEmail: email,
+  role: campaignRole,
+  status: campaignInvitationStatus,
+  createdAt: isoTimestamp,
+  decidedAt: isoTimestamp.nullable(),
+});
+
 export type CampaignOut = z.infer<typeof campaignOut>;
 export type CampaignCreate = z.infer<typeof campaignCreate>;
 export type CampaignUpdate = z.infer<typeof campaignUpdate>;
 export type AddMemberRequest = z.infer<typeof addMemberRequest>;
 export type TransferOwnershipRequest = z.infer<typeof transferOwnershipRequest>;
 export type CampaignMemberOut = z.infer<typeof campaignMemberOut>;
+export type InviteRequest = z.infer<typeof inviteRequest>;
+export type InvitationOut = z.infer<typeof invitationOut>;

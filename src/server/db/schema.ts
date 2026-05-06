@@ -63,7 +63,14 @@ export const postureEnum = pgEnum('posture', [
 
 export const visibilityEnum = pgEnum('log_visibility', ['campaign', 'private']);
 
-export const campaignRoleEnum = pgEnum('campaign_role', ['owner', 'member']);
+export const campaignRoleEnum = pgEnum('campaign_role', ['owner', 'member', 'manager']);
+
+export const campaignInvitationStatusEnum = pgEnum('campaign_invitation_status', [
+  'pending',
+  'accepted',
+  'rejected',
+  'cancelled',
+]);
 
 // ---------- columns helpers ----------
 
@@ -173,6 +180,33 @@ export const campaignMemberships = pgTable(
   },
   (t) => ({
     membershipKey: uniqueIndex('campaign_memberships_campaign_user_key').on(t.campaignId, t.userId),
+  }),
+);
+
+export const campaignInvitations = pgTable(
+  'campaign_invitations',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    inviterId: uuid('inviter_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    inviteeId: uuid('invitee_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: campaignRoleEnum('role').notNull(),
+    status: campaignInvitationStatusEnum('status').notNull().default('pending'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    campaignIdx: index('campaign_invitations_campaign_idx').on(t.campaignId),
+    inviteeIdx: index('campaign_invitations_invitee_idx').on(t.inviteeId),
+    statusIdx: index('campaign_invitations_status_idx').on(t.status),
   }),
 );
 
@@ -451,6 +485,7 @@ export type DbInventoryItem = typeof inventoryItems.$inferSelect;
 export type DbCombatState = typeof combatStates.$inferSelect;
 export type DbCampaign = typeof campaigns.$inferSelect;
 export type DbCampaignMembership = typeof campaignMemberships.$inferSelect;
+export type DbCampaignInvitation = typeof campaignInvitations.$inferSelect;
 export type DbAdventureLogEntry = typeof adventureLogEntries.$inferSelect;
 export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
