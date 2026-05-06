@@ -171,13 +171,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "prefix": {
-          "name": "prefix",
-          "type": "varchar(16)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
         "key_hash": {
           "name": "key_hash",
           "type": "varchar(64)",

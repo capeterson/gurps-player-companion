@@ -6,7 +6,6 @@ export const apiKeyName = z.string().min(1).max(80).trim();
 export const apiKeyOut = z.object({
   id: uuid,
   name: apiKeyName,
-  prefix: z.string().max(16),
   createdAt: isoTimestamp,
   lastUsedAt: isoTimestamp.nullable(),
 });

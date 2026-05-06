@@ -102,7 +102,6 @@ export function ApiKeysSection() {
           >
             <div className="min-w-0">
               <span className="font-medium">{k.name}</span>
-              <code className="text-xs ml-2">{k.prefix}…</code>
               <span className="ml-2 text-xs text-base-content/60">
                 created {new Date(k.createdAt).toLocaleDateString()}
                 {k.lastUsedAt

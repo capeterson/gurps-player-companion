@@ -40,7 +40,7 @@ function bearer(token: string) {
 }
 
 describe('POST /api/v1/auth/api-keys', () => {
-  it('creates a key; prefix matches first 12 chars of plaintextKey', async () => {
+  it('creates a key; plaintextKey has gpc_ prefix format', async () => {
     const { accessToken } = await register('create');
     const res = await app.request('/api/v1/auth/api-keys', {
       method: 'POST',
@@ -48,9 +48,8 @@ describe('POST /api/v1/auth/api-keys', () => {
       body: JSON.stringify({ name: 'test key' }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { apiKey: { prefix: string }; plaintextKey: string };
+    const body = (await res.json()) as { apiKey: Record<string, unknown>; plaintextKey: string };
     expect(body.plaintextKey).toMatch(/^gpc_[A-Za-z0-9_-]+$/);
-    expect(body.apiKey.prefix).toBe(body.plaintextKey.slice(0, 12));
   });
 
   it('422 on empty name', async () => {
@@ -75,7 +74,7 @@ describe('POST /api/v1/auth/api-keys', () => {
 });
 
 describe('GET /api/v1/auth/api-keys', () => {
-  it('returns keys with prefix field; omits plaintextKey and keyHash', async () => {
+  it('returns keys; omits plaintextKey, keyHash, and prefix', async () => {
     const { accessToken } = await register('list-fields');
     await app.request('/api/v1/auth/api-keys', {
       method: 'POST',
@@ -89,9 +88,9 @@ describe('GET /api/v1/auth/api-keys', () => {
     const body = (await res.json()) as Record<string, unknown>[];
     expect(body.length).toBeGreaterThan(0);
     const key = body[0];
-    expect(key).toHaveProperty('prefix');
     expect(key).not.toHaveProperty('plaintextKey');
     expect(key).not.toHaveProperty('keyHash');
+    expect(key).not.toHaveProperty('prefix');
   });
 
   it("returns only the current user's keys", async () => {

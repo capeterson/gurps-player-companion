@@ -45,7 +45,6 @@ import { apiKeysApi } from '../../lib/apiKeys.ts';
 const fakeKey = {
   id: 'key-uuid-1',
   name: 'My Script',
-  prefix: 'gpc_abc12345',
   createdAt: '2026-01-01T00:00:00.000Z',
   lastUsedAt: null,
 };
@@ -83,12 +82,11 @@ describe('ApiKeysSection', () => {
     });
   });
 
-  it('renders key rows with name, prefix, and created date', async () => {
+  it('renders key rows with name and created date', async () => {
     vi.mocked(apiKeysApi.list).mockResolvedValue([fakeKey]);
     renderSection();
     await waitFor(() => {
       expect(screen.getByText('My Script')).toBeInTheDocument();
-      expect(screen.getByText(/gpc_abc12345/)).toBeInTheDocument();
       expect(screen.getByText(/never used/)).toBeInTheDocument();
     });
   });
@@ -228,9 +226,8 @@ describe('ApiKeysSection', () => {
     await waitFor(() => screen.getByText('Revoke API key'));
 
     // The ConfirmDialog has a "Revoke" confirm button (btn-error)
-    const revokeBtns = screen.getAllByRole('button', { name: /^revoke$/i });
     // The confirm button is inside the modal (the list row button has aria-label "Revoke My Script")
-    const confirmBtn = revokeBtns[0];
+    const confirmBtn = screen.getAllByRole('button', { name: /^revoke$/i })[0] as HTMLElement;
     await user.click(confirmBtn);
 
     await waitFor(() => {

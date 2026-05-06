@@ -28,7 +28,6 @@ function rowToOut(row: typeof apiKeys.$inferSelect) {
   return {
     id: row.id,
     name: row.name,
-    prefix: row.prefix,
     createdAt: row.createdAt.toISOString(),
     lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
   };
@@ -89,7 +88,7 @@ router.openapi(
     const keyHash = hashApiKey(plaintextKey);
     const [row] = await getDb()
       .insert(apiKeys)
-      .values({ userId: user.id, name: body.name, keyHash, prefix: plaintextKey.slice(0, 12) })
+      .values({ userId: user.id, name: body.name, keyHash })
       .returning();
     if (!row) throw new HTTPException(500, { message: 'insert failed' });
     return c.json({ apiKey: rowToOut(row), plaintextKey }, 201);
