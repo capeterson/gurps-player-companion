@@ -44,6 +44,7 @@ import {
   MAX_ATTEMPTS,
   backoffMs,
   countPending,
+  enqueueFieldPatch,
   readDrainableOps,
   setOutboxStatus,
 } from './outbox.ts';
@@ -368,7 +369,40 @@ class SyncOrchestrator {
         case 'rejected':
         case 'unauthorized':
         case 'conflict':
+          await this.rollbackLocally(op, outcome);
+          break;
         case 'stale_base': {
+          // For patch ops: if the server returned the current entity, re-enqueue
+          // with the updated revision rather than rolling back. This avoids error
+          // toasts when patchMany enqueues multiple fields with the same snapshot
+          // revision — the first op advances the server, making later ops stale
+          // even though they are valid changes that haven't been applied yet.
+          if (
+            op.command === 'patch' &&
+            op.fieldPath !== undefined &&
+            outcome.latestEntity &&
+            typeof outcome.latestEntity === 'object'
+          ) {
+            const entity = outcome.latestEntity as Record<string, unknown>;
+            const newRevision =
+              typeof entity.revision === 'number' ? entity.revision : undefined;
+            if (newRevision !== undefined) {
+              await this.stampRevision(op.entityClass, op.entityId, newRevision);
+              await db.outbox.delete(op.clientOpId);
+              await enqueueFieldPatch({
+                entityClass: op.entityClass,
+                entityId: op.entityId,
+                fieldPath: op.fieldPath,
+                attemptedValue: op.attemptedValue,
+                prevValue: entity[op.fieldPath],
+                baseRevision: newRevision,
+                humanName: op.humanName,
+                flashKey: op.flashKey,
+                characterId: op.parentId ?? undefined,
+              });
+              break;
+            }
+          }
           await this.rollbackLocally(op, outcome);
           break;
         }

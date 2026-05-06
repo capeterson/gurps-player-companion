@@ -126,7 +126,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <span>{t.message}</span>
           <button
             type="button"
-            className="btn btn-ghost btn-xs"
+            className="btn btn-ghost btn-xs ml-auto shrink-0"
             onClick={() => dismiss(t.id)}
             aria-label="Dismiss notification"
           >

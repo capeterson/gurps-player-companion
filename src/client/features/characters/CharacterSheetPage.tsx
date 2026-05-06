@@ -195,12 +195,14 @@ function TempBoostButton({
   baseValue,
   tempValue,
   characterId,
+  displayScale,
 }: {
   label: string;
   field: AttrField;
   baseValue: number;
   tempValue: number;
   characterId: string;
+  displayScale?: number;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
   const { onSave, flashKey } = buildSave(field, { humanName: `${label} temp` });
@@ -237,6 +239,7 @@ function TempBoostButton({
             void onSave(v);
           }}
           onClose={() => setOpen(false)}
+          displayScale={displayScale}
         />
       )}
     </span>
@@ -362,6 +365,7 @@ function SecondaryModCell({
   tempValue,
   derived,
   derivedDisplay,
+  modScale,
   infoKey,
   characterId,
   canWrite,
@@ -372,13 +376,21 @@ function SecondaryModCell({
   tempField: AttrField;
   tempValue: number;
   derived: number;
-  /** Optional override for the derived display (e.g. "5.50 (×4)" for Speed). */
+  /** Optional override for the derived display (e.g. "5.50" for Speed). */
   derivedDisplay?: string;
+  /** Scale factor for displaying mod/temp values (e.g. 0.25 converts quarter-units to decimal). */
+  modScale?: number;
   infoKey: SecondaryModKey;
   characterId: string;
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
+  const fmtMod = (v: number) =>
+    modScale ? (v * modScale).toFixed(2) : String(v);
+  const fmtDelta = (v: number) => {
+    const s = fmtMod(Math.abs(v));
+    return v >= 0 ? `+${s}` : `-${s}`;
+  };
   const tooltip = (
     <div className="grid gap-1.5">
       <div className="font-semibold text-base-content">{info.label}</div>
@@ -409,26 +421,27 @@ function SecondaryModCell({
           <>
             <span
               className="num text-xl font-semibold text-warning"
-              title={`Effective ${derivedDisplay ?? derived} (base ${baseDerived} ${tempValue >= 0 ? '+' : ''}${tempValue})`}
+              title={`Effective ${derivedDisplay ?? derived} (base ${fmtMod(baseDerived)} ${fmtDelta(tempValue)})`}
             >
               {derivedDisplay ?? derived}
             </span>
             <span className="num text-[11px] text-base-content/60 flex items-baseline gap-0.5">
-              <AttrInput
-                label={`${label} mod`}
-                field={modField}
-                value={modValue}
-                characterId={characterId}
-                canWrite={canWrite}
-                min={-50}
-                max={50}
-                width="w-9"
-                size="sm"
-              />
-              <span className="text-warning">
-                {tempValue >= 0 ? '+' : ''}
-                {tempValue}
-              </span>
+              {!canWrite && modScale ? (
+                <span className="num" aria-label={`${label} mod`}>{fmtMod(modValue)}</span>
+              ) : (
+                <AttrInput
+                  label={`${label} mod`}
+                  field={modField}
+                  value={modValue}
+                  characterId={characterId}
+                  canWrite={canWrite}
+                  min={-50}
+                  max={50}
+                  width="w-9"
+                  size="sm"
+                />
+              )}
+              <span className="text-warning">{fmtDelta(tempValue)}</span>
             </span>
           </>
         ) : (
@@ -436,17 +449,21 @@ function SecondaryModCell({
             <span className="num text-xl font-semibold">{derivedDisplay ?? derived}</span>
             <span className="num text-[11px] text-base-content/60 flex items-baseline gap-1">
               <span>mod</span>
-              <AttrInput
-                label={`${label} mod`}
-                field={modField}
-                value={modValue}
-                characterId={characterId}
-                canWrite={canWrite}
-                min={-50}
-                max={50}
-                width="w-9"
-                size="sm"
-              />
+              {!canWrite && modScale ? (
+                <span className="num" aria-label={`${label} mod`}>{fmtMod(modValue)}</span>
+              ) : (
+                <AttrInput
+                  label={`${label} mod`}
+                  field={modField}
+                  value={modValue}
+                  characterId={characterId}
+                  canWrite={canWrite}
+                  min={-50}
+                  max={50}
+                  width="w-9"
+                  size="sm"
+                />
+              )}
             </span>
           </>
         )}
@@ -457,6 +474,7 @@ function SecondaryModCell({
             baseValue={baseDerived}
             tempValue={tempValue}
             characterId={characterId}
+            displayScale={modScale}
           />
         )}
       </span>
@@ -467,9 +485,11 @@ function SecondaryModCell({
 function IdentityPanel({
   character,
   canWrite,
+  campaigns,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
+  campaigns: CampaignSummary[];
 }) {
   // Bundled saver -- spreading `{ onSave, flashKey }` into useDraftField
   // wires the field to the flashBus so async server rejections trigger
@@ -592,6 +612,38 @@ function IdentityPanel({
             />
           ) : (
             <span>{character.weight ?? '—'}</span>
+          )}
+        </div>
+        <div className="form-control">
+          <span className="label-text-alt label-eyebrow">Campaign</span>
+          {canWrite ? (
+            <select
+              aria-label="campaign"
+              className="select select-bordered select-sm"
+              value={character.campaignId ?? ''}
+              onChange={(e) => {
+                const next = e.target.value || null;
+                void enqueueFieldPatch({
+                  entityClass: 'character',
+                  entityId: character.id,
+                  fieldPath: 'campaignId',
+                  attemptedValue: next,
+                  humanName: 'campaign',
+                  flashKey: makeFlashKey('character', character.id, 'campaignId'),
+                });
+              }}
+            >
+              <option value="">No campaign</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>
+              {campaigns.find((c) => c.id === character.campaignId)?.name ?? '—'}
+            </span>
           )}
         </div>
       </div>
@@ -779,20 +831,14 @@ function SecondaryModsPanel({
           canWrite={canWrite}
         />
         <SecondaryModCell
-          // The underlying field is in quarter-units of Basic Speed, so
-          // the row is labelled "Speed (¼)" — Codex review on PR #21
-          // flagged the previous "Basic Speed" label as misleading
-          // because the inline temp caption and the TempBoostPopover
-          // preview are quarters-arithmetic (e.g. "20 + (+1) = 21").
-          // The decimal headline stays via `derivedDisplay` with a
-          // "(×4)" hint, matching the legacy gurps-player-web pattern.
-          label="Speed (¼)"
+          label="Speed"
           modField="speedQuarterMod"
           modValue={character.speedQuarterMod}
           tempField="tempSpeedQuarterMod"
           tempValue={character.tempSpeedQuarterMod}
           derived={character.derived.basicSpeedQuarters}
-          derivedDisplay={`${character.derived.basicSpeed.toFixed(2)} (×4)`}
+          derivedDisplay={character.derived.basicSpeed.toFixed(2)}
+          modScale={0.25}
           infoKey="speed"
           characterId={character.id}
           canWrite={canWrite}
@@ -1371,7 +1417,9 @@ export function CharacterSheetPage() {
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignSummary[]>('/campaigns'),
-    enabled: !!character?.campaignId,
+    // Always fetch when the user is known so the Identity panel can offer
+    // the full campaign list — even for characters not yet in a campaign.
+    enabled: !!me.data,
   });
 
   if (character === undefined) {
@@ -1487,7 +1535,13 @@ export function CharacterSheetPage() {
 
       <div>
         {tab === 'Combat' && <CombatPanel character={character} canWrite={canWrite} />}
-        {tab === 'Identity' && <IdentityPanel character={character} canWrite={canWrite} />}
+        {tab === 'Identity' && (
+          <IdentityPanel
+            character={character}
+            canWrite={canWrite}
+            campaigns={campaigns.data ?? []}
+          />
+        )}
         {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
         {tab === 'Skills' && <SkillsPanel character={character} canWrite={canWrite} />}
         {tab === 'Inventory' && <InventoryPanel character={character} canWrite={canWrite} />}

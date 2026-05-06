@@ -20,6 +20,8 @@ interface TempBoostPopoverProps {
   currentTemp: number;
   onApply: (next: number) => void;
   onClose: () => void;
+  /** Multiply stored integer values by this scale for display (e.g. 0.25 for Speed quarter-units). */
+  displayScale?: number;
 }
 
 export function TempBoostPopover({
@@ -28,6 +30,7 @@ export function TempBoostPopover({
   currentTemp,
   onApply,
   onClose,
+  displayScale = 1,
 }: TempBoostPopoverProps) {
   const [raw, setRaw] = useState<string>(String(currentTemp));
   const ref = useRef<HTMLDivElement>(null);
@@ -49,6 +52,9 @@ export function TempBoostPopover({
   const parsed = Number.parseInt(raw, 10);
   const numValue = Number.isNaN(parsed) ? 0 : parsed;
   const effective = baseValue + numValue;
+  const fmt = (n: number) =>
+    displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n);
+  const stepStr = displayScale !== 1 ? (displayScale).toFixed(2) : '1';
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -91,7 +97,7 @@ export function TempBoostPopover({
           className="btn btn-sm btn-ghost"
           aria-label="Decrease"
         >
-          −1
+          −{stepStr}
         </button>
         <input
           type="text"
@@ -107,12 +113,12 @@ export function TempBoostPopover({
           className="btn btn-sm btn-ghost"
           aria-label="Increase"
         >
-          +1
+          +{stepStr}
         </button>
       </div>
       <div className="num text-[11px] text-muted mb-3">
-        {baseValue} + ({numValue >= 0 ? '+' : ''}
-        {numValue}) = <span className="text-base-content font-semibold">{effective}</span>
+        {fmt(baseValue)} + ({numValue >= 0 ? '+' : ''}{fmt(numValue)}) ={' '}
+        <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
       <div className="flex gap-1.5">
         <button
