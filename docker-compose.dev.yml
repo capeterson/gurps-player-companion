@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: gurps
       POSTGRES_DB: gurps
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - db_data_dev:/var/lib/postgresql
     healthcheck:
