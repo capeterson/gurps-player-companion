@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import { createApp } from '../app.ts';
-import type { AppConfig } from '../config.ts';
+import { resetConfigCache, type AppConfig } from '../config.ts';
 
 const testConfig: AppConfig = {
   environment: 'test',
@@ -21,6 +21,13 @@ const testConfig: AppConfig = {
   apiKeyPepper: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
   corsOrigins: [],
 };
+
+// Seed process.env so getDb() → loadConfig() finds the right database URL
+// and JWT secret when running outside CI without those variables exported.
+process.env.DATABASE_URL = testConfig.databaseUrl;
+process.env.JWT_SECRET = testConfig.jwtSecret;
+process.env.ENVIRONMENT = testConfig.environment;
+resetConfigCache();
 
 const app = createApp(testConfig);
 
