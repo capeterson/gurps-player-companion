@@ -16,6 +16,8 @@ export const userOut = z.object({
   displayName,
   createdAt: isoTimestamp,
   suspendedAt: isoTimestamp.nullable(),
+  /** True for instance admins; gates the Admin nav link client-side. */
+  isSuperuser: z.boolean(),
 });
 
 export const registerRequest = z.object({

@@ -15,6 +15,7 @@ import {
   campaignMemberships,
   campaigns,
   characters,
+  users as usersTbl,
 } from '../db/schema.ts';
 
 export type CampaignRole = DbCampaignMembership['role'];
@@ -42,6 +43,17 @@ export async function loadCampaignOr403(
   }
   if (!row.membership) throw new HTTPException(403, { message: 'forbidden' });
   return { campaign: row.campaign, role: row.membership.role };
+}
+
+export async function requireSuperuser(userId: string): Promise<void> {
+  const db = getDb();
+  const rows = await db
+    .select({ isSuperuser: usersTbl.isSuperuser })
+    .from(usersTbl)
+    .where(eq(usersTbl.id, userId));
+  if (!rows[0] || !rows[0].isSuperuser) {
+    throw new HTTPException(403, { message: 'superuser required' });
+  }
 }
 
 export async function requireCampaignOwner(

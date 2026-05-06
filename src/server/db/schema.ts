@@ -89,11 +89,23 @@ export const users = pgTable(
     passwordHash: text('password_hash').notNull(),
     displayName: varchar('display_name', { length: 80 }).notNull(),
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    /**
+     * Instance-admin gate.  Set ONLY by direct DB edit; the admin router
+     * is the only consumer.  Never exposed via the public auth/me payload.
+     */
+    isSuperuser: boolean('is_superuser').notNull().default(false),
+    /**
+     * 30-day soft-delete timer set by /admin/users/{id}/purge.  A future
+     * sweep job hard-deletes users whose timer has elapsed; for now the
+     * column itself is the contract.
+     */
+    purgeScheduledAt: timestamp('purge_scheduled_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => ({
     emailKey: uniqueIndex('users_email_key').on(t.email),
+    purgeIdx: index('users_purge_scheduled_at_idx').on(t.purgeScheduledAt),
   }),
 );
 
