@@ -134,9 +134,7 @@ export function TempBoostPopover({
         {fmtInput(displayDelta)}) ={' '}
         <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
-      {isOffStep && (
-        <p className="text-[11px] text-error mb-2">must be a multiple of {stepStr}</p>
-      )}
+      {isOffStep && <p className="text-[11px] text-error mb-2">must be a multiple of {stepStr}</p>}
       <div className="flex gap-1.5">
         <button
           type="button"
