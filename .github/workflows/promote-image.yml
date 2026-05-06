@@ -25,8 +25,10 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository }}
     steps:
       - name: Validate semver input
+        env:
+          VER: ${{ inputs.version }}
         run: |
-          echo "${{ inputs.version }}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
+          printf '%s\n' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' \
             || { echo "version must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-PRERELEASE"; exit 1; }
 
       - uses: actions/checkout@v4
@@ -41,6 +43,28 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ensure version is unused
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VER" >/dev/null 2>&1; then
+            echo "::error::git tag v$VER already exists"
+            exit 1
+          fi
+          if docker buildx imagetools inspect "$IMAGE:v$VER" >/dev/null 2>&1; then
+            echo "::error::image tag v$VER already exists in $IMAGE"
+            exit 1
+          fi
+
+      - name: Create and push git tag
+        env:
+          VER: ${{ inputs.version }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag -a "v$VER" -m "Release v$VER"
+          git push origin "v$VER"
 
       - name: Re-tag image in GHCR
         id: retag
@@ -57,13 +81,6 @@ jobs:
             echo "prerelease=true" >>"$GITHUB_OUTPUT"
           fi
           docker buildx imagetools create "${TAGS[@]}" "$IMAGE:$SRC"
-
-      - name: Create and push git tag
-        run: |
-          git config user.name  'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
