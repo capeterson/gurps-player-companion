@@ -65,8 +65,11 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
         // fall through to index.html
       }
     }
-    const indexPath = join(ROOT, 'index.html');
-    return new Response(Bun.file(indexPath), {
+    // Per AGENTS.md, /admin/* is served by a separate Vite entry
+    // (admin.html) so the regular client bundle stays admin-free.
+    const isAdmin = url.pathname === '/admin' || url.pathname.startsWith('/admin/');
+    const fallbackPath = join(ROOT, isAdmin ? 'admin.html' : 'index.html');
+    return new Response(Bun.file(fallbackPath), {
       headers: { 'content-type': 'text/html; charset=utf-8' },
     });
   });

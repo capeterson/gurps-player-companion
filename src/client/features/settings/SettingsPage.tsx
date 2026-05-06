@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ApiError, api } from '../../lib/api.ts';
 import { formatBytes, readLocalDbStatus } from '../../lib/localDbStatus.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { ApiKeysSection } from './ApiKeysSection.tsx';
 
 export function SettingsPage() {
   const toasts = useToasts();
@@ -170,6 +171,8 @@ export function SettingsPage() {
           )}
         </section>
       </section>
+
+      <ApiKeysSection />
     </div>
   );
 }

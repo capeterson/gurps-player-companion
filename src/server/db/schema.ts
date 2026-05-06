@@ -63,7 +63,14 @@ export const postureEnum = pgEnum('posture', [
 
 export const visibilityEnum = pgEnum('log_visibility', ['campaign', 'private']);
 
-export const campaignRoleEnum = pgEnum('campaign_role', ['owner', 'member']);
+export const campaignRoleEnum = pgEnum('campaign_role', ['owner', 'member', 'manager']);
+
+export const campaignInvitationStatusEnum = pgEnum('campaign_invitation_status', [
+  'pending',
+  'accepted',
+  'rejected',
+  'cancelled',
+]);
 
 // ---------- columns helpers ----------
 
@@ -82,11 +89,23 @@ export const users = pgTable(
     passwordHash: text('password_hash').notNull(),
     displayName: varchar('display_name', { length: 80 }).notNull(),
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    /**
+     * Instance-admin gate.  Set ONLY by direct DB edit; the admin router
+     * is the only consumer.  Never exposed via the public auth/me payload.
+     */
+    isSuperuser: boolean('is_superuser').notNull().default(false),
+    /**
+     * 30-day soft-delete timer set by /admin/users/{id}/purge.  A future
+     * sweep job hard-deletes users whose timer has elapsed; for now the
+     * column itself is the contract.
+     */
+    purgeScheduledAt: timestamp('purge_scheduled_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => ({
     emailKey: uniqueIndex('users_email_key').on(t.email),
+    purgeIdx: index('users_purge_scheduled_at_idx').on(t.purgeScheduledAt),
   }),
 );
 
@@ -173,6 +192,59 @@ export const campaignMemberships = pgTable(
   },
   (t) => ({
     membershipKey: uniqueIndex('campaign_memberships_campaign_user_key').on(t.campaignId, t.userId),
+  }),
+);
+
+// Generic per-user notifications. The discriminator is `type`; the payload
+// shape is owned by whoever emits the row.  See NOTIFICATION_TYPES below
+// for the values currently in use.
+export const NOTIFICATION_TYPE_CAMPAIGN_INVITATION = 'campaign_invitation' as const;
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: varchar('type', { length: 40 }).notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
+    relatedId: uuid('related_id'),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    userIdx: index('notifications_user_idx').on(t.userId),
+    relatedIdx: index('notifications_related_idx').on(t.relatedId),
+    readIdx: index('notifications_read_idx').on(t.readAt),
+  }),
+);
+
+export const campaignInvitations = pgTable(
+  'campaign_invitations',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    inviterId: uuid('inviter_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    inviteeId: uuid('invitee_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: campaignRoleEnum('role').notNull(),
+    status: campaignInvitationStatusEnum('status').notNull().default('pending'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    campaignIdx: index('campaign_invitations_campaign_idx').on(t.campaignId),
+    inviteeIdx: index('campaign_invitations_invitee_idx').on(t.inviteeId),
+    statusIdx: index('campaign_invitations_status_idx').on(t.status),
   }),
 );
 
@@ -451,6 +523,8 @@ export type DbInventoryItem = typeof inventoryItems.$inferSelect;
 export type DbCombatState = typeof combatStates.$inferSelect;
 export type DbCampaign = typeof campaigns.$inferSelect;
 export type DbCampaignMembership = typeof campaignMemberships.$inferSelect;
+export type DbCampaignInvitation = typeof campaignInvitations.$inferSelect;
+export type DbNotification = typeof notifications.$inferSelect;
 export type DbAdventureLogEntry = typeof adventureLogEntries.$inferSelect;
 export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;

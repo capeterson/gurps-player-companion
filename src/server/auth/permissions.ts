@@ -15,6 +15,7 @@ import {
   campaignMemberships,
   campaigns,
   characters,
+  users as usersTbl,
 } from '../db/schema.ts';
 
 export type CampaignRole = DbCampaignMembership['role'];
@@ -44,6 +45,17 @@ export async function loadCampaignOr403(
   return { campaign: row.campaign, role: row.membership.role };
 }
 
+export async function requireSuperuser(userId: string): Promise<void> {
+  const db = getDb();
+  const rows = await db
+    .select({ isSuperuser: usersTbl.isSuperuser })
+    .from(usersTbl)
+    .where(eq(usersTbl.id, userId));
+  if (!rows[0] || !rows[0].isSuperuser) {
+    throw new HTTPException(403, { message: 'superuser required' });
+  }
+}
+
 export async function requireCampaignOwner(
   campaignId: string,
   userId: string,
@@ -51,6 +63,21 @@ export async function requireCampaignOwner(
   const { campaign, role } = await loadCampaignOr403(campaignId, userId);
   if (role !== 'owner') throw new HTTPException(403, { message: 'owner required' });
   return campaign;
+}
+
+/**
+ * Either an owner or a manager — used by the invitations API where
+ * managers can invite members but only the owner can promote to manager.
+ */
+export async function requireCampaignAdmin(
+  campaignId: string,
+  userId: string,
+): Promise<{ campaign: DbCampaign; role: CampaignRole }> {
+  const result = await loadCampaignOr403(campaignId, userId);
+  if (result.role !== 'owner' && result.role !== 'manager') {
+    throw new HTTPException(403, { message: 'owner or manager required' });
+  }
+  return result;
 }
 
 export async function requireCampaignMember(

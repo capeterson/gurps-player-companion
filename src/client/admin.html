@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en" data-theme="arcane-dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GURPS Player Companion · Admin</title>
+    <meta name="theme-color" content="#0e1116" />
+    <!--
+      Admin app intentionally does NOT register the PWA service worker
+      and is NOT covered by the manifest.  See AGENTS.md: "No instance
+      admin in the PWA — admin code never ships in the client bundle."
+      This is a separate Vite entry that loads only when an admin
+      navigates to /admin/*.
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/admin/main.tsx"></script>
+  </body>
+</html>

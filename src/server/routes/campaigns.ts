@@ -6,11 +6,16 @@ import {
   campaignCreate,
   campaignOut,
   campaignUpdate,
+  setMemberRoleRequest,
   transferOwnershipRequest,
 } from '../../shared/schemas/campaign.ts';
 import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
-import { loadCampaignOr403, requireCampaignOwner } from '../auth/permissions.ts';
+import {
+  loadCampaignOr403,
+  requireCampaignAdmin,
+  requireCampaignOwner,
+} from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
@@ -332,10 +337,55 @@ router.openapi(
 
 router.openapi(
   createRoute({
+    method: 'patch',
+    path: '/campaigns/{id}/members/{userId}',
+    tags: ['campaigns'],
+    summary:
+      'Owner-only: promote a member to manager or demote back to member. Owner transitions go through transfer-ownership.',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ id: uuid, userId: uuid }),
+      body: { required: true, content: { 'application/json': { schema: setMemberRoleRequest } } },
+    },
+    responses: {
+      200: {
+        description: 'Updated campaign',
+        content: { 'application/json': { schema: campaignOut } },
+      },
+      400: errorResponse('Invalid'),
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, userId } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const campaign = await requireCampaignOwner(id, user.id);
+    if (userId === campaign.ownerId) {
+      throw new HTTPException(400, {
+        message: "cannot change the owner's role; use transfer-ownership instead",
+      });
+    }
+    const db = getDb();
+    const updated = await db
+      .update(campaignMemberships)
+      .set({ role: body.role, updatedAt: new Date() })
+      .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
+      .returning({ id: campaignMemberships.id });
+    if (updated.length === 0) throw new HTTPException(404, { message: 'membership not found' });
+    const members = await loadMembers(campaign.id);
+    return c.json(campaignToOut(campaign, members), 200);
+  },
+);
+
+router.openapi(
+  createRoute({
     method: 'delete',
     path: '/campaigns/{id}/members/{userId}',
     tags: ['campaigns'],
-    summary: 'Remove a member (owner only). Cannot remove the owner.',
+    summary:
+      'Remove a member. Owners may remove anyone but the owner; managers may remove only members.',
     security: [{ bearerAuth: [] }],
     request: { params: z.object({ id: uuid, userId: uuid }) },
     responses: {
@@ -348,11 +398,22 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, userId } = c.req.valid('param');
-    const campaign = await requireCampaignOwner(id, user.id);
+    const { campaign, role: actorRole } = await requireCampaignAdmin(id, user.id);
     if (userId === campaign.ownerId) {
       throw new HTTPException(400, { message: 'cannot remove owner; transfer ownership first' });
     }
-    const result = await getDb()
+    const db = getDb();
+    if (actorRole === 'manager') {
+      // Look up the target's role first; managers can only remove members.
+      const target = await db
+        .select()
+        .from(campaignMemberships)
+        .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)));
+      if (target[0] && target[0].role !== 'member') {
+        throw new HTTPException(403, { message: 'managers can only remove regular members' });
+      }
+    }
+    const result = await db
       .delete(campaignMemberships)
       .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
       .returning({ id: campaignMemberships.id });
