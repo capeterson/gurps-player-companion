@@ -24,27 +24,36 @@ interface LibraryPayload {
 
 type SectionKey = 'traits' | 'skills' | 'items';
 
-export function LibraryPage() {
+/**
+ * Top-level library page.  Mirrors LogPage: when the parent route
+ * passes `campaignId` (e.g. `/campaigns/:id/library`) we use that and
+ * skip the URL-sync logic; otherwise pick from `?campaign=` or the
+ * first campaign and mirror it back into the query string.
+ */
+export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignOut[]>('/campaigns'),
+    enabled: !campaignIdProp,
   });
 
   const urlCampaign = params.get('campaign');
   const campaignId = useMemo(() => {
+    if (campaignIdProp) return campaignIdProp;
     if (urlCampaign && campaigns.data?.some((c) => c.id === urlCampaign)) return urlCampaign;
     return campaigns.data?.[0]?.id ?? null;
-  }, [urlCampaign, campaigns.data]);
+  }, [campaignIdProp, urlCampaign, campaigns.data]);
 
   useEffect(() => {
+    if (campaignIdProp) return;
     if (campaignId && urlCampaign !== campaignId) {
       const next = new URLSearchParams(params);
       next.set('campaign', campaignId);
       setParams(next, { replace: true });
     }
-  }, [campaignId, urlCampaign, params, setParams]);
+  }, [campaignIdProp, campaignId, urlCampaign, params, setParams]);
 
   const library = useQuery({
     queryKey: ['campaigns', campaignId, 'library'],

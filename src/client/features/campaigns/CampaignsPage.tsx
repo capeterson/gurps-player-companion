@@ -126,7 +126,7 @@ export function CampaignsPage() {
           return (
             <Link
               key={c.id}
-              to={`/log?campaign=${c.id}`}
+              to={`/campaigns/${c.id}`}
               className={`card relative flex items-center gap-4 px-5 py-4 transition hover:border-border-strong ${
                 isOwner ? 'border-l-[3px] border-l-primary' : ''
               }`}

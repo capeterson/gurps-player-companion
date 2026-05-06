@@ -36,28 +36,41 @@ function formatDate(iso: string): string {
   });
 }
 
-export function LogPage() {
+/**
+ * Top-level adventure-log page.  When `campaignIdProp` is omitted the
+ * page picks a campaign from the `?campaign=` query string (or the
+ * first one available) and mirrors the selection back into the URL —
+ * the legacy /log behaviour.  When a parent route passes the id
+ * directly (e.g. /campaigns/:id), the URL-sync logic is skipped and
+ * the page just renders the log for that campaign.
+ */
+export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {
   const qc = useQueryClient();
   const [params, setParams] = useSearchParams();
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignOut[]>('/campaigns'),
+    enabled: !campaignIdProp,
   });
 
   const urlCampaign = params.get('campaign');
   const campaignId = useMemo(() => {
+    if (campaignIdProp) return campaignIdProp;
     if (urlCampaign && campaigns.data?.some((c) => c.id === urlCampaign)) return urlCampaign;
     return campaigns.data?.[0]?.id ?? null;
-  }, [urlCampaign, campaigns.data]);
+  }, [campaignIdProp, urlCampaign, campaigns.data]);
 
-  // Mirror the resolved campaign back to the URL so reloads are stable.
+  // Mirror the resolved campaign back to the URL so reloads are stable
+  // (only when this page owns the routing — embedded mode is driven by
+  // the parent route's path param).
   useEffect(() => {
+    if (campaignIdProp) return;
     if (campaignId && urlCampaign !== campaignId) {
       const next = new URLSearchParams(params);
       next.set('campaign', campaignId);
       setParams(next, { replace: true });
     }
-  }, [campaignId, urlCampaign, params, setParams]);
+  }, [campaignIdProp, campaignId, urlCampaign, params, setParams]);
 
   const entries = useQuery({
     queryKey: ['campaigns', campaignId, 'log'],

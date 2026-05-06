@@ -11,6 +11,8 @@ import { AdminUsersPage } from './features/admin/AdminUsersPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
+import { CampaignDetailPage } from './features/campaigns/CampaignDetailPage.tsx';
+import { CampaignLibraryPage } from './features/campaigns/CampaignLibraryPage.tsx';
 import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
@@ -50,6 +52,8 @@ const router = createBrowserRouter([
           { path: '/characters', element: <CharactersPage /> },
           { path: '/characters/:id', element: <CharacterSheetPage /> },
           { path: '/campaigns', element: <CampaignsPage /> },
+          { path: '/campaigns/:id', element: <CampaignDetailPage /> },
+          { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },
           { path: '/log', element: <LogPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/settings', element: <SettingsPage /> },
