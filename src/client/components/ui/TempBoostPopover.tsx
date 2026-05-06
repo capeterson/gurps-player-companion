@@ -52,9 +52,8 @@ export function TempBoostPopover({
   const parsed = Number.parseInt(raw, 10);
   const numValue = Number.isNaN(parsed) ? 0 : parsed;
   const effective = baseValue + numValue;
-  const fmt = (n: number) =>
-    displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n);
-  const stepStr = displayScale !== 1 ? (displayScale).toFixed(2) : '1';
+  const fmt = (n: number) => (displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n));
+  const stepStr = displayScale !== 1 ? displayScale.toFixed(2) : '1';
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -117,8 +116,8 @@ export function TempBoostPopover({
         </button>
       </div>
       <div className="num text-[11px] text-muted mb-3">
-        {fmt(baseValue)} + ({numValue >= 0 ? '+' : ''}{fmt(numValue)}) ={' '}
-        <span className="text-base-content font-semibold">{fmt(effective)}</span>
+        {fmt(baseValue)} + ({numValue >= 0 ? '+' : ''}
+        {fmt(numValue)}) = <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
       <div className="flex gap-1.5">
         <button

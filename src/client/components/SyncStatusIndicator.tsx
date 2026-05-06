@@ -22,9 +22,7 @@ export function SyncStatusIndicator() {
   const state = useSyncIndicatorState();
   const meta = STATE_META[state];
 
-  const [online, setOnline] = useState(
-    typeof navigator !== 'undefined' ? navigator.onLine : true,
-  );
+  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   useEffect(() => {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
@@ -44,9 +42,7 @@ export function SyncStatusIndicator() {
   });
 
   // Build a single-line tooltip: state message · storage info
-  const statusMsg = !online
-    ? '⚠ Offline — changes will sync when reconnected'
-    : meta.tooltip;
+  const statusMsg = !online ? '⚠ Offline — changes will sync when reconnected' : meta.tooltip;
 
   let storageMsg = '';
   if (storage.data) {
@@ -64,10 +60,7 @@ export function SyncStatusIndicator() {
   const tip = storageMsg ? `${statusMsg}  ·  ${storageMsg}` : statusMsg;
 
   return (
-    <span
-      className="tooltip tooltip-bottom"
-      data-tip={tip}
-    >
+    <span className="tooltip tooltip-bottom" data-tip={tip}>
       <output
         className={`badge ${meta.badgeClass} badge-sm`}
         aria-live="polite"

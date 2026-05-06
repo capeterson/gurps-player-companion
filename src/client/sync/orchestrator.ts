@@ -384,8 +384,7 @@ class SyncOrchestrator {
             typeof outcome.latestEntity === 'object'
           ) {
             const entity = outcome.latestEntity as Record<string, unknown>;
-            const newRevision =
-              typeof entity.revision === 'number' ? entity.revision : undefined;
+            const newRevision = typeof entity.revision === 'number' ? entity.revision : undefined;
             if (newRevision !== undefined) {
               await this.stampRevision(op.entityClass, op.entityId, newRevision);
               await db.outbox.delete(op.clientOpId);

@@ -385,8 +385,7 @@ function SecondaryModCell({
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
-  const fmtMod = (v: number) =>
-    modScale ? (v * modScale).toFixed(2) : String(v);
+  const fmtMod = (v: number) => (modScale ? (v * modScale).toFixed(2) : String(v));
   const fmtDelta = (v: number) => {
     const s = fmtMod(Math.abs(v));
     return v >= 0 ? `+${s}` : `-${s}`;
@@ -427,7 +426,9 @@ function SecondaryModCell({
             </span>
             <span className="num text-[11px] text-base-content/60 flex items-baseline gap-0.5">
               {!canWrite && modScale ? (
-                <span className="num" aria-label={`${label} mod`}>{fmtMod(modValue)}</span>
+                <span className="num" aria-label={`${label} mod`}>
+                  {fmtMod(modValue)}
+                </span>
               ) : (
                 <AttrInput
                   label={`${label} mod`}
@@ -450,7 +451,9 @@ function SecondaryModCell({
             <span className="num text-[11px] text-base-content/60 flex items-baseline gap-1">
               <span>mod</span>
               {!canWrite && modScale ? (
-                <span className="num" aria-label={`${label} mod`}>{fmtMod(modValue)}</span>
+                <span className="num" aria-label={`${label} mod`}>
+                  {fmtMod(modValue)}
+                </span>
               ) : (
                 <AttrInput
                   label={`${label} mod`}
@@ -641,9 +644,7 @@ function IdentityPanel({
               ))}
             </select>
           ) : (
-            <span>
-              {campaigns.find((c) => c.id === character.campaignId)?.name ?? '—'}
-            </span>
+            <span>{campaigns.find((c) => c.id === character.campaignId)?.name ?? '—'}</span>
           )}
         </div>
       </div>

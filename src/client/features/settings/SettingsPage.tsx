@@ -38,9 +38,7 @@ export function SettingsPage() {
       <header className="space-y-2">
         <p className="label-eyebrow">Account</p>
         <h1 className="font-display text-3xl">Settings</h1>
-        <p className="max-w-2xl text-sm text-muted">
-          Manage your sign-in credentials.
-        </p>
+        <p className="max-w-2xl text-sm text-muted">Manage your sign-in credentials.</p>
       </header>
 
       <section className="max-w-lg">
