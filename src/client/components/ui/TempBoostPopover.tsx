@@ -32,7 +32,11 @@ export function TempBoostPopover({
   onClose,
   displayScale = 1,
 }: TempBoostPopoverProps) {
-  const [raw, setRaw] = useState<string>(String(currentTemp));
+  // raw is stored in display units so the text box shows "0.25" rather than
+  // the raw integer "1" when displayScale=0.25.  Converted back on apply.
+  const [raw, setRaw] = useState<string>(
+    displayScale !== 1 ? (currentTemp * displayScale).toFixed(2) : String(currentTemp),
+  );
   const ref = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -49,11 +53,17 @@ export function TempBoostPopover({
     }
   }, []);
 
-  const parsed = Number.parseInt(raw, 10);
-  const numValue = Number.isNaN(parsed) ? 0 : parsed;
-  const effective = baseValue + numValue;
   const fmt = (n: number) => (displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n));
+  const step = displayScale !== 1 ? displayScale : 1;
   const stepStr = displayScale !== 1 ? displayScale.toFixed(2) : '1';
+  // Parse the display-unit value the user typed.
+  const parsedDisplay = displayScale !== 1 ? Number.parseFloat(raw) : Number.parseInt(raw, 10);
+  const displayDelta = Number.isNaN(parsedDisplay) ? 0 : parsedDisplay;
+  // Convert back to raw integer units for the apply callback.
+  const rawDelta = displayScale !== 1 ? Math.round(displayDelta / displayScale) : displayDelta;
+  const effective = baseValue + rawDelta;
+  // Format a display-unit number with the same precision as the input.
+  const fmtInput = (d: number) => (displayScale !== 1 ? d.toFixed(2) : String(d));
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -92,7 +102,7 @@ export function TempBoostPopover({
       <div className="flex items-center gap-1.5 mb-2">
         <button
           type="button"
-          onClick={() => setRaw(String(numValue - 1))}
+          onClick={() => setRaw(fmtInput(displayDelta - step))}
           className="btn btn-sm btn-ghost"
           aria-label="Decrease"
         >
@@ -100,7 +110,7 @@ export function TempBoostPopover({
         </button>
         <input
           type="text"
-          inputMode="numeric"
+          inputMode={displayScale !== 1 ? 'decimal' : 'numeric'}
           value={raw}
           onChange={(e) => setRaw(e.target.value)}
           className="num input input-sm input-bordered w-full text-center"
@@ -108,7 +118,7 @@ export function TempBoostPopover({
         />
         <button
           type="button"
-          onClick={() => setRaw(String(numValue + 1))}
+          onClick={() => setRaw(fmtInput(displayDelta + step))}
           className="btn btn-sm btn-ghost"
           aria-label="Increase"
         >
@@ -116,8 +126,9 @@ export function TempBoostPopover({
         </button>
       </div>
       <div className="num text-[11px] text-muted mb-3">
-        {fmt(baseValue)} + ({numValue >= 0 ? '+' : ''}
-        {fmt(numValue)}) = <span className="text-base-content font-semibold">{fmt(effective)}</span>
+        {fmt(baseValue)} + ({displayDelta >= 0 ? '+' : ''}
+        {fmtInput(displayDelta)}) ={' '}
+        <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
       <div className="flex gap-1.5">
         <button
@@ -133,7 +144,7 @@ export function TempBoostPopover({
         <button
           type="button"
           onClick={() => {
-            onApply(numValue);
+            onApply(rawDelta);
             onClose();
           }}
           className="btn btn-sm btn-primary flex-1"
