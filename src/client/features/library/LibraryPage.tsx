@@ -710,17 +710,19 @@ interface TraitFormProps {
 function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [kind, setKind] = useState<(typeof TRAIT_KINDS)[number]>(initial?.kind ?? 'advantage');
-  const [basePoints, setBasePoints] = useState(initial?.basePoints ?? 0);
+  // Keep as a string draft so typing a leading '-' isn't immediately clobbered.
+  const [basePointsDraft, setBasePointsDraft] = useState(String(initial?.basePoints ?? 0));
   const [description, setDescription] = useState(initial?.description ?? '');
   const [source, setSource] = useState(initial?.source ?? '');
   const [modifiers, setModifiers] = useState<TraitModifier[]>(initial?.availableModifiers ?? []);
 
   function handleSubmit() {
     if (!name.trim()) return;
+    const basePoints = Number.parseInt(basePointsDraft, 10);
     onSubmit({
       name: name.trim(),
       kind,
-      basePoints,
+      basePoints: Number.isNaN(basePoints) ? 0 : basePoints,
       description: description.trim() || null,
       source: source.trim() || null,
       availableModifiers: modifiers,
@@ -758,10 +760,11 @@ function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormP
         <label className="form-control w-24">
           <span className="label-text">Base pts</span>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
             className="input input-bordered input-sm"
-            value={basePoints}
-            onChange={(e) => setBasePoints(Number.parseInt(e.target.value, 10) || 0)}
+            value={basePointsDraft}
+            onChange={(e) => setBasePointsDraft(e.target.value)}
           />
         </label>
         <label className="form-control w-28">
@@ -819,17 +822,23 @@ function ModifierSubEditor({
   onChange: (m: TraitModifier[]) => void;
 }) {
   const [adding, setAdding] = useState(false);
-  const [newMod, setNewMod] = useState<TraitModifier>({
+  const [newMod, setNewMod] = useState<Omit<TraitModifier, 'costValue'>>({
     name: '',
     category: 'enhancement',
     costType: 'percent',
-    costValue: 0,
   });
+  // String draft so typing a leading '-' isn't clobbered on each keystroke.
+  const [costValueDraft, setCostValueDraft] = useState('0');
 
   function commitModifier() {
     if (!newMod.name.trim()) return;
-    onChange([...modifiers, { ...newMod, name: newMod.name.trim() }]);
-    setNewMod({ name: '', category: 'enhancement', costType: 'percent', costValue: 0 });
+    const costValue = Number.parseInt(costValueDraft, 10);
+    onChange([
+      ...modifiers,
+      { ...newMod, name: newMod.name.trim(), costValue: Number.isNaN(costValue) ? 0 : costValue },
+    ]);
+    setNewMod({ name: '', category: 'enhancement', costType: 'percent' });
+    setCostValueDraft('0');
     setAdding(false);
   }
 
@@ -904,12 +913,11 @@ function ModifierSubEditor({
           <label className="form-control w-20">
             <span className="label-text text-xs">Value</span>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               className="input input-bordered input-xs"
-              value={newMod.costValue}
-              onChange={(e) =>
-                setNewMod((m) => ({ ...m, costValue: Number.parseInt(e.target.value, 10) || 0 }))
-              }
+              value={costValueDraft}
+              onChange={(e) => setCostValueDraft(e.target.value)}
             />
           </label>
           <label className="form-control min-w-[8rem] flex-1">
