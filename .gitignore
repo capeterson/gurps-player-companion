@@ -119,3 +119,6 @@ dist
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# Local YAML fixtures (gitignored; generate from yaml-export skill)
+*.yaml.local

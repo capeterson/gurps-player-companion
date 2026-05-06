@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { LibraryYamlError, emitLibraryYaml, parseLibraryYaml } from './library.ts';
+import {
+  LIBRARY_YAML_MAX_BYTES,
+  LibraryYamlError,
+  emitLibraryYaml,
+  parseLibraryYaml,
+} from './library.ts';
 
 const SAMPLE = `version: 1
 campaign:
@@ -93,6 +98,26 @@ library:
   it('rejects unparseable YAML', () => {
     expect(() => parseLibraryYaml(': : : :')).toThrow(LibraryYamlError);
   });
+
+  it('rejects payload exceeding the size limit', () => {
+    const huge = 'x'.repeat(LIBRARY_YAML_MAX_BYTES + 1);
+    expect(() => parseLibraryYaml(huge)).toThrow(LibraryYamlError);
+    expect(() => parseLibraryYaml(huge)).toThrow(/exceeds/);
+  });
+
+  it('rejects an invalid trait kind enum value', () => {
+    const bad = `version: 1
+library:
+  traits:
+    - name: SuperPower
+      kind: superpower
+      basePoints: 10
+  skills: []
+  items: []
+`;
+    expect(() => parseLibraryYaml(bad)).toThrow(LibraryYamlError);
+    expect(() => parseLibraryYaml(bad)).toThrow(/schema validation/);
+  });
 });
 
 describe('emitLibraryYaml', () => {
@@ -147,5 +172,46 @@ describe('emitLibraryYaml', () => {
     });
     expect(out).not.toMatch(/tags:/);
     expect(out).toMatch(/Hard to Kill/);
+  });
+});
+
+// GURPS modifier cost formula (B102): percentages sum first, then apply
+// once, rounded up.  +50% and −50% cancel to base — NOT base × 1.5 × 0.5.
+describe('GURPS modifier cost formula', () => {
+  function computeFinal(
+    base: number,
+    mods: Array<{ costType: 'percent' | 'flat'; costValue: number }>,
+  ) {
+    const sumPercent = mods
+      .filter((m) => m.costType === 'percent')
+      .reduce((s, m) => s + m.costValue, 0);
+    const sumFlat = mods.filter((m) => m.costType === 'flat').reduce((s, m) => s + m.costValue, 0);
+    return Math.ceil(base * (1 + sumPercent / 100)) + sumFlat;
+  }
+
+  it('+50% and −50% cancel exactly to base cost', () => {
+    const result = computeFinal(10, [
+      { costType: 'percent', costValue: 50 },
+      { costType: 'percent', costValue: -50 },
+    ]);
+    expect(result).toBe(10);
+  });
+
+  it('+50% on 10 pts yields 15 pts', () => {
+    expect(computeFinal(10, [{ costType: 'percent', costValue: 50 }])).toBe(15);
+  });
+
+  it('fractional result rounds up (not truncates)', () => {
+    // +15% of 10 = 11.5 → rounds up to 12
+    expect(computeFinal(10, [{ costType: 'percent', costValue: 15 }])).toBe(12);
+  });
+
+  it('flat modifier adds after percent application', () => {
+    // +50% of 10 = 15, then +5 flat = 20
+    const result = computeFinal(10, [
+      { costType: 'percent', costValue: 50 },
+      { costType: 'flat', costValue: 5 },
+    ]);
+    expect(result).toBe(20);
   });
 });
