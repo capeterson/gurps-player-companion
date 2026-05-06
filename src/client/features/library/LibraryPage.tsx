@@ -8,7 +8,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../../../shared/constants/skills.ts';
-import { MODIFIER_CATEGORIES, MODIFIER_COST_TYPES, TRAIT_KINDS } from '../../../shared/constants/traits.ts';
+import {
+  MODIFIER_CATEGORIES,
+  MODIFIER_COST_TYPES,
+  TRAIT_KINDS,
+} from '../../../shared/constants/traits.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import type {
   ImportResult,
@@ -380,6 +384,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     key={t.id}
                     initial={t}
                     isPending={updateTrait.isPending}
+                    error={
+                      updateTrait.error instanceof ApiError
+                        ? updateTrait.error.message
+                        : updateTrait.error
+                          ? 'Save failed'
+                          : null
+                    }
                     onSubmit={(body) => updateTrait.mutate({ id: t.id, body })}
                     onCancel={() => setTraitsEditId(null)}
                   />
@@ -418,8 +429,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     {t.source && <p className="text-xs text-dim">Source · {t.source}</p>}
                     {t.availableModifiers.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {t.availableModifiers.map((m, i) => (
-                          <span key={i} className="chip text-xs">
+                        {t.availableModifiers.map((m) => (
+                          <span key={`${m.name}-${m.costValue}`} className="chip text-xs">
                             {m.name}{' '}
                             {m.costType === 'percent'
                               ? `${m.costValue > 0 ? '+' : ''}${m.costValue}%`
@@ -434,6 +445,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               {isOwner && traitsAddOpen && (
                 <TraitForm
                   isPending={createTrait.isPending}
+                  error={
+                    createTrait.error instanceof ApiError
+                      ? createTrait.error.message
+                      : createTrait.error
+                        ? 'Save failed'
+                        : null
+                  }
                   onSubmit={(body) => createTrait.mutate(body)}
                   onCancel={() => setTraitsAddOpen(false)}
                 />
@@ -465,6 +483,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     key={s.id}
                     initial={s}
                     isPending={updateSkill.isPending}
+                    error={
+                      updateSkill.error instanceof ApiError
+                        ? updateSkill.error.message
+                        : updateSkill.error
+                          ? 'Save failed'
+                          : null
+                    }
                     onSubmit={(body) => updateSkill.mutate({ id: s.id, body })}
                     onCancel={() => setSkillsEditId(null)}
                   />
@@ -508,6 +533,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               {isOwner && skillsAddOpen && (
                 <SkillForm
                   isPending={createSkill.isPending}
+                  error={
+                    createSkill.error instanceof ApiError
+                      ? createSkill.error.message
+                      : createSkill.error
+                        ? 'Save failed'
+                        : null
+                  }
                   onSubmit={(body) => createSkill.mutate(body)}
                   onCancel={() => setSkillsAddOpen(false)}
                 />
@@ -539,6 +571,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     key={i.id}
                     initial={i}
                     isPending={updateItem.isPending}
+                    error={
+                      updateItem.error instanceof ApiError
+                        ? updateItem.error.message
+                        : updateItem.error
+                          ? 'Save failed'
+                          : null
+                    }
                     onSubmit={(body) => updateItem.mutate({ id: i.id, body })}
                     onCancel={() => setItemsEditId(null)}
                   />
@@ -581,6 +620,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               {isOwner && itemsAddOpen && (
                 <ItemForm
                   isPending={createItem.isPending}
+                  error={
+                    createItem.error instanceof ApiError
+                      ? createItem.error.message
+                      : createItem.error
+                        ? 'Save failed'
+                        : null
+                  }
                   onSubmit={(body) => createItem.mutate(body)}
                   onCancel={() => setItemsAddOpen(false)}
                 />
@@ -616,8 +662,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         }}
         onCancel={() => setTraitsDeleteId(null)}
       >
-        Delete <strong>{traitToDelete?.name}</strong> from the library? Existing characters that
-        use this trait are not affected.
+        Delete <strong>{traitToDelete?.name}</strong> from the library? Existing characters that use
+        this trait are not affected.
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -630,8 +676,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         }}
         onCancel={() => setSkillsDeleteId(null)}
       >
-        Delete <strong>{skillToDelete?.name}</strong> from the library? Existing characters that
-        use this skill are not affected.
+        Delete <strong>{skillToDelete?.name}</strong> from the library? Existing characters that use
+        this skill are not affected.
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -644,8 +690,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         }}
         onCancel={() => setItemsDeleteId(null)}
       >
-        Delete <strong>{itemToDelete?.name}</strong> from the library? Existing characters that
-        have this item are not affected.
+        Delete <strong>{itemToDelete?.name}</strong> from the library? Existing characters that have
+        this item are not affected.
       </ConfirmDialog>
     </div>
   );
@@ -656,11 +702,12 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 interface TraitFormProps {
   initial?: LibraryTraitOut;
   isPending: boolean;
+  error?: string | null;
   onSubmit: (body: LibraryTraitCreate) => void;
   onCancel: () => void;
 }
 
-function TraitForm({ initial, isPending, onSubmit, onCancel }: TraitFormProps) {
+function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [kind, setKind] = useState<(typeof TRAIT_KINDS)[number]>(initial?.kind ?? 'advantage');
   const [basePoints, setBasePoints] = useState(initial?.basePoints ?? 0);
@@ -714,7 +761,7 @@ function TraitForm({ initial, isPending, onSubmit, onCancel }: TraitFormProps) {
             type="number"
             className="input input-bordered input-sm"
             value={basePoints}
-            onChange={(e) => setBasePoints(parseInt(e.target.value, 10) || 0)}
+            onChange={(e) => setBasePoints(Number.parseInt(e.target.value, 10) || 0)}
           />
         </label>
         <label className="form-control w-28">
@@ -754,9 +801,10 @@ function TraitForm({ initial, isPending, onSubmit, onCancel }: TraitFormProps) {
           onClick={handleSubmit}
           disabled={isPending || !name.trim()}
         >
-          {isPending ? 'Saving…' : (initial ? 'Save changes' : 'Add trait')}
+          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add trait'}
         </button>
       </div>
+      {error && <p className="alert alert-error text-sm">{error}</p>}
     </div>
   );
 }
@@ -790,8 +838,8 @@ function ModifierSubEditor({
       <span className="label-text">Modifiers</span>
       {modifiers.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          {modifiers.map((m, i) => (
-            <span key={i} className="chip flex items-center gap-1 text-xs">
+          {modifiers.map((m) => (
+            <span key={`${m.name}-${m.costValue}`} className="chip flex items-center gap-1 text-xs">
               {m.name}{' '}
               {m.costType === 'percent'
                 ? `${m.costValue > 0 ? '+' : ''}${m.costValue}%`
@@ -860,7 +908,7 @@ function ModifierSubEditor({
               className="input input-bordered input-xs"
               value={newMod.costValue}
               onChange={(e) =>
-                setNewMod((m) => ({ ...m, costValue: parseInt(e.target.value, 10) || 0 }))
+                setNewMod((m) => ({ ...m, costValue: Number.parseInt(e.target.value, 10) || 0 }))
               }
             />
           </label>
@@ -882,9 +930,7 @@ function ModifierSubEditor({
               type="text"
               className="input input-bordered input-xs"
               value={newMod.group ?? ''}
-              onChange={(e) =>
-                setNewMod((m) => ({ ...m, group: e.target.value || undefined }))
-              }
+              onChange={(e) => setNewMod((m) => ({ ...m, group: e.target.value || undefined }))}
               maxLength={80}
               placeholder="aspect"
             />
@@ -898,21 +944,13 @@ function ModifierSubEditor({
             >
               Add
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs"
-              onClick={() => setAdding(false)}
-            >
+            <button type="button" className="btn btn-ghost btn-xs" onClick={() => setAdding(false)}>
               Cancel
             </button>
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs"
-          onClick={() => setAdding(true)}
-        >
+        <button type="button" className="btn btn-ghost btn-xs" onClick={() => setAdding(true)}>
           + Add modifier
         </button>
       )}
@@ -925,11 +963,12 @@ function ModifierSubEditor({
 interface SkillFormProps {
   initial?: LibrarySkillOut;
   isPending: boolean;
+  error?: string | null;
   onSubmit: (body: LibrarySkillCreate) => void;
   onCancel: () => void;
 }
 
-function SkillForm({ initial, isPending, onSubmit, onCancel }: SkillFormProps) {
+function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [attribute, setAttribute] = useState<(typeof SKILL_ATTRIBUTES)[number]>(
     initial?.attribute ?? 'IQ',
@@ -948,7 +987,7 @@ function SkillForm({ initial, isPending, onSubmit, onCancel }: SkillFormProps) {
 
   function handleSubmit() {
     if (!name.trim()) return;
-    const tl = techLevel.trim() !== '' ? parseInt(techLevel, 10) : null;
+    const tl = techLevel.trim() !== '' ? Number.parseInt(techLevel, 10) : null;
     onSubmit({
       name: name.trim(),
       attribute,
@@ -1061,9 +1100,10 @@ function SkillForm({ initial, isPending, onSubmit, onCancel }: SkillFormProps) {
           onClick={handleSubmit}
           disabled={isPending || !name.trim()}
         >
-          {isPending ? 'Saving…' : (initial ? 'Save changes' : 'Add skill')}
+          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add skill'}
         </button>
       </div>
+      {error && <p className="alert alert-error text-sm">{error}</p>}
     </div>
   );
 }
@@ -1073,11 +1113,12 @@ function SkillForm({ initial, isPending, onSubmit, onCancel }: SkillFormProps) {
 interface ItemFormProps {
   initial?: LibraryItemOut;
   isPending: boolean;
+  error?: string | null;
   onSubmit: (body: LibraryItemCreate) => void;
   onCancel: () => void;
 }
 
-function ItemForm({ initial, isPending, onSubmit, onCancel }: ItemFormProps) {
+function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [category, setCategory] = useState(initial?.category ?? 'general');
   const [defaultQuantity, setDefaultQuantity] = useState(initial?.defaultQuantity ?? 1);
@@ -1132,7 +1173,10 @@ function ItemForm({ initial, isPending, onSubmit, onCancel }: ItemFormProps) {
             type="number"
             className="input input-bordered input-sm"
             value={defaultQuantity}
-            onChange={(e) => setDefaultQuantity(parseInt(e.target.value, 10) || 1)}
+            onChange={(e) => {
+              const v = Number.parseInt(e.target.value, 10);
+              setDefaultQuantity(Number.isNaN(v) ? 1 : v);
+            }}
             min={0}
           />
         </label>
@@ -1142,7 +1186,7 @@ function ItemForm({ initial, isPending, onSubmit, onCancel }: ItemFormProps) {
             type="number"
             className="input input-bordered input-sm"
             value={weightLbs}
-            onChange={(e) => setWeightLbs(parseFloat(e.target.value) || 0)}
+            onChange={(e) => setWeightLbs(Number.parseFloat(e.target.value) || 0)}
             min={0}
             step={0.1}
           />
@@ -1153,7 +1197,7 @@ function ItemForm({ initial, isPending, onSubmit, onCancel }: ItemFormProps) {
             type="number"
             className="input input-bordered input-sm"
             value={cost}
-            onChange={(e) => setCost(parseFloat(e.target.value) || 0)}
+            onChange={(e) => setCost(Number.parseFloat(e.target.value) || 0)}
             min={0}
             step={0.01}
           />
@@ -1194,9 +1238,10 @@ function ItemForm({ initial, isPending, onSubmit, onCancel }: ItemFormProps) {
           onClick={handleSubmit}
           disabled={isPending || !name.trim()}
         >
-          {isPending ? 'Saving…' : (initial ? 'Save changes' : 'Add item')}
+          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add item'}
         </button>
       </div>
+      {error && <p className="alert alert-error text-sm">{error}</p>}
     </div>
   );
 }
