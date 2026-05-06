@@ -137,6 +137,7 @@ export const apiKeys = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 80 }).notNull(),
+    prefix: varchar('prefix', { length: 16 }).notNull().default(''),
     keyHash: varchar('key_hash', { length: 64 }).notNull(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),

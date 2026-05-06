@@ -6,6 +6,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { ApiError } from '../../lib/api.ts';
 import { apiKeysApi } from '../../lib/apiKeys.ts';
 import { useToasts } from '../../lib/toast.tsx';
@@ -17,6 +18,7 @@ export function ApiKeysSection() {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [plaintext, setPlaintext] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string } | null>(null);
 
   const list = useQuery({
     queryKey: ['api-keys'],
@@ -100,6 +102,7 @@ export function ApiKeysSection() {
           >
             <div className="min-w-0">
               <span className="font-medium">{k.name}</span>
+              <code className="text-xs ml-2">{k.prefix}…</code>
               <span className="ml-2 text-xs text-base-content/60">
                 created {new Date(k.createdAt).toLocaleDateString()}
                 {k.lastUsedAt
@@ -111,7 +114,7 @@ export function ApiKeysSection() {
               type="button"
               className="btn btn-ghost btn-xs text-error"
               disabled={revoke.isPending}
-              onClick={() => revoke.mutate(k.id)}
+              onClick={() => setRevokeTarget({ id: k.id, name: k.name })}
               aria-label={`Revoke ${k.name}`}
             >
               Revoke
@@ -119,6 +122,25 @@ export function ApiKeysSection() {
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        title="Revoke API key"
+        tone="error"
+        confirmLabel="Revoke"
+        onConfirm={() => {
+          if (revokeTarget) {
+            revoke.mutate(revokeTarget.id);
+            setRevokeTarget(null);
+          }
+        }}
+        onCancel={() => setRevokeTarget(null)}
+      >
+        <p>
+          Revoke &ldquo;<strong>{revokeTarget?.name}</strong>&rdquo;? Any scripts using it will
+          immediately lose access.
+        </p>
+      </ConfirmDialog>
 
       <ApiKeyCreatedDialog
         open={plaintext !== null}

@@ -36,13 +36,7 @@ export function ApiKeyCreatedDialog({
   if (!open) return null;
 
   return (
-    <dialog
-      ref={ref}
-      className="modal"
-      // No onClose / onCancel handler: this modal must be acknowledged
-      // explicitly via the button below so the user can't accidentally
-      // lose the plaintext key (it's unrecoverable).
-    >
+    <dialog ref={ref} className="modal" onCancel={(e) => e.preventDefault()}>
       <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl">
         <h3 className="font-display text-xl font-semibold">Save your API key</h3>
         <div className="py-3 text-sm space-y-3">
