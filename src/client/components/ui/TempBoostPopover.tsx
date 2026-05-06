@@ -64,6 +64,10 @@ export function TempBoostPopover({
   const effective = baseValue + rawDelta;
   // Format a display-unit number with the same precision as the input.
   const fmtInput = (d: number) => (displayScale !== 1 ? d.toFixed(2) : String(d));
+  // Reject off-step values (e.g. 0.13 is not a valid multiple of 0.25).
+  // Uses the same 1e-9 tolerance as scaledIntParser in AttrInput.
+  const rawQuotient = displayDelta / displayScale;
+  const isOffStep = displayScale !== 1 && Math.abs(Math.round(rawQuotient) - rawQuotient) > 1e-9;
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -130,6 +134,9 @@ export function TempBoostPopover({
         {fmtInput(displayDelta)}) ={' '}
         <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
+      {isOffStep && (
+        <p className="text-[11px] text-error mb-2">must be a multiple of {stepStr}</p>
+      )}
       <div className="flex gap-1.5">
         <button
           type="button"
@@ -148,6 +155,7 @@ export function TempBoostPopover({
             onClose();
           }}
           className="btn btn-sm btn-primary flex-1"
+          disabled={isOffStep}
         >
           Apply
         </button>
