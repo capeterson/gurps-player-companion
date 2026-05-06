@@ -23,6 +23,7 @@ interface MeResponse {
   id: string;
   email: string;
   displayName: string;
+  isSuperuser: boolean;
 }
 
 export function App() {
@@ -192,6 +193,19 @@ export function App() {
               <li>
                 <Link to="/settings">Settings</Link>
               </li>
+              {me.data?.isSuperuser && (
+                <>
+                  <li className="menu-title px-3 pt-2">
+                    <span>Admin</span>
+                  </li>
+                  <li>
+                    <Link to="/admin/users">Users</Link>
+                  </li>
+                  <li>
+                    <Link to="/admin/campaigns">Campaigns</Link>
+                  </li>
+                </>
+              )}
               <li>
                 <button type="button" onClick={() => void signOut()}>
                   Logout
