@@ -411,9 +411,7 @@ class SyncOrchestrator {
               const newerPending = await db.outbox
                 .where('coalesceKey')
                 .equals(ckey)
-                .filter(
-                  (row) => row.status === 'pending' || row.status === 'transient_retry',
-                )
+                .filter((row) => row.status === 'pending' || row.status === 'transient_retry')
                 .first();
               if (!newerPending) {
                 await enqueueFieldPatch({
