@@ -87,13 +87,31 @@ indicator is honest, and rollbacks are visible. Future code that adds
 or modifies sync behaviour MUST follow these rules. Each rule has been
 broken at least once; assume the comment in the file already warns you.
 
-### S1. Mutations go through the outbox. Always.
+### S0. Know what's actually sync-backed.
 
-UI handlers MUST call `enqueueFieldPatch` / `enqueueCreate` /
-`enqueueDelete` in [src/client/sync/outbox.ts](src/client/sync/outbox.ts).
-Direct `fetch('/api/v1/...')` for mutations is forbidden. The
-orchestrator is the only module allowed to talk to `/sync/*`. This is
-what guarantees:
+The outbox + cursor system currently covers only the character
+classes: `character`, `character_trait`, `character_skill`,
+`character_inventory`, `character_combat`. Campaigns, the campaign
+library (traits/skills/items), adventure log entries, invitations,
+and notifications are still online-only HTTP/React-Query surfaces.
+The `entityClass` enum lists more values than the orchestrator
+currently pulls — that's intentional headroom for future migration,
+not a claim of current coverage. The authoritative list is
+`ALL_ENTITY_CLASSES` in
+[src/client/sync/orchestrator.ts](src/client/sync/orchestrator.ts).
+
+When working on an existing surface, check whether it's sync-backed
+before assuming offline behaviour. When migrating a surface onto the
+outbox, follow the S6 checklist end-to-end.
+
+### S1. Mutations on sync-backed classes go through the outbox. Always.
+
+For any sync-backed class (S0), UI handlers MUST call
+`enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in
+[src/client/sync/outbox.ts](src/client/sync/outbox.ts). Direct
+`fetch('/api/v1/...')` for mutations on those classes is forbidden.
+The orchestrator is the only module allowed to talk to `/sync/*`.
+This is what guarantees:
 
 - the local row and the queued op land in one Dexie transaction,
 - the indicator counts the work,
@@ -101,8 +119,9 @@ what guarantees:
 - coalescing applies (rule S3).
 
 If you find yourself wanting to write a new fetch in a mutation
-handler, you are on the wrong path — extend the outbox helpers
-instead.
+handler for a sync-backed class, you are on the wrong path — extend
+the outbox helpers instead. Surfaces that have not yet been migrated
+(see S0) keep using React Query for now.
 
 ### S2. Patches carry raw field values, never wrapped objects.
 

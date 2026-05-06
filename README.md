@@ -138,12 +138,21 @@ bootstrap/
 
 ## Offline sync
 
-The app is **local-first**: every UI read renders from IndexedDB
-(Dexie) and every UI write commits to IndexedDB before anything leaves
-the browser. Online mode adds active sync and WebSocket nudges on top
-of the same data path; going offline simply pauses sync. The user
-should never be able to tell the difference except for the indicator in
-the header.
+Character data is **local-first**: reads render from IndexedDB
+(Dexie) and writes commit to IndexedDB before anything leaves the
+browser. Online mode adds active sync and WebSocket nudges on top of
+the same data path; going offline simply pauses sync.
+
+**Scope.** As of this writing the offline-sync system covers
+characters and their child rows — `character`, `character_trait`,
+`character_skill`, `character_inventory`, and `character_combat`. The
+rest of the app (campaign settings, the campaign trait/skill/item
+library, adventure log entries, invitations, notifications, admin)
+still talks to the HTTP API directly via React Query and does not
+work offline. New surfaces are migrated onto the outbox class by
+class; until that work lands for a given surface, treat it as
+online-only. The tenets below describe the system as it applies to
+the sync-backed classes.
 
 ### Tenets
 
