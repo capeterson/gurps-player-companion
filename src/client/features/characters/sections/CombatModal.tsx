@@ -268,20 +268,34 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
           </div>
           <PoolMeter current={fp} max={fpMax} tone="fp" height="md" ariaLabel="Fatigue points" />
           {canWrite && (
-            <div className="mt-2.5 flex gap-1.5">
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-5)}>
-                −5
-              </button>
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-1)}>
-                −1
-              </button>
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+1)}>
-                +1
-              </button>
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+5)}>
-                +5
-              </button>
-            </div>
+            <>
+              <div className="mt-2.5 flex gap-1.5">
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-5)}>
+                  −5
+                </button>
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-1)}>
+                  −1
+                </button>
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+1)}>
+                  +1
+                </button>
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+5)}>
+                  +5
+                </button>
+              </div>
+              {fp !== fpMax && (
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
+                  onClick={() => {
+                    fpRef.current = fpMax;
+                    void patchCombat('currentFp', fpMax);
+                  }}
+                >
+                  Reset to {fpMax}
+                </button>
+              )}
+            </>
           )}
         </div>
 
