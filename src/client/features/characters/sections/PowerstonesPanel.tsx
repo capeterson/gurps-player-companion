@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { totalPowerstoneEnergy } from '../../../../shared/domain/spellCalc.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
@@ -12,6 +13,19 @@ interface PowerstoneRowProps {
 
 function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
   const data = item.powerstoneData;
+  // Latest-intended currentEnergy. Without this ref, two rapid -/+ taps
+  // both read the same render-time `data.currentEnergy` and enqueue
+  // duplicate patches, dropping one click. Mirrors the CombatModal pool
+  // bumper pattern. Ref is read directly off the prop on every render,
+  // which is safe because Dexie's local-first writes mean the prop
+  // already reflects the latest committed intent before the next
+  // synchronous click handler runs.
+  const propEnergy = data?.currentEnergy ?? 0;
+  const currentRef = useRef(propEnergy);
+  useEffect(() => {
+    currentRef.current = propEnergy;
+  }, [propEnergy]);
+
   if (!data) return null;
   const ratio = data.maxEnergy > 0 ? data.currentEnergy / data.maxEnergy : 0;
 
@@ -19,10 +33,11 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
   // `powerstoneData` field as a single unit to keep the orchestrator's
   // per-field validation happy (the field validator parses the full
   // shape, and we always send a fresh, valid copy).
-  const setEnergy = (next: number) => {
+  const setEnergyTo = (next: number) => {
     if (!canWrite) return;
     const clamped = Math.max(0, Math.min(data.maxEnergy, Math.round(next)));
-    if (clamped === data.currentEnergy) return;
+    if (clamped === currentRef.current) return;
+    currentRef.current = clamped;
     const updated: PowerstoneData = {
       maxEnergy: data.maxEnergy,
       currentEnergy: clamped,
@@ -38,6 +53,7 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
       characterId,
     });
   };
+  const bumpEnergy = (delta: number) => setEnergyTo(currentRef.current + delta);
 
   return (
     <li className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
@@ -62,7 +78,7 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
           <button
             type="button"
             className="btn btn-xs join-item"
-            onClick={() => setEnergy(data.currentEnergy - 1)}
+            onClick={() => bumpEnergy(-1)}
             disabled={data.currentEnergy <= 0}
             aria-label={`Drain 1 from ${item.name}`}
           >
@@ -71,7 +87,7 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
           <button
             type="button"
             className="btn btn-xs join-item"
-            onClick={() => setEnergy(data.currentEnergy + 1)}
+            onClick={() => bumpEnergy(1)}
             disabled={data.currentEnergy >= data.maxEnergy}
             aria-label={`Recharge 1 to ${item.name}`}
           >
@@ -80,7 +96,7 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
           <button
             type="button"
             className="btn btn-xs join-item"
-            onClick={() => setEnergy(data.maxEnergy)}
+            onClick={() => setEnergyTo(data.maxEnergy)}
             disabled={data.currentEnergy >= data.maxEnergy}
             aria-label={`Recharge ${item.name} to full`}
             title="Set to max"
@@ -165,17 +181,26 @@ interface MagicItemRowProps {
 
 function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
   const data = item.magicItemData;
+  // Latest-intended chargesCurrent so two rapid Use/Refill clicks
+  // compose instead of dropping one. Same rationale as PowerstoneRow.
+  const propCharges = data?.chargesCurrent ?? 0;
+  const chargesRef = useRef(propCharges);
+  useEffect(() => {
+    chargesRef.current = propCharges;
+  }, [propCharges]);
+
   if (!data) return null;
   const charged = data.mode === 'charged';
 
   // For "charged" items only, we expose -/+ controls on chargesCurrent.
   // Same patch-the-whole-jsonb pattern as powerstone, since the field
   // validator parses the entire object shape.
-  const setCharges = (next: number) => {
+  const setChargesTo = (next: number) => {
     if (!canWrite || !charged) return;
     const max = data.chargesMax ?? 0;
     const clamped = Math.max(0, Math.min(max, Math.round(next)));
-    if (clamped === (data.chargesCurrent ?? 0)) return;
+    if (clamped === chargesRef.current) return;
+    chargesRef.current = clamped;
     const updated = { ...data, chargesCurrent: clamped };
     void enqueueFieldPatch({
       entityClass: 'character_inventory',
@@ -187,6 +212,7 @@ function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
       characterId,
     });
   };
+  const bumpCharges = (delta: number) => setChargesTo(chargesRef.current + delta);
 
   return (
     <li className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
@@ -214,7 +240,7 @@ function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
           <button
             type="button"
             className="btn btn-xs join-item"
-            onClick={() => setCharges((data.chargesCurrent ?? 0) - 1)}
+            onClick={() => bumpCharges(-1)}
             disabled={(data.chargesCurrent ?? 0) <= 0}
             aria-label={`Use one charge from ${item.name}`}
           >
@@ -223,7 +249,7 @@ function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
           <button
             type="button"
             className="btn btn-xs join-item"
-            onClick={() => setCharges(data.chargesMax ?? 0)}
+            onClick={() => setChargesTo(data.chargesMax ?? 0)}
             disabled={(data.chargesCurrent ?? 0) >= (data.chargesMax ?? 0)}
             aria-label={`Recharge ${item.name} to full`}
             title="Refill charges"

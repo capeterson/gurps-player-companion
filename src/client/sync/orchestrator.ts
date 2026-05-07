@@ -239,6 +239,7 @@ class SyncOrchestrator {
         db.characters,
         db.characterTraits,
         db.characterSkills,
+        db.characterSpells,
         db.characterInventory,
         db.characterCombat,
         db.campaigns,
@@ -252,6 +253,7 @@ class SyncOrchestrator {
         await db.characters.clear();
         await db.characterTraits.clear();
         await db.characterSkills.clear();
+        await db.characterSpells.clear();
         await db.characterInventory.clear();
         await db.characterCombat.clear();
         await db.campaigns.clear();
@@ -854,14 +856,21 @@ class SyncOrchestrator {
     });
     if (ids.size === 0) return;
     const idArray = [...ids];
-    // One transaction across the four child tables so the purge is
-    // atomic — can't have skills present and traits gone halfway.
+    // One transaction across the child tables so the purge is atomic —
+    // can't have skills present and traits gone halfway.
     await db.transaction(
       'rw',
-      [db.characterTraits, db.characterSkills, db.characterInventory, db.characterCombat],
+      [
+        db.characterTraits,
+        db.characterSkills,
+        db.characterSpells,
+        db.characterInventory,
+        db.characterCombat,
+      ],
       async () => {
         await db.characterTraits.where('characterId').anyOf(idArray).delete();
         await db.characterSkills.where('characterId').anyOf(idArray).delete();
+        await db.characterSpells.where('characterId').anyOf(idArray).delete();
         await db.characterInventory.where('characterId').anyOf(idArray).delete();
         // Combat is keyed by characterId (1:1).
         await db.characterCombat.where('id').anyOf(idArray).delete();
