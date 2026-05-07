@@ -620,6 +620,7 @@ class SyncOrchestrator {
       db.characters,
       db.characterTraits,
       db.characterSkills,
+      db.characterSpells,
       db.characterInventory,
       db.characterCombat,
       db.campaigns,
