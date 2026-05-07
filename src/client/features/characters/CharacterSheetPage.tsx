@@ -1048,35 +1048,144 @@ function PointsPanel({ character }: { character: CharacterDetail }) {
   );
 }
 
+const ENCUMBRANCE_TONE = [
+  { badge: 'badge-success', fill: 'bg-success' },
+  { badge: 'badge-info', fill: 'bg-info' },
+  { badge: 'badge-warning', fill: 'bg-warning' },
+  { badge: 'badge-error', fill: 'bg-error' },
+  { badge: 'badge-error', fill: 'bg-error' },
+] as const;
+
 function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const e = character.encumbrance;
+  const d = character.derived;
+  const bl = e.basicLift;
+  const tiers = [
+    { label: 'None', from: 0, to: bl, level: 0 },
+    { label: 'Light', from: bl, to: bl * 2, level: 1 },
+    { label: 'Medium', from: bl * 2, to: bl * 3, level: 2 },
+    { label: 'Heavy', from: bl * 3, to: bl * 6, level: 3 },
+    { label: 'X-Heavy', from: bl * 6, to: bl * 10, level: 4 },
+  ] as const;
+  const maxWeight = bl * 10;
+  const fillPct =
+    maxWeight > 0 ? Math.max(0, Math.min(100, (e.playerWeightLbs / maxWeight) * 100)) : 100;
+  const nextTier = tiers[e.level + 1];
+  const lbToNext = nextTier ? Math.max(0, nextTier.from - e.playerWeightLbs) : null;
+  const tone = ENCUMBRANCE_TONE[e.level] ?? ENCUMBRANCE_TONE[0];
+
+  const moveNet = e.speedDivisor > 0 ? Math.floor(d.basicMove / e.speedDivisor) : 0;
+  const movePenalty = d.basicMove - moveNet;
+  const dodgePenaltyAbs = -e.dodgePenalty;
+  const dodgeNet = d.dodge + e.dodgePenalty;
+
+  const tierBreakdown = (
+    <div className="grid gap-1.5">
+      <div className="font-semibold text-base-content">Encumbrance tiers</div>
+      <div className="text-base-content/60">
+        Carried weight relative to your Basic Lift ({bl.toFixed(1)} lb).
+      </div>
+      <ul className="num grid gap-0.5">
+        {tiers.map((row) => (
+          <li
+            key={row.label}
+            className={`flex justify-between gap-3 ${
+              row.level === e.level ? 'text-base-content font-semibold' : 'text-base-content/60'
+            }`}
+          >
+            <span>{row.label}</span>
+            <span>
+              {row.from.toFixed(1)} – {row.to.toFixed(1)} lb
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const equation = (base: number, penalty: number, net: number) => (
+    <span className="num">
+      <span className="text-base-content/60">{base}</span>
+      <span className="text-base-content/40"> − </span>
+      <span className="text-base-content/60">{penalty}</span>
+      <span className="text-base-content/40"> = </span>
+      <span className="font-semibold text-base-content">{net}</span>
+    </span>
+  );
+
   return (
     <StatCard
       title="Encumbrance"
-      headerExtra={<span className="badge badge-ghost">{e.label}</span>}
+      headerExtra={<span className={`badge ${tone.badge}`}>{e.label}</span>}
     >
-      <ul className="text-sm space-y-1">
-        <li className="flex justify-between">
-          <span>Worn weight</span>
-          <span className="num">{e.playerWeightLbs.toFixed(1)} lb</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Basic Lift</span>
-          <span className="num">{e.basicLift.toFixed(1)} lb</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Ratio</span>
-          <span className="num">{Number.isFinite(e.ratio) ? e.ratio.toFixed(2) : '∞'}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Speed ÷</span>
-          <span className="num">{e.speedDivisor}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Dodge penalty</span>
-          <span className="num">{e.dodgePenalty}</span>
-        </li>
-      </ul>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <div className="flex items-baseline justify-between gap-2 text-xs">
+            <InfoTooltip content={tierBreakdown}>
+              <span>Carrying</span>
+            </InfoTooltip>
+            <span className="num">
+              <span className="font-semibold text-base-content">
+                {e.playerWeightLbs.toFixed(1)}
+              </span>
+              <span className="text-base-content/50"> / {maxWeight.toFixed(1)} lb</span>
+            </span>
+          </div>
+          <div
+            className="relative h-2.5 rounded-full bg-base-200 overflow-hidden"
+            aria-label={`Encumbrance ${e.label}, carrying ${e.playerWeightLbs.toFixed(1)} of ${maxWeight.toFixed(1)} lb`}
+          >
+            <div
+              className={`absolute inset-y-0 left-0 ${tone.fill} transition-[width]`}
+              style={{ width: `${fillPct}%` }}
+            />
+            {[10, 20, 30, 60].map((pct) => (
+              <div
+                key={pct}
+                className="absolute inset-y-0 w-px bg-base-100"
+                style={{ left: `${pct}%` }}
+              />
+            ))}
+          </div>
+          <div className="text-xs text-base-content/60 num">
+            {nextTier && lbToNext !== null
+              ? `${lbToNext.toFixed(1)} lb until ${nextTier.label}`
+              : 'Maxed out'}
+          </div>
+        </div>
+
+        <ul className="text-sm space-y-1 border-t border-base-300/60 pt-2">
+          <li className="flex justify-between gap-2">
+            <InfoTooltip
+              content={
+                <div className="grid gap-1">
+                  <div className="font-semibold text-base-content">Move</div>
+                  <div>Move at encumbrance = Move ÷ Speed Divisor, rounded down.</div>
+                  <div className="num text-base-content/60">
+                    Speed ÷ <span className="text-base-content">{e.speedDivisor}</span>
+                  </div>
+                </div>
+              }
+            >
+              <span>Move</span>
+            </InfoTooltip>
+            {equation(d.basicMove, movePenalty, moveNet)}
+          </li>
+          <li className="flex justify-between gap-2">
+            <InfoTooltip
+              content={
+                <div className="grid gap-1">
+                  <div className="font-semibold text-base-content">Dodge</div>
+                  <div>Each encumbrance level subtracts 1 from Dodge.</div>
+                </div>
+              }
+            >
+              <span>Dodge</span>
+            </InfoTooltip>
+            {equation(d.dodge, dodgePenaltyAbs, dodgeNet)}
+          </li>
+        </ul>
+      </div>
     </StatCard>
   );
 }
