@@ -19,6 +19,7 @@ import {
   campaignMemberships,
   campaigns,
   characterSkills,
+  characterSpells,
   characterTraits,
   characters,
   combatStates,
@@ -35,7 +36,7 @@ async function loadFullCharacter(id: string) {
   const db = getDb();
   const [c] = await db.select().from(characters).where(eq(characters.id, id));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, inventory, combat, campaign] = await Promise.all([
+  const [traits, skills, spells, inventory, combat, campaign] = await Promise.all([
     db
       .select()
       .from(characterTraits)
@@ -46,6 +47,11 @@ async function loadFullCharacter(id: string) {
       .from(characterSkills)
       .where(eq(characterSkills.characterId, id))
       .orderBy(asc(characterSkills.name)),
+    db
+      .select()
+      .from(characterSpells)
+      .where(eq(characterSpells.characterId, id))
+      .orderBy(asc(characterSpells.name)),
     db
       .select()
       .from(inventoryItems)
@@ -64,7 +70,15 @@ async function loadFullCharacter(id: string) {
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
   ]);
-  return buildCharacterDetail({ character: c, traits, skills, inventory, combat, campaign });
+  return buildCharacterDetail({
+    character: c,
+    traits,
+    skills,
+    spells,
+    inventory,
+    combat,
+    campaign,
+  });
 }
 
 /**

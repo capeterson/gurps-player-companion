@@ -9,6 +9,7 @@ export const entityClass = z.enum([
   'character',
   'character_trait',
   'character_skill',
+  'character_spell',
   'character_inventory',
   'character_combat',
   'campaign',

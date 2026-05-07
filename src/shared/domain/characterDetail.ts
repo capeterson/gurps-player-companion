@@ -17,6 +17,7 @@ import type { CharacterDetail } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
 import type { SkillOut } from '../schemas/skill.ts';
+import type { SpellOut } from '../schemas/spell.ts';
 import type { TraitModifier, TraitOut } from '../schemas/trait.ts';
 import {
   type CharacterAttrs,
@@ -27,6 +28,7 @@ import {
 } from './characterCalc.ts';
 import { type InventoryItemRow, computeEncumbrance, computeWeights } from './encumbrance.ts';
 import { computeSkillLevel } from './skillCalc.ts';
+import { computeSpellLevel, effectiveCastingCost, mageryLevel } from './spellCalc.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
 /**
@@ -120,7 +122,26 @@ export interface CharacterDetailInputInventory {
   isArmor: boolean;
   armor: unknown | null;
   weaponData: unknown | null;
+  powerstoneData: unknown | null;
+  magicItemData: unknown | null;
   libraryItemId: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CharacterDetailInputSpell {
+  id: string;
+  characterId: string;
+  name: string;
+  college: string | null;
+  points: number;
+  baseEnergyCost: number;
+  maintenanceCost: number | null;
+  castingTime: string | null;
+  duration: string | null;
+  prerequisites: string | null;
+  notes: string | null;
+  librarySpellId: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -147,6 +168,7 @@ export interface CharacterDetailInput {
   readonly character: CharacterDetailInputCharacter;
   readonly traits: readonly CharacterDetailInputTrait[];
   readonly skills: readonly CharacterDetailInputSkill[];
+  readonly spells: readonly CharacterDetailInputSpell[];
   readonly inventory: readonly CharacterDetailInputInventory[];
   readonly combat: CharacterDetailInputCombat | null;
   readonly campaign: CharacterDetailInputCampaign | null;
@@ -267,6 +289,8 @@ export function buildInventoryItemOut(
     isArmor: item.isArmor,
     armor: (item.armor as InventoryItemOut['armor']) ?? null,
     weaponData: (item.weaponData as InventoryItemOut['weaponData']) ?? null,
+    powerstoneData: (item.powerstoneData as InventoryItemOut['powerstoneData']) ?? null,
+    magicItemData: (item.magicItemData as InventoryItemOut['magicItemData']) ?? null,
     libraryItemId: item.libraryItemId,
     effectiveWeightLbs: perItemEffective.get(item.id) ?? Number(item.weightLbs) * item.quantity,
     createdAt: toIso(item.createdAt),
@@ -274,8 +298,34 @@ export function buildInventoryItemOut(
   };
 }
 
+export function buildSpellOut(
+  spell: CharacterDetailInputSpell,
+  iq: number,
+  magery: number,
+): SpellOut {
+  const level = computeSpellLevel(spell.points, iq, magery);
+  return {
+    id: spell.id,
+    characterId: spell.characterId,
+    name: spell.name,
+    college: spell.college,
+    points: spell.points,
+    baseEnergyCost: spell.baseEnergyCost,
+    maintenanceCost: spell.maintenanceCost,
+    castingTime: spell.castingTime,
+    duration: spell.duration,
+    prerequisites: spell.prerequisites,
+    notes: spell.notes,
+    librarySpellId: spell.librarySpellId,
+    level,
+    effectiveCost: effectiveCastingCost(spell.baseEnergyCost, level),
+    createdAt: toIso(spell.createdAt),
+    updatedAt: toIso(spell.updatedAt),
+  };
+}
+
 export function buildCharacterDetail(input: CharacterDetailInput): CharacterDetail {
-  const { character, traits, skills, inventory, combat, campaign } = input;
+  const { character, traits, skills, spells, inventory, combat, campaign } = input;
   const attrs = characterAttrsFromRow(character);
   const derived = computeDerived(attrs);
 
@@ -283,7 +333,13 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     kind: t.kind,
     points: t.points,
   }));
-  const skillInputs: CharacterSkillInput[] = skills.map((s) => ({ points: s.points }));
+  // Spells are mechanically IQ/H skills, so their points roll into the
+  // skill point bucket alongside regular skills.  This keeps the point
+  // ledger consistent with how a paper sheet adds them up.
+  const skillInputs: CharacterSkillInput[] = [
+    ...skills.map((s) => ({ points: s.points })),
+    ...spells.map((s) => ({ points: s.points })),
+  ];
   const points = computePointBreakdown(attrs, traitInputs, skillInputs);
 
   const weights = computeWeights(inventory.map(inventoryRowFor));
@@ -291,6 +347,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const inventoryOut = inventory.map((i) => buildInventoryItemOut(i, weights.perItem));
   const traitsOut = traits.map(buildTraitOut);
   const skillsOut = skills.map((s) => buildSkillOut(s, derived));
+  const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
+  const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery));
   const combatOut = combat ? buildCombatStateOut(combat) : null;
 
   const caps: CampaignCaps = {
@@ -351,6 +409,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     warnings,
     traits: traitsOut,
     skills: skillsOut,
+    spells: spellsOut,
     inventory: inventoryOut,
     combat: combatOut,
   };

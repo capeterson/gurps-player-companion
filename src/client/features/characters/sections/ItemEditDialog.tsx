@@ -4,11 +4,15 @@ import type {
   ArmorData,
   InventoryItemOut,
   InventoryItemUpdate,
+  MagicItemData,
+  MagicItemMode,
+  PowerstoneData,
 } from '../../../../shared/schemas/inventory.ts';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 
 const REDUCTIONS = [0, 25, 50] as const;
+const MAGIC_ITEM_MODES: readonly MagicItemMode[] = ['charged', 'powered', 'continuous'];
 
 function defaultArmor(): ArmorData {
   return {
@@ -18,6 +22,26 @@ function defaultArmor(): ArmorData {
     flexible: false,
     frontOnly: false,
     backOnly: false,
+    notes: null,
+  };
+}
+
+function defaultPowerstone(): PowerstoneData {
+  return {
+    maxEnergy: 5,
+    currentEnergy: 0,
+    notes: null,
+  };
+}
+
+function defaultMagicItem(): MagicItemData {
+  return {
+    spellName: '',
+    spellSkillLevel: 15,
+    mode: 'charged',
+    chargesMax: 10,
+    chargesCurrent: 10,
+    energyCost: null,
     notes: null,
   };
 }
@@ -52,6 +76,18 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
   const [drCrushingRaw, setDrCrushingRaw] = useState('');
   const [customLocation, setCustomLocation] = useState('');
 
+  const [isPowerstone, setIsPowerstone] = useState(false);
+  const [powerstone, setPowerstone] = useState<PowerstoneData>(defaultPowerstone());
+  const [psMaxRaw, setPsMaxRaw] = useState('5');
+  const [psCurRaw, setPsCurRaw] = useState('0');
+
+  const [isMagicItem, setIsMagicItem] = useState(false);
+  const [magicItem, setMagicItem] = useState<MagicItemData>(defaultMagicItem());
+  const [miSkillRaw, setMiSkillRaw] = useState('15');
+  const [miMaxRaw, setMiMaxRaw] = useState('10');
+  const [miCurRaw, setMiCurRaw] = useState('10');
+  const [miEnergyRaw, setMiEnergyRaw] = useState('');
+
   useEffect(() => {
     if (!item) return;
     setName(item.name);
@@ -71,6 +107,18 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
     setDrRaw(String(armorData.dr));
     setDrCrushingRaw(armorData.drCrushing == null ? '' : String(armorData.drCrushing));
     setCustomLocation('');
+    const ps = item.powerstoneData;
+    setIsPowerstone(ps != null);
+    setPowerstone(ps ?? defaultPowerstone());
+    setPsMaxRaw(String(ps?.maxEnergy ?? 5));
+    setPsCurRaw(String(ps?.currentEnergy ?? 0));
+    const mi = item.magicItemData;
+    setIsMagicItem(mi != null);
+    setMagicItem(mi ?? defaultMagicItem());
+    setMiSkillRaw(String(mi?.spellSkillLevel ?? 15));
+    setMiMaxRaw(String(mi?.chargesMax ?? 10));
+    setMiCurRaw(String(mi?.chargesCurrent ?? 10));
+    setMiEnergyRaw(mi?.energyCost == null ? '' : String(mi.energyCost));
   }, [item]);
 
   if (!item) return null;
@@ -115,6 +163,36 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
       return;
     }
     const parsedHideaway = hideaway === '' ? 0 : Number(hideaway);
+    let powerstonePatch: PowerstoneData | null = null;
+    if (isPowerstone) {
+      const max = Math.max(1, Math.floor(Number(psMaxRaw)) || 1);
+      const cur = Math.max(0, Math.min(max, Math.floor(Number(psCurRaw)) || 0));
+      powerstonePatch = {
+        maxEnergy: max,
+        currentEnergy: cur,
+        ...(powerstone.notes != null && powerstone.notes !== '' ? { notes: powerstone.notes } : {}),
+      };
+    }
+    let magicItemPatch: MagicItemData | null = null;
+    if (isMagicItem) {
+      if (!magicItem.spellName.trim()) {
+        toasts.push('Magic item needs a spell name', { kind: 'error' });
+        return;
+      }
+      const skill = Math.max(0, Math.min(40, Math.floor(Number(miSkillRaw)) || 0));
+      const max = Math.max(0, Math.floor(Number(miMaxRaw)) || 0);
+      const cur = Math.max(0, Math.min(max, Math.floor(Number(miCurRaw)) || 0));
+      const energyCost =
+        miEnergyRaw === '' ? null : Math.max(0, Math.floor(Number(miEnergyRaw)) || 0);
+      magicItemPatch = {
+        spellName: magicItem.spellName.trim(),
+        spellSkillLevel: skill,
+        mode: magicItem.mode,
+        ...(magicItem.mode === 'charged' ? { chargesMax: max, chargesCurrent: cur } : {}),
+        ...(magicItem.mode === 'powered' && energyCost != null ? { energyCost } : {}),
+        ...(magicItem.notes != null && magicItem.notes !== '' ? { notes: magicItem.notes } : {}),
+      };
+    }
     const patch: InventoryItemUpdate = {
       name: name.trim(),
       quantity: parsedQty,
@@ -130,6 +208,8 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
       weightReductionPercent: isContainer ? reduction : 0,
       isArmor,
       armor: isArmor ? armor : null,
+      powerstoneData: powerstonePatch,
+      magicItemData: magicItemPatch,
     };
     onSubmit(patch);
   }
@@ -409,6 +489,158 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
                     onChange={(e) =>
                       setArmor((a) => ({
                         ...a,
+                        notes: e.target.value === '' ? null : e.target.value,
+                      }))
+                    }
+                    className="input input-sm input-bordered"
+                  />
+                </label>
+              </div>
+            )}
+          </fieldset>
+
+          <fieldset className="border border-base-300/60 rounded-xl p-3">
+            <legend className="px-2 label-eyebrow">Powerstone</legend>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={isPowerstone}
+                onChange={(e) => setIsPowerstone(e.target.checked)}
+              />
+              <span>This item is a powerstone</span>
+            </label>
+            {isPowerstone && (
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="label-eyebrow">Max energy</span>
+                  <input
+                    value={psMaxRaw}
+                    inputMode="numeric"
+                    onChange={(e) => setPsMaxRaw(e.target.value)}
+                    className="num input input-sm input-bordered text-right"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="label-eyebrow">Current charge</span>
+                  <input
+                    value={psCurRaw}
+                    inputMode="numeric"
+                    onChange={(e) => setPsCurRaw(e.target.value)}
+                    className="num input input-sm input-bordered text-right"
+                  />
+                </label>
+                <label className="sm:col-span-3 flex flex-col gap-1">
+                  <span className="label-eyebrow">Stone notes</span>
+                  <input
+                    value={powerstone.notes ?? ''}
+                    onChange={(e) =>
+                      setPowerstone((p) => ({
+                        ...p,
+                        notes: e.target.value === '' ? null : e.target.value,
+                      }))
+                    }
+                    className="input input-sm input-bordered"
+                    placeholder="e.g. Manastone, attuned to fire"
+                  />
+                </label>
+              </div>
+            )}
+          </fieldset>
+
+          <fieldset className="border border-base-300/60 rounded-xl p-3">
+            <legend className="px-2 label-eyebrow">Magic item</legend>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={isMagicItem}
+                onChange={(e) => setIsMagicItem(e.target.checked)}
+              />
+              <span>This item casts a spell</span>
+            </label>
+            {isMagicItem && (
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Spell</span>
+                    <input
+                      value={magicItem.spellName}
+                      onChange={(e) => setMagicItem((m) => ({ ...m, spellName: e.target.value }))}
+                      className="input input-sm input-bordered"
+                      placeholder="e.g. Fireball"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Enchanter skill</span>
+                    <input
+                      value={miSkillRaw}
+                      inputMode="numeric"
+                      onChange={(e) => setMiSkillRaw(e.target.value)}
+                      className="num input input-sm input-bordered text-right"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Mode</span>
+                    <select
+                      className="select select-sm select-bordered"
+                      value={magicItem.mode}
+                      onChange={(e) =>
+                        setMagicItem((m) => ({
+                          ...m,
+                          mode: e.target.value as MagicItemMode,
+                        }))
+                      }
+                    >
+                      {MAGIC_ITEM_MODES.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {magicItem.mode === 'charged' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Max charges</span>
+                      <input
+                        value={miMaxRaw}
+                        inputMode="numeric"
+                        onChange={(e) => setMiMaxRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Current charges</span>
+                      <input
+                        value={miCurRaw}
+                        inputMode="numeric"
+                        onChange={(e) => setMiCurRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                      />
+                    </label>
+                  </div>
+                )}
+                {magicItem.mode === 'powered' && (
+                  <label className="flex flex-col gap-1 max-w-[14rem]">
+                    <span className="label-eyebrow">Energy / use (FP)</span>
+                    <input
+                      value={miEnergyRaw}
+                      inputMode="numeric"
+                      onChange={(e) => setMiEnergyRaw(e.target.value)}
+                      className="num input input-sm input-bordered text-right"
+                      placeholder="e.g. 1"
+                    />
+                  </label>
+                )}
+                <label className="flex flex-col gap-1">
+                  <span className="label-eyebrow">Item notes</span>
+                  <input
+                    value={magicItem.notes ?? ''}
+                    onChange={(e) =>
+                      setMagicItem((m) => ({
+                        ...m,
                         notes: e.target.value === '' ? null : e.target.value,
                       }))
                     }

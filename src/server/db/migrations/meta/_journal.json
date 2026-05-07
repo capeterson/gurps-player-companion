@@ -78,6 +78,13 @@
       "when": 1778045417883,
       "tag": "0010_late_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1778100000000,
+      "tag": "0011_magic_system",
+      "breakpoints": true
     }
   ]
 }

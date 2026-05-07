@@ -17,10 +17,12 @@
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
+import { computeDerived } from '../../shared/domain/characterCalc.ts';
 import { characterCreate, characterUpdate } from '../../shared/schemas/character.ts';
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
 import { skillCreate, skillUpdate } from '../../shared/schemas/skill.ts';
+import { spellCreate, spellUpdate } from '../../shared/schemas/spell.ts';
 import type {
   EntityClass,
   OperationEnvelope,
@@ -32,11 +34,13 @@ import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
   characterSkills,
+  characterSpells,
   characterTraits,
   characters,
   combatStates,
   inventoryItems,
 } from '../db/schema.ts';
+import { characterAttrsFromRow } from './characterSummary.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
 /**
@@ -50,6 +54,7 @@ const FIELD_VALIDATORS = {
   character: characterUpdate,
   character_trait: traitUpdate,
   character_skill: skillUpdate,
+  character_spell: spellUpdate,
   character_inventory: inventoryItemUpdate,
   character_combat: combatStateUpdate,
 } as const;
@@ -60,6 +65,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   character: Object.keys(characterUpdate.shape) as readonly string[],
   character_trait: Object.keys(traitUpdate.shape) as readonly string[],
   character_skill: Object.keys(skillUpdate.shape) as readonly string[],
+  character_spell: Object.keys(spellUpdate.shape) as readonly string[],
   character_inventory: Object.keys(inventoryItemUpdate.shape) as readonly string[],
   character_combat: Object.keys(combatStateUpdate.shape) as readonly string[],
   // Not yet exposed via /sync (no client UI mutations today).
@@ -140,6 +146,8 @@ async function dispatchOperationInner(
       return dispatchTrait(ctx, op);
     case 'character_skill':
       return dispatchSkill(ctx, op);
+    case 'character_spell':
+      return dispatchSpell(ctx, op);
     case 'character_inventory':
       return dispatchInventory(ctx, op);
     case 'character_combat':
@@ -371,6 +379,76 @@ async function dispatchSkill(
   });
 }
 
+// ---------- character_spell ----------
+
+async function dispatchSpell(
+  ctx: DispatchContext,
+  op: OperationEnvelope,
+): Promise<OperationOutcome> {
+  const db = getDb();
+  if (op.command === 'create') {
+    const body = spellCreate.parse(op.attemptedValue);
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    const [created] = await db
+      .insert(characterSpells)
+      .values({
+        ...(op.entityId ? { id: op.entityId } : {}),
+        characterId,
+        name: body.name,
+        college: body.college ?? null,
+        points: body.points ?? 1,
+        baseEnergyCost: body.baseEnergyCost ?? 1,
+        maintenanceCost: body.maintenanceCost ?? null,
+        castingTime: body.castingTime ?? null,
+        duration: body.duration ?? null,
+        prerequisites: body.prerequisites ?? null,
+        notes: body.notes ?? null,
+        librarySpellId: body.librarySpellId ?? null,
+      })
+      .returning();
+    if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    return appliedOutcome(op, Number(created.revision));
+  }
+
+  if (op.command === 'delete') {
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    const result = await db
+      .delete(characterSpells)
+      .where(and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)))
+      .returning({ id: characterSpells.id });
+    if (result.length === 0) {
+      return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'spell not found' };
+    }
+    return { clientOpId: op.clientOpId, status: 'applied' };
+  }
+
+  const characterId = requireParentId(op);
+  const access = await loadCharacterOr403(characterId, ctx.userId);
+  assertWrite(access);
+  return await patchEntity({
+    op,
+    userId: ctx.userId,
+    entityClass: 'character_spell',
+    table: characterSpells,
+    parentLookup: async () => {
+      const [row] = await db
+        .select()
+        .from(characterSpells)
+        .where(
+          and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+        );
+      if (!row) throw new HTTPException(404, { message: 'spell not found' });
+      return row;
+    },
+    childWhere: () =>
+      and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+  });
+}
+
 // ---------- character_inventory ----------
 
 async function dispatchInventory(
@@ -422,6 +500,8 @@ async function dispatchInventory(
           isArmor: body.isArmor ?? false,
           armor: body.armor ?? null,
           weaponData: body.weaponData ?? null,
+          powerstoneData: body.powerstoneData ?? null,
+          magicItemData: body.magicItemData ?? null,
           libraryItemId: body.libraryItemId ?? null,
         })
         .returning();
@@ -565,12 +645,20 @@ async function dispatchCombat(
     if (v === undefined) continue;
     setOnUpdate[k] = v;
   }
+  // Default the missing pool to the character's derived value, not the
+  // literal 10.  Without this, a per-field patch on a character with
+  // no combat row yet (e.g. a first-cast spending FP from CastSpellDialog)
+  // would create the row at currentHp=10 even when derived HP is 14,
+  // and the cursor pull would clobber the local pool.  The legacy CRUD
+  // route in characterSubResources.ts already computes derived for the
+  // same reason.
+  const derived = computeDerived(characterAttrsFromRow(access.character));
   const [row] = await db
     .insert(combatStates)
     .values({
       characterId,
-      currentHp: (body.currentHp as number | undefined) ?? 10,
-      currentFp: (body.currentFp as number | undefined) ?? 10,
+      currentHp: (body.currentHp as number | undefined) ?? derived.hp,
+      currentFp: (body.currentFp as number | undefined) ?? derived.fp,
       conditions: (body.conditions as string[] | undefined) ?? [],
       maneuver: (body.maneuver as string | null | undefined) ?? null,
       posture: (body.posture as 'standing' | undefined) ?? 'standing',

@@ -31,6 +31,7 @@ import {
   type LocalCharacterCombat,
   type LocalCharacterInventory,
   type LocalCharacterSkill,
+  type LocalCharacterSpell,
   type LocalCharacterTrait,
   type OutboxEntry,
   type RejectionRecord,
@@ -55,6 +56,7 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character',
   'character_trait',
   'character_skill',
+  'character_spell',
   'character_inventory',
   'character_combat',
 ];
@@ -70,8 +72,16 @@ const PERIODIC_PULL_MS = 30_000;
  * string↔number type mismatch so plain text fields (height, name, notes,
  * etc.) are still compared verbatim — changing "6" to "06" must not look
  * equal and trigger a silent overwrite instead of a conflict rollback.
+ *
+ * For jsonb columns (armor, weaponData, powerstoneData, magicItemData,
+ * trait modifiers, etc.) the server returns a freshly-parsed object,
+ * not the same reference the client stored.  We fall through to a
+ * structural deep-equal so the stale-base reconciliation correctly
+ * recognises "this field is unchanged from what I last knew" —
+ * otherwise rapid jsonb edits race and rollback even when the server
+ * value matches the queued prevValue.
  */
-function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
+export function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
   if (serverVal === storedVal) return true;
   // Coerce only on string↔number mismatch (Drizzle decimal string vs. Dexie number).
   if (typeof serverVal === 'string' && typeof storedVal === 'number') {
@@ -81,6 +91,29 @@ function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
   if (typeof serverVal === 'number' && typeof storedVal === 'string') {
     const n = Number(storedVal);
     return Number.isFinite(n) && n === serverVal;
+  }
+  if (Array.isArray(serverVal) && Array.isArray(storedVal)) {
+    if (serverVal.length !== storedVal.length) return false;
+    for (let i = 0; i < serverVal.length; i++) {
+      if (!fieldValuesEqual(serverVal[i], storedVal[i])) return false;
+    }
+    return true;
+  }
+  if (
+    serverVal !== null &&
+    storedVal !== null &&
+    typeof serverVal === 'object' &&
+    typeof storedVal === 'object' &&
+    !Array.isArray(serverVal) &&
+    !Array.isArray(storedVal)
+  ) {
+    const a = serverVal as Record<string, unknown>;
+    const b = storedVal as Record<string, unknown>;
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const k of keys) {
+      if (!fieldValuesEqual(a[k], b[k])) return false;
+    }
+    return true;
   }
   return false;
 }
@@ -237,6 +270,7 @@ class SyncOrchestrator {
         db.characters,
         db.characterTraits,
         db.characterSkills,
+        db.characterSpells,
         db.characterInventory,
         db.characterCombat,
         db.campaigns,
@@ -250,6 +284,7 @@ class SyncOrchestrator {
         await db.characters.clear();
         await db.characterTraits.clear();
         await db.characterSkills.clear();
+        await db.characterSpells.clear();
         await db.characterInventory.clear();
         await db.characterCombat.clear();
         await db.campaigns.clear();
@@ -585,6 +620,7 @@ class SyncOrchestrator {
       db.characters,
       db.characterTraits,
       db.characterSkills,
+      db.characterSpells,
       db.characterInventory,
       db.characterCombat,
       db.campaigns,
@@ -647,6 +683,9 @@ class SyncOrchestrator {
       case 'character_skill':
         await db.characterSkills.update(entityId, { revision });
         return;
+      case 'character_spell':
+        await db.characterSpells.update(entityId, { revision });
+        return;
       case 'character_inventory':
         await db.characterInventory.update(entityId, { revision });
         return;
@@ -676,6 +715,9 @@ class SyncOrchestrator {
       case 'character_skill':
         await db.characterSkills.update(entityId, updates as Partial<LocalCharacterSkill>);
         return;
+      case 'character_spell':
+        await db.characterSpells.update(entityId, updates as Partial<LocalCharacterSpell>);
+        return;
       case 'character_inventory':
         await db.characterInventory.update(entityId, updates as Partial<LocalCharacterInventory>);
         return;
@@ -698,6 +740,9 @@ class SyncOrchestrator {
         return;
       case 'character_skill':
         await db.characterSkills.delete(entityId);
+        return;
+      case 'character_spell':
+        await db.characterSpells.delete(entityId);
         return;
       case 'character_inventory':
         await db.characterInventory.delete(entityId);
@@ -769,6 +814,11 @@ class SyncOrchestrator {
         await db.characterSkills.put({ ...(existing ?? {}), ...merged } as LocalCharacterSkill);
         return;
       }
+      case 'character_spell': {
+        const existing = await db.characterSpells.get(id);
+        await db.characterSpells.put({ ...(existing ?? {}), ...merged } as LocalCharacterSpell);
+        return;
+      }
       case 'character_inventory': {
         const existing = await db.characterInventory.get(id);
         await db.characterInventory.put({
@@ -838,14 +888,21 @@ class SyncOrchestrator {
     });
     if (ids.size === 0) return;
     const idArray = [...ids];
-    // One transaction across the four child tables so the purge is
-    // atomic — can't have skills present and traits gone halfway.
+    // One transaction across the child tables so the purge is atomic —
+    // can't have skills present and traits gone halfway.
     await db.transaction(
       'rw',
-      [db.characterTraits, db.characterSkills, db.characterInventory, db.characterCombat],
+      [
+        db.characterTraits,
+        db.characterSkills,
+        db.characterSpells,
+        db.characterInventory,
+        db.characterCombat,
+      ],
       async () => {
         await db.characterTraits.where('characterId').anyOf(idArray).delete();
         await db.characterSkills.where('characterId').anyOf(idArray).delete();
+        await db.characterSpells.where('characterId').anyOf(idArray).delete();
         await db.characterInventory.where('characterId').anyOf(idArray).delete();
         // Combat is keyed by characterId (1:1).
         await db.characterCombat.where('id').anyOf(idArray).delete();

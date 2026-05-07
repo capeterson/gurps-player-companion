@@ -101,6 +101,24 @@ export interface LocalCharacterSkill {
   revision: number;
 }
 
+export interface LocalCharacterSpell {
+  id: string;
+  characterId: string;
+  name: string;
+  college: string | null;
+  points: number;
+  baseEnergyCost: number;
+  maintenanceCost: number | null;
+  castingTime: string | null;
+  duration: string | null;
+  prerequisites: string | null;
+  notes: string | null;
+  librarySpellId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
 export interface LocalCharacterInventory {
   id: string;
   characterId: string;
@@ -119,6 +137,8 @@ export interface LocalCharacterInventory {
   isArmor: boolean;
   armor: unknown | null;
   weaponData: unknown | null;
+  powerstoneData: unknown | null;
+  magicItemData: unknown | null;
   libraryItemId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -258,6 +278,7 @@ class LocalDb extends Dexie {
   characters!: Table<LocalCharacter, string>;
   characterTraits!: Table<LocalCharacterTrait, string>;
   characterSkills!: Table<LocalCharacterSkill, string>;
+  characterSpells!: Table<LocalCharacterSpell, string>;
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
   campaigns!: Table<LocalCampaign, string>;
@@ -282,6 +303,11 @@ class LocalDb extends Dexie {
       syncMeta: 'key',
       tombstones: '[entityClass+entityId], revision',
       rejectionToasts: 'id, entityId, dismissedAt',
+    });
+    // v2 adds character_spells.  Bumping the version triggers Dexie's
+    // schema upgrade flow; existing stores are preserved.
+    this.version(2).stores({
+      characterSpells: 'id, characterId, updatedAt, revision',
     });
   }
 }
@@ -314,6 +340,7 @@ export const ALL_STORE_NAMES = [
   'characters',
   'characterTraits',
   'characterSkills',
+  'characterSpells',
   'characterInventory',
   'characterCombat',
   'campaigns',
@@ -336,6 +363,8 @@ export function storeForEntityClass(entityClass: EntityClass): keyof LocalDb | n
       return 'characterTraits';
     case 'character_skill':
       return 'characterSkills';
+    case 'character_spell':
+      return 'characterSpells';
     case 'character_inventory':
       return 'characterInventory';
     case 'character_combat':

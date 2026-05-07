@@ -17,6 +17,7 @@ import {
   type LocalCharacterCombat,
   type LocalCharacterInventory,
   type LocalCharacterSkill,
+  type LocalCharacterSpell,
   type LocalCharacterTrait,
   type OutboxEntry,
   type OutboxStatus,
@@ -153,6 +154,10 @@ async function readFieldValue(args: EnqueueFieldPatchArgs): Promise<unknown> {
         const row = await db.characterSkills.get(args.entityId);
         return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
       }
+      case 'character_spell': {
+        const row = await db.characterSpells.get(args.entityId);
+        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
+      }
       case 'character_inventory': {
         const row = await db.characterInventory.get(args.entityId);
         return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
@@ -177,6 +182,8 @@ async function readEntityRevision(args: EnqueueFieldPatchArgs): Promise<number |
       return (await db.characterTraits.get(args.entityId))?.revision;
     case 'character_skill':
       return (await db.characterSkills.get(args.entityId))?.revision;
+    case 'character_spell':
+      return (await db.characterSpells.get(args.entityId))?.revision;
     case 'character_inventory':
       return (await db.characterInventory.get(args.entityId))?.revision;
     case 'character_combat':
@@ -270,6 +277,8 @@ function storesForOp(entityClass: EntityClass) {
       return [db.characterTraits];
     case 'character_skill':
       return [db.characterSkills];
+    case 'character_spell':
+      return [db.characterSpells];
     case 'character_inventory':
       return [db.characterInventory];
     case 'character_combat':
@@ -296,6 +305,9 @@ async function applyLocalPatch(args: EnqueueFieldPatchArgs): Promise<void> {
       return;
     case 'character_skill':
       await db.characterSkills.update(args.entityId, updates as Partial<LocalCharacterSkill>);
+      return;
+    case 'character_spell':
+      await db.characterSpells.update(args.entityId, updates as Partial<LocalCharacterSpell>);
       return;
     case 'character_inventory':
       await db.characterInventory.update(
@@ -342,6 +354,9 @@ async function applyLocalCreate<T extends Record<string, unknown>>(
     case 'character_skill':
       await db.characterSkills.put(base as unknown as LocalCharacterSkill);
       return;
+    case 'character_spell':
+      await db.characterSpells.put(base as unknown as LocalCharacterSpell);
+      return;
     case 'character_inventory':
       await db.characterInventory.put(base as unknown as LocalCharacterInventory);
       return;
@@ -367,6 +382,9 @@ async function applyLocalDelete(entityClass: EntityClass, entityId: string): Pro
       return;
     case 'character_skill':
       await db.characterSkills.delete(entityId);
+      return;
+    case 'character_spell':
+      await db.characterSpells.delete(entityId);
       return;
     case 'character_inventory':
       await db.characterInventory.delete(entityId);
