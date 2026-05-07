@@ -283,7 +283,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
                   +5
                 </button>
               </div>
-              {fp < fpMax && (
+              {fp !== fpMax && (
                 <button
                   type="button"
                   className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
