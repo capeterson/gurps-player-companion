@@ -498,6 +498,8 @@ async function dispatchInventory(
           isArmor: body.isArmor ?? false,
           armor: body.armor ?? null,
           weaponData: body.weaponData ?? null,
+          powerstoneData: body.powerstoneData ?? null,
+          magicItemData: body.magicItemData ?? null,
           libraryItemId: body.libraryItemId ?? null,
         })
         .returning();
