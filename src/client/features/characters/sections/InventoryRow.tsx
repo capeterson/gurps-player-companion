@@ -81,6 +81,15 @@ export function InventoryRow(props: InventoryRowProps) {
     drag.onDragOverTarget({ kind: 'container', id: item.id }, e.dataTransfer);
   }
 
+  // mobile-drag-drop polyfill only marks the element as a valid drop
+  // target when dragenter calls preventDefault — without this, drops
+  // on touch devices snap back to document.body and never fire onDrop.
+  function handleDragEnter(e: DragEvent<HTMLTableRowElement>) {
+    if (!drag || !drag.draggingId) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   function handleDragLeave() {
     if (!drag) return;
     drag.onDragLeaveTarget({ kind: 'container', id: item.id });
@@ -116,6 +125,7 @@ export function InventoryRow(props: InventoryRowProps) {
         draggable={canEdit && !!drag}
         onDragStart={canEdit && drag ? handleDragStart : undefined}
         onDragEnd={canEdit && drag ? drag.onDragEnd : undefined}
+        onDragEnter={canEdit && drag ? handleDragEnter : undefined}
         onDragOver={canEdit && drag ? handleDragOver : undefined}
         onDragLeave={canEdit && drag ? handleDragLeave : undefined}
         onDrop={canEdit && drag ? handleDrop : undefined}

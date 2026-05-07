@@ -601,6 +601,14 @@ export function InventoryPanel({
       {items.length > 0 && (
         <div className="px-5 py-4 space-y-6">
           <section
+            onDragEnter={
+              canWrite
+                ? (e) => {
+                    if (!draggedIdRef.current) return;
+                    e.preventDefault();
+                  }
+                : undefined
+            }
             onDragOver={
               canWrite
                 ? (e) => {
@@ -655,6 +663,14 @@ export function InventoryPanel({
           </section>
 
           <section
+            onDragEnter={
+              canWrite
+                ? (e) => {
+                    if (!draggedIdRef.current) return;
+                    e.preventDefault();
+                  }
+                : undefined
+            }
             onDragOver={
               canWrite
                 ? (e) => {
