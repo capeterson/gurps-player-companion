@@ -98,7 +98,7 @@ describe('computeEncumbrance', () => {
     expect(r.level).toBe(0);
     expect(r.label).toBe('None');
     expect(r.dodgePenalty).toBe(0);
-    expect(r.speedDivisor).toBe(1);
+    expect(r.moveMultiplier).toBe(1);
   });
   it('level 1 (Light) when 1 < ratio ≤ 2', () => {
     const r = computeEncumbrance(30, 20);
@@ -118,7 +118,7 @@ describe('computeEncumbrance', () => {
     const r = computeEncumbrance(200, 20);
     expect(r.level).toBe(4);
     expect(r.dodgePenalty).toBe(-4);
-    expect(r.speedDivisor).toBe(3);
+    expect(r.moveMultiplier).toBe(0.2);
   });
   it('treats zero basic lift as infinite ratio', () => {
     const r = computeEncumbrance(5, 0);

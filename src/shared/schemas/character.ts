@@ -92,7 +92,7 @@ export const warningOut = z.object({
 export const encumbranceOut = z.object({
   level: z.number().int().min(0).max(4),
   label: z.enum(['None', 'Light', 'Medium', 'Heavy', 'X-Heavy']),
-  speedDivisor: z.number(),
+  moveMultiplier: z.number(),
   dodgePenalty: z.number().int(),
   playerWeightLbs: z.number(),
   basicLift: z.number(),

@@ -1071,10 +1071,16 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const fillPct =
     maxWeight > 0 ? Math.max(0, Math.min(100, (e.playerWeightLbs / maxWeight) * 100)) : 100;
   const nextTier = tiers[e.level + 1];
-  const lbToNext = nextTier ? Math.max(0, nextTier.from - e.playerWeightLbs) : null;
+  // At X-Heavy there's no next tier, but the player can still be below
+  // the 10×BL carry cap — show headroom against `maxWeight` until they
+  // actually reach it; otherwise the bar would lie.
+  const nextThresholdLb = nextTier ? nextTier.from : maxWeight;
+  const nextThresholdLabel = nextTier ? nextTier.label : 'cap';
+  const lbToNext = Math.max(0, nextThresholdLb - e.playerWeightLbs);
+  const atCap = !nextTier && e.playerWeightLbs >= maxWeight;
   const tone = ENCUMBRANCE_TONE[e.level] ?? ENCUMBRANCE_TONE[0];
 
-  const moveNet = e.speedDivisor > 0 ? Math.floor(d.basicMove / e.speedDivisor) : 0;
+  const moveNet = Math.floor(d.basicMove * e.moveMultiplier);
   const movePenalty = d.basicMove - moveNet;
   const dodgePenaltyAbs = -e.dodgePenalty;
   const dodgeNet = d.dodge + e.dodgePenalty;
@@ -1148,9 +1154,7 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
             ))}
           </div>
           <div className="text-xs text-base-content/60 num">
-            {nextTier && lbToNext !== null
-              ? `${lbToNext.toFixed(1)} lb until ${nextTier.label}`
-              : 'Maxed out'}
+            {atCap ? 'Maxed out' : `${lbToNext.toFixed(1)} lb until ${nextThresholdLabel}`}
           </div>
         </div>
 
@@ -1160,9 +1164,11 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
               content={
                 <div className="grid gap-1">
                   <div className="font-semibold text-base-content">Move</div>
-                  <div>Move at encumbrance = Move ÷ Speed Divisor, rounded down.</div>
+                  <div>
+                    Move at encumbrance = Basic Move × encumbrance multiplier, rounded down.
+                  </div>
                   <div className="num text-base-content/60">
-                    Speed ÷ <span className="text-base-content">{e.speedDivisor}</span>
+                    × <span className="text-base-content">{e.moveMultiplier}</span> at {e.label}
                   </div>
                 </div>
               }
