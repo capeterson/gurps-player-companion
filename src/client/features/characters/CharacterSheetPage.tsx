@@ -1012,38 +1012,55 @@ function DerivedPanel({ character }: { character: CharacterDetail }) {
 
 function PointsPanel({ character }: { character: CharacterDetail }) {
   const p = character.points;
+  const [open, setOpen] = useState(false);
   return (
-    <StatCard title="Point ledger" points={p.total}>
-      <ul className="text-sm space-y-1">
-        <li className="flex justify-between">
-          <span>Attributes</span>
-          <span className="num">{p.attributes}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Secondary</span>
-          <span className="num">{p.secondary}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Advantages</span>
-          <span className="num">{p.advantages}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Disadvantages</span>
-          <span className="num">{p.disadvantages}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Quirks</span>
-          <span className="num">{p.quirks}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Skills</span>
-          <span className="num">{p.skills}</span>
-        </li>
-        <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
-          <span>Total</span>
-          <span className="num">{p.total}</span>
-        </li>
-      </ul>
+    <StatCard
+      title="Point ledger"
+      points={p.total}
+      headerExtra={
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="btn btn-ghost btn-xs px-1 text-base-content/50"
+          aria-expanded={open}
+          aria-label={open ? 'Collapse point ledger' : 'Expand point ledger'}
+        >
+          {open ? '▾' : '▸'}
+        </button>
+      }
+    >
+      {open && (
+        <ul className="text-sm space-y-1">
+          <li className="flex justify-between">
+            <span>Attributes</span>
+            <span className="num">{p.attributes}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Secondary</span>
+            <span className="num">{p.secondary}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Advantages</span>
+            <span className="num">{p.advantages}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Disadvantages</span>
+            <span className="num">{p.disadvantages}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Quirks</span>
+            <span className="num">{p.quirks}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Skills</span>
+            <span className="num">{p.skills}</span>
+          </li>
+          <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
+            <span>Total</span>
+            <span className="num">{p.total}</span>
+          </li>
+        </ul>
+      )}
     </StatCard>
   );
 }
