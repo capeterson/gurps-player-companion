@@ -54,12 +54,16 @@ function AddSpellForm({ characterId, canWrite }: AddSpellFormProps) {
         },
       });
       // Per AGENTS.md: only clear fields whose value still matches the
-      // snapshot we sent.  If the user has started typing the next
-      // spell while this enqueue was in flight, leave them alone.
-      if (name === snap.nameRaw) setName('');
-      if (college === snap.collegeRaw) setCollege('');
-      if (points === snap.pointsRaw) setPoints('1');
-      if (baseEnergyCost === snap.baseEnergyCostRaw) setBaseEnergyCost('1');
+      // snapshot we sent.  We use functional setters so the comparison
+      // runs against the *live* state at completion time, not the
+      // closure-captured value from the render that submitted; that
+      // way a field the user has typed into during the await isn't
+      // wiped, which is exactly the quick-edit loss this guard exists
+      // to prevent.
+      setName((cur) => (cur === snap.nameRaw ? '' : cur));
+      setCollege((cur) => (cur === snap.collegeRaw ? '' : cur));
+      setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
+      setBaseEnergyCost((cur) => (cur === snap.baseEnergyCostRaw ? '1' : cur));
     } catch (err) {
       toasts.push(`Couldn't add spell — ${(err as Error).message}`, { kind: 'error' });
     } finally {

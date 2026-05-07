@@ -17,6 +17,7 @@
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
+import { computeDerived } from '../../shared/domain/characterCalc.ts';
 import { characterCreate, characterUpdate } from '../../shared/schemas/character.ts';
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
@@ -39,6 +40,7 @@ import {
   combatStates,
   inventoryItems,
 } from '../db/schema.ts';
+import { characterAttrsFromRow } from './characterSummary.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
 /**
@@ -643,12 +645,20 @@ async function dispatchCombat(
     if (v === undefined) continue;
     setOnUpdate[k] = v;
   }
+  // Default the missing pool to the character's derived value, not the
+  // literal 10.  Without this, a per-field patch on a character with
+  // no combat row yet (e.g. a first-cast spending FP from CastSpellDialog)
+  // would create the row at currentHp=10 even when derived HP is 14,
+  // and the cursor pull would clobber the local pool.  The legacy CRUD
+  // route in characterSubResources.ts already computes derived for the
+  // same reason.
+  const derived = computeDerived(characterAttrsFromRow(access.character));
   const [row] = await db
     .insert(combatStates)
     .values({
       characterId,
-      currentHp: (body.currentHp as number | undefined) ?? 10,
-      currentFp: (body.currentFp as number | undefined) ?? 10,
+      currentHp: (body.currentHp as number | undefined) ?? derived.hp,
+      currentFp: (body.currentFp as number | undefined) ?? derived.fp,
       conditions: (body.conditions as string[] | undefined) ?? [],
       maneuver: (body.maneuver as string | null | undefined) ?? null,
       posture: (body.posture as 'standing' | undefined) ?? 'standing',
