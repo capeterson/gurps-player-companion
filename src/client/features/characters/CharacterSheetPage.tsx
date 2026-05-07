@@ -212,35 +212,52 @@ function AttrInput({
 }
 
 /**
- * Compact ✦ button used inline beside an attribute input. Click to
- * open the existing TempBoostPopover for that attribute. Renders
- * `border-warning text-warning` when the temp is non-zero so a
- * glance at the row tells the player "this is currently boosted."
+ * Compact ✦ button used inline beside a stat. Click to open the
+ * shared modifier popover. The popover edits a temp delta and,
+ * optionally, a permanent modifier (used by secondary stats whose
+ * "base" is computed from primary attributes and can only be
+ * shifted via a stored mod). Renders `border-warning text-warning`
+ * when any modifier is non-zero so a glance tells the player
+ * "this stat is being adjusted."
  *
- * Subscribes to the flashBus for the temp field so an async server
- * rejection visually pulses the button (AGENTS.md rule 2) — without
- * this the button would silently snap back to the reverted value.
+ * Subscribes to the flashBus for both fields so an async server
+ * rejection on either visually pulses the button (AGENTS.md rule 2).
  */
-function TempBoostButton({
+function ModifierButton({
   label,
-  field,
   baseValue,
-  tempValue,
   characterId,
+  tempField,
+  tempValue,
+  permField,
+  permValue,
+  permCostLabel,
   displayScale,
 }: {
   label: string;
-  field: AttrField;
+  /** Raw base before perm mod and temp (display-scaled inside the popover). */
   baseValue: number;
-  tempValue: number;
   characterId: string;
+  tempField: AttrField;
+  tempValue: number;
+  /** Optional permanent-modifier field; omit for primary attributes. */
+  permField?: AttrField;
+  permValue?: number;
+  permCostLabel?: string;
   displayScale?: number | undefined;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
-  const { onSave, flashKey } = buildSave(field, { humanName: `${label} temp` });
-  const flash = useFieldFlash(flashKey);
+  const tempSaver = buildSave(tempField, { humanName: `${label} temp` });
+  const permSaver = permField ? buildSave(permField, { humanName: `${label} mod` }) : null;
+  const tempFlash = useFieldFlash(tempSaver.flashKey);
+  const permFlash = useFieldFlash(permSaver?.flashKey);
   const [open, setOpen] = useState(false);
-  const active = tempValue !== 0;
+  const permActive = permValue !== undefined && permValue !== 0;
+  const active = tempValue !== 0 || permActive;
+  const flashing = tempFlash.flashing || permFlash.flashing ? 'true' : 'false';
+  const parity = tempFlash.flashing
+    ? tempFlash['data-flash-parity']
+    : permFlash['data-flash-parity'];
   return (
     <span className="relative inline-block">
       <button
@@ -249,16 +266,16 @@ function TempBoostButton({
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        aria-label={`Set temporary ${label}`}
+        aria-label={`Edit ${label} modifiers`}
         aria-expanded={open}
-        title="Add temporary buff"
+        title="Edit modifiers"
         className={`${DRAFT_FIELD_CLASS} num text-[10px] rounded px-1 border transition-colors ${
           active
             ? 'border-warning text-warning'
             : 'border-base-content/20 text-base-content/60 hover:text-base-content hover:border-base-content/40'
         }`}
-        data-flashing={flash['data-flashing']}
-        data-flash-parity={flash['data-flash-parity']}
+        data-flashing={flashing}
+        data-flash-parity={parity}
       >
         ✦
       </button>
@@ -266,16 +283,78 @@ function TempBoostButton({
         <TempBoostPopover
           label={label}
           baseValue={baseValue}
-          currentTemp={tempValue}
-          onApply={(v) => {
-            void onSave(v);
+          temp={{
+            value: tempValue,
+            onApply: (v) => {
+              void tempSaver.onSave(v);
+            },
+            // Mirrors the bounds the legacy inline AttrInput enforced;
+            // keeps a stray "100" from corrupting Dexie before the
+            // server's mod-schema rejects it.
+            min: -50,
+            max: 50,
           }}
+          perm={
+            permSaver && permValue !== undefined
+              ? {
+                  value: permValue,
+                  onApply: (v) => {
+                    void permSaver.onSave(v);
+                  },
+                  min: -50,
+                  max: 50,
+                }
+              : undefined
+          }
+          permCostLabel={permCostLabel}
           onClose={() => setOpen(false)}
           displayScale={displayScale}
         />
       )}
     </span>
   );
+}
+
+/**
+ * Tooltip body shared by primary attribute and secondary mod cells:
+ * "Spent X · Next Y" plus a plain-language influence list.
+ */
+function StatTooltipContent({
+  title,
+  spent,
+  nextCostLabel,
+  influences,
+}: {
+  title: string;
+  spent: number;
+  nextCostLabel: string;
+  influences: readonly string[];
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <div className="font-semibold text-base-content">{title}</div>
+      <div className="num">
+        Spent: <span className="text-base-content">{spent} pts</span>
+        {' · '}
+        Next: <span className="text-base-content">{nextCostLabel}</span>
+      </div>
+      <div>
+        <div className="label-eyebrow">Influences</div>
+        <ul className="mt-1 list-disc pl-4 space-y-0.5 text-base-content/70">
+          {influences.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/** Render a signed delta with an optional display scale. */
+function fmtSignedDelta(value: number, scale = 1): string {
+  const display = Math.abs(value) * scale;
+  const text = scale !== 1 ? display.toFixed(2) : String(display);
+  return value >= 0 ? `+${text}` : `−${text}`;
 }
 
 /**
@@ -306,28 +385,18 @@ function PrimaryAttrCell({
   characterId: string;
   canWrite: boolean;
 }) {
-  const tooltip = (
-    <div className="grid gap-1.5">
-      <div className="font-semibold text-base-content">{label}</div>
-      <div className="num">
-        Spent: <span className="text-base-content">{attrSpent(label, baseValue)} pts</span>
-        {' · '}
-        Next: <span className="text-base-content">+1 = {attrNextCost(label)} pts</span>
-      </div>
-      <div>
-        <div className="label-eyebrow">Influences</div>
-        <ul className="mt-1 list-disc pl-4 space-y-0.5 text-base-content/70">
-          {ATTR_INFLUENCE[label].map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
-      <InfoTooltip content={tooltip}>
+      <InfoTooltip
+        content={
+          <StatTooltipContent
+            title={label}
+            spent={attrSpent(label, baseValue)}
+            nextCostLabel={`+1 = ${attrNextCost(label)} pts`}
+            influences={ATTR_INFLUENCE[label]}
+          />
+        }
+      >
         <span className="label-eyebrow">{label}</span>
       </InfoTooltip>
       <span className="flex items-baseline gap-2">
@@ -335,7 +404,7 @@ function PrimaryAttrCell({
           <>
             <span
               className="num text-2xl font-semibold text-warning"
-              title={`Effective ${effective} (base ${baseValue} ${tempValue >= 0 ? '+' : ''}${tempValue})`}
+              title={`Effective ${effective} (base ${baseValue} ${fmtSignedDelta(tempValue)})`}
             >
               {effective}
             </span>
@@ -351,10 +420,7 @@ function PrimaryAttrCell({
                 width="w-12 sm:w-9"
                 size="sm"
               />
-              <span className="text-warning">
-                {tempValue >= 0 ? '+' : ''}
-                {tempValue}
-              </span>
+              <span className="text-warning">{fmtSignedDelta(tempValue)}</span>
             </span>
           </>
         ) : (
@@ -371,11 +437,11 @@ function PrimaryAttrCell({
           />
         )}
         {canWrite && (
-          <TempBoostButton
+          <ModifierButton
             label={label}
-            field={temp}
-            baseValue={baseValue}
+            tempField={temp}
             tempValue={tempValue}
+            baseValue={baseValue}
             characterId={characterId}
           />
         )}
@@ -385,9 +451,12 @@ function PrimaryAttrCell({
 }
 
 /**
- * Secondary-mod cell (HP / Will / Per / FP / Speed / Move). Same
- * inline pattern as PrimaryAttrCell but displays the derived value
- * (mod offset from the calculated base) rather than the raw mod.
+ * Secondary-mod cell (HP / Will / Per / FP / Speed / Move). The big
+ * number is the effective derived value; both the permanent mod and
+ * the temporary delta are edited through the shared modifier popover
+ * (the ✦ button), so we hide the inline detail line entirely when
+ * neither is set — mirroring how PrimaryAttrCell hides its "base ±
+ * temp" line when temp is zero.
  */
 function SecondaryModCell({
   label,
@@ -417,88 +486,56 @@ function SecondaryModCell({
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
-  const fmtMod = (v: number) => (modScale ? (v * modScale).toFixed(2) : String(v));
-  const fmtDelta = (v: number) => {
-    const s = fmtMod(Math.abs(v));
-    return v >= 0 ? `+${s}` : `-${s}`;
-  };
-  const tooltip = (
-    <div className="grid gap-1.5">
-      <div className="font-semibold text-base-content">{info.label}</div>
-      <div className="num">
-        Spent: <span className="text-base-content">{secondarySpent(infoKey, modValue)} pts</span>
-        {' · '}
-        Next: <span className="text-base-content">{info.nextCostLabel}</span>
-      </div>
-      <div>
-        <div className="label-eyebrow">Influences</div>
-        <ul className="mt-1 list-disc pl-4 space-y-0.5 text-base-content/70">
-          {info.influences.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-  const baseDerived = derived - tempValue;
+  const fmtRaw = (v: number) => (modScale ? (v * modScale).toFixed(2) : String(v));
+  const baseRaw = derived - modValue - tempValue;
+  const adjusted = modValue !== 0 || tempValue !== 0;
+  const displayValue = derivedDisplay ?? String(derived);
+  const breakdown = `base ${fmtRaw(baseRaw)}${
+    modValue !== 0 ? ` ${fmtSignedDelta(modValue, modScale ?? 1)}` : ''
+  }${tempValue !== 0 ? ` ${fmtSignedDelta(tempValue, modScale ?? 1)}` : ''}`;
 
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
-      <InfoTooltip content={tooltip}>
+      <InfoTooltip
+        content={
+          <StatTooltipContent
+            title={info.label}
+            spent={secondarySpent(infoKey, modValue)}
+            nextCostLabel={info.nextCostLabel}
+            influences={info.influences}
+          />
+        }
+      >
         <span className="label-eyebrow">{label}</span>
       </InfoTooltip>
       <span className="flex items-baseline gap-2">
-        {tempValue !== 0 ? (
-          <>
-            <span
-              className="num text-xl font-semibold text-warning"
-              title={`Effective ${derivedDisplay ?? derived} (base ${fmtMod(baseDerived)} ${fmtDelta(tempValue)})`}
-            >
-              {derivedDisplay ?? derived}
-            </span>
-            <span className="num text-[11px] text-base-content/60 flex items-baseline gap-0.5">
-              <AttrInput
-                label={`${label} mod`}
-                field={modField}
-                value={modValue}
-                characterId={characterId}
-                canWrite={canWrite}
-                min={-50}
-                max={50}
-                width="w-12 sm:w-9"
-                size="sm"
-                displayScale={modScale}
-              />
-              <span className="text-warning">{fmtDelta(tempValue)}</span>
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="num text-xl font-semibold">{derivedDisplay ?? derived}</span>
-            <span className="num text-[11px] text-base-content/60 flex items-baseline gap-1">
-              <span>mod</span>
-              <AttrInput
-                label={`${label} mod`}
-                field={modField}
-                value={modValue}
-                characterId={characterId}
-                canWrite={canWrite}
-                min={-50}
-                max={50}
-                width="w-12 sm:w-9"
-                size="sm"
-                displayScale={modScale}
-              />
-            </span>
-          </>
+        <span
+          className={`num text-xl font-semibold ${adjusted ? 'text-warning' : ''}`}
+          title={adjusted ? `Effective ${displayValue} (${breakdown})` : undefined}
+        >
+          {displayValue}
+        </span>
+        {adjusted && (
+          <span className="num text-[10px] text-base-content/60 flex items-baseline gap-0.5">
+            <span>{fmtRaw(baseRaw)}</span>
+            {modValue !== 0 && (
+              <span className="text-warning">{fmtSignedDelta(modValue, modScale ?? 1)}</span>
+            )}
+            {tempValue !== 0 && (
+              <span className="text-warning">{fmtSignedDelta(tempValue, modScale ?? 1)}</span>
+            )}
+          </span>
         )}
         {canWrite && (
-          <TempBoostButton
+          <ModifierButton
             label={label}
-            field={tempField}
-            baseValue={baseDerived}
-            tempValue={tempValue}
+            baseValue={baseRaw}
             characterId={characterId}
+            tempField={tempField}
+            tempValue={tempValue}
+            permField={modField}
+            permValue={modValue}
+            permCostLabel={info.nextCostLabel}
             displayScale={modScale}
           />
         )}
@@ -1012,38 +1049,55 @@ function DerivedPanel({ character }: { character: CharacterDetail }) {
 
 function PointsPanel({ character }: { character: CharacterDetail }) {
   const p = character.points;
+  const [open, setOpen] = useState(false);
   return (
-    <StatCard title="Point ledger" points={p.total}>
-      <ul className="text-sm space-y-1">
-        <li className="flex justify-between">
-          <span>Attributes</span>
-          <span className="num">{p.attributes}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Secondary</span>
-          <span className="num">{p.secondary}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Advantages</span>
-          <span className="num">{p.advantages}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Disadvantages</span>
-          <span className="num">{p.disadvantages}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Quirks</span>
-          <span className="num">{p.quirks}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Skills</span>
-          <span className="num">{p.skills}</span>
-        </li>
-        <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
-          <span>Total</span>
-          <span className="num">{p.total}</span>
-        </li>
-      </ul>
+    <StatCard
+      title="Point ledger"
+      points={p.total}
+      headerExtra={
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="btn btn-ghost btn-xs px-1 text-base-content/50"
+          aria-expanded={open}
+          aria-label={open ? 'Collapse point ledger' : 'Expand point ledger'}
+        >
+          {open ? '▾' : '▸'}
+        </button>
+      }
+    >
+      {open && (
+        <ul className="text-sm space-y-1">
+          <li className="flex justify-between">
+            <span>Attributes</span>
+            <span className="num">{p.attributes}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Secondary</span>
+            <span className="num">{p.secondary}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Advantages</span>
+            <span className="num">{p.advantages}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Disadvantages</span>
+            <span className="num">{p.disadvantages}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Quirks</span>
+            <span className="num">{p.quirks}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Skills</span>
+            <span className="num">{p.skills}</span>
+          </li>
+          <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
+            <span>Total</span>
+            <span className="num">{p.total}</span>
+          </li>
+        </ul>
+      )}
     </StatCard>
   );
 }

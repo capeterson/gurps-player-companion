@@ -57,11 +57,10 @@ export function Stat({
 }) {
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
-      {typeof label === 'string' ? (
-        <span className="label-eyebrow">{label}</span>
-      ) : (
-        <span className="label-eyebrow">{label}</span>
-      )}
+      {/* min-h reserves room for a two-line label so single-word labels
+          (e.g. "Dodge") align with two-word ones (e.g. "Basic Speed")
+          when the cells sit in the same row. */}
+      <span className="label-eyebrow block min-h-[2lh]">{label}</span>
       <span className={`num text-xl font-semibold leading-tight ${valueClassName}`}>{value}</span>
       {derived !== undefined && (
         <span className="num text-[11px] text-base-content/60">{derived}</span>
