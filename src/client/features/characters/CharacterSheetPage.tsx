@@ -1442,7 +1442,8 @@ function CombatPanel({
  * Identity hero — the design's full-width header on the sheet view:
  * eyebrow kicker → big display-font name (drop-cap fires automatically)
  * → a horizontal row of read-only Race/TL/Age/Height/Weight pairs →
- * Points / Unspent badges on the right.
+ * Unspent badge on the right when the campaign defines a point target
+ * (the running total lives in the Point Ledger card below).
  *
  * The detail editors for each of those fields live in the "Identity"
  * tab below; this hero is presentational + holds the inline name editor.
@@ -1499,13 +1500,6 @@ function IdentityHero({
         </div>
       </div>
       <div className="flex gap-2.5">
-        <div className="card min-w-[6rem] px-4 py-2.5 text-center">
-          <p className="label-eyebrow">Points</p>
-          <p className="num mt-0.5 text-2xl font-semibold">
-            {total}
-            {pointTarget != null && <span className="text-sm text-dim"> / {pointTarget}</span>}
-          </p>
-        </div>
         {remaining != null && (
           <div className="card min-w-[6rem] px-4 py-2.5 text-center">
             <p className="label-eyebrow">{remaining < 0 ? 'Over' : 'Unspent'}</p>
