@@ -81,6 +81,15 @@ export function InventoryRow(props: InventoryRowProps) {
     drag.onDragOverTarget({ kind: 'container', id: item.id }, e.dataTransfer);
   }
 
+  // mobile-drag-drop polyfill only marks the element as a valid drop
+  // target when dragenter calls preventDefault — without this, drops
+  // on touch devices snap back to document.body and never fire onDrop.
+  function handleDragEnter(e: DragEvent<HTMLTableRowElement>) {
+    if (!drag || !drag.draggingId) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   function handleDragLeave() {
     if (!drag) return;
     drag.onDragLeaveTarget({ kind: 'container', id: item.id });
@@ -116,6 +125,7 @@ export function InventoryRow(props: InventoryRowProps) {
         draggable={canEdit && !!drag}
         onDragStart={canEdit && drag ? handleDragStart : undefined}
         onDragEnd={canEdit && drag ? drag.onDragEnd : undefined}
+        onDragEnter={canEdit && drag ? handleDragEnter : undefined}
         onDragOver={canEdit && drag ? handleDragOver : undefined}
         onDragLeave={canEdit && drag ? handleDragLeave : undefined}
         onDrop={canEdit && drag ? handleDrop : undefined}
@@ -130,26 +140,31 @@ export function InventoryRow(props: InventoryRowProps) {
         ].join(' ')}
         aria-selected={sel}
       >
-        <td>
-          <div className="flex items-center gap-2" style={{ paddingLeft: `${depth * 1.25}rem` }}>
-            {hasChildren ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  stop(e);
-                  setOpen((o) => !o);
-                }}
-                className="btn btn-ghost btn-xs px-1 text-base-content/50"
-                aria-expanded={open}
-                aria-label={open ? 'Collapse contents' : 'Expand contents'}
-              >
-                {open ? '▾' : '▸'}
-              </button>
-            ) : (
-              <span className="inline-block w-5" aria-hidden />
-            )}
-            <span className="font-medium">{item.name}</span>
-            <span className="flex flex-wrap items-center gap-1">
+        <td className="align-top sm:align-middle">
+          <div
+            className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2"
+            style={{ paddingLeft: `${depth * 1.25}rem` }}
+          >
+            <span className="flex items-center gap-2">
+              {hasChildren ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    stop(e);
+                    setOpen((o) => !o);
+                  }}
+                  className="btn btn-ghost btn-xs px-1 text-base-content/50"
+                  aria-expanded={open}
+                  aria-label={open ? 'Collapse contents' : 'Expand contents'}
+                >
+                  {open ? '▾' : '▸'}
+                </button>
+              ) : (
+                <span className="inline-block w-5" aria-hidden />
+              )}
+              <span className="font-medium">{item.name}</span>
+            </span>
+            <span className="flex flex-wrap items-center gap-1 pl-7 sm:pl-0">
               {isRoot && item.worn && <span className="badge badge-sm badge-primary">Worn</span>}
               {item.equipped && <span className="badge badge-sm badge-secondary">Equipped</span>}
               {item.isContainer && (
@@ -179,9 +194,9 @@ export function InventoryRow(props: InventoryRowProps) {
             </div>
           )}
         </td>
-        <td className="num text-right">{item.quantity}</td>
+        <td className="num text-right align-top sm:align-middle">{item.quantity}</td>
         <td
-          className={`num text-right ${netWeight === 0 ? 'text-base-content/50' : ''}`}
+          className={`num text-right align-top sm:align-middle ${netWeight === 0 ? 'text-base-content/50' : ''}`}
           title={
             weightModified
               ? item.isContainer && weightDelta > 0
@@ -208,11 +223,13 @@ export function InventoryRow(props: InventoryRowProps) {
             <span className={weightModified ? 'font-semibold' : ''}>{netWeight.toFixed(1)}</span>
           </span>
         </td>
-        <td className="num text-right text-base-content/60">{item.cost.toFixed(0)}</td>
+        <td className="num text-right text-base-content/60 align-top sm:align-middle">
+          {item.cost.toFixed(0)}
+        </td>
         {canEdit && (
           // The Edit button below already stopPropagation()s clicks, so the cell
           // itself doesn't need an onClick handler to keep row-selection inert.
-          <td className="text-right">
+          <td className="text-right align-top sm:align-middle">
             <button
               type="button"
               className="btn btn-ghost btn-xs text-base-content/50 hover:text-base-content"

@@ -105,7 +105,7 @@ export function NotificationsBell() {
           </span>
         )}
       </summary>
-      <div className="dropdown-content z-50 mt-2 w-80 rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg">
+      <div className="dropdown-content z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg">
         <div className="flex items-baseline justify-between mb-2">
           <span className="label-eyebrow">Notifications</span>
           {unread.length > 0 && (

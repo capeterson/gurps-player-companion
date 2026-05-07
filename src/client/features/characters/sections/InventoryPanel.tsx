@@ -601,6 +601,14 @@ export function InventoryPanel({
       {items.length > 0 && (
         <div className="px-5 py-4 space-y-6">
           <section
+            onDragEnter={
+              canWrite
+                ? (e) => {
+                    if (!draggedIdRef.current) return;
+                    e.preventDefault();
+                  }
+                : undefined
+            }
             onDragOver={
               canWrite
                 ? (e) => {
@@ -655,6 +663,14 @@ export function InventoryPanel({
           </section>
 
           <section
+            onDragEnter={
+              canWrite
+                ? (e) => {
+                    if (!draggedIdRef.current) return;
+                    e.preventDefault();
+                  }
+                : undefined
+            }
             onDragOver={
               canWrite
                 ? (e) => {
@@ -787,7 +803,7 @@ export function InventoryPanel({
               value={qty}
               inputMode="numeric"
               onChange={(e) => setQty(e.target.value)}
-              className="num input input-sm input-bordered w-16 text-right"
+              className="num input input-sm input-bordered w-14 sm:w-16 min-w-0 text-right"
               aria-label="Quantity"
             />
             <input
@@ -795,7 +811,7 @@ export function InventoryPanel({
               value={weight}
               inputMode="decimal"
               onChange={(e) => setWeight(e.target.value)}
-              className="num input input-sm input-bordered w-24 text-right"
+              className="num input input-sm input-bordered w-20 sm:w-24 min-w-0 text-right"
               aria-label="Weight (lbs)"
             />
             <input
@@ -803,13 +819,13 @@ export function InventoryPanel({
               value={cost}
               inputMode="decimal"
               onChange={(e) => setCost(e.target.value)}
-              className="num input input-sm input-bordered w-24 text-right"
+              className="num input input-sm input-bordered w-20 sm:w-24 min-w-0 text-right"
               aria-label="Cost"
             />
             <select
               value={parentId}
               onChange={(e) => setParentId(e.target.value)}
-              className="select select-sm select-bordered"
+              className="select select-sm select-bordered max-w-full min-w-0"
               aria-label="Parent container"
             >
               <option value="">— No parent —</option>
