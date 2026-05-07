@@ -186,10 +186,12 @@ function AttrInput({
   }
   if (size === 'sm') {
     // Borderless inline number used inside the "base ±temp" caption.
+    // On mobile add a visible chip + 28px touch target so the input
+    // reads as editable; ≥sm reverts to the borderless inline style.
     return (
       <input
         aria-label={label}
-        className={`${DRAFT_FIELD_CLASS} num text-[11px] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded ${width}`}
+        className={`${DRAFT_FIELD_CLASS} num text-[11px] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded border border-base-300/60 px-1 h-7 min-w-[2rem] sm:border-0 sm:px-0 sm:h-auto sm:min-w-0 ${width}`}
         {...draft.inputProps}
       />
     );
@@ -341,7 +343,7 @@ function PrimaryAttrCell({
                 canWrite={canWrite}
                 min={min}
                 max={99}
-                width="w-9"
+                width="w-12 sm:w-9"
                 size="sm"
               />
               <span className="text-warning">
@@ -458,7 +460,7 @@ function SecondaryModCell({
                 canWrite={canWrite}
                 min={-50}
                 max={50}
-                width="w-9"
+                width="w-12 sm:w-9"
                 size="sm"
                 displayScale={modScale}
               />
@@ -478,7 +480,7 @@ function SecondaryModCell({
                 canWrite={canWrite}
                 min={-50}
                 max={50}
-                width="w-9"
+                width="w-12 sm:w-9"
                 size="sm"
                 displayScale={modScale}
               />
