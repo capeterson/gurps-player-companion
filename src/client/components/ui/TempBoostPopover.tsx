@@ -20,6 +20,9 @@ interface ModifierField {
   value: number;
   /** Apply callback called with the new integer value (raw units). */
   onApply: (next: number) => void;
+  /** Optional inclusive bounds (raw integer units). Apply is rejected if violated. */
+  min?: number;
+  max?: number;
 }
 
 interface TempBoostPopoverProps {
@@ -76,6 +79,13 @@ export function TempBoostPopover({
 
   const effective = baseValue + (perm ? permState.rawDelta : 0) + tempState.rawDelta;
   const offStep = tempState.offStep || (perm ? permState.offStep : false);
+  const outOfRange = (f: ModifierField | undefined, raw: number): boolean =>
+    f != null && ((f.min !== undefined && raw < f.min) || (f.max !== undefined && raw > f.max));
+  const tempOOR = outOfRange(temp, tempState.rawDelta);
+  const permOOR = perm ? outOfRange(perm, permState.rawDelta) : false;
+  const fmtBound = (n: number) => (displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n));
+  const rangeMsg = (f: ModifierField): string =>
+    `must be between ${fmtBound(f.min ?? Number.NEGATIVE_INFINITY)} and ${fmtBound(f.max ?? Number.POSITIVE_INFINITY)}`;
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -111,6 +121,7 @@ export function TempBoostPopover({
   }, [onClose]);
 
   const apply = () => {
+    if (offStep || tempOOR || permOOR) return;
     if (tempState.rawDelta !== temp.value) temp.onApply(tempState.rawDelta);
     if (perm && permState.rawDelta !== perm.value) perm.onApply(permState.rawDelta);
     onClose();
@@ -171,6 +182,8 @@ export function TempBoostPopover({
         <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
       {offStep && <p className="text-[11px] text-error mb-2">must be a multiple of {stepStr}</p>}
+      {permOOR && perm && <p className="text-[11px] text-error mb-2">Permanent {rangeMsg(perm)}</p>}
+      {tempOOR && <p className="text-[11px] text-error mb-2">Temporary {rangeMsg(temp)}</p>}
       <div className="flex gap-1.5">
         <button type="button" onClick={clear} className="btn btn-sm btn-ghost flex-1">
           Clear
@@ -179,7 +192,7 @@ export function TempBoostPopover({
           type="button"
           onClick={apply}
           className="btn btn-sm btn-primary flex-1"
-          disabled={offStep}
+          disabled={offStep || tempOOR || permOOR}
         >
           Apply
         </button>

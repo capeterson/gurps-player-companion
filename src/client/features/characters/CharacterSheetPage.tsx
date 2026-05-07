@@ -288,6 +288,11 @@ function ModifierButton({
             onApply: (v) => {
               void tempSaver.onSave(v);
             },
+            // Mirrors the bounds the legacy inline AttrInput enforced;
+            // keeps a stray "100" from corrupting Dexie before the
+            // server's mod-schema rejects it.
+            min: -50,
+            max: 50,
           }}
           perm={
             permSaver && permValue !== undefined
@@ -296,6 +301,8 @@ function ModifierButton({
                   onApply: (v) => {
                     void permSaver.onSave(v);
                   },
+                  min: -50,
+                  max: 50,
                 }
               : undefined
           }
