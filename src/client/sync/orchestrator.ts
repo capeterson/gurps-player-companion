@@ -72,8 +72,16 @@ const PERIODIC_PULL_MS = 30_000;
  * string↔number type mismatch so plain text fields (height, name, notes,
  * etc.) are still compared verbatim — changing "6" to "06" must not look
  * equal and trigger a silent overwrite instead of a conflict rollback.
+ *
+ * For jsonb columns (armor, weaponData, powerstoneData, magicItemData,
+ * trait modifiers, etc.) the server returns a freshly-parsed object,
+ * not the same reference the client stored.  We fall through to a
+ * structural deep-equal so the stale-base reconciliation correctly
+ * recognises "this field is unchanged from what I last knew" —
+ * otherwise rapid jsonb edits race and rollback even when the server
+ * value matches the queued prevValue.
  */
-function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
+export function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
   if (serverVal === storedVal) return true;
   // Coerce only on string↔number mismatch (Drizzle decimal string vs. Dexie number).
   if (typeof serverVal === 'string' && typeof storedVal === 'number') {
@@ -83,6 +91,29 @@ function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolean {
   if (typeof serverVal === 'number' && typeof storedVal === 'string') {
     const n = Number(storedVal);
     return Number.isFinite(n) && n === serverVal;
+  }
+  if (Array.isArray(serverVal) && Array.isArray(storedVal)) {
+    if (serverVal.length !== storedVal.length) return false;
+    for (let i = 0; i < serverVal.length; i++) {
+      if (!fieldValuesEqual(serverVal[i], storedVal[i])) return false;
+    }
+    return true;
+  }
+  if (
+    serverVal !== null &&
+    storedVal !== null &&
+    typeof serverVal === 'object' &&
+    typeof storedVal === 'object' &&
+    !Array.isArray(serverVal) &&
+    !Array.isArray(storedVal)
+  ) {
+    const a = serverVal as Record<string, unknown>;
+    const b = storedVal as Record<string, unknown>;
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const k of keys) {
+      if (!fieldValuesEqual(a[k], b[k])) return false;
+    }
+    return true;
   }
   return false;
 }
