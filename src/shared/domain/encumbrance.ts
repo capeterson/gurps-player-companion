@@ -135,7 +135,8 @@ export type EncumbranceLevel = 0 | 1 | 2 | 3 | 4;
 export interface EncumbranceResult {
   readonly level: EncumbranceLevel;
   readonly label: 'None' | 'Light' | 'Medium' | 'Heavy' | 'X-Heavy';
-  readonly speedDivisor: number;
+  /** GURPS Move multiplier per encumbrance level (None ×1, Light ×0.8, … X-Heavy ×0.2). */
+  readonly moveMultiplier: number;
   readonly dodgePenalty: number;
   readonly playerWeightLbs: number;
   readonly basicLift: number;
@@ -143,26 +144,32 @@ export interface EncumbranceResult {
 }
 
 const LEVEL_TABLE = [
-  { level: 0 as const, label: 'None' as const, speedDivisor: 1, dodgePenalty: 0, maxRatio: 1 },
-  { level: 1 as const, label: 'Light' as const, speedDivisor: 1.2, dodgePenalty: -1, maxRatio: 2 },
+  { level: 0 as const, label: 'None' as const, moveMultiplier: 1.0, dodgePenalty: 0, maxRatio: 1 },
+  {
+    level: 1 as const,
+    label: 'Light' as const,
+    moveMultiplier: 0.8,
+    dodgePenalty: -1,
+    maxRatio: 2,
+  },
   {
     level: 2 as const,
     label: 'Medium' as const,
-    speedDivisor: 1.5,
+    moveMultiplier: 0.6,
     dodgePenalty: -2,
     maxRatio: 3,
   },
   {
     level: 3 as const,
     label: 'Heavy' as const,
-    speedDivisor: 2,
+    moveMultiplier: 0.4,
     dodgePenalty: -3,
     maxRatio: 6,
   },
   {
     level: 4 as const,
     label: 'X-Heavy' as const,
-    speedDivisor: 3,
+    moveMultiplier: 0.2,
     dodgePenalty: -4,
     maxRatio: Number.POSITIVE_INFINITY,
   },
@@ -175,7 +182,7 @@ export function computeEncumbrance(playerWeightLbs: number, basicLift: number): 
       return {
         level: tier.level,
         label: tier.label,
-        speedDivisor: tier.speedDivisor,
+        moveMultiplier: tier.moveMultiplier,
         dodgePenalty: tier.dodgePenalty,
         playerWeightLbs,
         basicLift,

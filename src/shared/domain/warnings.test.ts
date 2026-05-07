@@ -21,7 +21,7 @@ const okPoints = {
 const okEnc = {
   level: 0 as const,
   label: 'None' as const,
-  speedDivisor: 1,
+  moveMultiplier: 1,
   dodgePenalty: 0,
   playerWeightLbs: 0,
   basicLift: 20,
@@ -79,7 +79,7 @@ describe('evaluateWarnings', () => {
     const ws = evaluateWarnings({
       attrs: { st: 10, dx: 10, iq: 10, ht: 10 },
       points: okPoints,
-      encumbrance: { ...okEnc, level: 3, label: 'Heavy', speedDivisor: 2, dodgePenalty: -3 },
+      encumbrance: { ...okEnc, level: 3, label: 'Heavy', moveMultiplier: 0.4, dodgePenalty: -3 },
       campaign: noCaps,
     });
     expect(ws.find((w) => w.code === 'encumbrance.heavy')).toBeDefined();

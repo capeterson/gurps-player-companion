@@ -7883,7 +7883,7 @@
                             "X-Heavy"
                           ]
                         },
-                        "speedDivisor": {
+                        "moveMultiplier": {
                           "type": "number"
                         },
                         "dodgePenalty": {
@@ -7902,7 +7902,7 @@
                       "required": [
                         "level",
                         "label",
-                        "speedDivisor",
+                        "moveMultiplier",
                         "dodgePenalty",
                         "playerWeightLbs",
                         "basicLift",
@@ -8962,7 +8962,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -8981,7 +8981,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -10284,7 +10284,7 @@
                             "X-Heavy"
                           ]
                         },
-                        "speedDivisor": {
+                        "moveMultiplier": {
                           "type": "number"
                         },
                         "dodgePenalty": {
@@ -10303,7 +10303,7 @@
                       "required": [
                         "level",
                         "label",
-                        "speedDivisor",
+                        "moveMultiplier",
                         "dodgePenalty",
                         "playerWeightLbs",
                         "basicLift",
@@ -11432,7 +11432,7 @@
                             "X-Heavy"
                           ]
                         },
-                        "speedDivisor": {
+                        "moveMultiplier": {
                           "type": "number"
                         },
                         "dodgePenalty": {
@@ -11451,7 +11451,7 @@
                       "required": [
                         "level",
                         "label",
-                        "speedDivisor",
+                        "moveMultiplier",
                         "dodgePenalty",
                         "playerWeightLbs",
                         "basicLift",
@@ -12731,7 +12731,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -12750,7 +12750,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -14041,7 +14041,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -14060,7 +14060,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -15132,7 +15132,7 @@
                             "X-Heavy"
                           ]
                         },
-                        "speedDivisor": {
+                        "moveMultiplier": {
                           "type": "number"
                         },
                         "dodgePenalty": {
@@ -15151,7 +15151,7 @@
                       "required": [
                         "level",
                         "label",
-                        "speedDivisor",
+                        "moveMultiplier",
                         "dodgePenalty",
                         "playerWeightLbs",
                         "basicLift",
@@ -16374,7 +16374,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -16393,7 +16393,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -17626,7 +17626,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -17645,7 +17645,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -18717,7 +18717,7 @@
                             "X-Heavy"
                           ]
                         },
-                        "speedDivisor": {
+                        "moveMultiplier": {
                           "type": "number"
                         },
                         "dodgePenalty": {
@@ -18736,7 +18736,7 @@
                       "required": [
                         "level",
                         "label",
-                        "speedDivisor",
+                        "moveMultiplier",
                         "dodgePenalty",
                         "playerWeightLbs",
                         "basicLift",
@@ -19962,7 +19962,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -19981,7 +19981,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -21219,7 +21219,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -21238,7 +21238,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -22310,7 +22310,7 @@
                             "X-Heavy"
                           ]
                         },
-                        "speedDivisor": {
+                        "moveMultiplier": {
                           "type": "number"
                         },
                         "dodgePenalty": {
@@ -22329,7 +22329,7 @@
                       "required": [
                         "level",
                         "label",
-                        "speedDivisor",
+                        "moveMultiplier",
                         "dodgePenalty",
                         "playerWeightLbs",
                         "basicLift",
@@ -23892,7 +23892,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -23911,7 +23911,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -25486,7 +25486,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -25505,7 +25505,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
@@ -26577,7 +26577,7 @@
                             "X-Heavy"
                           ]
                         },
-                        "speedDivisor": {
+                        "moveMultiplier": {
                           "type": "number"
                         },
                         "dodgePenalty": {
@@ -26596,7 +26596,7 @@
                       "required": [
                         "level",
                         "label",
-                        "speedDivisor",
+                        "moveMultiplier",
                         "dodgePenalty",
                         "playerWeightLbs",
                         "basicLift",
@@ -27769,7 +27769,7 @@
                                 "X-Heavy"
                               ]
                             },
-                            "speedDivisor": {
+                            "moveMultiplier": {
                               "type": "number"
                             },
                             "dodgePenalty": {
@@ -27788,7 +27788,7 @@
                           "required": [
                             "level",
                             "label",
-                            "speedDivisor",
+                            "moveMultiplier",
                             "dodgePenalty",
                             "playerWeightLbs",
                             "basicLift",
