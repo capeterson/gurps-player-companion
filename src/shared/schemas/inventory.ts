@@ -20,6 +20,40 @@ export const weaponData = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
+/**
+ * Powerstone metadata -- attached to an inventory item that stores
+ * castable energy.  `currentEnergy` is mutable game state; recharges
+ * are user-driven (manual + / -).  The item itself still carries the
+ * gem's weight and cost via the existing inventory columns.
+ */
+export const powerstoneData = z.object({
+  maxEnergy: z.number().int().min(1).max(100),
+  currentEnergy: z.number().int().min(0).max(100),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
+/**
+ * Magic-item metadata -- attached to an inventory item that casts a
+ * spell.  Three modes:
+ *   `charged`     - a wand-style item with chargesCurrent of N uses
+ *   `powered`     - draws from the user's FP/HP each cast (energyCost)
+ *   `continuous`  - always-on, no per-use cost
+ *
+ * `spellSkillLevel` is fixed at the enchanter's skill at creation, so
+ * casting from a magic item is independent of the user's own Magery.
+ */
+export const magicItemMode = z.enum(['charged', 'powered', 'continuous']);
+
+export const magicItemData = z.object({
+  spellName: z.string().min(1).max(160),
+  spellSkillLevel: z.number().int().min(0).max(40),
+  mode: magicItemMode,
+  chargesMax: z.number().int().min(0).max(1000).nullable().optional(),
+  chargesCurrent: z.number().int().min(0).max(1000).nullable().optional(),
+  energyCost: z.number().int().min(0).max(99).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
 export const inventoryItemOut = z.object({
   id: uuid,
   characterId: uuid,
@@ -38,6 +72,8 @@ export const inventoryItemOut = z.object({
   isArmor: z.boolean(),
   armor: armorData.nullable(),
   weaponData: weaponData.nullable(),
+  powerstoneData: powerstoneData.nullable(),
+  magicItemData: magicItemData.nullable(),
   libraryItemId: uuid.nullable(),
   /** Server-computed convenience field. */
   effectiveWeightLbs: z.number(),
@@ -61,6 +97,8 @@ export const inventoryItemCreate = z.object({
   isArmor: z.boolean().default(false),
   armor: armorData.nullable().optional(),
   weaponData: weaponData.nullable().optional(),
+  powerstoneData: powerstoneData.nullable().optional(),
+  magicItemData: magicItemData.nullable().optional(),
   libraryItemId: uuid.nullable().optional(),
 });
 
@@ -71,3 +109,6 @@ export type InventoryItemCreate = z.infer<typeof inventoryItemCreate>;
 export type InventoryItemUpdate = z.infer<typeof inventoryItemUpdate>;
 export type ArmorData = z.infer<typeof armorData>;
 export type WeaponData = z.infer<typeof weaponData>;
+export type PowerstoneData = z.infer<typeof powerstoneData>;
+export type MagicItemData = z.infer<typeof magicItemData>;
+export type MagicItemMode = z.infer<typeof magicItemMode>;

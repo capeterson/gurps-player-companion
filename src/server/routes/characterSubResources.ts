@@ -12,6 +12,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { computeDerived } from '../../shared/domain/characterCalc.ts';
 import { computeWeights } from '../../shared/domain/encumbrance.ts';
+import { mageryLevel } from '../../shared/domain/spellCalc.ts';
 import { characterDetail } from '../../shared/schemas/character.ts';
 import { combatStateOut, combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { uuid } from '../../shared/schemas/common.ts';
@@ -21,12 +22,14 @@ import {
   inventoryItemUpdate,
 } from '../../shared/schemas/inventory.ts';
 import { skillCreate, skillOut, skillUpdate } from '../../shared/schemas/skill.ts';
+import { spellCreate, spellOut, spellUpdate } from '../../shared/schemas/spell.ts';
 import { traitCreate, traitOut, traitUpdate } from '../../shared/schemas/trait.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCharacterOr403 } from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
 import {
   characterSkills,
+  characterSpells,
   characterTraits,
   characters,
   combatStates,
@@ -39,6 +42,7 @@ import {
   buildCombatStateOut,
   buildInventoryItemOut,
   buildSkillOut,
+  buildSpellOut,
   buildTraitOut,
   characterAttrsFromRow,
 } from '../services/characterSummary.ts';
@@ -50,7 +54,7 @@ async function refreshDetail(characterId: string) {
   const db = getDb();
   const [c] = await db.select().from(characters).where(eq(characters.id, characterId));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, inventory, combat, campaign] = await Promise.all([
+  const [traits, skills, spells, inventory, combat, campaign] = await Promise.all([
     db
       .select()
       .from(characterTraits)
@@ -61,6 +65,11 @@ async function refreshDetail(characterId: string) {
       .from(characterSkills)
       .where(eq(characterSkills.characterId, characterId))
       .orderBy(asc(characterSkills.name)),
+    db
+      .select()
+      .from(characterSpells)
+      .where(eq(characterSpells.characterId, characterId))
+      .orderBy(asc(characterSpells.name)),
     db
       .select()
       .from(inventoryItems)
@@ -79,7 +88,15 @@ async function refreshDetail(characterId: string) {
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
   ]);
-  return buildCharacterDetail({ character: c, traits, skills, inventory, combat, campaign });
+  return buildCharacterDetail({
+    character: c,
+    traits,
+    skills,
+    spells,
+    inventory,
+    combat,
+    campaign,
+  });
 }
 
 // ===================== TRAITS =====================
@@ -347,6 +364,161 @@ router.openapi(
   },
 );
 
+// ===================== SPELLS =====================
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/characters/{id}/spells',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Add a spell to a character (owner only)',
+    request: {
+      params: z.object({ id: uuid }),
+      body: { required: true, content: { 'application/json': { schema: spellCreate } } },
+    },
+    responses: {
+      201: {
+        description: 'Spell created — response includes the refreshed character',
+        content: {
+          'application/json': {
+            schema: z.object({ spell: spellOut, character: characterDetail }),
+          },
+        },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const db = getDb();
+    const [created] = await db
+      .insert(characterSpells)
+      .values({
+        characterId: id,
+        name: body.name,
+        college: body.college ?? null,
+        points: body.points ?? 1,
+        baseEnergyCost: body.baseEnergyCost ?? 1,
+        maintenanceCost: body.maintenanceCost ?? null,
+        castingTime: body.castingTime ?? null,
+        duration: body.duration ?? null,
+        prerequisites: body.prerequisites ?? null,
+        notes: body.notes ?? null,
+        librarySpellId: body.librarySpellId ?? null,
+      })
+      .returning();
+    if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    const derived = computeDerived(characterAttrsFromRow(access.character));
+    const traits = await db
+      .select()
+      .from(characterTraits)
+      .where(eq(characterTraits.characterId, id));
+    const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
+    return c.json(
+      {
+        spell: buildSpellOut(created, derived.effectiveIq, magery),
+        character: await refreshDetail(id),
+      },
+      201,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/characters/{id}/spells/{spellId}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Update a spell (owner only)',
+    request: {
+      params: z.object({ id: uuid, spellId: uuid }),
+      body: { required: true, content: { 'application/json': { schema: spellUpdate } } },
+    },
+    responses: {
+      200: {
+        description: 'Updated spell + refreshed character',
+        content: {
+          'application/json': {
+            schema: z.object({ spell: spellOut, character: characterDetail }),
+          },
+        },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, spellId } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const db = getDb();
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    for (const [k, v] of Object.entries(body)) {
+      if (v === undefined) continue;
+      updates[k] = v;
+    }
+    const [updated] = await db
+      .update(characterSpells)
+      .set(updates)
+      .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
+      .returning();
+    if (!updated) throw new HTTPException(404, { message: 'spell not found' });
+    const derived = computeDerived(characterAttrsFromRow(access.character));
+    const traits = await db
+      .select()
+      .from(characterTraits)
+      .where(eq(characterTraits.characterId, id));
+    const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
+    return c.json(
+      {
+        spell: buildSpellOut(updated, derived.effectiveIq, magery),
+        character: await refreshDetail(id),
+      },
+      200,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/characters/{id}/spells/{spellId}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Delete a spell (owner only)',
+    request: { params: z.object({ id: uuid, spellId: uuid }) },
+    responses: {
+      200: {
+        description: 'Refreshed character (after deletion)',
+        content: { 'application/json': { schema: characterDetail } },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, spellId } = c.req.valid('param');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const result = await getDb()
+      .delete(characterSpells)
+      .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
+      .returning({ id: characterSpells.id });
+    if (result.length === 0) throw new HTTPException(404, { message: 'spell not found' });
+    return c.json(await refreshDetail(id), 200);
+  },
+);
+
 // ===================== INVENTORY =====================
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
@@ -477,6 +649,8 @@ router.openapi(
           isArmor: body.isArmor ?? false,
           armor: body.armor ?? null,
           weaponData: body.weaponData ?? null,
+          powerstoneData: body.powerstoneData ?? null,
+          magicItemData: body.magicItemData ?? null,
           libraryItemId: body.libraryItemId ?? null,
         })
         .returning();

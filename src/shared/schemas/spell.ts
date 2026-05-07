@@ -1,0 +1,55 @@
+import { z } from 'zod';
+import { isoTimestamp, uuid } from './common.ts';
+
+/**
+ * GURPS 4e spells.  Mechanically a spell is an IQ/Hard skill, but we
+ * track it in its own table so spell-specific fields (college, energy
+ * cost, casting time, duration, prerequisites) and spell-specific UI
+ * can stay separate from the regular skill panel.  Effective skill
+ * level adds the caster's Magery level on top of the standard skill
+ * formula -- see `src/shared/domain/spellCalc.ts`.
+ */
+export const spellOut = z.object({
+  id: uuid,
+  characterId: uuid,
+  name: z.string().min(1).max(160),
+  /** Free-text college name (e.g. "Fire", "Healing").  No enum yet --
+   * different campaigns rearrange the college list in their own ways. */
+  college: z.string().max(80).nullable(),
+  points: z.number().int().min(0).max(1000),
+  /** Pre-discount energy cost the player records from the book. */
+  baseEnergyCost: z.number().int().min(0).max(99),
+  /** Per-tick maintenance cost while sustained.  Null = not sustained. */
+  maintenanceCost: z.number().int().min(0).max(99).nullable(),
+  /** Free-form casting time text (e.g. "1 second", "5 minutes"). */
+  castingTime: z.string().max(40).nullable(),
+  duration: z.string().max(40).nullable(),
+  prerequisites: z.string().max(2000).nullable(),
+  notes: z.string().max(20_000).nullable(),
+  librarySpellId: uuid.nullable(),
+  /** Server-computed convenience field: IQ/H + Magery + skill offset. */
+  level: z.number().int(),
+  /** Server-computed convenience field: cost after skill discount. */
+  effectiveCost: z.number().int(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+});
+
+export const spellCreate = z.object({
+  name: z.string().min(1).max(160).trim(),
+  college: z.string().max(80).trim().nullable().optional(),
+  points: z.number().int().min(0).max(1000).default(1),
+  baseEnergyCost: z.number().int().min(0).max(99).default(1),
+  maintenanceCost: z.number().int().min(0).max(99).nullable().optional(),
+  castingTime: z.string().max(40).trim().nullable().optional(),
+  duration: z.string().max(40).trim().nullable().optional(),
+  prerequisites: z.string().max(2000).trim().nullable().optional(),
+  notes: z.string().max(20_000).nullable().optional(),
+  librarySpellId: uuid.nullable().optional(),
+});
+
+export const spellUpdate = spellCreate.partial();
+
+export type SpellOut = z.infer<typeof spellOut>;
+export type SpellCreate = z.infer<typeof spellCreate>;
+export type SpellUpdate = z.infer<typeof spellUpdate>;

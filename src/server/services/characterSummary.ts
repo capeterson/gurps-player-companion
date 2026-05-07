@@ -15,12 +15,14 @@ import {
   buildCombatStateOut as buildCombatStateOutShared,
   buildInventoryItemOut as buildInventoryItemOutShared,
   buildSkillOut as buildSkillOutShared,
+  buildSpellOut as buildSpellOutShared,
   buildTraitOut as buildTraitOutShared,
 } from '../../shared/domain/characterDetail.ts';
 import type {
   DbCampaign,
   DbCharacter,
   DbCharacterSkill,
+  DbCharacterSpell,
   DbCharacterTrait,
   DbCombatState,
   DbInventoryItem,
@@ -55,6 +57,7 @@ export interface SummaryInput {
   readonly character: DbCharacter;
   readonly traits: readonly DbCharacterTrait[];
   readonly skills: readonly DbCharacterSkill[];
+  readonly spells: readonly DbCharacterSpell[];
   readonly inventory: readonly DbInventoryItem[];
   readonly combat: DbCombatState | null;
   readonly campaign: DbCampaign | null;
@@ -65,6 +68,7 @@ export function buildCharacterDetail(input: SummaryInput) {
     character: input.character,
     traits: input.traits,
     skills: input.skills,
+    spells: input.spells,
     inventory: input.inventory,
     combat: input.combat,
     campaign: input.campaign,
@@ -75,4 +79,5 @@ export function buildCharacterDetail(input: SummaryInput) {
 export const buildTraitOut = buildTraitOutShared;
 export const buildCombatStateOut = buildCombatStateOutShared;
 export const buildSkillOut = buildSkillOutShared;
+export const buildSpellOut = buildSpellOutShared;
 export const buildInventoryItemOut = buildInventoryItemOutShared;

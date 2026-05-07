@@ -31,6 +31,7 @@ import {
   type LocalCharacterCombat,
   type LocalCharacterInventory,
   type LocalCharacterSkill,
+  type LocalCharacterSpell,
   type LocalCharacterTrait,
   type OutboxEntry,
   type RejectionRecord,
@@ -55,6 +56,7 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character',
   'character_trait',
   'character_skill',
+  'character_spell',
   'character_inventory',
   'character_combat',
 ];
@@ -647,6 +649,9 @@ class SyncOrchestrator {
       case 'character_skill':
         await db.characterSkills.update(entityId, { revision });
         return;
+      case 'character_spell':
+        await db.characterSpells.update(entityId, { revision });
+        return;
       case 'character_inventory':
         await db.characterInventory.update(entityId, { revision });
         return;
@@ -676,6 +681,9 @@ class SyncOrchestrator {
       case 'character_skill':
         await db.characterSkills.update(entityId, updates as Partial<LocalCharacterSkill>);
         return;
+      case 'character_spell':
+        await db.characterSpells.update(entityId, updates as Partial<LocalCharacterSpell>);
+        return;
       case 'character_inventory':
         await db.characterInventory.update(entityId, updates as Partial<LocalCharacterInventory>);
         return;
@@ -698,6 +706,9 @@ class SyncOrchestrator {
         return;
       case 'character_skill':
         await db.characterSkills.delete(entityId);
+        return;
+      case 'character_spell':
+        await db.characterSpells.delete(entityId);
         return;
       case 'character_inventory':
         await db.characterInventory.delete(entityId);
@@ -767,6 +778,11 @@ class SyncOrchestrator {
       case 'character_skill': {
         const existing = await db.characterSkills.get(id);
         await db.characterSkills.put({ ...(existing ?? {}), ...merged } as LocalCharacterSkill);
+        return;
+      }
+      case 'character_spell': {
+        const existing = await db.characterSpells.get(id);
+        await db.characterSpells.put({ ...(existing ?? {}), ...merged } as LocalCharacterSpell);
         return;
       }
       case 'character_inventory': {

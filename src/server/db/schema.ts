@@ -376,6 +376,10 @@ export const inventoryItems = pgTable(
     isArmor: boolean('is_armor').notNull().default(false),
     armor: jsonb('armor'),
     weaponData: jsonb('weapon_data'),
+    /** Powerstone metadata (max/current charge).  Null = not a powerstone. */
+    powerstoneData: jsonb('powerstone_data'),
+    /** Magic-item metadata (linked spell, charges, mode).  Null = mundane item. */
+    magicItemData: jsonb('magic_item_data'),
     libraryItemId: uuid('library_item_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -384,6 +388,41 @@ export const inventoryItems = pgTable(
   (t) => ({
     characterIdx: index('inventory_items_character_idx').on(t.characterId),
     parentIdx: index('inventory_items_parent_idx').on(t.parentId),
+  }),
+);
+
+/**
+ * Spells the character knows.  Mechanically a spell is an IQ/Hard skill,
+ * but tracking it in its own table keeps spell-specific fields (college,
+ * energy cost, casting time) out of the regular skill row and lets the
+ * client surface a Magic panel without filtering.
+ *
+ * Effective skill level adds the caster's Magery level on top of the
+ * usual IQ/H formula -- see `src/shared/domain/spellCalc.ts`.
+ */
+export const characterSpells = pgTable(
+  'character_spells',
+  {
+    id: id(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    college: varchar('college', { length: 80 }),
+    points: integer('points').notNull().default(1),
+    baseEnergyCost: smallint('base_energy_cost').notNull().default(1),
+    maintenanceCost: smallint('maintenance_cost'),
+    castingTime: varchar('casting_time', { length: 40 }),
+    duration: varchar('duration', { length: 40 }),
+    prerequisites: text('prerequisites'),
+    notes: text('notes'),
+    librarySpellId: uuid('library_spell_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    characterIdx: index('character_spells_character_idx').on(t.characterId),
   }),
 );
 
@@ -519,6 +558,7 @@ export type DbUser = typeof users.$inferSelect;
 export type DbCharacter = typeof characters.$inferSelect;
 export type DbCharacterTrait = typeof characterTraits.$inferSelect;
 export type DbCharacterSkill = typeof characterSkills.$inferSelect;
+export type DbCharacterSpell = typeof characterSpells.$inferSelect;
 export type DbInventoryItem = typeof inventoryItems.$inferSelect;
 export type DbCombatState = typeof combatStates.$inferSelect;
 export type DbCampaign = typeof campaigns.$inferSelect;

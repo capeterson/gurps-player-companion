@@ -58,6 +58,17 @@ library:
       kind: language
       basePoints: 0
       source: B-23
+    - name: Magery
+      kind: advantage
+      basePoints: 5
+      description: |
+        The base supernatural prerequisite for spellcasting.  Magery 0
+        unlocks the ability to cast at all in a normal-mana zone (5
+        points).  Each level above 0 costs 10 points and adds +1 to
+        every spell skill, plus reduces learning time.  Some spells
+        require a minimum Magery level as a prerequisite.
+      source: B-66
+      tags: [magic]
   skills:
     - name: Stealth
       attribute: DX
@@ -127,3 +138,14 @@ library:
         reach: '1'
         parry: '0'
         stRequired: 10
+    - name: Powerstone (uncharged)
+      category: magic
+      weightLbs: 0
+      cost: 100
+      description: |
+        A magical gem that stores castable energy.  Note its capacity
+        (the powerstone spell determines max energy at creation).  In
+        play, set the current charge in the item's powerstone metadata
+        and burn down energy when casting.  Recharges at 1 point per
+        day in a normal-mana area.
+      source: M-69

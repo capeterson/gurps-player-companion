@@ -3,6 +3,7 @@ import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, uuid } from './common.ts';
 import { inventoryItemOut } from './inventory.ts';
 import { skillOut } from './skill.ts';
+import { spellOut } from './spell.ts';
 import { traitOut } from './trait.ts';
 
 const attr = z.number().int().min(1).max(99);
@@ -130,6 +131,7 @@ export const characterDetail = z.object({
   warnings: z.array(warningOut),
   traits: z.array(traitOut),
   skills: z.array(skillOut),
+  spells: z.array(spellOut),
   inventory: z.array(inventoryItemOut),
   combat: combatStateOut.nullable(),
 });

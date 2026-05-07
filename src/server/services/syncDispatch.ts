@@ -21,6 +21,7 @@ import { characterCreate, characterUpdate } from '../../shared/schemas/character
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
 import { skillCreate, skillUpdate } from '../../shared/schemas/skill.ts';
+import { spellCreate, spellUpdate } from '../../shared/schemas/spell.ts';
 import type {
   EntityClass,
   OperationEnvelope,
@@ -32,6 +33,7 @@ import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
   characterSkills,
+  characterSpells,
   characterTraits,
   characters,
   combatStates,
@@ -50,6 +52,7 @@ const FIELD_VALIDATORS = {
   character: characterUpdate,
   character_trait: traitUpdate,
   character_skill: skillUpdate,
+  character_spell: spellUpdate,
   character_inventory: inventoryItemUpdate,
   character_combat: combatStateUpdate,
 } as const;
@@ -60,6 +63,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   character: Object.keys(characterUpdate.shape) as readonly string[],
   character_trait: Object.keys(traitUpdate.shape) as readonly string[],
   character_skill: Object.keys(skillUpdate.shape) as readonly string[],
+  character_spell: Object.keys(spellUpdate.shape) as readonly string[],
   character_inventory: Object.keys(inventoryItemUpdate.shape) as readonly string[],
   character_combat: Object.keys(combatStateUpdate.shape) as readonly string[],
   // Not yet exposed via /sync (no client UI mutations today).
@@ -140,6 +144,8 @@ async function dispatchOperationInner(
       return dispatchTrait(ctx, op);
     case 'character_skill':
       return dispatchSkill(ctx, op);
+    case 'character_spell':
+      return dispatchSpell(ctx, op);
     case 'character_inventory':
       return dispatchInventory(ctx, op);
     case 'character_combat':
@@ -368,6 +374,76 @@ async function dispatchSkill(
     },
     childWhere: () =>
       and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
+  });
+}
+
+// ---------- character_spell ----------
+
+async function dispatchSpell(
+  ctx: DispatchContext,
+  op: OperationEnvelope,
+): Promise<OperationOutcome> {
+  const db = getDb();
+  if (op.command === 'create') {
+    const body = spellCreate.parse(op.attemptedValue);
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    const [created] = await db
+      .insert(characterSpells)
+      .values({
+        ...(op.entityId ? { id: op.entityId } : {}),
+        characterId,
+        name: body.name,
+        college: body.college ?? null,
+        points: body.points ?? 1,
+        baseEnergyCost: body.baseEnergyCost ?? 1,
+        maintenanceCost: body.maintenanceCost ?? null,
+        castingTime: body.castingTime ?? null,
+        duration: body.duration ?? null,
+        prerequisites: body.prerequisites ?? null,
+        notes: body.notes ?? null,
+        librarySpellId: body.librarySpellId ?? null,
+      })
+      .returning();
+    if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    return appliedOutcome(op, Number(created.revision));
+  }
+
+  if (op.command === 'delete') {
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    const result = await db
+      .delete(characterSpells)
+      .where(and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)))
+      .returning({ id: characterSpells.id });
+    if (result.length === 0) {
+      return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'spell not found' };
+    }
+    return { clientOpId: op.clientOpId, status: 'applied' };
+  }
+
+  const characterId = requireParentId(op);
+  const access = await loadCharacterOr403(characterId, ctx.userId);
+  assertWrite(access);
+  return await patchEntity({
+    op,
+    userId: ctx.userId,
+    entityClass: 'character_spell',
+    table: characterSpells,
+    parentLookup: async () => {
+      const [row] = await db
+        .select()
+        .from(characterSpells)
+        .where(
+          and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+        );
+      if (!row) throw new HTTPException(404, { message: 'spell not found' });
+      return row;
+    },
+    childWhere: () =>
+      and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
   });
 }
 

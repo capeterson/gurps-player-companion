@@ -9,6 +9,7 @@ import {
   attrSpent,
   secondarySpent,
 } from '../../../shared/domain/attributeTooltips.ts';
+import { hasMagery } from '../../../shared/domain/spellCalc.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { ConditionChip } from '../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
@@ -25,18 +26,21 @@ import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
 import { CombatModal } from './sections/CombatModal.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
+import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
+import { SpellsPanel } from './sections/SpellsPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
-type SheetTab = 'Combat' | 'Identity' | 'Traits' | 'Skills' | 'Inventory' | 'Notes';
+type SheetTab = 'Combat' | 'Identity' | 'Traits' | 'Skills' | 'Magic' | 'Inventory' | 'Notes';
 const SHEET_TABS: readonly SheetTab[] = [
   'Combat',
   'Identity',
   'Traits',
   'Skills',
+  'Magic',
   'Inventory',
   'Notes',
 ] as const;
@@ -45,6 +49,7 @@ interface CountByTab {
   Skills?: number;
   Inventory?: number;
   Traits?: number;
+  Magic?: number;
 }
 
 const POSTURES = [
@@ -1494,11 +1499,20 @@ export function CharacterSheetPage() {
     );
   }
 
+  const powerstoneCount = character.inventory.filter((i) => i.powerstoneData != null).length;
+  const magicItemCount = character.inventory.filter((i) => i.magicItemData != null).length;
+  const magicTabCount = character.spells.length + powerstoneCount + magicItemCount;
   const counts: CountByTab = {
     Traits: character.traits.length,
     Skills: character.skills.length,
+    Magic: magicTabCount,
     Inventory: character.inventory.length,
   };
+  // Show the Magic section by default for any caster (Magery present, or
+  // already has at least one spell / powerstone / magic item).  Owners
+  // without any magic can still tab to it to add their first.
+  const showMagicTab = hasMagery(character.traits) || magicTabCount > 0 || canWrite;
+  const visibleTabs = showMagicTab ? SHEET_TABS : SHEET_TABS.filter((t) => t !== 'Magic');
 
   const hpRatio =
     character.derived.hp > 0
@@ -1537,7 +1551,7 @@ export function CharacterSheetPage() {
       </div>
 
       <div className="panel-tabs">
-        {SHEET_TABS.map((t) => {
+        {visibleTabs.map((t) => {
           const count = counts[t as keyof CountByTab];
           return (
             <button
@@ -1564,6 +1578,13 @@ export function CharacterSheetPage() {
         )}
         {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
         {tab === 'Skills' && <SkillsPanel character={character} canWrite={canWrite} />}
+        {tab === 'Magic' && (
+          <div className="space-y-4">
+            <SpellsPanel character={character} canWrite={canWrite} />
+            <PowerstonesPanel character={character} canWrite={canWrite} />
+            <MagicItemsPanel character={character} canWrite={canWrite} />
+          </div>
+        )}
         {tab === 'Inventory' && <InventoryPanel character={character} canWrite={canWrite} />}
         {tab === 'Notes' && <NotesPanel character={character} canWrite={canWrite} />}
       </div>
