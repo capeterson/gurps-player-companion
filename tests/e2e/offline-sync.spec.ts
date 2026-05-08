@@ -136,9 +136,7 @@ test.describe('BUG-2: SyncBootstrapGate never flashes empty content', () => {
     // without a spinner present at the same moment.
     // A simpler invariant: if "No characters yet" ever appeared, the spinner
     // ("Bringing local data in sync") must have appeared before it or at the same time.
-    const sawEmptyState = renderedTexts.some((t) =>
-      t.toLowerCase().includes('no characters yet'),
-    );
+    const sawEmptyState = renderedTexts.some((t) => t.toLowerCase().includes('no characters yet'));
     const sawSpinner = renderedTexts.some((t) =>
       t.toLowerCase().includes('bringing local data in sync'),
     );
@@ -182,9 +180,7 @@ test.describe('BUG-2: SyncBootstrapGate never flashes empty content', () => {
 // ─── BUG-3: cursor pull immediately after drain on reconnect ─────────────────
 
 test.describe('BUG-3: server changes appear promptly after reconnect drain', () => {
-  test('edits from a second session appear within 3 seconds of reconnect', async ({
-    browser,
-  }) => {
+  test('edits from a second session appear within 3 seconds of reconnect', async ({ browser }) => {
     const email = `e2e-reconnect-${SUFFIX()}@example.com`;
     const password = 'CorrectHorseBatteryStaple1';
 
@@ -225,9 +221,10 @@ test.describe('BUG-3: server changes appear promptly after reconnect drain', () 
 
     // Session B should pick up the rename within 3 seconds (immediate pull after drain).
     // The character name displayed in the identity hero should update.
-    await expect(
-      pageB.getByRole('textbox', { name: /character name/i }).first(),
-    ).toHaveValue(newName, { timeout: 6_000 });
+    await expect(pageB.getByRole('textbox', { name: /character name/i }).first()).toHaveValue(
+      newName,
+      { timeout: 6_000 },
+    );
 
     await ctxA.close();
     await ctxB.close();
