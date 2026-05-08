@@ -798,9 +798,7 @@ class SyncOrchestrator {
         .equals(id)
         .and(
           (o) =>
-            o.status === 'pending' ||
-            o.status === 'in_flight' ||
-            o.status === 'transient_retry',
+            o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry',
         )
         .toArray()
         .catch(() => [] as OutboxEntry[]);

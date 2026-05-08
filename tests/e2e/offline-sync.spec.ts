@@ -48,20 +48,20 @@ async function createCharacter(page: import('@playwright/test').Page, name: stri
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
 }
 
-/** Simulate offline by overriding navigator.onLine and dispatching the event. */
+/**
+ * Take the page offline: Playwright's context.setOffline(true) blocks
+ * the Chromium network stack (so API calls genuinely fail), and we also
+ * dispatch the DOM event so the app's online/offline listeners fire.
+ */
 async function goOffline(page: import('@playwright/test').Page) {
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, 'onLine', { get: () => false, configurable: true });
-    window.dispatchEvent(new Event('offline'));
-  });
+  await page.context().setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 }
 
-/** Simulate back-online. */
+/** Bring the page back online and fire the DOM event. */
 async function goOnline(page: import('@playwright/test').Page) {
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
-    window.dispatchEvent(new Event('online'));
-  });
+  await page.context().setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
 }
 
 // ─── BUG-1: canWrite offline ──────────────────────────────────────────────────
