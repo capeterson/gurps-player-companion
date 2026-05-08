@@ -65,7 +65,15 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
       .finally(() => setBootstrapping(false));
   }, [userId, bootstrapped]);
 
-  if (userId && bootstrapped === false && bootstrapping) {
+  // Block children until bootstrap is confirmed. Three sub-states:
+  //   bootstrapped === undefined  liveQuery hasn't resolved yet (Dexie opening)
+  //   bootstrapped === false      bootstrap needed; useEffect will start it
+  //   bootstrapped === true       ready — render children
+  //
+  // Without the `undefined` case the gate would briefly render children
+  // with an empty Dexie on first login, between the liveQuery settling
+  // on `false` and the setBootstrapping(true) state update landing.
+  if (userId && bootstrapped !== true) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">

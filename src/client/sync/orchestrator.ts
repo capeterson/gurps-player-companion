@@ -402,6 +402,12 @@ class SyncOrchestrator {
         return;
       }
       await this.applyOutcomes(ops, outcomes);
+      // Pull server-side changes immediately after draining so edits from
+      // other devices appear right away rather than waiting up to 5 seconds
+      // for the next loop iteration.  triggerCursorPull handles its own
+      // fireCycleDone + refreshIndicator; the calls below are fallbacks for
+      // the early-return paths (offline / no token) where it returns silently.
+      await this.triggerCursorPull().catch(() => {});
       this.fireCycleDone();
       const pending = await countPending();
       this.refreshIndicator(pending);

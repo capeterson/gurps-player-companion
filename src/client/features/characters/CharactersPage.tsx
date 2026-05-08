@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { enqueueCreate, newClientId } from '../../sync/outbox.ts';
 import { useCharactersList } from './useCharacterDetail.ts';
 
@@ -28,6 +29,11 @@ export function CharactersPage() {
         entityId: localId,
         humanName: 'character',
         attemptedValue: {
+          // ownerId is set server-side from the session, but including the
+          // local token sub here means the Dexie row has the correct ownerId
+          // immediately — before the create round-trips — so canWrite works
+          // offline and on the character sheet before the first sync.
+          ownerId: readUserIdFromToken() ?? undefined,
           name: trimmed,
           st: 10,
           dx: 10,
