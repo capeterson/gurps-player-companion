@@ -22,7 +22,6 @@ interface MeResponse {
 
 export function SyncBootstrapGate({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
-  const [bootstrapping, setBootstrapping] = useState(false);
 
   // Resolve the current user's id so we can key the per-account
   // bootstrap flag.  Fast path: any access token implies an active
@@ -59,10 +58,7 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
   // Trigger the bootstrap once we know the user and it hasn't run yet.
   useEffect(() => {
     if (!userId || bootstrapped !== false) return;
-    setBootstrapping(true);
-    void getSyncOrchestrator()
-      .bootstrap(userId)
-      .finally(() => setBootstrapping(false));
+    void getSyncOrchestrator().bootstrap(userId);
   }, [userId, bootstrapped]);
 
   // Block children until bootstrap is confirmed. Three sub-states:
