@@ -35,3 +35,29 @@ export const tokenStore = {
     return this.read() !== null;
   },
 };
+
+/**
+ * Decode the `sub` claim from the stored access token without verifying
+ * the signature (verification happens server-side). Used in offline
+ * contexts where /auth/me is unreachable so we can still determine
+ * ownership for `canWrite` checks.
+ */
+export function readUserIdFromToken(): string | null {
+  const tokens = tokenStore.read();
+  if (!tokens) return null;
+  try {
+    const parts = tokens.accessToken.split('.');
+    if (parts.length !== 3) return null;
+    // JWT payload is base64url-encoded; convert to standard base64 before decoding.
+    // Explicit guard satisfies noUncheckedIndexedAccess (parts[1] is string|undefined).
+    const base64Url = parts[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(atob(base64)) as unknown;
+    if (typeof decoded !== 'object' || decoded === null) return null;
+    const sub = (decoded as Record<string, unknown>).sub;
+    return typeof sub === 'string' ? sub : null;
+  } catch {
+    return null;
+  }
+}

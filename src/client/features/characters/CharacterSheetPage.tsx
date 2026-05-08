@@ -21,6 +21,7 @@ import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
+import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
@@ -1625,7 +1626,11 @@ export function CharacterSheetPage() {
       </div>
     );
   }
-  const canWrite = me.data ? me.data.id === character.ownerId : false;
+  // Fall back to the local JWT sub when the /auth/me query hasn't resolved
+  // yet (offline, cold cache, or first render) so the sheet is editable
+  // while offline for the character's owner.
+  const myId = me.data?.id ?? readUserIdFromToken();
+  const canWrite = myId !== null && myId === character.ownerId;
 
   const campaign = campaigns.data?.find((c) => c.id === character.campaignId);
   const pointTarget = campaign?.pointTarget ?? null;
@@ -1636,7 +1641,6 @@ export function CharacterSheetPage() {
   // apparent" identity bits. Owners and GMs always see the full sheet.
   // Mirrors the server-side gate in `shouldUseMinimalView` so the
   // local-first path renders consistently with the API contract.
-  const myId = me.data?.id ?? null;
   const isOwner = myId !== null && myId === character.ownerId;
   const isGm = myId !== null && campaign != null && myId === campaign.ownerId;
   const sharesSheets = campaign?.shareCharacterSheets !== false; // undefined → default true

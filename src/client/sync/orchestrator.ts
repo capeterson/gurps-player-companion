@@ -13,8 +13,8 @@
  * outbox.ts.  This module is the only thing that talks to /sync/*.
  *
  * Local-first invariant: server cursor data NEVER overwrites a row
- * that has a `pending` or `in_flight` outbox op for the same
- * (entityId, fieldPath).  See `applyServerRow`.
+ * that has a `pending`, `in_flight`, or `transient_retry` outbox op
+ * for the same (entityId, fieldPath).  See `applyServerRow`.
  */
 
 import { liveQuery } from 'dexie';
@@ -402,6 +402,12 @@ class SyncOrchestrator {
         return;
       }
       await this.applyOutcomes(ops, outcomes);
+      // Pull server-side changes immediately after draining so edits from
+      // other devices appear right away rather than waiting up to 5 seconds
+      // for the next loop iteration.  triggerCursorPull handles its own
+      // fireCycleDone + refreshIndicator; the calls below are fallbacks for
+      // the early-return paths (offline / no token) where it returns silently.
+      await this.triggerCursorPull().catch(() => {});
       this.fireCycleDone();
       const pending = await countPending();
       this.refreshIndicator(pending);
@@ -767,9 +773,12 @@ class SyncOrchestrator {
 
   /**
    * Write a server-shaped row into the appropriate Dexie store.  Skips
-   * fields that have a pending/in_flight outbox op for that
-   * (entityId, fieldPath) -- the local user intent always wins until
-   * the server formally rejects it.
+   * fields that have a pending/in_flight/transient_retry outbox op for
+   * that (entityId, fieldPath) -- the local user intent always wins until
+   * the server formally rejects it.  transient_retry ops are included
+   * because they represent unconfirmed intent: the server may not have
+   * applied them yet, and an immediate cursor pull must not silently
+   * overwrite those fields with the pre-retry server value.
    */
   private async applyServerRow(
     entityClass: EntityClass,
@@ -787,7 +796,10 @@ class SyncOrchestrator {
       const dirty = await db.outbox
         .where('entityId' as never)
         .equals(id)
-        .and((o) => o.status === 'pending' || o.status === 'in_flight')
+        .and(
+          (o) =>
+            o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry',
+        )
         .toArray()
         .catch(() => [] as OutboxEntry[]);
       for (const op of dirty) {
