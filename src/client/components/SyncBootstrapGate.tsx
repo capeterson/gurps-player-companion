@@ -13,7 +13,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState } from 'react';
 import { getLocalDb } from '../db/dexie.ts';
 import { api } from '../lib/api.ts';
-import { tokenStore } from '../lib/tokenStore.ts';
+import { readUserIdFromToken, tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 
 interface MeResponse {
@@ -21,14 +21,18 @@ interface MeResponse {
 }
 
 export function SyncBootstrapGate({ children }: { children: ReactNode }) {
-  const [userId, setUserId] = useState<string | null>(null);
+  // Seed userId synchronously from the stored JWT so the gate blocks
+  // immediately on first render — before /auth/me has had a chance to
+  // resolve.  Without this, userId starts as null while the fetch is
+  // in-flight, causing the `userId && …` condition to short-circuit and
+  // briefly render children with an empty Dexie on first login.
+  const [userId, setUserId] = useState<string | null>(() => readUserIdFromToken());
 
-  // Resolve the current user's id so we can key the per-account
-  // bootstrap flag.  Fast path: any access token implies an active
-  // session and /auth/me will return the id.
+  // Confirm the id server-side and pick up any change (e.g. a different
+  // account logging in on the same device).  RequireAuth handles the
+  // redirect if the token is invalid; we just keep the gate rendered.
   useEffect(() => {
-    const tokens = tokenStore.read();
-    if (!tokens) {
+    if (!tokenStore.read()) {
       setUserId(null);
       return;
     }
