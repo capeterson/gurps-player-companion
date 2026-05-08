@@ -49,7 +49,9 @@ export function readUserIdFromToken(): string | null {
     const parts = tokens.accessToken.split('.');
     if (parts.length !== 3) return null;
     // JWT payload is base64url-encoded; convert to standard base64 before decoding.
+    // Explicit guard satisfies noUncheckedIndexedAccess (parts[1] is string|undefined).
     const base64Url = parts[1];
+    if (!base64Url) return null;
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const decoded = JSON.parse(atob(base64)) as unknown;
     if (typeof decoded !== 'object' || decoded === null) return null;
