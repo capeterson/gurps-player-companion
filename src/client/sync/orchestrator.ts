@@ -13,8 +13,8 @@
  * outbox.ts.  This module is the only thing that talks to /sync/*.
  *
  * Local-first invariant: server cursor data NEVER overwrites a row
- * that has a `pending` or `in_flight` outbox op for the same
- * (entityId, fieldPath).  See `applyServerRow`.
+ * that has a `pending`, `in_flight`, or `transient_retry` outbox op
+ * for the same (entityId, fieldPath).  See `applyServerRow`.
  */
 
 import { liveQuery } from 'dexie';
@@ -773,9 +773,12 @@ class SyncOrchestrator {
 
   /**
    * Write a server-shaped row into the appropriate Dexie store.  Skips
-   * fields that have a pending/in_flight outbox op for that
-   * (entityId, fieldPath) -- the local user intent always wins until
-   * the server formally rejects it.
+   * fields that have a pending/in_flight/transient_retry outbox op for
+   * that (entityId, fieldPath) -- the local user intent always wins until
+   * the server formally rejects it.  transient_retry ops are included
+   * because they represent unconfirmed intent: the server may not have
+   * applied them yet, and an immediate cursor pull must not silently
+   * overwrite those fields with the pre-retry server value.
    */
   private async applyServerRow(
     entityClass: EntityClass,
@@ -793,7 +796,12 @@ class SyncOrchestrator {
       const dirty = await db.outbox
         .where('entityId' as never)
         .equals(id)
-        .and((o) => o.status === 'pending' || o.status === 'in_flight')
+        .and(
+          (o) =>
+            o.status === 'pending' ||
+            o.status === 'in_flight' ||
+            o.status === 'transient_retry',
+        )
         .toArray()
         .catch(() => [] as OutboxEntry[]);
       for (const op of dirty) {
