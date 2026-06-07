@@ -27,6 +27,7 @@ import type {
   SyncOperationsResponse,
 } from '../../shared/schemas/sync.ts';
 import {
+  ALL_STORE_NAMES,
   type LocalCharacter,
   type LocalCharacterCombat,
   type LocalCharacterInventory,
@@ -131,6 +132,7 @@ class SyncOrchestrator {
   private outboxLiveSub: { unsubscribe(): void } | null = null;
   private listeners = new Set<keyof OrchestratorEvents>();
   private cycleListeners = new Set<() => void>();
+  private recoveryInProgress = false;
   /**
    * The viewer's user id, captured at bootstrap. Used by
    * `enforceMinimalViewLocally` to figure out which campaign-shared
@@ -197,7 +199,8 @@ class SyncOrchestrator {
    * results into Dexie.  Safe to call repeatedly; each class's cursor
    * is the high-water mark seen so far.
    */
-  async triggerCursorPull(): Promise<void> {
+  async triggerCursorPull(force = false): Promise<void> {
+    if (this.recoveryInProgress && !force) return;
     if (!tokenStore.read()) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     // Don't flip the indicator to 'syncing' just to *check* for changes —
@@ -232,6 +235,7 @@ class SyncOrchestrator {
       this.refreshIndicator(pending);
     } catch (_err) {
       syncStateStore.set('error');
+      throw _err;
     }
   }
 
@@ -241,7 +245,7 @@ class SyncOrchestrator {
    * "bootstrapped" flag so the SyncBootstrapGate can render the UI
    * straight away on subsequent loads.
    */
-  async bootstrap(userId: string): Promise<void> {
+  async bootstrap(userId: string, forceCursorPull = false): Promise<void> {
     // Captured for `enforceMinimalViewLocally` — the periodic
     // cursor-pull doesn't otherwise know who's logged in.
     this.currentUserId = userId;
@@ -253,48 +257,52 @@ class SyncOrchestrator {
       // so we definitely start at 0 and pull every owned row.
       await db.syncCursors.clear();
     }
-    await this.triggerCursorPull();
+    await this.triggerCursorPull(forceCursorPull);
     await db.syncMeta.put({ key: flagKey, value: { bootstrappedAt: new Date().toISOString() } });
     // Re-emit any persistent rejection toasts that survived the
     // reload so the user doesn't lose an open error.
     await this.replayRejectionToasts();
   }
 
+  /**
+   * Destructive recovery path for unrecoverable local sync errors.
+   *
+   * This intentionally discards pending outbox edits, clears the same
+   * per-user Dexie tables as logout, resets the visible sync state, and
+   * then runs a forced bootstrap from revision 0 for the supplied user.
+   * Callers must require explicit user confirmation before invoking it.
+   */
+  async clearLocalAndFullResync(userId: string): Promise<void> {
+    if (!tokenStore.read()) {
+      throw new Error('Cannot resync without an authenticated session');
+    }
+
+    const wasStarted = this.started;
+    this.recoveryInProgress = true;
+    this.running = false;
+    this.wake();
+
+    try {
+      await runWithLock('sync-drain', async () => {
+        await this.clearAllLocalStores();
+        syncStateStore.reset('syncing');
+        this.currentUserId = userId;
+        await this.bootstrap(userId, true);
+      });
+    } finally {
+      this.recoveryInProgress = false;
+      if (wasStarted) {
+        this.running = false;
+        void this.runLoop();
+        this.wake();
+      }
+    }
+  }
+
   /** Wipe Dexie and reset state -- called on logout. */
   async purge(): Promise<void> {
     this.currentUserId = null;
-    const db = getLocalDb();
-    await db.transaction(
-      'rw',
-      [
-        db.characters,
-        db.characterTraits,
-        db.characterSkills,
-        db.characterSpells,
-        db.characterInventory,
-        db.characterCombat,
-        db.campaigns,
-        db.outbox,
-        db.syncCursors,
-        db.syncMeta,
-        db.tombstones,
-        db.rejectionToasts,
-      ],
-      async () => {
-        await db.characters.clear();
-        await db.characterTraits.clear();
-        await db.characterSkills.clear();
-        await db.characterSpells.clear();
-        await db.characterInventory.clear();
-        await db.characterCombat.clear();
-        await db.campaigns.clear();
-        await db.outbox.clear();
-        await db.syncCursors.clear();
-        await db.syncMeta.clear();
-        await db.tombstones.clear();
-        await db.rejectionToasts.clear();
-      },
-    );
+    await this.clearAllLocalStores();
     syncStateStore.reset('synced');
   }
 
@@ -306,6 +314,16 @@ class SyncOrchestrator {
   }
 
   // ---------- internals ----------
+
+  private async clearAllLocalStores(): Promise<void> {
+    const db = getLocalDb();
+    const stores = ALL_STORE_NAMES.map((name) => db[name]);
+    await db.transaction('rw', stores, async () => {
+      for (const name of ALL_STORE_NAMES) {
+        await db[name].clear();
+      }
+    });
+  }
 
   private onOnline = (): void => {
     this.wake();
@@ -351,6 +369,7 @@ class SyncOrchestrator {
   }
 
   private async maybeDrainOnce(): Promise<void> {
+    if (this.recoveryInProgress) return;
     if (!tokenStore.read()) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       // Can't drain while offline -- leave the indicator showing
