@@ -325,7 +325,9 @@ router.openapi(
         await db.transaction(async (tx) => {
           await tx
             .delete(passwordResetTokens)
-            .where(and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)));
+            .where(
+              and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)),
+            );
           await tx.insert(passwordResetTokens).values({ userId: user.id, tokenHash, expiresAt });
         });
 
