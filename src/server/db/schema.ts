@@ -129,6 +129,24 @@ export const refreshTokens = pgTable(
   }),
 );
 
+export const passwordResetTokens = pgTable(
+  'password_reset_tokens',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    tokenHashKey: uniqueIndex('password_reset_tokens_hash_key').on(t.tokenHash),
+    userIdx: index('password_reset_tokens_user_idx').on(t.userId),
+  }),
+);
+
 export const apiKeys = pgTable(
   'api_keys',
   {
@@ -571,6 +589,7 @@ export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
 export type DbCampaignLibraryItem = typeof campaignLibraryItems.$inferSelect;
 export type DbApiKey = typeof apiKeys.$inferSelect;
 export type DbRefreshToken = typeof refreshTokens.$inferSelect;
+export type DbPasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 // Use the bigserial as our `revision` (auto-incremented per-row insert)
 // rather than per-table.  For multi-table sync, clients track a cursor

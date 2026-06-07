@@ -63,3 +63,13 @@ export type TokenPair = z.infer<typeof tokenPair>;
 export type RefreshRequest = z.infer<typeof refreshRequest>;
 export type LogoutRequest = z.infer<typeof logoutRequest>;
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequest>;
+
+export const forgotPasswordRequest = z.object({ email });
+
+export const resetPasswordRequest = z.object({
+  token: z.string().min(1),
+  newPassword: password,
+});
+
+export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequest>;
+export type ResetPasswordRequest = z.infer<typeof resetPasswordRequest>;

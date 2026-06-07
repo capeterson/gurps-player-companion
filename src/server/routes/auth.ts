@@ -1,13 +1,15 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createRoute } from '@hono/zod-openapi';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   changePasswordRequest,
+  forgotPasswordRequest,
   loginRequest,
   logoutRequest,
   refreshRequest,
   registerRequest,
+  resetPasswordRequest,
   tokenPair,
   userOut,
 } from '../../shared/schemas/auth.ts';
@@ -15,9 +17,11 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/j
 import { requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
 import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
+import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
-import { refreshTokens, users } from '../db/schema.ts';
+import { getResend, sendPasswordResetEmail } from '../email.ts';
+import { passwordResetTokens, refreshTokens, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();
@@ -281,6 +285,121 @@ router.openapi(
     const user = rows[0];
     if (!user) throw new HTTPException(401, { message: 'unknown_user' });
     return c.json(userToOut(user), 200);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/auth/forgot-password',
+    tags: ['auth'],
+    summary: 'Request a password-reset email (always 200 to prevent enumeration)',
+    request: {
+      body: { required: true, content: { 'application/json': { schema: forgotPasswordRequest } } },
+    },
+    responses: {
+      200: { description: 'Request received' },
+      422: errorResponse('Validation error'),
+    },
+  }),
+  async (c) => {
+    const body = c.req.valid('json');
+    const config = loadConfig();
+    const resend = getResend(config);
+
+    if (resend && config.resendFromEmail) {
+      const db = getDb();
+      const rows = await db.select().from(users).where(eq(users.email, body.email));
+      const user = rows[0];
+      if (user) {
+        const rawToken = randomBytes(32).toString('hex');
+        const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+        // Remove any prior unused tokens for this user before creating a new one.
+        await db
+          .delete(passwordResetTokens)
+          .where(and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)));
+
+        await db.insert(passwordResetTokens).values({
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+        });
+
+        const resetUrl = config.appBaseUrl
+          ? `${config.appBaseUrl}/reset-password?token=${rawToken}`
+          : '';
+
+        sendPasswordResetEmail(resend, config.resendFromEmail, {
+          to: user.email,
+          displayName: user.displayName,
+          resetUrl,
+        }).catch(() => {});
+      }
+    }
+
+    return c.json({ message: 'If that email is registered, a reset link has been sent.' }, 200);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/auth/reset-password',
+    tags: ['auth'],
+    summary: 'Reset password using a token from a reset email',
+    request: {
+      body: { required: true, content: { 'application/json': { schema: resetPasswordRequest } } },
+    },
+    responses: {
+      204: { description: 'Password reset successfully' },
+      400: errorResponse('Invalid or expired token'),
+      422: errorResponse('Validation error'),
+    },
+  }),
+  async (c) => {
+    const body = c.req.valid('json');
+    const tokenHash = createHash('sha256').update(body.token).digest('hex');
+    const db = getDb();
+    const now = new Date();
+
+    const rows = await db
+      .select()
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.tokenHash, tokenHash),
+          isNull(passwordResetTokens.usedAt),
+          gt(passwordResetTokens.expiresAt, now),
+        ),
+      );
+    const resetToken = rows[0];
+    if (!resetToken) {
+      throw new HTTPException(400, { message: 'invalid or expired reset token' });
+    }
+
+    const passwordHash = await hashPassword(body.newPassword);
+
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ passwordHash, updatedAt: now }).where(eq(users.id, resetToken.userId));
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: now })
+        .where(
+          and(
+            eq(refreshTokens.userId, resetToken.userId),
+            isNull(refreshTokens.revokedAt),
+            gt(refreshTokens.expiresAt, now),
+          ),
+        );
+      await tx
+        .update(passwordResetTokens)
+        .set({ usedAt: now })
+        .where(eq(passwordResetTokens.id, resetToken.id));
+    });
+
+    return c.body(null, 204);
   },
 );
 
