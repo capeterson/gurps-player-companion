@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { tokenStore } from '../../lib/tokenStore.ts';
+import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -21,8 +22,9 @@ export function ResetPasswordPage() {
         body: { token, newPassword },
         authenticated: false,
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
       tokenStore.clear();
+      await getSyncOrchestrator().purge();
       toasts.push('Password updated. Please sign in.', { kind: 'success' });
       navigate('/login');
     },
