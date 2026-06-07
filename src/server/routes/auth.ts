@@ -320,18 +320,17 @@ router.openapi(
         const tokenHash = createHash('sha256').update(rawToken).digest('hex');
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-        // Remove any prior unused tokens for this user before creating a new one.
-        await db
-          .delete(passwordResetTokens)
-          .where(and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)));
-
-        await db.insert(passwordResetTokens).values({
-          userId: user.id,
-          tokenHash,
-          expiresAt,
+        // Delete then insert atomically so no window exists where two concurrent
+        // requests for the same user both succeed and produce two live tokens.
+        await db.transaction(async (tx) => {
+          await tx
+            .delete(passwordResetTokens)
+            .where(and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)));
+          await tx.insert(passwordResetTokens).values({ userId: user.id, tokenHash, expiresAt });
         });
 
-        const resetUrl = `${config.appBaseUrl}/reset-password?token=${rawToken}`;
+        const baseUrl = config.appBaseUrl.replace(/\/+$/, '');
+        const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
 
         sendPasswordResetEmail(resend, config.resendFromEmail, {
           to: user.email,
@@ -366,8 +365,22 @@ router.openapi(
     const db = getDb();
     const now = new Date();
 
-    // Hash the password before entering the transaction so the slow argon2id
-    // work doesn't hold the row lock longer than necessary.
+    // Fast pre-check (no lock) to reject obviously bogus tokens before burning
+    // argon2id cycles. The authoritative check is the FOR UPDATE inside the tx.
+    const preCheck = await db
+      .select({ id: passwordResetTokens.id })
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.tokenHash, tokenHash),
+          isNull(passwordResetTokens.usedAt),
+          gt(passwordResetTokens.expiresAt, now),
+        ),
+      );
+    if (!preCheck[0]) {
+      throw new HTTPException(400, { message: 'invalid or expired reset token' });
+    }
+
     const passwordHash = await hashPassword(body.newPassword);
 
     // SELECT FOR UPDATE acquires a row-level write lock so concurrent requests

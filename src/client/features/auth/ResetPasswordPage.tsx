@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { tokenStore } from '../../lib/tokenStore.ts';
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
@@ -21,6 +22,7 @@ export function ResetPasswordPage() {
         authenticated: false,
       }),
     onSuccess: () => {
+      tokenStore.clear();
       toasts.push('Password updated. Please sign in.', { kind: 'success' });
       navigate('/login');
     },
