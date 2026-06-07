@@ -27,6 +27,7 @@ import { type InvitationOut, invitationOut, inviteRequest } from '../../shared/s
 import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin } from '../auth/permissions.ts';
+import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
@@ -40,6 +41,7 @@ import {
   notifications,
   users,
 } from '../db/schema.ts';
+import { getResend, sendCampaignInviteEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();
@@ -217,6 +219,19 @@ router.openapi(
         });
       }
       throw err;
+    }
+
+    const config = loadConfig();
+    const resend = getResend(config);
+    if (resend && config.resendFromEmail) {
+      sendCampaignInviteEmail(resend, config.resendFromEmail, {
+        to: target.email,
+        displayName: target.displayName,
+        inviterName: user.displayName,
+        campaignName: campaign.name,
+        role: requestedRole,
+        appUrl: config.appBaseUrl ?? '',
+      }).catch(() => {});
     }
 
     const out = await loadInvitationOut(insertedId);

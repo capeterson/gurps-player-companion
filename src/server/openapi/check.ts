@@ -19,6 +19,9 @@ const config: AppConfig = {
   jwtRefreshTtlDays: 14,
   apiKeyPepper: 'spec-emit-only-secret-which-is-deliberately-very-long',
   corsOrigins: [],
+  resendApiKey: undefined,
+  resendFromEmail: undefined,
+  appBaseUrl: undefined,
 };
 
 const SNAPSHOT_PATH = 'docs/openapi.json';

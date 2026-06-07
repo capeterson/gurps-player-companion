@@ -12,6 +12,9 @@ const testConfig: AppConfig = {
   jwtRefreshTtlDays: 14,
   apiKeyPepper: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
   corsOrigins: [],
+  resendApiKey: undefined,
+  resendFromEmail: undefined,
+  appBaseUrl: undefined,
 };
 
 describe('healthz', () => {

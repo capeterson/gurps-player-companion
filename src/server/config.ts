@@ -20,6 +20,9 @@ const envSchema = z.object({
   JWT_ACCESS_TTL_MINUTES: z.coerce.number().int().positive().default(15),
   JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(14),
   API_KEY_PEPPER: z.string().min(16).optional(),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().email().optional(),
+  APP_BASE_URL: z.string().url().optional(),
   CORS_ORIGINS: z
     .string()
     .default('[]')
@@ -57,6 +60,9 @@ export type AppConfig = {
   jwtRefreshTtlDays: number;
   apiKeyPepper: string;
   corsOrigins: string[];
+  resendApiKey: string | undefined;
+  resendFromEmail: string | undefined;
+  appBaseUrl: string | undefined;
 };
 
 let cached: AppConfig | undefined;
@@ -73,6 +79,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     JWT_REFRESH_TTL_DAYS: env.JWT_REFRESH_TTL_DAYS,
     API_KEY_PEPPER: env.API_KEY_PEPPER,
     CORS_ORIGINS: env.CORS_ORIGINS,
+    RESEND_API_KEY: env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL,
+    APP_BASE_URL: env.APP_BASE_URL,
   });
 
   cached = {
@@ -85,6 +94,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     jwtRefreshTtlDays: parsed.JWT_REFRESH_TTL_DAYS,
     apiKeyPepper: parsed.API_KEY_PEPPER ?? parsed.JWT_SECRET,
     corsOrigins: parsed.CORS_ORIGINS,
+    resendApiKey: parsed.RESEND_API_KEY,
+    resendFromEmail: parsed.RESEND_FROM_EMAIL,
+    appBaseUrl: parsed.APP_BASE_URL,
   };
   return cached;
 }

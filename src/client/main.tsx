@@ -6,8 +6,10 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
+import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
 import { CampaignDetailPage } from './features/campaigns/CampaignDetailPage.tsx';
 import { CampaignLibraryPage } from './features/campaigns/CampaignLibraryPage.tsx';
@@ -53,6 +55,8 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/suspended', element: <SuspendedPage /> },
   {
     element: <RequireAuth />,
