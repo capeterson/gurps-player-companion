@@ -259,6 +259,9 @@ router.openapi(
             gt(refreshTokens.expiresAt, now),
           ),
         );
+      await tx
+        .delete(passwordResetTokens)
+        .where(and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)));
     });
     return c.body(null, 204);
   },
@@ -307,7 +310,8 @@ router.openapi(
     const config = loadConfig();
     const resend = getResend(config);
 
-    if (resend && config.resendFromEmail) {
+    // Only attempt to send if we have everything needed to produce a usable link.
+    if (resend && config.resendFromEmail && config.appBaseUrl) {
       const db = getDb();
       const rows = await db.select().from(users).where(eq(users.email, body.email));
       const user = rows[0];
@@ -327,9 +331,7 @@ router.openapi(
           expiresAt,
         });
 
-        const resetUrl = config.appBaseUrl
-          ? `${config.appBaseUrl}/reset-password?token=${rawToken}`
-          : '';
+        const resetUrl = `${config.appBaseUrl}/reset-password?token=${rawToken}`;
 
         sendPasswordResetEmail(resend, config.resendFromEmail, {
           to: user.email,
@@ -364,43 +366,51 @@ router.openapi(
     const db = getDb();
     const now = new Date();
 
-    const rows = await db
-      .select()
-      .from(passwordResetTokens)
-      .where(
-        and(
-          eq(passwordResetTokens.tokenHash, tokenHash),
-          isNull(passwordResetTokens.usedAt),
-          gt(passwordResetTokens.expiresAt, now),
-        ),
-      );
-    const resetToken = rows[0];
-    if (!resetToken) {
-      throw new HTTPException(400, { message: 'invalid or expired reset token' });
-    }
-
+    // Hash the password before entering the transaction so the slow argon2id
+    // work doesn't hold the row lock longer than necessary.
     const passwordHash = await hashPassword(body.newPassword);
 
-    await db.transaction(async (tx) => {
+    // SELECT FOR UPDATE acquires a row-level write lock so concurrent requests
+    // with the same token block here rather than both passing the used_at check.
+    const userId = await db.transaction(async (tx) => {
+      const locked = await tx
+        .select()
+        .from(passwordResetTokens)
+        .where(
+          and(
+            eq(passwordResetTokens.tokenHash, tokenHash),
+            isNull(passwordResetTokens.usedAt),
+            gt(passwordResetTokens.expiresAt, now),
+          ),
+        )
+        .for('update');
+      const token = locked[0];
+      if (!token) return null;
+
+      await tx
+        .update(passwordResetTokens)
+        .set({ usedAt: now })
+        .where(eq(passwordResetTokens.id, token.id));
       await tx
         .update(users)
         .set({ passwordHash, updatedAt: now })
-        .where(eq(users.id, resetToken.userId));
+        .where(eq(users.id, token.userId));
       await tx
         .update(refreshTokens)
         .set({ revokedAt: now })
         .where(
           and(
-            eq(refreshTokens.userId, resetToken.userId),
+            eq(refreshTokens.userId, token.userId),
             isNull(refreshTokens.revokedAt),
             gt(refreshTokens.expiresAt, now),
           ),
         );
-      await tx
-        .update(passwordResetTokens)
-        .set({ usedAt: now })
-        .where(eq(passwordResetTokens.id, resetToken.id));
+      return token.userId;
     });
+
+    if (!userId) {
+      throw new HTTPException(400, { message: 'invalid or expired reset token' });
+    }
 
     return c.body(null, 204);
   },
