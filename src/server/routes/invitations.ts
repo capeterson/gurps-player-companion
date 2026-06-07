@@ -30,7 +30,6 @@ import { requireCampaignAdmin } from '../auth/permissions.ts';
 import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
-import { getResend, sendCampaignInviteEmail } from '../email.ts';
 import {
   type DbCampaign,
   type DbCampaignInvitation,
@@ -42,6 +41,7 @@ import {
   notifications,
   users,
 } from '../db/schema.ts';
+import { getResend, sendCampaignInviteEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();

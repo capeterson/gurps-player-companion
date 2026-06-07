@@ -20,8 +20,8 @@ import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../a
 import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
-import { getResend, sendPasswordResetEmail } from '../email.ts';
 import { passwordResetTokens, refreshTokens, users } from '../db/schema.ts';
+import { getResend, sendPasswordResetEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();
@@ -382,7 +382,10 @@ router.openapi(
     const passwordHash = await hashPassword(body.newPassword);
 
     await db.transaction(async (tx) => {
-      await tx.update(users).set({ passwordHash, updatedAt: now }).where(eq(users.id, resetToken.userId));
+      await tx
+        .update(users)
+        .set({ passwordHash, updatedAt: now })
+        .where(eq(users.id, resetToken.userId));
       await tx
         .update(refreshTokens)
         .set({ revokedAt: now })
