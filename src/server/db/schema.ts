@@ -109,6 +109,44 @@ export const users = pgTable(
   }),
 );
 
+export const passkeyCredentials = pgTable(
+  'passkey_credentials',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    credentialId: text('credential_id').notNull(),
+    publicKey: text('public_key').notNull(),
+    signCount: integer('sign_count').notNull().default(0),
+    name: varchar('name', { length: 80 }).notNull().default('Passkey'),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    credentialIdKey: uniqueIndex('passkey_credentials_credential_id_key').on(t.credentialId),
+    userIdx: index('passkey_credentials_user_idx').on(t.userId),
+  }),
+);
+
+export const passkeyChallenges = pgTable(
+  'passkey_challenges',
+  {
+    id: id(),
+    challengeHash: varchar('challenge_hash', { length: 64 }).notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    purpose: varchar('purpose', { length: 32 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    challengeHashKey: uniqueIndex('passkey_challenges_hash_key').on(t.challengeHash),
+    expiresAtIdx: index('passkey_challenges_expires_at_idx').on(t.expiresAt),
+  }),
+);
+
 export const refreshTokens = pgTable(
   'refresh_tokens',
   {
