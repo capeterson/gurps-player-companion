@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
+import { getPasskey, passkeysSupported } from '../../lib/passkeys.ts';
 import { type Tokens, tokenStore } from '../../lib/tokenStore.ts';
 
 export function LoginPage() {
@@ -9,6 +10,32 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const passkeyLogin = useMutation({
+    mutationFn: async () => {
+      if (!passkeysSupported()) throw new Error('Passkeys are not supported by this browser');
+      const options = await api<PublicKeyCredentialRequestOptions>('/auth/passkeys/login/options', {
+        method: 'POST',
+        body: { email: email || undefined },
+        authenticated: false,
+      });
+      const assertion = await getPasskey(options);
+      return api<Tokens>('/auth/passkeys/login', {
+        method: 'POST',
+        body: assertion,
+        authenticated: false,
+      });
+    },
+    onSuccess: (tokens) => {
+      tokenStore.write(tokens);
+      navigate('/');
+    },
+    onError: (err) => {
+      setError(
+        err instanceof ApiError || err instanceof Error ? err.message : 'passkey login failed',
+      );
+    },
+  });
 
   const login = useMutation({
     mutationFn: () =>
@@ -59,8 +86,23 @@ export function LoginPage() {
           />
         </label>
         {error && <p className="alert alert-error text-sm">{error}</p>}
-        <button type="submit" className="btn btn-primary" disabled={login.isPending}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={login.isPending || passkeyLogin.isPending}
+        >
           {login.isPending ? 'Signing in…' : 'Sign in'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={login.isPending || passkeyLogin.isPending || !passkeysSupported()}
+          onClick={() => {
+            setError(null);
+            passkeyLogin.mutate();
+          }}
+        >
+          {passkeyLogin.isPending ? 'Checking passkey…' : 'Use a passkey'}
         </button>
         <p className="text-sm text-muted">
           <Link to="/forgot-password" className="link link-primary">
