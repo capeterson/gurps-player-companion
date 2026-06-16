@@ -245,6 +245,49 @@ A new outbox path, entity class, or draft input MUST have tests for:
 The `useDraftField`, `outbox`, and orchestrator test files are the
 working references.
 
+## History tracking is a required baseline for all new entities
+
+Every new syncable entity class MUST participate in the history/audit log.
+Adding a class without it silently loses history forever; retroactive backfills
+are impractical. Follow this checklist in addition to S6:
+
+### H1. DB trigger (server)
+Add `AFTER INSERT OR UPDATE OR DELETE` trigger `record_history_trg` on the new
+table in its migration, using the trigger function family from
+`src/server/db/migrations/0013_entity_history.sql`:
+- character-family tables → `record_character_child_history('<entity_class>')`
+- campaign-family tables → `record_campaign_history('<entity_class>')`
+- the root `characters`/`campaigns` tables use their own dedicated wrappers.
+
+### H2. SYNCABLE_TABLES entry (shared)
+Add `{ table: '<postgres_table_name>', family: 'character' | 'campaign' }`
+to `SYNCABLE_TABLES` in `src/shared/schemas/history.ts`. Guard-1 CI test
+(`src/server/db/historyTriggers.test.ts`) will fail until you do.
+
+### H3. summarizeEvent case (shared)
+Add a case to the `switch (entityClass)` in `summarizeEvent()` in
+`src/shared/history/summarize.ts` so the history panel shows a human-readable
+one-liner instead of a raw JSON blob. Add tests to
+`src/shared/history/summarize.test.ts`.
+
+### H4. withAudit on write paths (server)
+All DB writes for the new entity (both through `/sync/operations` and any REST
+routes) MUST run inside `withAudit(actorId, batchId, async (tx) => { ... })`
+from `src/server/db/auditContext.ts`. Guard-2 source test
+(`src/server/db/auditContext.test.ts`) fails if bare `getDb().insert/update/delete`
+calls appear in mutating route files. Campaign-family REST routes that start a new
+file must be added to the `MUTATING_ROUTE_FILES` list in the guard test.
+
+### H5. batchId threading (client, if applicable)
+For user gestures that enqueue multiple ops at once (bulk moves, "revert all"),
+generate a single `newBatchId()` from `src/client/sync/outbox.ts` and pass it
+to every `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in that
+gesture so the history panel can fold them under one expandable group.
+
+### Design spec
+Full rationale and file index: `docs/specs/history-tracking.md`.
+REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id/history`.
+
 ## Dev environment
 
 - Bun is run inside Docker (see `docker-compose.dev.yml`). There is no

@@ -23,9 +23,10 @@ import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
-import { enqueueFieldPatch } from '../../sync/outbox.ts';
+import { enqueueFieldPatch, newBatchId } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
 import { CombatModal } from './sections/CombatModal.tsx';
+import { HistoryPanel } from './sections/HistoryPanel.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
@@ -35,7 +36,7 @@ import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
-type SheetTab = 'Combat' | 'Identity' | 'Traits' | 'Skills' | 'Magic' | 'Inventory' | 'Notes';
+type SheetTab = 'Combat' | 'Identity' | 'Traits' | 'Skills' | 'Magic' | 'Inventory' | 'Notes' | 'History';
 const SHEET_TABS: readonly SheetTab[] = [
   'Combat',
   'Identity',
@@ -44,6 +45,7 @@ const SHEET_TABS: readonly SheetTab[] = [
   'Magic',
   'Inventory',
   'Notes',
+  'History',
 ] as const;
 
 interface CountByTab {
@@ -758,6 +760,7 @@ function anyTempActive(c: CharacterDetail): boolean {
  * outbox path so an offline bulk-revert is durable.
  */
 function revertAllTemps(c: CharacterDetail): void {
+  const batchId = newBatchId();
   for (const f of TEMP_FIELDS) {
     const value = (c as unknown as Record<AttrField, number>)[f];
     if (value === 0) continue;
@@ -768,6 +771,7 @@ function revertAllTemps(c: CharacterDetail): void {
       attemptedValue: 0,
       humanName: `${f} temp`,
       flashKey: makeFlashKey('character', c.id, f),
+      batchId,
     });
   }
 }
@@ -1756,6 +1760,7 @@ export function CharacterSheetPage() {
         )}
         {tab === 'Inventory' && <InventoryPanel character={character} canWrite={canWrite} />}
         {tab === 'Notes' && <NotesPanel character={character} canWrite={canWrite} />}
+        {tab === 'History' && <HistoryPanel characterId={character.id} />}
       </div>
 
       <button

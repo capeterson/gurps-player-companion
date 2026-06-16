@@ -16,6 +16,7 @@ import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { api } from '../../lib/api.ts';
 import { LogPage } from '../log/LogPage.tsx';
+import { CampaignHistoryPanel } from './CampaignHistoryPanel.tsx';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 
 export function CampaignDetailPage() {
@@ -89,6 +90,12 @@ export function CampaignDetailPage() {
 
       {/* Embedded adventure log scoped to this campaign. */}
       <LogPage campaignId={c.id} />
+
+      {/* Campaign history — campaign-level changes (owner also gets character roll-up). */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold">History</h2>
+        <CampaignHistoryPanel campaignId={c.id} isOwner={myId === c.ownerId} />
+      </section>
 
       {settingsOpen && (
         <CampaignSettingsDialog

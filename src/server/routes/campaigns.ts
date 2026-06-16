@@ -17,6 +17,7 @@ import {
   requireCampaignOwner,
 } from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
+import { withAudit } from '../db/auditContext.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
   type DbCampaign,
@@ -158,26 +159,28 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const body = c.req.valid('json');
-    const db = getDb();
-    const [created] = await db
-      .insert(campaigns)
-      .values({
-        name: body.name,
-        description: body.description ?? null,
-        ownerId: user.id,
-        pointTarget: body.pointTarget ?? null,
-        disadvantageCap: body.disadvantageCap ?? null,
-        quirkCap: body.quirkCap ?? 5,
-        ...(body.shareCharacterSheets !== undefined
-          ? { shareCharacterSheets: body.shareCharacterSheets }
-          : {}),
-      })
-      .returning();
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    await db.insert(campaignMemberships).values({
-      campaignId: created.id,
-      userId: user.id,
-      role: 'owner',
+    const created = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx
+        .insert(campaigns)
+        .values({
+          name: body.name,
+          description: body.description ?? null,
+          ownerId: user.id,
+          pointTarget: body.pointTarget ?? null,
+          disadvantageCap: body.disadvantageCap ?? null,
+          quirkCap: body.quirkCap ?? 5,
+          ...(body.shareCharacterSheets !== undefined
+            ? { shareCharacterSheets: body.shareCharacterSheets }
+            : {}),
+        })
+        .returning();
+      if (!row) throw new HTTPException(500, { message: 'insert failed' });
+      await tx.insert(campaignMemberships).values({
+        campaignId: row.id,
+        userId: user.id,
+        role: 'owner',
+      });
+      return row;
     });
     const members = await loadMembers(created.id);
     return c.json(campaignToOut(created, members), 201);
@@ -232,23 +235,25 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const db = getDb();
-    const [row] = await db
-      .update(campaigns)
-      .set({
-        ...(body.name !== undefined ? { name: body.name } : {}),
-        ...(body.description !== undefined ? { description: body.description } : {}),
-        ...(body.pointTarget !== undefined ? { pointTarget: body.pointTarget } : {}),
-        ...(body.disadvantageCap !== undefined ? { disadvantageCap: body.disadvantageCap } : {}),
-        ...(body.quirkCap !== undefined ? { quirkCap: body.quirkCap } : {}),
-        ...(body.shareCharacterSheets !== undefined
-          ? { shareCharacterSheets: body.shareCharacterSheets }
-          : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(campaigns.id, id))
-      .returning();
-    if (!row) throw new HTTPException(500, { message: 'update failed' });
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [updated] = await tx
+        .update(campaigns)
+        .set({
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.description !== undefined ? { description: body.description } : {}),
+          ...(body.pointTarget !== undefined ? { pointTarget: body.pointTarget } : {}),
+          ...(body.disadvantageCap !== undefined ? { disadvantageCap: body.disadvantageCap } : {}),
+          ...(body.quirkCap !== undefined ? { quirkCap: body.quirkCap } : {}),
+          ...(body.shareCharacterSheets !== undefined
+            ? { shareCharacterSheets: body.shareCharacterSheets }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(campaigns.id, id))
+        .returning();
+      if (!updated) throw new HTTPException(500, { message: 'update failed' });
+      return updated;
+    });
     const members = await loadMembers(row.id);
     return c.json(campaignToOut(row, members), 200);
   },
@@ -272,7 +277,9 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     await requireCampaignOwner(id, user.id);
-    await getDb().delete(campaigns).where(eq(campaigns.id, id));
+    await withAudit(user.id, undefined, async (tx) => {
+      await tx.delete(campaigns).where(eq(campaigns.id, id));
+    });
     return c.body(null, 204);
   },
 );
@@ -319,10 +326,12 @@ router.openapi(
       );
     if (existing[0]) throw new HTTPException(409, { message: 'already a member' });
     try {
-      await db.insert(campaignMemberships).values({
-        campaignId: campaign.id,
-        userId: target.id,
-        role: 'member',
+      await withAudit(user.id, undefined, async (tx) => {
+        await tx.insert(campaignMemberships).values({
+          campaignId: campaign.id,
+          userId: target.id,
+          role: 'member',
+        });
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -367,12 +376,13 @@ router.openapi(
         message: "cannot change the owner's role; use transfer-ownership instead",
       });
     }
-    const db = getDb();
-    const updated = await db
-      .update(campaignMemberships)
-      .set({ role: body.role, updatedAt: new Date() })
-      .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
-      .returning({ id: campaignMemberships.id });
+    const updated = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .update(campaignMemberships)
+        .set({ role: body.role, updatedAt: new Date() })
+        .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
+        .returning({ id: campaignMemberships.id });
+    });
     if (updated.length === 0) throw new HTTPException(404, { message: 'membership not found' });
     const members = await loadMembers(campaign.id);
     return c.json(campaignToOut(campaign, members), 200);
@@ -413,10 +423,12 @@ router.openapi(
         throw new HTTPException(403, { message: 'managers can only remove regular members' });
       }
     }
-    const result = await db
-      .delete(campaignMemberships)
-      .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
-      .returning({ id: campaignMemberships.id });
+    const result = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .delete(campaignMemberships)
+        .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
+        .returning({ id: campaignMemberships.id });
+    });
     if (result.length === 0) throw new HTTPException(404, { message: 'membership not found' });
     return c.body(null, 204);
   },
@@ -463,7 +475,7 @@ router.openapi(
     if (!memberships[0]) {
       throw new HTTPException(400, { message: 'new owner must be a campaign member' });
     }
-    await db.transaction(async (tx) => {
+    await withAudit(user.id, undefined, async (tx) => {
       await tx
         .update(campaigns)
         .set({ ownerId: newOwnerId, updatedAt: new Date() })

@@ -20,6 +20,7 @@ import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { loadCampaignOr403, requireCampaignMember } from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
+import { withAudit } from '../db/auditContext.ts';
 import { type DbAdventureLogEntry, adventureLogEntries, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
@@ -119,20 +120,22 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignMember(id, user.id);
-    const db = getDb();
-    const [created] = await db
-      .insert(adventureLogEntries)
-      .values({
-        campaignId: id,
-        authorId: user.id,
-        sessionDate: body.sessionDate,
-        title: body.title,
-        body: body.body,
-        visibility: body.visibility,
-        xpAwards: body.xpAwards,
-      })
-      .returning();
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    const created = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx
+        .insert(adventureLogEntries)
+        .values({
+          campaignId: id,
+          authorId: user.id,
+          sessionDate: body.sessionDate,
+          title: body.title,
+          body: body.body,
+          visibility: body.visibility,
+          xpAwards: body.xpAwards,
+        })
+        .returning();
+      if (!row) throw new HTTPException(500, { message: 'insert failed' });
+      return row;
+    });
     return c.json(entryToOut(created, { id: user.id, displayName: user.displayName }), 201);
   },
 );
@@ -173,19 +176,22 @@ router.openapi(
     if (existing.authorId !== user.id && campaign.ownerId !== user.id) {
       throw new HTTPException(403, { message: 'author or owner only' });
     }
-    const [updated] = await db
-      .update(adventureLogEntries)
-      .set({
-        ...(body.sessionDate !== undefined ? { sessionDate: body.sessionDate } : {}),
-        ...(body.title !== undefined ? { title: body.title } : {}),
-        ...(body.body !== undefined ? { body: body.body } : {}),
-        ...(body.visibility !== undefined ? { visibility: body.visibility } : {}),
-        ...(body.xpAwards !== undefined ? { xpAwards: body.xpAwards } : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(adventureLogEntries.id, entryId))
-      .returning();
-    if (!updated) throw new HTTPException(500, { message: 'update failed' });
+    const updated = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx
+        .update(adventureLogEntries)
+        .set({
+          ...(body.sessionDate !== undefined ? { sessionDate: body.sessionDate } : {}),
+          ...(body.title !== undefined ? { title: body.title } : {}),
+          ...(body.body !== undefined ? { body: body.body } : {}),
+          ...(body.visibility !== undefined ? { visibility: body.visibility } : {}),
+          ...(body.xpAwards !== undefined ? { xpAwards: body.xpAwards } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(adventureLogEntries.id, entryId))
+        .returning();
+      if (!row) throw new HTTPException(500, { message: 'update failed' });
+      return row;
+    });
     const author = (
       await db
         .select({ id: users.id, displayName: users.displayName })
@@ -226,7 +232,9 @@ router.openapi(
     if (existing.authorId !== user.id && campaign.ownerId !== user.id) {
       throw new HTTPException(403, { message: 'author or owner only' });
     }
-    await db.delete(adventureLogEntries).where(eq(adventureLogEntries.id, entryId));
+    await withAudit(user.id, undefined, async (tx) => {
+      await tx.delete(adventureLogEntries).where(eq(adventureLogEntries.id, entryId));
+    });
     return c.body(null, 204);
   },
 );
