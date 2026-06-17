@@ -28661,9 +28661,7 @@
           },
           {
             "schema": {
-              "type": "boolean",
-              "nullable": true,
-              "default": false
+              "type": "string"
             },
             "required": false,
             "name": "detail",
@@ -28878,9 +28876,7 @@
           },
           {
             "schema": {
-              "type": "boolean",
-              "nullable": true,
-              "default": false
+              "type": "string"
             },
             "required": false,
             "name": "detail",

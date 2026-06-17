@@ -33,7 +33,14 @@ export type HistoryEventOut = z.infer<typeof historyEventOut>;
 export const historyQueryParams = z.object({
   before: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
-  detail: z.coerce.boolean().default(false),
+  // NB: do NOT use z.coerce.boolean() — it parses ANY non-empty string
+  // (including 'false' and '0') as true, so `?detail=false` would still
+  // expose raw old_row/new_row snapshots. Only explicit truthy tokens
+  // enable detail; everything else (false/0/absent/unknown) stays off.
+  detail: z
+    .string()
+    .optional()
+    .transform((v) => v === '1' || v === 'true' || v === 'yes'),
   scope: historyScope.optional(),
 });
 export type HistoryQueryParams = z.infer<typeof historyQueryParams>;

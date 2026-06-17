@@ -25,6 +25,8 @@ const MUTATING_ROUTE_FILES = [
   'src/server/routes/adventureLog.ts',
   'src/server/routes/campaignLibrary.ts',
   'src/server/routes/invitations.ts',
+  'src/server/routes/characters.ts',
+  'src/server/routes/characterSubResources.ts',
 ];
 
 /**

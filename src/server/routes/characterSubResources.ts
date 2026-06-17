@@ -26,6 +26,7 @@ import { spellCreate, spellOut, spellUpdate } from '../../shared/schemas/spell.t
 import { traitCreate, traitOut, traitUpdate } from '../../shared/schemas/trait.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCharacterOr403 } from '../auth/permissions.ts';
+import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
   characterSkills,
@@ -131,20 +132,21 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
-    const [created] = await db
-      .insert(characterTraits)
-      .values({
-        characterId: id,
-        kind: body.kind,
-        name: body.name,
-        points: body.points ?? 0,
-        level: body.level ?? null,
-        notes: body.notes ?? null,
-        modifiers: body.modifiers ?? [],
-        libraryTraitId: body.libraryTraitId ?? null,
-      })
-      .returning();
+    const [created] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .insert(characterTraits)
+        .values({
+          characterId: id,
+          kind: body.kind,
+          name: body.name,
+          points: body.points ?? 0,
+          level: body.level ?? null,
+          notes: body.notes ?? null,
+          modifiers: body.modifiers ?? [],
+          libraryTraitId: body.libraryTraitId ?? null,
+        })
+        .returning(),
+    );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return c.json({ trait: buildTraitOut(created), character: await refreshDetail(id) }, 201);
   },
@@ -180,17 +182,18 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries(body)) {
       if (v === undefined) continue;
       updates[k] = v;
     }
-    const [updated] = await db
-      .update(characterTraits)
-      .set(updates)
-      .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
-      .returning();
+    const [updated] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .update(characterTraits)
+        .set(updates)
+        .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
+        .returning(),
+    );
     if (!updated) throw new HTTPException(404, { message: 'trait not found' });
     return c.json({ trait: buildTraitOut(updated), character: await refreshDetail(id) }, 200);
   },
@@ -218,10 +221,12 @@ router.openapi(
     const { id, traitId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await getDb()
-      .delete(characterTraits)
-      .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
-      .returning({ id: characterTraits.id });
+    const result = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .delete(characterTraits)
+        .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
+        .returning({ id: characterTraits.id }),
+    );
     if (result.length === 0) throw new HTTPException(404, { message: 'trait not found' });
     return c.json(await refreshDetail(id), 200);
   },
@@ -259,21 +264,22 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
-    const [created] = await db
-      .insert(characterSkills)
-      .values({
-        characterId: id,
-        name: body.name,
-        attribute: body.attribute,
-        difficulty: body.difficulty,
-        points: body.points ?? 1,
-        techLevel: body.techLevel ?? null,
-        specialization: body.specialization ?? null,
-        notes: body.notes ?? null,
-        librarySkillId: body.librarySkillId ?? null,
-      })
-      .returning();
+    const [created] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .insert(characterSkills)
+        .values({
+          characterId: id,
+          name: body.name,
+          attribute: body.attribute,
+          difficulty: body.difficulty,
+          points: body.points ?? 1,
+          techLevel: body.techLevel ?? null,
+          specialization: body.specialization ?? null,
+          notes: body.notes ?? null,
+          librarySkillId: body.librarySkillId ?? null,
+        })
+        .returning(),
+    );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
     return c.json(
@@ -313,17 +319,18 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries(body)) {
       if (v === undefined) continue;
       updates[k] = v;
     }
-    const [updated] = await db
-      .update(characterSkills)
-      .set(updates)
-      .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
-      .returning();
+    const [updated] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .update(characterSkills)
+        .set(updates)
+        .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
+        .returning(),
+    );
     if (!updated) throw new HTTPException(404, { message: 'skill not found' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
     return c.json(
@@ -355,10 +362,12 @@ router.openapi(
     const { id, skillId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await getDb()
-      .delete(characterSkills)
-      .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
-      .returning({ id: characterSkills.id });
+    const result = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .delete(characterSkills)
+        .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
+        .returning({ id: characterSkills.id }),
+    );
     if (result.length === 0) throw new HTTPException(404, { message: 'skill not found' });
     return c.json(await refreshDetail(id), 200);
   },
@@ -397,22 +406,24 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const db = getDb();
-    const [created] = await db
-      .insert(characterSpells)
-      .values({
-        characterId: id,
-        name: body.name,
-        college: body.college ?? null,
-        points: body.points ?? 1,
-        baseEnergyCost: body.baseEnergyCost ?? 1,
-        maintenanceCost: body.maintenanceCost ?? null,
-        castingTime: body.castingTime ?? null,
-        duration: body.duration ?? null,
-        prerequisites: body.prerequisites ?? null,
-        notes: body.notes ?? null,
-        librarySpellId: body.librarySpellId ?? null,
-      })
-      .returning();
+    const [created] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .insert(characterSpells)
+        .values({
+          characterId: id,
+          name: body.name,
+          college: body.college ?? null,
+          points: body.points ?? 1,
+          baseEnergyCost: body.baseEnergyCost ?? 1,
+          maintenanceCost: body.maintenanceCost ?? null,
+          castingTime: body.castingTime ?? null,
+          duration: body.duration ?? null,
+          prerequisites: body.prerequisites ?? null,
+          notes: body.notes ?? null,
+          librarySpellId: body.librarySpellId ?? null,
+        })
+        .returning(),
+    );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
     const traits = await db
@@ -466,11 +477,13 @@ router.openapi(
       if (v === undefined) continue;
       updates[k] = v;
     }
-    const [updated] = await db
-      .update(characterSpells)
-      .set(updates)
-      .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
-      .returning();
+    const [updated] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .update(characterSpells)
+        .set(updates)
+        .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
+        .returning(),
+    );
     if (!updated) throw new HTTPException(404, { message: 'spell not found' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
     const traits = await db
@@ -510,10 +523,12 @@ router.openapi(
     const { id, spellId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await getDb()
-      .delete(characterSpells)
-      .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
-      .returning({ id: characterSpells.id });
+    const result = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .delete(characterSpells)
+        .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
+        .returning({ id: characterSpells.id }),
+    );
     if (result.length === 0) throw new HTTPException(404, { message: 'spell not found' });
     return c.json(await refreshDetail(id), 200);
   },
@@ -617,7 +632,7 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const db = getDb();
-    const created = await db.transaction(async (tx) => {
+    const created = await withAudit(user.id, undefined, async (tx) => {
       // Hold a row lock on the character so concurrent inventory tree
       // changes for this character serialize.  Without it two parent
       // changes can each pass their own pre-checks against pre-write
@@ -732,7 +747,7 @@ router.openapi(
     // all parent changes for this character so two concurrent calls
     // can't each pass their own pre-checks against pre-write state and
     // then both commit a cycle.
-    const updated = await db.transaction(async (tx) => {
+    const updated = await withAudit(user.id, undefined, async (tx) => {
       await tx
         .select({ id: characters.id })
         .from(characters)
@@ -809,13 +824,15 @@ router.openapi(
     // `parentId`, defence in depth means a stray cross-character link
     // (e.g. from an older record) can't pull a sibling character's row
     // along on delete.
-    await db
-      .update(inventoryItems)
-      .set({ parentId: doomed.parentId, updatedAt: new Date() })
-      .where(and(eq(inventoryItems.parentId, itemId), eq(inventoryItems.characterId, id)));
-    await db
-      .delete(inventoryItems)
-      .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)));
+    await withAudit(user.id, undefined, async (tx) => {
+      await tx
+        .update(inventoryItems)
+        .set({ parentId: doomed.parentId, updatedAt: new Date() })
+        .where(and(eq(inventoryItems.parentId, itemId), eq(inventoryItems.characterId, id)));
+      await tx
+        .delete(inventoryItems)
+        .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)));
+    });
     return c.json(await refreshDetail(id), 200);
   },
 );
@@ -857,7 +874,6 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
 
     // Atomic upsert keyed on the unique (character_id) index. Doing this
     // as a single statement is essential: the previous select-then-insert
@@ -869,21 +885,23 @@ router.openapi(
       if (v === undefined) continue;
       setOnUpdate[k] = v;
     }
-    const [row] = await db
-      .insert(combatStates)
-      .values({
-        characterId: id,
-        currentHp: body.currentHp ?? derived.hp,
-        currentFp: body.currentFp ?? derived.fp,
-        conditions: body.conditions ?? [],
-        maneuver: body.maneuver ?? null,
-        posture: body.posture ?? 'standing',
-      })
-      .onConflictDoUpdate({
-        target: combatStates.characterId,
-        set: setOnUpdate,
-      })
-      .returning();
+    const [row] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .insert(combatStates)
+        .values({
+          characterId: id,
+          currentHp: body.currentHp ?? derived.hp,
+          currentFp: body.currentFp ?? derived.fp,
+          conditions: body.conditions ?? [],
+          maneuver: body.maneuver ?? null,
+          posture: body.posture ?? 'standing',
+        })
+        .onConflictDoUpdate({
+          target: combatStates.characterId,
+          set: setOnUpdate,
+        })
+        .returning(),
+    );
     if (!row) throw new HTTPException(500, { message: 'combat upsert failed' });
     return c.json({ combat: buildCombatStateOut(row), character: await refreshDetail(id) }, 200);
   },

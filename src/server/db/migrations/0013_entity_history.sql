@@ -80,6 +80,26 @@ BEGIN
     CASE WHEN TG_OP = 'INSERT' THEN NULL ELSE to_jsonb(OLD) END,
     CASE WHEN TG_OP = 'DELETE' THEN NULL ELSE to_jsonb(NEW) END
   );
+  -- When a character changes campaigns (moved A->B, or removed from a campaign
+  -- so campaign_id becomes null), the row above is keyed to the NEW campaign
+  -- (or null), so the PREVIOUS campaign's GM would never see the departure in
+  -- their scope=character rollup. Emit an extra row keyed to the old campaign
+  -- so that move-away/removal is auditable from the campaign it left.
+  IF TG_OP = 'UPDATE'
+     AND OLD.campaign_id IS DISTINCT FROM NEW.campaign_id
+     AND OLD.campaign_id IS NOT NULL THEN
+    INSERT INTO entity_history (
+      scope, entity_class, entity_id, op,
+      character_id, campaign_id, owner_user_id,
+      actor_user_id, batch_id, old_row, new_row
+    ) VALUES (
+      'character', 'character', row_character,
+      'update',
+      row_character, OLD.campaign_id, row_owner,
+      actor, batch,
+      to_jsonb(OLD), to_jsonb(NEW)
+    );
+  END IF;
   RETURN coalesce(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;

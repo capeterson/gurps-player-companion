@@ -228,54 +228,77 @@ router.openapi(
     // Determine scope filter: default to campaign-scope rows only.
     const scopeFilter = scope ?? 'campaign';
 
-    const whereClause = before
-      ? and(
-          eq(entityHistory.campaignId, campaignId),
-          eq(entityHistory.scope, scopeFilter),
-          lt(entityHistory.revision, before),
-        )
-      : and(eq(entityHistory.campaignId, campaignId), eq(entityHistory.scope, scopeFilter));
-
     const db = getDb();
 
-    const campaignRows = await db
-      .select({
-        id: entityHistory.id,
-        revision: entityHistory.revision,
-        scope: entityHistory.scope,
-        entityClass: entityHistory.entityClass,
-        entityId: entityHistory.entityId,
-        op: entityHistory.op,
-        characterId: entityHistory.characterId,
-        campaignId: entityHistory.campaignId,
-        actorUserId: entityHistory.actorUserId,
-        batchId: entityHistory.batchId,
-        oldRow: entityHistory.oldRow,
-        newRow: entityHistory.newRow,
-        createdAt: entityHistory.createdAt,
-        actorDisplayName: users.displayName,
-      })
-      .from(entityHistory)
-      .leftJoin(users, eq(users.id, entityHistory.actorUserId))
-      .where(whereClause)
-      .orderBy(desc(entityHistory.revision))
-      .limit(limit);
+    const selectBatch = (beforeRev: number | undefined) =>
+      db
+        .select({
+          id: entityHistory.id,
+          revision: entityHistory.revision,
+          scope: entityHistory.scope,
+          entityClass: entityHistory.entityClass,
+          entityId: entityHistory.entityId,
+          op: entityHistory.op,
+          characterId: entityHistory.characterId,
+          campaignId: entityHistory.campaignId,
+          actorUserId: entityHistory.actorUserId,
+          batchId: entityHistory.batchId,
+          oldRow: entityHistory.oldRow,
+          newRow: entityHistory.newRow,
+          createdAt: entityHistory.createdAt,
+          actorDisplayName: users.displayName,
+        })
+        .from(entityHistory)
+        .leftJoin(users, eq(users.id, entityHistory.actorUserId))
+        .where(
+          beforeRev
+            ? and(
+                eq(entityHistory.campaignId, campaignId),
+                eq(entityHistory.scope, scopeFilter),
+                lt(entityHistory.revision, beforeRev),
+              )
+            : and(eq(entityHistory.campaignId, campaignId), eq(entityHistory.scope, scopeFilter)),
+        )
+        .orderBy(desc(entityHistory.revision))
+        .limit(limit);
+
+    type CampaignHistoryRow = Awaited<ReturnType<typeof selectBatch>>[number];
 
     // Private adventure-log entries are campaign-scoped but the log route only
-    // shows them to their author (or the campaign owner). Apply the same gate
-    // here so other members can't read private log titles via the summary or
-    // pull the raw body with ?detail=1. Snapshots use jsonb column names
+    // shows them to their author (or the campaign owner). Hide a row if EITHER
+    // snapshot was a private entry: editing a private entry to 'campaign'
+    // visibility would otherwise leak the prior private title/body via the
+    // old_row when ?detail=1. Snapshots use jsonb column names
     // (`visibility`, `author_id`).
     const isCampaignOwner = campaign.ownerId === user.id;
-    const visibleRows = campaignRows.filter((row) => {
+    const rowVisible = (row: CampaignHistoryRow): boolean => {
       if (row.entityClass !== 'adventure_log' || isCampaignOwner) return true;
-      const snap = (row.newRow ?? row.oldRow) as Record<string, unknown> | null;
-      const isPrivate = snap?.visibility === 'private';
-      const authorId = snap?.author_id;
-      return !isPrivate || authorId === user.id;
-    });
+      for (const snap of [row.oldRow, row.newRow] as Array<Record<string, unknown> | null>) {
+        if (snap && snap.visibility === 'private' && snap.author_id !== user.id) return false;
+      }
+      return true;
+    };
 
-    const events = visibleRows.map((row) => {
+    // Over-fetch: the visibility predicate runs AFTER the SQL limit, so a
+    // single query could return fewer than `limit` visible rows and make the
+    // client stop paginating early (it treats a short page as the end). Keep
+    // pulling older batches until we have `limit` visible rows or the source is
+    // exhausted. Bounded by MAX_BATCHES so a pathological run of hidden rows
+    // can't loop unboundedly.
+    const MAX_BATCHES = 20;
+    const visibleRows: CampaignHistoryRow[] = [];
+    let cursor = before;
+    for (let i = 0; i < MAX_BATCHES && visibleRows.length < limit; i++) {
+      const batch = await selectBatch(cursor);
+      if (batch.length === 0) break;
+      for (const row of batch) {
+        if (rowVisible(row)) visibleRows.push(row);
+      }
+      cursor = Number(batch[batch.length - 1]?.revision);
+      if (batch.length < limit) break; // source exhausted
+    }
+
+    const events = visibleRows.slice(0, limit).map((row) => {
       const { summary } = summarizeEvent({
         entityClass: row.entityClass,
         op: row.op,
