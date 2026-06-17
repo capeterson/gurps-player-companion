@@ -90,6 +90,41 @@ interface DispatchContext {
   readonly batchId?: string | undefined;
 }
 
+/** Entity classes that have a write dispatcher below. */
+const DISPATCHABLE_CLASSES = new Set<EntityClass>([
+  'character',
+  'character_trait',
+  'character_skill',
+  'character_spell',
+  'character_inventory',
+  'character_combat',
+]);
+
+/**
+ * Rejections that need no DB access at all.  Returned before opening the
+ * withAudit transaction so an unsupported op (or a delete on the
+ * non-deletable combat state) never checks out a pooled connection.  The
+ * matching branches inside dispatchOperationInner stay as defensive
+ * duplicates.
+ */
+function dbFreeRejection(op: OperationEnvelope): OperationOutcome | null {
+  if (!DISPATCHABLE_CLASSES.has(op.entityClass)) {
+    return {
+      clientOpId: op.clientOpId,
+      status: 'rejected',
+      reason: `entity class ${op.entityClass} not yet supported by /sync`,
+    };
+  }
+  if (op.entityClass === 'character_combat' && op.command === 'delete') {
+    return {
+      clientOpId: op.clientOpId,
+      status: 'rejected',
+      reason: 'combat state is not deletable',
+    };
+  }
+  return null;
+}
+
 /**
  * Apply one operation.  Returns the outcome — never throws.
  * The shape mirrors what the client outbox needs to advance state:
@@ -100,6 +135,11 @@ export async function dispatchOperation(
   ctx: DispatchContext,
   op: OperationEnvelope,
 ): Promise<OperationOutcome> {
+  // Reject DB-free cases before opening a transaction so they don't
+  // borrow a pooled connection just to roll back.
+  const early = dbFreeRejection(op);
+  if (early) return early;
+
   // Use the op's batchId if present, fall back to clientOpId so even
   // singleton edits have a stable non-null batch_id in entity_history.
   const batchId = op.batchId ?? op.clientOpId;

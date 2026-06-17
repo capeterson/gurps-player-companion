@@ -18,10 +18,14 @@
  */
 
 import { sql } from 'drizzle-orm';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { getDb } from './client.ts';
 
-export type AuditTx = Parameters<Parameters<NodePgDatabase['transaction']>[0]>[0];
+// Derive the transaction type from the actual schema-typed database that
+// getDb() returns. Deriving it from a bare NodePgDatabase (schema =
+// Record<string, never>) makes the tx passed to fn unassignable under
+// exactOptionalPropertyTypes.
+type AuditDb = ReturnType<typeof getDb>;
+export type AuditTx = Parameters<Parameters<AuditDb['transaction']>[0]>[0];
 
 export async function withAudit<T>(
   actorId: string,
@@ -31,9 +35,7 @@ export async function withAudit<T>(
   const db = getDb();
   return db.transaction(async (tx) => {
     await tx.execute(sql`select set_config('app.actor_id', ${actorId}, true)`);
-    await tx.execute(
-      sql`select set_config('app.batch_id', ${batchId ?? ''}, true)`,
-    );
+    await tx.execute(sql`select set_config('app.batch_id', ${batchId ?? ''}, true)`);
     return fn(tx);
   });
 }

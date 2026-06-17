@@ -11,19 +11,13 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, desc, eq, lt } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { historyEventOut, historyQueryParams } from '../../shared/schemas/history.ts';
-import { uuid } from '../../shared/schemas/common.ts';
 import { summarizeEvent } from '../../shared/history/summarize.ts';
+import { uuid } from '../../shared/schemas/common.ts';
+import { historyEventOut, historyQueryParams } from '../../shared/schemas/history.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { loadCampaignOr403 } from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
-import {
-  campaignMemberships,
-  campaigns,
-  characters,
-  entityHistory,
-  users,
-} from '../db/schema.ts';
+import { campaignMemberships, campaigns, characters, entityHistory, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { decideCharacterAccess } from './sync.ts';
 
@@ -93,34 +87,33 @@ router.openapi(
       const camp = campRows[0];
       if (!camp) throw new HTTPException(404, { message: 'character not found' });
 
-      // Check membership.
-      const memberRows = await db
-        .select({ userId: campaignMemberships.userId })
-        .from(campaignMemberships)
-        .where(
-          and(
-            eq(campaignMemberships.campaignId, char.campaignId),
-            eq(campaignMemberships.userId, user.id),
-          ),
-        );
+      // `decideCharacterAccess` assumes its inputs were already filtered to
+      // campaigns the viewer belongs to (it never re-checks membership), so a
+      // shareCharacterSheets=true campaign would otherwise grant `full` access
+      // to ANY authenticated user who knows the character id. Gate on actual
+      // ownership/membership here before trusting the computed access mode.
+      const isCampaignOwner = camp.ownerId === user.id;
+      const memberRows = isCampaignOwner
+        ? []
+        : await db
+            .select({ userId: campaignMemberships.userId })
+            .from(campaignMemberships)
+            .where(
+              and(
+                eq(campaignMemberships.campaignId, char.campaignId),
+                eq(campaignMemberships.userId, user.id),
+              ),
+            );
+      if (!isCampaignOwner && memberRows.length === 0) {
+        throw new HTTPException(403, { message: 'forbidden' });
+      }
 
-      const accessMap = decideCharacterAccess({
+      const computed = decideCharacterAccess({
         viewerId: user.id,
         characters: [char],
         campaigns: [camp],
-      });
-
-      const computed = accessMap.get(char.id);
-
-      if (!computed) {
-        // Not owner and not a campaign member — no access at all.
-        if (camp.ownerId === user.id || memberRows[0]) {
-          // decideCharacterAccess would have set a value; if it didn't, it
-          // means campaign lookup returned a row but viewer isn't connected.
-          // Fall through to 403.
-        }
-        throw new HTTPException(403, { message: 'forbidden' });
-      }
+      }).get(char.id);
+      if (!computed) throw new HTTPException(403, { message: 'forbidden' });
 
       accessMode = computed;
     } else {
@@ -245,7 +238,7 @@ router.openapi(
 
     const db = getDb();
 
-    const rows = await db
+    const campaignRows = await db
       .select({
         id: entityHistory.id,
         revision: entityHistory.revision,
@@ -268,7 +261,21 @@ router.openapi(
       .orderBy(desc(entityHistory.revision))
       .limit(limit);
 
-    const events = rows.map((row) => {
+    // Private adventure-log entries are campaign-scoped but the log route only
+    // shows them to their author (or the campaign owner). Apply the same gate
+    // here so other members can't read private log titles via the summary or
+    // pull the raw body with ?detail=1. Snapshots use jsonb column names
+    // (`visibility`, `author_id`).
+    const isCampaignOwner = campaign.ownerId === user.id;
+    const visibleRows = campaignRows.filter((row) => {
+      if (row.entityClass !== 'adventure_log' || isCampaignOwner) return true;
+      const snap = (row.newRow ?? row.oldRow) as Record<string, unknown> | null;
+      const isPrivate = snap?.visibility === 'private';
+      const authorId = snap?.author_id;
+      return !isPrivate || authorId === user.id;
+    });
+
+    const events = visibleRows.map((row) => {
       const { summary } = summarizeEvent({
         entityClass: row.entityClass,
         op: row.op,

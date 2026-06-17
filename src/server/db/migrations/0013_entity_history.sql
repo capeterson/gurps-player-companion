@@ -12,7 +12,7 @@
 -- onto unrelated requests.
 
 CREATE TABLE "entity_history" (
-  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+  "id" uuid NOT NULL DEFAULT uuidv7(),
   "revision" bigint NOT NULL DEFAULT nextval('revisions_seq'),
   "scope" text NOT NULL,
   "entity_class" text NOT NULL,

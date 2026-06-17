@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const ROOT = join(import.meta.dir, '../../..');
 
@@ -55,15 +55,14 @@ describe('audit context — source guard', () => {
     for (const rel of MUTATING_ROUTE_FILES) {
       const source = readRoute(rel);
       const hasImport =
-        source.includes("import { withAudit") ||
+        source.includes('import { withAudit') ||
         source.includes("withAudit } from '../db/auditContext") ||
         source.includes("withAudit } from '../../db/auditContext");
       // syncDispatch has a different relative path
       const hasSyncImport = source.includes("from '../db/auditContext");
       expect(
         hasImport || hasSyncImport,
-        `${rel} does not import withAudit from auditContext. ` +
-          `All mutating route files must wrap their DB writes in withAudit().`,
+        `${rel} does not import withAudit from auditContext. All mutating route files must wrap their DB writes in withAudit().`,
       ).toBe(true);
     }
   });
@@ -77,9 +76,7 @@ describe('audit context — source guard', () => {
     }
     expect(
       allViolations,
-      `Found bare getDb().insert/update/delete calls outside withAudit:\n${allViolations.join('\n')}\n\n` +
-        `Wrap these writes in withAudit(actorId, batchId, async (tx) => { ... }) ` +
-        `so the Postgres trigger can capture actor_user_id.`,
+      `Found bare getDb().insert/update/delete calls outside withAudit:\n${allViolations.join('\n')}\n\nWrap these writes in withAudit(actorId, batchId, async (tx) => { ... }) so the Postgres trigger can capture actor_user_id.`,
     ).toHaveLength(0);
   });
 });

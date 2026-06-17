@@ -39,12 +39,10 @@ export function useCampaignHistory(campaignId: string, scope?: 'campaign' | 'cha
       if (pageParam !== undefined) params.set('before', String(pageParam));
       params.set('limit', '50');
       if (scope) params.set('scope', scope);
-      return api<HistoryEventOut[]>(`/campaigns/${campaignId}/history?${params}`).then(
-        (items) => ({
-          items,
-          nextCursor: items.length === 50 ? (items[items.length - 1]?.revision ?? null) : null,
-        }),
-      );
+      return api<HistoryEventOut[]>(`/campaigns/${campaignId}/history?${params}`).then((items) => ({
+        items,
+        nextCursor: items.length === 50 ? (items[items.length - 1]?.revision ?? null) : null,
+      }));
     },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,

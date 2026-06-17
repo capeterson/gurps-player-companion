@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { HistoryEventOut } from '../../../shared/schemas/history.ts';
 import type { HistoryGroup } from '../../../shared/history/summarize.ts';
+import type { HistoryEventOut } from '../../../shared/schemas/history.ts';
 
 function formatRelative(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -16,9 +16,7 @@ function formatRelative(iso: string): string {
 
 function EntityChip({ entityClass }: { entityClass: string }) {
   const label = entityClass.replace('character_', '').replace('campaign_', '').replace('_', ' ');
-  return (
-    <span className="chip text-[10px] px-1.5 py-0 opacity-60 capitalize">{label}</span>
-  );
+  return <span className="chip text-[10px] px-1.5 py-0 opacity-60 capitalize">{label}</span>;
 }
 
 function SingleRow({ event }: { event: HistoryEventOut }) {

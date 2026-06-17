@@ -966,6 +966,7 @@ function toEnvelope(op: OutboxEntry): OperationEnvelope {
     baseRevision: op.baseRevision,
     parentId: op.parentId,
     validationVersion: op.validationVersion,
+    batchId: op.batchId,
     createdAt: op.enqueuedAt,
   };
 }

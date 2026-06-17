@@ -638,7 +638,7 @@ export type DbEntityTombstone = typeof entityTombstones.$inferSelect;
 export const entityHistory = pgTable(
   'entity_history',
   {
-    id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
     revision: bigint('revision', { mode: 'number' }).notNull(),
     scope: text('scope').notNull(),
     entityClass: text('entity_class').notNull(),

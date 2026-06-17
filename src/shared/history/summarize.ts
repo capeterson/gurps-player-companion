@@ -59,14 +59,29 @@ export interface FieldChange {
   newValue: unknown;
 }
 
+/**
+ * History triggers snapshot rows with `to_jsonb(NEW)`, so the keys are raw
+ * Postgres column names (`temp_dx`, `current_hp`, `parent_id`,
+ * `share_character_sheets`). The per-entity summarizers branch on the
+ * camelCase field names the rest of the app uses, so we normalize snake_case
+ * → camelCase once before summarizing. Already-camelCase keys (e.g. from the
+ * unit tests or any future JS-side caller) pass through unchanged.
+ */
+function camelizeKey(key: string): string {
+  return key.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+}
+
+export function camelizeRow(
+  row: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+  if (!row) return null;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) out[camelizeKey(k)] = v;
+  return out;
+}
+
 /** Diff two jsonb snapshots, ignoring noise columns. */
-const IGNORE_KEYS = new Set([
-  'revision',
-  'updatedAt',
-  'createdAt',
-  'updated_at',
-  'created_at',
-]);
+const IGNORE_KEYS = new Set(['revision', 'updatedAt', 'createdAt', 'updated_at', 'created_at']);
 
 export function diffRows(
   oldRow: Record<string, unknown> | null | undefined,
@@ -115,7 +130,7 @@ function summarizeCharacter(
   // patch: find first meaningful change
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Character updated';
-  const c = changes[0];
+  const c = changes[0] as FieldChange;
   // Temp boost: delta-style label
   if (c.field in TEMP_ATTR_LABELS) {
     const label = TEMP_ATTR_LABELS[c.field];
@@ -141,7 +156,7 @@ function summarizeCharacterTrait(
   if (op === 'delete') return `Removed ${old?.kind ?? 'trait'} ${old?.name ?? ''}`;
   const changes = diffRows(old, next);
   if (changes.length === 0) return `Trait ${name} updated`;
-  const c = changes[0];
+  const c = changes[0] as FieldChange;
   if (c.field === 'points') return `${name} points ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'level') return `${name} level ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'name') return `Renamed trait to ${c.newValue}`;
@@ -162,7 +177,7 @@ function summarizeCharacterSkill(
   if (op === 'delete') return `Removed skill ${old?.name ?? ''}`;
   const changes = diffRows(old, next);
   if (changes.length === 0) return `Skill ${name} updated`;
-  const c = changes[0];
+  const c = changes[0] as FieldChange;
   if (c.field === 'points') return `${fullName} ${c.oldValue} → ${c.newValue} pts`;
   if (c.field === 'name') return `Renamed skill to ${c.newValue}`;
   return `${fullName} updated`;
@@ -178,7 +193,7 @@ function summarizeCharacterSpell(
   if (op === 'delete') return `Removed spell ${old?.name ?? ''}`;
   const changes = diffRows(old, next);
   if (changes.length === 0) return `Spell ${name} updated`;
-  const c = changes[0];
+  const c = changes[0] as FieldChange;
   if (c.field === 'points') return `${name} ${c.oldValue} → ${c.newValue} pts`;
   if (c.field === 'college') return `${name} college updated`;
   return `${name} updated`;
@@ -197,15 +212,14 @@ function summarizeInventory(
   if (op === 'delete') return `Removed ${old?.name ?? 'item'}`;
   const changes = diffRows(old, next);
   if (changes.length === 0) return `${name} updated`;
-  const c = changes[0];
+  const c = changes[0] as FieldChange;
   if (c.field === 'parentId') {
     if (c.newValue === null) return `Moved ${name} out of container`;
     return `Moved ${name} into container`;
   }
   if (c.field === 'quantity') return `${name} qty ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'worn') return c.newValue ? `Wearing ${name}` : `Removed ${name} (worn)`;
-  if (c.field === 'equipped')
-    return c.newValue ? `Equipped ${name}` : `Unequipped ${name}`;
+  if (c.field === 'equipped') return c.newValue ? `Equipped ${name}` : `Unequipped ${name}`;
   if (changes.length === 1) return `${name} ${c.field} updated`;
   return `${name} updated`;
 }
@@ -218,7 +232,7 @@ function summarizeCombat(
   if (op === 'insert') return 'Combat tracker initialized';
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Combat state updated';
-  const c = changes[0];
+  const c = changes[0] as FieldChange;
   if (c.field === 'currentHp') return `HP ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'currentFp') return `FP ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'posture') return `Posture ${c.oldValue} → ${c.newValue}`;
@@ -258,11 +272,11 @@ function summarizeMembership(
     return `Member added (${MEMBERSHIP_ROLE_LABELS[String(role)] ?? role})`;
   }
   if (op === 'delete') {
-    return `Member removed`;
+    return 'Member removed';
   }
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Membership updated';
-  const c = changes[0];
+  const c = changes[0] as FieldChange;
   if (c.field === 'role') {
     const from = MEMBERSHIP_ROLE_LABELS[String(c.oldValue)] ?? c.oldValue;
     const to = MEMBERSHIP_ROLE_LABELS[String(c.newValue)] ?? c.newValue;
@@ -313,8 +327,8 @@ function summarizeAdventureLog(
   if (op === 'insert') return `Posted session log: ${title}`;
   if (op === 'delete') return `Deleted session log: ${old?.title ?? ''}`;
   const changes = diffRows(old, next);
-  if (changes.length === 0) return `Log entry updated`;
-  const c = changes[0];
+  if (changes.length === 0) return 'Log entry updated';
+  const c = changes[0] as FieldChange;
   if (c.field === 'title') return `Log renamed to: ${c.newValue}`;
   if (c.field === 'body') return `Log ${title} content updated`;
   if (c.field === 'visibility') return `Log ${title} visibility → ${c.newValue}`;
@@ -335,7 +349,11 @@ export function summarizeEvent(event: {
   oldRow?: Record<string, unknown> | null;
   newRow?: Record<string, unknown> | null;
 }): SummarizedEvent {
-  const { entityClass, op, oldRow = null, newRow = null } = event;
+  const { entityClass, op } = event;
+  // Normalize snake_case column names from the jsonb snapshot to the
+  // camelCase the summarizers expect (see camelizeRow).
+  const oldRow = camelizeRow(event.oldRow);
+  const newRow = camelizeRow(event.newRow);
   const changes = diffRows(oldRow, newRow);
   let summary: string;
   switch (entityClass) {
@@ -423,9 +441,11 @@ export function groupIntoBatches(events: HistoryEventOut[]): HistoryGroup[] {
 
 function makeBatchSummary(events: HistoryEventOut[]): string {
   const n = events.length;
+  const first = events[0];
+  if (!first) return `${n} changes`;
   // If all events share the same entity class and op, describe uniformly.
-  const firstClass = events[0].entityClass;
-  const firstOp = events[0].op;
+  const firstClass = first.entityClass;
+  const firstOp = first.op;
   const uniform = events.every((e) => e.entityClass === firstClass && e.op === firstOp);
   if (!uniform) return `${n} changes`;
   switch (firstClass) {

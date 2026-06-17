@@ -36,7 +36,15 @@ import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
-type SheetTab = 'Combat' | 'Identity' | 'Traits' | 'Skills' | 'Magic' | 'Inventory' | 'Notes' | 'History';
+type SheetTab =
+  | 'Combat'
+  | 'Identity'
+  | 'Traits'
+  | 'Skills'
+  | 'Magic'
+  | 'Inventory'
+  | 'Notes'
+  | 'History';
 const SHEET_TABS: readonly SheetTab[] = [
   'Combat',
   'Identity',

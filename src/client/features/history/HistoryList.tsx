@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { HistoryEventOut } from '../../../shared/schemas/history.ts';
 import { groupIntoBatches } from '../../../shared/history/summarize.ts';
+import type { HistoryEventOut } from '../../../shared/schemas/history.ts';
 import { HistoryGroupRow } from './HistoryGroupRow.tsx';
 
 const ENTITY_FILTERS = [
@@ -24,8 +24,15 @@ const ENTITY_FILTERS = [
   },
 ] as const;
 
-const OP_FILTERS = ['create', 'patch', 'delete'] as const;
-type OpFilter = (typeof OP_FILTERS)[number];
+// History rows store the DB-level op values (`insert` / `update` /
+// `delete`), so filters must match those — not the outbox command names
+// (`create` / `patch`). The labels are the user-facing verbs.
+const OP_FILTERS = [
+  { op: 'insert', label: 'Added' },
+  { op: 'update', label: 'Changed' },
+  { op: 'delete', label: 'Removed' },
+] as const;
+type OpFilter = (typeof OP_FILTERS)[number]['op'];
 
 interface HistoryListProps {
   events: HistoryEventOut[];
@@ -53,7 +60,7 @@ export function HistoryList({
       if (def) list = list.filter(def.match);
     }
     if (opFilter) {
-      list = list.filter((e) => e.op === opFilter || (opFilter === 'patch' && e.op === 'update'));
+      list = list.filter((e) => e.op === opFilter);
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -92,14 +99,14 @@ export function HistoryList({
           ))}
         </div>
         <div className="flex gap-1">
-          {OP_FILTERS.map((op) => (
+          {OP_FILTERS.map(({ op, label }) => (
             <button
               key={op}
               type="button"
               onClick={() => setOpFilter(opFilter === op ? null : op)}
-              className={`chip text-xs capitalize ${opFilter === op ? 'on' : ''}`}
+              className={`chip text-xs ${opFilter === op ? 'on' : ''}`}
             >
-              {op === 'create' ? 'Added' : op === 'delete' ? 'Removed' : 'Changed'}
+              {label}
             </button>
           ))}
         </div>

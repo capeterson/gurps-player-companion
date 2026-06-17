@@ -43,20 +43,18 @@ export type HistoryQueryParams = z.infer<typeof historyQueryParams>;
  * family.  Adding an EntityClass to the enum in sync.ts without adding an
  * entry here will cause the Guard-1 enforcement test to fail CI.
  */
-export const SYNCABLE_TABLES: Record<
-  string,
-  { table: string; family: 'character' | 'campaign' }
-> = {
-  character: { table: 'characters', family: 'character' },
-  character_trait: { table: 'character_traits', family: 'character' },
-  character_skill: { table: 'character_skills', family: 'character' },
-  character_spell: { table: 'character_spells', family: 'character' },
-  character_inventory: { table: 'inventory_items', family: 'character' },
-  character_combat: { table: 'combat_states', family: 'character' },
-  campaign: { table: 'campaigns', family: 'campaign' },
-  campaign_membership: { table: 'campaign_memberships', family: 'campaign' },
-  campaign_library_trait: { table: 'campaign_library_traits', family: 'campaign' },
-  campaign_library_skill: { table: 'campaign_library_skills', family: 'campaign' },
-  campaign_library_item: { table: 'campaign_library_items', family: 'campaign' },
-  adventure_log: { table: 'adventure_log_entries', family: 'campaign' },
-};
+export const SYNCABLE_TABLES: Record<string, { table: string; family: 'character' | 'campaign' }> =
+  {
+    character: { table: 'characters', family: 'character' },
+    character_trait: { table: 'character_traits', family: 'character' },
+    character_skill: { table: 'character_skills', family: 'character' },
+    character_spell: { table: 'character_spells', family: 'character' },
+    character_inventory: { table: 'inventory_items', family: 'character' },
+    character_combat: { table: 'combat_states', family: 'character' },
+    campaign: { table: 'campaigns', family: 'campaign' },
+    campaign_membership: { table: 'campaign_memberships', family: 'campaign' },
+    campaign_library_trait: { table: 'campaign_library_traits', family: 'campaign' },
+    campaign_library_skill: { table: 'campaign_library_skills', family: 'campaign' },
+    campaign_library_item: { table: 'campaign_library_items', family: 'campaign' },
+    adventure_log: { table: 'adventure_log_entries', family: 'campaign' },
+  };

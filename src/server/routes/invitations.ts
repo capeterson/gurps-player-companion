@@ -28,8 +28,8 @@ import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin } from '../auth/permissions.ts';
 import { loadConfig } from '../config.ts';
-import { getDb } from '../db/client.ts';
 import { withAudit } from '../db/auditContext.ts';
+import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
   type DbCampaign,

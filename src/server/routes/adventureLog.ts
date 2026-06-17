@@ -19,8 +19,8 @@ import {
 import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { loadCampaignOr403, requireCampaignMember } from '../auth/permissions.ts';
-import { getDb } from '../db/client.ts';
 import { withAudit } from '../db/auditContext.ts';
+import { getDb } from '../db/client.ts';
 import { type DbAdventureLogEntry, adventureLogEntries, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 

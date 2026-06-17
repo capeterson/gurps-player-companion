@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { groupIntoBatches, summarizeEvent, diffRows } from './summarize.ts';
 import type { HistoryEventOut } from '../schemas/history.ts';
+import { diffRows, groupIntoBatches, summarizeEvent } from './summarize.ts';
 
 // ---------- diffRows ----------
 
@@ -88,6 +88,30 @@ describe('summarizeEvent character', () => {
     });
     expect(summary).toContain('Temp DX');
     expect(summary.toLowerCase()).toContain('clear');
+  });
+
+  // History snapshots come from to_jsonb(NEW), so keys are snake_case
+  // (temp_dx). The summarizer must normalize them, not fall through to a
+  // generic message.
+  it('handles snake_case DB column names for temp boosts', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { temp_dx: 0 },
+      newRow: { temp_dx: 2 },
+    });
+    expect(summary).toContain('Temp DX');
+    expect(summary).toContain('+2');
+  });
+
+  it('handles snake_case attribute names', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { st: 10 },
+      newRow: { st: 12 },
+    });
+    expect(summary).toContain('ST');
   });
 });
 
