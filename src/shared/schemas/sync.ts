@@ -60,6 +60,14 @@ export const operationEnvelope = z.object({
   parentId: uuid.optional(),
   /** Validation schema version the client used.  Bumped on breaking changes. */
   validationVersion: z.number().int().nonnegative().default(1),
+  /**
+   * Client-generated id grouping mutations from one user gesture (e.g. a
+   * multi-item inventory move or "revert all temps").  The server threads
+   * this through to app.batch_id so all history rows from one gesture share
+   * a batch_id and the UI can fold them into one expandable entry.  Omit
+   * for singleton edits.
+   */
+  batchId: uuid.optional(),
   createdAt: isoTimestamp,
 });
 

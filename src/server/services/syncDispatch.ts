@@ -12,6 +12,11 @@
  * the existing `xxxUpdate.shape[field]` definitions in
  * `src/shared/schemas/*.ts` so the sync path enforces the exact same
  * constraints as the legacy CRUD routes.
+ *
+ * Every write runs inside withAudit() (src/server/db/auditContext.ts)
+ * which sets the transaction-local session GUCs app.actor_id and
+ * app.batch_id before the write.  The entity_history triggers read
+ * those GUCs so every history row is properly attributed.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -30,6 +35,7 @@ import type {
 } from '../../shared/schemas/sync.ts';
 import { traitCreate, traitUpdate } from '../../shared/schemas/trait.ts';
 import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
+import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
@@ -81,6 +87,42 @@ const NUMERIC_INVENTORY_FIELDS = new Set(['weightLbs', 'cost', 'hideawayCapacity
 
 interface DispatchContext {
   readonly userId: string;
+  readonly batchId?: string | undefined;
+}
+
+/** Entity classes that have a write dispatcher below. */
+const DISPATCHABLE_CLASSES = new Set<EntityClass>([
+  'character',
+  'character_trait',
+  'character_skill',
+  'character_spell',
+  'character_inventory',
+  'character_combat',
+]);
+
+/**
+ * Rejections that need no DB access at all.  Returned before opening the
+ * withAudit transaction so an unsupported op (or a delete on the
+ * non-deletable combat state) never checks out a pooled connection.  The
+ * matching branches inside dispatchOperationInner stay as defensive
+ * duplicates.
+ */
+function dbFreeRejection(op: OperationEnvelope): OperationOutcome | null {
+  if (!DISPATCHABLE_CLASSES.has(op.entityClass)) {
+    return {
+      clientOpId: op.clientOpId,
+      status: 'rejected',
+      reason: `entity class ${op.entityClass} not yet supported by /sync`,
+    };
+  }
+  if (op.entityClass === 'character_combat' && op.command === 'delete') {
+    return {
+      clientOpId: op.clientOpId,
+      status: 'rejected',
+      reason: 'combat state is not deletable',
+    };
+  }
+  return null;
 }
 
 /**
@@ -93,8 +135,18 @@ export async function dispatchOperation(
   ctx: DispatchContext,
   op: OperationEnvelope,
 ): Promise<OperationOutcome> {
+  // Reject DB-free cases before opening a transaction so they don't
+  // borrow a pooled connection just to roll back.
+  const early = dbFreeRejection(op);
+  if (early) return early;
+
+  // Use the op's batchId if present, fall back to clientOpId so even
+  // singleton edits have a stable non-null batch_id in entity_history.
+  const batchId = op.batchId ?? op.clientOpId;
   try {
-    const outcome = await dispatchOperationInner(ctx, op);
+    const outcome = await withAudit(ctx.userId, batchId, (tx) =>
+      dispatchOperationInner({ ...ctx, batchId }, op, tx),
+    );
     if (outcome.status === 'applied') {
       // Wake any other tabs/devices for this user.  WS messages carry
       // no row data — the client always reconciles via /sync/cursor.
@@ -138,20 +190,21 @@ export async function dispatchOperation(
 async function dispatchOperationInner(
   ctx: DispatchContext,
   op: OperationEnvelope,
+  tx: AuditTx,
 ): Promise<OperationOutcome> {
   switch (op.entityClass) {
     case 'character':
-      return dispatchCharacter(ctx, op);
+      return dispatchCharacter(ctx, op, tx);
     case 'character_trait':
-      return dispatchTrait(ctx, op);
+      return dispatchTrait(ctx, op, tx);
     case 'character_skill':
-      return dispatchSkill(ctx, op);
+      return dispatchSkill(ctx, op, tx);
     case 'character_spell':
-      return dispatchSpell(ctx, op);
+      return dispatchSpell(ctx, op, tx);
     case 'character_inventory':
-      return dispatchInventory(ctx, op);
+      return dispatchInventory(ctx, op, tx);
     case 'character_combat':
-      return dispatchCombat(ctx, op);
+      return dispatchCombat(ctx, op, tx);
     default:
       return {
         clientOpId: op.clientOpId,
@@ -166,8 +219,8 @@ async function dispatchOperationInner(
 async function dispatchCharacter(
   ctx: DispatchContext,
   op: OperationEnvelope,
+  tx: AuditTx,
 ): Promise<OperationOutcome> {
-  const db = getDb();
   if (op.command === 'create') {
     const body = characterCreate.parse(op.attemptedValue);
     if (body.campaignId) {
@@ -176,7 +229,7 @@ async function dispatchCharacter(
     // Honor a client-supplied id so the local Dexie row keeps its
     // identity after the create round-trips.  If the id is already
     // taken, the unique index returns conflict via isUniqueViolation.
-    const [created] = await db
+    const [created] = await tx
       .insert(characters)
       .values({
         ...(op.entityId ? { id: op.entityId } : {}),
@@ -218,7 +271,7 @@ async function dispatchCharacter(
   if (op.command === 'delete') {
     const access = await loadCharacterOr403(op.entityId, ctx.userId);
     assertWrite(access);
-    await db.delete(characters).where(eq(characters.id, op.entityId));
+    await tx.delete(characters).where(eq(characters.id, op.entityId));
     // Tombstone trigger inserts a tombstone row whose revision becomes
     // the cursor for "this entity was deleted".  We don't know it
     // ahead of time, so we don't include `newRevision` here -- the
@@ -231,6 +284,7 @@ async function dispatchCharacter(
     op,
     userId: ctx.userId,
     entityClass: 'character',
+    tx,
     table: characters,
     parentLookup: () => loadCharacterOr403(op.entityId, ctx.userId).then((a) => a.character),
     childWhere: () => eq(characters.id, op.entityId),
@@ -248,14 +302,14 @@ async function dispatchCharacter(
 async function dispatchTrait(
   ctx: DispatchContext,
   op: OperationEnvelope,
+  tx: AuditTx,
 ): Promise<OperationOutcome> {
-  const db = getDb();
   if (op.command === 'create') {
     const body = traitCreate.parse(op.attemptedValue);
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const [created] = await db
+    const [created] = await tx
       .insert(characterTraits)
       .values({
         ...(op.entityId ? { id: op.entityId } : {}),
@@ -277,7 +331,7 @@ async function dispatchTrait(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const result = await db
+    const result = await tx
       .delete(characterTraits)
       .where(and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)))
       .returning({ id: characterTraits.id });
@@ -295,9 +349,10 @@ async function dispatchTrait(
     op,
     userId: ctx.userId,
     entityClass: 'character_trait',
+    tx,
     table: characterTraits,
     parentLookup: async () => {
-      const [row] = await db
+      const [row] = await getDb()
         .select()
         .from(characterTraits)
         .where(
@@ -316,14 +371,14 @@ async function dispatchTrait(
 async function dispatchSkill(
   ctx: DispatchContext,
   op: OperationEnvelope,
+  tx: AuditTx,
 ): Promise<OperationOutcome> {
-  const db = getDb();
   if (op.command === 'create') {
     const body = skillCreate.parse(op.attemptedValue);
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const [created] = await db
+    const [created] = await tx
       .insert(characterSkills)
       .values({
         ...(op.entityId ? { id: op.entityId } : {}),
@@ -346,7 +401,7 @@ async function dispatchSkill(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const result = await db
+    const result = await tx
       .delete(characterSkills)
       .where(and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)))
       .returning({ id: characterSkills.id });
@@ -363,9 +418,10 @@ async function dispatchSkill(
     op,
     userId: ctx.userId,
     entityClass: 'character_skill',
+    tx,
     table: characterSkills,
     parentLookup: async () => {
-      const [row] = await db
+      const [row] = await getDb()
         .select()
         .from(characterSkills)
         .where(
@@ -384,14 +440,14 @@ async function dispatchSkill(
 async function dispatchSpell(
   ctx: DispatchContext,
   op: OperationEnvelope,
+  tx: AuditTx,
 ): Promise<OperationOutcome> {
-  const db = getDb();
   if (op.command === 'create') {
     const body = spellCreate.parse(op.attemptedValue);
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const [created] = await db
+    const [created] = await tx
       .insert(characterSpells)
       .values({
         ...(op.entityId ? { id: op.entityId } : {}),
@@ -416,7 +472,7 @@ async function dispatchSpell(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const result = await db
+    const result = await tx
       .delete(characterSpells)
       .where(and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)))
       .returning({ id: characterSpells.id });
@@ -433,9 +489,10 @@ async function dispatchSpell(
     op,
     userId: ctx.userId,
     entityClass: 'character_spell',
+    tx,
     table: characterSpells,
     parentLookup: async () => {
-      const [row] = await db
+      const [row] = await getDb()
         .select()
         .from(characterSpells)
         .where(
@@ -454,59 +511,58 @@ async function dispatchSpell(
 async function dispatchInventory(
   ctx: DispatchContext,
   op: OperationEnvelope,
+  tx: AuditTx,
 ): Promise<OperationOutcome> {
-  const db = getDb();
   if (op.command === 'create') {
     const body = inventoryItemCreate.parse(op.attemptedValue);
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const created = await db.transaction(async (tx) => {
-      await tx
-        .select({ id: characters.id })
-        .from(characters)
-        .where(eq(characters.id, characterId))
-        .for('update');
-      if (body.parentId) {
-        const [parent] = await tx
-          .select({ id: inventoryItems.id })
-          .from(inventoryItems)
-          .where(
-            and(eq(inventoryItems.id, body.parentId), eq(inventoryItems.characterId, characterId)),
-          );
-        if (!parent) {
-          throw new HTTPException(400, {
-            message: 'parentId must reference an item on this character',
-          });
-        }
+    // Lock the character row to prevent race conditions on inventory parent
+    // validation, then validate the parent item if specified.
+    await tx
+      .select({ id: characters.id })
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .for('update');
+    if (body.parentId) {
+      const [parent] = await tx
+        .select({ id: inventoryItems.id })
+        .from(inventoryItems)
+        .where(
+          and(eq(inventoryItems.id, body.parentId), eq(inventoryItems.characterId, characterId)),
+        );
+      if (!parent) {
+        throw new HTTPException(400, {
+          message: 'parentId must reference an item on this character',
+        });
       }
-      const [row] = await tx
-        .insert(inventoryItems)
-        .values({
-          ...(op.entityId ? { id: op.entityId } : {}),
-          characterId,
-          name: body.name,
-          quantity: body.quantity ?? 1,
-          weightLbs: String(body.weightLbs ?? 0),
-          cost: String(body.cost ?? 0),
-          notes: body.notes ?? null,
-          parentId: body.parentId ?? null,
-          externalLocation: body.externalLocation ?? null,
-          worn: body.worn ?? false,
-          equipped: body.equipped ?? false,
-          isContainer: body.isContainer ?? false,
-          hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
-          weightReductionPercent: body.weightReductionPercent ?? 0,
-          isArmor: body.isArmor ?? false,
-          armor: body.armor ?? null,
-          weaponData: body.weaponData ?? null,
-          powerstoneData: body.powerstoneData ?? null,
-          magicItemData: body.magicItemData ?? null,
-          libraryItemId: body.libraryItemId ?? null,
-        })
-        .returning();
-      return row;
-    });
+    }
+    const [created] = await tx
+      .insert(inventoryItems)
+      .values({
+        ...(op.entityId ? { id: op.entityId } : {}),
+        characterId,
+        name: body.name,
+        quantity: body.quantity ?? 1,
+        weightLbs: String(body.weightLbs ?? 0),
+        cost: String(body.cost ?? 0),
+        notes: body.notes ?? null,
+        parentId: body.parentId ?? null,
+        externalLocation: body.externalLocation ?? null,
+        worn: body.worn ?? false,
+        equipped: body.equipped ?? false,
+        isContainer: body.isContainer ?? false,
+        hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
+        weightReductionPercent: body.weightReductionPercent ?? 0,
+        isArmor: body.isArmor ?? false,
+        armor: body.armor ?? null,
+        weaponData: body.weaponData ?? null,
+        powerstoneData: body.powerstoneData ?? null,
+        magicItemData: body.magicItemData ?? null,
+        libraryItemId: body.libraryItemId ?? null,
+      })
+      .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
   }
@@ -515,20 +571,20 @@ async function dispatchInventory(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const [doomed] = await db
+    const [doomed] = await getDb()
       .select()
       .from(inventoryItems)
       .where(and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)));
     if (!doomed) {
       return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'item not found' };
     }
-    await db
+    await tx
       .update(inventoryItems)
       .set({ parentId: doomed.parentId, updatedAt: new Date() })
       .where(
         and(eq(inventoryItems.parentId, op.entityId), eq(inventoryItems.characterId, characterId)),
       );
-    await db
+    await tx
       .delete(inventoryItems)
       .where(and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)));
     return { clientOpId: op.clientOpId, status: 'applied' };
@@ -542,9 +598,10 @@ async function dispatchInventory(
     op,
     userId: ctx.userId,
     entityClass: 'character_inventory',
+    tx,
     table: inventoryItems,
     parentLookup: async () => {
-      const [row] = await db
+      const [row] = await getDb()
         .select()
         .from(inventoryItems)
         .where(
@@ -566,8 +623,6 @@ async function dispatchInventory(
           throw new HTTPException(400, { message: 'an item cannot be its own parent' });
         }
         if (value !== null && value !== undefined) {
-          // Cycle check inside the same transaction — pessimistic lock
-          // is taken by the calling patchEntity if needed.
           await assertNoCycle(op.entityId, value as string, characterId);
         }
       }
@@ -601,6 +656,7 @@ async function assertNoCycle(itemId: string, proposedParent: string, characterId
 async function dispatchCombat(
   ctx: DispatchContext,
   op: OperationEnvelope,
+  tx: AuditTx,
 ): Promise<OperationOutcome> {
   if (op.command === 'delete') {
     return {
@@ -612,7 +668,6 @@ async function dispatchCombat(
   const characterId = requireParentId(op);
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
-  const db = getDb();
 
   // Combat state is 1:1 keyed on character_id.  Whether the client
   // sends `(command='patch', fieldPath='currentHp', attemptedValue=10)`
@@ -653,7 +708,7 @@ async function dispatchCombat(
   // route in characterSubResources.ts already computes derived for the
   // same reason.
   const derived = computeDerived(characterAttrsFromRow(access.character));
-  const [row] = await db
+  const [row] = await tx
     .insert(combatStates)
     .values({
       characterId,
@@ -678,6 +733,7 @@ interface PatchEntityArgs {
   readonly op: OperationEnvelope;
   readonly userId: string;
   readonly entityClass: WritableEntityClass;
+  readonly tx: AuditTx;
   // biome-ignore lint/suspicious/noExplicitAny: drizzle table object
   readonly table: any;
   readonly parentLookup: () => Promise<{ revision: number | bigint } | undefined>;
@@ -688,7 +744,8 @@ interface PatchEntityArgs {
 }
 
 async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
-  const { op, entityClass, table, parentLookup, childWhere, valueTransform, extraValidate } = args;
+  const { op, entityClass, tx, table, parentLookup, childWhere, valueTransform, extraValidate } =
+    args;
   const writableFields = WRITABLE_FOR_PATCH[entityClass];
   if (!writableFields) {
     return { clientOpId: op.clientOpId, status: 'rejected', reason: 'entity class not writable' };
@@ -716,7 +773,7 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
         latestEntity: current,
       };
     }
-    const result = await getDb().update(table).set(updates).where(childWhere()).returning();
+    const result = await tx.update(table).set(updates).where(childWhere()).returning();
     const updated = result[0];
     if (!updated) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };
     return appliedOutcome(op, Number(updated.revision));
@@ -757,7 +814,7 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
     [fieldPath]: transformed,
     updatedAt: new Date(),
   };
-  const result = await getDb().update(table).set(updates).where(childWhere()).returning();
+  const result = await tx.update(table).set(updates).where(childWhere()).returning();
   const updated = result[0];
   if (!updated) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };
   return appliedOutcome(op, Number(updated.revision));

@@ -75,7 +75,7 @@ router.openapi(
     // works.  Each op runs in dispatchOperation's own try/catch so a
     // failure on op N does not roll back ops 1..N-1.
     for (const op of operations) {
-      outcomes.push(await dispatchOperation({ userId: user.id }, op));
+      outcomes.push(await dispatchOperation({ userId: user.id, batchId: op.batchId }, op));
     }
     return c.json({ outcomes }, 200);
   },

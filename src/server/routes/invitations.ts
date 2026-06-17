@@ -28,6 +28,7 @@ import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin } from '../auth/permissions.ts';
 import { loadConfig } from '../config.ts';
+import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
@@ -182,7 +183,7 @@ router.openapi(
 
     let insertedId: string;
     try {
-      insertedId = await getDb().transaction(async (tx) => {
+      insertedId = await withAudit(user.id, undefined, async (tx) => {
         const inserted = await tx
           .insert(campaignInvitations)
           .values({
@@ -336,13 +337,15 @@ router.openapi(
     // cancel) may have flipped the row between the read above and this
     // write. Including `status='pending'` in the predicate makes the
     // update atomic; a zero-row result means we lost the race.
-    const updated = await db
-      .update(campaignInvitations)
-      .set({ status: 'cancelled', decidedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(eq(campaignInvitations.id, invitationId), eq(campaignInvitations.status, 'pending')),
-      )
-      .returning({ id: campaignInvitations.id });
+    const updated = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .update(campaignInvitations)
+        .set({ status: 'cancelled', decidedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(eq(campaignInvitations.id, invitationId), eq(campaignInvitations.status, 'pending')),
+        )
+        .returning({ id: campaignInvitations.id });
+    });
     if (updated.length === 0) {
       throw new HTTPException(409, { message: 'invitation already decided' });
     }
@@ -431,7 +434,7 @@ router.openapi(
     // commit, then re-reads and observes the new terminal status.
     // The conditional UPDATE on top is belt-and-braces (and lets the
     // 0-rows return short-circuit cleanly if a writer somehow snuck in).
-    const flipped = await db.transaction(async (tx) => {
+    const flipped = await withAudit(user.id, undefined, async (tx) => {
       const lockedRows = await tx
         .select()
         .from(campaignInvitations)
@@ -520,13 +523,15 @@ router.openapi(
     }
     // Same conditional-update pattern as cancel/accept: zero rows means
     // a parallel decision already terminated the invitation.
-    const updated = await db
-      .update(campaignInvitations)
-      .set({ status: 'rejected', decidedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(eq(campaignInvitations.id, invitationId), eq(campaignInvitations.status, 'pending')),
-      )
-      .returning({ id: campaignInvitations.id });
+    const updated = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .update(campaignInvitations)
+        .set({ status: 'rejected', decidedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(eq(campaignInvitations.id, invitationId), eq(campaignInvitations.status, 'pending')),
+        )
+        .returning({ id: campaignInvitations.id });
+    });
     if (updated.length === 0) {
       throw new HTTPException(409, { message: 'invitation already decided' });
     }

@@ -58,6 +58,8 @@ export interface EnqueueFieldPatchArgs {
   readonly flashKey?: string | undefined;
   /** Optional parent for child entity classes (trait/skill/inventory/combat). */
   readonly characterId?: string | undefined;
+  /** Groups mutations from one user gesture for history fold-grouping. */
+  readonly batchId?: string | undefined;
 }
 
 /**
@@ -116,6 +118,7 @@ export async function enqueueFieldPatch(args: EnqueueFieldPatchArgs): Promise<vo
       attemptCount: 0,
       humanName: args.humanName,
       flashKey: args.flashKey,
+      batchId: args.batchId,
     };
     await db.outbox.add(op);
   });
@@ -201,6 +204,7 @@ export interface EnqueueCreateArgs<T> {
   readonly attemptedValue: T;
   readonly humanName?: string | undefined;
   readonly characterId?: string | undefined;
+  readonly batchId?: string | undefined;
 }
 
 export async function enqueueCreate<T extends Record<string, unknown>>(
@@ -227,6 +231,7 @@ export async function enqueueCreate<T extends Record<string, unknown>>(
     enqueuedAt: now,
     attemptCount: 0,
     humanName: args.humanName,
+    batchId: args.batchId,
   };
   await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
     await applyLocalCreate(args);
@@ -240,6 +245,7 @@ export interface EnqueueDeleteArgs {
   readonly humanName?: string | undefined;
   readonly characterId?: string | undefined;
   readonly prevValue?: unknown;
+  readonly batchId?: string | undefined;
 }
 
 export async function enqueueDelete(args: EnqueueDeleteArgs): Promise<void> {
@@ -259,11 +265,26 @@ export async function enqueueDelete(args: EnqueueDeleteArgs): Promise<void> {
     enqueuedAt: now,
     attemptCount: 0,
     humanName: args.humanName,
+    batchId: args.batchId,
   };
   await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
     await applyLocalDelete(args.entityClass, args.entityId);
     await db.outbox.add(op);
   });
+}
+
+/**
+ * Run multiple enqueue* calls under a single shared batchId.  Every op
+ * enqueued within `fn` that passes the returned `batchId` will share the
+ * same group id so the history UI can fold them into one expandable entry.
+ *
+ * Usage:
+ *   const batchId = newBatchId();
+ *   await enqueueFieldPatch({ ..., batchId });
+ *   await enqueueFieldPatch({ ..., batchId });
+ */
+export function newBatchId(): string {
+  return newClientId();
 }
 
 // ---------- internal: local writers ----------

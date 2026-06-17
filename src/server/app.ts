@@ -13,6 +13,7 @@ import { campaignsRouter } from './routes/campaigns.ts';
 import { characterSubResourcesRouter } from './routes/characterSubResources.ts';
 import { charactersRouter } from './routes/characters.ts';
 import { healthRouter } from './routes/health.ts';
+import { historyRouter } from './routes/history.ts';
 import { invitationsRouter } from './routes/invitations.ts';
 import { notificationsRouter } from './routes/notifications.ts';
 import { syncRouter } from './routes/sync.ts';
@@ -45,6 +46,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', adventureLogRouter);
   app.route('/api/v1', charactersRouter);
   app.route('/api/v1', characterSubResourcesRouter);
+  app.route('/api/v1', historyRouter);
 
   // WebSocket push channel.  Auth via query-string token because the
   // browser WebSocket API can't set Authorization headers.  See

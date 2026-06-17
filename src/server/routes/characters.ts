@@ -14,6 +14,7 @@ import {
 import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
+import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
   campaignMemberships,
@@ -211,41 +212,42 @@ router.openapi(
       // Confirm visibility (member or owner).
       await loadCampaignOr403(body.campaignId, user.id);
     }
-    const db = getDb();
-    const [created] = await db
-      .insert(characters)
-      .values({
-        ownerId: user.id,
-        campaignId: body.campaignId ?? null,
-        name: body.name,
-        playerName: body.playerName ?? null,
-        height: body.height ?? null,
-        weight: body.weight ?? null,
-        age: body.age ?? null,
-        appearance: body.appearance ?? null,
-        techLevel: body.techLevel ?? null,
-        st: body.st,
-        dx: body.dx,
-        iq: body.iq,
-        ht: body.ht,
-        hpMod: body.hpMod,
-        willMod: body.willMod,
-        perMod: body.perMod,
-        fpMod: body.fpMod,
-        speedQuarterMod: body.speedQuarterMod,
-        moveMod: body.moveMod,
-        tempSt: body.tempSt,
-        tempDx: body.tempDx,
-        tempIq: body.tempIq,
-        tempHt: body.tempHt,
-        tempHpMod: body.tempHpMod,
-        tempWillMod: body.tempWillMod,
-        tempPerMod: body.tempPerMod,
-        tempFpMod: body.tempFpMod,
-        tempSpeedQuarterMod: body.tempSpeedQuarterMod,
-        tempMoveMod: body.tempMoveMod,
-      })
-      .returning();
+    const [created] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .insert(characters)
+        .values({
+          ownerId: user.id,
+          campaignId: body.campaignId ?? null,
+          name: body.name,
+          playerName: body.playerName ?? null,
+          height: body.height ?? null,
+          weight: body.weight ?? null,
+          age: body.age ?? null,
+          appearance: body.appearance ?? null,
+          techLevel: body.techLevel ?? null,
+          st: body.st,
+          dx: body.dx,
+          iq: body.iq,
+          ht: body.ht,
+          hpMod: body.hpMod,
+          willMod: body.willMod,
+          perMod: body.perMod,
+          fpMod: body.fpMod,
+          speedQuarterMod: body.speedQuarterMod,
+          moveMod: body.moveMod,
+          tempSt: body.tempSt,
+          tempDx: body.tempDx,
+          tempIq: body.tempIq,
+          tempHt: body.tempHt,
+          tempHpMod: body.tempHpMod,
+          tempWillMod: body.tempWillMod,
+          tempPerMod: body.tempPerMod,
+          tempFpMod: body.tempFpMod,
+          tempSpeedQuarterMod: body.tempSpeedQuarterMod,
+          tempMoveMod: body.tempMoveMod,
+        })
+        .returning(),
+    );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return c.json(await loadFullCharacter(created.id), 201);
   },
@@ -307,13 +309,14 @@ router.openapi(
     if (body.campaignId !== undefined && body.campaignId !== null) {
       await loadCampaignOr403(body.campaignId, user.id);
     }
-    const db = getDb();
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries(body)) {
       if (v === undefined) continue;
       updates[k] = v;
     }
-    await db.update(characters).set(updates).where(eq(characters.id, id));
+    await withAudit(user.id, undefined, (tx) =>
+      tx.update(characters).set(updates).where(eq(characters.id, id)),
+    );
     return c.json(await loadFullCharacter(id), 200);
   },
 );
@@ -336,7 +339,7 @@ router.openapi(
     const { id } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    await getDb().delete(characters).where(eq(characters.id, id));
+    await withAudit(user.id, undefined, (tx) => tx.delete(characters).where(eq(characters.id, id)));
     return c.body(null, 204);
   },
 );
@@ -367,10 +370,12 @@ router.openapi(
     const current = new Set(access.character.dismissedWarnings);
     if (dismissed) current.add(code);
     else current.delete(code);
-    await getDb()
-      .update(characters)
-      .set({ dismissedWarnings: [...current], updatedAt: new Date() })
-      .where(eq(characters.id, id));
+    await withAudit(user.id, undefined, (tx) =>
+      tx
+        .update(characters)
+        .set({ dismissedWarnings: [...current], updatedAt: new Date() })
+        .where(eq(characters.id, id)),
+    );
     return c.json(await loadFullCharacter(id), 200);
   },
 );

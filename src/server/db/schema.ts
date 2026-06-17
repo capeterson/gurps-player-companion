@@ -627,3 +627,45 @@ export const entityTombstones = pgTable(
 );
 
 export type DbEntityTombstone = typeof entityTombstones.$inferSelect;
+
+// ---------- entity history ----------
+//
+// Append-only audit log for every syncable entity.  Populated by AFTER
+// INSERT/UPDATE/DELETE triggers (see migration 0013_entity_history.sql).
+// actor_user_id and batch_id come from transaction-local session settings
+// set by withAudit() in src/server/db/auditContext.ts.
+
+export const entityHistory = pgTable(
+  'entity_history',
+  {
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
+    revision: bigint('revision', { mode: 'number' }).notNull(),
+    scope: text('scope').notNull(),
+    entityClass: text('entity_class').notNull(),
+    entityId: uuid('entity_id').notNull(),
+    op: text('op').notNull(),
+    characterId: uuid('character_id'),
+    campaignId: uuid('campaign_id'),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    actorUserId: uuid('actor_user_id'),
+    batchId: uuid('batch_id'),
+    oldRow: jsonb('old_row'),
+    newRow: jsonb('new_row'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    characterRevisionIdx: index('entity_history_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
+    campaignScopeRevisionIdx: index('entity_history_campaign_scope_revision_idx').on(
+      t.campaignId,
+      t.scope,
+      t.revision,
+    ),
+    ownerRevisionIdx: index('entity_history_owner_revision_idx').on(t.ownerUserId, t.revision),
+    batchIdx: index('entity_history_batch_idx').on(t.batchId),
+  }),
+);
+
+export type DbEntityHistory = typeof entityHistory.$inferSelect;

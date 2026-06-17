@@ -34,6 +34,7 @@ import { uuid } from '../../shared/schemas/common.ts';
 import { LibraryYamlError, emitLibraryYaml, parseLibraryYaml } from '../../shared/yaml/library.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignMember, requireCampaignOwner } from '../auth/permissions.ts';
+import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
   type DbCampaignLibraryItem,
@@ -184,20 +185,23 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const [row] = await getDb()
-      .insert(campaignLibraryTraits)
-      .values({
-        campaignId: id,
-        name: body.name,
-        kind: body.kind,
-        basePoints: body.basePoints ?? 0,
-        description: body.description ?? null,
-        source: body.source ?? null,
-        availableModifiers: body.availableModifiers ?? [],
-        tags: body.tags ?? [],
-      })
-      .returning();
-    if (!row) throw new HTTPException(500, { message: 'insert failed' });
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [inserted] = await tx
+        .insert(campaignLibraryTraits)
+        .values({
+          campaignId: id,
+          name: body.name,
+          kind: body.kind,
+          basePoints: body.basePoints ?? 0,
+          description: body.description ?? null,
+          source: body.source ?? null,
+          availableModifiers: body.availableModifiers ?? [],
+          tags: body.tags ?? [],
+        })
+        .returning();
+      if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
+      return inserted;
+    });
     return c.json(traitToOut(row), 201);
   },
 );
@@ -229,12 +233,15 @@ router.openapi(
       if (v === undefined) continue;
       updates[k] = v;
     }
-    const [row] = await getDb()
-      .update(campaignLibraryTraits)
-      .set(updates)
-      .where(and(eq(campaignLibraryTraits.id, traitId), eq(campaignLibraryTraits.campaignId, id)))
-      .returning();
-    if (!row) throw new HTTPException(404, { message: 'trait not found' });
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [updated] = await tx
+        .update(campaignLibraryTraits)
+        .set(updates)
+        .where(and(eq(campaignLibraryTraits.id, traitId), eq(campaignLibraryTraits.campaignId, id)))
+        .returning();
+      if (!updated) throw new HTTPException(404, { message: 'trait not found' });
+      return updated;
+    });
     return c.json(traitToOut(row), 200);
   },
 );
@@ -257,10 +264,12 @@ router.openapi(
     const user = c.get('user');
     const { id, traitId } = c.req.valid('param');
     await requireCampaignOwner(id, user.id);
-    const result = await getDb()
-      .delete(campaignLibraryTraits)
-      .where(and(eq(campaignLibraryTraits.id, traitId), eq(campaignLibraryTraits.campaignId, id)))
-      .returning({ id: campaignLibraryTraits.id });
+    const result = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .delete(campaignLibraryTraits)
+        .where(and(eq(campaignLibraryTraits.id, traitId), eq(campaignLibraryTraits.campaignId, id)))
+        .returning({ id: campaignLibraryTraits.id });
+    });
     if (result.length === 0) throw new HTTPException(404, { message: 'trait not found' });
     return c.body(null, 204);
   },
@@ -289,22 +298,25 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const [row] = await getDb()
-      .insert(campaignLibrarySkills)
-      .values({
-        campaignId: id,
-        name: body.name,
-        attribute: body.attribute,
-        difficulty: body.difficulty,
-        techLevel: body.techLevel ?? null,
-        description: body.description ?? null,
-        source: body.source ?? null,
-        defaultSpecialization: body.defaultSpecialization ?? null,
-        prerequisites: body.prerequisites ?? null,
-        situationalModifiers: body.situationalModifiers ?? [],
-      })
-      .returning();
-    if (!row) throw new HTTPException(500, { message: 'insert failed' });
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [inserted] = await tx
+        .insert(campaignLibrarySkills)
+        .values({
+          campaignId: id,
+          name: body.name,
+          attribute: body.attribute,
+          difficulty: body.difficulty,
+          techLevel: body.techLevel ?? null,
+          description: body.description ?? null,
+          source: body.source ?? null,
+          defaultSpecialization: body.defaultSpecialization ?? null,
+          prerequisites: body.prerequisites ?? null,
+          situationalModifiers: body.situationalModifiers ?? [],
+        })
+        .returning();
+      if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
+      return inserted;
+    });
     return c.json(skillToOut(row), 201);
   },
 );
@@ -336,12 +348,15 @@ router.openapi(
       if (v === undefined) continue;
       updates[k] = v;
     }
-    const [row] = await getDb()
-      .update(campaignLibrarySkills)
-      .set(updates)
-      .where(and(eq(campaignLibrarySkills.id, skillId), eq(campaignLibrarySkills.campaignId, id)))
-      .returning();
-    if (!row) throw new HTTPException(404, { message: 'skill not found' });
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [updated] = await tx
+        .update(campaignLibrarySkills)
+        .set(updates)
+        .where(and(eq(campaignLibrarySkills.id, skillId), eq(campaignLibrarySkills.campaignId, id)))
+        .returning();
+      if (!updated) throw new HTTPException(404, { message: 'skill not found' });
+      return updated;
+    });
     return c.json(skillToOut(row), 200);
   },
 );
@@ -364,10 +379,12 @@ router.openapi(
     const user = c.get('user');
     const { id, skillId } = c.req.valid('param');
     await requireCampaignOwner(id, user.id);
-    const result = await getDb()
-      .delete(campaignLibrarySkills)
-      .where(and(eq(campaignLibrarySkills.id, skillId), eq(campaignLibrarySkills.campaignId, id)))
-      .returning({ id: campaignLibrarySkills.id });
+    const result = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .delete(campaignLibrarySkills)
+        .where(and(eq(campaignLibrarySkills.id, skillId), eq(campaignLibrarySkills.campaignId, id)))
+        .returning({ id: campaignLibrarySkills.id });
+    });
     if (result.length === 0) throw new HTTPException(404, { message: 'skill not found' });
     return c.body(null, 204);
   },
@@ -396,23 +413,26 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const [row] = await getDb()
-      .insert(campaignLibraryItems)
-      .values({
-        campaignId: id,
-        name: body.name,
-        category: body.category ?? 'general',
-        defaultQuantity: body.defaultQuantity ?? 1,
-        weightLbs: String(body.weightLbs ?? 0),
-        cost: String(body.cost ?? 0),
-        description: body.description ?? null,
-        source: body.source ?? null,
-        isArmor: body.isArmor ?? false,
-        armor: body.armor ?? null,
-        weaponData: body.weaponData ?? null,
-      })
-      .returning();
-    if (!row) throw new HTTPException(500, { message: 'insert failed' });
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [inserted] = await tx
+        .insert(campaignLibraryItems)
+        .values({
+          campaignId: id,
+          name: body.name,
+          category: body.category ?? 'general',
+          defaultQuantity: body.defaultQuantity ?? 1,
+          weightLbs: String(body.weightLbs ?? 0),
+          cost: String(body.cost ?? 0),
+          description: body.description ?? null,
+          source: body.source ?? null,
+          isArmor: body.isArmor ?? false,
+          armor: body.armor ?? null,
+          weaponData: body.weaponData ?? null,
+        })
+        .returning();
+      if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
+      return inserted;
+    });
     return c.json(itemToOut(row), 201);
   },
 );
@@ -448,12 +468,15 @@ router.openapi(
       }
       updates[k] = v;
     }
-    const [row] = await getDb()
-      .update(campaignLibraryItems)
-      .set(updates)
-      .where(and(eq(campaignLibraryItems.id, itemId), eq(campaignLibraryItems.campaignId, id)))
-      .returning();
-    if (!row) throw new HTTPException(404, { message: 'item not found' });
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [updated] = await tx
+        .update(campaignLibraryItems)
+        .set(updates)
+        .where(and(eq(campaignLibraryItems.id, itemId), eq(campaignLibraryItems.campaignId, id)))
+        .returning();
+      if (!updated) throw new HTTPException(404, { message: 'item not found' });
+      return updated;
+    });
     return c.json(itemToOut(row), 200);
   },
 );
@@ -476,10 +499,12 @@ router.openapi(
     const user = c.get('user');
     const { id, itemId } = c.req.valid('param');
     await requireCampaignOwner(id, user.id);
-    const result = await getDb()
-      .delete(campaignLibraryItems)
-      .where(and(eq(campaignLibraryItems.id, itemId), eq(campaignLibraryItems.campaignId, id)))
-      .returning({ id: campaignLibraryItems.id });
+    const result = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .delete(campaignLibraryItems)
+        .where(and(eq(campaignLibraryItems.id, itemId), eq(campaignLibraryItems.campaignId, id)))
+        .returning({ id: campaignLibraryItems.id });
+    });
     if (result.length === 0) throw new HTTPException(404, { message: 'item not found' });
     return c.body(null, 204);
   },
@@ -630,8 +655,7 @@ router.openapi(
       throw err;
     }
 
-    const db = getDb();
-    const result = await db.transaction(async (tx) => {
+    const result = await withAudit(user.id, undefined, async (tx) => {
       const traitCounts = { created: 0, updated: 0, deleted: 0 };
       const skillCounts = { created: 0, updated: 0, deleted: 0 };
       const itemCounts = { created: 0, updated: 0, deleted: 0 };
