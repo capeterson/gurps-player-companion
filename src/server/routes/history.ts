@@ -264,15 +264,15 @@ router.openapi(
 
     type CampaignHistoryRow = Awaited<ReturnType<typeof selectBatch>>[number];
 
-    // Private adventure-log entries are campaign-scoped but the log route only
-    // shows them to their author (or the campaign owner). Hide a row if EITHER
-    // snapshot was a private entry: editing a private entry to 'campaign'
-    // visibility would otherwise leak the prior private title/body via the
-    // old_row when ?detail=1. Snapshots use jsonb column names
-    // (`visibility`, `author_id`).
-    const isCampaignOwner = campaign.ownerId === user.id;
+    // Private adventure-log entries are visible ONLY to their author — even
+    // the campaign owner cannot read another member's private entry through
+    // /campaigns/{id}/log, so we don't exempt the owner here either. Hide a row
+    // if EITHER snapshot was a private entry not authored by the viewer:
+    // editing a private entry to 'campaign' visibility would otherwise leak the
+    // prior private title/body via the old_row when ?detail=1. Snapshots use
+    // jsonb column names (`visibility`, `author_id`).
     const rowVisible = (row: CampaignHistoryRow): boolean => {
-      if (row.entityClass !== 'adventure_log' || isCampaignOwner) return true;
+      if (row.entityClass !== 'adventure_log') return true;
       for (const snap of [row.oldRow, row.newRow] as Array<Record<string, unknown> | null>) {
         if (snap && snap.visibility === 'private' && snap.author_id !== user.id) return false;
       }

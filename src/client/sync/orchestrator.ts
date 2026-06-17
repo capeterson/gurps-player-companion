@@ -518,6 +518,11 @@ class SyncOrchestrator {
                   humanName: op.humanName,
                   flashKey: op.flashKey,
                   characterId: op.parentId ?? undefined,
+                  // Preserve the original gesture's batch id so a stale_base
+                  // retry of one patch in a bulk action (e.g. "Revert all
+                  // temporary buffs") stays in the same history fold instead
+                  // of falling back to a fresh clientOpId batch.
+                  batchId: op.batchId,
                 });
               } else {
                 // Refresh the superseding op so Guard 1 passes on its next

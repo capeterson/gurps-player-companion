@@ -85,6 +85,11 @@ BEGIN
   -- (or null), so the PREVIOUS campaign's GM would never see the departure in
   -- their scope=character rollup. Emit an extra row keyed to the old campaign
   -- so that move-away/removal is auditable from the campaign it left.
+  --
+  -- character_id is deliberately NULL on this mirror row: the per-character
+  -- feed (/characters/{id}/history) filters by character_id, so a NULL keeps
+  -- the move from showing twice there, while the campaign rollup
+  -- (campaign_id + scope='character') still surfaces it for the old GM.
   IF TG_OP = 'UPDATE'
      AND OLD.campaign_id IS DISTINCT FROM NEW.campaign_id
      AND OLD.campaign_id IS NOT NULL THEN
@@ -95,7 +100,7 @@ BEGIN
     ) VALUES (
       'character', 'character', row_character,
       'update',
-      row_character, OLD.campaign_id, row_owner,
+      NULL, OLD.campaign_id, row_owner,
       actor, batch,
       to_jsonb(OLD), to_jsonb(NEW)
     );
