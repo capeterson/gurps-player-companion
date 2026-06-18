@@ -93,7 +93,7 @@ export const passkeyRegistrationOptions = z.object({
   pubKeyCredParams: z.array(z.object({ type: z.literal('public-key'), alg: z.number() })),
   timeout: z.number().int().positive(),
   attestation: z.literal('none'),
-  authenticatorSelection: z.object({ userVerification: z.literal('required') }),
+  authenticatorSelection: z.object({ residentKey: z.literal('required'), userVerification: z.literal('required') }),
   excludeCredentials: z.array(passkeyCredentialDescriptor),
 });
 

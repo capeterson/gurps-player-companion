@@ -243,7 +243,7 @@ router.openapi(
         ],
         timeout: 300000,
         attestation: 'none' as const,
-        authenticatorSelection: { userVerification: 'required' as const },
+        authenticatorSelection: { residentKey: 'required' as const, userVerification: 'required' as const },
         excludeCredentials: existing.map((row) => ({
           type: 'public-key' as const,
           id: row.credentialId,
@@ -416,14 +416,23 @@ router.openapi(
     if (credential.signCount > 0 && verified.signCount <= credential.signCount) {
       throw new HTTPException(401, { message: 'invalid passkey' });
     }
-    await getDb()
+    // Advance counter conditionally so a concurrent assertion with the same counter
+    // (e.g. a cloned key) fails the UPDATE rather than silently winning the race.
+    const updated = await getDb()
       .update(passkeyCredentials)
       .set({
         signCount: verified.signCount,
         lastUsedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(passkeyCredentials.id, credential.id));
+      .where(
+        and(
+          eq(passkeyCredentials.id, credential.id),
+          eq(passkeyCredentials.signCount, credential.signCount),
+        ),
+      )
+      .returning({ id: passkeyCredentials.id });
+    if (!updated[0]) throw new HTTPException(401, { message: 'invalid passkey' });
     const tokens = await issueTokenPair(credential.userId);
     return c.json(tokens, 200);
   },

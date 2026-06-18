@@ -1,5 +1,5 @@
 import { createHash, createPublicKey, randomBytes, verify as verifySignature } from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
@@ -29,13 +29,17 @@ export async function createChallenge(
   purpose: 'registration' | 'authentication',
 ) {
   const challenge = b64url(randomBytes(32));
-  await getDb()
+  const db = getDb();
+  const now = new Date();
+  // Purge expired rows so the table doesn't grow without bound from unauthenticated callers.
+  await db.delete(passkeyChallenges).where(lt(passkeyChallenges.expiresAt, now));
+  await db
     .insert(passkeyChallenges)
     .values({
       challengeHash: sha256(challenge).toString('hex'),
       userId,
       purpose,
-      expiresAt: new Date(Date.now() + PASSKEY_CHALLENGE_TTL_MS),
+      expiresAt: new Date(now.getTime() + PASSKEY_CHALLENGE_TTL_MS),
     });
   return challenge;
 }
@@ -157,7 +161,8 @@ export function extractAttestation(attestationObjectB64: string) {
   if (!authData.subarray(0, 32).equals(sha256(rpId)))
     throw new HTTPException(401, { message: 'invalid passkey rp' });
   const flags = authData[32] ?? 0;
-  if ((flags & 0x01) === 0 || (flags & 0x40) === 0)
+  // Require UP (0x01), UV (0x04), and AT (0x40) during registration.
+  if ((flags & 0x01) === 0 || (flags & 0x04) === 0 || (flags & 0x40) === 0)
     throw new HTTPException(401, { message: 'user verification required' });
   const signCount = authData.readUInt32BE(33);
   let offset = 37 + 16;

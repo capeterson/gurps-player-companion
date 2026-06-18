@@ -398,6 +398,12 @@
                     "authenticatorSelection": {
                       "type": "object",
                       "properties": {
+                        "residentKey": {
+                          "type": "string",
+                          "enum": [
+                            "required"
+                          ]
+                        },
                         "userVerification": {
                           "type": "string",
                           "enum": [
@@ -406,6 +412,7 @@
                         }
                       },
                       "required": [
+                        "residentKey",
                         "userVerification"
                       ]
                     },
