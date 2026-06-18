@@ -21,7 +21,7 @@ import {
   userOut,
 } from '../../shared/schemas/auth.ts';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
-import { requireJwt, requireUser } from '../auth/middleware.ts';
+import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
 import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
 import {
@@ -170,12 +170,12 @@ router.openapi(
   },
 );
 
-// requireJwt (not requireUser) prevents API keys from enrolling/managing passkeys.
+// requireActiveJwt: JWT-only (no API keys) and rejects suspended users.
 // The :id constraint (UUID pattern) prevents the /:id middleware from matching the
 // public /auth/passkeys/login route.
-router.use('/auth/passkeys', requireJwt);
-router.use('/auth/passkeys/register/*', requireJwt);
-router.use('/auth/passkeys/:id{[0-9a-fA-F-]{36}}', requireJwt);
+router.use('/auth/passkeys', requireActiveJwt);
+router.use('/auth/passkeys/register/*', requireActiveJwt);
+router.use('/auth/passkeys/:id{[0-9a-fA-F-]{36}}', requireActiveJwt);
 router.openapi(
   createRoute({
     method: 'get',
@@ -282,9 +282,14 @@ router.openapi(
   async (c) => {
     const body = c.req.valid('json');
     const user = c.get('user');
-    const clientData = JSON.parse(
-      Buffer.from(body.response.clientDataJSON, 'base64url').toString('utf8'),
-    ) as { challenge?: string };
+    let clientData: { challenge?: string };
+    try {
+      clientData = JSON.parse(
+        Buffer.from(body.response.clientDataJSON, 'base64url').toString('utf8'),
+      ) as { challenge?: string };
+    } catch {
+      throw new HTTPException(422, { message: 'invalid passkey response' });
+    }
     if (!clientData.challenge)
       throw new HTTPException(401, { message: 'invalid passkey response' });
     const challenge = await consumeChallenge(clientData.challenge, 'registration');
@@ -351,26 +356,18 @@ router.openapi(
     },
   }),
   async (c) => {
-    const body = c.req.valid('json');
     const { rpId } = webauthnRp();
     const challenge = await createChallenge(null, 'authentication');
-    const rows = body.email
-      ? await getDb()
-          .select({ credentialId: passkeyCredentials.credentialId })
-          .from(passkeyCredentials)
-          .innerJoin(users, eq(passkeyCredentials.userId, users.id))
-          .where(eq(users.email, body.email))
-      : [];
+    // Credentials are enrolled as discoverable (residentKey: 'required') so the
+    // browser's account selector works without per-user credential hints.  Omitting
+    // the unauthenticated per-email lookup also prevents leaking credential IDs.
     return c.json(
       {
         challenge,
         timeout: 300000,
         rpId,
         userVerification: 'required' as const,
-        allowCredentials: rows.map((row) => ({
-          type: 'public-key' as const,
-          id: row.credentialId,
-        })),
+        allowCredentials: [],
       },
       200,
     );
@@ -396,9 +393,14 @@ router.openapi(
   }),
   async (c) => {
     const body = c.req.valid('json');
-    const clientData = JSON.parse(
-      Buffer.from(body.response.clientDataJSON, 'base64url').toString('utf8'),
-    ) as { challenge?: string };
+    let clientData: { challenge?: string };
+    try {
+      clientData = JSON.parse(
+        Buffer.from(body.response.clientDataJSON, 'base64url').toString('utf8'),
+      ) as { challenge?: string };
+    } catch {
+      throw new HTTPException(422, { message: 'invalid passkey response' });
+    }
     if (!clientData.challenge)
       throw new HTTPException(401, { message: 'invalid passkey response' });
     await consumeChallenge(clientData.challenge, 'authentication');
