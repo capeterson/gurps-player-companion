@@ -93,7 +93,7 @@ export const passkeyRegistrationOptions = z.object({
   pubKeyCredParams: z.array(z.object({ type: z.literal('public-key'), alg: z.number() })),
   timeout: z.number().int().positive(),
   attestation: z.literal('none'),
-  authenticatorSelection: z.object({ userVerification: z.literal('preferred') }),
+  authenticatorSelection: z.object({ userVerification: z.literal('required') }),
   excludeCredentials: z.array(passkeyCredentialDescriptor),
 });
 
@@ -114,7 +114,7 @@ export const passkeyLoginOptions = z.object({
   challenge: z.string().min(1),
   timeout: z.number().int().positive(),
   rpId: z.string().min(1),
-  userVerification: z.literal('preferred'),
+  userVerification: z.literal('required'),
   allowCredentials: z.array(passkeyCredentialDescriptor),
 });
 

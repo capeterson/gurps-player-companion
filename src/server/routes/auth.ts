@@ -21,7 +21,7 @@ import {
   userOut,
 } from '../../shared/schemas/auth.ts';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
-import { requireUser } from '../auth/middleware.ts';
+import { requireJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
 import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
 import {
@@ -170,9 +170,12 @@ router.openapi(
   },
 );
 
-router.use('/auth/passkeys', requireUser);
-router.use('/auth/passkeys/register/*', requireUser);
-router.use('/auth/passkeys/:id', requireUser);
+// requireJwt (not requireUser) prevents API keys from enrolling/managing passkeys.
+// The :id constraint (UUID pattern) prevents the /:id middleware from matching the
+// public /auth/passkeys/login route.
+router.use('/auth/passkeys', requireJwt);
+router.use('/auth/passkeys/register/*', requireJwt);
+router.use('/auth/passkeys/:id{[0-9a-fA-F-]{36}}', requireJwt);
 router.openapi(
   createRoute({
     method: 'get',
@@ -240,7 +243,7 @@ router.openapi(
         ],
         timeout: 300000,
         attestation: 'none' as const,
-        authenticatorSelection: { userVerification: 'preferred' as const },
+        authenticatorSelection: { userVerification: 'required' as const },
         excludeCredentials: existing.map((row) => ({
           type: 'public-key' as const,
           id: row.credentialId,
@@ -360,7 +363,7 @@ router.openapi(
         challenge,
         timeout: 300000,
         rpId,
-        userVerification: 'preferred' as const,
+        userVerification: 'required' as const,
         allowCredentials: rows.map((row) => ({
           type: 'public-key' as const,
           id: row.credentialId,
@@ -409,10 +412,14 @@ router.openapi(
       signature: body.response.signature,
       challenge: clientData.challenge,
     });
+    // Reject cloned credentials: a non-zero stored counter must strictly advance.
+    if (credential.signCount > 0 && verified.signCount <= credential.signCount) {
+      throw new HTTPException(401, { message: 'invalid passkey' });
+    }
     await getDb()
       .update(passkeyCredentials)
       .set({
-        signCount: Math.max(credential.signCount, verified.signCount),
+        signCount: verified.signCount,
         lastUsedAt: new Date(),
         updatedAt: new Date(),
       })

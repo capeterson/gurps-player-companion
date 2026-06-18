@@ -401,7 +401,7 @@
                         "userVerification": {
                           "type": "string",
                           "enum": [
-                            "preferred"
+                            "required"
                           ]
                         }
                       },
@@ -670,7 +670,7 @@
                     "userVerification": {
                       "type": "string",
                       "enum": [
-                        "preferred"
+                        "required"
                       ]
                     },
                     "allowCredentials": {

@@ -1,5 +1,5 @@
 import { createHash, createPublicKey, randomBytes, verify as verifySignature } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
@@ -45,19 +45,21 @@ export async function consumeChallenge(
   purpose: 'registration' | 'authentication',
 ) {
   const hash = sha256(challenge).toString('hex');
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(passkeyChallenges)
-    .where(eq(passkeyChallenges.challengeHash, hash));
-  const row = rows[0];
-  if (!row || row.purpose !== purpose || row.expiresAt.getTime() < Date.now() || row.usedAt) {
-    throw new HTTPException(401, { message: 'invalid passkey challenge' });
-  }
-  await db
+  const now = new Date();
+  const consumed = await getDb()
     .update(passkeyChallenges)
-    .set({ usedAt: new Date() })
-    .where(eq(passkeyChallenges.id, row.id));
+    .set({ usedAt: now })
+    .where(
+      and(
+        eq(passkeyChallenges.challengeHash, hash),
+        eq(passkeyChallenges.purpose, purpose),
+        isNull(passkeyChallenges.usedAt),
+        gt(passkeyChallenges.expiresAt, now),
+      ),
+    )
+    .returning();
+  const row = consumed[0];
+  if (!row) throw new HTTPException(401, { message: 'invalid passkey challenge' });
   return row;
 }
 
@@ -194,7 +196,8 @@ export async function verifyAssertion(args: {
   parseClientData(args.clientDataJSON, args.challenge, 'webauthn.get');
   const authData = fromB64url(args.authenticatorData);
   const { rpId } = webauthnRp();
-  if (!authData.subarray(0, 32).equals(sha256(rpId)) || ((authData[32] ?? 0) & 0x01) === 0) {
+  // Require both UP (0x01) and UV (0x04): passwordless login must verify the user.
+  if (!authData.subarray(0, 32).equals(sha256(rpId)) || ((authData[32] ?? 0) & 0x05) !== 0x05) {
     throw new HTTPException(401, { message: 'invalid passkey response' });
   }
   const data = Buffer.concat([authData, sha256(fromB64url(args.clientDataJSON))]);
