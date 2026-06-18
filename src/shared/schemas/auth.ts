@@ -73,3 +73,66 @@ export const resetPasswordRequest = z.object({
 
 export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequest>;
 export type ResetPasswordRequest = z.infer<typeof resetPasswordRequest>;
+
+const passkeyCredentialDescriptor = z.object({
+  type: z.literal('public-key'),
+  id: z.string().min(1),
+});
+
+export const passkeyInfo = z.object({
+  id: uuid,
+  name: z.string().min(1).max(80),
+  createdAt: isoTimestamp,
+  lastUsedAt: isoTimestamp.nullable(),
+});
+
+export const passkeyRegistrationOptions = z.object({
+  challenge: z.string().min(1),
+  rp: z.object({ name: z.string(), id: z.string() }),
+  user: z.object({ id: z.string(), name: email, displayName }),
+  pubKeyCredParams: z.array(z.object({ type: z.literal('public-key'), alg: z.number() })),
+  timeout: z.number().int().positive(),
+  attestation: z.literal('none'),
+  authenticatorSelection: z.object({ userVerification: z.literal('required') }),
+  excludeCredentials: z.array(passkeyCredentialDescriptor),
+});
+
+export const passkeyRegistrationRequest = z.object({
+  name: z.string().min(1).max(80).optional(),
+  id: z.string().min(1),
+  rawId: z.string().min(1),
+  type: z.literal('public-key'),
+  response: z.object({
+    clientDataJSON: z.string().min(1),
+    attestationObject: z.string().min(1),
+  }),
+});
+
+export const passkeyLoginOptionsRequest = z.object({ email: email.optional() });
+
+export const passkeyLoginOptions = z.object({
+  challenge: z.string().min(1),
+  timeout: z.number().int().positive(),
+  rpId: z.string().min(1),
+  userVerification: z.literal('required'),
+  allowCredentials: z.array(passkeyCredentialDescriptor),
+});
+
+export const passkeyLoginRequest = z.object({
+  id: z.string().min(1),
+  rawId: z.string().min(1),
+  type: z.literal('public-key'),
+  response: z.object({
+    clientDataJSON: z.string().min(1),
+    authenticatorData: z.string().min(1),
+    signature: z.string().min(1),
+    userHandle: z.string().nullable().optional(),
+  }),
+});
+
+export type PasskeyInfo = z.infer<typeof passkeyInfo>;
+export type PasskeyRegistrationOptions = z.infer<typeof passkeyRegistrationOptions>;
+export type PasskeyRegistrationRequest = z.infer<typeof passkeyRegistrationRequest>;
+export type PasskeyLoginOptionsRequest = z.infer<typeof passkeyLoginOptionsRequest>;
+export type PasskeyLoginOptions = z.infer<typeof passkeyLoginOptions>;
+export type PasskeyLoginRequest = z.infer<typeof passkeyLoginRequest>;
