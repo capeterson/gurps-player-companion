@@ -238,6 +238,593 @@
         }
       }
     },
+    "/api/v1/auth/passkeys": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List passkeys for the authenticated user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Passkeys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "lastUsedAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "createdAt",
+                      "lastUsedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/passkeys/register/options": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create passkey registration options",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registration options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "rp": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "id"
+                      ]
+                    },
+                    "user": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 255,
+                          "format": "email"
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "displayName"
+                      ]
+                    },
+                    "pubKeyCredParams": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "public-key"
+                            ]
+                          },
+                          "alg": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "alg"
+                        ]
+                      }
+                    },
+                    "timeout": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    },
+                    "attestation": {
+                      "type": "string",
+                      "enum": [
+                        "none"
+                      ]
+                    },
+                    "authenticatorSelection": {
+                      "type": "object",
+                      "properties": {
+                        "residentKey": {
+                          "type": "string",
+                          "enum": [
+                            "required"
+                          ]
+                        },
+                        "userVerification": {
+                          "type": "string",
+                          "enum": [
+                            "required"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "residentKey",
+                        "userVerification"
+                      ]
+                    },
+                    "excludeCredentials": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "public-key"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "challenge",
+                    "rp",
+                    "user",
+                    "pubKeyCredParams",
+                    "timeout",
+                    "attestation",
+                    "authenticatorSelection",
+                    "excludeCredentials"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/passkeys/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Register a passkey for the authenticated user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rawId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "public-key"
+                    ]
+                  },
+                  "response": {
+                    "type": "object",
+                    "properties": {
+                      "clientDataJSON": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "attestationObject": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "clientDataJSON",
+                      "attestationObject"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "rawId",
+                  "type",
+                  "response"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Passkey registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "lastUsedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "createdAt",
+                    "lastUsedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/passkeys/{id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Delete a passkey",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/passkeys/login/options": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create passkey login options",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "timeout": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    },
+                    "rpId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "userVerification": {
+                      "type": "string",
+                      "enum": [
+                        "required"
+                      ]
+                    },
+                    "allowCredentials": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "public-key"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "id"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "challenge",
+                    "timeout",
+                    "rpId",
+                    "userVerification",
+                    "allowCredentials"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/passkeys/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange a passkey assertion for a token pair",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rawId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "public-key"
+                    ]
+                  },
+                  "response": {
+                    "type": "object",
+                    "properties": {
+                      "clientDataJSON": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "authenticatorData": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "signature": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "userHandle": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "clientDataJSON",
+                      "authenticatorData",
+                      "signature"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "rawId",
+                  "type",
+                  "response"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token pair issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "refreshToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "accessTokenExpiresIn": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "accessTokenExpiresIn"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid passkey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/refresh": {
       "post": {
         "tags": [

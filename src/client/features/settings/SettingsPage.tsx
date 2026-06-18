@@ -1,15 +1,59 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError, api } from '../../lib/api.ts';
+import { createPasskey, passkeysSupported } from '../../lib/passkeys.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { ApiKeysSection } from './ApiKeysSection.tsx';
 
 export function SettingsPage() {
   const toasts = useToasts();
+  const queryClient = useQueryClient();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const passkeys = useQuery({
+    queryKey: ['passkeys'],
+    queryFn: () =>
+      api<Array<{ id: string; name: string; createdAt: string; lastUsedAt: string | null }>>(
+        '/auth/passkeys',
+      ),
+  });
+
+  const addPasskey = useMutation({
+    mutationFn: async () => {
+      if (!passkeysSupported()) throw new Error('Passkeys are not supported by this browser');
+      const options = await api<PublicKeyCredentialCreationOptions>(
+        '/auth/passkeys/register/options',
+        { method: 'POST' },
+      );
+      const credential = await createPasskey(options);
+      return api('/auth/passkeys/register', { method: 'POST', body: credential });
+    },
+    onSuccess: () => {
+      toasts.push('Passkey added', { kind: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['passkeys'] });
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError || err instanceof Error ? err.message : 'passkey setup failed';
+      toasts.push(`Couldn't add passkey — ${message}`, { kind: 'error' });
+    },
+  });
+
+  const deletePasskey = useMutation({
+    mutationFn: (id: string) => api(`/auth/passkeys/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      toasts.push('Passkey removed', { kind: 'success' });
+      queryClient.invalidateQueries({ queryKey: ['passkeys'] });
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError || err instanceof Error ? err.message : 'passkey removal failed';
+      toasts.push(`Couldn't remove passkey — ${message}`, { kind: 'error' });
+    },
+  });
 
   const changePassword = useMutation({
     mutationFn: () => {
@@ -96,6 +140,53 @@ export function SettingsPage() {
             {changePassword.isPending ? 'Changing…' : 'Change password'}
           </button>
         </form>
+      </section>
+
+      <section className="max-w-lg">
+        <div className="card gap-4 p-card">
+          <div>
+            <p className="label-eyebrow">Security</p>
+            <h2 className="font-display text-2xl">Passkeys</h2>
+            <p className="text-sm text-muted">
+              Add a passkey for optional passwordless sign-in on supported devices.
+            </p>
+          </div>
+          {!passkeysSupported() && (
+            <p className="alert alert-warning text-sm">This browser does not support passkeys.</p>
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary w-fit"
+            disabled={addPasskey.isPending || !passkeysSupported()}
+            onClick={() => addPasskey.mutate()}
+          >
+            {addPasskey.isPending ? 'Creating passkey…' : 'Add passkey'}
+          </button>
+          <div className="space-y-2">
+            {passkeys.data?.length === 0 && <p className="text-sm text-muted">No passkeys yet.</p>}
+            {passkeys.data?.map((passkey) => (
+              <div
+                key={passkey.id}
+                className="flex items-center justify-between gap-3 rounded-box border border-base-300 p-3"
+              >
+                <div>
+                  <p className="font-medium">{passkey.name}</p>
+                  <p className="text-xs text-muted">
+                    Added {new Date(passkey.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-error"
+                  disabled={deletePasskey.isPending}
+                  onClick={() => deletePasskey.mutate(passkey.id)}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       <ApiKeysSection />

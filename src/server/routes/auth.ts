@@ -2,11 +2,18 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createRoute } from '@hono/zod-openapi';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { z } from 'zod';
 import {
   changePasswordRequest,
   forgotPasswordRequest,
   loginRequest,
   logoutRequest,
+  passkeyInfo,
+  passkeyLoginOptions,
+  passkeyLoginOptionsRequest,
+  passkeyLoginRequest,
+  passkeyRegistrationOptions,
+  passkeyRegistrationRequest,
   refreshRequest,
   registerRequest,
   resetPasswordRequest,
@@ -14,13 +21,21 @@ import {
   userOut,
 } from '../../shared/schemas/auth.ts';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
-import { requireUser } from '../auth/middleware.ts';
+import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
 import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
+import {
+  consumeChallenge,
+  createChallenge,
+  extractAttestation,
+  parseClientData,
+  verifyAssertion,
+  webauthnRp,
+} from '../auth/webauthn.ts';
 import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
-import { passwordResetTokens, refreshTokens, users } from '../db/schema.ts';
+import { passkeyCredentials, passwordResetTokens, refreshTokens, users } from '../db/schema.ts';
 import { getResend, sendPasswordResetEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
@@ -151,6 +166,279 @@ router.openapi(
       throw new HTTPException(401, { message: 'invalid credentials' });
     }
     const tokens = await issueTokenPair(user.id);
+    return c.json(tokens, 200);
+  },
+);
+
+// requireActiveJwt: JWT-only (no API keys) and rejects suspended users.
+// The :id constraint (UUID pattern) prevents the /:id middleware from matching the
+// public /auth/passkeys/login route.
+router.use('/auth/passkeys', requireActiveJwt);
+router.use('/auth/passkeys/register/*', requireActiveJwt);
+router.use('/auth/passkeys/:id{[0-9a-fA-F-]{36}}', requireActiveJwt);
+router.openapi(
+  createRoute({
+    method: 'get',
+    path: '/auth/passkeys',
+    tags: ['auth'],
+    summary: 'List passkeys for the authenticated user',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Passkeys',
+        content: { 'application/json': { schema: passkeyInfo.array() } },
+      },
+      401: errorResponse('Unauthorized'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const rows = await getDb()
+      .select()
+      .from(passkeyCredentials)
+      .where(eq(passkeyCredentials.userId, user.id));
+    return c.json(
+      rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        createdAt: row.createdAt.toISOString(),
+        lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+      })),
+      200,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/auth/passkeys/register/options',
+    tags: ['auth'],
+    summary: 'Create passkey registration options',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Registration options',
+        content: { 'application/json': { schema: passkeyRegistrationOptions } },
+      },
+      401: errorResponse('Unauthorized'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { rpName, rpId } = webauthnRp();
+    const challenge = await createChallenge(user.id, 'registration');
+    const existing = await getDb()
+      .select({ credentialId: passkeyCredentials.credentialId })
+      .from(passkeyCredentials)
+      .where(eq(passkeyCredentials.userId, user.id));
+    return c.json(
+      {
+        challenge,
+        rp: { name: rpName, id: rpId },
+        user: { id: user.id, name: user.email, displayName: user.displayName },
+        pubKeyCredParams: [
+          { type: 'public-key' as const, alg: -7 },
+          { type: 'public-key' as const, alg: -257 },
+        ],
+        timeout: 300000,
+        attestation: 'none' as const,
+        authenticatorSelection: {
+          residentKey: 'required' as const,
+          userVerification: 'required' as const,
+        },
+        excludeCredentials: existing.map((row) => ({
+          type: 'public-key' as const,
+          id: row.credentialId,
+        })),
+      },
+      200,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/auth/passkeys/register',
+    tags: ['auth'],
+    summary: 'Register a passkey for the authenticated user',
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: { 'application/json': { schema: passkeyRegistrationRequest } },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Passkey registered',
+        content: { 'application/json': { schema: passkeyInfo } },
+      },
+      401: errorResponse('Unauthorized'),
+      422: errorResponse('Validation error'),
+    },
+  }),
+  async (c) => {
+    const body = c.req.valid('json');
+    const user = c.get('user');
+    let clientData: { challenge?: string };
+    try {
+      clientData = JSON.parse(
+        Buffer.from(body.response.clientDataJSON, 'base64url').toString('utf8'),
+      ) as { challenge?: string };
+    } catch {
+      throw new HTTPException(422, { message: 'invalid passkey response' });
+    }
+    if (!clientData.challenge)
+      throw new HTTPException(401, { message: 'invalid passkey response' });
+    const challenge = await consumeChallenge(clientData.challenge, 'registration');
+    if (challenge.userId !== user.id)
+      throw new HTTPException(401, { message: 'invalid passkey challenge' });
+    parseClientData(body.response.clientDataJSON, clientData.challenge, 'webauthn.create');
+    const attestation = extractAttestation(body.response.attestationObject);
+    const inserted = await getDb()
+      .insert(passkeyCredentials)
+      .values({
+        userId: user.id,
+        credentialId: attestation.credentialId,
+        publicKey: attestation.publicKey,
+        signCount: attestation.signCount,
+        name: body.name?.trim() || 'Passkey',
+      })
+      .returning();
+    const row = inserted[0];
+    if (!row) throw new HTTPException(500, { message: 'insert failed' });
+    return c.json(
+      { id: row.id, name: row.name, createdAt: row.createdAt.toISOString(), lastUsedAt: null },
+      201,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/auth/passkeys/{id}',
+    tags: ['auth'],
+    summary: 'Delete a passkey',
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: z.string().uuid() }) },
+    responses: { 204: { description: 'Deleted' }, 401: errorResponse('Unauthorized') },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    await getDb()
+      .delete(passkeyCredentials)
+      .where(and(eq(passkeyCredentials.id, id), eq(passkeyCredentials.userId, user.id)));
+    return c.body(null, 204);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/auth/passkeys/login/options',
+    tags: ['auth'],
+    summary: 'Create passkey login options',
+    request: {
+      body: {
+        required: true,
+        content: { 'application/json': { schema: passkeyLoginOptionsRequest } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Login options',
+        content: { 'application/json': { schema: passkeyLoginOptions } },
+      },
+    },
+  }),
+  async (c) => {
+    const { rpId } = webauthnRp();
+    const challenge = await createChallenge(null, 'authentication');
+    // Credentials are enrolled as discoverable (residentKey: 'required') so the
+    // browser's account selector works without per-user credential hints.  Omitting
+    // the unauthenticated per-email lookup also prevents leaking credential IDs.
+    return c.json(
+      {
+        challenge,
+        timeout: 300000,
+        rpId,
+        userVerification: 'required' as const,
+        allowCredentials: [],
+      },
+      200,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/auth/passkeys/login',
+    tags: ['auth'],
+    summary: 'Exchange a passkey assertion for a token pair',
+    request: {
+      body: { required: true, content: { 'application/json': { schema: passkeyLoginRequest } } },
+    },
+    responses: {
+      200: {
+        description: 'Token pair issued',
+        content: { 'application/json': { schema: tokenPair } },
+      },
+      401: errorResponse('Invalid passkey'),
+    },
+  }),
+  async (c) => {
+    const body = c.req.valid('json');
+    let clientData: { challenge?: string };
+    try {
+      clientData = JSON.parse(
+        Buffer.from(body.response.clientDataJSON, 'base64url').toString('utf8'),
+      ) as { challenge?: string };
+    } catch {
+      throw new HTTPException(422, { message: 'invalid passkey response' });
+    }
+    if (!clientData.challenge)
+      throw new HTTPException(401, { message: 'invalid passkey response' });
+    await consumeChallenge(clientData.challenge, 'authentication');
+    const rows = await getDb()
+      .select()
+      .from(passkeyCredentials)
+      .where(eq(passkeyCredentials.credentialId, body.rawId));
+    const credential = rows[0];
+    if (!credential) throw new HTTPException(401, { message: 'unknown passkey' });
+    const verified = await verifyAssertion({
+      credentialPublicKey: credential.publicKey,
+      authenticatorData: body.response.authenticatorData,
+      clientDataJSON: body.response.clientDataJSON,
+      signature: body.response.signature,
+      challenge: clientData.challenge,
+    });
+    // Reject cloned credentials: a non-zero stored counter must strictly advance.
+    if (credential.signCount > 0 && verified.signCount <= credential.signCount) {
+      throw new HTTPException(401, { message: 'invalid passkey' });
+    }
+    // Advance counter conditionally so a concurrent assertion with the same counter
+    // (e.g. a cloned key) fails the UPDATE rather than silently winning the race.
+    const updated = await getDb()
+      .update(passkeyCredentials)
+      .set({
+        signCount: verified.signCount,
+        lastUsedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(passkeyCredentials.id, credential.id),
+          eq(passkeyCredentials.signCount, credential.signCount),
+        ),
+      )
+      .returning({ id: passkeyCredentials.id });
+    if (!updated[0]) throw new HTTPException(401, { message: 'invalid passkey' });
+    const tokens = await issueTokenPair(credential.userId);
     return c.json(tokens, 200);
   },
 );
