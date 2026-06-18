@@ -243,7 +243,10 @@ router.openapi(
         ],
         timeout: 300000,
         attestation: 'none' as const,
-        authenticatorSelection: { residentKey: 'required' as const, userVerification: 'required' as const },
+        authenticatorSelection: {
+          residentKey: 'required' as const,
+          userVerification: 'required' as const,
+        },
         excludeCredentials: existing.map((row) => ({
           type: 'public-key' as const,
           id: row.credentialId,

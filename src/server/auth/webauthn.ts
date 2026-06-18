@@ -33,14 +33,12 @@ export async function createChallenge(
   const now = new Date();
   // Purge expired rows so the table doesn't grow without bound from unauthenticated callers.
   await db.delete(passkeyChallenges).where(lt(passkeyChallenges.expiresAt, now));
-  await db
-    .insert(passkeyChallenges)
-    .values({
-      challengeHash: sha256(challenge).toString('hex'),
-      userId,
-      purpose,
-      expiresAt: new Date(now.getTime() + PASSKEY_CHALLENGE_TTL_MS),
-    });
+  await db.insert(passkeyChallenges).values({
+    challengeHash: sha256(challenge).toString('hex'),
+    userId,
+    purpose,
+    expiresAt: new Date(now.getTime() + PASSKEY_CHALLENGE_TTL_MS),
+  });
   return challenge;
 }
 
