@@ -71,15 +71,17 @@ describe('parseLibraryYaml', () => {
 
   it('defaults spell difficulty to H and accepts VH', () => {
     const doc = parseLibraryYaml(SAMPLE);
-    const light = doc.library.spells.find((s) => s.name === 'Light');
-    const major = doc.library.spells.find((s) => s.name === 'Major Healing');
+    const light = doc.library.spells?.find((s) => s.name === 'Light');
+    const major = doc.library.spells?.find((s) => s.name === 'Major Healing');
     expect(light?.difficulty).toBe('H');
     expect(major?.difficulty).toBe('VH');
   });
 
-  it('tolerates a document without a spells section (pre-spell-library exports)', () => {
+  it('leaves the spells section undefined when absent (pre-spell-library exports)', () => {
+    // Undefined (not []) so replace-mode imports can distinguish "old
+    // file with no spells section" from an explicit empty spell list.
     const doc = parseLibraryYaml('version: 1\nlibrary:\n  traits: []\n  skills: []\n  items: []\n');
-    expect(doc.library.spells).toEqual([]);
+    expect(doc.library.spells).toBeUndefined();
   });
 
   it('rejects a wrong version', () => {
@@ -165,7 +167,7 @@ describe('emitLibraryYaml', () => {
       campaign: doc.campaign,
       traits: doc.library.traits,
       skills: doc.library.skills,
-      spells: doc.library.spells,
+      spells: doc.library.spells ?? [],
       items: doc.library.items,
     });
     const reparsed = parseLibraryYaml(reemit);
@@ -184,7 +186,7 @@ describe('emitLibraryYaml', () => {
       campaign: doc.campaign,
       traits: doc.library.traits,
       skills: doc.library.skills,
-      spells: doc.library.spells,
+      spells: doc.library.spells ?? [],
       items: doc.library.items,
     });
     const docB = parseLibraryYaml(first);
@@ -192,7 +194,7 @@ describe('emitLibraryYaml', () => {
       campaign: docB.campaign,
       traits: docB.library.traits,
       skills: docB.library.skills,
-      spells: docB.library.spells,
+      spells: docB.library.spells ?? [],
       items: docB.library.items,
     });
     expect(second).toBe(first);

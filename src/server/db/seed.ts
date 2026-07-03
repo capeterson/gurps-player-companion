@@ -135,7 +135,7 @@ async function seedLibrary(db: ReturnType<typeof getDb>, campaignId: string): Pr
       });
   }
 
-  for (const s of doc.library.spells) {
+  for (const s of doc.library.spells ?? []) {
     await db
       .insert(campaignLibrarySpells)
       .values({

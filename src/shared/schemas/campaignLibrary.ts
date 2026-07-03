@@ -170,7 +170,11 @@ export const libraryYamlDoc = z.object({
   library: z.object({
     traits: z.array(libraryTraitCreate).default([]),
     skills: z.array(librarySkillCreate).default([]),
-    spells: z.array(librarySpellCreate).default([]),
+    /** Optional (no default): pre-spell-library exports lack this
+     * section, and a replace-mode import must be able to tell "no
+     * spells section" (leave existing spells alone) apart from an
+     * explicit empty list (delete them all). */
+    spells: z.array(librarySpellCreate).optional(),
     items: z.array(libraryItemCreate).default([]),
   }),
 });

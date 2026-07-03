@@ -934,7 +934,7 @@ router.openapi(
       const spellKey = (s: { name: string }) => s.name.toLowerCase();
       const existingSpellMap = new Map(existingSpells.map((s) => [spellKey(s), s]));
       const incomingSpellKeys = new Set<string>();
-      for (const s of doc.library.spells) {
+      for (const s of doc.library.spells ?? []) {
         const k = spellKey(s);
         incomingSpellKeys.add(k);
         const existing = existingSpellMap.get(k);
@@ -972,7 +972,11 @@ router.openapi(
           spellCounts.created++;
         }
       }
-      if (mode === 'replace') {
+      // Only prune spells when the document actually carried a spells
+      // section: pre-spell-library exports omit it entirely, and a
+      // replace-mode import of one of those files must not wipe the
+      // current spell library.  An explicit `spells: []` still deletes.
+      if (mode === 'replace' && doc.library.spells !== undefined) {
         for (const s of existingSpells) {
           if (!incomingSpellKeys.has(spellKey(s))) {
             await tx.delete(campaignLibrarySpells).where(eq(campaignLibrarySpells.id, s.id));

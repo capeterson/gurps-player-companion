@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ATTR_INFLUENCE,
@@ -1594,9 +1594,16 @@ function IdentityHero({
 interface CampaignSummary {
   id: string;
   name: string;
+  description: string | null;
   ownerId: string;
   pointTarget: number | null;
+  disadvantageCap: number | null;
+  quirkCap: number | null;
+  manaLevel: 'none' | 'low' | 'normal' | 'high' | 'very_high';
   shareCharacterSheets: boolean;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
 }
 
 export function CharacterSheetPage() {
@@ -1624,6 +1631,35 @@ export function CharacterSheetPage() {
     // the full campaign list — even for characters not yet in a campaign.
     enabled: !!me.data,
   });
+
+  // Mirror the fetched campaigns into Dexie: the sync cursor pulls only
+  // the character-family classes (ALL_ENTITY_CLASSES), so this fetch is
+  // the only route campaign rows have into the local store — and the
+  // local-first detail builder (useCharacterDetail) reads caps + mana
+  // level from `db.campaigns`.  Campaigns have no outbox mutations, so a
+  // plain upsert can't clobber pending local intent (rule S4), and the
+  // rows persist for offline sessions after the first online load.
+  useEffect(() => {
+    const rows = campaigns.data;
+    if (!rows || rows.length === 0) return;
+    const db = getLocalDb();
+    void db.campaigns.bulkPut(
+      rows.map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        ownerId: c.ownerId,
+        pointTarget: c.pointTarget,
+        disadvantageCap: c.disadvantageCap,
+        quirkCap: c.quirkCap,
+        manaLevel: c.manaLevel,
+        shareCharacterSheets: c.shareCharacterSheets,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        revision: c.revision,
+      })),
+    );
+  }, [campaigns.data]);
 
   if (character === undefined) {
     return <p className="text-muted">Loading…</p>;

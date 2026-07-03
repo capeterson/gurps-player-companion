@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { SPELL_DIFFICULTIES, type SpellDifficulty } from '../../../../shared/constants/skills.ts';
-import { hasMagery } from '../../../../shared/domain/spellCalc.ts';
+import { canCastInMana, hasMagery } from '../../../../shared/domain/spellCalc.ts';
 import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { useFieldFlash } from '../../../hooks/useFieldFlash.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import {
@@ -212,11 +213,17 @@ interface SpellRowProps {
   characterId: string;
   spell: SpellOut;
   canWrite: boolean;
+  /** False when the ambient mana level forbids this character casting. */
+  castable: boolean;
   onCast(spell: SpellOut, mode: 'cast' | 'maintain'): void;
 }
 
-function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
+function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowProps) {
   const toasts = useToasts();
+  // The difficulty select commits instantly (no draft state), so it
+  // wires the rollback flash through useFieldFlash directly (AGENTS.md
+  // rule 2 / S5: a rejected patch must pulse the input it reverts).
+  const difficultyFlash = useFieldFlash(makeFlashKey('character_spell', spell.id, 'difficulty'));
 
   const patchSpell = (field: string, value: unknown) =>
     enqueueFieldPatch({
@@ -294,7 +301,9 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
       {canWrite ? (
         <select
           aria-label={`${spell.name} difficulty`}
-          className="select select-bordered select-sm"
+          className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm`}
+          data-flashing={difficultyFlash['data-flashing']}
+          data-flash-parity={difficultyFlash['data-flash-parity']}
           value={spell.difficulty}
           onChange={(e) => void patchSpell('difficulty', e.target.value as SpellDifficulty)}
         >
@@ -343,8 +352,13 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
             type="button"
             className="btn btn-primary btn-xs"
             onClick={() => onCast(spell, 'cast')}
+            disabled={!castable}
             aria-label={`Cast ${spell.name}`}
-            title="Cast this spell"
+            title={
+              castable
+                ? 'Cast this spell'
+                : 'This character cannot cast here — see the mana notice above'
+            }
           >
             Cast
           </button>
@@ -354,8 +368,13 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
             type="button"
             className="btn btn-ghost btn-xs"
             onClick={() => onCast(spell, 'maintain')}
+            disabled={!castable}
             aria-label={`Maintain ${spell.name}`}
-            title={`Pay the maintenance cost (${spell.effectiveMaintenanceCost ?? spell.maintenanceCost} after discount) to keep this spell running`}
+            title={
+              castable
+                ? `Pay the maintenance cost (${spell.effectiveMaintenanceCost ?? spell.maintenanceCost} after discount) to keep this spell running`
+                : 'This character cannot cast here — see the mana notice above'
+            }
           >
             Maint
           </button>
@@ -425,6 +444,7 @@ export function SpellsPanel({
   );
   const characterHasMagery = hasMagery(character.traits);
   const notice = manaNotice(character.manaLevel, characterHasMagery);
+  const castable = canCastInMana(characterHasMagery, character.manaLevel);
 
   return (
     <section className="card space-y-3 p-5">
@@ -467,6 +487,7 @@ export function SpellsPanel({
                 characterId={character.id}
                 spell={s}
                 canWrite={canWrite}
+                castable={castable}
                 onCast={(spell, mode) => setCasting({ spell, mode })}
               />
             ))}

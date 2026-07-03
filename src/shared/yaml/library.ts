@@ -67,7 +67,7 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     skillKeys.add(k);
   }
   const spellKeys = new Set<string>();
-  for (const s of doc.library.spells) {
+  for (const s of doc.library.spells ?? []) {
     const k = s.name.toLowerCase();
     if (spellKeys.has(k)) throw new LibraryYamlError(`duplicate spell (${s.name})`);
     spellKeys.add(k);
