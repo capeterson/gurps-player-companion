@@ -29,11 +29,16 @@ const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30_000;
 const PING_INTERVAL_MS = 25_000;
 // Cap reconnect attempts that never reach `open` (e.g. a dev server
-// that doesn't proxy WS upgrades, or a permanently misconfigured edge
-// proxy in prod). Without this, the client logs a fresh handshake
-// failure every backoff tick. The orchestrator's periodic /sync/cursor
-// pull keeps state fresh without WS push.
+// that doesn't proxy WS upgrades, or a misconfigured edge proxy).
+// Without this, the client logs a fresh handshake failure every
+// backoff tick. The orchestrator's periodic /sync/cursor pull keeps
+// state fresh without WS push.
 const MAX_HANDSHAKE_FAILURES = 4;
+// After MAX_HANDSHAKE_FAILURES consecutive failures we cool down for
+// this long and then try again — a permanent give-up would leave WS
+// acceleration dead for the rest of the session even when the cause
+// was a transient outage (server deploy, proxy restart).
+const HANDSHAKE_COOLDOWN_MS = 5 * 60_000;
 
 class SyncWsSubscriber {
   private socket: WebSocket | null = null;
@@ -42,14 +47,10 @@ class SyncWsSubscriber {
   private attempts = 0;
   private handshakeFailures = 0;
   private running = false;
-  private gaveUp = false;
 
   start(): void {
     if (this.running) return;
     this.running = true;
-    // Re-arm after a previous give-up: a fresh `start()` (e.g. login,
-    // token refresh) means the caller wants us to try again.
-    this.gaveUp = false;
     this.handshakeFailures = 0;
     this.attempts = 0;
     this.connect();
@@ -73,7 +74,6 @@ class SyncWsSubscriber {
 
   private connect(): void {
     if (!this.running) return;
-    if (this.gaveUp) return;
     if (typeof window === 'undefined' || typeof WebSocket === 'undefined') return;
     const tokens = tokenStore.read();
     if (!tokens) {
@@ -133,13 +133,18 @@ class SyncWsSubscriber {
       this.pingTimer = null;
       if (this.socket === socket) this.socket = null;
       // A close before `open` means the handshake never succeeded —
-      // commonly the dev server (no WS upgrade support) or a misconfigured
-      // proxy. After a few of those in a row, stop spamming reconnects;
-      // periodic /sync/cursor pulls remain in effect.
+      // commonly the dev server (no WS upgrade support), a misconfigured
+      // proxy, or the server being briefly down. After a few of those in
+      // a row, back off to a long cool-down instead of spamming
+      // reconnects every backoff tick; periodic /sync/cursor pulls keep
+      // data fresh in the meantime, and the cool-down retry self-heals
+      // WS acceleration once the server is reachable again.
       if (!opened) {
         this.handshakeFailures += 1;
         if (this.handshakeFailures >= MAX_HANDSHAKE_FAILURES) {
-          this.gaveUp = true;
+          this.handshakeFailures = 0;
+          this.attempts = 0;
+          this.scheduleReconnect(HANDSHAKE_COOLDOWN_MS);
           return;
         }
       }
@@ -152,11 +157,12 @@ class SyncWsSubscriber {
     });
   }
 
-  private scheduleReconnect(): void {
+  private scheduleReconnect(delayOverrideMs?: number): void {
     if (!this.running) return;
     if (this.reconnectTimer) return;
     this.attempts += 1;
-    const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** (this.attempts - 1));
+    const delay =
+      delayOverrideMs ?? Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** (this.attempts - 1));
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();

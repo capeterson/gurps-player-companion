@@ -181,10 +181,17 @@ export interface LocalCampaign {
 
 /**
  * One row per pending mutation.  Lifecycle:
- *   pending → in_flight → applied (deleted)
- *                         | rejected (kept for audit, drives toast)
- *                         | failed_permanent (idem; surfaces error)
- *                         | transient_retry → pending (after backoff)
+ *   pending → in_flight → applied (row deleted; revision stamped)
+ *                         | rejected/unauthorized/conflict/stale_base/
+ *                         |   suspended (row deleted; `rejectionToasts`
+ *                         |   keeps the durable audit + toast record)
+ *                         | transient_retry (drains again once backoff
+ *                         |   elapses; retries forever, relaxing to a
+ *                         |   5-minute cadence past MAX_ATTEMPTS)
+ * Rows found `in_flight` while holding the cross-tab drain lock are
+ * orphans from a crashed/closed tab and are re-promoted to `pending`
+ * (see `recoverStaleInFlight`).  `failed_permanent` remains in the
+ * enum only for rows written by older client versions.
  */
 export type OutboxStatus =
   | 'pending'
@@ -314,6 +321,14 @@ class LocalDb extends Dexie {
     // schema upgrade flow; existing stores are preserved.
     this.version(2).stores({
       characterSpells: 'id, characterId, updatedAt, revision',
+    });
+    // v3 adds an `entityId` index to the outbox.  The orchestrator's
+    // applyServerRow queries outbox rows by entityId to skip fields
+    // with pending local edits (AGENTS.md rule S4); without the index
+    // Dexie throws SchemaError and the skip silently never happens,
+    // letting cursor pulls clobber unsaved local intent.
+    this.version(3).stores({
+      outbox: 'clientOpId, status, coalesceKey, enqueuedAt, entityId, [status+enqueuedAt]',
     });
   }
 }

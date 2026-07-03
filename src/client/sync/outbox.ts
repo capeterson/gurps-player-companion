@@ -430,18 +430,75 @@ async function applyLocalDelete(entityClass: EntityClass, entityId: string): Pro
  * never re-promotes them to `pending`, so a status filter that only
  * matches `pending` would silently drop them.
  *
- * Rows with a future `nextEarliestAttemptAt` are filtered out post-query
- * so the backoff window is honored.
+ * Rows with a future `nextEarliestAttemptAt` are held back so the
+ * backoff window is honored.  Crucially, holding back a `create` also
+ * holds back every later op that depends on it: patches/deletes on the
+ * same entity and any op whose `parentId` is the held-back entity.
+ * Without that gate, a child patch could drain while its parent create
+ * was still backing off -- the server answers `unauthorized: not found`
+ * and the orchestrator rolls the user's queued edit back (data loss)
+ * even though the create would have succeeded seconds later.
+ *
+ * Patches never gate other patches: same-field commits coalesce into a
+ * single op (rule S3) and different fields are order-independent
+ * ("different fields save in parallel").
  */
 export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   const db = getLocalDb();
   const now = new Date().toISOString();
-  const all = await db.outbox
-    .where('status')
-    .anyOf(['pending', 'transient_retry'])
-    .sortBy('enqueuedAt');
-  const ready = all.filter((op) => !op.nextEarliestAttemptAt || op.nextEarliestAttemptAt <= now);
-  return ready.slice(0, limit);
+  const all = await db.outbox.where('status').anyOf(['pending', 'transient_retry']).toArray();
+  // Deterministic replay order: enqueue time, then create < patch <
+  // delete so a create+patch enqueued in the same millisecond can never
+  // invert (the server applies the batch in array order).
+  const commandRank: Record<OperationCommand, number> = { create: 0, patch: 1, delete: 2 };
+  all.sort((a, b) => {
+    if (a.enqueuedAt !== b.enqueuedAt) return a.enqueuedAt < b.enqueuedAt ? -1 : 1;
+    if (a.command !== b.command) return commandRank[a.command] - commandRank[b.command];
+    return a.clientOpId < b.clientOpId ? -1 : 1;
+  });
+  const heldBackCreates = new Set<string>();
+  const ready: OutboxEntry[] = [];
+  for (const op of all) {
+    const backingOff = op.nextEarliestAttemptAt !== undefined && op.nextEarliestAttemptAt > now;
+    const dependencyHeld =
+      heldBackCreates.has(op.entityId) ||
+      (op.parentId !== undefined && heldBackCreates.has(op.parentId));
+    if (!backingOff && !dependencyHeld && ready.length < limit) {
+      ready.push(op);
+    } else if (op.command === 'create') {
+      // Anything created under (or on) this entity must wait its turn.
+      heldBackCreates.add(op.entityId);
+    }
+  }
+  return ready;
+}
+
+/**
+ * Reset stale `in_flight` rows back to `pending`.
+ *
+ * MUST be called while holding the cross-tab drain lock: under the
+ * lock, no tab can have a /sync/operations POST outstanding, so any
+ * row still marked `in_flight` was orphaned by a crash, tab close, or
+ * an error between marking and settling.  Without this sweep those
+ * rows are invisible to `readDrainableOps` forever -- the edit never
+ * syncs and `countPending` pins the indicator at 'syncing'.
+ *
+ * The replay is safe even if the orphaned POST actually reached the
+ * server: patches reconcile through the stale_base path, creates are
+ * replay-idempotent server-side (an existing row with the same id
+ * comes back `applied`), and deletes of already-deleted rows are
+ * idempotent no-ops.
+ */
+export async function recoverStaleInFlight(): Promise<number> {
+  const db = getLocalDb();
+  const stale = await db.outbox.where('status').equals('in_flight').primaryKeys();
+  for (const clientOpId of stale) {
+    await db.outbox.update(clientOpId, {
+      status: 'pending',
+      serverReason: 'recovered from interrupted send',
+    });
+  }
+  return stale.length;
 }
 
 export async function countPending(): Promise<number> {
@@ -459,11 +516,17 @@ export async function setOutboxStatus(
 
 /**
  * Compute the next-attempt timestamp for a `transient` outcome.
- * Exponential backoff with jitter, capped at 60s.  Pure so the
- * orchestrator tests can stub time.
+ * Exponential backoff with jitter, capped at 60s while the op is
+ * "fresh" and relaxing to a 5-minute cap once it has burned through
+ * MAX_ATTEMPTS.  Transient failures never give up entirely -- a
+ * durable outbox that silently stops retrying would leave the local
+ * row diverged from the server forever with no path back; a slow
+ * retry cadence self-heals the moment the server recovers.  Pure so
+ * the orchestrator tests can stub time.
  */
 export function backoffMs(attemptCount: number): number {
-  const base = Math.min(60_000, 2 ** attemptCount * 500);
+  const cap = attemptCount > MAX_ATTEMPTS ? 300_000 : 60_000;
+  const base = Math.min(cap, 2 ** attemptCount * 500);
   const jitter = Math.random() * Math.min(1000, base * 0.25);
   return base + jitter;
 }
