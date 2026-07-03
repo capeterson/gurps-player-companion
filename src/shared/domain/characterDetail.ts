@@ -372,6 +372,11 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const skillsOut = skills.map((s) => buildSkillOut(s, derived));
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
+  // A character in a campaign whose row we don't have yet (client-side,
+  // before the campaign mirror lands in Dexie) gets the 'normal'
+  // fallback above -- flag it so the UI can hold cast actions instead
+  // of trusting a guess.  Campaignless characters are always 'known'.
+  const manaLevelKnown = character.campaignId == null || campaign != null;
   const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery, manaLevel));
   const combatOut = combat ? buildCombatStateOut(combat) : null;
 
@@ -432,6 +437,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     encumbrance,
     warnings,
     manaLevel,
+    manaLevelKnown,
     traits: traitsOut,
     skills: skillsOut,
     spells: spellsOut,

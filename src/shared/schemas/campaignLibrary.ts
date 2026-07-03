@@ -80,7 +80,11 @@ export const librarySpellOut = z.object({
   maintenanceCost: z.number().int().min(0).max(99).nullable(),
   castingTime: z.string().max(40).nullable(),
   duration: z.string().max(40).nullable(),
-  prerequisites: z.string().max(20_000).nullable(),
+  /** Capped at the character-spell limit (spellCreate.prerequisites,
+   * 2000) because learning a library spell copies this value verbatim
+   * into the character row -- a longer value would import fine and
+   * then be rejected every time someone learns the spell. */
+  prerequisites: z.string().max(2000).nullable(),
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
   createdAt: isoTimestamp,
@@ -95,7 +99,8 @@ export const librarySpellCreate = z.object({
   maintenanceCost: z.number().int().min(0).max(99).nullable().optional(),
   castingTime: z.string().max(40).trim().nullable().optional(),
   duration: z.string().max(40).trim().nullable().optional(),
-  prerequisites: z.string().max(20_000).nullable().optional(),
+  /** Must fit spellCreate.prerequisites (2000) -- see librarySpellOut. */
+  prerequisites: z.string().max(2000).nullable().optional(),
   description: z.string().max(20_000).nullable().optional(),
   source: z.string().max(40).trim().nullable().optional(),
 });

@@ -396,7 +396,17 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowPr
   );
 }
 
-function manaNotice(mana: CharacterDetail['manaLevel'], characterHasMagery: boolean) {
+function manaNotice(
+  mana: CharacterDetail['manaLevel'],
+  manaKnown: boolean,
+  characterHasMagery: boolean,
+) {
+  if (!manaKnown) {
+    return {
+      tone: 'text-base-content/60',
+      text: 'Campaign mana level not synced yet — casting is disabled until it loads.',
+    };
+  }
   if (mana === 'none') {
     return {
       tone: 'text-error',
@@ -443,8 +453,12 @@ export function SpellsPanel({
     null,
   );
   const characterHasMagery = hasMagery(character.traits);
-  const notice = manaNotice(character.manaLevel, characterHasMagery);
-  const castable = canCastInMana(characterHasMagery, character.manaLevel);
+  const notice = manaNotice(character.manaLevel, character.manaLevelKnown, characterHasMagery);
+  // Hold casting entirely while the campaign row (and thus the real
+  // mana level) hasn't reached the local store: the builder's 'normal'
+  // fallback must not let a no-mana campaign spend FP on first load.
+  const castable =
+    character.manaLevelKnown && canCastInMana(characterHasMagery, character.manaLevel);
 
   return (
     <section className="card space-y-3 p-5">

@@ -133,6 +133,11 @@ export const characterDetail = z.object({
   /** Ambient mana from the campaign ('normal' when campaignless);
    * already folded into every spell's level and effective costs. */
   manaLevel: z.enum(MANA_LEVELS).default('normal'),
+  /** False when the character belongs to a campaign whose row hasn't
+   * reached the local store yet -- manaLevel is then only the 'normal'
+   * fallback and casting should be held rather than trusted. Always
+   * true on server-built details (the server joins the campaign). */
+  manaLevelKnown: z.boolean().default(true),
   traits: z.array(traitOut),
   skills: z.array(skillOut),
   spells: z.array(spellOut),

@@ -5221,7 +5221,7 @@
                           "prerequisites": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 2000
                           },
                           "description": {
                             "type": "string",
@@ -6693,7 +6693,7 @@
                   "prerequisites": {
                     "type": "string",
                     "nullable": true,
-                    "maxLength": 20000
+                    "maxLength": 2000
                   },
                   "description": {
                     "type": "string",
@@ -6770,7 +6770,7 @@
                     "prerequisites": {
                       "type": "string",
                       "nullable": true,
-                      "maxLength": 20000
+                      "maxLength": 2000
                     },
                     "description": {
                       "type": "string",
@@ -6905,7 +6905,7 @@
                   "prerequisites": {
                     "type": "string",
                     "nullable": true,
-                    "maxLength": 20000
+                    "maxLength": 2000
                   },
                   "description": {
                     "type": "string",
@@ -6979,7 +6979,7 @@
                     "prerequisites": {
                       "type": "string",
                       "nullable": true,
-                      "maxLength": 20000
+                      "maxLength": 2000
                     },
                     "description": {
                       "type": "string",
@@ -9326,6 +9326,10 @@
                       ],
                       "default": "normal"
                     },
+                    "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
                     "traits": {
                       "type": "array",
                       "items": {
@@ -10428,6 +10432,10 @@
                             "very_high"
                           ],
                           "default": "normal"
+                        },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
                         },
                         "traits": {
                           "type": "array",
@@ -11775,6 +11783,10 @@
                       ],
                       "default": "normal"
                     },
+                    "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
                     "traits": {
                       "type": "array",
                       "items": {
@@ -12946,6 +12958,10 @@
                         "very_high"
                       ],
                       "default": "normal"
+                    },
+                    "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
                     },
                     "traits": {
                       "type": "array",
@@ -14269,6 +14285,10 @@
                             "very_high"
                           ],
                           "default": "normal"
+                        },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
                         },
                         "traits": {
                           "type": "array",
@@ -15604,6 +15624,10 @@
                           ],
                           "default": "normal"
                         },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -16718,6 +16742,10 @@
                         "very_high"
                       ],
                       "default": "normal"
+                    },
+                    "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
                     },
                     "traits": {
                       "type": "array",
@@ -17984,6 +18012,10 @@
                             "very_high"
                           ],
                           "default": "normal"
+                        },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
                         },
                         "traits": {
                           "type": "array",
@@ -19261,6 +19293,10 @@
                           ],
                           "default": "normal"
                         },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -20375,6 +20411,10 @@
                         "very_high"
                       ],
                       "default": "normal"
+                    },
+                    "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
                     },
                     "traits": {
                       "type": "array",
@@ -21665,6 +21705,10 @@
                             "very_high"
                           ],
                           "default": "normal"
+                        },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
                         },
                         "traits": {
                           "type": "array",
@@ -22968,6 +23012,10 @@
                           ],
                           "default": "normal"
                         },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -24082,6 +24130,10 @@
                         "very_high"
                       ],
                       "default": "normal"
+                    },
+                    "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
                     },
                     "traits": {
                       "type": "array",
@@ -25688,6 +25740,10 @@
                             "very_high"
                           ],
                           "default": "normal"
+                        },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
                         },
                         "traits": {
                           "type": "array",
@@ -27307,6 +27363,10 @@
                           ],
                           "default": "normal"
                         },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -28421,6 +28481,10 @@
                         "very_high"
                       ],
                       "default": "normal"
+                    },
+                    "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
                     },
                     "traits": {
                       "type": "array",
@@ -29637,6 +29701,10 @@
                             "very_high"
                           ],
                           "default": "normal"
+                        },
+                        "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
                         },
                         "traits": {
                           "type": "array",
