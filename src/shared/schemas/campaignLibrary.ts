@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { isoTimestamp, uuid } from './common.ts';
 import { armorData, weaponData } from './inventory.ts';
 import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
+import { spellDifficulty } from './spell.ts';
 import { traitKindEnum, traitModifier } from './trait.ts';
 
 const tagList = z.array(z.string().min(1).max(40)).default([]);
@@ -64,6 +65,43 @@ export const librarySkillCreate = z.object({
 
 export const librarySkillUpdate = librarySkillCreate.partial();
 
+/**
+ * Library spells mirror the per-character spell shape minus the
+ * per-character bits (points, character id): the library records the
+ * book data a player copies when learning the spell.
+ */
+export const librarySpellOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  college: z.string().max(80).nullable(),
+  difficulty: spellDifficulty,
+  baseEnergyCost: z.number().int().min(0).max(99),
+  maintenanceCost: z.number().int().min(0).max(99).nullable(),
+  castingTime: z.string().max(40).nullable(),
+  duration: z.string().max(40).nullable(),
+  prerequisites: z.string().max(20_000).nullable(),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+});
+
+export const librarySpellCreate = z.object({
+  name: z.string().min(1).max(160).trim(),
+  college: z.string().max(80).trim().nullable().optional(),
+  difficulty: spellDifficulty.default('H'),
+  baseEnergyCost: z.number().int().min(0).max(99).default(1),
+  maintenanceCost: z.number().int().min(0).max(99).nullable().optional(),
+  castingTime: z.string().max(40).trim().nullable().optional(),
+  duration: z.string().max(40).trim().nullable().optional(),
+  prerequisites: z.string().max(20_000).nullable().optional(),
+  description: z.string().max(20_000).nullable().optional(),
+  source: z.string().max(40).trim().nullable().optional(),
+});
+
+export const librarySpellUpdate = librarySpellCreate.partial();
+
 export const libraryItemOut = z.object({
   id: uuid,
   campaignId: uuid,
@@ -110,6 +148,7 @@ export const importResult = z.object({
   mode: importMode,
   traits: importSectionResult,
   skills: importSectionResult,
+  spells: importSectionResult,
   items: importSectionResult,
 });
 
@@ -131,6 +170,7 @@ export const libraryYamlDoc = z.object({
   library: z.object({
     traits: z.array(libraryTraitCreate).default([]),
     skills: z.array(librarySkillCreate).default([]),
+    spells: z.array(librarySpellCreate).default([]),
     items: z.array(libraryItemCreate).default([]),
   }),
 });
@@ -141,6 +181,9 @@ export type LibraryTraitUpdate = z.infer<typeof libraryTraitUpdate>;
 export type LibrarySkillOut = z.infer<typeof librarySkillOut>;
 export type LibrarySkillCreate = z.infer<typeof librarySkillCreate>;
 export type LibrarySkillUpdate = z.infer<typeof librarySkillUpdate>;
+export type LibrarySpellOut = z.infer<typeof librarySpellOut>;
+export type LibrarySpellCreate = z.infer<typeof librarySpellCreate>;
+export type LibrarySpellUpdate = z.infer<typeof librarySpellUpdate>;
 export type LibraryItemOut = z.infer<typeof libraryItemOut>;
 export type LibraryItemCreate = z.infer<typeof libraryItemCreate>;
 export type LibraryItemUpdate = z.infer<typeof libraryItemUpdate>;

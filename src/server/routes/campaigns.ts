@@ -64,6 +64,7 @@ function campaignToOut(row: DbCampaign, members: readonly MemberRow[]) {
     pointTarget: row.pointTarget,
     disadvantageCap: row.disadvantageCap,
     quirkCap: row.quirkCap,
+    manaLevel: row.manaLevel,
     shareCharacterSheets: row.shareCharacterSheets,
     members: members.map((m) => ({
       userId: m.userId,
@@ -169,6 +170,7 @@ router.openapi(
           pointTarget: body.pointTarget ?? null,
           disadvantageCap: body.disadvantageCap ?? null,
           quirkCap: body.quirkCap ?? 5,
+          ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
           ...(body.shareCharacterSheets !== undefined
             ? { shareCharacterSheets: body.shareCharacterSheets }
             : {}),
@@ -244,6 +246,7 @@ router.openapi(
           ...(body.pointTarget !== undefined ? { pointTarget: body.pointTarget } : {}),
           ...(body.disadvantageCap !== undefined ? { disadvantageCap: body.disadvantageCap } : {}),
           ...(body.quirkCap !== undefined ? { quirkCap: body.quirkCap } : {}),
+          ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
           ...(body.shareCharacterSheets !== undefined
             ? { shareCharacterSheets: body.shareCharacterSheets }
             : {}),

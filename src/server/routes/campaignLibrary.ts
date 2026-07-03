@@ -17,6 +17,7 @@ import { HTTPException } from 'hono/http-exception';
 import {
   type LibraryItemCreate,
   type LibrarySkillCreate,
+  type LibrarySpellCreate,
   type LibraryTraitCreate,
   importMode,
   importResult,
@@ -26,6 +27,9 @@ import {
   librarySkillCreate,
   librarySkillOut,
   librarySkillUpdate,
+  librarySpellCreate,
+  librarySpellOut,
+  librarySpellUpdate,
   libraryTraitCreate,
   libraryTraitOut,
   libraryTraitUpdate,
@@ -39,9 +43,11 @@ import { getDb } from '../db/client.ts';
 import {
   type DbCampaignLibraryItem,
   type DbCampaignLibrarySkill,
+  type DbCampaignLibrarySpell,
   type DbCampaignLibraryTrait,
   campaignLibraryItems,
   campaignLibrarySkills,
+  campaignLibrarySpells,
   campaignLibraryTraits,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
@@ -78,6 +84,25 @@ function skillToOut(row: DbCampaignLibrarySkill): z.infer<typeof librarySkillOut
     defaultSpecialization: row.defaultSpecialization,
     prerequisites: row.prerequisites,
     situationalModifiers: row.situationalModifiers ?? [],
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  });
+}
+
+function spellToOut(row: DbCampaignLibrarySpell): z.infer<typeof librarySpellOut> {
+  return librarySpellOut.parse({
+    id: row.id,
+    campaignId: row.campaignId,
+    name: row.name,
+    college: row.college,
+    difficulty: row.difficulty,
+    baseEnergyCost: row.baseEnergyCost,
+    maintenanceCost: row.maintenanceCost,
+    castingTime: row.castingTime,
+    duration: row.duration,
+    prerequisites: row.prerequisites,
+    description: row.description,
+    source: row.source,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   });
@@ -120,6 +145,7 @@ router.openapi(
             schema: z.object({
               traits: z.array(libraryTraitOut),
               skills: z.array(librarySkillOut),
+              spells: z.array(librarySpellOut),
               items: z.array(libraryItemOut),
             }),
           },
@@ -134,7 +160,7 @@ router.openapi(
     const { id } = c.req.valid('param');
     await requireCampaignMember(id, user.id);
     const db = getDb();
-    const [traits, skills, items] = await Promise.all([
+    const [traits, skills, spells, items] = await Promise.all([
       db
         .select()
         .from(campaignLibraryTraits)
@@ -147,6 +173,11 @@ router.openapi(
         .orderBy(asc(campaignLibrarySkills.name)),
       db
         .select()
+        .from(campaignLibrarySpells)
+        .where(eq(campaignLibrarySpells.campaignId, id))
+        .orderBy(asc(campaignLibrarySpells.name)),
+      db
+        .select()
         .from(campaignLibraryItems)
         .where(eq(campaignLibraryItems.campaignId, id))
         .orderBy(asc(campaignLibraryItems.name)),
@@ -155,6 +186,7 @@ router.openapi(
       {
         traits: traits.map(traitToOut),
         skills: skills.map(skillToOut),
+        spells: spells.map(spellToOut),
         items: items.map(itemToOut),
       },
       200,
@@ -390,6 +422,122 @@ router.openapi(
   },
 );
 
+// ===================== SPELL CRUD =====================
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/campaigns/{id}/library/spells',
+    tags: ['campaigns'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Add a library spell (owner only)',
+    request: {
+      params: z.object({ id: uuid }),
+      body: { required: true, content: { 'application/json': { schema: librarySpellCreate } } },
+    },
+    responses: {
+      201: { description: 'Created', content: { 'application/json': { schema: librarySpellOut } } },
+      403: errorResponse('Forbidden'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    await requireCampaignOwner(id, user.id);
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [inserted] = await tx
+        .insert(campaignLibrarySpells)
+        .values({
+          campaignId: id,
+          name: body.name,
+          college: body.college ?? null,
+          difficulty: body.difficulty ?? 'H',
+          baseEnergyCost: body.baseEnergyCost ?? 1,
+          maintenanceCost: body.maintenanceCost ?? null,
+          castingTime: body.castingTime ?? null,
+          duration: body.duration ?? null,
+          prerequisites: body.prerequisites ?? null,
+          description: body.description ?? null,
+          source: body.source ?? null,
+        })
+        .returning();
+      if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
+      return inserted;
+    });
+    return c.json(spellToOut(row), 201);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/campaigns/{id}/library/spells/{spellId}',
+    tags: ['campaigns'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Update a library spell (owner only)',
+    request: {
+      params: z.object({ id: uuid, spellId: uuid }),
+      body: { required: true, content: { 'application/json': { schema: librarySpellUpdate } } },
+    },
+    responses: {
+      200: { description: 'Updated', content: { 'application/json': { schema: librarySpellOut } } },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, spellId } = c.req.valid('param');
+    const body = c.req.valid('json');
+    await requireCampaignOwner(id, user.id);
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    for (const [k, v] of Object.entries(body)) {
+      if (v === undefined) continue;
+      updates[k] = v;
+    }
+    const row = await withAudit(user.id, undefined, async (tx) => {
+      const [updated] = await tx
+        .update(campaignLibrarySpells)
+        .set(updates)
+        .where(and(eq(campaignLibrarySpells.id, spellId), eq(campaignLibrarySpells.campaignId, id)))
+        .returning();
+      if (!updated) throw new HTTPException(404, { message: 'spell not found' });
+      return updated;
+    });
+    return c.json(spellToOut(row), 200);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/campaigns/{id}/library/spells/{spellId}',
+    tags: ['campaigns'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Delete a library spell (owner only)',
+    request: { params: z.object({ id: uuid, spellId: uuid }) },
+    responses: {
+      204: { description: 'Deleted' },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, spellId } = c.req.valid('param');
+    await requireCampaignOwner(id, user.id);
+    const result = await withAudit(user.id, undefined, async (tx) => {
+      return tx
+        .delete(campaignLibrarySpells)
+        .where(and(eq(campaignLibrarySpells.id, spellId), eq(campaignLibrarySpells.campaignId, id)))
+        .returning({ id: campaignLibrarySpells.id });
+    });
+    if (result.length === 0) throw new HTTPException(404, { message: 'spell not found' });
+    return c.body(null, 204);
+  },
+);
+
 // ===================== ITEM CRUD =====================
 
 router.openapi(
@@ -537,9 +685,10 @@ router.openapi(
     const { id } = c.req.valid('param');
     const { campaign } = await requireCampaignMember(id, user.id);
     const db = getDb();
-    const [traits, skills, items] = await Promise.all([
+    const [traits, skills, spells, items] = await Promise.all([
       db.select().from(campaignLibraryTraits).where(eq(campaignLibraryTraits.campaignId, id)),
       db.select().from(campaignLibrarySkills).where(eq(campaignLibrarySkills.campaignId, id)),
+      db.select().from(campaignLibrarySpells).where(eq(campaignLibrarySpells.campaignId, id)),
       db.select().from(campaignLibraryItems).where(eq(campaignLibraryItems.campaignId, id)),
     ]);
     const yamlText = emitLibraryYaml({
@@ -574,6 +723,21 @@ router.openapi(
             defaultSpecialization: s.defaultSpecialization ?? undefined,
             prerequisites: s.prerequisites ?? undefined,
             situationalModifiers: s.situationalModifiers ?? [],
+          }),
+      ),
+      spells: spells.map(
+        (s): LibrarySpellCreate =>
+          librarySpellCreate.parse({
+            name: s.name,
+            college: s.college ?? undefined,
+            difficulty: s.difficulty,
+            baseEnergyCost: s.baseEnergyCost,
+            maintenanceCost: s.maintenanceCost ?? undefined,
+            castingTime: s.castingTime ?? undefined,
+            duration: s.duration ?? undefined,
+            prerequisites: s.prerequisites ?? undefined,
+            description: s.description ?? undefined,
+            source: s.source ?? undefined,
           }),
       ),
       items: items.map(
@@ -658,6 +822,7 @@ router.openapi(
     const result = await withAudit(user.id, undefined, async (tx) => {
       const traitCounts = { created: 0, updated: 0, deleted: 0 };
       const skillCounts = { created: 0, updated: 0, deleted: 0 };
+      const spellCounts = { created: 0, updated: 0, deleted: 0 };
       const itemCounts = { created: 0, updated: 0, deleted: 0 };
 
       // -------- traits --------
@@ -761,6 +926,61 @@ router.openapi(
         }
       }
 
+      // -------- spells --------
+      const existingSpells = await tx
+        .select()
+        .from(campaignLibrarySpells)
+        .where(eq(campaignLibrarySpells.campaignId, id));
+      const spellKey = (s: { name: string }) => s.name.toLowerCase();
+      const existingSpellMap = new Map(existingSpells.map((s) => [spellKey(s), s]));
+      const incomingSpellKeys = new Set<string>();
+      for (const s of doc.library.spells) {
+        const k = spellKey(s);
+        incomingSpellKeys.add(k);
+        const existing = existingSpellMap.get(k);
+        if (existing) {
+          await tx
+            .update(campaignLibrarySpells)
+            .set({
+              college: s.college ?? null,
+              difficulty: s.difficulty ?? 'H',
+              baseEnergyCost: s.baseEnergyCost ?? 1,
+              maintenanceCost: s.maintenanceCost ?? null,
+              castingTime: s.castingTime ?? null,
+              duration: s.duration ?? null,
+              prerequisites: s.prerequisites ?? null,
+              description: s.description ?? null,
+              source: s.source ?? null,
+              updatedAt: new Date(),
+            })
+            .where(eq(campaignLibrarySpells.id, existing.id));
+          spellCounts.updated++;
+        } else {
+          await tx.insert(campaignLibrarySpells).values({
+            campaignId: id,
+            name: s.name,
+            college: s.college ?? null,
+            difficulty: s.difficulty ?? 'H',
+            baseEnergyCost: s.baseEnergyCost ?? 1,
+            maintenanceCost: s.maintenanceCost ?? null,
+            castingTime: s.castingTime ?? null,
+            duration: s.duration ?? null,
+            prerequisites: s.prerequisites ?? null,
+            description: s.description ?? null,
+            source: s.source ?? null,
+          });
+          spellCounts.created++;
+        }
+      }
+      if (mode === 'replace') {
+        for (const s of existingSpells) {
+          if (!incomingSpellKeys.has(spellKey(s))) {
+            await tx.delete(campaignLibrarySpells).where(eq(campaignLibrarySpells.id, s.id));
+            spellCounts.deleted++;
+          }
+        }
+      }
+
       // -------- items --------
       const existingItems = await tx
         .select()
@@ -816,7 +1036,13 @@ router.openapi(
         }
       }
 
-      return { mode, traits: traitCounts, skills: skillCounts, items: itemCounts };
+      return {
+        mode,
+        traits: traitCounts,
+        skills: skillCounts,
+        spells: spellCounts,
+        items: itemCounts,
+      };
     });
     return c.json(result, 200);
   },

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MANA_LEVELS } from '../constants/magic.ts';
 import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, uuid } from './common.ts';
 import { inventoryItemOut } from './inventory.ts';
@@ -129,6 +130,9 @@ export const characterDetail = z.object({
   points: pointBreakdownOut,
   encumbrance: encumbranceOut,
   warnings: z.array(warningOut),
+  /** Ambient mana from the campaign ('normal' when campaignless);
+   * already folded into every spell's level and effective costs. */
+  manaLevel: z.enum(MANA_LEVELS).default('normal'),
   traits: z.array(traitOut),
   skills: z.array(skillOut),
   spells: z.array(spellOut),

@@ -13,6 +13,7 @@
  * the browser (Dexie returns ISO strings).
  */
 
+import type { ManaLevel } from '../constants/magic.ts';
 import type { SpellDifficulty } from '../constants/skills.ts';
 import type { CharacterDetail } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
@@ -33,7 +34,9 @@ import {
   computeSpellLevel,
   effectiveCastingCost,
   effectiveMaintenanceCost,
+  isFreeCastingMana,
   mageryLevel,
+  manaSkillModifier,
 } from './spellCalc.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
@@ -171,6 +174,8 @@ export interface CharacterDetailInputCampaign {
   pointTarget: number | null;
   disadvantageCap: number | null;
   quirkCap: number | null;
+  /** Optional: rows from before the mana column default to 'normal'. */
+  manaLevel?: ManaLevel | null;
 }
 
 export interface CharacterDetailInput {
@@ -311,9 +316,11 @@ export function buildSpellOut(
   spell: CharacterDetailInputSpell,
   iq: number,
   magery: number,
+  mana: ManaLevel = 'normal',
 ): SpellOut {
   const difficulty = spell.difficulty ?? 'H';
-  const level = computeSpellLevel(spell.points, iq, magery, difficulty);
+  const level = computeSpellLevel(spell.points, iq, magery, difficulty) + manaSkillModifier(mana);
+  const freeCasting = isFreeCastingMana(mana);
   return {
     id: spell.id,
     characterId: spell.characterId,
@@ -329,8 +336,12 @@ export function buildSpellOut(
     notes: spell.notes,
     librarySpellId: spell.librarySpellId,
     level,
-    effectiveCost: effectiveCastingCost(spell.baseEnergyCost, level),
-    effectiveMaintenanceCost: effectiveMaintenanceCost(spell.maintenanceCost, level),
+    effectiveCost: freeCasting ? 0 : effectiveCastingCost(spell.baseEnergyCost, level),
+    effectiveMaintenanceCost: freeCasting
+      ? spell.maintenanceCost == null
+        ? null
+        : 0
+      : effectiveMaintenanceCost(spell.maintenanceCost, level),
     createdAt: toIso(spell.createdAt),
     updatedAt: toIso(spell.updatedAt),
   };
@@ -360,7 +371,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const traitsOut = traits.map(buildTraitOut);
   const skillsOut = skills.map((s) => buildSkillOut(s, derived));
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
-  const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery));
+  const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
+  const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery, manaLevel));
   const combatOut = combat ? buildCombatStateOut(combat) : null;
 
   const caps: CampaignCaps = {
@@ -419,6 +431,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     points,
     encumbrance,
     warnings,
+    manaLevel,
     traits: traitsOut,
     skills: skillsOut,
     spells: spellsOut,

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  canCastInMana,
   computeSpellLevel,
   costReduction,
   effectiveCastingCost,
   effectiveMaintenanceCost,
   hasMagery,
+  isFreeCastingMana,
   mageryLevel,
+  manaSkillModifier,
   totalPowerstoneEnergy,
 } from './spellCalc.ts';
 
@@ -38,6 +41,19 @@ describe('mageryLevel', () => {
         { name: 'Magery (Solid!)', level: 3 },
       ]),
     ).toBe(3);
+  });
+
+  it('falls back to a level embedded in the name when level is null', () => {
+    expect(mageryLevel([{ name: 'Magery 3', level: null }])).toBe(3);
+    expect(mageryLevel([{ name: 'magery 2 (One College)', level: null }])).toBe(2);
+  });
+
+  it('prefers the explicit level column over the name', () => {
+    expect(mageryLevel([{ name: 'Magery 3', level: 1 }])).toBe(1);
+  });
+
+  it('name without a number still reads as Magery 0', () => {
+    expect(mageryLevel([{ name: 'Magery (Dance)', level: null }])).toBe(0);
   });
 });
 
@@ -150,6 +166,31 @@ describe('effectiveMaintenanceCost', () => {
 
   it('keeps a zero maintenance at zero', () => {
     expect(effectiveMaintenanceCost(0, 10)).toBe(0);
+  });
+});
+
+describe('mana levels (B235)', () => {
+  it('low mana is -5 to skill; every other level is unmodified', () => {
+    expect(manaSkillModifier('low')).toBe(-5);
+    for (const m of ['none', 'normal', 'high', 'very_high'] as const) {
+      expect(manaSkillModifier(m)).toBe(0);
+    }
+  });
+
+  it('nobody casts in no mana; anyone casts in high+; otherwise Magery gates', () => {
+    expect(canCastInMana(true, 'none')).toBe(false);
+    expect(canCastInMana(false, 'high')).toBe(true);
+    expect(canCastInMana(false, 'very_high')).toBe(true);
+    expect(canCastInMana(false, 'normal')).toBe(false);
+    expect(canCastInMana(true, 'normal')).toBe(true);
+    expect(canCastInMana(false, 'low')).toBe(false);
+    expect(canCastInMana(true, 'low')).toBe(true);
+  });
+
+  it('only very high mana makes casting free', () => {
+    expect(isFreeCastingMana('very_high')).toBe(true);
+    expect(isFreeCastingMana('high')).toBe(false);
+    expect(isFreeCastingMana('normal')).toBe(false);
   });
 });
 

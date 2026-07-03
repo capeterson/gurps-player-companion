@@ -7,7 +7,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../../../shared/constants/skills.ts';
+import {
+  SKILL_ATTRIBUTES,
+  SKILL_DIFFICULTIES,
+  SPELL_DIFFICULTIES,
+} from '../../../shared/constants/skills.ts';
 import {
   MODIFIER_CATEGORIES,
   MODIFIER_COST_TYPES,
@@ -20,6 +24,8 @@ import type {
   LibraryItemOut,
   LibrarySkillCreate,
   LibrarySkillOut,
+  LibrarySpellCreate,
+  LibrarySpellOut,
   LibraryTraitCreate,
   LibraryTraitOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
@@ -30,10 +36,11 @@ import { ApiError, api, apiFetch } from '../../lib/api.ts';
 interface LibraryPayload {
   traits: LibraryTraitOut[];
   skills: LibrarySkillOut[];
+  spells: LibrarySpellOut[];
   items: LibraryItemOut[];
 }
 
-type SectionKey = 'traits' | 'skills' | 'items';
+type SectionKey = 'traits' | 'skills' | 'spells' | 'items';
 
 /**
  * Top-level library page.  Mirrors LogPage: when the parent route
@@ -95,6 +102,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   const [skillsAddOpen, setSkillsAddOpen] = useState(false);
   const [skillsEditId, setSkillsEditId] = useState<string | null>(null);
   const [skillsDeleteId, setSkillsDeleteId] = useState<string | null>(null);
+  const [spellsAddOpen, setSpellsAddOpen] = useState(false);
+  const [spellsEditId, setSpellsEditId] = useState<string | null>(null);
+  const [spellsDeleteId, setSpellsDeleteId] = useState<string | null>(null);
   const [itemsAddOpen, setItemsAddOpen] = useState(false);
   const [itemsEditId, setItemsEditId] = useState<string | null>(null);
   const [itemsDeleteId, setItemsDeleteId] = useState<string | null>(null);
@@ -157,6 +167,35 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     },
   });
 
+  // Spell mutations
+  const createSpell = useMutation({
+    mutationFn: (body: LibrarySpellCreate) =>
+      api<LibrarySpellOut>(`/campaigns/${campaignId}/library/spells`, { method: 'POST', body }),
+    onSuccess: () => {
+      setSpellsAddOpen(false);
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+    },
+  });
+  const updateSpell = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: LibrarySpellCreate }) =>
+      api<LibrarySpellOut>(`/campaigns/${campaignId}/library/spells/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      setSpellsEditId(null);
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+    },
+  });
+  const deleteSpell = useMutation({
+    mutationFn: (id: string) =>
+      api(`/campaigns/${campaignId}/library/spells/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setSpellsDeleteId(null);
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+    },
+  });
+
   // Item mutations
   const createItem = useMutation({
     mutationFn: (body: LibraryItemCreate) =>
@@ -208,6 +247,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     return {
       traits: lib?.traits.length ?? 0,
       skills: lib?.skills.length ?? 0,
+      spells: lib?.spells?.length ?? 0,
       items: lib?.items.length ?? 0,
     };
   }, [library.data]);
@@ -257,6 +297,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
   const traitToDelete = library.data?.traits.find((t) => t.id === traitsDeleteId);
   const skillToDelete = library.data?.skills.find((s) => s.id === skillsDeleteId);
+  const spellToDelete = library.data?.spells?.find((s) => s.id === spellsDeleteId);
   const itemToDelete = library.data?.items.find((i) => i.id === itemsDeleteId);
 
   return (
@@ -361,6 +402,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           className={`chip ${section === 'skills' ? 'on' : ''}`}
         >
           Skills <span className="num text-dim ml-1">{counts.skills}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setSection('spells')}
+          className={`chip ${section === 'spells' ? 'on' : ''}`}
+        >
+          Spells <span className="num text-dim ml-1">{counts.spells}</span>
         </button>
         <button
           type="button"
@@ -562,6 +610,105 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
             </>
           )}
 
+          {/* ── Spells ── */}
+          {section === 'spells' && (
+            <>
+              {(library.data.spells ?? []).map((s) =>
+                spellsEditId === s.id ? (
+                  <SpellForm
+                    key={s.id}
+                    initial={s}
+                    isPending={updateSpell.isPending}
+                    error={
+                      updateSpell.error instanceof ApiError
+                        ? updateSpell.error.message
+                        : updateSpell.error
+                          ? 'Save failed'
+                          : null
+                    }
+                    onSubmit={(body) => updateSpell.mutate({ id: s.id, body })}
+                    onCancel={() => setSpellsEditId(null)}
+                  />
+                ) : (
+                  <article key={s.id} className="card p-card">
+                    <div className="mb-1 flex items-start justify-between gap-2">
+                      <span className="font-display text-lg font-semibold">{s.name}</span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="num text-xs uppercase tracking-widest text-dim">
+                          {s.college ? `${s.college} · ` : ''}IQ/{s.difficulty} · {s.baseEnergyCost}{' '}
+                          FP
+                          {s.maintenanceCost != null ? ` · upkeep ${s.maintenanceCost}` : ''}
+                        </span>
+                        {isOwner && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs"
+                              onClick={() => {
+                                setSpellsEditId(s.id);
+                                setSpellsAddOpen(false);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs text-error"
+                              onClick={() => setSpellsDeleteId(s.id)}
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {(s.castingTime || s.duration) && (
+                      <p className="text-xs text-dim">
+                        {s.castingTime ? `Cast in ${s.castingTime}` : ''}
+                        {s.castingTime && s.duration ? ' · ' : ''}
+                        {s.duration ? `Lasts ${s.duration}` : ''}
+                      </p>
+                    )}
+                    {s.prerequisites && (
+                      <p className="text-xs text-dim">Prerequisites · {s.prerequisites}</p>
+                    )}
+                    {s.description && <p className="text-sm text-muted">{s.description}</p>}
+                    {s.source && <p className="text-xs text-dim">Source · {s.source}</p>}
+                  </article>
+                ),
+              )}
+              {isOwner && spellsAddOpen && (
+                <SpellForm
+                  isPending={createSpell.isPending}
+                  error={
+                    createSpell.error instanceof ApiError
+                      ? createSpell.error.message
+                      : createSpell.error
+                        ? 'Save failed'
+                        : null
+                  }
+                  onSubmit={(body) => createSpell.mutate(body)}
+                  onCancel={() => setSpellsAddOpen(false)}
+                />
+              )}
+              {counts.spells === 0 && !spellsAddOpen && (
+                <p className="text-center text-muted">No spells in the library yet.</p>
+              )}
+              {isOwner && !spellsAddOpen && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm self-start"
+                  onClick={() => {
+                    setSpellsAddOpen(true);
+                    setSpellsEditId(null);
+                  }}
+                >
+                  + Add spell
+                </button>
+              )}
+            </>
+          )}
+
           {/* ── Items ── */}
           {section === 'items' && (
             <>
@@ -678,6 +825,20 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       >
         Delete <strong>{skillToDelete?.name}</strong> from the library? Existing characters that use
         this skill are not affected.
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={!!spellsDeleteId}
+        title="Delete library spell"
+        confirmLabel="Delete"
+        tone="error"
+        onConfirm={() => {
+          if (spellsDeleteId) deleteSpell.mutate(spellsDeleteId);
+        }}
+        onCancel={() => setSpellsDeleteId(null)}
+      >
+        Delete <strong>{spellToDelete?.name}</strong> from the library? Existing characters that
+        know this spell are not affected.
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -1116,6 +1277,189 @@ function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormP
   );
 }
 
+// ── Spell form ──────────────────────────────────────────────────────────────
+
+interface SpellFormProps {
+  initial?: LibrarySpellOut;
+  isPending: boolean;
+  error?: string | null;
+  onSubmit: (body: LibrarySpellCreate) => void;
+  onCancel: () => void;
+}
+
+function SpellForm({ initial, isPending, error, onSubmit, onCancel }: SpellFormProps) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [college, setCollege] = useState(initial?.college ?? '');
+  const [difficulty, setDifficulty] = useState<(typeof SPELL_DIFFICULTIES)[number]>(
+    initial?.difficulty ?? 'H',
+  );
+  const [baseEnergyCost, setBaseEnergyCost] = useState(String(initial?.baseEnergyCost ?? 1));
+  const [maintenanceCost, setMaintenanceCost] = useState(
+    initial?.maintenanceCost != null ? String(initial.maintenanceCost) : '',
+  );
+  const [castingTime, setCastingTime] = useState(initial?.castingTime ?? '');
+  const [duration, setDuration] = useState(initial?.duration ?? '');
+  const [prerequisites, setPrerequisites] = useState(initial?.prerequisites ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [source, setSource] = useState(initial?.source ?? '');
+
+  function handleSubmit() {
+    if (!name.trim()) return;
+    const cost = Number.parseInt(baseEnergyCost, 10);
+    const upkeep = maintenanceCost.trim() !== '' ? Number.parseInt(maintenanceCost, 10) : null;
+    onSubmit({
+      name: name.trim(),
+      college: college.trim() || null,
+      difficulty,
+      baseEnergyCost: Number.isNaN(cost) ? 1 : cost,
+      maintenanceCost: upkeep != null && Number.isNaN(upkeep) ? null : upkeep,
+      castingTime: castingTime.trim() || null,
+      duration: duration.trim() || null,
+      prerequisites: prerequisites.trim() || null,
+      description: description.trim() || null,
+      source: source.trim() || null,
+    });
+  }
+
+  return (
+    <div className="card p-card space-y-3 border border-primary/30">
+      <div className="flex flex-wrap gap-3">
+        <label className="form-control min-w-[10rem] flex-1">
+          <span className="label-text">Name *</span>
+          <input
+            type="text"
+            className="input input-bordered input-sm"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={160}
+          />
+        </label>
+        <label className="form-control w-28">
+          <span className="label-text">College</span>
+          <input
+            type="text"
+            className="input input-bordered input-sm"
+            value={college}
+            onChange={(e) => setCollege(e.target.value)}
+            maxLength={80}
+            placeholder="Fire"
+          />
+        </label>
+        <label className="form-control">
+          <span className="label-text">Difficulty</span>
+          <select
+            className="select select-bordered select-sm"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}
+          >
+            {SPELL_DIFFICULTIES.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="form-control w-20">
+          <span className="label-text">Cost</span>
+          <input
+            type="number"
+            className="input input-bordered input-sm"
+            value={baseEnergyCost}
+            onChange={(e) => setBaseEnergyCost(e.target.value)}
+            min={0}
+            max={99}
+          />
+        </label>
+        <label className="form-control w-20">
+          <span className="label-text">Upkeep</span>
+          <input
+            type="number"
+            className="input input-bordered input-sm"
+            value={maintenanceCost}
+            onChange={(e) => setMaintenanceCost(e.target.value)}
+            min={0}
+            max={99}
+            placeholder="—"
+          />
+        </label>
+        <label className="form-control w-28">
+          <span className="label-text">Source</span>
+          <input
+            type="text"
+            className="input input-bordered input-sm"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            maxLength={40}
+            placeholder="M-110"
+          />
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <label className="form-control w-40">
+          <span className="label-text">Casting time</span>
+          <input
+            type="text"
+            className="input input-bordered input-sm"
+            value={castingTime}
+            onChange={(e) => setCastingTime(e.target.value)}
+            maxLength={40}
+            placeholder="1 second"
+          />
+        </label>
+        <label className="form-control w-40">
+          <span className="label-text">Duration</span>
+          <input
+            type="text"
+            className="input input-bordered input-sm"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            maxLength={40}
+            placeholder="1 minute"
+          />
+        </label>
+        <label className="form-control min-w-[12rem] flex-1">
+          <span className="label-text">Prerequisites</span>
+          <input
+            type="text"
+            className="input input-bordered input-sm"
+            value={prerequisites}
+            onChange={(e) => setPrerequisites(e.target.value)}
+            placeholder="Magery 1, Ignite Fire"
+          />
+        </label>
+      </div>
+      <label className="form-control">
+        <span className="label-text">Description</span>
+        <textarea
+          className="textarea textarea-bordered textarea-sm"
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </label>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={onCancel}
+          disabled={isPending}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={handleSubmit}
+          disabled={isPending || !name.trim()}
+        >
+          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add spell'}
+        </button>
+      </div>
+      {error && <p className="alert alert-error text-sm">{error}</p>}
+    </div>
+  );
+}
+
 // ── Item form ───────────────────────────────────────────────────────────────
 
 interface ItemFormProps {
@@ -1261,7 +1605,7 @@ function formatImportResult(r: ImportResult): string {
     const s = r[label];
     return `${label}: +${s.created} · ~${s.updated} · −${s.deleted}`;
   };
-  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('items')}`;
+  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}`;
 }
 
 function slugify(name: string): string {

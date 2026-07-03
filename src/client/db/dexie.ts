@@ -169,6 +169,9 @@ export interface LocalCampaign {
   pointTarget: number | null;
   disadvantageCap: number | null;
   quirkCap: number | null;
+  /** Optional: rows synced before the mana column existed lack it;
+   * readers default missing values to 'normal'. */
+  manaLevel?: 'none' | 'low' | 'normal' | 'high' | 'very_high';
   /**
    * When false, non-owner members see the minimal "readily apparent"
    * view of other players' character sheets instead of the full

@@ -14,6 +14,7 @@
  *   effectiveCost = max(0, baseCost - reduction)
  */
 
+import type { ManaLevel } from '../constants/magic.ts';
 import type { SpellDifficulty } from '../constants/skills.ts';
 import { skillOffset } from './skillCalc.ts';
 
@@ -42,11 +43,19 @@ export function mageryLevel(traits: readonly MageryTraitInput[]): number {
   for (const t of traits) {
     if (!isMageryName(t.name)) continue;
     // Magery 0 is encoded as level=null in many sheets (no level in
-    // GURPS terms = "level 0").  Treat null as 0.
-    const lvl = t.level ?? 0;
+    // GURPS terms = "level 0").  When the level column is empty, fall
+    // back to a level embedded in the name -- GCS-style sheets write
+    // "Magery 3" as the trait name with no separate level.
+    const lvl = t.level ?? mageryLevelFromName(t.name);
     if (lvl > best) best = lvl;
   }
   return best;
+}
+
+/** "Magery 3", "magery 2 (One College)" → 3 / 2; no number → 0. */
+function mageryLevelFromName(name: string): number {
+  const m = /\bmagery\s+(\d{1,2})\b/i.exec(name);
+  return m?.[1] ? Number.parseInt(m[1], 10) : 0;
 }
 
 /** True when the character has any Magery trait at all (incl. Magery 0). */
@@ -73,6 +82,30 @@ export function computeSpellLevel(
   difficulty: SpellDifficulty = 'H',
 ): number {
   return iq + skillOffset(difficulty, points) + magery;
+}
+
+/**
+ * Skill modifier from the ambient mana level (Basic Set p. 235).
+ * Low mana is -5 to every spell; the other levels don't shift skill.
+ */
+export function manaSkillModifier(mana: ManaLevel): number {
+  return mana === 'low' ? -5 : 0;
+}
+
+/**
+ * Whether this character can cast spells at all here (B235): no mana
+ * means nobody casts, high or better lets anyone cast, and normal/low
+ * mana require Magery (even Magery 0).
+ */
+export function canCastInMana(casterHasMagery: boolean, mana: ManaLevel): boolean {
+  if (mana === 'none') return false;
+  if (mana === 'high' || mana === 'very_high') return true;
+  return casterHasMagery;
+}
+
+/** In very high mana, spells cost no energy to cast or maintain (B235). */
+export function isFreeCastingMana(mana: ManaLevel): boolean {
+  return mana === 'very_high';
 }
 
 /**

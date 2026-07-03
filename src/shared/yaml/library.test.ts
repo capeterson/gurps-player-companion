@@ -31,6 +31,17 @@ library:
     - name: Acrobatics
       attribute: DX
       difficulty: H
+  spells:
+    - name: Light
+      college: Light & Darkness
+      difficulty: H
+      baseEnergyCost: 1
+      maintenanceCost: 1
+    - name: Major Healing
+      college: Healing
+      difficulty: VH
+      baseEnergyCost: 2
+      prerequisites: Magery 1, Minor Healing
   items:
     - name: Mail Hauberk
       category: armor
@@ -54,7 +65,21 @@ describe('parseLibraryYaml', () => {
     expect(doc.campaign?.name).toBe('Sample');
     expect(doc.library.traits).toHaveLength(2);
     expect(doc.library.skills).toHaveLength(2);
+    expect(doc.library.spells).toHaveLength(2);
     expect(doc.library.items).toHaveLength(2);
+  });
+
+  it('defaults spell difficulty to H and accepts VH', () => {
+    const doc = parseLibraryYaml(SAMPLE);
+    const light = doc.library.spells.find((s) => s.name === 'Light');
+    const major = doc.library.spells.find((s) => s.name === 'Major Healing');
+    expect(light?.difficulty).toBe('H');
+    expect(major?.difficulty).toBe('VH');
+  });
+
+  it('tolerates a document without a spells section (pre-spell-library exports)', () => {
+    const doc = parseLibraryYaml('version: 1\nlibrary:\n  traits: []\n  skills: []\n  items: []\n');
+    expect(doc.library.spells).toEqual([]);
   });
 
   it('rejects a wrong version', () => {
@@ -95,6 +120,19 @@ library:
     expect(() => parseLibraryYaml(dup)).toThrow(/duplicate skill/);
   });
 
+  it('rejects duplicate spell names regardless of case', () => {
+    const dup = `version: 1
+library:
+  traits: []
+  skills: []
+  spells:
+    - name: Light
+    - name: light
+  items: []
+`;
+    expect(() => parseLibraryYaml(dup)).toThrow(/duplicate spell/);
+  });
+
   it('rejects unparseable YAML', () => {
     expect(() => parseLibraryYaml(': : : :')).toThrow(LibraryYamlError);
   });
@@ -127,9 +165,11 @@ describe('emitLibraryYaml', () => {
       campaign: doc.campaign,
       traits: doc.library.traits,
       skills: doc.library.skills,
+      spells: doc.library.spells,
       items: doc.library.items,
     });
     const reparsed = parseLibraryYaml(reemit);
+    expect(reparsed.library.spells).toHaveLength(2);
     expect(reparsed.library.traits).toEqual(
       [...doc.library.traits].sort((a, b) => {
         if (a.kind !== b.kind) return a.kind.localeCompare(b.kind);
@@ -144,6 +184,7 @@ describe('emitLibraryYaml', () => {
       campaign: doc.campaign,
       traits: doc.library.traits,
       skills: doc.library.skills,
+      spells: doc.library.spells,
       items: doc.library.items,
     });
     const docB = parseLibraryYaml(first);
@@ -151,6 +192,7 @@ describe('emitLibraryYaml', () => {
       campaign: docB.campaign,
       traits: docB.library.traits,
       skills: docB.library.skills,
+      spells: docB.library.spells,
       items: docB.library.items,
     });
     expect(second).toBe(first);
@@ -168,6 +210,7 @@ describe('emitLibraryYaml', () => {
         },
       ],
       skills: [],
+      spells: [],
       items: [],
     });
     expect(out).not.toMatch(/tags:/);

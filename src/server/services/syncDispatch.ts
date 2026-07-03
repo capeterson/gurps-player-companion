@@ -79,6 +79,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_membership: null,
   campaign_library_trait: null,
   campaign_library_skill: null,
+  campaign_library_spell: null,
   campaign_library_item: null,
   adventure_log: null,
 };

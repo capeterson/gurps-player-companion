@@ -10,6 +10,7 @@ import { Document, parse, stringify } from 'yaml';
 import {
   type LibraryItemCreate,
   type LibrarySkillCreate,
+  type LibrarySpellCreate,
   type LibraryTraitCreate,
   type LibraryYamlDoc,
   libraryYamlDoc,
@@ -65,6 +66,12 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     if (skillKeys.has(k)) throw new LibraryYamlError(`duplicate skill (${s.name})`);
     skillKeys.add(k);
   }
+  const spellKeys = new Set<string>();
+  for (const s of doc.library.spells) {
+    const k = s.name.toLowerCase();
+    if (spellKeys.has(k)) throw new LibraryYamlError(`duplicate spell (${s.name})`);
+    spellKeys.add(k);
+  }
   const itemKeys = new Set<string>();
   for (const i of doc.library.items) {
     const k = i.name.toLowerCase();
@@ -77,6 +84,7 @@ export interface LibraryYamlExportInput {
   readonly campaign?: LibraryYamlDoc['campaign'];
   readonly traits: readonly LibraryTraitCreate[];
   readonly skills: readonly LibrarySkillCreate[];
+  readonly spells: readonly LibrarySpellCreate[];
   readonly items: readonly LibraryItemCreate[];
 }
 
@@ -111,11 +119,12 @@ function compact<T extends Record<string, unknown>>(input: T): Record<string, un
 export function emitLibraryYaml(input: LibraryYamlExportInput): string {
   const traits = sortedTraits(input.traits).map((t) => compact(t));
   const skills = sortedByName(input.skills).map((s) => compact(s));
+  const spells = sortedByName(input.spells).map((s) => compact(s));
   const items = sortedByName(input.items).map((i) => compact(i));
 
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };
   if (input.campaign) payload.campaign = compact(input.campaign);
-  payload.library = { traits, skills, items };
+  payload.library = { traits, skills, spells, items };
 
   const doc = new Document(payload);
   return stringify(doc, {

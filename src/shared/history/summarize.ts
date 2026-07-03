@@ -307,6 +307,17 @@ function summarizeLibrarySkill(
   return `Library skill ${name} updated`;
 }
 
+function summarizeLibrarySpell(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'spell';
+  if (op === 'insert') return `Added library spell ${name}`;
+  if (op === 'delete') return `Removed library spell ${old?.name ?? ''}`;
+  return `Library spell ${name} updated`;
+}
+
 function summarizeLibraryItem(
   op: string,
   old: Record<string, unknown> | null,
@@ -386,6 +397,9 @@ export function summarizeEvent(event: {
       break;
     case 'campaign_library_skill':
       summary = summarizeLibrarySkill(op, oldRow, newRow);
+      break;
+    case 'campaign_library_spell':
+      summary = summarizeLibrarySpell(op, oldRow, newRow);
       break;
     case 'campaign_library_item':
       summary = summarizeLibraryItem(op, oldRow, newRow);

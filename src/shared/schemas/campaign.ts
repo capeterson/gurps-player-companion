@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MANA_LEVELS } from '../constants/magic.ts';
 import { email } from './auth.ts';
 import { isoTimestamp, revision, uuid } from './common.ts';
 
@@ -26,6 +27,8 @@ export const campaignOut = z.object({
   pointTarget: z.number().int().nullable(),
   disadvantageCap: z.number().int().nullable(),
   quirkCap: z.number().int().nullable(),
+  /** Ambient mana level for the whole campaign (Basic Set p. 235). */
+  manaLevel: z.enum(MANA_LEVELS).default('normal'),
   /**
    * When false, non-owner members get the minimal "readily apparent"
    * view of other players' character sheets instead of the full
@@ -45,6 +48,7 @@ export const campaignCreate = z.object({
   pointTarget: z.number().int().min(0).max(10_000).nullable().optional(),
   disadvantageCap: z.number().int().min(0).max(10_000).nullable().optional(),
   quirkCap: z.number().int().min(0).max(50).nullable().optional(),
+  manaLevel: z.enum(MANA_LEVELS).optional(),
   shareCharacterSheets: z.boolean().optional(),
 });
 

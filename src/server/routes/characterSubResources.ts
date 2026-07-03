@@ -10,6 +10,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import type { ManaLevel } from '../../shared/constants/magic.ts';
 import { computeDerived } from '../../shared/domain/characterCalc.ts';
 import { computeWeights } from '../../shared/domain/encumbrance.ts';
 import { mageryLevel } from '../../shared/domain/spellCalc.ts';
@@ -50,6 +51,16 @@ import {
 
 const router = createOpenApiApp();
 router.use('/characters/*', requireActiveUser);
+
+/** Ambient mana for a character's campaign; campaignless = normal. */
+async function manaLevelFor(campaignId: string | null): Promise<ManaLevel> {
+  if (!campaignId) return 'normal';
+  const [row] = await getDb()
+    .select({ manaLevel: campaignsTable.manaLevel })
+    .from(campaignsTable)
+    .where(eq(campaignsTable.id, campaignId));
+  return row?.manaLevel ?? 'normal';
+}
 
 async function refreshDetail(characterId: string) {
   const db = getDb();
@@ -432,9 +443,10 @@ router.openapi(
       .from(characterTraits)
       .where(eq(characterTraits.characterId, id));
     const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
+    const mana = await manaLevelFor(access.character.campaignId);
     return c.json(
       {
-        spell: buildSpellOut(created, derived.effectiveIq, magery),
+        spell: buildSpellOut(created, derived.effectiveIq, magery, mana),
         character: await refreshDetail(id),
       },
       201,
@@ -492,9 +504,10 @@ router.openapi(
       .from(characterTraits)
       .where(eq(characterTraits.characterId, id));
     const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
+    const mana = await manaLevelFor(access.character.campaignId);
     return c.json(
       {
-        spell: buildSpellOut(updated, derived.effectiveIq, magery),
+        spell: buildSpellOut(updated, derived.effectiveIq, magery, mana),
         character: await refreshDetail(id),
       },
       200,

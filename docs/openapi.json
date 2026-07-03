@@ -1458,6 +1458,17 @@
                         "type": "integer",
                         "nullable": true
                       },
+                      "manaLevel": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "normal",
+                          "high",
+                          "very_high"
+                        ],
+                        "default": "normal"
+                      },
                       "shareCharacterSheets": {
                         "type": "boolean"
                       },
@@ -1584,6 +1595,16 @@
                     "minimum": 0,
                     "maximum": 50
                   },
+                  "manaLevel": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "normal",
+                      "high",
+                      "very_high"
+                    ]
+                  },
                   "shareCharacterSheets": {
                     "type": "boolean"
                   }
@@ -1632,6 +1653,17 @@
                     "quirkCap": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "shareCharacterSheets": {
                       "type": "boolean"
@@ -1784,6 +1816,17 @@
                       "type": "integer",
                       "nullable": true
                     },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -1930,6 +1973,16 @@
                     "minimum": 0,
                     "maximum": 50
                   },
+                  "manaLevel": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "normal",
+                      "high",
+                      "very_high"
+                    ]
+                  },
                   "shareCharacterSheets": {
                     "type": "boolean"
                   }
@@ -1975,6 +2028,17 @@
                     "quirkCap": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "shareCharacterSheets": {
                       "type": "boolean"
@@ -2194,6 +2258,17 @@
                       "type": "integer",
                       "nullable": true
                     },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2385,6 +2460,17 @@
                     "quirkCap": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "shareCharacterSheets": {
                       "type": "boolean"
@@ -2631,6 +2717,17 @@
                     "quirkCap": {
                       "type": "integer",
                       "nullable": true
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "shareCharacterSheets": {
                       "type": "boolean"
@@ -5070,6 +5167,99 @@
                         ]
                       }
                     },
+                    "spells": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "campaignId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "college": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 80
+                          },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
+                          "baseEnergyCost": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 99
+                          },
+                          "maintenanceCost": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 99
+                          },
+                          "castingTime": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "duration": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "prerequisites": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20000
+                          },
+                          "description": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20000
+                          },
+                          "source": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "campaignId",
+                          "name",
+                          "college",
+                          "difficulty",
+                          "baseEnergyCost",
+                          "maintenanceCost",
+                          "castingTime",
+                          "duration",
+                          "prerequisites",
+                          "description",
+                          "source",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -5226,6 +5416,7 @@
                   "required": [
                     "traits",
                     "skills",
+                    "spells",
                     "items"
                   ]
                 }
@@ -6430,6 +6621,484 @@
         }
       }
     },
+    "/api/v1/campaigns/{id}/library/spells": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a library spell (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "college": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 80
+                  },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "H",
+                      "VH"
+                    ],
+                    "default": "H"
+                  },
+                  "baseEnergyCost": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 99,
+                    "default": 1
+                  },
+                  "maintenanceCost": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 99
+                  },
+                  "castingTime": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "duration": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "prerequisites": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "college": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 80
+                    },
+                    "difficulty": {
+                      "type": "string",
+                      "enum": [
+                        "H",
+                        "VH"
+                      ]
+                    },
+                    "baseEnergyCost": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 99
+                    },
+                    "maintenanceCost": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 99
+                    },
+                    "castingTime": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "duration": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "prerequisites": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "college",
+                    "difficulty",
+                    "baseEnergyCost",
+                    "maintenanceCost",
+                    "castingTime",
+                    "duration",
+                    "prerequisites",
+                    "description",
+                    "source",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/spells/{spellId}": {
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a library spell (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "spellId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "college": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 80
+                  },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "H",
+                      "VH"
+                    ],
+                    "default": "H"
+                  },
+                  "baseEnergyCost": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 99,
+                    "default": 1
+                  },
+                  "maintenanceCost": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 99
+                  },
+                  "castingTime": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "duration": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "prerequisites": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "description": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 20000
+                  },
+                  "source": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "college": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 80
+                    },
+                    "difficulty": {
+                      "type": "string",
+                      "enum": [
+                        "H",
+                        "VH"
+                      ]
+                    },
+                    "baseEnergyCost": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 99
+                    },
+                    "maintenanceCost": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 99
+                    },
+                    "castingTime": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "duration": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "prerequisites": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 20000
+                    },
+                    "source": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "college",
+                    "difficulty",
+                    "baseEnergyCost",
+                    "maintenanceCost",
+                    "castingTime",
+                    "duration",
+                    "prerequisites",
+                    "description",
+                    "source",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a library spell (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "spellId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/campaigns/{id}/library/items": {
       "post": {
         "tags": [
@@ -7320,6 +7989,28 @@
                         "deleted"
                       ]
                     },
+                    "spells": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "updated": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "created",
+                        "updated",
+                        "deleted"
+                      ]
+                    },
                     "items": {
                       "type": "object",
                       "properties": {
@@ -7347,6 +8038,7 @@
                     "mode",
                     "traits",
                     "skills",
+                    "spells",
                     "items"
                   ]
                 }
@@ -8623,6 +9315,17 @@
                         ]
                       }
                     },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
+                    },
                     "traits": {
                       "type": "array",
                       "items": {
@@ -9714,6 +10417,17 @@
                               "message"
                             ]
                           }
+                        },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
                         },
                         "traits": {
                           "type": "array",
@@ -11050,6 +11764,17 @@
                         ]
                       }
                     },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
+                    },
                     "traits": {
                       "type": "array",
                       "items": {
@@ -12210,6 +12935,17 @@
                           "message"
                         ]
                       }
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "traits": {
                       "type": "array",
@@ -13522,6 +14258,17 @@
                               "message"
                             ]
                           }
+                        },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
                         },
                         "traits": {
                           "type": "array",
@@ -14846,6 +15593,17 @@
                             ]
                           }
                         },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -15949,6 +16707,17 @@
                           "message"
                         ]
                       }
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "traits": {
                       "type": "array",
@@ -17204,6 +17973,17 @@
                               "message"
                             ]
                           }
+                        },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
                         },
                         "traits": {
                           "type": "array",
@@ -18470,6 +19250,17 @@
                             ]
                           }
                         },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -19573,6 +20364,17 @@
                           "message"
                         ]
                       }
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "traits": {
                       "type": "array",
@@ -20852,6 +21654,17 @@
                               "message"
                             ]
                           }
+                        },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
                         },
                         "traits": {
                           "type": "array",
@@ -22144,6 +22957,17 @@
                             ]
                           }
                         },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -23247,6 +24071,17 @@
                           "message"
                         ]
                       }
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "traits": {
                       "type": "array",
@@ -24842,6 +25677,17 @@
                               "message"
                             ]
                           }
+                        },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
                         },
                         "traits": {
                           "type": "array",
@@ -26450,6 +27296,17 @@
                             ]
                           }
                         },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -27553,6 +28410,17 @@
                           "message"
                         ]
                       }
+                    },
+                    "manaLevel": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "normal",
+                        "high",
+                        "very_high"
+                      ],
+                      "default": "normal"
                     },
                     "traits": {
                       "type": "array",
@@ -28759,6 +29627,17 @@
                             ]
                           }
                         },
+                        "manaLevel": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "low",
+                            "normal",
+                            "high",
+                            "very_high"
+                          ],
+                          "default": "normal"
+                        },
                         "traits": {
                           "type": "array",
                           "items": {
@@ -29567,6 +30446,7 @@
                           "campaign_membership",
                           "campaign_library_trait",
                           "campaign_library_skill",
+                          "campaign_library_spell",
                           "campaign_library_item",
                           "adventure_log"
                         ]
@@ -29782,6 +30662,7 @@
                           "campaign_membership",
                           "campaign_library_trait",
                           "campaign_library_skill",
+                          "campaign_library_spell",
                           "campaign_library_item",
                           "adventure_log"
                         ]
@@ -29937,6 +30818,7 @@
                             "campaign_membership",
                             "campaign_library_trait",
                             "campaign_library_skill",
+                            "campaign_library_spell",
                             "campaign_library_item",
                             "adventure_log"
                           ]
@@ -30117,6 +30999,7 @@
                             "campaign_membership",
                             "campaign_library_trait",
                             "campaign_library_skill",
+                            "campaign_library_spell",
                             "campaign_library_item",
                             "adventure_log"
                           ]
@@ -30171,6 +31054,7 @@
                               "campaign_membership",
                               "campaign_library_trait",
                               "campaign_library_skill",
+                              "campaign_library_spell",
                               "campaign_library_item",
                               "adventure_log"
                             ]
@@ -30240,6 +31124,9 @@
                         "campaign_library_skill": {
                           "type": "boolean"
                         },
+                        "campaign_library_spell": {
+                          "type": "boolean"
+                        },
                         "campaign_library_item": {
                           "type": "boolean"
                         },
@@ -30288,6 +31175,10 @@
                           "minimum": 0
                         },
                         "campaign_library_skill": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "campaign_library_spell": {
                           "type": "integer",
                           "minimum": 0
                         },
