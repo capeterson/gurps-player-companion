@@ -465,6 +465,9 @@ export const characterSpells = pgTable(
       .references(() => characters.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 160 }).notNull(),
     college: varchar('college', { length: 80 }),
+    difficulty: varchar('difficulty', { length: 2, enum: ['H', 'VH'] })
+      .notNull()
+      .default('H'),
     points: integer('points').notNull().default(1),
     baseEnergyCost: smallint('base_energy_cost').notNull().default(1),
     maintenanceCost: smallint('maintenance_cost'),

@@ -13,6 +13,7 @@
  * the browser (Dexie returns ISO strings).
  */
 
+import type { SpellDifficulty } from '../constants/skills.ts';
 import type { CharacterDetail } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
@@ -28,7 +29,12 @@ import {
 } from './characterCalc.ts';
 import { type InventoryItemRow, computeEncumbrance, computeWeights } from './encumbrance.ts';
 import { computeSkillLevel } from './skillCalc.ts';
-import { computeSpellLevel, effectiveCastingCost, mageryLevel } from './spellCalc.ts';
+import {
+  computeSpellLevel,
+  effectiveCastingCost,
+  effectiveMaintenanceCost,
+  mageryLevel,
+} from './spellCalc.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
 /**
@@ -134,6 +140,9 @@ export interface CharacterDetailInputSpell {
   characterId: string;
   name: string;
   college: string | null;
+  /** Optional: local rows synced before the column existed lack it;
+   * `buildSpellOut` defaults missing values to 'H'. */
+  difficulty?: SpellDifficulty;
   points: number;
   baseEnergyCost: number;
   maintenanceCost: number | null;
@@ -303,12 +312,14 @@ export function buildSpellOut(
   iq: number,
   magery: number,
 ): SpellOut {
-  const level = computeSpellLevel(spell.points, iq, magery);
+  const difficulty = spell.difficulty ?? 'H';
+  const level = computeSpellLevel(spell.points, iq, magery, difficulty);
   return {
     id: spell.id,
     characterId: spell.characterId,
     name: spell.name,
     college: spell.college,
+    difficulty,
     points: spell.points,
     baseEnergyCost: spell.baseEnergyCost,
     maintenanceCost: spell.maintenanceCost,
@@ -319,6 +330,7 @@ export function buildSpellOut(
     librarySpellId: spell.librarySpellId,
     level,
     effectiveCost: effectiveCastingCost(spell.baseEnergyCost, level),
+    effectiveMaintenanceCost: effectiveMaintenanceCost(spell.maintenanceCost, level),
     createdAt: toIso(spell.createdAt),
     updatedAt: toIso(spell.updatedAt),
   };

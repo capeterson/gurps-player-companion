@@ -71,11 +71,19 @@ export function CastSpellDialog({ character, spell, onClose }: CastSpellDialogPr
   const ref = useDialogState(true);
   const toasts = useToasts();
 
-  const cost = spell.effectiveCost;
+  // Energy actually spent this casting.  Seeded from the discounted
+  // cost but editable: a critical success costs 0, an ordinary failure
+  // costs 1, a critical failure costs the full base cost (B236), and
+  // Area / Missile spells scale their cost per casting.
+  const [energyRaw, setEnergyRaw] = useState(String(spell.effectiveCost));
+  const cost = clamp(Number(energyRaw), 0, 999);
+  // A powerstone only powers a spell if the caster is touching it
+  // (B481), so stones stored elsewhere (external location) don't count.
   const stones = useMemo(
     () =>
       character.inventory.filter(
-        (i): i is InventoryItemOut & { powerstoneData: PowerstoneData } => i.powerstoneData != null,
+        (i): i is InventoryItemOut & { powerstoneData: PowerstoneData } =>
+          i.powerstoneData != null && i.externalLocation == null,
       ),
     [character.inventory],
   );
@@ -87,8 +95,14 @@ export function CastSpellDialog({ character, spell, onClose }: CastSpellDialogPr
   );
   const [casting, setCasting] = useState(false);
 
-  // Re-suggest if the spell cost or pool sizes shift (e.g. user edits
-  // base cost while the dialog is open in another tab).
+  // Re-seed the editable amount if the discounted cost itself shifts
+  // (e.g. user edits base cost while the dialog is open in another tab).
+  useEffect(() => {
+    setEnergyRaw(String(spell.effectiveCost));
+  }, [spell.effectiveCost]);
+
+  // Re-suggest the allocation whenever the amount to spend or the pool
+  // sizes shift.
   useEffect(() => {
     setAlloc(suggestAllocation(cost, fpAvailable, hpAvailable, stones));
   }, [cost, fpAvailable, hpAvailable, stones]);
@@ -201,17 +215,23 @@ export function CastSpellDialog({ character, spell, onClose }: CastSpellDialogPr
       <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
         <h3 className="font-display text-2xl">{spell.name}</h3>
         <p className="text-sm text-base-content/70 mt-1">
-          {spell.college ?? 'No college'} · effective skill{' '}
+          {spell.college ?? 'No college'} · IQ/{spell.difficulty} · effective skill{' '}
           <span className="num text-base-content">{spell.level}</span>
         </p>
-        <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+        <div className="mt-3 grid grid-cols-4 gap-3 text-sm">
           <div>
             <p className="label-eyebrow">Base cost</p>
             <p className="num text-xl">{spell.baseEnergyCost}</p>
           </div>
           <div>
             <p className="label-eyebrow">After discount</p>
-            <p className="num text-xl text-primary">{cost}</p>
+            <p className="num text-xl text-primary">{spell.effectiveCost}</p>
+          </div>
+          <div>
+            <p className="label-eyebrow">Maintain</p>
+            <p className="num text-xl">
+              {spell.effectiveMaintenanceCost != null ? spell.effectiveMaintenanceCost : '—'}
+            </p>
           </div>
           <div>
             <p className="label-eyebrow">Casting time</p>
@@ -221,7 +241,23 @@ export function CastSpellDialog({ character, spell, onClose }: CastSpellDialogPr
 
         <div className="divider my-3" />
 
-        <p className="label-eyebrow mb-2">Allocate {cost} energy</p>
+        <div className="flex items-end gap-3 mb-2">
+          <label className="form-control w-28 shrink-0">
+            <span className="label-text text-xs">Energy to spend</span>
+            <input
+              type="number"
+              className="input input-bordered input-sm num text-right"
+              min={0}
+              value={energyRaw}
+              onChange={(e) => setEnergyRaw(e.target.value)}
+            />
+          </label>
+          <p className="text-xs text-base-content/60">
+            Critical success costs 0, a failure costs 1, a critical failure costs the full base
+            cost; Area and Missile spells scale with size.
+          </p>
+        </div>
+        <p className="label-eyebrow mb-2">Draw {cost} energy from</p>
         <ul className="space-y-2">
           <SourceRow
             label="Fatigue Points (FP)"

@@ -8860,6 +8860,13 @@
                             "nullable": true,
                             "maxLength": 80
                           },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
                           "points": {
                             "type": "integer",
                             "minimum": 0,
@@ -8907,6 +8914,10 @@
                           "effectiveCost": {
                             "type": "integer"
                           },
+                          "effectiveMaintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -8921,6 +8932,7 @@
                           "characterId",
                           "name",
                           "college",
+                          "difficulty",
                           "points",
                           "baseEnergyCost",
                           "maintenanceCost",
@@ -8931,6 +8943,7 @@
                           "librarySpellId",
                           "level",
                           "effectiveCost",
+                          "effectiveMaintenanceCost",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -9939,6 +9952,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -9986,6 +10006,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -10000,6 +10024,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -10010,6 +10035,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -11261,6 +11287,13 @@
                             "nullable": true,
                             "maxLength": 80
                           },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
                           "points": {
                             "type": "integer",
                             "minimum": 0,
@@ -11308,6 +11341,10 @@
                           "effectiveCost": {
                             "type": "integer"
                           },
+                          "effectiveMaintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -11322,6 +11359,7 @@
                           "characterId",
                           "name",
                           "college",
+                          "difficulty",
                           "points",
                           "baseEnergyCost",
                           "maintenanceCost",
@@ -11332,6 +11370,7 @@
                           "librarySpellId",
                           "level",
                           "effectiveCost",
+                          "effectiveMaintenanceCost",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -12409,6 +12448,13 @@
                             "nullable": true,
                             "maxLength": 80
                           },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
                           "points": {
                             "type": "integer",
                             "minimum": 0,
@@ -12456,6 +12502,10 @@
                           "effectiveCost": {
                             "type": "integer"
                           },
+                          "effectiveMaintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -12470,6 +12520,7 @@
                           "characterId",
                           "name",
                           "college",
+                          "difficulty",
                           "points",
                           "baseEnergyCost",
                           "maintenanceCost",
@@ -12480,6 +12531,7 @@
                           "librarySpellId",
                           "level",
                           "effectiveCost",
+                          "effectiveMaintenanceCost",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -13708,6 +13760,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -13755,6 +13814,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -13769,6 +13832,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -13779,6 +13843,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -15018,6 +15083,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -15065,6 +15137,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -15079,6 +15155,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -15089,6 +15166,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -16109,6 +16187,13 @@
                             "nullable": true,
                             "maxLength": 80
                           },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
                           "points": {
                             "type": "integer",
                             "minimum": 0,
@@ -16156,6 +16241,10 @@
                           "effectiveCost": {
                             "type": "integer"
                           },
+                          "effectiveMaintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -16170,6 +16259,7 @@
                           "characterId",
                           "name",
                           "college",
+                          "difficulty",
                           "points",
                           "baseEnergyCost",
                           "maintenanceCost",
@@ -16180,6 +16270,7 @@
                           "librarySpellId",
                           "level",
                           "effectiveCost",
+                          "effectiveMaintenanceCost",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -17351,6 +17442,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -17398,6 +17496,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -17412,6 +17514,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -17422,6 +17525,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -18603,6 +18707,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -18650,6 +18761,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -18664,6 +18779,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -18674,6 +18790,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -19694,6 +19811,13 @@
                             "nullable": true,
                             "maxLength": 80
                           },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
                           "points": {
                             "type": "integer",
                             "minimum": 0,
@@ -19741,6 +19865,10 @@
                           "effectiveCost": {
                             "type": "integer"
                           },
+                          "effectiveMaintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -19755,6 +19883,7 @@
                           "characterId",
                           "name",
                           "college",
+                          "difficulty",
                           "points",
                           "baseEnergyCost",
                           "maintenanceCost",
@@ -19765,6 +19894,7 @@
                           "librarySpellId",
                           "level",
                           "effectiveCost",
+                          "effectiveMaintenanceCost",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -20185,9 +20315,17 @@
                     "nullable": true,
                     "maxLength": 80
                   },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "H",
+                      "VH"
+                    ],
+                    "default": "H"
+                  },
                   "points": {
                     "type": "integer",
-                    "minimum": 0,
+                    "minimum": 1,
                     "maximum": 1000,
                     "default": 1
                   },
@@ -20265,6 +20403,13 @@
                           "nullable": true,
                           "maxLength": 80
                         },
+                        "difficulty": {
+                          "type": "string",
+                          "enum": [
+                            "H",
+                            "VH"
+                          ]
+                        },
                         "points": {
                           "type": "integer",
                           "minimum": 0,
@@ -20312,6 +20457,10 @@
                         "effectiveCost": {
                           "type": "integer"
                         },
+                        "effectiveMaintenanceCost": {
+                          "type": "integer",
+                          "nullable": true
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -20326,6 +20475,7 @@
                         "characterId",
                         "name",
                         "college",
+                        "difficulty",
                         "points",
                         "baseEnergyCost",
                         "maintenanceCost",
@@ -20336,6 +20486,7 @@
                         "librarySpellId",
                         "level",
                         "effectiveCost",
+                        "effectiveMaintenanceCost",
                         "createdAt",
                         "updatedAt"
                       ]
@@ -20939,6 +21090,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -20986,6 +21144,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -21000,6 +21162,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -21010,6 +21173,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -21445,9 +21609,17 @@
                     "nullable": true,
                     "maxLength": 80
                   },
+                  "difficulty": {
+                    "type": "string",
+                    "enum": [
+                      "H",
+                      "VH"
+                    ],
+                    "default": "H"
+                  },
                   "points": {
                     "type": "integer",
-                    "minimum": 0,
+                    "minimum": 1,
                     "maximum": 1000,
                     "default": 1
                   },
@@ -21522,6 +21694,13 @@
                           "nullable": true,
                           "maxLength": 80
                         },
+                        "difficulty": {
+                          "type": "string",
+                          "enum": [
+                            "H",
+                            "VH"
+                          ]
+                        },
                         "points": {
                           "type": "integer",
                           "minimum": 0,
@@ -21569,6 +21748,10 @@
                         "effectiveCost": {
                           "type": "integer"
                         },
+                        "effectiveMaintenanceCost": {
+                          "type": "integer",
+                          "nullable": true
+                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -21583,6 +21766,7 @@
                         "characterId",
                         "name",
                         "college",
+                        "difficulty",
                         "points",
                         "baseEnergyCost",
                         "maintenanceCost",
@@ -21593,6 +21777,7 @@
                         "librarySpellId",
                         "level",
                         "effectiveCost",
+                        "effectiveMaintenanceCost",
                         "createdAt",
                         "updatedAt"
                       ]
@@ -22196,6 +22381,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -22243,6 +22435,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -22257,6 +22453,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -22267,6 +22464,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -23287,6 +23485,13 @@
                             "nullable": true,
                             "maxLength": 80
                           },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
                           "points": {
                             "type": "integer",
                             "minimum": 0,
@@ -23334,6 +23539,10 @@
                           "effectiveCost": {
                             "type": "integer"
                           },
+                          "effectiveMaintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -23348,6 +23557,7 @@
                           "characterId",
                           "name",
                           "college",
+                          "difficulty",
                           "points",
                           "baseEnergyCost",
                           "maintenanceCost",
@@ -23358,6 +23568,7 @@
                           "librarySpellId",
                           "level",
                           "effectiveCost",
+                          "effectiveMaintenanceCost",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -24869,6 +25080,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -24916,6 +25134,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -24930,6 +25152,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -24940,6 +25163,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -26463,6 +26687,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -26510,6 +26741,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -26524,6 +26759,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -26534,6 +26770,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]
@@ -27554,6 +27791,13 @@
                             "nullable": true,
                             "maxLength": 80
                           },
+                          "difficulty": {
+                            "type": "string",
+                            "enum": [
+                              "H",
+                              "VH"
+                            ]
+                          },
                           "points": {
                             "type": "integer",
                             "minimum": 0,
@@ -27601,6 +27845,10 @@
                           "effectiveCost": {
                             "type": "integer"
                           },
+                          "effectiveMaintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -27615,6 +27863,7 @@
                           "characterId",
                           "name",
                           "college",
+                          "difficulty",
                           "points",
                           "baseEnergyCost",
                           "maintenanceCost",
@@ -27625,6 +27874,7 @@
                           "librarySpellId",
                           "level",
                           "effectiveCost",
+                          "effectiveMaintenanceCost",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -28746,6 +28996,13 @@
                                 "nullable": true,
                                 "maxLength": 80
                               },
+                              "difficulty": {
+                                "type": "string",
+                                "enum": [
+                                  "H",
+                                  "VH"
+                                ]
+                              },
                               "points": {
                                 "type": "integer",
                                 "minimum": 0,
@@ -28793,6 +29050,10 @@
                               "effectiveCost": {
                                 "type": "integer"
                               },
+                              "effectiveMaintenanceCost": {
+                                "type": "integer",
+                                "nullable": true
+                              },
                               "createdAt": {
                                 "type": "string",
                                 "format": "date-time"
@@ -28807,6 +29068,7 @@
                               "characterId",
                               "name",
                               "college",
+                              "difficulty",
                               "points",
                               "baseEnergyCost",
                               "maintenanceCost",
@@ -28817,6 +29079,7 @@
                               "librarySpellId",
                               "level",
                               "effectiveCost",
+                              "effectiveMaintenanceCost",
                               "createdAt",
                               "updatedAt"
                             ]

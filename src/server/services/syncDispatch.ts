@@ -454,6 +454,7 @@ async function dispatchSpell(
         characterId,
         name: body.name,
         college: body.college ?? null,
+        difficulty: body.difficulty ?? 'H',
         points: body.points ?? 1,
         baseEnergyCost: body.baseEnergyCost ?? 1,
         maintenanceCost: body.maintenanceCost ?? null,

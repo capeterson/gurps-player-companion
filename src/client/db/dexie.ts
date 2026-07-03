@@ -106,6 +106,9 @@ export interface LocalCharacterSpell {
   characterId: string;
   name: string;
   college: string | null;
+  /** Optional because rows synced before the difficulty column existed
+   * lack it; readers default missing values to 'H'. */
+  difficulty?: 'H' | 'VH';
   points: number;
   baseEnergyCost: number;
   maintenanceCost: number | null;
