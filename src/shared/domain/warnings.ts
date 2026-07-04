@@ -25,7 +25,14 @@ export interface CampaignCaps {
 }
 
 export interface WarningInput {
-  readonly attrs: { st: number; dx: number; iq: number; ht: number };
+  readonly attrs: {
+    st: number;
+    dx: number;
+    iq: number;
+    ht: number;
+    hpMod: number;
+    fpMod: number;
+  };
   readonly points: PointBreakdown;
   readonly encumbrance: EncumbranceResult;
   readonly campaign: CampaignCaps;
@@ -88,6 +95,41 @@ rule('encumbrance.x-heavy', ({ encumbrance }) =>
     : null,
 );
 
+rule('encumbrance.over_carry_cap', ({ encumbrance }) =>
+  encumbrance.ratio > 10
+    ? {
+        code: 'encumbrance.over_carry_cap',
+        severity: 'warn',
+        message:
+          'Carried weight exceeds 10× Basic Lift — beyond the X-Heavy carry limit, the character cannot move (B17).',
+      }
+    : null,
+);
+
+// HP may be adjusted by no more than ±30% of ST, and FP by no more
+// than ±30% of HT (B16-17).  Warn, don't block, per app philosophy.
+rule('hp.mod_out_of_range', ({ attrs }) => {
+  const cap = Math.floor(attrs.st * 0.3);
+  return Math.abs(attrs.hpMod) > cap
+    ? {
+        code: 'hp.mod_out_of_range',
+        severity: 'warn',
+        message: `HP modifier of ${attrs.hpMod > 0 ? '+' : ''}${attrs.hpMod} exceeds ±30% of ST (±${cap}) allowed by B16.`,
+      }
+    : null;
+});
+
+rule('fp.mod_out_of_range', ({ attrs }) => {
+  const cap = Math.floor(attrs.ht * 0.3);
+  return Math.abs(attrs.fpMod) > cap
+    ? {
+        code: 'fp.mod_out_of_range',
+        severity: 'warn',
+        message: `FP modifier of ${attrs.fpMod > 0 ? '+' : ''}${attrs.fpMod} exceeds ±30% of HT (±${cap}) allowed by B16.`,
+      }
+    : null;
+});
+
 rule('disadvantages.over_cap', ({ points, campaign }) => {
   const cap = campaign.disadvantageCap;
   if (cap === null) return null;
@@ -104,14 +146,16 @@ rule('disadvantages.over_cap', ({ points, campaign }) => {
 
 rule('quirks.over_cap', ({ points, campaign }) => {
   const cap = campaign.quirkCap ?? 5;
-  // Quirks are stored as negative.  A character with 6 quirks has
-  // points.quirks = -6.  Cap is 5 → over when -points.quirks > cap.
-  const quirkCount = -points.quirks;
-  if (quirkCount > cap) {
+  // Quirks are stored as negative points.  RAW quirks are -1 apiece
+  // (B162), so a cap of 5 quirks is a cap of -5 points — comparing
+  // points (not row count) stays correct even if someone records a
+  // non-standard quirk value.
+  const quirkPoints = -points.quirks;
+  if (quirkPoints > cap) {
     return {
       code: 'quirks.over_cap',
       severity: 'warn',
-      message: `${quirkCount} quirks exceed the campaign cap of ${cap}.`,
+      message: `${quirkPoints} points of quirks exceed the campaign cap of ${cap}.`,
     };
   }
   return null;

@@ -35,8 +35,9 @@ export const spellOut = z.object({
   prerequisites: z.string().max(2000).nullable(),
   notes: z.string().max(20_000).nullable(),
   librarySpellId: uuid.nullable(),
-  /** Server-computed convenience field: IQ/H + Magery + skill offset. */
-  level: z.number().int(),
+  /** Server-computed convenience field: IQ/H + Magery + skill offset.
+   * Null for a legacy 0-point row — spells have no default in GURPS. */
+  level: z.number().int().nullable(),
   /** Server-computed convenience field: cost after skill discount. */
   effectiveCost: z.number().int(),
   /** Server-computed: maintenance cost after the same skill discount.

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { type CharacterAttrs, computeDerived } from './characterCalc.ts';
-import { attributeLevelFor, computeSkillLevel, skillOffset } from './skillCalc.ts';
+import {
+  attributeLevelFor,
+  computeSkillLevel,
+  skillDefaultOffset,
+  skillOffset,
+} from './skillCalc.ts';
 
 const baseAttrs: CharacterAttrs = {
   st: 10,
@@ -25,10 +30,18 @@ const baseAttrs: CharacterAttrs = {
   tempMoveMod: 0,
 };
 
-describe('skillOffset', () => {
-  it('Easy default (0 pts) is base-1 = -1', () => {
-    expect(skillOffset('E', 0)).toBe(-1);
+describe('skillDefaultOffset', () => {
+  it('attribute defaults are -4 / -5 / -6 for E / A / H (B173)', () => {
+    expect(skillDefaultOffset('E')).toBe(-4);
+    expect(skillDefaultOffset('A')).toBe(-5);
+    expect(skillDefaultOffset('H')).toBe(-6);
   });
+  it('Very Hard skills have no attribute default', () => {
+    expect(skillDefaultOffset('VH')).toBeNull();
+  });
+});
+
+describe('skillOffset', () => {
   it('Easy 1 pt is +0', () => {
     expect(skillOffset('E', 1)).toBe(0);
   });
@@ -83,5 +96,13 @@ describe('computeSkillLevel', () => {
   });
   it('Will/Average/2 pts for Will 15 is 15', () => {
     expect(computeSkillLevel('Will', 'A', 2, derived)).toBe(15);
+  });
+  it('0 points rolls the attribute default: DX/E at DX 12 is 8', () => {
+    expect(computeSkillLevel('DX', 'E', 0, derived)).toBe(8);
+    expect(computeSkillLevel('DX', 'A', 0, derived)).toBe(7);
+    expect(computeSkillLevel('DX', 'H', 0, derived)).toBe(6);
+  });
+  it('0 points on a Very Hard skill has no level at all', () => {
+    expect(computeSkillLevel('IQ', 'VH', 0, derived)).toBeNull();
   });
 });

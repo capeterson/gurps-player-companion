@@ -90,6 +90,10 @@ export const derivedStatsOut = z.object({
   basicMove: z.number().int(),
   dodge: z.number().int(),
   basicLift: z.number(),
+  /** Basic thrust damage from ST, e.g. "1d-2" (B16). */
+  thrust: z.string(),
+  /** Basic swing damage from ST, e.g. "1d" (B16). */
+  swing: z.string(),
 });
 
 export const pointBreakdownOut = z.object({

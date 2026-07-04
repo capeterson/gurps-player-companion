@@ -74,13 +74,18 @@ function isMageryName(name: string): boolean {
  * Effective spell skill level.  Spells are IQ/Hard or IQ/Very Hard;
  * we delegate the points→offset table to `skillOffset` and add the
  * caster's IQ and Magery on top.
+ *
+ * Spells have no default in GURPS — knowing one takes at least 1
+ * point — so a legacy 0-point row has no level (null) rather than a
+ * fabricated default.
  */
 export function computeSpellLevel(
   points: number,
   iq: number,
   magery: number,
   difficulty: SpellDifficulty = 'H',
-): number {
+): number | null {
+  if (points <= 0) return null;
   return iq + skillOffset(difficulty, points) + magery;
 }
 

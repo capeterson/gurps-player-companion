@@ -9192,6 +9192,12 @@
                         },
                         "basicLift": {
                           "type": "number"
+                        },
+                        "thrust": {
+                          "type": "string"
+                        },
+                        "swing": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -9207,7 +9213,9 @@
                         "basicSpeed",
                         "basicMove",
                         "dodge",
-                        "basicLift"
+                        "basicLift",
+                        "thrust",
+                        "swing"
                       ]
                     },
                     "points": {
@@ -9516,7 +9524,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "createdAt": {
                             "type": "string",
@@ -9616,7 +9625,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "effectiveCost": {
                             "type": "integer"
@@ -10299,6 +10309,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -10314,7 +10330,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -10623,7 +10641,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -10723,7 +10742,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -11649,6 +11669,12 @@
                         },
                         "basicLift": {
                           "type": "number"
+                        },
+                        "thrust": {
+                          "type": "string"
+                        },
+                        "swing": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -11664,7 +11690,9 @@
                         "basicSpeed",
                         "basicMove",
                         "dodge",
-                        "basicLift"
+                        "basicLift",
+                        "thrust",
+                        "swing"
                       ]
                     },
                     "points": {
@@ -11973,7 +12001,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "createdAt": {
                             "type": "string",
@@ -12073,7 +12102,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "effectiveCost": {
                             "type": "integer"
@@ -12825,6 +12855,12 @@
                         },
                         "basicLift": {
                           "type": "number"
+                        },
+                        "thrust": {
+                          "type": "string"
+                        },
+                        "swing": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -12840,7 +12876,9 @@
                         "basicSpeed",
                         "basicMove",
                         "dodge",
-                        "basicLift"
+                        "basicLift",
+                        "thrust",
+                        "swing"
                       ]
                     },
                     "points": {
@@ -13149,7 +13187,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "createdAt": {
                             "type": "string",
@@ -13249,7 +13288,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "effectiveCost": {
                             "type": "integer"
@@ -14152,6 +14192,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -14167,7 +14213,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -14476,7 +14524,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -14576,7 +14625,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -15490,6 +15540,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -15505,7 +15561,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -15814,7 +15872,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -15914,7 +15973,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -16609,6 +16669,12 @@
                         },
                         "basicLift": {
                           "type": "number"
+                        },
+                        "thrust": {
+                          "type": "string"
+                        },
+                        "swing": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -16624,7 +16690,9 @@
                         "basicSpeed",
                         "basicMove",
                         "dodge",
-                        "basicLift"
+                        "basicLift",
+                        "thrust",
+                        "swing"
                       ]
                     },
                     "points": {
@@ -16933,7 +17001,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "createdAt": {
                             "type": "string",
@@ -17033,7 +17102,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "effectiveCost": {
                             "type": "integer"
@@ -17613,7 +17683,8 @@
                           "format": "uuid"
                         },
                         "level": {
-                          "type": "integer"
+                          "type": "integer",
+                          "nullable": true
                         },
                         "createdAt": {
                           "type": "string",
@@ -17879,6 +17950,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -17894,7 +17971,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -18203,7 +18282,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -18303,7 +18383,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -18893,7 +18974,8 @@
                           "format": "uuid"
                         },
                         "level": {
-                          "type": "integer"
+                          "type": "integer",
+                          "nullable": true
                         },
                         "createdAt": {
                           "type": "string",
@@ -19159,6 +19241,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -19174,7 +19262,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -19483,7 +19573,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -19583,7 +19674,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -20278,6 +20370,12 @@
                         },
                         "basicLift": {
                           "type": "number"
+                        },
+                        "thrust": {
+                          "type": "string"
+                        },
+                        "swing": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -20293,7 +20391,9 @@
                         "basicSpeed",
                         "basicMove",
                         "dodge",
-                        "basicLift"
+                        "basicLift",
+                        "thrust",
+                        "swing"
                       ]
                     },
                     "points": {
@@ -20602,7 +20702,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "createdAt": {
                             "type": "string",
@@ -20702,7 +20803,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "effectiveCost": {
                             "type": "integer"
@@ -21294,7 +21396,8 @@
                           "format": "uuid"
                         },
                         "level": {
-                          "type": "integer"
+                          "type": "integer",
+                          "nullable": true
                         },
                         "effectiveCost": {
                           "type": "integer"
@@ -21572,6 +21675,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -21587,7 +21696,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -21896,7 +22007,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -21996,7 +22108,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -22600,7 +22713,8 @@
                           "format": "uuid"
                         },
                         "level": {
-                          "type": "integer"
+                          "type": "integer",
+                          "nullable": true
                         },
                         "effectiveCost": {
                           "type": "integer"
@@ -22878,6 +22992,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -22893,7 +23013,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -23202,7 +23324,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -23302,7 +23425,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -23997,6 +24121,12 @@
                         },
                         "basicLift": {
                           "type": "number"
+                        },
+                        "thrust": {
+                          "type": "string"
+                        },
+                        "swing": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -24012,7 +24142,9 @@
                         "basicSpeed",
                         "basicMove",
                         "dodge",
-                        "basicLift"
+                        "basicLift",
+                        "thrust",
+                        "swing"
                       ]
                     },
                     "points": {
@@ -24321,7 +24453,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "createdAt": {
                             "type": "string",
@@ -24421,7 +24554,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "effectiveCost": {
                             "type": "integer"
@@ -25607,6 +25741,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -25622,7 +25762,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -25931,7 +26073,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -26031,7 +26174,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -27229,6 +27373,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -27244,7 +27394,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -27553,7 +27705,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -27653,7 +27806,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"
@@ -28348,6 +28502,12 @@
                         },
                         "basicLift": {
                           "type": "number"
+                        },
+                        "thrust": {
+                          "type": "string"
+                        },
+                        "swing": {
+                          "type": "string"
                         }
                       },
                       "required": [
@@ -28363,7 +28523,9 @@
                         "basicSpeed",
                         "basicMove",
                         "dodge",
-                        "basicLift"
+                        "basicLift",
+                        "thrust",
+                        "swing"
                       ]
                     },
                     "points": {
@@ -28672,7 +28834,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "createdAt": {
                             "type": "string",
@@ -28772,7 +28935,8 @@
                             "format": "uuid"
                           },
                           "level": {
-                            "type": "integer"
+                            "type": "integer",
+                            "nullable": true
                           },
                           "effectiveCost": {
                             "type": "integer"
@@ -29568,6 +29732,12 @@
                             },
                             "basicLift": {
                               "type": "number"
+                            },
+                            "thrust": {
+                              "type": "string"
+                            },
+                            "swing": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -29583,7 +29753,9 @@
                             "basicSpeed",
                             "basicMove",
                             "dodge",
-                            "basicLift"
+                            "basicLift",
+                            "thrust",
+                            "swing"
                           ]
                         },
                         "points": {
@@ -29892,7 +30064,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "createdAt": {
                                 "type": "string",
@@ -29992,7 +30165,8 @@
                                 "format": "uuid"
                               },
                               "level": {
-                                "type": "integer"
+                                "type": "integer",
+                                "nullable": true
                               },
                               "effectiveCost": {
                                 "type": "integer"

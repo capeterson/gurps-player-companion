@@ -46,7 +46,7 @@ describe('evaluateWarnings', () => {
   it('emits no warnings for a typical character with no campaign caps', () => {
     expect(
       evaluateWarnings({
-        attrs: { st: 10, dx: 10, iq: 10, ht: 10 },
+        attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
         points: okPoints,
         encumbrance: okEnc,
         campaign: noCaps,
@@ -56,7 +56,7 @@ describe('evaluateWarnings', () => {
 
   it('warns on ST below 1', () => {
     const ws = evaluateWarnings({
-      attrs: { st: 0, dx: 10, iq: 10, ht: 10 },
+      attrs: { st: 0, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
       points: okPoints,
       encumbrance: okEnc,
       campaign: noCaps,
@@ -66,7 +66,7 @@ describe('evaluateWarnings', () => {
 
   it('notes IQ above 20', () => {
     const ws = evaluateWarnings({
-      attrs: { st: 10, dx: 10, iq: 21, ht: 10 },
+      attrs: { st: 10, dx: 10, iq: 21, ht: 10, hpMod: 0, fpMod: 0 },
       points: okPoints,
       encumbrance: okEnc,
       campaign: noCaps,
@@ -77,7 +77,7 @@ describe('evaluateWarnings', () => {
 
   it('warns when encumbrance level is Heavy', () => {
     const ws = evaluateWarnings({
-      attrs: { st: 10, dx: 10, iq: 10, ht: 10 },
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
       points: okPoints,
       encumbrance: { ...okEnc, level: 3, label: 'Heavy', moveMultiplier: 0.4, dodgePenalty: -3 },
       campaign: noCaps,
@@ -87,7 +87,7 @@ describe('evaluateWarnings', () => {
 
   it('warns when total points exceed campaign target', () => {
     const ws = evaluateWarnings({
-      attrs: { st: 10, dx: 10, iq: 10, ht: 10 },
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
       points: { ...okPoints, total: 175 },
       encumbrance: okEnc,
       campaign: { ...noCaps, pointTarget: 150 },
@@ -97,7 +97,7 @@ describe('evaluateWarnings', () => {
 
   it('notes when total points are under target', () => {
     const ws = evaluateWarnings({
-      attrs: { st: 10, dx: 10, iq: 10, ht: 10 },
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
       points: { ...okPoints, total: 120 },
       encumbrance: okEnc,
       campaign: { ...noCaps, pointTarget: 150 },
@@ -107,7 +107,7 @@ describe('evaluateWarnings', () => {
 
   it('warns when quirks exceed default cap of 5', () => {
     const ws = evaluateWarnings({
-      attrs: { st: 10, dx: 10, iq: 10, ht: 10 },
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
       points: { ...okPoints, quirks: -6 },
       encumbrance: okEnc,
       campaign: noCaps,
@@ -117,7 +117,7 @@ describe('evaluateWarnings', () => {
 
   it('warns when disadvantage cap is exceeded', () => {
     const ws = evaluateWarnings({
-      attrs: { st: 10, dx: 10, iq: 10, ht: 10 },
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
       points: { ...okPoints, disadvantages: -75 },
       encumbrance: okEnc,
       campaign: { ...noCaps, disadvantageCap: 50 },
@@ -125,10 +125,56 @@ describe('evaluateWarnings', () => {
     expect(ws.find((w) => w.code === 'disadvantages.over_cap')).toBeDefined();
   });
 
+  it('warns when the HP modifier exceeds ±30% of ST (B16)', () => {
+    const ws = evaluateWarnings({
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 4, fpMod: 0 },
+      points: okPoints,
+      encumbrance: okEnc,
+      campaign: noCaps,
+    });
+    expect(ws.find((w) => w.code === 'hp.mod_out_of_range')).toBeDefined();
+    // ±3 for ST 10 is legal.
+    const ok = evaluateWarnings({
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 3, fpMod: 0 },
+      points: okPoints,
+      encumbrance: okEnc,
+      campaign: noCaps,
+    });
+    expect(ok.find((w) => w.code === 'hp.mod_out_of_range')).toBeUndefined();
+  });
+
+  it('warns when the FP modifier exceeds ±30% of HT (B16)', () => {
+    const ws = evaluateWarnings({
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: -4 },
+      points: okPoints,
+      encumbrance: okEnc,
+      campaign: noCaps,
+    });
+    expect(ws.find((w) => w.code === 'fp.mod_out_of_range')).toBeDefined();
+  });
+
+  it('warns when carried weight exceeds the 10×BL carry cap', () => {
+    const ws = evaluateWarnings({
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
+      points: okPoints,
+      encumbrance: {
+        ...okEnc,
+        level: 4,
+        label: 'X-Heavy',
+        moveMultiplier: 0.2,
+        dodgePenalty: -4,
+        playerWeightLbs: 220,
+        ratio: 11,
+      },
+      campaign: noCaps,
+    });
+    expect(ws.find((w) => w.code === 'encumbrance.over_carry_cap')).toBeDefined();
+  });
+
   it('skips dismissed codes', () => {
     const ws = evaluateWarnings(
       {
-        attrs: { st: 0, dx: 10, iq: 10, ht: 10 },
+        attrs: { st: 0, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
         points: okPoints,
         encumbrance: okEnc,
         campaign: noCaps,

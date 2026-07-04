@@ -323,8 +323,12 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowPr
       ) : (
         <span className="num text-right">{spell.points}</span>
       )}
-      <span className="num text-right font-medium" aria-label={`${spell.name} level`}>
-        {spell.level}
+      <span
+        className="num text-right font-medium"
+        aria-label={`${spell.name} level`}
+        title={spell.level == null ? 'No points invested — spells have no default' : undefined}
+      >
+        {spell.level ?? '—'}
       </span>
       {canWrite ? (
         <input

@@ -36,8 +36,10 @@ function totalAllocation(a: Allocation): number {
 }
 
 /**
- * Auto-pick a sensible default allocation: FP first, then powerstones in
- * carry order, HP only as last resort.  The player can redistribute by
+ * Auto-pick a sensible default allocation: FP first, then a powerstone,
+ * HP only as last resort.  A single casting may draw from at most ONE
+ * powerstone (B481 / M69), so the suggestion picks the fullest stone
+ * rather than splitting across several.  The player can redistribute by
  * editing the per-source numbers.
  */
 function suggestAllocation(
@@ -54,13 +56,21 @@ function suggestAllocation(
   out.fromFp = drawFromFp;
   remaining -= drawFromFp;
 
-  for (const stone of stones) {
-    if (remaining <= 0) break;
-    const have = stone.powerstoneData?.currentEnergy ?? 0;
-    if (have <= 0) continue;
-    const draw = Math.min(remaining, have);
-    out.fromStones.set(stone.id, draw);
-    remaining -= draw;
+  if (remaining > 0) {
+    let best: InventoryItemOut | null = null;
+    let bestEnergy = 0;
+    for (const stone of stones) {
+      const have = stone.powerstoneData?.currentEnergy ?? 0;
+      if (have > bestEnergy) {
+        best = stone;
+        bestEnergy = have;
+      }
+    }
+    if (best) {
+      const draw = Math.min(remaining, bestEnergy);
+      out.fromStones.set(best.id, draw);
+      remaining -= draw;
+    }
   }
 
   if (remaining > 0) {
@@ -121,6 +131,9 @@ export function CastSpellDialog({
   const allocated = totalAllocation(alloc);
   const remaining = cost - allocated;
   const overspent = allocated > cost;
+  // One casting can draw from at most one powerstone (B481 / M69).
+  // Warn-don't-block, matching the app's rules philosophy.
+  const stonesUsed = [...alloc.fromStones.values()].filter((v) => v > 0).length;
 
   function setFp(next: number) {
     setAlloc((a) => ({ ...a, fromFp: clamp(next, 0, fpAvailable) }));
@@ -230,7 +243,7 @@ export function CastSpellDialog({
         </h3>
         <p className="text-sm text-base-content/70 mt-1">
           {spell.college ?? 'No college'} · IQ/{spell.difficulty} · effective skill{' '}
-          <span className="num text-base-content">{spell.level}</span>
+          <span className="num text-base-content">{spell.level ?? '—'}</span>
           {character.manaLevel !== 'normal' && (
             <> · {MANA_LEVEL_LABELS[character.manaLevel].toLowerCase()}</>
           )}
@@ -316,6 +329,12 @@ export function CastSpellDialog({
           />
         </ul>
 
+        {stonesUsed > 1 && (
+          <p className="mt-2 text-xs text-warning">
+            A single casting can draw energy from only one powerstone (B481) — you&apos;ve allocated
+            from {stonesUsed}.
+          </p>
+        )}
         <div className="mt-3 flex items-baseline justify-between text-sm">
           <span className="text-base-content/70">
             Allocated <span className="num text-base-content">{allocated}</span> / {cost}

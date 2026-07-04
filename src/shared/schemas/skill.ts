@@ -22,8 +22,10 @@ export const skillOut = z.object({
   specialization: z.string().max(160).nullable(),
   notes: z.string().max(20_000).nullable(),
   librarySkillId: uuid.nullable(),
-  /** Server-computed convenience field. */
-  level: z.number().int(),
+  /** Server-computed convenience field.  At 0 points this is the
+   * attribute default (attr-4/-5/-6 per B173); null for a 0-point
+   * Very Hard skill, which has no attribute default. */
+  level: z.number().int().nullable(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
 });

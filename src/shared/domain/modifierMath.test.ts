@@ -42,18 +42,18 @@ describe('computeTraitCost', () => {
 
   it('combines percent enhancements and limitations (sum then apply)', () => {
     const r = computeTraitCost(50, [enh('a', 50), lim('b', -25)]);
-    // 50 * (1 + 0.25) = 62.5 → trunc to 62
-    expect(r.total).toBe(62);
+    // 50 * (1 + 0.25) = 62.5 → ceil to 63 (round against the character)
+    expect(r.total).toBe(63);
   });
 
-  it('clamps total limitations to -80%', () => {
+  it('clamps the net modifier to -80% (B110)', () => {
     const r = computeTraitCost(100, [lim('a', -50), lim('b', -50), lim('c', -50)]);
     // sum = -150 → clamped to -80 → 100 * 0.2 = 20
     expect(r.total).toBe(20);
   });
 
-  it('truncs toward zero (matches "ceiling toward zero")', () => {
-    expect(computeTraitCost(10, [enh('+15%', 15)]).total).toBe(11); // 11.5 → 11
+  it('rounds up, against the character, for both signs (B102)', () => {
+    expect(computeTraitCost(10, [enh('+15%', 15)]).total).toBe(12); // 11.5 → 12
     expect(computeTraitCost(-10, [lim('-25%', -25)]).total).toBe(-7); // -7.5 → -7
   });
 
