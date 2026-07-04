@@ -130,8 +130,9 @@ src/
   shared/      Pure TypeScript: Zod schemas, GURPS math, YAML codec
   sw/          Service worker + offline replay
 docs/
-  specs/       YAML and WebSocket protocol specs
-  rules/       GURPS rule references (armor mechanics, etc.)
+  specs/       Design specs (start at docs/specs/overview.md): product
+               surface, architecture, offline sync, campaign sharing, history
+  openapi.json Emitted OpenAPI contract (CI-checked)
 bootstrap/
   sample_library.yaml    seeded into the "Sample" campaign
 ```

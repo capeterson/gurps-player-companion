@@ -3,6 +3,35 @@
 Compact, durable rules for anyone (human or agent) editing this repo. Keep
 it short; add a section only when a rule has been broken at least once.
 
+## Design specs are a maintained requirement
+
+`docs/specs/` holds the living description of this application's current
+state. **Reading them first, and keeping them accurate, is a firm project
+requirement — not optional documentation.**
+
+- **Start here.** [docs/specs/overview.md](docs/specs/overview.md) is the
+  orientation hub: user-facing feature catalog, codebase map, architecture
+  summary, and orientation notes for new sessions. A fresh session (human or
+  LLM) should read it before scanning the tree. The set is:
+  - `overview.md` — product surface + codebase map + orientation notes.
+  - `architecture.md` — stack, process model, request lifecycle, data model.
+  - `offline-sync.md` — the local-first / outbox / cursor / WS system.
+  - `campaign-content-sharing.md` — roles, invitations, the share gate /
+    minimal view, and the YAML library.
+  - `history-tracking.md` — the append-only audit log.
+- **These docs describe *what exists*; this file (`AGENTS.md`) prescribes
+  *what you must keep true*.** When they disagree with the code, the code is
+  the truth and the spec is a bug — fix it.
+- **Update the relevant spec in the same change** whenever you alter:
+  user-facing features, the offline-sync architecture, campaign
+  content-sharing behaviour, the history subsystem, the codebase layout, or
+  any orientation note. A behaviour change that lands without its spec update
+  is incomplete. In particular, `overview.md`'s feature catalog and codebase
+  map must not drift from reality.
+- **Adding a spec-worthy subsystem** (a new key area, not a small feature)
+  means adding a new `docs/specs/*.md` and linking it from `overview.md`'s
+  document map and this section.
+
 ## Interaction design rules
 
 ### 1. Never silently discard user edits — queue them client-side
