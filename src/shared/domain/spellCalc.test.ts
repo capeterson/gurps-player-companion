@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  canCastInMana,
   computeSpellLevel,
   costReduction,
   effectiveCastingCost,
+  effectiveMaintenanceCost,
   hasMagery,
+  isFreeCastingMana,
   mageryLevel,
+  manaSkillModifier,
   totalPowerstoneEnergy,
 } from './spellCalc.ts';
 
@@ -38,6 +42,19 @@ describe('mageryLevel', () => {
       ]),
     ).toBe(3);
   });
+
+  it('falls back to a level embedded in the name when level is null', () => {
+    expect(mageryLevel([{ name: 'Magery 3', level: null }])).toBe(3);
+    expect(mageryLevel([{ name: 'magery 2 (One College)', level: null }])).toBe(2);
+  });
+
+  it('prefers the explicit level column over the name', () => {
+    expect(mageryLevel([{ name: 'Magery 3', level: 1 }])).toBe(1);
+  });
+
+  it('name without a number still reads as Magery 0', () => {
+    expect(mageryLevel([{ name: 'Magery (Dance)', level: null }])).toBe(0);
+  });
 });
 
 describe('hasMagery', () => {
@@ -55,7 +72,7 @@ describe('hasMagery', () => {
 });
 
 describe('computeSpellLevel', () => {
-  it('IQ 12, 1 point, Magery 0 → 12 (IQ -2 for H, +1 for 1 pt)', () => {
+  it('IQ 12, 1 point, Magery 0 → 10 (IQ/H at 1 pt is IQ-2)', () => {
     // skillOffset('H', 1) = -2; level = 12 + (-2) + 0 = 10
     expect(computeSpellLevel(1, 12, 0)).toBe(10);
   });
@@ -72,6 +89,16 @@ describe('computeSpellLevel', () => {
   it('Magery 3 stacks linearly', () => {
     // skillOffset('H', 1) = -2; 12 - 2 + 3 = 13
     expect(computeSpellLevel(1, 12, 3)).toBe(13);
+  });
+
+  it('Very Hard spells compute one lower than Hard', () => {
+    // skillOffset('VH', 1) = -3; 12 - 3 + 1 = 10
+    expect(computeSpellLevel(1, 12, 1, 'VH')).toBe(10);
+    expect(computeSpellLevel(1, 12, 1, 'H')).toBe(11);
+  });
+
+  it('difficulty defaults to Hard', () => {
+    expect(computeSpellLevel(4, 14, 2)).toBe(computeSpellLevel(4, 14, 2, 'H'));
   });
 });
 
@@ -106,19 +133,64 @@ describe('effectiveCastingCost', () => {
     expect(effectiveCastingCost(0, 25)).toBe(0);
   });
 
-  it('floors a paid spell at 1', () => {
-    expect(effectiveCastingCost(1, 30)).toBe(1);
+  it('discounts a 1-point spell to free at skill 15 (B236)', () => {
+    expect(effectiveCastingCost(1, 14)).toBe(1);
+    expect(effectiveCastingCost(1, 15)).toBe(0);
+    expect(effectiveCastingCost(1, 30)).toBe(0);
   });
 
-  it('subtracts the discount', () => {
+  it('subtracts the discount, flooring at 0', () => {
     expect(effectiveCastingCost(4, 15)).toBe(3); // -1
     expect(effectiveCastingCost(4, 20)).toBe(2); // -2
-    expect(effectiveCastingCost(4, 25)).toBe(1); // -3 → floor 1
-    expect(effectiveCastingCost(4, 30)).toBe(1); // -4 → would be 0, floor 1
+    expect(effectiveCastingCost(4, 25)).toBe(1); // -3
+    expect(effectiveCastingCost(4, 30)).toBe(0); // -4 → free
+    expect(effectiveCastingCost(4, 35)).toBe(0); // -5 → still 0, never negative
   });
 
   it('passes through unchanged when skill is too low to discount', () => {
     expect(effectiveCastingCost(3, 12)).toBe(3);
+  });
+});
+
+describe('effectiveMaintenanceCost', () => {
+  it('passes null through (spell is not sustainable)', () => {
+    expect(effectiveMaintenanceCost(null, 20)).toBeNull();
+  });
+
+  it('applies the same skill discount as casting (B236)', () => {
+    expect(effectiveMaintenanceCost(2, 14)).toBe(2);
+    expect(effectiveMaintenanceCost(2, 15)).toBe(1);
+    expect(effectiveMaintenanceCost(2, 20)).toBe(0); // free to maintain
+    expect(effectiveMaintenanceCost(2, 30)).toBe(0);
+  });
+
+  it('keeps a zero maintenance at zero', () => {
+    expect(effectiveMaintenanceCost(0, 10)).toBe(0);
+  });
+});
+
+describe('mana levels (B235)', () => {
+  it('low mana is -5 to skill; every other level is unmodified', () => {
+    expect(manaSkillModifier('low')).toBe(-5);
+    for (const m of ['none', 'normal', 'high', 'very_high'] as const) {
+      expect(manaSkillModifier(m)).toBe(0);
+    }
+  });
+
+  it('nobody casts in no mana; anyone casts in high+; otherwise Magery gates', () => {
+    expect(canCastInMana(true, 'none')).toBe(false);
+    expect(canCastInMana(false, 'high')).toBe(true);
+    expect(canCastInMana(false, 'very_high')).toBe(true);
+    expect(canCastInMana(false, 'normal')).toBe(false);
+    expect(canCastInMana(true, 'normal')).toBe(true);
+    expect(canCastInMana(false, 'low')).toBe(false);
+    expect(canCastInMana(true, 'low')).toBe(true);
+  });
+
+  it('only very high mana makes casting free', () => {
+    expect(isFreeCastingMana('very_high')).toBe(true);
+    expect(isFreeCastingMana('high')).toBe(false);
+    expect(isFreeCastingMana('normal')).toBe(false);
   });
 });
 

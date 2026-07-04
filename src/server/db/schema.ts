@@ -218,6 +218,13 @@ export const campaigns = pgTable('campaigns', {
   pointTarget: integer('point_target'),
   disadvantageCap: integer('disadvantage_cap'),
   quirkCap: integer('quirk_cap').default(5),
+  /** Ambient mana level (Basic Set p. 235); folded into spell math. */
+  manaLevel: varchar('mana_level', {
+    length: 12,
+    enum: ['none', 'low', 'normal', 'high', 'very_high'],
+  })
+    .notNull()
+    .default('normal'),
   /**
    * When false, non-owner members fetching `/characters/{id}` get the
    * minimal "readily apparent" view (race / height / weight / age /
@@ -465,6 +472,9 @@ export const characterSpells = pgTable(
       .references(() => characters.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 160 }).notNull(),
     college: varchar('college', { length: 80 }),
+    difficulty: varchar('difficulty', { length: 2, enum: ['H', 'VH'] })
+      .notNull()
+      .default('H'),
     points: integer('points').notNull().default(1),
     baseEnergyCost: smallint('base_energy_cost').notNull().default(1),
     maintenanceCost: smallint('maintenance_cost'),
@@ -583,6 +593,39 @@ export const campaignLibrarySkills = pgTable(
   }),
 );
 
+/**
+ * Campaign spell library.  Mirrors the per-character spell shape minus
+ * per-character state (points); `character_spells.library_spell_id`
+ * points here when a spell was learned from the library.
+ */
+export const campaignLibrarySpells = pgTable(
+  'campaign_library_spells',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    college: varchar('college', { length: 80 }),
+    difficulty: varchar('difficulty', { length: 2, enum: ['H', 'VH'] })
+      .notNull()
+      .default('H'),
+    baseEnergyCost: smallint('base_energy_cost').notNull().default(1),
+    maintenanceCost: smallint('maintenance_cost'),
+    castingTime: varchar('casting_time', { length: 40 }),
+    duration: varchar('duration', { length: 40 }),
+    prerequisites: text('prerequisites'),
+    description: text('description'),
+    source: varchar('source', { length: 40 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    naturalKey: uniqueIndex('campaign_library_spells_key').on(t.campaignId, t.name),
+  }),
+);
+
 export const campaignLibraryItems = pgTable(
   'campaign_library_items',
   {
@@ -624,6 +667,7 @@ export type DbNotification = typeof notifications.$inferSelect;
 export type DbAdventureLogEntry = typeof adventureLogEntries.$inferSelect;
 export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
+export type DbCampaignLibrarySpell = typeof campaignLibrarySpells.$inferSelect;
 export type DbCampaignLibraryItem = typeof campaignLibraryItems.$inferSelect;
 export type DbApiKey = typeof apiKeys.$inferSelect;
 export type DbRefreshToken = typeof refreshTokens.$inferSelect;

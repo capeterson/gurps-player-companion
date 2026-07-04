@@ -1,17 +1,21 @@
 /**
  * GURPS 4e magic math.
  *
- * Spells are mechanically IQ/Hard skills, but their effective level
- * gets the caster's Magery level added on top.  The casting cost
- * shrinks by 1 for every full +5 the effective skill is above 10
- * (Basic Set p. 235 / GURPS Magic p. 7), to a floor of 1 -- unless
- * the spell's base cost is 0, in which case it stays free.
+ * Spells are mechanically IQ skills of Hard or Very Hard difficulty,
+ * and their effective level gets the caster's Magery level added on
+ * top.  The casting cost shrinks by 1 at effective skill 15, by 2 at
+ * 20, and so on (Basic Set p. 236 / GURPS Magic p. 8) -- all the way
+ * down to 0: high enough skill makes a cheap spell free.  The same
+ * reduction applies to the per-interval maintenance cost; a spell
+ * whose maintenance drops to 0 can be maintained indefinitely.
  *
- *   level         = IQ + skillOffset(H, points) + Magery
+ *   level         = IQ + skillOffset(H|VH, points) + Magery
  *   reduction     = floor(max(0, level - 10) / 5)
- *   effectiveCost = max(baseCost === 0 ? 0 : 1, baseCost - reduction)
+ *   effectiveCost = max(0, baseCost - reduction)
  */
 
+import type { ManaLevel } from '../constants/magic.ts';
+import type { SpellDifficulty } from '../constants/skills.ts';
 import { skillOffset } from './skillCalc.ts';
 
 /** Minimal trait shape the magic helpers need. */
@@ -39,11 +43,19 @@ export function mageryLevel(traits: readonly MageryTraitInput[]): number {
   for (const t of traits) {
     if (!isMageryName(t.name)) continue;
     // Magery 0 is encoded as level=null in many sheets (no level in
-    // GURPS terms = "level 0").  Treat null as 0.
-    const lvl = t.level ?? 0;
+    // GURPS terms = "level 0").  When the level column is empty, fall
+    // back to a level embedded in the name -- GCS-style sheets write
+    // "Magery 3" as the trait name with no separate level.
+    const lvl = t.level ?? mageryLevelFromName(t.name);
     if (lvl > best) best = lvl;
   }
   return best;
+}
+
+/** "Magery 3", "magery 2 (One College)" → 3 / 2; no number → 0. */
+function mageryLevelFromName(name: string): number {
+  const m = /\bmagery\s+(\d{1,2})\b/i.exec(name);
+  return m?.[1] ? Number.parseInt(m[1], 10) : 0;
 }
 
 /** True when the character has any Magery trait at all (incl. Magery 0). */
@@ -59,12 +71,41 @@ function isMageryName(name: string): boolean {
 }
 
 /**
- * Effective spell skill level.  Spells are always IQ/Hard, so we
- * delegate the points→offset table to `skillOffset('H', points)` and
- * add the caster's IQ and Magery on top.
+ * Effective spell skill level.  Spells are IQ/Hard or IQ/Very Hard;
+ * we delegate the points→offset table to `skillOffset` and add the
+ * caster's IQ and Magery on top.
  */
-export function computeSpellLevel(points: number, iq: number, magery: number): number {
-  return iq + skillOffset('H', points) + magery;
+export function computeSpellLevel(
+  points: number,
+  iq: number,
+  magery: number,
+  difficulty: SpellDifficulty = 'H',
+): number {
+  return iq + skillOffset(difficulty, points) + magery;
+}
+
+/**
+ * Skill modifier from the ambient mana level (Basic Set p. 235).
+ * Low mana is -5 to every spell; the other levels don't shift skill.
+ */
+export function manaSkillModifier(mana: ManaLevel): number {
+  return mana === 'low' ? -5 : 0;
+}
+
+/**
+ * Whether this character can cast spells at all here (B235): no mana
+ * means nobody casts, high or better lets anyone cast, and normal/low
+ * mana require Magery (even Magery 0).
+ */
+export function canCastInMana(casterHasMagery: boolean, mana: ManaLevel): boolean {
+  if (mana === 'none') return false;
+  if (mana === 'high' || mana === 'very_high') return true;
+  return casterHasMagery;
+}
+
+/** In very high mana, spells cost no energy to cast or maintain (B235). */
+export function isFreeCastingMana(mana: ManaLevel): boolean {
+  return mana === 'very_high';
 }
 
 /**
@@ -79,14 +120,27 @@ export function costReduction(effectiveSkill: number): number {
 }
 
 /**
- * Cost actually paid to cast this spell.  Free spells (base 0) stay
- * free; everything else floors at 1 -- you can't get a paid spell
- * down to 0 by being skilled.
+ * Cost actually paid to cast this spell.  The skill discount can take
+ * a paid spell all the way to 0 (Basic Set p. 236): at skill 15+ a
+ * 1-point spell is free.
  */
 export function effectiveCastingCost(baseCost: number, effectiveSkill: number): number {
   if (baseCost <= 0) return 0;
-  const discounted = baseCost - costReduction(effectiveSkill);
-  return Math.max(1, discounted);
+  return Math.max(0, baseCost - costReduction(effectiveSkill));
+}
+
+/**
+ * Per-interval cost to keep the spell running, after the same skill
+ * discount (Basic Set p. 236).  Null passes through (spell is not
+ * sustainable); 0 means it can be maintained indefinitely for free.
+ */
+export function effectiveMaintenanceCost(
+  baseMaintenance: number | null,
+  effectiveSkill: number,
+): number | null {
+  if (baseMaintenance == null) return null;
+  if (baseMaintenance <= 0) return 0;
+  return Math.max(0, baseMaintenance - costReduction(effectiveSkill));
 }
 
 /**

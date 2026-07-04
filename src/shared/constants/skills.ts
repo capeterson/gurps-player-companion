@@ -15,6 +15,13 @@ export const DIFFICULTY_BASE_OFFSET: Record<SkillDifficulty, number> = {
   VH: -3,
 };
 
+/**
+ * Spells are IQ skills that come in Hard (most) and Very Hard (Major
+ * Healing, Great Haste, Enchant, ...) flavours only — never E or A.
+ */
+export const SPELL_DIFFICULTIES = ['H', 'VH'] as const;
+export type SpellDifficulty = (typeof SPELL_DIFFICULTIES)[number];
+
 export const SKILL_ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per', 'Other'] as const;
 export type SkillAttribute = (typeof SKILL_ATTRIBUTES)[number];
 

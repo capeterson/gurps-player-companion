@@ -16,6 +16,7 @@ export const entityClass = z.enum([
   'campaign_membership',
   'campaign_library_trait',
   'campaign_library_skill',
+  'campaign_library_spell',
   'campaign_library_item',
   'adventure_log',
 ]);

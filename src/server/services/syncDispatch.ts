@@ -79,6 +79,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_membership: null,
   campaign_library_trait: null,
   campaign_library_skill: null,
+  campaign_library_spell: null,
   campaign_library_item: null,
   adventure_log: null,
 };
@@ -454,6 +455,7 @@ async function dispatchSpell(
         characterId,
         name: body.name,
         college: body.college ?? null,
+        difficulty: body.difficulty ?? 'H',
         points: body.points ?? 1,
         baseEnergyCost: body.baseEnergyCost ?? 1,
         maintenanceCost: body.maintenanceCost ?? null,

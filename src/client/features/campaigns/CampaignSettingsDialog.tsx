@@ -11,6 +11,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { MANA_LEVELS, MANA_LEVEL_LABELS, type ManaLevel } from '../../../shared/constants/magic.ts';
 import type {
   CampaignMemberOut,
   CampaignOut,
@@ -56,6 +57,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   const [quirkCap, setQuirkCap] = useState(
     campaign.quirkCap == null ? '' : String(campaign.quirkCap),
   );
+  const [manaLevel, setManaLevel] = useState<ManaLevel>(campaign.manaLevel);
   const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets);
   const [error, setError] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<CampaignMemberOut | null>(null);
@@ -69,6 +71,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     setPointTarget(campaign.pointTarget == null ? '' : String(campaign.pointTarget));
     setDisadCap(campaign.disadvantageCap == null ? '' : String(campaign.disadvantageCap));
     setQuirkCap(campaign.quirkCap == null ? '' : String(campaign.quirkCap));
+    setManaLevel(campaign.manaLevel);
     setShareSheets(campaign.shareCharacterSheets);
     setError(null);
   }, [open, campaign]);
@@ -133,6 +136,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       pointTarget: pt,
       disadvantageCap: dc,
       quirkCap: qcVal,
+      manaLevel,
       shareCharacterSheets: shareSheets,
     });
   };
@@ -198,6 +202,25 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
               />
             </label>
           </div>
+
+          <label className="form-control">
+            <span className="label-text text-xs">Mana level</span>
+            <select
+              className="select select-bordered select-sm"
+              value={manaLevel}
+              onChange={(e) => setManaLevel(e.target.value as ManaLevel)}
+            >
+              {MANA_LEVELS.map((m) => (
+                <option key={m} value={m}>
+                  {MANA_LEVEL_LABELS[m]}
+                </option>
+              ))}
+            </select>
+            <span className="label-text-alt text-xs text-base-content/60">
+              Low mana is −5 to every spell; high or better lets non-mages cast; very high makes
+              casting free. Applied to every character sheet in this campaign.
+            </span>
+          </label>
 
           <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
             <input

@@ -51,6 +51,7 @@ export function useCharacterDetail(id: string | undefined): CharacterDetailResul
             pointTarget: campaign.pointTarget,
             disadvantageCap: campaign.disadvantageCap,
             quirkCap: campaign.quirkCap,
+            manaLevel: campaign.manaLevel ?? 'normal',
           }
         : null,
     });

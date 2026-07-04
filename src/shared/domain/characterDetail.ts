@@ -13,6 +13,8 @@
  * the browser (Dexie returns ISO strings).
  */
 
+import type { ManaLevel } from '../constants/magic.ts';
+import type { SpellDifficulty } from '../constants/skills.ts';
 import type { CharacterDetail } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
@@ -28,7 +30,14 @@ import {
 } from './characterCalc.ts';
 import { type InventoryItemRow, computeEncumbrance, computeWeights } from './encumbrance.ts';
 import { computeSkillLevel } from './skillCalc.ts';
-import { computeSpellLevel, effectiveCastingCost, mageryLevel } from './spellCalc.ts';
+import {
+  computeSpellLevel,
+  effectiveCastingCost,
+  effectiveMaintenanceCost,
+  isFreeCastingMana,
+  mageryLevel,
+  manaSkillModifier,
+} from './spellCalc.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
 /**
@@ -134,6 +143,9 @@ export interface CharacterDetailInputSpell {
   characterId: string;
   name: string;
   college: string | null;
+  /** Optional: local rows synced before the column existed lack it;
+   * `buildSpellOut` defaults missing values to 'H'. */
+  difficulty?: SpellDifficulty;
   points: number;
   baseEnergyCost: number;
   maintenanceCost: number | null;
@@ -162,6 +174,8 @@ export interface CharacterDetailInputCampaign {
   pointTarget: number | null;
   disadvantageCap: number | null;
   quirkCap: number | null;
+  /** Optional: rows from before the mana column default to 'normal'. */
+  manaLevel?: ManaLevel | null;
 }
 
 export interface CharacterDetailInput {
@@ -302,13 +316,17 @@ export function buildSpellOut(
   spell: CharacterDetailInputSpell,
   iq: number,
   magery: number,
+  mana: ManaLevel = 'normal',
 ): SpellOut {
-  const level = computeSpellLevel(spell.points, iq, magery);
+  const difficulty = spell.difficulty ?? 'H';
+  const level = computeSpellLevel(spell.points, iq, magery, difficulty) + manaSkillModifier(mana);
+  const freeCasting = isFreeCastingMana(mana);
   return {
     id: spell.id,
     characterId: spell.characterId,
     name: spell.name,
     college: spell.college,
+    difficulty,
     points: spell.points,
     baseEnergyCost: spell.baseEnergyCost,
     maintenanceCost: spell.maintenanceCost,
@@ -318,7 +336,12 @@ export function buildSpellOut(
     notes: spell.notes,
     librarySpellId: spell.librarySpellId,
     level,
-    effectiveCost: effectiveCastingCost(spell.baseEnergyCost, level),
+    effectiveCost: freeCasting ? 0 : effectiveCastingCost(spell.baseEnergyCost, level),
+    effectiveMaintenanceCost: freeCasting
+      ? spell.maintenanceCost == null
+        ? null
+        : 0
+      : effectiveMaintenanceCost(spell.maintenanceCost, level),
     createdAt: toIso(spell.createdAt),
     updatedAt: toIso(spell.updatedAt),
   };
@@ -348,7 +371,13 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const traitsOut = traits.map(buildTraitOut);
   const skillsOut = skills.map((s) => buildSkillOut(s, derived));
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
-  const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery));
+  const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
+  // A character in a campaign whose row we don't have yet (client-side,
+  // before the campaign mirror lands in Dexie) gets the 'normal'
+  // fallback above -- flag it so the UI can hold cast actions instead
+  // of trusting a guess.  Campaignless characters are always 'known'.
+  const manaLevelKnown = character.campaignId == null || campaign != null;
+  const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery, manaLevel));
   const combatOut = combat ? buildCombatStateOut(combat) : null;
 
   const caps: CampaignCaps = {
@@ -407,6 +436,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     points,
     encumbrance,
     warnings,
+    manaLevel,
+    manaLevelKnown,
     traits: traitsOut,
     skills: skillsOut,
     spells: spellsOut,

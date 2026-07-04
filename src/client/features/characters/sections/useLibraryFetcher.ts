@@ -23,17 +23,20 @@ import { useCallback } from 'react';
 import type {
   LibraryItemOut,
   LibrarySkillOut,
+  LibrarySpellOut,
   LibraryTraitOut,
 } from '../../../../shared/schemas/campaignLibrary.ts';
 import { ApiError, api } from '../../../lib/api.ts';
 
-type Kind = 'traits' | 'skills' | 'items';
+type Kind = 'traits' | 'skills' | 'spells' | 'items';
 
-type LibraryEntry = LibraryTraitOut | LibrarySkillOut | LibraryItemOut;
+type LibraryEntry = LibraryTraitOut | LibrarySkillOut | LibrarySpellOut | LibraryItemOut;
 
 interface LibraryPayload {
   readonly traits: LibraryTraitOut[];
   readonly skills: LibrarySkillOut[];
+  /** Optional: servers from before the spell library omit it. */
+  readonly spells?: LibrarySpellOut[];
   readonly items: LibraryItemOut[];
 }
 
@@ -51,13 +54,13 @@ export function useLibraryFetcher<T extends LibraryEntry>(
     // aggregate response so picking traits then skills doesn't refetch.
     queryKey: ['campaignLibrary', campaignId],
     queryFn: async (): Promise<LibraryPayload> => {
-      if (!campaignId) return { traits: [], skills: [], items: [] };
+      if (!campaignId) return { traits: [], skills: [], spells: [], items: [] };
       try {
         return await api<LibraryPayload>(`/campaigns/${campaignId}/library`);
       } catch (err) {
         // 403 (member can't see campaign) shouldn't crash the form.
         if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
-          return { traits: [], skills: [], items: [] };
+          return { traits: [], skills: [], spells: [], items: [] };
         }
         throw err;
       }
@@ -67,11 +70,11 @@ export function useLibraryFetcher<T extends LibraryEntry>(
 
   const fetchOptions = useCallback(
     async (q: string): Promise<T[]> => {
-      const payload = query.data ?? { traits: [], skills: [], items: [] };
-      // The caller's `T` is one of the three union members; the kind
-      // arg discriminates which array we want. TS can't narrow through
+      const payload = query.data ?? { traits: [], skills: [], spells: [], items: [] };
+      // The caller's `T` is one of the union members; the kind arg
+      // discriminates which array we want. TS can't narrow through
       // the indexed access so this cast is necessary at the boundary.
-      const list = payload[kind] as unknown as readonly T[];
+      const list = (payload[kind] ?? []) as unknown as readonly T[];
       if (q.length === 0) return list.slice(0, 20);
       const needle = q.toLowerCase();
       const ranked = list

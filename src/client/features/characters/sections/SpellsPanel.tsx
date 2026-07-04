@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { hasMagery } from '../../../../shared/domain/spellCalc.ts';
+import { SPELL_DIFFICULTIES, type SpellDifficulty } from '../../../../shared/constants/skills.ts';
+import { canCastInMana, hasMagery } from '../../../../shared/domain/spellCalc.ts';
+import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
+import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { useFieldFlash } from '../../../hooks/useFieldFlash.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import {
@@ -12,9 +16,11 @@ import {
   newClientId,
 } from '../../../sync/outbox.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
+import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 interface AddSpellFormProps {
   characterId: string;
+  campaignId: string | null;
   canWrite: boolean;
 }
 
@@ -23,19 +29,28 @@ interface SpellSnapshot {
   nameRaw: string;
   college: string;
   collegeRaw: string;
+  difficulty: SpellDifficulty;
   points: number;
   pointsRaw: string;
   baseEnergyCost: number;
   baseEnergyCostRaw: string;
+  /** Library row the name was picked from, if any. */
+  library: LibrarySpellOut | null;
 }
 
-function AddSpellForm({ characterId, canWrite }: AddSpellFormProps) {
+function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) {
   const toasts = useToasts();
   const [name, setName] = useState('');
   const [college, setCollege] = useState('');
+  const [difficulty, setDifficulty] = useState<SpellDifficulty>('H');
   const [points, setPoints] = useState('1');
   const [baseEnergyCost, setBaseEnergyCost] = useState('1');
   const [creating, setCreating] = useState(false);
+  // Full library row when the name was picked from the autocomplete;
+  // carries book fields (maintenance, casting time, ...) into the create.
+  const [picked, setPicked] = useState<LibrarySpellOut | null>(null);
+
+  const { fetchOptions } = useLibraryFetcher<LibrarySpellOut>('spells', campaignId);
 
   async function submit(snap: SpellSnapshot) {
     setCreating(true);
@@ -48,8 +63,19 @@ function AddSpellForm({ characterId, canWrite }: AddSpellFormProps) {
         attemptedValue: {
           name: snap.name,
           college: snap.college === '' ? null : snap.college,
+          difficulty: snap.difficulty,
           points: snap.points,
           baseEnergyCost: snap.baseEnergyCost,
+          ...(snap.library
+            ? {
+                maintenanceCost: snap.library.maintenanceCost,
+                castingTime: snap.library.castingTime,
+                duration: snap.library.duration,
+                prerequisites: snap.library.prerequisites,
+                notes: snap.library.description,
+                librarySpellId: snap.library.id,
+              }
+            : {}),
           characterId,
         },
       });
@@ -62,8 +88,10 @@ function AddSpellForm({ characterId, canWrite }: AddSpellFormProps) {
       // to prevent.
       setName((cur) => (cur === snap.nameRaw ? '' : cur));
       setCollege((cur) => (cur === snap.collegeRaw ? '' : cur));
+      setDifficulty((cur) => (cur === snap.difficulty ? 'H' : cur));
       setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
       setBaseEnergyCost((cur) => (cur === snap.baseEnergyCostRaw ? '1' : cur));
+      setPicked((cur) => (cur?.id === snap.library?.id ? null : cur));
     } catch (err) {
       toasts.push(`Couldn't add spell — ${(err as Error).message}`, { kind: 'error' });
     } finally {
@@ -86,22 +114,57 @@ function AddSpellForm({ characterId, canWrite }: AddSpellFormProps) {
           nameRaw: name,
           college: college.trim(),
           collegeRaw: college,
-          points: Number.isFinite(pParsed) && pParsed >= 0 ? pParsed : 1,
+          difficulty,
+          // Spells have no default in GURPS: at least 1 point to know one.
+          points: Number.isFinite(pParsed) && pParsed >= 1 ? pParsed : 1,
           pointsRaw: points,
           baseEnergyCost: Number.isFinite(eParsed) && eParsed >= 0 ? eParsed : 1,
           baseEnergyCostRaw: baseEnergyCost,
+          library: picked && picked.name === name.trim() ? picked : null,
         });
       }}
     >
-      <label className="form-control flex-1 min-w-[10rem]">
-        <span className="label-text text-xs">Spell</span>
-        <input
-          className="input input-bordered input-sm"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Light"
-        />
-      </label>
+      <div className="form-control flex-1 min-w-[10rem]">
+        <span className="label-text text-xs" id="add-spell-name-label">
+          Spell
+        </span>
+        {campaignId ? (
+          <LibraryAutocomplete<LibrarySpellOut>
+            value={name}
+            onChange={(v) => {
+              setName(v);
+              setPicked(null);
+            }}
+            onPick={(opt) => {
+              setName(opt.name);
+              setCollege(opt.college ?? '');
+              setDifficulty(opt.difficulty);
+              setBaseEnergyCost(String(opt.baseEnergyCost));
+              setPicked(opt);
+            }}
+            fetchOptions={fetchOptions}
+            getOptionKey={(o) => o.id}
+            renderOption={(o) => (
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="truncate">{o.name}</span>
+                <span className="num text-xs text-base-content/70">
+                  {o.college ?? '—'} · IQ/{o.difficulty}
+                </span>
+              </span>
+            )}
+            placeholder="e.g. Light"
+            inputProps={{ 'aria-labelledby': 'add-spell-name-label' }}
+          />
+        ) : (
+          <input
+            aria-labelledby="add-spell-name-label"
+            className="input input-bordered input-sm"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Light"
+          />
+        )}
+      </div>
       <label className="form-control w-32">
         <span className="label-text text-xs">College</span>
         <input
@@ -110,6 +173,18 @@ function AddSpellForm({ characterId, canWrite }: AddSpellFormProps) {
           onChange={(e) => setCollege(e.target.value)}
           placeholder="e.g. Light"
         />
+      </label>
+      <label className="form-control">
+        <span className="label-text text-xs">Diff</span>
+        <select
+          className="select select-bordered select-sm"
+          value={difficulty}
+          onChange={(e) => setDifficulty(e.target.value as SpellDifficulty)}
+        >
+          {SPELL_DIFFICULTIES.map((d) => (
+            <option key={d}>{d}</option>
+          ))}
+        </select>
       </label>
       <label className="form-control w-16">
         <span className="label-text text-xs">Pts</span>
@@ -138,11 +213,17 @@ interface SpellRowProps {
   characterId: string;
   spell: SpellOut;
   canWrite: boolean;
-  onCast(spell: SpellOut): void;
+  /** False when the ambient mana level forbids this character casting. */
+  castable: boolean;
+  onCast(spell: SpellOut, mode: 'cast' | 'maintain'): void;
 }
 
-function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
+function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowProps) {
   const toasts = useToasts();
+  // The difficulty select commits instantly (no draft state), so it
+  // wires the rollback flash through useFieldFlash directly (AGENTS.md
+  // rule 2 / S5: a rejected patch must pulse the input it reverts).
+  const difficultyFlash = useFieldFlash(makeFlashKey('character_spell', spell.id, 'difficulty'));
 
   const patchSpell = (field: string, value: unknown) =>
     enqueueFieldPatch({
@@ -168,8 +249,9 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
     serverValue: spell.points,
     parse: (s) => {
       const n = Number(s);
-      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
-        throw new Error('non-negative integer only');
+      // Spells have no default in GURPS — knowing one takes >= 1 point.
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+        throw new Error('positive integer only');
       }
       return n;
     },
@@ -205,7 +287,7 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
   };
 
   return (
-    <li className="grid grid-cols-[1fr_5rem_3rem_3rem_3rem_3rem_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
+    <li className="grid grid-cols-[1fr_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
       {canWrite ? (
         <input
           aria-label={`${spell.name} name`}
@@ -216,6 +298,22 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
         <span className="font-medium">{spell.name}</span>
       )}
       <span className="text-xs text-base-content/70 truncate">{spell.college ?? '—'}</span>
+      {canWrite ? (
+        <select
+          aria-label={`${spell.name} difficulty`}
+          className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm`}
+          data-flashing={difficultyFlash['data-flashing']}
+          data-flash-parity={difficultyFlash['data-flash-parity']}
+          value={spell.difficulty}
+          onChange={(e) => void patchSpell('difficulty', e.target.value as SpellDifficulty)}
+        >
+          {SPELL_DIFFICULTIES.map((d) => (
+            <option key={d}>{d}</option>
+          ))}
+        </select>
+      ) : (
+        <span className="text-xs text-base-content/70 num text-center">IQ/{spell.difficulty}</span>
+      )}
       {canWrite ? (
         <input
           aria-label={`${spell.name} points`}
@@ -240,7 +338,11 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
       <span
         className="num text-right font-medium text-primary"
         aria-label={`${spell.name} effective cost`}
-        title={`After skill discount: ${spell.effectiveCost} energy`}
+        title={`After skill discount: ${spell.effectiveCost} energy to cast${
+          spell.effectiveMaintenanceCost != null
+            ? `, ${spell.effectiveMaintenanceCost} to maintain`
+            : ''
+        }`}
       >
         {spell.effectiveCost}
       </span>
@@ -249,11 +351,32 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
           <button
             type="button"
             className="btn btn-primary btn-xs"
-            onClick={() => onCast(spell)}
+            onClick={() => onCast(spell, 'cast')}
+            disabled={!castable}
             aria-label={`Cast ${spell.name}`}
-            title="Cast this spell"
+            title={
+              castable
+                ? 'Cast this spell'
+                : 'This character cannot cast here — see the mana notice above'
+            }
           >
             Cast
+          </button>
+        )}
+        {canWrite && spell.maintenanceCost != null && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => onCast(spell, 'maintain')}
+            disabled={!castable}
+            aria-label={`Maintain ${spell.name}`}
+            title={
+              castable
+                ? `Pay the maintenance cost (${spell.effectiveMaintenanceCost ?? spell.maintenanceCost} after discount) to keep this spell running`
+                : 'This character cannot cast here — see the mana notice above'
+            }
+          >
+            Maint
           </button>
         )}
         {canWrite && (
@@ -273,6 +396,52 @@ function SpellRow({ characterId, spell, canWrite, onCast }: SpellRowProps) {
   );
 }
 
+function manaNotice(
+  mana: CharacterDetail['manaLevel'],
+  manaKnown: boolean,
+  characterHasMagery: boolean,
+) {
+  if (!manaKnown) {
+    return {
+      tone: 'text-base-content/60',
+      text: 'Campaign mana level not synced yet — casting is disabled until it loads.',
+    };
+  }
+  if (mana === 'none') {
+    return {
+      tone: 'text-error',
+      text: 'This campaign is a no-mana zone: spells cannot be cast at all here.',
+    };
+  }
+  if (mana === 'low') {
+    return {
+      tone: characterHasMagery ? 'text-base-content/60' : 'text-warning',
+      text: characterHasMagery
+        ? 'Low mana: −5 to every spell is already included in the levels below.'
+        : 'Low mana (−5 already included below) — and without Magery this character cannot cast here at all.',
+    };
+  }
+  if (mana === 'high' || mana === 'very_high') {
+    return {
+      tone: 'text-base-content/60',
+      text:
+        mana === 'very_high'
+          ? 'Very high mana: anyone can cast here (no Magery needed) and spells cost no energy.'
+          : 'High mana: anyone can cast here — Magery is not required.',
+    };
+  }
+  if (!characterHasMagery) {
+    return {
+      tone: 'text-warning',
+      text:
+        'No Magery trait detected. In normal mana only characters with Magery (even Magery 0) ' +
+        'can cast spells, and spells have no default skill. Levels below assume Magery 0 — add ' +
+        'the Magery advantage in Traits.',
+    };
+  }
+  return null;
+}
+
 export function SpellsPanel({
   character,
   canWrite,
@@ -280,8 +449,16 @@ export function SpellsPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const [castSpell, setCastSpell] = useState<SpellOut | null>(null);
+  const [casting, setCasting] = useState<{ spell: SpellOut; mode: 'cast' | 'maintain' } | null>(
+    null,
+  );
   const characterHasMagery = hasMagery(character.traits);
+  const notice = manaNotice(character.manaLevel, character.manaLevelKnown, characterHasMagery);
+  // Hold casting entirely while the campaign row (and thus the real
+  // mana level) hasn't reached the local store: the builder's 'normal'
+  // fallback must not let a no-mana campaign spend FP on first load.
+  const castable =
+    character.manaLevelKnown && canCastInMana(characterHasMagery, character.manaLevel);
 
   return (
     <section className="card space-y-3 p-5">
@@ -295,22 +472,22 @@ export function SpellsPanel({
         </p>
       </header>
 
-      {!characterHasMagery && (
-        <p className="text-xs text-warning">
-          No Magery trait detected. Spells default to skill -2 (no Magery bonus); add the Magery
-          advantage in Traits to unlock spell casting in normal mana.
-        </p>
-      )}
+      {notice && <p className={`text-xs ${notice.tone}`}>{notice.text}</p>}
 
-      <AddSpellForm characterId={character.id} canWrite={canWrite} />
+      <AddSpellForm
+        characterId={character.id}
+        campaignId={character.campaignId ?? null}
+        canWrite={canWrite}
+      />
 
       {character.spells.length === 0 ? (
         <p className="text-sm text-base-content/60">No spells learned yet.</p>
       ) : (
         <>
-          <div className="grid grid-cols-[1fr_5rem_3rem_3rem_3rem_3rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
+          <div className="grid grid-cols-[1fr_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
             <span>Spell</span>
             <span>College</span>
+            <span>Diff</span>
             <span className="text-right">Pts</span>
             <span className="text-right">Lvl</span>
             <span className="text-right">Base</span>
@@ -324,18 +501,20 @@ export function SpellsPanel({
                 characterId={character.id}
                 spell={s}
                 canWrite={canWrite}
-                onCast={setCastSpell}
+                castable={castable}
+                onCast={(spell, mode) => setCasting({ spell, mode })}
               />
             ))}
           </ul>
         </>
       )}
 
-      {castSpell && (
+      {casting && (
         <CastSpellDialog
           character={character}
-          spell={castSpell}
-          onClose={() => setCastSpell(null)}
+          spell={casting.spell}
+          mode={casting.mode}
+          onClose={() => setCasting(null)}
         />
       )}
     </section>

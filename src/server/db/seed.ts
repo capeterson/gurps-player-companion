@@ -14,6 +14,7 @@ import { closeDb, getDb } from './client.ts';
 import {
   campaignLibraryItems,
   campaignLibrarySkills,
+  campaignLibrarySpells,
   campaignLibraryTraits,
   campaignMemberships,
   campaigns,
@@ -129,6 +130,39 @@ async function seedLibrary(db: ReturnType<typeof getDb>, campaignId: string): Pr
           defaultSpecialization: s.defaultSpecialization ?? null,
           prerequisites: s.prerequisites ?? null,
           situationalModifiers: s.situationalModifiers ?? [],
+          updatedAt: new Date(),
+        },
+      });
+  }
+
+  for (const s of doc.library.spells ?? []) {
+    await db
+      .insert(campaignLibrarySpells)
+      .values({
+        campaignId,
+        name: s.name,
+        college: s.college ?? null,
+        difficulty: s.difficulty,
+        baseEnergyCost: s.baseEnergyCost,
+        maintenanceCost: s.maintenanceCost ?? null,
+        castingTime: s.castingTime ?? null,
+        duration: s.duration ?? null,
+        prerequisites: s.prerequisites ?? null,
+        description: s.description ?? null,
+        source: s.source ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [campaignLibrarySpells.campaignId, campaignLibrarySpells.name],
+        set: {
+          college: s.college ?? null,
+          difficulty: s.difficulty,
+          baseEnergyCost: s.baseEnergyCost,
+          maintenanceCost: s.maintenanceCost ?? null,
+          castingTime: s.castingTime ?? null,
+          duration: s.duration ?? null,
+          prerequisites: s.prerequisites ?? null,
+          description: s.description ?? null,
+          source: s.source ?? null,
           updatedAt: new Date(),
         },
       });

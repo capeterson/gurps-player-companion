@@ -95,6 +95,49 @@ library:
       difficulty: A
       source: B-217
       defaultSpecialization: Equine
+  spells:
+    - name: Light
+      college: Light & Darkness
+      difficulty: H
+      baseEnergyCost: 1
+      maintenanceCost: 1
+      castingTime: 1 second
+      duration: 1 minute
+      description: |
+        Produces a small, mobile light like a torch.  The classic first
+        spell: at skill 15+ the 1-point cost is discounted to free.
+      source: M-110
+    - name: Ignite Fire
+      college: Fire
+      difficulty: H
+      baseEnergyCost: 1
+      castingTime: 1 second
+      duration: 1 second
+      description: |
+        Makes an inflammable object burst into flame.  Cost varies with
+        the size of the fire (1-4); record the base and adjust the
+        energy to spend when casting.
+      source: M-72
+    - name: Minor Healing
+      college: Healing
+      difficulty: H
+      baseEnergyCost: 1
+      castingTime: 1 second
+      prerequisites: Lend Vitality
+      description: |
+        Restores up to 3 HP to a subject you touch; cost equals the HP
+        restored (1-3).
+      source: M-91
+    - name: Major Healing
+      college: Healing
+      difficulty: VH
+      baseEnergyCost: 2
+      castingTime: 1 second
+      prerequisites: Magery 1, Minor Healing
+      description: |
+        Restores 2 HP per energy point spent (max 8 HP).  Very Hard --
+        one skill level lower than a Hard spell for the same points.
+      source: M-91
   items:
     - name: Mail Hauberk
       category: armor
