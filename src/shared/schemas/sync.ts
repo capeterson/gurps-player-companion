@@ -112,6 +112,22 @@ export const syncCursorResponse = z.object({
   hasMore: z.record(entityClass, z.boolean()),
   /** entityClass → highest revision returned in this batch.  Use as the next cursor. */
   nextCursor: z.record(entityClass, revision),
+  /**
+   * Authoritative "what can this viewer see right now" sets, included on
+   * every response so the client can prune local rows that fell out of
+   * access (removed from a campaign, campaign deleted, character moved
+   * out of a shared campaign).  Tombstones don't reach ex-members —
+   * they're scoped to campaigns the viewer *currently* belongs to — so
+   * this is the only signal that tells the client "stop keeping this
+   * around."  Optional so old clients/servers on either side of a
+   * deploy still interoperate: an absent field means "don't prune."
+   */
+  accessible: z
+    .object({
+      characterIds: z.array(uuid),
+      campaignIds: z.array(uuid),
+    })
+    .optional(),
 });
 
 /** /api/v1/sync/operations request: a batch of envelopes (max 50). */

@@ -39,6 +39,8 @@ import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
+  campaignMemberships,
+  campaigns,
   characterSkills,
   characterSpells,
   characterTraits,
@@ -148,13 +150,13 @@ export async function dispatchOperation(
       dispatchOperationInner({ ...ctx, batchId }, op, tx),
     );
     if (outcome.status === 'applied') {
-      // Wake any other tabs/devices for this user.  WS messages carry
-      // no row data — the client always reconciles via /sync/cursor.
-      wsPublish(ctx.userId, {
-        kind: 'sync_invalidate',
-        entityClasses: [op.entityClass],
-        emittedAt: new Date().toISOString(),
-      });
+      // Wake the actor's other tabs/devices AND every other user who
+      // can see the affected character (owner, campaign GM, campaign
+      // members) so a GM editing a player's sheet -- or vice versa --
+      // doesn't wait up to 30s for the periodic pull.  WS messages
+      // carry no row data (rule S8) — every recipient still reconciles
+      // via /sync/cursor.
+      await publishSyncInvalidation(ctx.userId, op);
     }
     return outcome;
   } catch (err) {
@@ -195,6 +197,63 @@ export async function dispatchOperation(
       status: 'transient',
       reason: err instanceof Error ? err.message : 'transient error',
     };
+  }
+}
+
+/**
+ * Fan out a `sync_invalidate` WS nudge to every user who can see the
+ * change: the actor (their other tabs/devices), the character's owner,
+ * the campaign owner (GM), and campaign members when the character
+ * belongs to a campaign.
+ *
+ * Resolves the character id for the op (entityId for `character`,
+ * `requireParentId` for child classes) and does at most one query for
+ * the character row and one for campaign owner+members.  Both the
+ * parent-id resolution and the queries are wrapped so a failure here
+ * (deleted character, missing parentId, DB hiccup) can never affect the
+ * outcome already returned to the client — WS is acceleration only
+ * (rule S8).  When the character row can't be resolved (e.g. it was
+ * just deleted), we fall back to publishing to the actor alone; other
+ * members converge via the periodic pull plus the accessible-set prune.
+ */
+async function publishSyncInvalidation(actorId: string, op: OperationEnvelope): Promise<void> {
+  const recipients = new Set<string>([actorId]);
+  if (DISPATCHABLE_CLASSES.has(op.entityClass)) {
+    try {
+      const characterId = op.entityClass === 'character' ? op.entityId : requireParentId(op);
+      const db = getDb();
+      const [charRow] = await db
+        .select({ ownerId: characters.ownerId, campaignId: characters.campaignId })
+        .from(characters)
+        .where(eq(characters.id, characterId));
+      if (charRow) {
+        recipients.add(charRow.ownerId);
+        if (charRow.campaignId) {
+          const [campaignRow] = await db
+            .select({ ownerId: campaigns.ownerId })
+            .from(campaigns)
+            .where(eq(campaigns.id, charRow.campaignId));
+          if (campaignRow) recipients.add(campaignRow.ownerId);
+          const members = await db
+            .select({ userId: campaignMemberships.userId })
+            .from(campaignMemberships)
+            .where(eq(campaignMemberships.campaignId, charRow.campaignId));
+          for (const m of members) recipients.add(m.userId);
+        }
+      }
+    } catch {
+      // Row gone, parentId missing (combat/character delete), or a
+      // transient DB error -- fall back to the actor-only recipient
+      // set already seeded above.
+    }
+  }
+  const message = {
+    kind: 'sync_invalidate' as const,
+    entityClasses: [op.entityClass],
+    emittedAt: new Date().toISOString(),
+  };
+  for (const userId of recipients) {
+    wsPublish(userId, message);
   }
 }
 

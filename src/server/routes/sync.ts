@@ -149,6 +149,15 @@ router.openapi(
         changes,
         hasMore: hasMore as Record<EntityClass, boolean>,
         nextCursor: nextCursor as Record<EntityClass, number>,
+        // Authoritative access sets — already computed above for this
+        // same request, zero extra queries. Lets the client prune local
+        // rows that fell out of access (tombstones alone can't reach
+        // ex-members: they're scoped to campaigns the viewer *currently*
+        // belongs to).
+        accessible: {
+          characterIds: accessibleCharacterIds,
+          campaignIds: accessibleCampaignIds,
+        },
       },
       200,
     );

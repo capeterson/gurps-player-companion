@@ -244,6 +244,7 @@ class SyncOrchestrator {
     // when nothing is actually moving. Defer the flip until we see a
     // response that actually carries rows to apply.
     let appliedAnything = false;
+    let lastAccessible: SyncCursorResponse['accessible'];
     try {
       let hasMore = true;
       while (hasMore) {
@@ -257,6 +258,7 @@ class SyncOrchestrator {
           appliedAnything = true;
         }
         await this.applyCursorResponse(res);
+        lastAccessible = res.accessible;
         hasMore = Object.values(res.hasMore ?? {}).some((v) => v);
       }
       // After every successful pull, drop any private child rows that
@@ -265,6 +267,13 @@ class SyncOrchestrator {
       // server stops emitting them as upserts; this sweep cleans up
       // what's already in Dexie.
       await this.enforceMinimalViewLocally();
+      // Prune characters/campaigns the viewer has lost access to
+      // entirely (removed from a campaign, campaign deleted, character
+      // moved out of a shared campaign). Tombstones can't reach ex-
+      // members -- they're scoped to campaigns the viewer *currently*
+      // belongs to -- so the authoritative `accessible` set on the last
+      // page is the only signal. Absent on old servers -> no-op.
+      await this.pruneInaccessibleLocally(lastAccessible);
       this.fireCycleDone();
       const pending = await countPending();
       this.refreshIndicator(pending);
@@ -1054,6 +1063,95 @@ class SyncOrchestrator {
         // isn't indexed on this store, and the resulting SchemaError
         // used to abort the sweep and wedge the pull in 'error'.)
         await db.characterCombat.bulkDelete(idArray);
+      },
+    );
+  }
+
+  /**
+   * Prune local characters/campaigns the viewer has completely lost
+   * access to (removed from a campaign, campaign deleted, character
+   * moved out of a shared campaign) using the authoritative `accessible`
+   * set the cursor response carries on every page (see
+   * `src/server/routes/sync.ts`).  The server simply stops emitting
+   * these rows as upserts once access is gone, and tombstones can't
+   * help either -- they're scoped to campaigns the viewer *currently*
+   * belongs to, so an ex-member never sees the delete.  Without this
+   * sweep the stale rows (and their child rows) live in IndexedDB
+   * forever.
+   *
+   * Never prunes:
+   *   - rows with `revision < 0` (speculative local create not yet
+   *     acked -- AGENTS.md rule S7),
+   *   - any entity with an outstanding outbox op (pending/in_flight/
+   *     transient_retry) -- queued intent the server doesn't know
+   *     about yet.
+   *
+   * No-op when `accessible` is absent (older server that doesn't send
+   * the field yet).
+   */
+  private async pruneInaccessibleLocally(
+    accessible: SyncCursorResponse['accessible'],
+  ): Promise<void> {
+    if (!accessible) return;
+    const db = getLocalDb();
+    const accessibleCharacterIds = new Set(accessible.characterIds);
+    const accessibleCampaignIds = new Set(accessible.campaignIds);
+
+    const [chars, camps] = await Promise.all([db.characters.toArray(), db.campaigns.toArray()]);
+
+    const staleCharacterIds = chars
+      .filter((c) => !accessibleCharacterIds.has(c.id) && c.revision >= 0)
+      .map((c) => c.id);
+    const staleCampaignIds = camps
+      .filter((c) => !accessibleCampaignIds.has(c.id) && c.revision >= 0)
+      .map((c) => c.id);
+
+    if (staleCharacterIds.length === 0 && staleCampaignIds.length === 0) return;
+
+    // Never prune an entity with unsent/unsettled local intent -- a
+    // queued create/patch/delete means the server doesn't know about it
+    // yet, or the user has an edit in flight.
+    const candidateIds = [...staleCharacterIds, ...staleCampaignIds];
+    const dirtyOps = await db.outbox
+      .where('entityId')
+      .anyOf(candidateIds)
+      .filter(
+        (o) => o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry',
+      )
+      .toArray();
+    const dirtyEntityIds = new Set(dirtyOps.map((o) => o.entityId));
+
+    const charIdsToDelete = staleCharacterIds.filter((id) => !dirtyEntityIds.has(id));
+    const campaignIdsToDelete = staleCampaignIds.filter((id) => !dirtyEntityIds.has(id));
+    if (charIdsToDelete.length === 0 && campaignIdsToDelete.length === 0) return;
+
+    // Single transaction across every affected store so observers see
+    // one atomic update.
+    await db.transaction(
+      'rw',
+      [
+        db.characters,
+        db.characterTraits,
+        db.characterSkills,
+        db.characterSpells,
+        db.characterInventory,
+        db.characterCombat,
+        db.campaigns,
+      ],
+      async () => {
+        if (charIdsToDelete.length > 0) {
+          await db.characterTraits.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterSkills.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterSpells.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterInventory.where('characterId').anyOf(charIdsToDelete).delete();
+          // Combat's primary key IS the characterId -- bulkDelete by pk,
+          // not `where('id')` (unindexed, throws SchemaError).
+          await db.characterCombat.bulkDelete(charIdsToDelete);
+          await db.characters.bulkDelete(charIdsToDelete);
+        }
+        if (campaignIdsToDelete.length > 0) {
+          await db.campaigns.bulkDelete(campaignIdsToDelete);
+        }
       },
     );
   }
