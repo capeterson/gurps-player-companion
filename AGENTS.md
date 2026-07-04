@@ -19,6 +19,9 @@ requirement — not optional documentation.**
   - `campaign-content-sharing.md` — roles, invitations, the share gate /
     minimal view, and the YAML library.
   - `history-tracking.md` — the append-only audit log.
+  - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
+    schema; a new JSON-typed field is incomplete without a schema and a
+    catalog row.
 - **These docs describe *what exists*; this file (`AGENTS.md`) prescribes
   *what you must keep true*.** When they disagree with the code, the code is
   the truth and the spec is a bug — fix it.
@@ -103,10 +106,30 @@ The `useDraftField` test file is the working reference.
 - **OpenAPI is the contract.** Every Hono route uses `createRoute`
   from `@hono/zod-openapi`. CI fails on drift between routes and
   `docs/openapi.json`.
-- **No instance admin in the PWA.** Admin code, if it ever exists,
-  lives in a separate process and never ships in the client bundle.
+- **No instance admin in the PWA.** Admin UI lives in its own build
+  entry (`src/client/admin.html` → `/admin/*`), never in the PWA
+  bundle, and never participates in the PWA (no service worker, no
+  manifest — `vite.config.ts` strips both from the admin entry). It is
+  served by the same Bun process; the admin API is `/api/v1/admin/*`
+  gated by `requireSuperuser`. (This bullet used to say "separate
+  process"; the code chose a separate *bundle* instead — the invariant
+  that matters is bundle isolation from the PWA.)
 - **WebSockets are acceleration, not correctness.** The HTTP sync
   cursor + outbox replay is the source of truth.
+- **Every JSON/JSONB field has a Zod schema.** The DB can't enforce
+  shape inside `jsonb`, so every such field gets a schema in
+  `src/shared/schemas/`, is validated through it at every write
+  boundary, has a `$type<>` on its Drizzle column, and has a row in
+  `docs/specs/json-fields.md`. A new JSON-typed field without all four
+  is incomplete. (Broken once: `notifications.payload` shipped with no
+  schema; emitter and consumer drifted on blind casts.)
+- **The share gate applies to EVERY payload carrying character data.**
+  `shareCharacterSheets=false` must mask private fields on *every*
+  surface that emits character rows — detail, **list**, sync cursor,
+  history — not just the obvious one. (Broken once: `GET /characters`
+  leaked ST/DX/IQ/HT to fellow members while the detail and sync paths
+  masked them.) Use `decideCharacterAccess` for the decision; never
+  re-derive it ad hoc.
 
 ## Offline sync — extension rules
 
@@ -276,6 +299,38 @@ A new outbox path, entity class, or draft input MUST have tests for:
 
 The `useDraftField`, `outbox`, and orchestrator test files are the
 working references.
+
+### S12. Sync and REST are two doors to the same rows — keep their guards identical.
+
+Every authorization check and validation that a REST route applies to
+a write MUST also exist on the `/sync/operations` dispatcher path for
+the same entity, and vice versa. The dispatcher is not "internal" —
+it accepts arbitrary client-crafted envelopes with any entityId,
+fieldPath, and value.
+
+This rule was broken three ways in one review, so check all of them
+when touching either path:
+
+1. **Write authorization.** REST `PATCH /characters/{id}` calls
+   `assertWrite`; the sync character-patch dispatcher didn't, letting
+   any campaign member edit another member's character through /sync.
+   Every dispatcher branch (create/patch/delete, including whole-body
+   patches) needs the same `loadCharacterOr403` + `assertWrite` the
+   REST route has.
+2. **Cross-entity referential checks.** The REST inventory patch
+   validates `parentId` with `assertParentBelongsToCharacter` + cycle
+   check; the sync path had only the cycle check, whose per-character
+   scoping silently passes a foreign parent. A scoped-lookup "not
+   found" is NOT a substitute for an explicit belongs-to check.
+3. **Writable-field parity with the client.** The sync whitelist is
+   derived from the `xxxUpdate` schemas. If the client enqueues a
+   fieldPath the schema lacks, the op is rejected server-side and the
+   user's edit visibly rolls back on every attempt
+   (`dismissedWarnings` shipped broken this way). When the sync
+   surface needs a field REST handles via a bespoke endpoint, extend a
+   dedicated sync-patch schema (see `characterSyncPatch` in
+   `src/shared/schemas/character.ts`) — and grep the client for
+   `fieldPath:` literals to confirm every one is writable server-side.
 
 ## History tracking is a required baseline for all new entities
 

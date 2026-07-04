@@ -28,6 +28,7 @@ connectivity indefinitely and converge later. See
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
 | [campaign-content-sharing.md](campaign-content-sharing.md) | Campaigns, roles, invitations, the share gate / minimal view, and the YAML library. |
 | [history-tracking.md](history-tracking.md) | The append-only audit-log subsystem (character + campaign history). |
+| [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
 
 The **rules of engagement** (invariants you must not break, and the multi-site
 checklists for extending sync/history) live in

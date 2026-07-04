@@ -23,7 +23,7 @@ import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import { computeDerived } from '../../shared/domain/characterCalc.ts';
-import { characterCreate, characterUpdate } from '../../shared/schemas/character.ts';
+import { characterCreate, characterSyncPatch } from '../../shared/schemas/character.ts';
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
 import { skillCreate, skillUpdate } from '../../shared/schemas/skill.ts';
@@ -59,7 +59,10 @@ import { publish as wsPublish } from './wsBus.ts';
  * "field not writable".
  */
 const FIELD_VALIDATORS = {
-  character: characterUpdate,
+  // characterSyncPatch = characterUpdate + dismissedWarnings: the client
+  // patches dismissed warnings as a plain field through the outbox
+  // (REST uses the dedicated /warnings/dismiss endpoint instead).
+  character: characterSyncPatch,
   character_trait: traitUpdate,
   character_skill: skillUpdate,
   character_spell: spellUpdate,
@@ -70,7 +73,7 @@ const FIELD_VALIDATORS = {
 type WritableEntityClass = keyof typeof FIELD_VALIDATORS;
 
 const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
-  character: Object.keys(characterUpdate.shape) as readonly string[],
+  character: Object.keys(characterSyncPatch.shape) as readonly string[],
   character_trait: Object.keys(traitUpdate.shape) as readonly string[],
   character_skill: Object.keys(skillUpdate.shape) as readonly string[],
   character_spell: Object.keys(spellUpdate.shape) as readonly string[],
@@ -426,6 +429,13 @@ async function dispatchCharacter(
   }
 
   // patch
+  //
+  // loadCharacterOr403 grants READ access to campaign members
+  // (canWrite=false); without the assertWrite below, any member of the
+  // same campaign could patch someone else's character through /sync
+  // even though the REST PATCH route forbids it.
+  const access = await loadCharacterOr403(op.entityId, ctx.userId);
+  assertWrite(access);
   return await patchEntity({
     op,
     userId: ctx.userId,
@@ -772,6 +782,26 @@ async function dispatchInventory(
           throw new HTTPException(400, { message: 'an item cannot be its own parent' });
         }
         if (value !== null && value !== undefined) {
+          // The parent must be an item on the SAME character.  The
+          // cycle walk below scopes its lookups to this character, so
+          // a foreign parent id would simply "not be found" and pass —
+          // silently creating a cross-character containment link (the
+          // REST patch route checks this via
+          // assertParentBelongsToCharacter; mirror it here).
+          const [parent] = await getDb()
+            .select({ id: inventoryItems.id })
+            .from(inventoryItems)
+            .where(
+              and(
+                eq(inventoryItems.id, value as string),
+                eq(inventoryItems.characterId, characterId),
+              ),
+            );
+          if (!parent) {
+            throw new HTTPException(400, {
+              message: 'parentId must reference an item on this character',
+            });
+          }
           await assertNoCycle(op.entityId, value as string, characterId);
         }
       }

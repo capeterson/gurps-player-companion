@@ -8,7 +8,10 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { NotificationOut } from '../../shared/schemas/notification.ts';
+import {
+  type NotificationOut,
+  campaignInvitationNotificationPayload,
+} from '../../shared/schemas/notification.ts';
 import { ApiError } from '../lib/api.ts';
 import { invitationsApi } from '../lib/invitations.ts';
 import { notificationsApi } from '../lib/notifications.ts';
@@ -124,9 +127,13 @@ export function NotificationsBell() {
           <ul className="grid gap-2 max-h-96 overflow-y-auto">
             {items.map((n) => {
               const inviteId = n.relatedId;
-              const inviter = (n.payload?.inviter_display_name as string | undefined) ?? 'Someone';
-              const campaignName = (n.payload?.campaign_name as string | undefined) ?? 'a campaign';
-              const role = (n.payload?.role as string | undefined) ?? 'member';
+              // Parse via the shared payload schema; fall back to
+              // placeholder copy for malformed/legacy rows rather than
+              // hiding the notification entirely.
+              const parsed = campaignInvitationNotificationPayload.safeParse(n.payload);
+              const inviter = parsed.success ? parsed.data.inviter_display_name : 'Someone';
+              const campaignName = parsed.success ? parsed.data.campaign_name : 'a campaign';
+              const role = parsed.success ? parsed.data.role : 'member';
               const isUnread = n.readAt === null;
               // Accept / Decline only while the underlying invite is still
               // actionable. Past that, show Dismiss so the row can be

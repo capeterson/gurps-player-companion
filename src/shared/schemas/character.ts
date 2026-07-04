@@ -53,6 +53,24 @@ export const characterCreate = z.object({
 
 export const characterUpdate = characterCreate.partial();
 
+/**
+ * Schema for the `characters.dismissed_warnings` jsonb column: the set
+ * of warning codes the owner has dismissed.  Codes match
+ * `warningOut.code` (see `src/shared/domain/warnings.ts`).
+ */
+export const dismissedWarningsField = z.array(z.string().min(1).max(80)).max(200);
+
+/**
+ * Fields writable through /sync/operations for the `character` class.
+ * Extends the REST-update surface with `dismissedWarnings`, which REST
+ * mutates via the dedicated /warnings/dismiss endpoint but the
+ * offline-first client patches directly as a field (WarningsPanel
+ * enqueues `fieldPath: 'dismissedWarnings'`).
+ */
+export const characterSyncPatch = characterUpdate.extend({
+  dismissedWarnings: dismissedWarningsField.optional(),
+});
+
 export const dismissWarningRequest = z.object({
   code: z.string().min(1).max(80),
   dismissed: z.boolean(),
@@ -174,6 +192,7 @@ export const characterDetailEnvelope = z.discriminatedUnion('view', [
 
 export type CharacterCreate = z.infer<typeof characterCreate>;
 export type CharacterUpdate = z.infer<typeof characterUpdate>;
+export type CharacterSyncPatch = z.infer<typeof characterSyncPatch>;
 export type CharacterDetail = z.infer<typeof characterDetail>;
 export type CharacterMinimalOut = z.infer<typeof characterMinimalOut>;
 export type CharacterDetailEnvelope = z.infer<typeof characterDetailEnvelope>;
