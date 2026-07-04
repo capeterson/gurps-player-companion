@@ -4,8 +4,14 @@
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
-import { enqueueFieldPatch } from './outbox.ts';
+import { type OutboxEntry, getLocalDb, resetLocalDb } from '../db/dexie.ts';
+import {
+  MAX_ATTEMPTS,
+  backoffMs,
+  enqueueFieldPatch,
+  readDrainableOps,
+  recoverStaleInFlight,
+} from './outbox.ts';
 
 afterEach(async () => {
   await resetLocalDb();
@@ -108,5 +114,147 @@ describe('enqueueFieldPatch', () => {
     });
     const op = (await getLocalDb().outbox.toArray())[0];
     expect(op?.prevValue).toBe(10);
+  });
+});
+
+// ---------- drain ordering / self-heal ----------
+
+function opRow(overrides: Partial<OutboxEntry> & Pick<OutboxEntry, 'clientOpId'>): OutboxEntry {
+  return {
+    entityClass: 'character',
+    entityId: CHAR_ID,
+    command: 'patch',
+    coalesceKey: `${CHAR_ID}|st`,
+    fieldPath: 'st',
+    attemptedValue: 11,
+    validationVersion: 1,
+    status: 'pending',
+    enqueuedAt: new Date().toISOString(),
+    attemptCount: 0,
+    ...overrides,
+  };
+}
+
+describe('readDrainableOps', () => {
+  const TRAIT_ID = '0193b3c0-f1f0-7000-8000-00000000e001';
+  const future = new Date(Date.now() + 60_000).toISOString();
+
+  it('holds back ops that depend on a create still in backoff', async () => {
+    const db = getLocalDb();
+    // Trait create backing off after a transient failure…
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'op-create',
+        entityClass: 'character_trait',
+        entityId: TRAIT_ID,
+        command: 'create',
+        coalesceKey: `${TRAIT_ID}|:create`,
+        fieldPath: undefined,
+        parentId: CHAR_ID,
+        status: 'transient_retry',
+        nextEarliestAttemptAt: future,
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    );
+    // …a queued patch on that same trait…
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'op-trait-patch',
+        entityClass: 'character_trait',
+        entityId: TRAIT_ID,
+        coalesceKey: `${TRAIT_ID}|points`,
+        fieldPath: 'points',
+        parentId: CHAR_ID,
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+    );
+    // …and an unrelated character patch.
+    await db.outbox.put(
+      opRow({ clientOpId: 'op-char-patch', enqueuedAt: '2026-01-01T00:00:02.000Z' }),
+    );
+
+    const ready = await readDrainableOps(50);
+    // Only the unrelated patch drains; sending the trait patch now
+    // would 404 server-side and roll the user's edit back.
+    expect(ready.map((o) => o.clientOpId)).toEqual(['op-char-patch']);
+  });
+
+  it('lets a backoff on one field NOT block patches to other fields', async () => {
+    const db = getLocalDb();
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'op-st',
+        status: 'transient_retry',
+        nextEarliestAttemptAt: future,
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+    );
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'op-dx',
+        coalesceKey: `${CHAR_ID}|dx`,
+        fieldPath: 'dx',
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+    );
+    const ready = await readDrainableOps(50);
+    expect(ready.map((o) => o.clientOpId)).toEqual(['op-dx']);
+  });
+
+  it('orders a create before a patch enqueued in the same millisecond', async () => {
+    const db = getLocalDb();
+    const sameInstant = '2026-01-01T00:00:00.000Z';
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'op-b-patch',
+        entityClass: 'character_trait',
+        entityId: TRAIT_ID,
+        coalesceKey: `${TRAIT_ID}|points`,
+        fieldPath: 'points',
+        parentId: CHAR_ID,
+        enqueuedAt: sameInstant,
+      }),
+    );
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'op-a-create',
+        entityClass: 'character_trait',
+        entityId: TRAIT_ID,
+        command: 'create',
+        coalesceKey: `${TRAIT_ID}|:create`,
+        fieldPath: undefined,
+        parentId: CHAR_ID,
+        enqueuedAt: sameInstant,
+      }),
+    );
+    const ready = await readDrainableOps(50);
+    expect(ready.map((o) => o.command)).toEqual(['create', 'patch']);
+  });
+});
+
+describe('recoverStaleInFlight', () => {
+  it('re-promotes orphaned in_flight rows to pending', async () => {
+    const db = getLocalDb();
+    await db.outbox.put(opRow({ clientOpId: 'op-stale', status: 'in_flight', attemptCount: 2 }));
+    const recovered = await recoverStaleInFlight();
+    expect(recovered).toBe(1);
+    const row = await db.outbox.get('op-stale');
+    expect(row?.status).toBe('pending');
+    // Attempt count survives so backoff keeps escalating on retry.
+    expect(row?.attemptCount).toBe(2);
+  });
+});
+
+describe('backoffMs', () => {
+  it('caps at ~60s while attempts are fresh', () => {
+    const ms = backoffMs(MAX_ATTEMPTS);
+    expect(ms).toBeGreaterThanOrEqual(60_000);
+    expect(ms).toBeLessThanOrEqual(61_000);
+  });
+
+  it('relaxes to a ~5-minute cadence past MAX_ATTEMPTS instead of giving up', () => {
+    const ms = backoffMs(MAX_ATTEMPTS + 5);
+    expect(ms).toBeGreaterThanOrEqual(300_000);
+    expect(ms).toBeLessThanOrEqual(301_000);
   });
 });

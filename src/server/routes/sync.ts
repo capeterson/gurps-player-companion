@@ -149,6 +149,15 @@ router.openapi(
         changes,
         hasMore: hasMore as Record<EntityClass, boolean>,
         nextCursor: nextCursor as Record<EntityClass, number>,
+        // Authoritative access sets — already computed above for this
+        // same request, zero extra queries. Lets the client prune local
+        // rows that fell out of access (tombstones alone can't reach
+        // ex-members: they're scoped to campaigns the viewer *currently*
+        // belongs to).
+        accessible: {
+          characterIds: accessibleCharacterIds,
+          campaignIds: accessibleCampaignIds,
+        },
       },
       200,
     );
@@ -332,6 +341,7 @@ async function fetchClassChanges(args: FetchArgs): Promise<FetchResult> {
     accessibleCharacterIds,
     fullAccessCharacterIds,
     characterAccess,
+    accessibleCampaignIds: args.accessibleCampaignIds,
   });
 
   const merged: SyncCursorChange[] = [
@@ -348,7 +358,12 @@ async function fetchClassChanges(args: FetchArgs): Promise<FetchResult> {
   // Apply the per-class limit AFTER merging so we don't lose tombstones
   // sitting just past the upsert cap (or vice versa).
   const limited = merged.slice(0, limit);
-  const hasMore = merged.length > limit;
+  // `merged.length > limit` alone under-reports: each source query is
+  // itself capped at `limit`, so when either one came back full there
+  // may be rows past its own SQL LIMIT even though the merged list
+  // fits.  Reporting hasMore=false in that case stalls the client's
+  // backfill mid-stream until some unrelated change bumps a revision.
+  const hasMore = merged.length > limit || tombstoneRows.length >= limit || upserts.length >= limit;
   const last = limited[limited.length - 1];
   const nextRevision = last ? last.revision : sinceRevision;
 
@@ -363,6 +378,7 @@ async function fetchClassUpserts(args: {
   accessibleCharacterIds: string[];
   fullAccessCharacterIds: string[];
   characterAccess: Map<string, CharacterAccessMode>;
+  accessibleCampaignIds: string[];
 }): Promise<SyncCursorChange[]> {
   const {
     entityClass,
@@ -372,6 +388,7 @@ async function fetchClassUpserts(args: {
     accessibleCharacterIds,
     fullAccessCharacterIds,
     characterAccess,
+    accessibleCampaignIds,
   } = args;
   const db = getDb();
 
@@ -463,9 +480,28 @@ async function fetchClassUpserts(args: {
         sinceRevision,
         limit,
       });
+    case 'campaign': {
+      // Campaigns sync READ-ONLY: the client needs them locally so the
+      // minimal-view sweep can evaluate `shareCharacterSheets` and so
+      // campaign names resolve offline.  Mutations still go through the
+      // REST routes; there is no /sync/operations dispatcher for them.
+      if (accessibleCampaignIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(campaigns)
+        .where(
+          and(
+            gt(campaigns.revision, sinceRevision),
+            inArray(campaigns.id, [...accessibleCampaignIds]),
+          ),
+        )
+        .orderBy(asc(campaigns.revision))
+        .limit(limit);
+      return rows.map((row) => upsertChange('campaign', row.id, Number(row.revision), row));
+    }
     default:
-      // Other entity classes (campaigns, library, adventure log) are not
-      // synced through this endpoint yet -- the client doesn't drive any
+      // Other entity classes (library, adventure log) are not synced
+      // through this endpoint yet -- the client doesn't drive any
       // mutations for them today.  Returning empty keeps the cursor
       // contract honest.
       return [];

@@ -31259,6 +31259,29 @@
                           "minimum": 0
                         }
                       }
+                    },
+                    "accessible": {
+                      "type": "object",
+                      "properties": {
+                        "characterIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "campaignIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        }
+                      },
+                      "required": [
+                        "characterIds",
+                        "campaignIds"
+                      ]
                     }
                   },
                   "required": [

@@ -44,11 +44,11 @@ import { tokenStore } from '../lib/tokenStore.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
 import { characterIdsToMinimize } from './minimalViewSweep.ts';
 import {
-  MAX_ATTEMPTS,
   backoffMs,
   countPending,
   enqueueFieldPatch,
   readDrainableOps,
+  recoverStaleInFlight,
   setOutboxStatus,
 } from './outbox.ts';
 import { syncStateStore } from './state.ts';
@@ -60,10 +60,25 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character_spell',
   'character_inventory',
   'character_combat',
+  // Campaigns are pulled READ-ONLY: rows land in Dexie so
+  // `enforceMinimalViewLocally` can evaluate shareCharacterSheets and
+  // `useCharacterDetail` can resolve campaign names offline.  Campaign
+  // *mutations* still go through the REST routes — there is no outbox
+  // path for them (see AGENTS.md S0).
+  'campaign',
 ];
 
 const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
+const BOOTSTRAP_RETRY_MS = 5_000;
+
+/**
+ * Cross-tab lock names.  Lock order is always DRAIN → CURSOR (the
+ * drain loop pulls the cursor while holding the drain lock); no path
+ * may acquire them in the opposite order or Web Locks will deadlock.
+ */
+const DRAIN_LOCK = 'sync-drain';
+const CURSOR_LOCK = 'sync-cursor';
 
 /**
  * Compare a server field value with the locally-stored prevValue.
@@ -133,6 +148,7 @@ class SyncOrchestrator {
   private listeners = new Set<keyof OrchestratorEvents>();
   private cycleListeners = new Set<() => void>();
   private recoveryInProgress = false;
+  private bootstrapRetryTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * The viewer's user id, captured at bootstrap. Used by
    * `enforceMinimalViewLocally` to figure out which campaign-shared
@@ -184,6 +200,8 @@ class SyncOrchestrator {
     }
     if (this.periodicTimer) clearInterval(this.periodicTimer);
     this.periodicTimer = null;
+    if (this.bootstrapRetryTimer) clearTimeout(this.bootstrapRetryTimer);
+    this.bootstrapRetryTimer = null;
     this.outboxLiveSub?.unsubscribe();
     this.outboxLiveSub = null;
     this.wake();
@@ -198,17 +216,35 @@ class SyncOrchestrator {
    * Pull /sync/cursor for every known entity class and apply the
    * results into Dexie.  Safe to call repeatedly; each class's cursor
    * is the high-water mark seen so far.
+   *
+   * Serialized under CURSOR_LOCK so a periodic pull can never
+   * interleave with bootstrap's cursor-clear (the race would persist
+   * a stale pre-clear cursor and leave a permanent gap in local data).
    */
   async triggerCursorPull(force = false): Promise<void> {
-    if (this.recoveryInProgress && !force) return;
-    if (!tokenStore.read()) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    await runWithLock(CURSOR_LOCK, async () => {
+      await this.pullInner(force);
+    });
+  }
+
+  /**
+   * The cursor-pull body.  Callers must hold CURSOR_LOCK.  Returns
+   * true when the pull actually ran to completion, false when it was
+   * skipped (recovery in progress, logged out, offline) -- bootstrap
+   * uses the distinction to decide whether the per-user bootstrapped
+   * flag may be written.
+   */
+  private async pullInner(force: boolean): Promise<boolean> {
+    if (this.recoveryInProgress && !force) return false;
+    if (!tokenStore.read()) return false;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
     // Don't flip the indicator to 'syncing' just to *check* for changes —
     // the periodic loop polls every 5s and would otherwise leave the
     // badge perpetually flickering between 'syncing' and 'synced' even
     // when nothing is actually moving. Defer the flip until we see a
     // response that actually carries rows to apply.
     let appliedAnything = false;
+    let lastAccessible: SyncCursorResponse['accessible'];
     try {
       let hasMore = true;
       while (hasMore) {
@@ -222,6 +258,7 @@ class SyncOrchestrator {
           appliedAnything = true;
         }
         await this.applyCursorResponse(res);
+        lastAccessible = res.accessible;
         hasMore = Object.values(res.hasMore ?? {}).some((v) => v);
       }
       // After every successful pull, drop any private child rows that
@@ -230,9 +267,17 @@ class SyncOrchestrator {
       // server stops emitting them as upserts; this sweep cleans up
       // what's already in Dexie.
       await this.enforceMinimalViewLocally();
+      // Prune characters/campaigns the viewer has lost access to
+      // entirely (removed from a campaign, campaign deleted, character
+      // moved out of a shared campaign). Tombstones can't reach ex-
+      // members -- they're scoped to campaigns the viewer *currently*
+      // belongs to -- so the authoritative `accessible` set on the last
+      // page is the only signal. Absent on old servers -> no-op.
+      await this.pruneInaccessibleLocally(lastAccessible);
       this.fireCycleDone();
       const pending = await countPending();
       this.refreshIndicator(pending);
+      return true;
     } catch (_err) {
       syncStateStore.set('error');
       throw _err;
@@ -244,6 +289,17 @@ class SyncOrchestrator {
    * except it always starts from cursor 0 and writes a per-user
    * "bootstrapped" flag so the SyncBootstrapGate can render the UI
    * straight away on subsequent loads.
+   *
+   * The cursor-clear + pull + flag-write run as one CURSOR_LOCK
+   * critical section: without it, a periodic pull that started before
+   * the clear could persist its (previous-account or pre-clear) cursor
+   * AFTER the clear, making the from-zero pull silently skip
+   * everything below that revision — a permanent local data hole.
+   *
+   * If the pull is skipped (offline, recovery) or fails, the flag is
+   * NOT written and a retry is scheduled, so a first login on a flaky
+   * connection self-heals instead of leaving the gate spinning until
+   * a manual reload.
    */
   async bootstrap(userId: string, forceCursorPull = false): Promise<void> {
     // Captured for `enforceMinimalViewLocally` — the periodic
@@ -251,17 +307,49 @@ class SyncOrchestrator {
     this.currentUserId = userId;
     const db = getLocalDb();
     const flagKey = `bootstrap:${userId}`;
-    const flag = await db.syncMeta.get(flagKey);
-    if (!flag) {
-      // Wipe any per-class cursors carried over from a previous account
-      // so we definitely start at 0 and pull every owned row.
-      await db.syncCursors.clear();
+    let completed = false;
+    try {
+      completed = await runWithLock(CURSOR_LOCK, async () => {
+        const flag = await db.syncMeta.get(flagKey);
+        if (!flag) {
+          // Wipe any per-class cursors carried over from a previous
+          // account so we definitely start at 0 and pull every owned row.
+          await db.syncCursors.clear();
+        }
+        const ran = await this.pullInner(forceCursorPull);
+        if (ran) {
+          await db.syncMeta.put({
+            key: flagKey,
+            value: { bootstrappedAt: new Date().toISOString() },
+          });
+        }
+        return ran;
+      });
+    } finally {
+      if (!completed) this.scheduleBootstrapRetry(userId);
     }
-    await this.triggerCursorPull(forceCursorPull);
-    await db.syncMeta.put({ key: flagKey, value: { bootstrappedAt: new Date().toISOString() } });
+    if (!completed) return;
     // Re-emit any persistent rejection toasts that survived the
     // reload so the user doesn't lose an open error.
     await this.replayRejectionToasts();
+  }
+
+  /**
+   * Retry a skipped/failed bootstrap in the background.  The
+   * SyncBootstrapGate fires `bootstrap()` exactly once per login; if
+   * that attempt can't complete there is otherwise nothing to try
+   * again, and the gate spins forever.
+   */
+  private scheduleBootstrapRetry(userId: string): void {
+    if (this.bootstrapRetryTimer) return;
+    this.bootstrapRetryTimer = setTimeout(() => {
+      this.bootstrapRetryTimer = null;
+      if (this.currentUserId !== userId) return;
+      if (!tokenStore.read()) return;
+      void this.bootstrap(userId).catch(() => {
+        /* bootstrap re-schedules itself on failure */
+      });
+    }, BOOTSTRAP_RETRY_MS);
   }
 
   /**
@@ -283,7 +371,7 @@ class SyncOrchestrator {
     this.wake();
 
     try {
-      await runWithLock('sync-drain', async () => {
+      await runWithLock(DRAIN_LOCK, async () => {
         await this.clearAllLocalStores();
         syncStateStore.reset('syncing');
         this.currentUserId = userId;
@@ -302,6 +390,8 @@ class SyncOrchestrator {
   /** Wipe Dexie and reset state -- called on logout. */
   async purge(): Promise<void> {
     this.currentUserId = null;
+    if (this.bootstrapRetryTimer) clearTimeout(this.bootstrapRetryTimer);
+    this.bootstrapRetryTimer = null;
     await this.clearAllLocalStores();
     syncStateStore.reset('synced');
   }
@@ -383,7 +473,12 @@ class SyncOrchestrator {
     // Acquire an exclusive cross-tab lock so two open tabs don't both
     // POST the same outbox rows.  The other tab still reads from
     // Dexie via useLiveQuery -- we just serialize the outbound flush.
-    await runWithLock('sync-drain', async () => {
+    await runWithLock(DRAIN_LOCK, async () => {
+      // Under the drain lock no POST can be outstanding anywhere, so
+      // any row still `in_flight` was orphaned (crash / tab close /
+      // error between marking and settling).  Re-promote it so the
+      // edit isn't stranded un-syncable forever.
+      await recoverStaleInFlight();
       const ops = await readDrainableOps(DRAIN_BATCH_SIZE);
       if (ops.length === 0) {
         // Nothing to drain -- but if /sync/cursor hasn't run recently,
@@ -540,17 +635,17 @@ class SyncOrchestrator {
           break;
         }
         case 'transient': {
-          if (op.attemptCount >= MAX_ATTEMPTS) {
-            await this.failPermanently(op, outcome);
-          } else {
-            await setOutboxStatus(op.clientOpId, 'transient_retry', {
-              attemptCount: op.attemptCount,
-              nextEarliestAttemptAt: new Date(
-                Date.now() + backoffMs(op.attemptCount),
-              ).toISOString(),
-              serverReason: outcome.reason,
-            });
-          }
+          // Transient failures retry forever -- backoffMs() relaxes to
+          // a 5-minute cadence past MAX_ATTEMPTS.  Giving up would
+          // strand the optimistic local value diverged from the server
+          // with no reconciliation path; retrying self-heals as soon
+          // as the server recovers.  The indicator honestly shows
+          // 'syncing' the whole time because the op stays counted.
+          await setOutboxStatus(op.clientOpId, 'transient_retry', {
+            attemptCount: op.attemptCount,
+            nextEarliestAttemptAt: new Date(Date.now() + backoffMs(op.attemptCount)).toISOString(),
+            serverReason: outcome.reason,
+          });
           break;
         }
         case 'suspended': {
@@ -561,11 +656,12 @@ class SyncOrchestrator {
     }
   }
 
-  private async rollbackLocally(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
-    const db = getLocalDb();
-    // Revert the local Dexie row to the pre-mutation value when we have
-    // one.  The server may also have returned a `latestEntity` (for
-    // stale_base / conflict); prefer that since it's more recent.
+  /**
+   * Revert the local Dexie row to the pre-mutation value when we have
+   * one.  The server may also have returned a `latestEntity` (for
+   * stale_base / conflict); prefer that since it's more recent.
+   */
+  private async revertLocal(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
     if (outcome.latestEntity && typeof outcome.latestEntity === 'object') {
       await this.applyServerRow(op.entityClass, outcome.latestEntity as Record<string, unknown>, {
         ignoreOutboxConflict: true,
@@ -579,6 +675,11 @@ class SyncOrchestrator {
       // Re-insert the row we deleted locally.
       await this.reinsertLocal(op.entityClass, op.prevValue);
     }
+  }
+
+  private async rollbackLocally(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
+    const db = getLocalDb();
+    await this.revertLocal(op, outcome);
     // Persistent toast + flash event so the input animates.
     await this.recordRejection(op, outcome);
     syncStateStore.set('error');
@@ -591,14 +692,19 @@ class SyncOrchestrator {
     await db.outbox.delete(op.clientOpId);
   }
 
+  /**
+   * Terminal failure (server `suspended` outcome).  Unlike the old
+   * behaviour -- which parked the op as `failed_permanent` and left
+   * the optimistic local value silently diverged from the server
+   * forever -- this reverts the local row so client and server
+   * converge, then surfaces the failure as a persistent toast + flash
+   * (AGENTS.md rule 2: a rollback is a UX event).  The op row is
+   * deleted; the rejectionToasts record is the durable audit trail,
+   * same as the rejected/conflict paths.
+   */
   private async failPermanently(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
     const db = getLocalDb();
-    await setOutboxStatus(op.clientOpId, 'failed_permanent', {
-      serverReason: outcome.reason ?? 'sync failed',
-    });
-    // Reuse the rejection record path with a synthesized 'failed_permanent'
-    // status by writing directly (recordRejection doesn't accept that
-    // status because it mirrors OperationOutcome).
+    await this.revertLocal(op, outcome);
     const rec: RejectionRecord = {
       id: op.clientOpId,
       clientOpId: op.clientOpId,
@@ -606,13 +712,20 @@ class SyncOrchestrator {
       entityId: op.entityId,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
-      reason: outcome.reason ?? 'sync failed (max attempts)',
+      reason: outcome.reason ?? 'sync failed',
       status: 'failed_permanent',
       createdAt: new Date().toISOString(),
     };
     await db.rejectionToasts.put(rec);
     notifyRejection(rec);
     syncStateStore.set('error');
+    if (op.fieldPath) {
+      flashBus.emit({
+        key: makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
+        reason: outcome.reason ?? 'sync failed',
+      });
+    }
+    await db.outbox.delete(op.clientOpId);
   }
 
   private async recordRejection(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
@@ -817,15 +930,20 @@ class SyncOrchestrator {
     if (!id) return;
     const merged: Record<string, unknown> = { ...row };
     if (!opts.ignoreOutboxConflict) {
+      // `entityId` is indexed on the outbox (Dexie v3).  Do NOT wrap
+      // this in a swallowing catch: if the query ever breaks again the
+      // pull must fail loudly rather than silently clobbering pending
+      // local edits (that exact bug shipped once — the index was
+      // missing, Dexie threw SchemaError, and a `.catch(() => [])`
+      // turned rule S4 into a no-op).
       const dirty = await db.outbox
-        .where('entityId' as never)
+        .where('entityId')
         .equals(id)
         .and(
           (o) =>
             o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry',
         )
-        .toArray()
-        .catch(() => [] as OutboxEntry[]);
+        .toArray();
       for (const op of dirty) {
         if (op.fieldPath && op.fieldPath in merged) {
           // Caller had a pending edit on this field; keep the local
@@ -940,8 +1058,100 @@ class SyncOrchestrator {
         await db.characterSkills.where('characterId').anyOf(idArray).delete();
         await db.characterSpells.where('characterId').anyOf(idArray).delete();
         await db.characterInventory.where('characterId').anyOf(idArray).delete();
-        // Combat is keyed by characterId (1:1).
-        await db.characterCombat.where('id').anyOf(idArray).delete();
+        // Combat's primary key IS the characterId (1:1), so a straight
+        // bulkDelete by pk works.  (`where('id')` is wrong here — `id`
+        // isn't indexed on this store, and the resulting SchemaError
+        // used to abort the sweep and wedge the pull in 'error'.)
+        await db.characterCombat.bulkDelete(idArray);
+      },
+    );
+  }
+
+  /**
+   * Prune local characters/campaigns the viewer has completely lost
+   * access to (removed from a campaign, campaign deleted, character
+   * moved out of a shared campaign) using the authoritative `accessible`
+   * set the cursor response carries on every page (see
+   * `src/server/routes/sync.ts`).  The server simply stops emitting
+   * these rows as upserts once access is gone, and tombstones can't
+   * help either -- they're scoped to campaigns the viewer *currently*
+   * belongs to, so an ex-member never sees the delete.  Without this
+   * sweep the stale rows (and their child rows) live in IndexedDB
+   * forever.
+   *
+   * Never prunes:
+   *   - rows with `revision < 0` (speculative local create not yet
+   *     acked -- AGENTS.md rule S7),
+   *   - any entity with an outstanding outbox op (pending/in_flight/
+   *     transient_retry) -- queued intent the server doesn't know
+   *     about yet.
+   *
+   * No-op when `accessible` is absent (older server that doesn't send
+   * the field yet).
+   */
+  private async pruneInaccessibleLocally(
+    accessible: SyncCursorResponse['accessible'],
+  ): Promise<void> {
+    if (!accessible) return;
+    const db = getLocalDb();
+    const accessibleCharacterIds = new Set(accessible.characterIds);
+    const accessibleCampaignIds = new Set(accessible.campaignIds);
+
+    const [chars, camps] = await Promise.all([db.characters.toArray(), db.campaigns.toArray()]);
+
+    const staleCharacterIds = chars
+      .filter((c) => !accessibleCharacterIds.has(c.id) && c.revision >= 0)
+      .map((c) => c.id);
+    const staleCampaignIds = camps
+      .filter((c) => !accessibleCampaignIds.has(c.id) && c.revision >= 0)
+      .map((c) => c.id);
+
+    if (staleCharacterIds.length === 0 && staleCampaignIds.length === 0) return;
+
+    // Never prune an entity with unsent/unsettled local intent -- a
+    // queued create/patch/delete means the server doesn't know about it
+    // yet, or the user has an edit in flight.
+    const candidateIds = [...staleCharacterIds, ...staleCampaignIds];
+    const dirtyOps = await db.outbox
+      .where('entityId')
+      .anyOf(candidateIds)
+      .filter(
+        (o) => o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry',
+      )
+      .toArray();
+    const dirtyEntityIds = new Set(dirtyOps.map((o) => o.entityId));
+
+    const charIdsToDelete = staleCharacterIds.filter((id) => !dirtyEntityIds.has(id));
+    const campaignIdsToDelete = staleCampaignIds.filter((id) => !dirtyEntityIds.has(id));
+    if (charIdsToDelete.length === 0 && campaignIdsToDelete.length === 0) return;
+
+    // Single transaction across every affected store so observers see
+    // one atomic update.
+    await db.transaction(
+      'rw',
+      [
+        db.characters,
+        db.characterTraits,
+        db.characterSkills,
+        db.characterSpells,
+        db.characterInventory,
+        db.characterCombat,
+        db.campaigns,
+      ],
+      async () => {
+        if (charIdsToDelete.length > 0) {
+          await db.characterTraits.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterSkills.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterSpells.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterInventory.where('characterId').anyOf(charIdsToDelete).delete();
+          // Combat's primary key IS the characterId -- bulkDelete by pk,
+          // not `where('id')` (unindexed, throws SchemaError).
+          await db.characterCombat.bulkDelete(charIdsToDelete);
+          await db.characters.bulkDelete(charIdsToDelete);
+        }
+        if (campaignIdsToDelete.length > 0) {
+          await db.campaigns.bulkDelete(campaignIdsToDelete);
+        }
       },
     );
   }

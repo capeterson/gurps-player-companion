@@ -39,6 +39,8 @@ import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
+  campaignMemberships,
+  campaigns,
   characterSkills,
   characterSpells,
   characterTraits,
@@ -149,13 +151,13 @@ export async function dispatchOperation(
       dispatchOperationInner({ ...ctx, batchId }, op, tx),
     );
     if (outcome.status === 'applied') {
-      // Wake any other tabs/devices for this user.  WS messages carry
-      // no row data — the client always reconciles via /sync/cursor.
-      wsPublish(ctx.userId, {
-        kind: 'sync_invalidate',
-        entityClasses: [op.entityClass],
-        emittedAt: new Date().toISOString(),
-      });
+      // Wake the actor's other tabs/devices AND every other user who
+      // can see the affected character (owner, campaign GM, campaign
+      // members) so a GM editing a player's sheet -- or vice versa --
+      // doesn't wait up to 30s for the periodic pull.  WS messages
+      // carry no row data (rule S8) — every recipient still reconciles
+      // via /sync/cursor.
+      await publishSyncInvalidation(ctx.userId, op);
     }
     return outcome;
   } catch (err) {
@@ -177,6 +179,17 @@ export async function dispatchOperation(
       };
     }
     if (isUniqueViolation(err)) {
+      // A `create` hitting a unique violation is very often the client
+      // replaying an op whose ack got lost (crash / network drop after
+      // the server applied it).  Treating that as a conflict makes the
+      // client roll back — deleting its perfectly good local row.  If
+      // the row with the client's id already exists and the user may
+      // write it, the create already happened: report `applied` with
+      // the current revision so the replay settles idempotently.
+      if (op.command === 'create') {
+        const replayed = await resolveReplayedCreate(ctx.userId, op);
+        if (replayed) return replayed;
+      }
       return { clientOpId: op.clientOpId, status: 'conflict', reason: 'unique constraint' };
     }
     // Network / serialization / unexpected: tell the client to retry.
@@ -185,6 +198,138 @@ export async function dispatchOperation(
       status: 'transient',
       reason: err instanceof Error ? err.message : 'transient error',
     };
+  }
+}
+
+/**
+ * Fan out a `sync_invalidate` WS nudge to every user who can see the
+ * change: the actor (their other tabs/devices), the character's owner,
+ * the campaign owner (GM), and campaign members when the character
+ * belongs to a campaign.
+ *
+ * Resolves the character id for the op (entityId for `character`,
+ * `requireParentId` for child classes) and does at most one query for
+ * the character row and one for campaign owner+members.  Both the
+ * parent-id resolution and the queries are wrapped so a failure here
+ * (deleted character, missing parentId, DB hiccup) can never affect the
+ * outcome already returned to the client — WS is acceleration only
+ * (rule S8).  When the character row can't be resolved (e.g. it was
+ * just deleted), we fall back to publishing to the actor alone; other
+ * members converge via the periodic pull plus the accessible-set prune.
+ */
+async function publishSyncInvalidation(actorId: string, op: OperationEnvelope): Promise<void> {
+  const recipients = new Set<string>([actorId]);
+  if (DISPATCHABLE_CLASSES.has(op.entityClass)) {
+    try {
+      const characterId = op.entityClass === 'character' ? op.entityId : requireParentId(op);
+      const db = getDb();
+      const [charRow] = await db
+        .select({ ownerId: characters.ownerId, campaignId: characters.campaignId })
+        .from(characters)
+        .where(eq(characters.id, characterId));
+      if (charRow) {
+        recipients.add(charRow.ownerId);
+        if (charRow.campaignId) {
+          const [campaignRow] = await db
+            .select({ ownerId: campaigns.ownerId })
+            .from(campaigns)
+            .where(eq(campaigns.id, charRow.campaignId));
+          if (campaignRow) recipients.add(campaignRow.ownerId);
+          const members = await db
+            .select({ userId: campaignMemberships.userId })
+            .from(campaignMemberships)
+            .where(eq(campaignMemberships.campaignId, charRow.campaignId));
+          for (const m of members) recipients.add(m.userId);
+        }
+      }
+    } catch {
+      // Row gone, parentId missing (combat/character delete), or a
+      // transient DB error -- fall back to the actor-only recipient
+      // set already seeded above.
+    }
+  }
+  const message = {
+    kind: 'sync_invalidate' as const,
+    entityClasses: [op.entityClass],
+    emittedAt: new Date().toISOString(),
+  };
+  for (const userId of recipients) {
+    wsPublish(userId, message);
+  }
+}
+
+/**
+ * Check whether a unique-violating `create` is a replay of an op the
+ * server already applied.  Returns an `applied` outcome carrying the
+ * existing row's revision when the entity with the client-supplied id
+ * exists and the user is allowed to write it; null otherwise (genuine
+ * conflict).  Read-only — runs after the failed insert's transaction
+ * rolled back.
+ */
+async function resolveReplayedCreate(
+  userId: string,
+  op: OperationEnvelope,
+): Promise<OperationOutcome | null> {
+  try {
+    const db = getDb();
+    switch (op.entityClass) {
+      case 'character': {
+        const [row] = await db.select().from(characters).where(eq(characters.id, op.entityId));
+        return row && row.ownerId === userId ? appliedOutcome(op, Number(row.revision)) : null;
+      }
+      case 'character_trait': {
+        const characterId = requireParentId(op);
+        assertWrite(await loadCharacterOr403(characterId, userId));
+        const [row] = await db
+          .select()
+          .from(characterTraits)
+          .where(
+            and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
+          );
+        return row ? appliedOutcome(op, Number(row.revision)) : null;
+      }
+      case 'character_skill': {
+        const characterId = requireParentId(op);
+        assertWrite(await loadCharacterOr403(characterId, userId));
+        const [row] = await db
+          .select()
+          .from(characterSkills)
+          .where(
+            and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
+          );
+        return row ? appliedOutcome(op, Number(row.revision)) : null;
+      }
+      case 'character_spell': {
+        const characterId = requireParentId(op);
+        assertWrite(await loadCharacterOr403(characterId, userId));
+        const [row] = await db
+          .select()
+          .from(characterSpells)
+          .where(
+            and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+          );
+        return row ? appliedOutcome(op, Number(row.revision)) : null;
+      }
+      case 'character_inventory': {
+        const characterId = requireParentId(op);
+        assertWrite(await loadCharacterOr403(characterId, userId));
+        const [row] = await db
+          .select()
+          .from(inventoryItems)
+          .where(
+            and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)),
+          );
+        return row ? appliedOutcome(op, Number(row.revision)) : null;
+      }
+      default:
+        // character_combat creates are upserts (no unique violation);
+        // other classes have no create dispatcher.
+        return null;
+    }
+  } catch {
+    // Any access/parent-resolution failure means this is not a clean
+    // replay — fall through to the normal conflict outcome.
+    return null;
   }
 }
 
@@ -332,13 +477,16 @@ async function dispatchTrait(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const result = await tx
+    // No existence check: deletes are idempotent.  A replayed delete
+    // whose first ack got lost finds the row already gone; write
+    // access to the parent was asserted above, so "nothing to delete"
+    // is success — returning unauthorized would make the client roll
+    // back and resurrect the row locally.
+    await tx
       .delete(characterTraits)
-      .where(and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)))
-      .returning({ id: characterTraits.id });
-    if (result.length === 0) {
-      return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'trait not found' };
-    }
+      .where(
+        and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
+      );
     return { clientOpId: op.clientOpId, status: 'applied' };
   }
 
@@ -402,13 +550,12 @@ async function dispatchSkill(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const result = await tx
+    // Idempotent delete — see the trait dispatcher for rationale.
+    await tx
       .delete(characterSkills)
-      .where(and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)))
-      .returning({ id: characterSkills.id });
-    if (result.length === 0) {
-      return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'skill not found' };
-    }
+      .where(
+        and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
+      );
     return { clientOpId: op.clientOpId, status: 'applied' };
   }
 
@@ -474,13 +621,12 @@ async function dispatchSpell(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const result = await tx
+    // Idempotent delete — see the trait dispatcher for rationale.
+    await tx
       .delete(characterSpells)
-      .where(and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)))
-      .returning({ id: characterSpells.id });
-    if (result.length === 0) {
-      return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'spell not found' };
-    }
+      .where(
+        and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+      );
     return { clientOpId: op.clientOpId, status: 'applied' };
   }
 
@@ -578,7 +724,8 @@ async function dispatchInventory(
       .from(inventoryItems)
       .where(and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)));
     if (!doomed) {
-      return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'item not found' };
+      // Idempotent delete — see the trait dispatcher for rationale.
+      return { clientOpId: op.clientOpId, status: 'applied' };
     }
     await tx
       .update(inventoryItems)
