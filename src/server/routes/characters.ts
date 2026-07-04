@@ -28,6 +28,7 @@ import {
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { buildCharacterDetail } from '../services/characterSummary.ts';
+import { decideCharacterAccess } from './sync.ts';
 
 const router = createOpenApiApp();
 router.use('/characters', requireActiveUser);
@@ -166,21 +167,48 @@ router.openapi(
       .from(characters)
       .where(where)
       .orderBy(desc(characters.updatedAt));
+    // Same share gate as GET /characters/{id} and /sync/cursor: fellow
+    // members of a shareCharacterSheets=false campaign only get the
+    // "readily apparent" identity bits, so core attributes are masked
+    // to the 10/10/10/10 baseline for characters the viewer may only
+    // see in minimal form.
+    const relevantCampaignIds = [
+      ...new Set(rows.map((r) => r.campaignId).filter((id): id is string => id !== null)),
+    ];
+    const campaignRows =
+      relevantCampaignIds.length === 0
+        ? []
+        : await db
+            .select({
+              id: campaigns.id,
+              ownerId: campaigns.ownerId,
+              shareCharacterSheets: campaigns.shareCharacterSheets,
+            })
+            .from(campaigns)
+            .where(inArray(campaigns.id, relevantCampaignIds));
+    const accessModes = decideCharacterAccess({
+      viewerId: user.id,
+      characters: rows,
+      campaigns: campaignRows,
+    });
     return c.json(
-      rows.map((r) => ({
-        id: r.id,
-        ownerId: r.ownerId,
-        campaignId: r.campaignId,
-        name: r.name,
-        playerName: r.playerName,
-        techLevel: r.techLevel,
-        st: r.st,
-        dx: r.dx,
-        iq: r.iq,
-        ht: r.ht,
-        updatedAt: r.updatedAt.toISOString(),
-        revision: Number(r.revision),
-      })),
+      rows.map((r) => {
+        const minimal = accessModes.get(r.id) === 'minimal';
+        return {
+          id: r.id,
+          ownerId: r.ownerId,
+          campaignId: r.campaignId,
+          name: r.name,
+          playerName: r.playerName,
+          techLevel: r.techLevel,
+          st: minimal ? 10 : r.st,
+          dx: minimal ? 10 : r.dx,
+          iq: minimal ? 10 : r.iq,
+          ht: minimal ? 10 : r.ht,
+          updatedAt: r.updatedAt.toISOString(),
+          revision: Number(r.revision),
+        };
+      }),
       200,
     );
   },

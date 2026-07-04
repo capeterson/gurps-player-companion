@@ -19,6 +19,9 @@ requirement — not optional documentation.**
   - `campaign-content-sharing.md` — roles, invitations, the share gate /
     minimal view, and the YAML library.
   - `history-tracking.md` — the append-only audit log.
+  - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
+    schema; a new JSON-typed field is incomplete without a schema and a
+    catalog row.
 - **These docs describe *what exists*; this file (`AGENTS.md`) prescribes
   *what you must keep true*.** When they disagree with the code, the code is
   the truth and the spec is a bug — fix it.

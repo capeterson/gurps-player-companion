@@ -92,6 +92,9 @@ data-leak hole (this is exactly what Codex review on PR #22 caught).
      `campaignIds` so the client can prune rows that fell out of access
      (tombstones can't reach ex-members).
    - `GET /characters/{id}` applies the same gate via `shouldUseMinimalView`.
+   - `GET /characters` (the list) masks `st/dx/iq/ht` to the 10/10/10/10
+     baseline for rows the viewer may only see in `minimal` form, using the
+     same `decideCharacterAccess` decision.
 
 2. **Client — what stays in IndexedDB.**
    `characterIdsToMinimize()` in `src/client/sync/minimalViewSweep.ts` mirrors

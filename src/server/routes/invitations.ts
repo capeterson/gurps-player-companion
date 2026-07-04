@@ -25,6 +25,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { HTTPException } from 'hono/http-exception';
 import { type InvitationOut, invitationOut, inviteRequest } from '../../shared/schemas/campaign.ts';
 import { uuid } from '../../shared/schemas/common.ts';
+import { campaignInvitationNotificationPayload } from '../../shared/schemas/notification.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin } from '../auth/permissions.ts';
 import { loadConfig } from '../config.ts';
@@ -203,13 +204,15 @@ router.openapi(
           userId: target.id,
           type: NOTIFICATION_TYPE_CAMPAIGN_INVITATION,
           relatedId: row.id,
-          payload: {
+          // Parse through the shared payload schema so the emitted jsonb
+          // can never drift from what NotificationsBell expects to read.
+          payload: campaignInvitationNotificationPayload.parse({
             campaign_id: campaignId,
             campaign_name: campaign.name,
             inviter_id: user.id,
             inviter_display_name: user.displayName,
             role: requestedRole,
-          },
+          }),
         });
         return row.id;
       });

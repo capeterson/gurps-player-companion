@@ -24,6 +24,19 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+// Type-only imports: every jsonb column below is typed against the Zod
+// schema that validates it at the API/sync boundary, so the DB layer
+// and the wire contract can't drift apart.  The catalog of jsonb
+// columns and their owning schemas lives in docs/specs/json-fields.md.
+import type { XpAward } from '../../shared/schemas/adventureLog.ts';
+import type {
+  ArmorData,
+  MagicItemData,
+  PowerstoneData,
+  WeaponData,
+} from '../../shared/schemas/inventory.ts';
+import type { SituationalModifier } from '../../shared/schemas/skill.ts';
+import type { TraitModifier } from '../../shared/schemas/trait.ts';
 
 // ---------- enums ----------
 // We let Postgres enforce these at the column level via CHECK / ENUM.
@@ -271,6 +284,9 @@ export const notifications = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     type: varchar('type', { length: 40 }).notNull(),
+    /** Shape depends on `type`; per-type payload schemas live in
+     * src/shared/schemas/notification.ts (e.g.
+     * `campaignInvitationNotificationPayload` for 'campaign_invitation'). */
     payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
     relatedId: uuid('related_id'),
     readAt: timestamp('read_at', { withTimezone: true }),
@@ -353,6 +369,8 @@ export const characters = pgTable(
     tempSpeedQuarterMod: smallint('temp_speed_quarter_mod').notNull().default(0),
     tempMoveMod: smallint('temp_move_mod').notNull().default(0),
 
+    /** Warning codes the owner dismissed; validated by
+     * `dismissedWarningsField` (src/shared/schemas/character.ts). */
     dismissedWarnings: jsonb('dismissed_warnings').$type<string[]>().notNull().default([]),
 
     createdAt: createdAt(),
@@ -379,7 +397,8 @@ export const characterTraits = pgTable(
     points: integer('points').notNull().default(0),
     level: smallint('level'),
     notes: text('notes'),
-    modifiers: jsonb('modifiers').$type<unknown[]>().notNull().default([]),
+    /** Validated by `traitModifier` (src/shared/schemas/trait.ts). */
+    modifiers: jsonb('modifiers').$type<TraitModifier[]>().notNull().default([]),
     libraryTraitId: uuid('library_trait_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -437,12 +456,16 @@ export const inventoryItems = pgTable(
       .default('0'),
     weightReductionPercent: smallint('weight_reduction_percent').notNull().default(0),
     isArmor: boolean('is_armor').notNull().default(false),
-    armor: jsonb('armor'),
-    weaponData: jsonb('weapon_data'),
-    /** Powerstone metadata (max/current charge).  Null = not a powerstone. */
-    powerstoneData: jsonb('powerstone_data'),
-    /** Magic-item metadata (linked spell, charges, mode).  Null = mundane item. */
-    magicItemData: jsonb('magic_item_data'),
+    /** Validated by `armorData` (src/shared/schemas/inventory.ts).  Null = not armor. */
+    armor: jsonb('armor').$type<ArmorData>(),
+    /** Validated by `weaponData` (src/shared/schemas/inventory.ts).  Null = not a weapon. */
+    weaponData: jsonb('weapon_data').$type<WeaponData>(),
+    /** Powerstone metadata (max/current charge), validated by
+     * `powerstoneData` (src/shared/schemas/inventory.ts).  Null = not a powerstone. */
+    powerstoneData: jsonb('powerstone_data').$type<PowerstoneData>(),
+    /** Magic-item metadata (linked spell, charges, mode), validated by
+     * `magicItemData` (src/shared/schemas/inventory.ts).  Null = mundane item. */
+    magicItemData: jsonb('magic_item_data').$type<MagicItemData>(),
     libraryItemId: uuid('library_item_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -501,6 +524,8 @@ export const combatStates = pgTable(
       .references(() => characters.id, { onDelete: 'cascade' }),
     currentHp: integer('current_hp').notNull().default(10),
     currentFp: integer('current_fp').notNull().default(10),
+    /** Condition labels; validated by `combatStateUpdate.conditions`
+     * (src/shared/schemas/combat.ts). */
     conditions: jsonb('conditions').$type<string[]>().notNull().default([]),
     maneuver: varchar('maneuver', { length: 80 }),
     posture: postureEnum('posture').notNull().default('standing'),
@@ -529,10 +554,8 @@ export const adventureLogEntries = pgTable(
     title: varchar('title', { length: 200 }).notNull(),
     body: text('body').notNull().default(''),
     visibility: visibilityEnum('visibility').notNull().default('campaign'),
-    xpAwards: jsonb('xp_awards')
-      .$type<Array<{ characterId: string; amount: number }>>()
-      .notNull()
-      .default([]),
+    /** Validated by `xpAward` (src/shared/schemas/adventureLog.ts). */
+    xpAwards: jsonb('xp_awards').$type<XpAward[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -557,7 +580,9 @@ export const campaignLibraryTraits = pgTable(
     basePoints: integer('base_points').notNull().default(0),
     description: text('description'),
     source: varchar('source', { length: 40 }),
-    availableModifiers: jsonb('available_modifiers').$type<unknown[]>().notNull().default([]),
+    /** Validated by `traitModifier` (src/shared/schemas/trait.ts). */
+    availableModifiers: jsonb('available_modifiers').$type<TraitModifier[]>().notNull().default([]),
+    /** Validated by the `tagList` element schema (src/shared/schemas/campaignLibrary.ts). */
     tags: jsonb('tags').$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -583,7 +608,11 @@ export const campaignLibrarySkills = pgTable(
     source: varchar('source', { length: 40 }),
     defaultSpecialization: varchar('default_specialization', { length: 160 }),
     prerequisites: text('prerequisites'),
-    situationalModifiers: jsonb('situational_modifiers').$type<unknown[]>().notNull().default([]),
+    /** Validated by `situationalModifier` (src/shared/schemas/skill.ts). */
+    situationalModifiers: jsonb('situational_modifiers')
+      .$type<SituationalModifier[]>()
+      .notNull()
+      .default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -641,8 +670,10 @@ export const campaignLibraryItems = pgTable(
     description: text('description'),
     source: varchar('source', { length: 40 }),
     isArmor: boolean('is_armor').notNull().default(false),
-    armor: jsonb('armor'),
-    weaponData: jsonb('weapon_data'),
+    /** Validated by `armorData` (src/shared/schemas/inventory.ts).  Null = not armor. */
+    armor: jsonb('armor').$type<ArmorData>(),
+    /** Validated by `weaponData` (src/shared/schemas/inventory.ts).  Null = not a weapon. */
+    weaponData: jsonb('weapon_data').$type<WeaponData>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
