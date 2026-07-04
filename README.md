@@ -128,7 +128,7 @@ src/
   server/      Bun process: Hono routes, auth, Drizzle, OpenAPI, WS
   client/      React PWA
   shared/      Pure TypeScript: Zod schemas, GURPS math, YAML codec
-  sw/          Service worker + offline replay
+  sw/          Service worker registration (app-shell precache; NOT replay)
 docs/
   specs/       Design specs (start at docs/specs/overview.md): product
                surface, architecture, offline sync, campaign sharing, history

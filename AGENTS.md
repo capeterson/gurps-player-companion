@@ -120,7 +120,7 @@ broken at least once; assume the comment in the file already warns you.
 
 The outbox + cursor system currently covers only the character
 classes: `character`, `character_trait`, `character_skill`,
-`character_inventory`, `character_combat`. Campaigns are pulled
+`character_spell`, `character_inventory`, `character_combat`. Campaigns are pulled
 READ-ONLY through `/sync/cursor` (so the minimal-view sweep and
 offline campaign-name lookups have local rows to work with) but have
 no outbox path — campaign mutations, the campaign library

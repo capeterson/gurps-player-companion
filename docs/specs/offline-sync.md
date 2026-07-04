@@ -109,7 +109,7 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 | `unauthorized` | Same as rejected; toast names the permission failure. |
 | `conflict` | Server returns `latestEntity`; client adopts it, then flashes. |
 | `stale_base` | Same as conflict — `baseRevision` was behind the server. |
-| `transient` | Backoff with jitter, retry up to `MAX_ATTEMPTS` (8). |
+| `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
 | network error | Whole batch reverts to `transient_retry`; loop retries. |
 

@@ -23,7 +23,7 @@ A campaign (`campaigns` table) has one **owner** and a set of
 | Role | Capabilities |
 |---|---|
 | `owner` (GM) | Everything: edit settings, manage all members and roles, transfer ownership, delete the campaign, edit the library, always sees every member character in full. |
-| `manager` | Invite members (at the member tier only), manage day-to-day; cannot promote to manager or change owner-level settings. |
+| `manager` | Invite at the `member` tier, cancel pending invitations, and remove members (`requireCampaignAdmin`). Cannot add members directly, change roles, promote to manager, transfer ownership, or edit campaign settings / the library — those are owner-only. |
 | `member` | Belongs to the campaign; can read shared content and their own character. |
 
 Authorization is centralized in `src/server/auth/permissions.ts`:
@@ -120,9 +120,11 @@ pull them onto their sheets.
   `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items}[/{id}]`
   in `src/server/routes/campaignLibrary.ts`. These back the library editor UI;
   library mutations do **not** go through the sync outbox.
-- Client surfaces: `CampaignLibraryPage`, plus `LibraryAutocomplete` /
-  `LibraryModifierPicker` on the character sheet, which let a player search the
-  campaign library when adding a trait/skill/spell/item.
+- Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor)
+  and the top-nav `LibraryPage` (`/library`, the primary home for YAML
+  import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
+  character sheet, which let a player search the campaign library when adding a
+  trait/skill/spell/item.
 
 ### YAML import/export (cross-campaign sharing)
 

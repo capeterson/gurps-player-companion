@@ -54,7 +54,8 @@ checklists for extending sync/history) live in
 Route `/characters/:id`. Tabbed sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), tabs:
 **Combat, Identity, Traits, Skills, Magic, Inventory, Notes, History**
-(Magic hides itself until the character has magical aptitude / spells).
+(on a read-only view of a non-magical character the Magic tab is hidden;
+on any sheet the viewer can edit — their own — it always shows).
 
 - **Attributes & derived stats.** ST/DX/IQ/HT drive HP, FP, Will, Per, Basic
   Speed, Basic Move, Dodge, etc. All GURPS math is pure and shared
@@ -85,14 +86,18 @@ Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/library`.
 - **Roles**: `owner` (GM), `manager`, `member`.
 - **Membership management**: add/remove members, change roles, **transfer
   ownership**, delete campaign.
-- **Invitations**: invite by email, inbox to accept/reject, notifications.
+- **Invitations**: invite by handle (email or display name), inbox to
+  accept/reject, notifications.
 - **Character-sheet sharing gate** (`shareCharacterSheets`): when off, only the
   owner (GM) and a character's own player see full sheets; other members get a
   "minimal view" (public columns only). Enforced on both server and client —
   see campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells, and
   items, editable by the owner and **importable/exportable as versioned YAML**
-  for sharing between campaigns.
+  for sharing between campaigns. The catalog editor lives at
+  `/campaigns/:id/library`; the top-nav **Library** page (`/library`,
+  `features/library/LibraryPage.tsx`) is the primary home for the YAML
+  import/export flow.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private).
 - **Campaign history view**: campaign-level audit log (settings, membership,
@@ -120,8 +125,9 @@ player client.
 src/
   server/        Bun process — Hono routes, auth, Drizzle, OpenAPI, WS
     routes/      One file per resource group (auth, characters, campaigns,
-                 campaignLibrary, invitations, notifications, sync, history,
-                 admin, adventureLog, characterSubResources, apiKeys, health)
+                 campaignLibrary, invitations, notifications, sync, syncWs,
+                 history, admin, adventureLog, characterSubResources, apiKeys,
+                 health)
     auth/        jwt, password, webauthn (passkeys), apiKey, session,
                  middleware, permissions (the authz helpers)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
@@ -144,7 +150,9 @@ src/
     constants/   attributes, skills, traits, combat, hitLocations, magic
     yaml/        library.ts — round-trippable campaign-library YAML codec
     history/     summarize.ts — shared history one-liner formatter
-  sw/            Service worker registration + offline replay
+  sw/            Service worker registration (app-shell precache + a few
+                 read-only GET caches). NOT outbox replay — that lives in the
+                 page orchestrator, see src/sw/registerSW.ts.
 docs/
   specs/         These design specs
   openapi.json   Emitted OpenAPI contract (CI-checked)
@@ -164,8 +172,9 @@ contract and the bugs they exist to prevent.
 - **One process, one origin.** The Bun server hosts HTTP + WebSocket + OpenAPI
   + static client. Do not split it.
 - **Postgres 18 only.** No SQLite, no cross-DB shims. IDs are `uuidv7()`
-  server-defaults; leans on PG18 features (virtual generated columns,
-  `MERGE…RETURNING`).
+  server-defaults (the concrete PG18 dependency); the schema also uses
+  `GENERATED ALWAYS AS … STORED` columns. `AGENTS.md` frames PG18 as headroom
+  to "lean on" (e.g. `MERGE…RETURNING`); not all of that is used yet.
 - **OpenAPI is the contract.** Every route uses `createRoute` from
   `@hono/zod-openapi`; CI fails on drift against `docs/openapi.json`.
 - **Shared code is pure TS.** Anything in `src/shared/` must run in Bun, the
@@ -227,7 +236,9 @@ Things that repeatedly surprise people working in this repo:
 
 7. **Dev + tests run in Docker/Bun.** There is no host `bun` requirement. `bun
    test` covers `src/server` + `src/shared`; `vitest` covers client; Playwright
-   covers e2e. `npm run check` runs lint + typecheck + tests + OpenAPI drift.
+   covers e2e. `npm run check` = lint + typecheck + **`bun test`
+   (server+shared only)** + OpenAPI drift — it does **not** run the client
+   vitest or Playwright suites, so run those separately for client changes.
 
 8. **When in doubt, read the file's top comment and the relevant `AGENTS.md`
    rule** before editing — most invariants are annotated at the call site
