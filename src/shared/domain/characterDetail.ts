@@ -319,7 +319,10 @@ export function buildSpellOut(
   mana: ManaLevel = 'normal',
 ): SpellOut {
   const difficulty = spell.difficulty ?? 'H';
-  const level = computeSpellLevel(spell.points, iq, magery, difficulty) + manaSkillModifier(mana);
+  // Null when the spell has no points invested (no default in GURPS);
+  // an unknown spell gets no skill discount either.
+  const baseLevel = computeSpellLevel(spell.points, iq, magery, difficulty);
+  const level = baseLevel == null ? null : baseLevel + manaSkillModifier(mana);
   const freeCasting = isFreeCastingMana(mana);
   return {
     id: spell.id,
@@ -336,12 +339,18 @@ export function buildSpellOut(
     notes: spell.notes,
     librarySpellId: spell.librarySpellId,
     level,
-    effectiveCost: freeCasting ? 0 : effectiveCastingCost(spell.baseEnergyCost, level),
+    effectiveCost: freeCasting
+      ? 0
+      : level == null
+        ? spell.baseEnergyCost
+        : effectiveCastingCost(spell.baseEnergyCost, level),
     effectiveMaintenanceCost: freeCasting
       ? spell.maintenanceCost == null
         ? null
         : 0
-      : effectiveMaintenanceCost(spell.maintenanceCost, level),
+      : level == null
+        ? spell.maintenanceCost
+        : effectiveMaintenanceCost(spell.maintenanceCost, level),
     createdAt: toIso(spell.createdAt),
     updatedAt: toIso(spell.updatedAt),
   };
@@ -388,7 +397,14 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const dismissed = new Set(character.dismissedWarnings);
   const warnings = evaluateWarnings(
     {
-      attrs: { st: character.st, dx: character.dx, iq: character.iq, ht: character.ht },
+      attrs: {
+        st: character.st,
+        dx: character.dx,
+        iq: character.iq,
+        ht: character.ht,
+        hpMod: character.hpMod,
+        fpMod: character.fpMod,
+      },
       points,
       encumbrance,
       campaign: caps,

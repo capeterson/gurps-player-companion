@@ -17,6 +17,7 @@ import {
   SECONDARY_COST_PER_LEVEL,
   SPEED_COST_PER_QUARTER,
 } from '../constants/attributes.ts';
+import { damageForSt, formatDamageDice } from '../constants/damage.ts';
 import {
   ADVANTAGE_KINDS,
   DISADVANTAGE_KINDS,
@@ -72,6 +73,10 @@ export interface DerivedStats {
   readonly basicMove: number;
   readonly dodge: number;
   readonly basicLift: number;
+  /** Basic thrust damage from ST, e.g. "1d-2" (B16). */
+  readonly thrust: string;
+  /** Basic swing damage from ST, e.g. "1d" (B16). */
+  readonly swing: string;
 }
 
 export function computeDerived(attrs: CharacterAttrs): DerivedStats {
@@ -90,7 +95,11 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
   const basicSpeed = basicSpeedQuarters / 4;
   const basicMove = Math.floor(basicSpeed) + attrs.moveMod + attrs.tempMoveMod;
   const dodge = Math.floor(basicSpeed) + 3;
-  const basicLift = (effectiveSt * effectiveSt) / 5;
+  // Basic Lift = ST²/5; round to the nearest whole number once BL
+  // reaches 10 (B15).  Below 10 the fraction is kept as printed.
+  const rawBasicLift = (effectiveSt * effectiveSt) / 5;
+  const basicLift = rawBasicLift >= 10 ? Math.round(rawBasicLift) : rawBasicLift;
+  const damage = damageForSt(effectiveSt);
 
   return {
     effectiveSt,
@@ -106,6 +115,8 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
     basicMove,
     dodge,
     basicLift,
+    thrust: formatDamageDice(damage.thrust),
+    swing: formatDamageDice(damage.swing),
   };
 }
 

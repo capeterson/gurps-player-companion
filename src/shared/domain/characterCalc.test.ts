@@ -79,6 +79,28 @@ describe('computeDerived', () => {
     expect(d.basicLift).toBe(80); // 20*20/5
   });
 
+  it('rounds Basic Lift to the nearest whole number when BL >= 10 (B15)', () => {
+    // ST 11 → 121/5 = 24.2 → 24
+    expect(computeDerived({ ...baseAttrs, st: 11 }).basicLift).toBe(24);
+    // ST 13 → 169/5 = 33.8 → 34
+    expect(computeDerived({ ...baseAttrs, st: 13 }).basicLift).toBe(34);
+    // ST 6 → 36/5 = 7.2 stays fractional (BL < 10 keeps the fraction)
+    expect(computeDerived({ ...baseAttrs, st: 6 }).basicLift).toBeCloseTo(7.2);
+  });
+
+  it('derives basic thrust/swing damage from ST (B16)', () => {
+    const st10 = computeDerived(baseAttrs);
+    expect(st10.thrust).toBe('1d-2');
+    expect(st10.swing).toBe('1d');
+    const st13 = computeDerived({ ...baseAttrs, st: 13 });
+    expect(st13.thrust).toBe('1d');
+    expect(st13.swing).toBe('2d-1');
+    // Temp ST boosts shift damage too.
+    const st15 = computeDerived({ ...baseAttrs, tempSt: 5 });
+    expect(st15.thrust).toBe('1d+1');
+    expect(st15.swing).toBe('2d+1');
+  });
+
   it('temporary speed mods stack with persistent speed mods', () => {
     const d = computeDerived({
       ...baseAttrs,

@@ -15,8 +15,9 @@ library:
       kind: advantage
       basePoints: 15
       description: |
-        +1 to all active defenses, +2 to fast-draw, +6 to wake up or
-        recover from surprise.  Never freezes on a critical failure.
+        +1 to all active defenses, +1 to Fast-Draw, +2 to Fright
+        Checks, +6 to wake up or recover from surprise.  Never freezes
+        on a critical failure.
       source: B-43
       tags: [combat]
     - name: Bad Temper
@@ -35,6 +36,11 @@ library:
       basePoints: -10
       source: B-138
       availableModifiers:
+        - name: Self-Control 15
+          category: limitation
+          costType: percent
+          costValue: -50
+          group: self-control
         - name: Self-Control 12
           category: limitation
           costType: percent
@@ -173,11 +179,11 @@ library:
     - name: Broadsword
       category: weapon
       weightLbs: 3
-      cost: 600
+      cost: 500
       description: A sturdy steel cut-and-thrust sword.
-      source: B-273
+      source: B-271
       weaponData:
-        damage: sw cut / thr+1 imp
+        damage: sw+1 cut / thr+1 cr
         reach: '1'
         parry: '0'
         stRequired: 10

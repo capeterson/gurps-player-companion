@@ -220,6 +220,10 @@ interface SpellRowProps {
 
 function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowProps) {
   const toasts = useToasts();
+  // A spell with no points has no skill level (spells have no default
+  // in GURPS), so there is nothing to roll against — hold Cast/Maintain
+  // for that row even when the ambient mana allows casting.
+  const rowCastable = castable && spell.level != null;
   // The difficulty select commits instantly (no draft state), so it
   // wires the rollback flash through useFieldFlash directly (AGENTS.md
   // rule 2 / S5: a rejected patch must pulse the input it reverts).
@@ -323,8 +327,12 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowPr
       ) : (
         <span className="num text-right">{spell.points}</span>
       )}
-      <span className="num text-right font-medium" aria-label={`${spell.name} level`}>
-        {spell.level}
+      <span
+        className="num text-right font-medium"
+        aria-label={`${spell.name} level`}
+        title={spell.level == null ? 'No points invested — spells have no default' : undefined}
+      >
+        {spell.level ?? '—'}
       </span>
       {canWrite ? (
         <input
@@ -352,12 +360,14 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowPr
             type="button"
             className="btn btn-primary btn-xs"
             onClick={() => onCast(spell, 'cast')}
-            disabled={!castable}
+            disabled={!rowCastable}
             aria-label={`Cast ${spell.name}`}
             title={
-              castable
+              rowCastable
                 ? 'Cast this spell'
-                : 'This character cannot cast here — see the mana notice above'
+                : spell.level == null
+                  ? 'No points invested — this spell has no skill level to cast against'
+                  : 'This character cannot cast here — see the mana notice above'
             }
           >
             Cast
@@ -368,12 +378,14 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowPr
             type="button"
             className="btn btn-ghost btn-xs"
             onClick={() => onCast(spell, 'maintain')}
-            disabled={!castable}
+            disabled={!rowCastable}
             aria-label={`Maintain ${spell.name}`}
             title={
-              castable
+              rowCastable
                 ? `Pay the maintenance cost (${spell.effectiveMaintenanceCost ?? spell.maintenanceCost} after discount) to keep this spell running`
-                : 'This character cannot cast here — see the mana notice above'
+                : spell.level == null
+                  ? 'No points invested — this spell has no skill level to cast against'
+                  : 'This character cannot cast here — see the mana notice above'
             }
           >
             Maint

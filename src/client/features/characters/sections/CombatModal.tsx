@@ -207,7 +207,9 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               {hp > hpMax && <OverflowBadge amount={hp - hpMax} />}
             </span>
             <span className="num text-xs text-dim">
-              max {hpMax} · reeling at {Math.ceil(hpMax / 3)}
+              {/* Reeling starts when HP drops BELOW ⅓ of max (B419), so the
+                  highest reeling value is ceil(max/3) − 1. */}
+              max {hpMax} · reeling at {Math.ceil(hpMax / 3) - 1}
             </span>
           </div>
           <div className="mb-3 flex items-baseline gap-1.5">

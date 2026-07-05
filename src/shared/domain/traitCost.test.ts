@@ -36,4 +36,31 @@ describe('computeTraitCost', () => {
   it('handles negative bases (limitations on disadvantages)', () => {
     expect(computeTraitCost(-20, [{ costType: 'percent', costValue: -50 }])).toBe(-10);
   });
+
+  it('rounds up (against the character) for both signs — B102', () => {
+    expect(computeTraitCost(10, [{ costType: 'percent', costValue: 15 }])).toBe(12); // 11.5 → 12
+    expect(computeTraitCost(-10, [{ costType: 'percent', costValue: -25 }])).toBe(-7); // -7.5 → -7
+  });
+
+  it('clamps the net percent at -80% (B110 limitation floor)', () => {
+    expect(computeTraitCost(10, [{ costType: 'percent', costValue: -100 }])).toBe(2);
+    expect(
+      computeTraitCost(10, [
+        { costType: 'percent', costValue: -50 },
+        { costType: 'percent', costValue: -50 },
+      ]),
+    ).toBe(2);
+    // Enhancements pull the net back above the floor before clamping.
+    expect(
+      computeTraitCost(10, [
+        { costType: 'percent', costValue: -100 },
+        { costType: 'percent', costValue: 40 },
+      ]),
+    ).toBe(4); // net -60%, no clamp
+  });
+
+  it('avoids float error at the clamp boundary', () => {
+    // 20 * 0.2 must be exactly 4, not 3.999... truncated later.
+    expect(computeTraitCost(20, [{ costType: 'percent', costValue: -80 }])).toBe(4);
+  });
 });

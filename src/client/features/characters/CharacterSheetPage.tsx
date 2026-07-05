@@ -1055,6 +1055,21 @@ function DerivedPanel({ character }: { character: CharacterDetail }) {
           }
           value={`${d.basicLift.toFixed(1)} lb`}
         />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Basic damage</strong> from ST (B16): thrust for stabs and punches, swing
+                  for swung weapons. Weapon lines add their own modifiers.
+                </span>
+              }
+            >
+              <span>Thr / Sw</span>
+            </InfoTooltip>
+          }
+          value={`${d.thrust} / ${d.swing}`}
+        />
       </div>
     </StatCard>
   );
@@ -1147,7 +1162,13 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const atCap = !nextTier && e.playerWeightLbs >= maxWeight;
   const tone = ENCUMBRANCE_TONE[e.level] ?? ENCUMBRANCE_TONE[0];
 
-  const moveNet = Math.floor(d.basicMove * e.moveMultiplier);
+  // Move at encumbrance is floor(Basic Move × multiplier) but never
+  // below 1 while the load is legal (B17); past 10×BL you can't move.
+  const overCarryCap = e.ratio > 10;
+  const moveFloor = d.basicMove > 0 ? 1 : 0;
+  const moveNet = overCarryCap
+    ? 0
+    : Math.max(moveFloor, Math.floor(d.basicMove * e.moveMultiplier));
   const movePenalty = d.basicMove - moveNet;
   const dodgePenaltyAbs = -e.dodgePenalty;
   const dodgeNet = d.dodge + e.dodgePenalty;

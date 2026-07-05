@@ -72,6 +72,10 @@ describe('hasMagery', () => {
 });
 
 describe('computeSpellLevel', () => {
+  it('0 points has no level — spells have no default in GURPS', () => {
+    expect(computeSpellLevel(0, 12, 3)).toBeNull();
+  });
+
   it('IQ 12, 1 point, Magery 0 → 10 (IQ/H at 1 pt is IQ-2)', () => {
     // skillOffset('H', 1) = -2; level = 12 + (-2) + 0 = 10
     expect(computeSpellLevel(1, 12, 0)).toBe(10);

@@ -59,20 +59,36 @@ Route `/characters/:id`. Tabbed sheet
 on any sheet the viewer can edit — their own — it always shows).
 
 - **Attributes & derived stats.** ST/DX/IQ/HT drive HP, FP, Will, Per, Basic
-  Speed, Basic Move, Dodge, etc. All GURPS math is pure and shared
+  Speed, Basic Move, Dodge, basic **thrust/swing damage** (B16 table, shown
+  as "Thr / Sw" on the derived card), etc. Basic Lift rounds to the nearest
+  whole number once it reaches 10 (B15). All GURPS math is pure and shared
   (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
   disadvantage / quirk cap warnings.
 - **Temporary stat boosts.** Transient DX+2-style bumps with a "revert all"
   gesture, tracked distinctly from permanent edits.
-- **Traits** (advantages/disadvantages/perks/quirks) with modifier math.
-- **Skills** with attribute/difficulty relative levels.
+- **Traits** (advantages/disadvantages/perks/quirks) with modifier math:
+  percent modifiers sum, the net is clamped at -80% (B110), the result
+  rounds against the character (B102), then flat modifiers add.
+- **Skills** with attribute/difficulty relative levels. A 0-point skill
+  shows its **attribute default** (attr-4/-5/-6 for E/A/H per B173);
+  0-point Very Hard skills have no default, so their level renders as
+  an em dash (`level` is null in the API).
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
+  Spells have no default: a 0-point (legacy) spell row has a null level,
+  gets no energy discount, and its Cast/Maintain actions are held. The
+  cast dialog suggests drawing from a single powerstone and warns when
+  energy is allocated from more than one (B481).
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
-  encumbrance, armor and weapon data, cost/weight rollups.
+  encumbrance, armor and weapon data, cost/weight rollups. Encumbered
+  Move floors at 1 while the load is legal and reads 0 past the 10×BL
+  carry cap (B17).
 - **Combat tracker**: HP/FP pools, posture, conditions, hit-location model.
 - **Warnings**: derived rule-violation banners the user can dismiss.
+  Beyond the attribute-range and campaign-cap rules, this includes HP
+  modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
+  and carried weight past the 10×BL carry cap.
 - **History tab**: per-character audit log (see history-tracking.md).
 
 Every editable input on the sheet is **draft-on-blur** and never silently

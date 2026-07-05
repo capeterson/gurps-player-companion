@@ -255,8 +255,12 @@ function SkillRow({ characterId, skill, canWrite }: SkillRowProps) {
       ) : (
         <span className="num text-right">{skill.points}</span>
       )}
-      <span className="num text-right font-medium" aria-label={`${skill.name} level`}>
-        {skill.level}
+      <span
+        className="num text-right font-medium"
+        aria-label={`${skill.name} level`}
+        title={skill.points <= 0 ? 'No points invested — attribute default (B173)' : undefined}
+      >
+        {skill.level ?? '—'}
       </span>
       {canWrite && (
         <button
