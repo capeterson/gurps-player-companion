@@ -1,33 +1,22 @@
 /**
  * Combat modal — the prototype's bottom-right FAB target.
  * Edits flow through the local Dexie outbox (same path as the in-sheet
- * CombatPanel): each bumper / chip toggle calls `enqueueFieldPatch`,
- * which the orchestrator drains to the server. Posture/conditions
- * toggles update live; HP damage triggers the `flash` keyframe and
- * the `num-tween` pop on the big HP number.
+ * CombatPanel): each bumper / chip toggle calls `enqueueFieldPatch`
+ * via useCombatPatch, which the orchestrator drains to the server.
+ * Posture/conditions toggles update live; HP damage triggers the
+ * `flash` keyframe and the `num-tween` pop on the big HP number.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { bumpPool } from '../../../../shared/domain/poolBump.ts';
+import { useEffect } from 'react';
+import { POSTURES } from '../../../../shared/constants/combat.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
 import { OverflowBadge } from '../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
-import { getLocalDb } from '../../../db/dexie.ts';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueFieldPatch } from '../../../sync/outbox.ts';
 import { hpVarFor } from './hpColor.ts';
-
-const POSTURES = [
-  'standing',
-  'crouching',
-  'kneeling',
-  'prone',
-  'sitting',
-  'crawling',
-  'lying',
-] as const;
+import { useCombatPatch } from './useCombatPatch.ts';
+import { usePoolBumpers } from './usePoolBumpers.ts';
 
 const CONDITIONS = ['Stunned', 'Shock', 'Bleeding', 'Grappled', 'Reeling', 'Unconscious'] as const;
 
@@ -39,42 +28,15 @@ interface CombatModalProps {
 
 export function CombatModal({ character, canWrite, onClose }: CombatModalProps) {
   const combat = character.combat;
-  const hp = combat?.currentHp ?? character.derived.hp;
-  const fp = combat?.currentFp ?? character.derived.fp;
-  const hpMax = character.derived.hp;
-  const fpMax = character.derived.fp;
   const posture = combat?.posture ?? 'standing';
   const conditions = combat?.conditions ?? [];
 
-  // Latest-intended values for HP/FP, updated synchronously on every
-  // bumper tap. Without these refs, two taps that fire before React
-  // commits a new `combat` prop would read the same render-time `hp`
-  // and enqueue duplicate patches, dropping the second tap. The refs
-  // resync from the prop whenever Dexie surfaces a new value.
-  const hpRef = useRef(hp);
-  const fpRef = useRef(fp);
-  useEffect(() => {
-    hpRef.current = hp;
-  }, [hp]);
-  useEffect(() => {
-    fpRef.current = fp;
-  }, [fp]);
-
-  // Soft-cap "double-press to override" state for HP and FP. The
-  // helper returns `lastBlockedAt` we feed back on the next call —
-  // a second press within 2 s allows the overflow to land. See
-  // src/shared/domain/poolBump.ts.
-  const hpBlockedAtRef = useRef<number | null>(null);
-  const fpBlockedAtRef = useRef<number | null>(null);
-
-  const [flashHp, setFlashHp] = useState(false);
-  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-    };
-  }, []);
+  const patchCombat = useCombatPatch(character);
+  const { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp, flashHp } = usePoolBumpers(
+    character,
+    canWrite,
+    patchCombat,
+  );
 
   // Close on Escape — mirrors any standard modal behaviour.
   useEffect(() => {
@@ -84,68 +46,6 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  // Combat is 1:1 keyed by characterId. If a local row doesn't exist
-  // yet, materialize a default in Dexie so the per-field patch has a
-  // row to update; the orchestrator's whole-body upsert handles the
-  // server side. Mirrors CharacterSheetPage's CombatPanel.patchCombat.
-  async function patchCombat(field: string, value: unknown) {
-    const db = getLocalDb();
-    const existing = await db.characterCombat.get(character.id);
-    if (!existing) {
-      await db.characterCombat.put({
-        id: character.id,
-        characterId: character.id,
-        currentHp: character.derived.hp,
-        currentFp: character.derived.fp,
-        conditions: [],
-        maneuver: null,
-        posture: 'standing',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        revision: -1,
-      });
-    }
-    await enqueueFieldPatch({
-      entityClass: 'character_combat',
-      entityId: character.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: field,
-      flashKey: makeFlashKey('character_combat', character.id, field),
-      characterId: character.id,
-    });
-  }
-
-  function bumpHp(d: number) {
-    if (!canWrite || hpMax <= 0) return;
-    // Compose against the latest-intended value (hpRef), not the
-    // render snapshot, so rapid same-frame taps each compound
-    // instead of overwriting the prior tap.  bumpPool gives us the
-    // soft-cap "double-press to override" rule for free; we still
-    // clamp the lower bound at 4×max death-check zone.
-    const result = bumpPool(hpRef.current, d, hpMax, hpBlockedAtRef.current);
-    const next = Math.max(-hpMax * 4, result.next);
-    hpBlockedAtRef.current = result.lastBlockedAt;
-    if (next === hpRef.current) return; // pure block, no patch needed
-    hpRef.current = next;
-    void patchCombat('currentHp', next);
-    if (d < 0) {
-      setFlashHp(true);
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setFlashHp(false), 500);
-    }
-  }
-
-  function bumpFp(d: number) {
-    if (!canWrite || fpMax <= 0) return;
-    const result = bumpPool(fpRef.current, d, fpMax, fpBlockedAtRef.current);
-    const next = Math.max(-fpMax, result.next);
-    fpBlockedAtRef.current = result.lastBlockedAt;
-    if (next === fpRef.current) return;
-    fpRef.current = next;
-    void patchCombat('currentFp', next);
-  }
 
   function setPosture(p: (typeof POSTURES)[number]) {
     if (!canWrite) return;
@@ -241,10 +141,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               <button
                 type="button"
                 className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                onClick={() => {
-                  hpRef.current = hpMax;
-                  void patchCombat('currentHp', hpMax);
-                }}
+                onClick={resetHp}
               >
                 Reset to {hpMax}
               </button>
@@ -289,10 +186,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
                 <button
                   type="button"
                   className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                  onClick={() => {
-                    fpRef.current = fpMax;
-                    void patchCombat('currentFp', fpMax);
-                  }}
+                  onClick={resetFp}
                 >
                   Reset to {fpMax}
                 </button>

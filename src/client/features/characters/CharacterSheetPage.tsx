@@ -21,7 +21,6 @@ import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
-import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch, newBatchId } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
@@ -34,6 +33,8 @@ import { SpellsPanel } from './sections/SpellsPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
+import { useCombatPatch } from './sections/useCombatPatch.ts';
+import { type CampaignSummary, useCharacterAccess } from './useCharacterAccess.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
 type SheetTab =
@@ -1370,37 +1371,10 @@ function CombatPanel({
   const posture = combat?.posture ?? 'standing';
   const maneuver = combat?.maneuver ?? '';
 
-  // Combat is 1:1 keyed by characterId.  If a local row doesn't exist
-  // yet (first edit on this device) we materialize a default row in
-  // Dexie so the per-field patch has something to update; the
-  // orchestrator's whole-body upsert handles the server side.
-  const patchCombat = async (field: string, value: unknown) => {
-    const db = getLocalDb();
-    const existing = await db.characterCombat.get(character.id);
-    if (!existing) {
-      await db.characterCombat.put({
-        id: character.id,
-        characterId: character.id,
-        currentHp: character.derived.hp,
-        currentFp: character.derived.fp,
-        conditions: [],
-        maneuver: null,
-        posture: 'standing',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        revision: -1,
-      });
-    }
-    await enqueueFieldPatch({
-      entityClass: 'character_combat',
-      entityId: character.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: field,
-      flashKey: makeFlashKey('character_combat', character.id, field),
-      characterId: character.id,
-    });
-  };
+  // Ensure-row + outbox enqueue logic is shared with CombatModal (and
+  // future combat surfaces) via useCombatPatch — see that hook for the
+  // materialize-default-row rationale.
+  const patchCombat = useCombatPatch(character);
 
   const hpField = useDraftField<number>({
     name: 'current HP',
@@ -1612,21 +1586,6 @@ function IdentityHero({
   );
 }
 
-interface CampaignSummary {
-  id: string;
-  name: string;
-  description: string | null;
-  ownerId: string;
-  pointTarget: number | null;
-  disadvantageCap: number | null;
-  quirkCap: number | null;
-  manaLevel: 'none' | 'low' | 'normal' | 'high' | 'very_high';
-  shareCharacterSheets: boolean;
-  createdAt: string;
-  updatedAt: string;
-  revision: number;
-}
-
 export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [tab, setTab] = useState<SheetTab>('Combat');
@@ -1652,6 +1611,12 @@ export function CharacterSheetPage() {
     // the full campaign list — even for characters not yet in a campaign.
     enabled: !!me.data,
   });
+
+  // Access + share-gate decision, single-sourced (AGENTS.md: never
+  // re-derive the share gate ad hoc). Called before the loading /
+  // not-found early returns so hook order stays stable; the hook
+  // degrades gracefully while `character` is still loading.
+  const access = useCharacterAccess(character, campaigns.data, me.data?.id);
 
   // Mirror the fetched campaigns into Dexie: the sync cursor pulls only
   // the character-family classes (ALL_ENTITY_CLASSES), so this fetch is
@@ -1695,25 +1660,10 @@ export function CharacterSheetPage() {
       </div>
     );
   }
-  // Fall back to the local JWT sub when the /auth/me query hasn't resolved
-  // yet (offline, cold cache, or first render) so the sheet is editable
-  // while offline for the character's owner.
-  const myId = me.data?.id ?? readUserIdFromToken();
-  const canWrite = myId !== null && myId === character.ownerId;
-
-  const campaign = campaigns.data?.find((c) => c.id === character.campaignId);
+  const { canWrite, isMinimal, campaign } = access;
   const pointTarget = campaign?.pointTarget ?? null;
 
-  // Minimal-view gate: when the character belongs to a campaign that
-  // has flipped `shareCharacterSheets` off, members other than the
-  // character's owner and the campaign GM see only the "readily
-  // apparent" identity bits. Owners and GMs always see the full sheet.
-  // Mirrors the server-side gate in `shouldUseMinimalView` so the
-  // local-first path renders consistently with the API contract.
-  const isOwner = myId !== null && myId === character.ownerId;
-  const isGm = myId !== null && campaign != null && myId === campaign.ownerId;
-  const sharesSheets = campaign?.shareCharacterSheets !== false; // undefined → default true
-  if (!isOwner && !isGm && campaign != null && !sharesSheets) {
+  if (isMinimal) {
     return (
       <CharacterMinimalView
         data={{
