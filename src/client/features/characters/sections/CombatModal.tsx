@@ -8,6 +8,7 @@
  */
 
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { POSTURES } from '../../../../shared/constants/combat.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../components/ui/Bumper.tsx';
@@ -30,6 +31,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
   const combat = character.combat;
   const posture = combat?.posture ?? 'standing';
   const conditions = combat?.conditions ?? [];
+  const navigate = useNavigate();
 
   const patchCombat = useCombatPatch(character);
   const { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp, flashHp } = usePoolBumpers(
@@ -90,14 +92,26 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
             <p className="label-eyebrow">Combat</p>
             <h2 className="font-display text-2xl font-semibold">{character.name}</h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-ghost btn-sm"
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={() => {
+                onClose();
+                navigate(`/characters/${character.id}/play`);
+              }}
+            >
+              Open Play Mode
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-ghost btn-sm"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className={`card mb-3 p-4 ${flashHp ? 'flash' : ''}`}>

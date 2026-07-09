@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ATTR_INFLUENCE,
@@ -17,7 +17,6 @@ import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
 import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
-import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
@@ -36,6 +35,7 @@ import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCombatPatch } from './sections/useCombatPatch.ts';
 import { type CampaignSummary, useCharacterAccess } from './useCharacterAccess.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
+import { useMirrorCampaigns } from './useMirrorCampaigns.ts';
 
 type SheetTab =
   | 'Combat'
@@ -1618,34 +1618,10 @@ export function CharacterSheetPage() {
   // degrades gracefully while `character` is still loading.
   const access = useCharacterAccess(character, campaigns.data, me.data?.id);
 
-  // Mirror the fetched campaigns into Dexie: the sync cursor pulls only
-  // the character-family classes (ALL_ENTITY_CLASSES), so this fetch is
-  // the only route campaign rows have into the local store — and the
-  // local-first detail builder (useCharacterDetail) reads caps + mana
-  // level from `db.campaigns`.  Campaigns have no outbox mutations, so a
-  // plain upsert can't clobber pending local intent (rule S4), and the
-  // rows persist for offline sessions after the first online load.
-  useEffect(() => {
-    const rows = campaigns.data;
-    if (!rows || rows.length === 0) return;
-    const db = getLocalDb();
-    void db.campaigns.bulkPut(
-      rows.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        ownerId: c.ownerId,
-        pointTarget: c.pointTarget,
-        disadvantageCap: c.disadvantageCap,
-        quirkCap: c.quirkCap,
-        manaLevel: c.manaLevel,
-        shareCharacterSheets: c.shareCharacterSheets,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        revision: c.revision,
-      })),
-    );
-  }, [campaigns.data]);
+  // Mirror the fetched campaigns into Dexie — see useMirrorCampaigns.ts.
+  // The local-first detail builder (useCharacterDetail) reads caps +
+  // mana level from `db.campaigns`, so this keeps offline sessions warm.
+  useMirrorCampaigns(campaigns.data);
 
   if (character === undefined) {
     return <p className="text-muted">Loading…</p>;
@@ -1722,6 +1698,9 @@ export function CharacterSheetPage() {
             read-only
           </span>
         )}
+        <Link to={`/characters/${character.id}/play`} className="btn btn-ghost btn-xs ml-auto">
+          <span aria-hidden="true">⚔</span> Play
+        </Link>
       </nav>
 
       <IdentityHero character={character} pointTarget={pointTarget} canWrite={canWrite} />

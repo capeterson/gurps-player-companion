@@ -193,3 +193,32 @@
 .bumper.dmg {
   color: var(--hp-crit);
 }
+
+/* ---- Roll sheet backdrop (Play Mode) ------------------------ */
+/* `.modal-back` centers its content by default; Play Mode's roll
+   sheet reads better as a bottom drawer on small screens (thumb
+   reach) and a centered dialog everywhere else. Applied alongside
+   `.modal-back` — same specificity, source order after it wins. */
+.roll-sheet-back {
+  align-items: flex-end;
+  padding: 0;
+}
+@media (min-width: 768px) {
+  .roll-sheet-back {
+    align-items: center;
+    padding: 1.5rem;
+  }
+}
+
+/* ---- Play Mode sticky bottom bar (mobile only) --------------- */
+.play-bottom-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--color-base-100);
+  border-top: 1px solid var(--color-base-300);
+  padding: 0.625rem 0.875rem calc(0.625rem + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}

@@ -69,18 +69,25 @@ export function HomePage() {
           <p className="label-eyebrow">Recent characters</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {recent.map((c) => (
-              <Link
+              <div
                 key={c.id}
-                to={`/characters/${c.id}`}
                 className="card flex flex-col gap-1 p-card transition hover:border-border-strong"
               >
-                <p className="font-display text-lg font-semibold leading-tight truncate">
-                  {c.name}
-                </p>
-                <p className="text-xs text-muted">
-                  ST {c.st} · DX {c.dx} · IQ {c.iq} · HT {c.ht}
-                </p>
-              </Link>
+                <Link to={`/characters/${c.id}`} className="min-w-0">
+                  <p className="font-display text-lg font-semibold leading-tight truncate">
+                    {c.name}
+                  </p>
+                  <p className="text-xs text-muted">
+                    ST {c.st} · DX {c.dx} · IQ {c.iq} · HT {c.ht}
+                  </p>
+                </Link>
+                <Link
+                  to={`/characters/${c.id}/play`}
+                  className="btn btn-ghost btn-xs mt-1 self-start"
+                >
+                  <span aria-hidden="true">⚔</span> Play
+                </Link>
+              </div>
             ))}
           </div>
         </section>
