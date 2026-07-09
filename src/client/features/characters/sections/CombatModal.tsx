@@ -9,7 +9,12 @@
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { POSTURES } from '../../../../shared/constants/combat.ts';
+import { COMMON_CONDITIONS, POSTURES } from '../../../../shared/constants/combat.ts';
+import {
+  conditionLabel,
+  conditionsInclude,
+  toggleCondition,
+} from '../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
@@ -18,8 +23,6 @@ import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
 import { hpVarFor } from './hpColor.ts';
 import { useCombatPatch } from './useCombatPatch.ts';
 import { usePoolBumpers } from './usePoolBumpers.ts';
-
-const CONDITIONS = ['Stunned', 'Shock', 'Bleeding', 'Grappled', 'Reeling', 'Unconscious'] as const;
 
 interface CombatModalProps {
   character: CharacterDetail;
@@ -54,18 +57,20 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
     void patchCombat('posture', p);
   }
 
-  function toggleCondition(c: string) {
+  function toggle(id: string) {
     if (!canWrite) return;
-    const next = conditions.includes(c)
-      ? conditions.filter((x: string) => x !== c)
-      : [...conditions, c];
-    void patchCombat('conditions', next);
+    void patchCombat('conditions', toggleCondition(conditions, id));
   }
 
   const hpRatio = hpMax > 0 ? hp / hpMax : 0;
   const fpRatio = fpMax > 0 ? fp / fpMax : 0;
   const hpColor = hpVarFor(hpRatio);
   const fpColor = hpVarFor(fpRatio);
+  // Reeling starts when HP drops BELOW 1/3 of max (B419), so the
+  // highest reeling value is ceil(max/3) - 1 — same convention as PoolsCard.
+  const reelingThreshold = Math.ceil(hpMax / 3) - 1;
+  const reelingSuggested =
+    canWrite && hpMax > 0 && hp < Math.ceil(hpMax / 3) && !conditionsInclude(conditions, 'reeling');
 
   return (
     <div
@@ -121,9 +126,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               {hp > hpMax && <OverflowBadge amount={hp - hpMax} />}
             </span>
             <span className="num text-xs text-dim">
-              {/* Reeling starts when HP drops BELOW ⅓ of max (B419), so the
-                  highest reeling value is ceil(max/3) − 1. */}
-              max {hpMax} · reeling at {Math.ceil(hpMax / 3) - 1}
+              max {hpMax} · reeling at {reelingThreshold} · death checks from −{hpMax} (B419/B423)
             </span>
           </div>
           <div className="mb-3 flex items-baseline gap-1.5">
@@ -231,16 +234,24 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
             <span className="num text-[10px] text-dim">{conditions.length} active</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {CONDITIONS.map((c) => (
-              <ConditionChip
-                key={c}
-                label={c}
-                active={conditions.includes(c)}
-                onClick={() => toggleCondition(c)}
-                disabled={!canWrite}
-              />
-            ))}
+            {COMMON_CONDITIONS.map((id) => {
+              const active = conditionsInclude(conditions, id);
+              const suggest = id === 'reeling' && reelingSuggested && !active;
+              return (
+                <ConditionChip
+                  key={id}
+                  label={conditionLabel(id)}
+                  active={active}
+                  onClick={() => toggle(id)}
+                  disabled={!canWrite}
+                  className={suggest ? 'animate-pulse ring-2 ring-warning/70' : ''}
+                />
+              );
+            })}
           </div>
+          {reelingSuggested && (
+            <p className="mt-1.5 text-[11px] text-warning">Reeling suggested — B419</p>
+          )}
         </div>
       </div>
     </div>

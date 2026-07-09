@@ -5,6 +5,7 @@ import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
+import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../../hooks/useFieldFlash.ts';
 import { useToasts } from '../../../lib/toast.tsx';
@@ -15,6 +16,8 @@ import {
   enqueueFieldPatch,
   newClientId,
 } from '../../../sync/outbox.ts';
+import { RollSheet } from '../play/RollSheet.tsx';
+import type { RollRequest } from '../play/rollTypes.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
@@ -216,9 +219,10 @@ interface SpellRowProps {
   /** False when the ambient mana level forbids this character casting. */
   castable: boolean;
   onCast(spell: SpellOut, mode: 'cast' | 'maintain'): void;
+  onRoll(req: RollRequest): void;
 }
 
-function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowProps) {
+function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: SpellRowProps) {
   const toasts = useToasts();
   // A spell with no points has no skill level (spells have no default
   // in GURPS), so there is nothing to roll against — hold Cast/Maintain
@@ -327,13 +331,12 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast }: SpellRowPr
       ) : (
         <span className="num text-right">{spell.points}</span>
       )}
-      <span
-        className="num text-right font-medium"
-        aria-label={`${spell.name} level`}
+      <RollLevelChip
+        level={spell.level}
+        name={spell.name}
         title={spell.level == null ? 'No points invested — spells have no default' : undefined}
-      >
-        {spell.level ?? '—'}
-      </span>
+        onRoll={(level) => onRoll({ label: spell.name, baseTarget: level })}
+      />
       {canWrite ? (
         <input
           aria-label={`${spell.name} base cost`}
@@ -464,6 +467,9 @@ export function SpellsPanel({
   const [casting, setCasting] = useState<{ spell: SpellOut; mode: 'cast' | 'maintain' } | null>(
     null,
   );
+  // Hosted once here (not per row), same as SkillsPanel, so every
+  // roll-target tap opens the same sheet instance.
+  const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
   const characterHasMagery = hasMagery(character.traits);
   const notice = manaNotice(character.manaLevel, character.manaLevelKnown, characterHasMagery);
   // Hold casting entirely while the campaign row (and thus the real
@@ -515,6 +521,7 @@ export function SpellsPanel({
                 canWrite={canWrite}
                 castable={castable}
                 onCast={(spell, mode) => setCasting({ spell, mode })}
+                onRoll={setRollRequest}
               />
             ))}
           </ul>
@@ -527,6 +534,14 @@ export function SpellsPanel({
           spell={casting.spell}
           mode={casting.mode}
           onClose={() => setCasting(null)}
+        />
+      )}
+
+      {rollRequest && (
+        <RollSheet
+          request={rollRequest}
+          characterId={character.id}
+          onClose={() => setRollRequest(null)}
         />
       )}
     </section>

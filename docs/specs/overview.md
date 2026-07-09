@@ -73,7 +73,10 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Skills** with attribute/difficulty relative levels. A 0-point skill
   shows its **attribute default** (attr-4/-5/-6 for E/A/H per B173);
   0-point Very Hard skills have no default, so their level renders as
-  an em dash (`level` is null in the API).
+  an em dash (`level` is null in the API). A computed level is a
+  tappable roll target: it opens the same Play Mode roll sheet used
+  everywhere else on the character (dispatch only, so read-only
+  viewers can roll too); null-level rows stay plain text.
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
   Spells have no default: a 0-point (legacy) spell row has a null level,
@@ -84,7 +87,12 @@ on any sheet the viewer can edit — their own — it always shows).
   encumbrance, armor and weapon data, cost/weight rollups. Encumbered
   Move floors at 1 while the load is legal and reads 0 past the 10×BL
   carry cap (B17).
-- **Combat tracker**: HP/FP pools, posture, conditions, hit-location model.
+- **Combat tracker**: HP/FP pools, posture, hit-location model, and the
+  full 12-entry common-condition set (normalized against legacy
+  Capitalized entries so old data still lights the right chip). Shows
+  reeling and death-check thresholds (B419/B423) in one caption, and
+  pulses a "suggested" highlight on the Reeling chip — never
+  auto-applied — when HP drops below ⅓ max and it isn't set yet.
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
@@ -110,7 +118,7 @@ mid-combat:
 - **Pools** — HP/FP with the same bumper/reset controls as the Combat
   modal (one shared `usePoolBumpers` instance so a sticky mobile bottom
   bar and the in-page card never race each other), posture, and all 12
-  common condition chips (vs. the Combat modal's shorter legacy list).
+  common condition chips (the Combat modal shares this same full set).
   Surfaces reeling *and* death-check thresholds (B419/B423) in one
   caption, and pulses a "suggested" highlight on the Reeling chip when
   HP drops below ⅓ max and it isn't set yet — never auto-applied.
