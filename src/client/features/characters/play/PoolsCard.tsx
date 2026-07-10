@@ -8,17 +8,14 @@
  */
 
 import { COMMON_CONDITIONS, POSTURES } from '../../../../shared/constants/combat.ts';
-import {
-  conditionLabel,
-  conditionsInclude,
-  toggleCondition,
-} from '../../../../shared/domain/conditions.ts';
+import { conditionLabel, conditionsInclude } from '../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
 import { OverflowBadge } from '../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
 import { hpVarFor } from '../sections/hpColor.ts';
+import { useConditionsToggle } from '../sections/useConditionsToggle.ts';
 import type { PoolBumpers } from '../sections/usePoolBumpers.ts';
 
 export interface PoolsCardProps {
@@ -31,7 +28,7 @@ export interface PoolsCardProps {
 export function PoolsCard({ character, canWrite, patchCombat, bumpers }: PoolsCardProps) {
   const combat = character.combat;
   const posture = combat?.posture ?? 'standing';
-  const conditions = combat?.conditions ?? [];
+  const { conditions, toggle } = useConditionsToggle(character, canWrite, patchCombat);
   const { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp, flashHp } = bumpers;
 
   const hpColor = hpVarFor(hpMax > 0 ? hp / hpMax : 0);
@@ -42,10 +39,6 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers }: PoolsCa
   const reelingSuggested =
     canWrite && hpMax > 0 && hp < Math.ceil(hpMax / 3) && !conditionsInclude(conditions, 'reeling');
 
-  function toggle(id: string) {
-    if (!canWrite) return;
-    void patchCombat('conditions', toggleCondition(conditions, id));
-  }
   function setPosture(p: string) {
     if (!canWrite) return;
     void patchCombat('posture', p);

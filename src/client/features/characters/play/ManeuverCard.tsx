@@ -28,9 +28,14 @@ export function ManeuverCard({ character, canWrite, patchCombat }: ManeuverCardP
     (m) => stored != null && m.label.toLowerCase() === stored.trim().toLowerCase(),
   );
 
+  // serverValue is `?? ''`, not `?? null` — matches CharacterSheetPage's
+  // CombatPanel maneuverField exactly. useDraftField's default `format`
+  // is `String(v)`, which renders a literal null as the string "null";
+  // an unedited custom-maneuver input would then show and could persist
+  // that literal text.
   const maneuverField = useDraftField<string | null>({
     name: 'maneuver',
-    serverValue: stored,
+    serverValue: stored ?? '',
     parse: nullableTextParser,
     onSave: (v) => patchCombat('maneuver', v),
     flashKey: makeFlashKey('character_combat', character.id, 'maneuver'),

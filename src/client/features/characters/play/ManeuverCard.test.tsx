@@ -64,4 +64,24 @@ describe('ManeuverCard', () => {
 
     expect(screen.getByText(/NO defenses this turn/)).toBeInTheDocument();
   });
+
+  it('with no stored maneuver, the custom input shows an empty string, not the literal "null"', () => {
+    const patchCombat = vi.fn().mockResolvedValue(undefined);
+    render(
+      <Wrap>
+        <ManeuverCard character={makeCharacter(null)} canWrite={true} patchCombat={patchCombat} />
+      </Wrap>,
+    );
+
+    // Switch to the custom input (the draft-on-blur field under test).
+    fireEvent.click(screen.getByRole('button', { name: 'Custom…' }));
+    const input = screen.getByRole('textbox', { name: 'custom maneuver' }) as HTMLInputElement;
+    expect(input.value).toBe('');
+
+    // Blurring without typing anything must not persist the literal
+    // string "null" — nullableTextParser treats an empty draft as null,
+    // which is a no-op against the already-null server value.
+    fireEvent.blur(input);
+    expect(patchCombat).not.toHaveBeenCalled();
+  });
 });

@@ -10,11 +10,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { COMMON_CONDITIONS, POSTURES } from '../../../../shared/constants/combat.ts';
-import {
-  conditionLabel,
-  conditionsInclude,
-  toggleCondition,
-} from '../../../../shared/domain/conditions.ts';
+import { conditionLabel, conditionsInclude } from '../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
@@ -22,6 +18,7 @@ import { OverflowBadge } from '../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
 import { hpVarFor } from './hpColor.ts';
 import { useCombatPatch } from './useCombatPatch.ts';
+import { useConditionsToggle } from './useConditionsToggle.ts';
 import { usePoolBumpers } from './usePoolBumpers.ts';
 
 interface CombatModalProps {
@@ -33,7 +30,6 @@ interface CombatModalProps {
 export function CombatModal({ character, canWrite, onClose }: CombatModalProps) {
   const combat = character.combat;
   const posture = combat?.posture ?? 'standing';
-  const conditions = combat?.conditions ?? [];
   const navigate = useNavigate();
 
   const patchCombat = useCombatPatch(character);
@@ -42,6 +38,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
     canWrite,
     patchCombat,
   );
+  const { conditions, toggle } = useConditionsToggle(character, canWrite, patchCombat);
 
   // Close on Escape — mirrors any standard modal behaviour.
   useEffect(() => {
@@ -55,11 +52,6 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
   function setPosture(p: (typeof POSTURES)[number]) {
     if (!canWrite) return;
     void patchCombat('posture', p);
-  }
-
-  function toggle(id: string) {
-    if (!canWrite) return;
-    void patchCombat('conditions', toggleCondition(conditions, id));
   }
 
   const hpRatio = hpMax > 0 ? hp / hpMax : 0;

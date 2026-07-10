@@ -122,6 +122,11 @@ mid-combat:
   Surfaces reeling *and* death-check thresholds (B419/B423) in one
   caption, and pulses a "suggested" highlight on the Reeling chip when
   HP drops below ⅓ max and it isn't set yet — never auto-applied.
+  Condition chip taps compose against a latest-intended ref
+  (`useConditionsToggle`, shared by PoolsCard and the Combat modal), the
+  same pattern `usePoolBumpers` uses for HP/FP, so two rapid taps before
+  Dexie re-renders don't coalesce into a single outbox patch and drop
+  the first tap.
 - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
   chip shows its blurb; tapping it again clears to no maneuver), plus a
   "Custom…" free-text fallback using the same `useDraftField` pattern as
@@ -137,7 +142,12 @@ mid-combat:
 - **Skills / Spells** — every skill and spell with a non-null computed
   level (0-point/no-default entries are the full sheet's job), each
   rollable; spells also get a "Cast" button that reuses the sheet's
-  `CastSpellDialog` as-is.
+  `CastSpellDialog` as-is. Casting is gated by the same ambient-mana
+  rule as the sheet's SpellsPanel (`manaLevelKnown` +
+  `canCastInMana`/`hasMagery` from `shared/domain/spellCalc.ts`) — the
+  button is disabled with a compact notice when the campaign's mana
+  level hasn't synced yet or the ambient mana forbids casting here.
+  Rolling a spell row stays unrestricted (it's ephemeral, no cost).
 - **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
   stepper (−10..+10) plus single-select preset chips (picking a second
   preset replaces the first), a deliberately unobtrusive "Roll 3d6"
