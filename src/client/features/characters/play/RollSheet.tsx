@@ -43,6 +43,9 @@ interface RollResult {
   readonly margin: number;
   readonly crit: CritKind;
   readonly success: boolean;
+  /** Effective target the roll was made against, so a displayed result
+   * is self-describing even after the modifier changes underneath it. */
+  readonly target: number;
 }
 
 export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
@@ -67,6 +70,10 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   const effectiveTarget = request.baseTarget + modifier;
 
   function applyPreset(label: string, mod: number) {
+    // Changing the effective target invalidates any displayed result --
+    // it would otherwise show a margin/crit rolled against a target that
+    // no longer matches what's on screen.
+    setResult(null);
     if (activePreset === label) {
       setActivePreset(null);
       setModifier(0);
@@ -77,11 +84,13 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   }
 
   function step(delta: number) {
+    setResult(null);
     setActivePreset(null);
     setModifier((m) => clampMod(m + delta));
   }
 
   function resetModifier() {
+    setResult(null);
     setActivePreset(null);
     setModifier(0);
   }
@@ -98,6 +107,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
       margin: outcome.margin,
       crit: outcome.crit,
       success: outcome.success,
+      target: effectiveTarget,
     });
     pushRoll({
       id: newClientId(),
@@ -218,6 +228,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
               </span>
             </div>
             <p className="num text-3xl font-bold">{result.total}</p>
+            <p className="text-xs text-base-content/60">vs {result.target}</p>
             <p className={`text-sm font-medium ${result.success ? 'text-success' : 'text-error'}`}>
               {result.success ? 'Success' : 'Failure'} · margin {fmtSigned(result.margin)}
             </p>

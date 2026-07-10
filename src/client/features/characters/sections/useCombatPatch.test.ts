@@ -6,6 +6,10 @@
  *      the outbox with the raw field value (AGENTS.md rule S2),
  *   2. an existing row is NOT re-materialized / clobbered by later
  *      patches on other fields.
+ *   3. two interleaved first-edits (no local row yet) on different
+ *      fields, fired concurrently, both land -- the ensure-row step is
+ *      atomic so neither `put`/`add` can overwrite the other's patched
+ *      field back to a default.
  */
 
 import { renderHook } from '@testing-library/react';
@@ -81,5 +85,34 @@ describe('useCombatPatch', () => {
     expect(ops.length).toBe(2);
     const fields = ops.map((o) => o.fieldPath).sort();
     expect(fields).toEqual(['currentFp', 'currentHp']);
+  });
+
+  it('does not lose an edit when two first-edits on a missing row race', async () => {
+    const character = makeCharacter(10, 12);
+    const { result } = renderHook(() => useCombatPatch(character));
+
+    // Neither call awaits before the other starts: both observe the
+    // combat row as absent, so both would materialize a default row if
+    // the ensure-row step weren't atomic. The second `put` clobbering
+    // the whole row back to defaults is exactly the race this test
+    // guards against.
+    await Promise.all([result.current('currentHp', 42), result.current('posture', 'kneeling')]);
+
+    const db = getLocalDb();
+    const row = await db.characterCombat.get(CHAR_ID);
+    expect(row).toBeDefined();
+    // Both concurrent edits survive.
+    expect(row?.currentHp).toBe(42);
+    expect(row?.posture).toBe('kneeling');
+    // Untouched fields keep their materialized defaults.
+    expect(row?.currentFp).toBe(12);
+    expect(row?.conditions).toEqual([]);
+    expect(row?.maneuver).toBeNull();
+    expect(row?.revision).toBe(-1);
+
+    const ops = await db.outbox.toArray();
+    expect(ops.length).toBe(2);
+    const fields = ops.map((o) => o.fieldPath).sort();
+    expect(fields).toEqual(['currentHp', 'posture']);
   });
 });

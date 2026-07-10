@@ -28,6 +28,22 @@ describe('RollSheet', () => {
     expect(screen.getByText('3')).toBeInTheDocument(); // total
     expect(screen.getByText(/margin \+9/)).toBeInTheDocument(); // 12 - 3
     expect(screen.getByText('Critical success')).toBeInTheDocument();
+    expect(screen.getByText('vs 12')).toBeInTheDocument(); // rolled-against target
+  });
+
+  it('clears the result when the modifier changes after a roll', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const request: RollRequest = { label: 'Broadsword', baseTarget: 12 };
+    render(<RollSheet request={request} characterId="char-1" onClose={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    expect(screen.getByText('vs 12')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Increase modifier'));
+
+    expect(screen.queryByText('vs 12')).not.toBeInTheDocument();
+    expect(screen.queryByText('Critical success')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll 3d6' })).toBeInTheDocument();
   });
 
   it('the modifier stepper changes the effective target display', () => {
