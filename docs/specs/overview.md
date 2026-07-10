@@ -73,7 +73,10 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Skills** with attribute/difficulty relative levels. A 0-point skill
   shows its **attribute default** (attr-4/-5/-6 for E/A/H per B173);
   0-point Very Hard skills have no default, so their level renders as
-  an em dash (`level` is null in the API).
+  an em dash (`level` is null in the API). A computed level is a
+  tappable roll target: it opens the same Play Mode roll sheet used
+  everywhere else on the character (dispatch only, so read-only
+  viewers can roll too); null-level rows stay plain text.
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
   Spells have no default: a 0-point (legacy) spell row has a null level,
@@ -84,7 +87,12 @@ on any sheet the viewer can edit — their own — it always shows).
   encumbrance, armor and weapon data, cost/weight rollups. Encumbered
   Move floors at 1 while the load is legal and reads 0 past the 10×BL
   carry cap (B17).
-- **Combat tracker**: HP/FP pools, posture, conditions, hit-location model.
+- **Combat tracker**: HP/FP pools, posture, hit-location model, and the
+  full 12-entry common-condition set (normalized against legacy
+  Capitalized entries so old data still lights the right chip). Shows
+  reeling and death-check thresholds (B419/B423) in one caption, and
+  pulses a "suggested" highlight on the Reeling chip — never
+  auto-applied — when HP drops below ⅓ max and it isn't set yet.
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
@@ -94,6 +102,64 @@ on any sheet the viewer can edit — their own — it always shows).
 Every editable input on the sheet is **draft-on-blur** and never silently
 loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
 interaction rules.
+
+### Play Mode (live-gameplay surface)
+Route `/characters/:id/play`
+(`src/client/features/characters/play/PlayModePage.tsx`). Reached from a
+"⚔ Play" link on the sheet header, an "Open Play Mode" link in the Combat
+modal, or a per-card "Play" action on HomePage's recent-characters list.
+Redirects back to the sheet route for the share-gated minimal view (Play
+Mode has nothing to show there).
+
+A condensed, table-friendly layout for the middle of a session — no
+editable identity/traits/inventory fields, just what a player touches
+mid-combat:
+
+- **Pools** — HP/FP with the same bumper/reset controls as the Combat
+  modal (one shared `usePoolBumpers` instance so a sticky mobile bottom
+  bar and the in-page card never race each other), posture, and all 12
+  common condition chips (the Combat modal shares this same full set).
+  Surfaces reeling *and* death-check thresholds (B419/B423) in one
+  caption, and pulses a "suggested" highlight on the Reeling chip when
+  HP drops below ⅓ max and it isn't set yet — never auto-applied.
+  Condition chip taps compose against a latest-intended ref
+  (`useConditionsToggle`, shared by PoolsCard and the Combat modal), the
+  same pattern `usePoolBumpers` uses for HP/FP, so two rapid taps before
+  Dexie re-renders don't coalesce into a single outbox patch and drop
+  the first tap.
+- **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
+  chip shows its blurb; tapping it again clears to no maneuver), plus a
+  "Custom…" free-text fallback using the same `useDraftField` pattern as
+  the sheet's Combat panel.
+- **Defenses** — Dodge (with the encumbrance-penalty breakdown), Parry
+  per equipped weapon with a parry string (computed from the matched
+  skill when one is found, else the raw library string), and Block when
+  a Shield skill is known. Every numeric defense opens the roll sheet.
+- **Attacks** — one row per equipped weapon: resolved damage dice (ST
+  thrust/swing + the weapon's modifiers), reach, an over-ST warning
+  badge, and the best-matching skill as a rollable row with hit-location
+  preset chips (aim penalties, B398-399).
+- **Skills / Spells** — every skill and spell with a non-null computed
+  level (0-point/no-default entries are the full sheet's job), each
+  rollable; spells also get a "Cast" button that reuses the sheet's
+  `CastSpellDialog` as-is. Casting is gated by the same ambient-mana
+  rule as the sheet's SpellsPanel (`manaLevelKnown` +
+  `canCastInMana`/`hasMagery` from `shared/domain/spellCalc.ts`) — the
+  button is disabled with a compact notice when the campaign's mana
+  level hasn't synced yet or the ambient mana forbids casting here.
+  Rolling a spell row stays unrestricted (it's ephemeral, no cost).
+- **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
+  stepper (−10..+10) plus single-select preset chips (picking a second
+  preset replaces the first), a deliberately unobtrusive "Roll 3d6"
+  button, and a result panel (dice, total, success/margin, crit badge)
+  built on the shared `evaluateRoll`. Defense rows are routed through
+  the same success-roll evaluator as skills — GURPS defenses actually
+  use a different crit table, an accepted simplification for this pass.
+- **Roll history strip** — a collapsible, session-only log of this
+  character's rolls this visit (newest first, capped at 20 entries).
+  **Never persisted** — no Dexie table, no localStorage — so it carries
+  none of the sync/purge/history obligations a durable entity would
+  (deliberate: reloading the page clears it).
 
 ### Campaigns
 Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/library`.
@@ -154,6 +220,10 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, library, log, settings, history, home)
+      characters/play/  Play Mode — the live-gameplay surface
+                 (PlayModePage + PoolsCard/ManeuverCard/DefensesCard/
+                 AttacksCard/SkillsCard/RollableRow/RollSheet/
+                 RollHistoryStrip + the ephemeral rollHistory store)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth)
@@ -163,8 +233,13 @@ src/
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol)
     domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
-                 traitCost, modifierMath, poolBump, warnings)
-    constants/   attributes, skills, traits, combat, hitLocations, magic
+                 traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
+                 success-roll evaluation), damageParse (weapon damage-string
+                 parsing/resolution), defenseCalc (Dodge/Parry/Block +
+                 weapon-to-skill matching), conditions (snake_case condition
+                 normalization, tolerant of legacy Capitalized entries))
+    constants/   attributes, skills, traits, combat (postures, common
+                 conditions, maneuvers), hitLocations (+ aim penalties), magic
     yaml/        library.ts — round-trippable campaign-library YAML codec
     history/     summarize.ts — shared history one-liner formatter
   sw/            Service worker registration (app-shell precache + a few

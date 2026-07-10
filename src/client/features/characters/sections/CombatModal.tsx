@@ -1,35 +1,25 @@
 /**
  * Combat modal — the prototype's bottom-right FAB target.
  * Edits flow through the local Dexie outbox (same path as the in-sheet
- * CombatPanel): each bumper / chip toggle calls `enqueueFieldPatch`,
- * which the orchestrator drains to the server. Posture/conditions
- * toggles update live; HP damage triggers the `flash` keyframe and
- * the `num-tween` pop on the big HP number.
+ * CombatPanel): each bumper / chip toggle calls `enqueueFieldPatch`
+ * via useCombatPatch, which the orchestrator drains to the server.
+ * Posture/conditions toggles update live; HP damage triggers the
+ * `flash` keyframe and the `num-tween` pop on the big HP number.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { bumpPool } from '../../../../shared/domain/poolBump.ts';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { COMMON_CONDITIONS, POSTURES } from '../../../../shared/constants/combat.ts';
+import { conditionLabel, conditionsInclude } from '../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
 import { OverflowBadge } from '../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
-import { getLocalDb } from '../../../db/dexie.ts';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueFieldPatch } from '../../../sync/outbox.ts';
 import { hpVarFor } from './hpColor.ts';
-
-const POSTURES = [
-  'standing',
-  'crouching',
-  'kneeling',
-  'prone',
-  'sitting',
-  'crawling',
-  'lying',
-] as const;
-
-const CONDITIONS = ['Stunned', 'Shock', 'Bleeding', 'Grappled', 'Reeling', 'Unconscious'] as const;
+import { useCombatPatch } from './useCombatPatch.ts';
+import { useConditionsToggle } from './useConditionsToggle.ts';
+import { usePoolBumpers } from './usePoolBumpers.ts';
 
 interface CombatModalProps {
   character: CharacterDetail;
@@ -39,42 +29,16 @@ interface CombatModalProps {
 
 export function CombatModal({ character, canWrite, onClose }: CombatModalProps) {
   const combat = character.combat;
-  const hp = combat?.currentHp ?? character.derived.hp;
-  const fp = combat?.currentFp ?? character.derived.fp;
-  const hpMax = character.derived.hp;
-  const fpMax = character.derived.fp;
   const posture = combat?.posture ?? 'standing';
-  const conditions = combat?.conditions ?? [];
+  const navigate = useNavigate();
 
-  // Latest-intended values for HP/FP, updated synchronously on every
-  // bumper tap. Without these refs, two taps that fire before React
-  // commits a new `combat` prop would read the same render-time `hp`
-  // and enqueue duplicate patches, dropping the second tap. The refs
-  // resync from the prop whenever Dexie surfaces a new value.
-  const hpRef = useRef(hp);
-  const fpRef = useRef(fp);
-  useEffect(() => {
-    hpRef.current = hp;
-  }, [hp]);
-  useEffect(() => {
-    fpRef.current = fp;
-  }, [fp]);
-
-  // Soft-cap "double-press to override" state for HP and FP. The
-  // helper returns `lastBlockedAt` we feed back on the next call —
-  // a second press within 2 s allows the overflow to land. See
-  // src/shared/domain/poolBump.ts.
-  const hpBlockedAtRef = useRef<number | null>(null);
-  const fpBlockedAtRef = useRef<number | null>(null);
-
-  const [flashHp, setFlashHp] = useState(false);
-  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-    };
-  }, []);
+  const patchCombat = useCombatPatch(character);
+  const { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp, flashHp } = usePoolBumpers(
+    character,
+    canWrite,
+    patchCombat,
+  );
+  const { conditions, toggle } = useConditionsToggle(character, canWrite, patchCombat);
 
   // Close on Escape — mirrors any standard modal behaviour.
   useEffect(() => {
@@ -85,85 +49,20 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Combat is 1:1 keyed by characterId. If a local row doesn't exist
-  // yet, materialize a default in Dexie so the per-field patch has a
-  // row to update; the orchestrator's whole-body upsert handles the
-  // server side. Mirrors CharacterSheetPage's CombatPanel.patchCombat.
-  async function patchCombat(field: string, value: unknown) {
-    const db = getLocalDb();
-    const existing = await db.characterCombat.get(character.id);
-    if (!existing) {
-      await db.characterCombat.put({
-        id: character.id,
-        characterId: character.id,
-        currentHp: character.derived.hp,
-        currentFp: character.derived.fp,
-        conditions: [],
-        maneuver: null,
-        posture: 'standing',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        revision: -1,
-      });
-    }
-    await enqueueFieldPatch({
-      entityClass: 'character_combat',
-      entityId: character.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: field,
-      flashKey: makeFlashKey('character_combat', character.id, field),
-      characterId: character.id,
-    });
-  }
-
-  function bumpHp(d: number) {
-    if (!canWrite || hpMax <= 0) return;
-    // Compose against the latest-intended value (hpRef), not the
-    // render snapshot, so rapid same-frame taps each compound
-    // instead of overwriting the prior tap.  bumpPool gives us the
-    // soft-cap "double-press to override" rule for free; we still
-    // clamp the lower bound at 4×max death-check zone.
-    const result = bumpPool(hpRef.current, d, hpMax, hpBlockedAtRef.current);
-    const next = Math.max(-hpMax * 4, result.next);
-    hpBlockedAtRef.current = result.lastBlockedAt;
-    if (next === hpRef.current) return; // pure block, no patch needed
-    hpRef.current = next;
-    void patchCombat('currentHp', next);
-    if (d < 0) {
-      setFlashHp(true);
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setFlashHp(false), 500);
-    }
-  }
-
-  function bumpFp(d: number) {
-    if (!canWrite || fpMax <= 0) return;
-    const result = bumpPool(fpRef.current, d, fpMax, fpBlockedAtRef.current);
-    const next = Math.max(-fpMax, result.next);
-    fpBlockedAtRef.current = result.lastBlockedAt;
-    if (next === fpRef.current) return;
-    fpRef.current = next;
-    void patchCombat('currentFp', next);
-  }
-
   function setPosture(p: (typeof POSTURES)[number]) {
     if (!canWrite) return;
     void patchCombat('posture', p);
-  }
-
-  function toggleCondition(c: string) {
-    if (!canWrite) return;
-    const next = conditions.includes(c)
-      ? conditions.filter((x: string) => x !== c)
-      : [...conditions, c];
-    void patchCombat('conditions', next);
   }
 
   const hpRatio = hpMax > 0 ? hp / hpMax : 0;
   const fpRatio = fpMax > 0 ? fp / fpMax : 0;
   const hpColor = hpVarFor(hpRatio);
   const fpColor = hpVarFor(fpRatio);
+  // Reeling starts when HP drops BELOW 1/3 of max (B419), so the
+  // highest reeling value is ceil(max/3) - 1 — same convention as PoolsCard.
+  const reelingThreshold = Math.ceil(hpMax / 3) - 1;
+  const reelingSuggested =
+    canWrite && hpMax > 0 && hp < Math.ceil(hpMax / 3) && !conditionsInclude(conditions, 'reeling');
 
   return (
     <div
@@ -190,14 +89,26 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
             <p className="label-eyebrow">Combat</p>
             <h2 className="font-display text-2xl font-semibold">{character.name}</h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-ghost btn-sm"
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={() => {
+                onClose();
+                navigate(`/characters/${character.id}/play`);
+              }}
+            >
+              Open Play Mode
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-ghost btn-sm"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className={`card mb-3 p-4 ${flashHp ? 'flash' : ''}`}>
@@ -207,9 +118,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               {hp > hpMax && <OverflowBadge amount={hp - hpMax} />}
             </span>
             <span className="num text-xs text-dim">
-              {/* Reeling starts when HP drops BELOW ⅓ of max (B419), so the
-                  highest reeling value is ceil(max/3) − 1. */}
-              max {hpMax} · reeling at {Math.ceil(hpMax / 3) - 1}
+              max {hpMax} · reeling at {reelingThreshold} · death checks from −{hpMax} (B419/B423)
             </span>
           </div>
           <div className="mb-3 flex items-baseline gap-1.5">
@@ -241,10 +150,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
               <button
                 type="button"
                 className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                onClick={() => {
-                  hpRef.current = hpMax;
-                  void patchCombat('currentHp', hpMax);
-                }}
+                onClick={resetHp}
               >
                 Reset to {hpMax}
               </button>
@@ -289,10 +195,7 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
                 <button
                   type="button"
                   className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                  onClick={() => {
-                    fpRef.current = fpMax;
-                    void patchCombat('currentFp', fpMax);
-                  }}
+                  onClick={resetFp}
                 >
                   Reset to {fpMax}
                 </button>
@@ -323,16 +226,24 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
             <span className="num text-[10px] text-dim">{conditions.length} active</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {CONDITIONS.map((c) => (
-              <ConditionChip
-                key={c}
-                label={c}
-                active={conditions.includes(c)}
-                onClick={() => toggleCondition(c)}
-                disabled={!canWrite}
-              />
-            ))}
+            {COMMON_CONDITIONS.map((id) => {
+              const active = conditionsInclude(conditions, id);
+              const suggest = id === 'reeling' && reelingSuggested && !active;
+              return (
+                <ConditionChip
+                  key={id}
+                  label={conditionLabel(id)}
+                  active={active}
+                  onClick={() => toggle(id)}
+                  disabled={!canWrite}
+                  className={suggest ? 'animate-pulse ring-2 ring-warning/70' : ''}
+                />
+              );
+            })}
           </div>
+          {reelingSuggested && (
+            <p className="mt-1.5 text-[11px] text-warning">Reeling suggested — B419</p>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ATTR_INFLUENCE,
@@ -17,11 +17,9 @@ import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
 import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
-import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
-import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch, newBatchId } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
@@ -34,7 +32,10 @@ import { SpellsPanel } from './sections/SpellsPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
+import { useCombatPatch } from './sections/useCombatPatch.ts';
+import { type CampaignSummary, useCharacterAccessLocal } from './useCharacterAccess.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
+import { useMirrorCampaigns } from './useMirrorCampaigns.ts';
 
 type SheetTab =
   | 'Combat'
@@ -1370,37 +1371,10 @@ function CombatPanel({
   const posture = combat?.posture ?? 'standing';
   const maneuver = combat?.maneuver ?? '';
 
-  // Combat is 1:1 keyed by characterId.  If a local row doesn't exist
-  // yet (first edit on this device) we materialize a default row in
-  // Dexie so the per-field patch has something to update; the
-  // orchestrator's whole-body upsert handles the server side.
-  const patchCombat = async (field: string, value: unknown) => {
-    const db = getLocalDb();
-    const existing = await db.characterCombat.get(character.id);
-    if (!existing) {
-      await db.characterCombat.put({
-        id: character.id,
-        characterId: character.id,
-        currentHp: character.derived.hp,
-        currentFp: character.derived.fp,
-        conditions: [],
-        maneuver: null,
-        posture: 'standing',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        revision: -1,
-      });
-    }
-    await enqueueFieldPatch({
-      entityClass: 'character_combat',
-      entityId: character.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: field,
-      flashKey: makeFlashKey('character_combat', character.id, field),
-      characterId: character.id,
-    });
-  };
+  // Ensure-row + outbox enqueue logic is shared with CombatModal (and
+  // future combat surfaces) via useCombatPatch — see that hook for the
+  // materialize-default-row rationale.
+  const patchCombat = useCombatPatch(character);
 
   const hpField = useDraftField<number>({
     name: 'current HP',
@@ -1612,21 +1586,6 @@ function IdentityHero({
   );
 }
 
-interface CampaignSummary {
-  id: string;
-  name: string;
-  description: string | null;
-  ownerId: string;
-  pointTarget: number | null;
-  disadvantageCap: number | null;
-  quirkCap: number | null;
-  manaLevel: 'none' | 'low' | 'normal' | 'high' | 'very_high';
-  shareCharacterSheets: boolean;
-  createdAt: string;
-  updatedAt: string;
-  revision: number;
-}
-
 export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [tab, setTab] = useState<SheetTab>('Combat');
@@ -1643,8 +1602,11 @@ export function CharacterSheetPage() {
   const character = useCharacterDetail(id);
 
   // Fetch the character's campaign (if any) so the hero can show
-  // a `Points / Target` ratio. Campaigns are cheap to read from Dexie;
-  // missing target just collapses the second card.
+  // a `Points / Target` ratio, and so the Identity panel can offer the
+  // full campaign list. This is the online refresher only — see
+  // useMirrorCampaigns.ts; the share-gate decision itself is
+  // local-first via useCharacterAccessLocal below and does not wait on
+  // this REST call.
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignSummary[]>('/campaigns'),
@@ -1653,34 +1615,18 @@ export function CharacterSheetPage() {
     enabled: !!me.data,
   });
 
-  // Mirror the fetched campaigns into Dexie: the sync cursor pulls only
-  // the character-family classes (ALL_ENTITY_CLASSES), so this fetch is
-  // the only route campaign rows have into the local store — and the
-  // local-first detail builder (useCharacterDetail) reads caps + mana
-  // level from `db.campaigns`.  Campaigns have no outbox mutations, so a
-  // plain upsert can't clobber pending local intent (rule S4), and the
-  // rows persist for offline sessions after the first online load.
-  useEffect(() => {
-    const rows = campaigns.data;
-    if (!rows || rows.length === 0) return;
-    const db = getLocalDb();
-    void db.campaigns.bulkPut(
-      rows.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        ownerId: c.ownerId,
-        pointTarget: c.pointTarget,
-        disadvantageCap: c.disadvantageCap,
-        quirkCap: c.quirkCap,
-        manaLevel: c.manaLevel,
-        shareCharacterSheets: c.shareCharacterSheets,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        revision: c.revision,
-      })),
-    );
-  }, [campaigns.data]);
+  // Mirror the fetched campaigns into Dexie — see useMirrorCampaigns.ts.
+  // The local-first detail builder (useCharacterDetail) reads caps +
+  // mana level from `db.campaigns`, so this keeps offline sessions warm.
+  useMirrorCampaigns(campaigns.data);
+
+  // Access + share-gate decision, single-sourced (AGENTS.md: never
+  // re-derive the share gate ad hoc; see useCharacterAccess.ts). Reads
+  // campaign rows from Dexie rather than this REST query so the
+  // decision is available offline / on a cold cache. Called before the
+  // loading / not-found early returns so hook order stays stable; the
+  // hook degrades gracefully while `character` is still loading.
+  const access = useCharacterAccessLocal(character, me.data?.id);
 
   if (character === undefined) {
     return <p className="text-muted">Loading…</p>;
@@ -1695,25 +1641,19 @@ export function CharacterSheetPage() {
       </div>
     );
   }
-  // Fall back to the local JWT sub when the /auth/me query hasn't resolved
-  // yet (offline, cold cache, or first render) so the sheet is editable
-  // while offline for the character's owner.
-  const myId = me.data?.id ?? readUserIdFromToken();
-  const canWrite = myId !== null && myId === character.ownerId;
 
-  const campaign = campaigns.data?.find((c) => c.id === character.campaignId);
+  // Hold the gate: a non-owner viewing a campaign character whose
+  // local Dexie campaigns table hasn't resolved yet must not
+  // momentarily see the full sheet before the minimal (share-gated)
+  // decision is known. See useCharacterAccessLocal.
+  if (access.accessPending) {
+    return <p className="text-muted">Loading…</p>;
+  }
+
+  const { canWrite, isMinimal, campaign } = access;
   const pointTarget = campaign?.pointTarget ?? null;
 
-  // Minimal-view gate: when the character belongs to a campaign that
-  // has flipped `shareCharacterSheets` off, members other than the
-  // character's owner and the campaign GM see only the "readily
-  // apparent" identity bits. Owners and GMs always see the full sheet.
-  // Mirrors the server-side gate in `shouldUseMinimalView` so the
-  // local-first path renders consistently with the API contract.
-  const isOwner = myId !== null && myId === character.ownerId;
-  const isGm = myId !== null && campaign != null && myId === campaign.ownerId;
-  const sharesSheets = campaign?.shareCharacterSheets !== false; // undefined → default true
-  if (!isOwner && !isGm && campaign != null && !sharesSheets) {
+  if (isMinimal) {
     return (
       <CharacterMinimalView
         data={{
@@ -1772,6 +1712,9 @@ export function CharacterSheetPage() {
             read-only
           </span>
         )}
+        <Link to={`/characters/${character.id}/play`} className="btn btn-ghost btn-xs ml-auto">
+          <span aria-hidden="true">⚔</span> Play
+        </Link>
       </nav>
 
       <IdentityHero character={character} pointTarget={pointTarget} canWrite={canWrite} />

@@ -3,6 +3,7 @@ import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
+import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
@@ -12,6 +13,8 @@ import {
   enqueueFieldPatch,
   newClientId,
 } from '../../../sync/outbox.ts';
+import { RollSheet } from '../play/RollSheet.tsx';
+import type { RollRequest } from '../play/rollTypes.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per', 'Other'] as const;
@@ -180,9 +183,10 @@ interface SkillRowProps {
   characterId: string;
   skill: SkillOut;
   canWrite: boolean;
+  onRoll: (req: RollRequest) => void;
 }
 
-function SkillRow({ characterId, skill, canWrite }: SkillRowProps) {
+function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   const toasts = useToasts();
 
   const patchSkill = (field: string, value: unknown) =>
@@ -255,13 +259,12 @@ function SkillRow({ characterId, skill, canWrite }: SkillRowProps) {
       ) : (
         <span className="num text-right">{skill.points}</span>
       )}
-      <span
-        className="num text-right font-medium"
-        aria-label={`${skill.name} level`}
+      <RollLevelChip
+        level={skill.level}
+        name={skill.name}
         title={skill.points <= 0 ? 'No points invested — attribute default (B173)' : undefined}
-      >
-        {skill.level ?? '—'}
-      </span>
+        onRoll={(level) => onRoll({ label: skill.name, baseTarget: level })}
+      />
       {canWrite && (
         <button
           type="button"
@@ -285,6 +288,11 @@ export function SkillsPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
+  // Hosted once here (not per row) so every roll-target tap in the
+  // table opens the SAME sheet instance instead of each row owning its
+  // own dialog state.
+  const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
+
   return (
     <section className="card space-y-3 p-5">
       <header className="flex items-baseline justify-between">
@@ -316,10 +324,24 @@ export function SkillsPanel({
           </div>
           <ul>
             {character.skills.map((s) => (
-              <SkillRow key={s.id} characterId={character.id} skill={s} canWrite={canWrite} />
+              <SkillRow
+                key={s.id}
+                characterId={character.id}
+                skill={s}
+                canWrite={canWrite}
+                onRoll={setRollRequest}
+              />
             ))}
           </ul>
         </>
+      )}
+
+      {rollRequest && (
+        <RollSheet
+          request={rollRequest}
+          characterId={character.id}
+          onClose={() => setRollRequest(null)}
+        />
       )}
     </section>
   );
