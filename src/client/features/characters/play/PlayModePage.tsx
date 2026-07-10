@@ -16,7 +16,7 @@ import { api } from '../../../lib/api.ts';
 import { hpVarFor } from '../sections/hpColor.ts';
 import { useCombatPatch } from '../sections/useCombatPatch.ts';
 import { usePoolBumpers } from '../sections/usePoolBumpers.ts';
-import { type CampaignSummary, useCharacterAccess } from '../useCharacterAccess.ts';
+import { type CampaignSummary, useCharacterAccessLocal } from '../useCharacterAccess.ts';
 import { useCharacterDetail } from '../useCharacterDetail.ts';
 import { useMirrorCampaigns } from '../useMirrorCampaigns.ts';
 import { AttacksCard } from './AttacksCard.tsx';
@@ -44,15 +44,23 @@ export function PlayModePage() {
 
   const character = useCharacterDetail(id);
 
+  // Online refresher only: keeps Dexie's `campaigns` table warm (see
+  // useMirrorCampaigns.ts). The share-gate decision itself is
+  // local-first via useCharacterAccessLocal below, so it doesn't wait
+  // on this REST call.
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignSummary[]>('/campaigns'),
     enabled: !!me.data,
   });
 
-  const access = useCharacterAccess(character, campaigns.data, me.data?.id);
-
   useMirrorCampaigns(campaigns.data);
+
+  // Local-first access + share-gate decision (AGENTS.md: never
+  // re-derive the share gate ad hoc; single-sourced in
+  // useCharacterAccess/useCharacterAccessLocal). Called before the
+  // loading / not-found early returns so hook order stays stable.
+  const access = useCharacterAccessLocal(character, me.data?.id);
 
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
 
@@ -68,6 +76,14 @@ export function PlayModePage() {
         </Link>
       </div>
     );
+  }
+
+  // Hold the gate: a non-owner viewing a campaign character whose
+  // local Dexie campaigns table hasn't resolved yet must not
+  // momentarily see the full combat/skills view before the minimal
+  // (share-gated) decision is known. See useCharacterAccessLocal.
+  if (access.accessPending) {
+    return <p className="text-muted">Loading…</p>;
   }
 
   const { canWrite, isMinimal } = access;

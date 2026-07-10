@@ -33,7 +33,7 @@ import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCombatPatch } from './sections/useCombatPatch.ts';
-import { type CampaignSummary, useCharacterAccess } from './useCharacterAccess.ts';
+import { type CampaignSummary, useCharacterAccessLocal } from './useCharacterAccess.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 import { useMirrorCampaigns } from './useMirrorCampaigns.ts';
 
@@ -1602,8 +1602,11 @@ export function CharacterSheetPage() {
   const character = useCharacterDetail(id);
 
   // Fetch the character's campaign (if any) so the hero can show
-  // a `Points / Target` ratio. Campaigns are cheap to read from Dexie;
-  // missing target just collapses the second card.
+  // a `Points / Target` ratio, and so the Identity panel can offer the
+  // full campaign list. This is the online refresher only — see
+  // useMirrorCampaigns.ts; the share-gate decision itself is
+  // local-first via useCharacterAccessLocal below and does not wait on
+  // this REST call.
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignSummary[]>('/campaigns'),
@@ -1612,16 +1615,18 @@ export function CharacterSheetPage() {
     enabled: !!me.data,
   });
 
-  // Access + share-gate decision, single-sourced (AGENTS.md: never
-  // re-derive the share gate ad hoc). Called before the loading /
-  // not-found early returns so hook order stays stable; the hook
-  // degrades gracefully while `character` is still loading.
-  const access = useCharacterAccess(character, campaigns.data, me.data?.id);
-
   // Mirror the fetched campaigns into Dexie — see useMirrorCampaigns.ts.
   // The local-first detail builder (useCharacterDetail) reads caps +
   // mana level from `db.campaigns`, so this keeps offline sessions warm.
   useMirrorCampaigns(campaigns.data);
+
+  // Access + share-gate decision, single-sourced (AGENTS.md: never
+  // re-derive the share gate ad hoc; see useCharacterAccess.ts). Reads
+  // campaign rows from Dexie rather than this REST query so the
+  // decision is available offline / on a cold cache. Called before the
+  // loading / not-found early returns so hook order stays stable; the
+  // hook degrades gracefully while `character` is still loading.
+  const access = useCharacterAccessLocal(character, me.data?.id);
 
   if (character === undefined) {
     return <p className="text-muted">Loading…</p>;
@@ -1636,6 +1641,15 @@ export function CharacterSheetPage() {
       </div>
     );
   }
+
+  // Hold the gate: a non-owner viewing a campaign character whose
+  // local Dexie campaigns table hasn't resolved yet must not
+  // momentarily see the full sheet before the minimal (share-gated)
+  // decision is known. See useCharacterAccessLocal.
+  if (access.accessPending) {
+    return <p className="text-muted">Loading…</p>;
+  }
+
   const { canWrite, isMinimal, campaign } = access;
   const pointTarget = campaign?.pointTarget ?? null;
 
