@@ -8,7 +8,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ManaLevel } from '../../shared/constants/magic.ts';
 import { computeDerived } from '../../shared/domain/characterCalc.ts';
@@ -40,19 +40,37 @@ import {
 import { campaigns as campaignsTable } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import {
-  buildCharacterDetail,
   buildCombatStateOut,
   buildInventoryItemOut,
   buildSkillOut,
   buildSpellOut,
   buildTraitOut,
   characterAttrsFromRow,
+  loadCharacterDetail,
 } from '../services/characterSummary.ts';
+import {
+  combatUpsertValues,
+  inventoryInsertValues,
+  skillInsertValues,
+  spellInsertValues,
+  traitInsertValues,
+} from '../services/entityWrites.ts';
+import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
 router.use('/characters/*', requireActiveUser);
 
-/** Ambient mana for a character's campaign; campaignless = normal. */
+/**
+ * Ambient mana for a character's campaign; campaignless = normal.
+ *
+ * This is a lighter-weight, standalone query rather than reading
+ * `manaLevel` off a `loadCharacterDetail` result: both spell handlers
+ * that call it need the mana level *before* the post-write detail
+ * refresh happens (they build the `spellOut` response from it, then
+ * separately call `loadCharacterDetail` afterward to pick up the
+ * just-created/updated spell). Reusing the detail load here would mean
+ * loading it twice anyway, so there's nothing to consolidate.
+ */
 async function manaLevelFor(campaignId: string | null): Promise<ManaLevel> {
   if (!campaignId) return 'normal';
   const [row] = await getDb()
@@ -60,55 +78,6 @@ async function manaLevelFor(campaignId: string | null): Promise<ManaLevel> {
     .from(campaignsTable)
     .where(eq(campaignsTable.id, campaignId));
   return row?.manaLevel ?? 'normal';
-}
-
-async function refreshDetail(characterId: string) {
-  const db = getDb();
-  const [c] = await db.select().from(characters).where(eq(characters.id, characterId));
-  if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, spells, inventory, combat, campaign] = await Promise.all([
-    db
-      .select()
-      .from(characterTraits)
-      .where(eq(characterTraits.characterId, characterId))
-      .orderBy(asc(characterTraits.kind), asc(characterTraits.name)),
-    db
-      .select()
-      .from(characterSkills)
-      .where(eq(characterSkills.characterId, characterId))
-      .orderBy(asc(characterSkills.name)),
-    db
-      .select()
-      .from(characterSpells)
-      .where(eq(characterSpells.characterId, characterId))
-      .orderBy(asc(characterSpells.name)),
-    db
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.characterId, characterId))
-      .orderBy(asc(inventoryItems.name)),
-    db
-      .select()
-      .from(combatStates)
-      .where(eq(combatStates.characterId, characterId))
-      .then((r) => r[0] ?? null),
-    c.campaignId
-      ? db
-          .select()
-          .from(campaignsTable)
-          .where(eq(campaignsTable.id, c.campaignId))
-          .then((r) => r[0] ?? null)
-      : Promise.resolve(null),
-  ]);
-  return buildCharacterDetail({
-    character: c,
-    traits,
-    skills,
-    spells,
-    inventory,
-    combat,
-    campaign,
-  });
 }
 
 // ===================== TRAITS =====================
@@ -146,20 +115,11 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characterTraits)
-        .values({
-          characterId: id,
-          kind: body.kind,
-          name: body.name,
-          points: body.points ?? 0,
-          level: body.level ?? null,
-          notes: body.notes ?? null,
-          modifiers: body.modifiers ?? [],
-          libraryTraitId: body.libraryTraitId ?? null,
-        })
+        .values(traitInsertValues(body, { characterId: id }))
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    return c.json({ trait: buildTraitOut(created), character: await refreshDetail(id) }, 201);
+    return c.json({ trait: buildTraitOut(created), character: await loadCharacterDetail(id) }, 201);
   },
 );
 
@@ -193,11 +153,7 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, (tx) =>
       tx
         .update(characterTraits)
@@ -206,7 +162,7 @@ router.openapi(
         .returning(),
     );
     if (!updated) throw new HTTPException(404, { message: 'trait not found' });
-    return c.json({ trait: buildTraitOut(updated), character: await refreshDetail(id) }, 200);
+    return c.json({ trait: buildTraitOut(updated), character: await loadCharacterDetail(id) }, 200);
   },
 );
 
@@ -239,7 +195,7 @@ router.openapi(
         .returning({ id: characterTraits.id }),
     );
     if (result.length === 0) throw new HTTPException(404, { message: 'trait not found' });
-    return c.json(await refreshDetail(id), 200);
+    return c.json(await loadCharacterDetail(id), 200);
   },
 );
 
@@ -278,23 +234,13 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characterSkills)
-        .values({
-          characterId: id,
-          name: body.name,
-          attribute: body.attribute,
-          difficulty: body.difficulty,
-          points: body.points ?? 1,
-          techLevel: body.techLevel ?? null,
-          specialization: body.specialization ?? null,
-          notes: body.notes ?? null,
-          librarySkillId: body.librarySkillId ?? null,
-        })
+        .values(skillInsertValues(body, { characterId: id }))
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
     return c.json(
-      { skill: buildSkillOut(created, derived), character: await refreshDetail(id) },
+      { skill: buildSkillOut(created, derived), character: await loadCharacterDetail(id) },
       201,
     );
   },
@@ -330,11 +276,7 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, (tx) =>
       tx
         .update(characterSkills)
@@ -345,7 +287,7 @@ router.openapi(
     if (!updated) throw new HTTPException(404, { message: 'skill not found' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
     return c.json(
-      { skill: buildSkillOut(updated, derived), character: await refreshDetail(id) },
+      { skill: buildSkillOut(updated, derived), character: await loadCharacterDetail(id) },
       200,
     );
   },
@@ -380,7 +322,7 @@ router.openapi(
         .returning({ id: characterSkills.id }),
     );
     if (result.length === 0) throw new HTTPException(404, { message: 'skill not found' });
-    return c.json(await refreshDetail(id), 200);
+    return c.json(await loadCharacterDetail(id), 200);
   },
 );
 
@@ -420,20 +362,7 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characterSpells)
-        .values({
-          characterId: id,
-          name: body.name,
-          college: body.college ?? null,
-          difficulty: body.difficulty ?? 'H',
-          points: body.points ?? 1,
-          baseEnergyCost: body.baseEnergyCost ?? 1,
-          maintenanceCost: body.maintenanceCost ?? null,
-          castingTime: body.castingTime ?? null,
-          duration: body.duration ?? null,
-          prerequisites: body.prerequisites ?? null,
-          notes: body.notes ?? null,
-          librarySpellId: body.librarySpellId ?? null,
-        })
+        .values(spellInsertValues(body, { characterId: id }))
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -447,7 +376,7 @@ router.openapi(
     return c.json(
       {
         spell: buildSpellOut(created, derived.effectiveIq, magery, mana),
-        character: await refreshDetail(id),
+        character: await loadCharacterDetail(id),
       },
       201,
     );
@@ -485,11 +414,7 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const db = getDb();
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, (tx) =>
       tx
         .update(characterSpells)
@@ -508,7 +433,7 @@ router.openapi(
     return c.json(
       {
         spell: buildSpellOut(updated, derived.effectiveIq, magery, mana),
-        character: await refreshDetail(id),
+        character: await loadCharacterDetail(id),
       },
       200,
     );
@@ -544,7 +469,7 @@ router.openapi(
         .returning({ id: characterSpells.id }),
     );
     if (result.length === 0) throw new HTTPException(404, { message: 'spell not found' });
-    return c.json(await refreshDetail(id), 200);
+    return c.json(await loadCharacterDetail(id), 200);
   },
 );
 
@@ -661,27 +586,7 @@ router.openapi(
       // a fresh row's id can't appear in any existing parent chain.
       const [row] = await tx
         .insert(inventoryItems)
-        .values({
-          characterId: id,
-          name: body.name,
-          quantity: body.quantity ?? 1,
-          weightLbs: String(body.weightLbs ?? 0),
-          cost: String(body.cost ?? 0),
-          notes: body.notes ?? null,
-          parentId: body.parentId ?? null,
-          externalLocation: body.externalLocation ?? null,
-          worn: body.worn ?? false,
-          equipped: body.equipped ?? false,
-          isContainer: body.isContainer ?? false,
-          hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
-          weightReductionPercent: body.weightReductionPercent ?? 0,
-          isArmor: body.isArmor ?? false,
-          armor: body.armor ?? null,
-          weaponData: body.weaponData ?? null,
-          powerstoneData: body.powerstoneData ?? null,
-          magicItemData: body.magicItemData ?? null,
-          libraryItemId: body.libraryItemId ?? null,
-        })
+        .values(inventoryInsertValues(body, { characterId: id }))
         .returning();
       return row;
     });
@@ -705,7 +610,7 @@ router.openapi(
     return c.json(
       {
         item: buildInventoryItemOut(created, weights.perItem),
-        character: await refreshDetail(id),
+        character: await loadCharacterDetail(id),
       },
       201,
     );
@@ -746,16 +651,10 @@ router.openapi(
       throw new HTTPException(400, { message: 'an item cannot be its own parent' });
     }
     const db = getDb();
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      // numeric columns expect strings (drizzle decimal).
-      if (k === 'weightLbs' || k === 'cost' || k === 'hideawayCapacityLbs') {
-        updates[k] = String(v);
-        continue;
-      }
-      updates[k] = v;
-    }
+    // numeric columns expect strings (drizzle decimal).
+    const updates = buildPatchSet(body, {
+      stringifyKeys: ['weightLbs', 'cost', 'hideawayCapacityLbs'],
+    });
     // Wrap parent-validation + cycle-check + update in one transaction
     // with a pessimistic lock on the character row.  This serializes
     // all parent changes for this character so two concurrent calls
@@ -798,7 +697,7 @@ router.openapi(
     return c.json(
       {
         item: buildInventoryItemOut(updated, weights.perItem),
-        character: await refreshDetail(id),
+        character: await loadCharacterDetail(id),
       },
       200,
     );
@@ -847,7 +746,7 @@ router.openapi(
         .delete(inventoryItems)
         .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)));
     });
-    return c.json(await refreshDetail(id), 200);
+    return c.json(await loadCharacterDetail(id), 200);
   },
 );
 
@@ -894,22 +793,11 @@ router.openapi(
     // sequence let two parallel first-time edits both observe `!existing`
     // and then collide on the unique constraint, rolling one save back.
     const derived = computeDerived(characterAttrsFromRow(access.character));
-    const setOnUpdate: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      setOnUpdate[k] = v;
-    }
+    const setOnUpdate = buildPatchSet(body);
     const [row] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(combatStates)
-        .values({
-          characterId: id,
-          currentHp: body.currentHp ?? derived.hp,
-          currentFp: body.currentFp ?? derived.fp,
-          conditions: body.conditions ?? [],
-          maneuver: body.maneuver ?? null,
-          posture: body.posture ?? 'standing',
-        })
+        .values(combatUpsertValues(body, { characterId: id, derived }))
         .onConflictDoUpdate({
           target: combatStates.characterId,
           set: setOnUpdate,
@@ -917,7 +805,10 @@ router.openapi(
         .returning(),
     );
     if (!row) throw new HTTPException(500, { message: 'combat upsert failed' });
-    return c.json({ combat: buildCombatStateOut(row), character: await refreshDetail(id) }, 200);
+    return c.json(
+      { combat: buildCombatStateOut(row), character: await loadCharacterDetail(id) },
+      200,
+    );
   },
 );
 

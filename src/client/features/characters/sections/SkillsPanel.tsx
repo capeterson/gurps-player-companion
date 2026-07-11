@@ -2,19 +2,20 @@ import { useState } from 'react';
 import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
-import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
-import {
-  enqueueCreate,
-  enqueueDelete,
-  enqueueFieldPatch,
-  newClientId,
-} from '../../../sync/outbox.ts';
+import { enqueueDelete } from '../../../sync/outbox.ts';
 import { RollSheet } from '../play/RollSheet.tsx';
 import type { RollRequest } from '../play/rollTypes.ts';
+import { useAddEntityForm } from './useAddEntityForm.ts';
+import {
+  useEntityNameField,
+  useEntityPointsField,
+  useEntityRowPatch,
+} from './useEntityRowPatch.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per', 'Other'] as const;
@@ -39,45 +40,43 @@ interface SkillSnapshot {
 }
 
 function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) {
-  const toasts = useToasts();
   const [name, setName] = useState('');
   const [attribute, setAttribute] = useState<SkillAttribute>('DX');
   const [difficulty, setDifficulty] = useState<SkillDifficulty>('A');
   const [points, setPoints] = useState('1');
-  const [creating, setCreating] = useState(false);
   const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
+  const { creating, submit: submitEntity } = useAddEntityForm({
+    entityClass: 'character_skill',
+    characterId,
+    label: 'skill',
+  });
 
   async function submit(snap: SkillSnapshot) {
-    setCreating(true);
-    try {
-      await enqueueCreate({
-        entityClass: 'character_skill',
-        entityId: newClientId(),
-        humanName: 'skill',
+    await submitEntity(
+      {
+        name: snap.name,
+        attribute: snap.attribute,
+        difficulty: snap.difficulty,
+        points: snap.points,
         characterId,
-        attemptedValue: {
-          name: snap.name,
-          attribute: snap.attribute,
-          difficulty: snap.difficulty,
-          points: snap.points,
-          characterId,
-          ...(snap.librarySkillId ? { librarySkillId: snap.librarySkillId } : {}),
-        },
-      });
-      // Per AGENTS.md (rule 1: never silently discard user edits): only
-      // clear fields whose current value still matches the snapshot we
-      // submitted.  If the user has started typing the next skill while
-      // this enqueue was in flight, leave that draft alone.
-      if (name === snap.nameRaw) setName('');
-      if (points === snap.pointsRaw) setPoints('1');
-      setPickedLibraryId(null);
-    } catch (err) {
-      toasts.push(`Couldn't add skill — ${(err as Error).message}`, { kind: 'error' });
-    } finally {
-      setCreating(false);
-    }
+        ...(snap.librarySkillId ? { librarySkillId: snap.librarySkillId } : {}),
+      },
+      () => {
+        // Per AGENTS.md (rule 1: never silently discard user edits): only
+        // clear fields whose current value still matches the snapshot we
+        // submitted.  We use functional setters so the comparison runs
+        // against the *live* state at completion time, not the
+        // closure-captured value from the render that submitted; that
+        // way a field the user has typed into during the await isn't
+        // wiped, which is exactly the quick-edit loss this guard exists
+        // to prevent.
+        setName((cur) => (cur === snap.nameRaw ? '' : cur));
+        setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
+        setPickedLibraryId(null);
+      },
+    );
   }
 
   if (!canWrite) return null;
@@ -188,38 +187,17 @@ interface SkillRowProps {
 
 function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   const toasts = useToasts();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const patchSkill = (field: string, value: unknown) =>
-    enqueueFieldPatch({
-      entityClass: 'character_skill',
-      entityId: skill.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: `${skill.name} ${field}`,
-      flashKey: makeFlashKey('character_skill', skill.id, field),
-      characterId,
-    });
+  const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, skill.name);
 
-  const nameField = useDraftField<string>({
-    name: `${skill.name} name`,
-    serverValue: skill.name,
-    parse: (s) => s.trim(),
-    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: (v) => patchSkill('name', v),
-    flashKey: makeFlashKey('character_skill', skill.id, 'name'),
-  });
-  const pointsField = useDraftField<number>({
-    name: `${skill.name} points`,
-    serverValue: skill.points,
-    parse: (s) => {
-      const n = Number(s);
-      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
-        throw new Error('non-negative integer only');
-      }
-      return n;
-    },
-    onSave: (v) => patchSkill('points', v),
-    flashKey: makeFlashKey('character_skill', skill.id, 'points'),
+  const nameField = useEntityNameField(rowPatch, skill.name);
+  const pointsField = useEntityPointsField(rowPatch, skill.name, skill.points, (s) => {
+    const n = Number(s);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+      throw new Error('non-negative integer only');
+    }
+    return n;
   });
 
   const removeSkill = async () => {
@@ -269,14 +247,23 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
         <button
           type="button"
           className="btn btn-ghost btn-xs"
-          onClick={() => {
-            if (confirm(`Delete skill "${skill.name}"?`)) void removeSkill();
-          }}
+          onClick={() => setConfirmDelete(true)}
           aria-label={`Delete skill ${skill.name}`}
         >
           ✕
         </button>
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete skill "${skill.name}"?`}
+        confirmLabel="Delete"
+        tone="error"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void removeSkill();
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </li>
   );
 }

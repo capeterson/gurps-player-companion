@@ -7,6 +7,7 @@
  * so renaming a code requires a migration.
  */
 
+import { formatSigned } from '../format/number.ts';
 import type { PointBreakdown } from './characterCalc.ts';
 import type { EncumbranceResult } from './encumbrance.ts';
 
@@ -114,7 +115,7 @@ rule('hp.mod_out_of_range', ({ attrs }) => {
     ? {
         code: 'hp.mod_out_of_range',
         severity: 'warn',
-        message: `HP modifier of ${attrs.hpMod > 0 ? '+' : ''}${attrs.hpMod} exceeds ±30% of ST (±${cap}) allowed by B16.`,
+        message: `HP modifier of ${formatSigned(attrs.hpMod)} exceeds ±30% of ST (±${cap}) allowed by B16.`,
       }
     : null;
 });
@@ -125,7 +126,7 @@ rule('fp.mod_out_of_range', ({ attrs }) => {
     ? {
         code: 'fp.mod_out_of_range',
         severity: 'warn',
-        message: `FP modifier of ${attrs.fpMod > 0 ? '+' : ''}${attrs.fpMod} exceeds ±30% of HT (±${cap}) allowed by B16.`,
+        message: `FP modifier of ${formatSigned(attrs.fpMod)} exceeds ±30% of HT (±${cap}) allowed by B16.`,
       }
     : null;
 });

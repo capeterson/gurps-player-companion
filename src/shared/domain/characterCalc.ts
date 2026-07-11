@@ -24,6 +24,7 @@ import {
   QUIRK_KINDS,
   type TraitKind,
 } from '../constants/traits.ts';
+import { TEMP_STAT_AXES, type TempEffect, type TempStatAxis } from '../schemas/character.ts';
 
 export interface CharacterAttrs {
   readonly st: number;
@@ -38,16 +39,30 @@ export interface CharacterAttrs {
   readonly speedQuarterMod: number;
   readonly moveMod: number;
 
-  readonly tempSt: number;
-  readonly tempDx: number;
-  readonly tempIq: number;
-  readonly tempHt: number;
-  readonly tempHpMod: number;
-  readonly tempWillMod: number;
-  readonly tempPerMod: number;
-  readonly tempFpMod: number;
-  readonly tempSpeedQuarterMod: number;
-  readonly tempMoveMod: number;
+  readonly tempEffects: readonly TempEffect[];
+}
+
+/**
+ * Sum every temporary effect's per-axis modifiers into one totals
+ * record. Pure, unclamped: bounds are enforced only at validation
+ * time (`tempEffectsField`'s `superRefine`), not here -- a reducer
+ * that silently clamped would hide a data problem instead of letting
+ * the write boundary reject it.  Missing axes default to 0 so callers
+ * can always index every axis unconditionally.
+ */
+export function sumTempMods(effects: readonly TempEffect[]): Record<TempStatAxis, number> {
+  const totals = Object.fromEntries(TEMP_STAT_AXES.map((axis) => [axis, 0])) as Record<
+    TempStatAxis,
+    number
+  >;
+  for (const effect of effects) {
+    for (const axis of TEMP_STAT_AXES) {
+      const v = effect.mods[axis];
+      if (v === undefined) continue;
+      totals[axis] += v;
+    }
+  }
+  return totals;
 }
 
 export interface CharacterTraitInput {
@@ -64,11 +79,11 @@ export interface DerivedStats {
   readonly effectiveDx: number;
   readonly effectiveIq: number;
   readonly effectiveHt: number;
-  /** From base ST (not effectiveSt) + hpMod + tempHpMod — temp ST doesn't add HP. */
+  /** From base ST (not effectiveSt) + hpMod + temporary HP effects. */
   readonly hp: number;
   readonly will: number;
   readonly per: number;
-  /** From base HT (not effectiveHt) + fpMod + tempFpMod — temp HT doesn't add FP. */
+  /** From base HT (not effectiveHt) + fpMod + temporary FP effects. */
   readonly fp: number;
   readonly basicSpeedQuarters: number;
   readonly basicSpeed: number;
@@ -82,26 +97,26 @@ export interface DerivedStats {
 }
 
 export function computeDerived(attrs: CharacterAttrs): DerivedStats {
-  const effectiveSt = attrs.st + attrs.tempSt;
-  const effectiveDx = attrs.dx + attrs.tempDx;
-  const effectiveIq = attrs.iq + attrs.tempIq;
-  const effectiveHt = attrs.ht + attrs.tempHt;
+  const t = sumTempMods(attrs.tempEffects);
+  const effectiveSt = attrs.st + t.st;
+  const effectiveDx = attrs.dx + t.dx;
+  const effectiveIq = attrs.iq + t.iq;
+  const effectiveHt = attrs.ht + t.ht;
 
   // HP and FP are derived from BASE ST/HT, not effective (temp-boosted)
-  // ST/HT. Canonical temporary attribute boosts (e.g. Might/Vigor
-  // spells, M37) explicitly do NOT change HP or FP maxima — only the
-  // dedicated tempHpMod/tempFpMod fields do that. Temp ST still drives
+  // ST/HT. Canonical temporary attribute boosts (e.g. Might/Vigor spells,
+  // M37) explicitly do NOT change HP or FP maxima -- only effects on the
+  // dedicated HP/FP axes do that. Temp ST still drives
   // Basic Lift, thrust/swing damage, and effectiveSt itself (exactly
   // what a Might-type boost is meant to affect).
-  const hp = attrs.st + attrs.hpMod + attrs.tempHpMod;
-  const will = effectiveIq + attrs.willMod + attrs.tempWillMod;
-  const per = effectiveIq + attrs.perMod + attrs.tempPerMod;
-  const fp = attrs.ht + attrs.fpMod + attrs.tempFpMod;
+  const hp = attrs.st + attrs.hpMod + t.hp;
+  const will = effectiveIq + attrs.willMod + t.will;
+  const per = effectiveIq + attrs.perMod + t.per;
+  const fp = attrs.ht + attrs.fpMod + t.fp;
 
-  const basicSpeedQuarters =
-    effectiveDx + effectiveHt + attrs.speedQuarterMod + attrs.tempSpeedQuarterMod;
+  const basicSpeedQuarters = effectiveDx + effectiveHt + attrs.speedQuarterMod + t.speedQuarter;
   const basicSpeed = basicSpeedQuarters / 4;
-  const basicMove = Math.floor(basicSpeed) + attrs.moveMod + attrs.tempMoveMod;
+  const basicMove = Math.floor(basicSpeed) + attrs.moveMod + t.move;
   const dodge = Math.floor(basicSpeed) + 3;
   // Basic Lift = ST²/5; round to the nearest whole number once BL
   // reaches 10 (B15).  Below 10 the fraction is kept as printed.

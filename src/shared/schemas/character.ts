@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { combatStateOut } from './combat.ts';
-import { isoTimestamp, revision, uuid } from './common.ts';
+import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 import { inventoryItemOut } from './inventory.ts';
 import { skillOut } from './skill.ts';
 import { spellOut } from './spell.ts';
@@ -9,6 +9,118 @@ import { traitOut } from './trait.ts';
 
 const attr = z.number().int().min(1).max(99);
 const mod = z.number().int().min(-50).max(50);
+
+/** The ten stat axes a temporary effect can modify. */
+export const TEMP_STAT_AXES = [
+  'st',
+  'dx',
+  'iq',
+  'ht',
+  'hp',
+  'will',
+  'per',
+  'fp',
+  'speedQuarter',
+  'move',
+] as const;
+export type TempStatAxis = (typeof TEMP_STAT_AXES)[number];
+
+/** Axis key -> display label. Shared by the effects-list rows, the add
+ * form's axis select, and the client-side cap-violation toast message. */
+export const TEMP_AXIS_LABELS: Record<TempStatAxis, string> = {
+  st: 'ST',
+  dx: 'DX',
+  iq: 'IQ',
+  ht: 'HT',
+  hp: 'HP',
+  will: 'Will',
+  per: 'Per',
+  fp: 'FP',
+  speedQuarter: 'Speed',
+  move: 'Move',
+};
+
+/**
+ * Sentinel id for the single "manual adjustment" effect: the
+ * always-present bucket the ✦ modifier popovers write to directly
+ * (as opposed to a named effect added through the effects list).
+ * Never collides with a client-generated uuid.
+ */
+export const MANUAL_TEMP_EFFECT_ID = 'manual';
+
+const tempAxisMod = z.number().int().min(-50).max(50);
+
+/**
+ * One temporary effect: a named bundle of per-axis modifiers (e.g.
+ * "Might potion" -> ST +2, HT +1). Validated by `tempEffectsField`
+ * below (characters.temp_effects jsonb column — see
+ * docs/specs/json-fields.md). Each axis is optional (an effect only
+ * lists the axes it actually touches); `mods` is `.strict()` so an
+ * unknown axis key is rejected rather than silently ignored.
+ */
+export const tempEffect = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(80).trim(),
+  mods: z
+    .object({
+      st: tempAxisMod.optional(),
+      dx: tempAxisMod.optional(),
+      iq: tempAxisMod.optional(),
+      ht: tempAxisMod.optional(),
+      hp: tempAxisMod.optional(),
+      will: tempAxisMod.optional(),
+      per: tempAxisMod.optional(),
+      fp: tempAxisMod.optional(),
+      speedQuarter: tempAxisMod.optional(),
+      move: tempAxisMod.optional(),
+    })
+    .strict(),
+});
+export type TempEffect = z.infer<typeof tempEffect>;
+
+/**
+ * The full `characters.temp_effects` jsonb column: a bounded list of
+ * `tempEffect`s. Two invariants Zod alone can't express per-element,
+ * enforced here via `superRefine`:
+ *   - effect ids are unique (the client keys list rows and the
+ *     manual-sentinel upsert by id),
+ *   - the per-axis SUM across every effect stays within [-50, 50] --
+ *     matches the bound a single scalar temp mod used to carry, so
+ *     stacking five +10 ST buffs is rejected the same way a lone +60
+ *     would have been.
+ */
+export const tempEffectsField = z
+  .array(tempEffect)
+  .max(40)
+  .superRefine((effects, ctx) => {
+    const seenIds = new Set<string>();
+    for (const effect of effects) {
+      if (seenIds.has(effect.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate temporary effect id "${effect.id}"`,
+        });
+      }
+      seenIds.add(effect.id);
+    }
+    const totals: Record<string, number> = {};
+    for (const effect of effects) {
+      for (const axis of TEMP_STAT_AXES) {
+        const v = effect.mods[axis];
+        if (v === undefined) continue;
+        totals[axis] = (totals[axis] ?? 0) + v;
+      }
+    }
+    for (const axis of TEMP_STAT_AXES) {
+      const total = totals[axis] ?? 0;
+      if (total < -50 || total > 50) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `combined ${axis} modifier ${total} out of range [-50, 50]`,
+        });
+      }
+    }
+  });
 
 export const characterAttributesShape = {
   st: attr.default(10),
@@ -23,16 +135,7 @@ export const characterAttributesShape = {
   speedQuarterMod: mod.default(0),
   moveMod: mod.default(0),
 
-  tempSt: mod.default(0),
-  tempDx: mod.default(0),
-  tempIq: mod.default(0),
-  tempHt: mod.default(0),
-  tempHpMod: mod.default(0),
-  tempWillMod: mod.default(0),
-  tempPerMod: mod.default(0),
-  tempFpMod: mod.default(0),
-  tempSpeedQuarterMod: mod.default(0),
-  tempMoveMod: mod.default(0),
+  tempEffects: tempEffectsField.default([]),
 } as const;
 
 export const characterIdentityShape = {
@@ -145,8 +248,7 @@ export const characterDetail = z.object({
   ...characterIdentityShape,
   ...characterAttributesShape,
   dismissedWarnings: z.array(z.string()),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
   revision,
   derived: derivedStatsOut,
   points: pointBreakdownOut,

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MODIFIER_CATEGORIES, MODIFIER_COST_TYPES, TRAIT_KINDS } from '../constants/traits.ts';
-import { isoTimestamp, uuid } from './common.ts';
+import { timestamps, uuid } from './common.ts';
 
 export const traitKindEnum = z.enum(TRAIT_KINDS);
 export const modifierCategoryEnum = z.enum(MODIFIER_CATEGORIES);
@@ -25,8 +25,7 @@ export const traitOut = z.object({
   notes: z.string().max(20_000).nullable(),
   modifiers: z.array(traitModifier).default([]),
   libraryTraitId: uuid.nullable(),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const traitCreate = z.object({

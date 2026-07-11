@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { formatScaled } from '../../../shared/format/number.ts';
 
 interface ModifierField {
   /** Currently committed integer value (raw units). */
@@ -37,6 +38,14 @@ interface TempBoostPopoverProps {
   perm?: ModifierField | undefined;
   /** Tooltip-style cost hint shown beside the perm mod input. */
   permCostLabel?: string | undefined;
+  /**
+   * Sum of every NAMED (non-manual) temporary effect's contribution to
+   * this axis (raw units). The Temporary section here only edits the
+   * reserved 'manual' effect -- named effects come from the effects
+   * list -- so this is shown read-only, and folded into the effective
+   * total, so "base + perm + manual + named = effective" stays legible.
+   */
+  namedTempContribution?: number | undefined;
 }
 
 interface FieldState {
@@ -54,10 +63,23 @@ export function TempBoostPopover({
   displayScale = 1,
   perm,
   permCostLabel,
+  namedTempContribution = 0,
 }: TempBoostPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
-  const fmt = (n: number) => (displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n));
+  const fmt = (n: number) => formatScaled(n, displayScale);
+  // Signed variant of `fmt` for deltas -- `formatScaled` already
+  // preserves the sign of `n` (n * displayScale), so this only needs to
+  // add the leading "+" for non-negative values. Used for
+  // `namedTempContribution`, which arrives in RAW units (see the prop
+  // doc below) and must be scaled just like every other raw value here
+  // (PR #46 review: this used to go through the unscaled `formatSigned`,
+  // so a Speed axis's "±N from effects" caption showed raw quarter-steps
+  // instead of whole Speed points).
+  const fmtSigned = (n: number) => (n >= 0 ? `+${fmt(n)}` : fmt(n));
+  // Not formatScaled: `d` here is already in display units (pre-scaled),
+  // so this only conditionally fixes precision — it must not re-multiply
+  // by displayScale like formatScaled does.
   const fmtInput = (d: number) => (displayScale !== 1 ? d.toFixed(2) : String(d));
   const step = displayScale !== 1 ? displayScale : 1;
   const stepStr = displayScale !== 1 ? displayScale.toFixed(2) : '1';
@@ -77,13 +99,14 @@ export function TempBoostPopover({
   const [tempState, setTempRaw] = useField(temp.value);
   const [permState, setPermRaw] = useField(perm?.value ?? 0);
 
-  const effective = baseValue + (perm ? permState.rawDelta : 0) + tempState.rawDelta;
+  const effective =
+    baseValue + (perm ? permState.rawDelta : 0) + tempState.rawDelta + namedTempContribution;
   const offStep = tempState.offStep || (perm ? permState.offStep : false);
   const outOfRange = (f: ModifierField | undefined, raw: number): boolean =>
     f != null && ((f.min !== undefined && raw < f.min) || (f.max !== undefined && raw > f.max));
   const tempOOR = outOfRange(temp, tempState.rawDelta);
   const permOOR = perm ? outOfRange(perm, permState.rawDelta) : false;
-  const fmtBound = (n: number) => (displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n));
+  const fmtBound = (n: number) => formatScaled(n, displayScale);
   const rangeMsg = (f: ModifierField): string =>
     `must be between ${fmtBound(f.min ?? Number.NEGATIVE_INFINITY)} and ${fmtBound(f.max ?? Number.POSITIVE_INFINITY)}`;
 
@@ -168,6 +191,11 @@ export function TempBoostPopover({
         inputMode={displayScale !== 1 ? 'decimal' : 'numeric'}
         ariaLabel={`Temporary ${label} delta`}
       />
+      {namedTempContribution !== 0 && (
+        <p className="text-[11px] text-muted mb-2">
+          {fmtSigned(namedTempContribution)} from effects
+        </p>
+      )}
       <div className="num text-[11px] text-muted mb-3">
         {fmt(baseValue)}
         {perm && (
@@ -178,7 +206,8 @@ export function TempBoostPopover({
           </>
         )}{' '}
         + ({tempState.delta >= 0 ? '+' : ''}
-        {fmtInput(tempState.delta)}) ={' '}
+        {fmtInput(tempState.delta)})
+        {namedTempContribution !== 0 && <> + ({fmtSigned(namedTempContribution)})</>} ={' '}
         <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
       {offStep && <p className="text-[11px] text-error mb-2">must be a multiple of {stepStr}</p>}

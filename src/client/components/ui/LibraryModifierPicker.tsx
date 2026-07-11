@@ -13,6 +13,7 @@
 
 import { useMemo } from 'react';
 import { computeTraitCost } from '../../../shared/domain/traitCost.ts';
+import { formatSigned } from '../../../shared/format/number.ts';
 import type { TraitModifier } from '../../../shared/schemas/trait.ts';
 
 interface Props {
@@ -52,9 +53,8 @@ export function LibraryModifierPicker({
       <ul className="grid gap-1">
         {available.map((m) => {
           const on = selectedSet.has(m.name);
-          const sign = m.costValue >= 0 ? '+' : '';
-          const cost =
-            m.costType === 'percent' ? `${sign}${m.costValue}%` : `${sign}${m.costValue} pts`;
+          const signedCost = formatSigned(m.costValue);
+          const cost = m.costType === 'percent' ? `${signedCost}%` : `${signedCost} pts`;
           return (
             <li key={m.name}>
               <button

@@ -49,6 +49,15 @@ import {
   inventoryItems,
 } from '../db/schema.ts';
 import { characterAttrsFromRow } from './characterSummary.ts';
+import {
+  characterInsertValues,
+  combatUpsertValues,
+  inventoryInsertValues,
+  skillInsertValues,
+  spellInsertValues,
+  traitInsertValues,
+} from './entityWrites.ts';
+import { buildPatchSet } from './patchSet.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
 /**
@@ -380,38 +389,7 @@ async function dispatchCharacter(
     // taken, the unique index returns conflict via isUniqueViolation.
     const [created] = await tx
       .insert(characters)
-      .values({
-        ...(op.entityId ? { id: op.entityId } : {}),
-        ownerId: ctx.userId,
-        campaignId: body.campaignId ?? null,
-        name: body.name,
-        playerName: body.playerName ?? null,
-        height: body.height ?? null,
-        weight: body.weight ?? null,
-        age: body.age ?? null,
-        appearance: body.appearance ?? null,
-        techLevel: body.techLevel ?? null,
-        st: body.st,
-        dx: body.dx,
-        iq: body.iq,
-        ht: body.ht,
-        hpMod: body.hpMod,
-        willMod: body.willMod,
-        perMod: body.perMod,
-        fpMod: body.fpMod,
-        speedQuarterMod: body.speedQuarterMod,
-        moveMod: body.moveMod,
-        tempSt: body.tempSt,
-        tempDx: body.tempDx,
-        tempIq: body.tempIq,
-        tempHt: body.tempHt,
-        tempHpMod: body.tempHpMod,
-        tempWillMod: body.tempWillMod,
-        tempPerMod: body.tempPerMod,
-        tempFpMod: body.tempFpMod,
-        tempSpeedQuarterMod: body.tempSpeedQuarterMod,
-        tempMoveMod: body.tempMoveMod,
-      })
+      .values(characterInsertValues(body, { ownerId: ctx.userId, id: op.entityId }))
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -467,17 +445,7 @@ async function dispatchTrait(
     assertWrite(access);
     const [created] = await tx
       .insert(characterTraits)
-      .values({
-        ...(op.entityId ? { id: op.entityId } : {}),
-        characterId,
-        kind: body.kind,
-        name: body.name,
-        points: body.points ?? 0,
-        level: body.level ?? null,
-        notes: body.notes ?? null,
-        modifiers: body.modifiers ?? [],
-        libraryTraitId: body.libraryTraitId ?? null,
-      })
+      .values(traitInsertValues(body, { characterId, id: op.entityId }))
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -539,18 +507,7 @@ async function dispatchSkill(
     assertWrite(access);
     const [created] = await tx
       .insert(characterSkills)
-      .values({
-        ...(op.entityId ? { id: op.entityId } : {}),
-        characterId,
-        name: body.name,
-        attribute: body.attribute,
-        difficulty: body.difficulty,
-        points: body.points ?? 1,
-        techLevel: body.techLevel ?? null,
-        specialization: body.specialization ?? null,
-        notes: body.notes ?? null,
-        librarySkillId: body.librarySkillId ?? null,
-      })
+      .values(skillInsertValues(body, { characterId, id: op.entityId }))
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -607,21 +564,7 @@ async function dispatchSpell(
     assertWrite(access);
     const [created] = await tx
       .insert(characterSpells)
-      .values({
-        ...(op.entityId ? { id: op.entityId } : {}),
-        characterId,
-        name: body.name,
-        college: body.college ?? null,
-        difficulty: body.difficulty ?? 'H',
-        points: body.points ?? 1,
-        baseEnergyCost: body.baseEnergyCost ?? 1,
-        maintenanceCost: body.maintenanceCost ?? null,
-        castingTime: body.castingTime ?? null,
-        duration: body.duration ?? null,
-        prerequisites: body.prerequisites ?? null,
-        notes: body.notes ?? null,
-        librarySpellId: body.librarySpellId ?? null,
-      })
+      .values(spellInsertValues(body, { characterId, id: op.entityId }))
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -698,28 +641,7 @@ async function dispatchInventory(
     }
     const [created] = await tx
       .insert(inventoryItems)
-      .values({
-        ...(op.entityId ? { id: op.entityId } : {}),
-        characterId,
-        name: body.name,
-        quantity: body.quantity ?? 1,
-        weightLbs: String(body.weightLbs ?? 0),
-        cost: String(body.cost ?? 0),
-        notes: body.notes ?? null,
-        parentId: body.parentId ?? null,
-        externalLocation: body.externalLocation ?? null,
-        worn: body.worn ?? false,
-        equipped: body.equipped ?? false,
-        isContainer: body.isContainer ?? false,
-        hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
-        weightReductionPercent: body.weightReductionPercent ?? 0,
-        isArmor: body.isArmor ?? false,
-        armor: body.armor ?? null,
-        weaponData: body.weaponData ?? null,
-        powerstoneData: body.powerstoneData ?? null,
-        magicItemData: body.magicItemData ?? null,
-        libraryItemId: body.libraryItemId ?? null,
-      })
+      .values(inventoryInsertValues(body, { characterId, id: op.entityId }))
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -874,11 +796,7 @@ async function dispatchCombat(
     body = combatStateUpdate.parse(op.attemptedValue) as Record<string, unknown>;
   }
 
-  const setOnUpdate: Record<string, unknown> = { updatedAt: new Date() };
-  for (const [k, v] of Object.entries(body)) {
-    if (v === undefined) continue;
-    setOnUpdate[k] = v;
-  }
+  const setOnUpdate = buildPatchSet(body);
   // Default the missing pool to the character's derived value, not the
   // literal 10.  Without this, a per-field patch on a character with
   // no combat row yet (e.g. a first-cast spending FP from CastSpellDialog)
@@ -889,14 +807,7 @@ async function dispatchCombat(
   const derived = computeDerived(characterAttrsFromRow(access.character));
   const [row] = await tx
     .insert(combatStates)
-    .values({
-      characterId,
-      currentHp: (body.currentHp as number | undefined) ?? derived.hp,
-      currentFp: (body.currentFp as number | undefined) ?? derived.fp,
-      conditions: (body.conditions as string[] | undefined) ?? [],
-      maneuver: (body.maneuver as string | null | undefined) ?? null,
-      posture: (body.posture as 'standing' | undefined) ?? 'standing',
-    })
+    .values(combatUpsertValues(body, { characterId, derived }))
     .onConflictDoUpdate({
       target: combatStates.characterId,
       set: setOnUpdate,
@@ -935,6 +846,12 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
     // Whole-body patch: validate against the partial schema and apply
     // every present field.  Used for create-style upserts (combat) and
     // for legacy clients that don't bother with per-field paths.
+    //
+    // Deliberately NOT built with `buildPatchSet`: `valueTransform` is
+    // async and per-field (e.g. the character dispatcher re-validates a
+    // patched `campaignId` against the actor's membership before it's
+    // allowed through), which `buildPatchSet`'s synchronous
+    // value-copy-or-stringify shape can't express.
     const validator = FIELD_VALIDATORS[entityClass];
     const body = validator.parse(op.attemptedValue);
     const updates: Record<string, unknown> = { updatedAt: new Date() };

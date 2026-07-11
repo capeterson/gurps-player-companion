@@ -366,10 +366,14 @@ calls appear in mutating route files. Campaign-family REST routes that start a n
 file must be added to the `MUTATING_ROUTE_FILES` list in the guard test.
 
 ### H5. batchId threading (client, if applicable)
-For user gestures that enqueue multiple ops at once (bulk moves, "revert all"),
-generate a single `newBatchId()` from `src/client/sync/outbox.ts` and pass it
-to every `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in that
-gesture so the history panel can fold them under one expandable group.
+For user gestures that enqueue multiple ops at once (e.g. bulk inventory
+moves), generate a single `newBatchId()` from `src/client/sync/outbox.ts` and
+pass it to every `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in
+that gesture so the history panel can fold them under one expandable group.
+A gesture that only ever produces a single op — e.g. the character sheet's
+"Revert all temporary buffs", which clears the whole `temp_effects` list in
+one field patch — doesn't need a `batchId`; it renders as a standalone
+one-liner.
 
 ### Design spec
 Full rationale and file index: `docs/specs/history-tracking.md`.

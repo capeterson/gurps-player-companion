@@ -29,6 +29,7 @@ import {
 // and the wire contract can't drift apart.  The catalog of jsonb
 // columns and their owning schemas lives in docs/specs/json-fields.md.
 import type { XpAward } from '../../shared/schemas/adventureLog.ts';
+import type { TempEffect } from '../../shared/schemas/character.ts';
 import type {
   ArmorData,
   MagicItemData,
@@ -358,16 +359,11 @@ export const characters = pgTable(
     speedQuarterMod: smallint('speed_quarter_mod').notNull().default(0),
     moveMod: smallint('move_mod').notNull().default(0),
 
-    tempSt: smallint('temp_st').notNull().default(0),
-    tempDx: smallint('temp_dx').notNull().default(0),
-    tempIq: smallint('temp_iq').notNull().default(0),
-    tempHt: smallint('temp_ht').notNull().default(0),
-    tempHpMod: smallint('temp_hp_mod').notNull().default(0),
-    tempWillMod: smallint('temp_will_mod').notNull().default(0),
-    tempPerMod: smallint('temp_per_mod').notNull().default(0),
-    tempFpMod: smallint('temp_fp_mod').notNull().default(0),
-    tempSpeedQuarterMod: smallint('temp_speed_quarter_mod').notNull().default(0),
-    tempMoveMod: smallint('temp_move_mod').notNull().default(0),
+    /** Named/manual temporary-buff list; each entry is a bundle of
+     * per-axis modifiers. Validated by `tempEffectsField`
+     * (src/shared/schemas/character.ts) -- see docs/specs/json-fields.md.
+     * Replaces the ten `temp_*` scalar columns (see migration 0017). */
+    tempEffects: jsonb('temp_effects').$type<TempEffect[]>().notNull().default([]),
 
     /** Warning codes the owner dismissed; validated by
      * `dismissedWarningsField` (src/shared/schemas/character.ts). */

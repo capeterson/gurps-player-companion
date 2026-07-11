@@ -86,7 +86,7 @@ Edge case: writes with no GUC set (DB seed, migrations, scripts) record `actor_u
 ### Batch grouping (foldable detail requirement)
 A "batch" = the set of mutations from one user gesture (e.g. multi-select inventory move). Implement with a client-generated `batchId`:
 - Add optional `batchId: uuid` to `operationEnvelope` in `src/shared/schemas/sync.ts` and to `OutboxEntry` in `src/client/db/dexie.ts`.
-- `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in `src/client/sync/outbox.ts` accept an optional `batchId`; a new helper `runBatch(fn)` generates one id and tags every op enqueued within the callback. Wire the concrete multi-row gestures: `revertAllTemps()` (CharacterSheetPage.tsx:760 — the canonical "Temp DX +2 / Revert all" batch), the inventory bulk toolbar / drag-move in `sections/InventoryPanel.tsx`, and any bulk add-from-library flows that enqueue multiple creates. Single edits omit `batchId` (rendered as standalone one-liners).
+- `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in `src/client/sync/outbox.ts` accept an optional `batchId`; a new helper `runBatch(fn)` generates one id and tags every op enqueued within the callback. Wire the concrete multi-row gestures: the inventory bulk toolbar / drag-move in `sections/InventoryPanel.tsx`, and any bulk add-from-library flows that enqueue multiple creates. Single edits, including the Attributes panel's "Revert all temporary buffs" (`useTempEffects.ts`'s `clearAll()`, a single whole-array `enqueueFieldPatch` on `tempEffects`), omit `batchId` and render as standalone one-liners.
 - The orchestrator already sends the full envelope; pass `batchId` through to the server, where `dispatchOperation` sets `app.batch_id`. History rows from one gesture therefore share a `batch_id` regardless of how the outbox coalesces/drains them.
 
 ---
@@ -111,7 +111,7 @@ New module `src/shared/history/summarize.ts` — pure functions, unit-testable, 
 - `summarizeEvent(event): { line: string; icon?: string; detail: FieldChange[] }` — produces the one-line summary and the structured field-level diff for the expanded view by diffing `oldRow` vs `newRow` keyed on `entityClass` + `op`.
 - Examples it must handle:
   - Attribute change: `"ST 10 → 12"`, `"IQ 12 → 13"`.
-  - **Temp boost** (columns `tempSt`, `tempDx`, …): `"Temp DX +2"` / `"Temp DX boost removed"` — special-cased label so temporary boosts read distinctly from permanent attribute edits.
+  - **Temporary effects** (`characters.temp_effects`, a JSONB list since migration 0017): `"Temporary effect added: Might (ST +2, HT +1)"`, `"Temporary effect removed: Might"`, `"Temporary effects cleared"`, `"Temporary adjustment: ST +2"` (the reserved `manual` sentinel entry the ✦ popovers write to). Pre-migration history rows still carry the old per-stat scalar columns (`tempSt`, `tempDx`, …) in their jsonb snapshot forever — `TEMP_ATTR_LABELS` keeps those readable as `"Temp DX +2"` / `"Temp DX boost cleared"`.
   - Skill/spell/trait: `"Added skill Broadsword (DX/A)"`, `"Removed spell Fireball"`, `"Acrobatics points 2 → 4"`.
   - Inventory: `"Added Torch ×2"`, `"Moved Sword into Backpack"`, `"Removed Rations"`.
   - Campaign: `"Point target 100 → 125"`, `"Disadvantage cap changed"`.

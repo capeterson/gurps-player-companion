@@ -8880,65 +8880,86 @@
                     "maximum": 50,
                     "default": 0
                   },
-                  "tempSt": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempDx": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempIq": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempHt": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempHpMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempWillMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempPerMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempFpMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempSpeedQuarterMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempMoveMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
+                  "tempEffects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "mods": {
+                          "type": "object",
+                          "properties": {
+                            "st": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "dx": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "iq": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "ht": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "hp": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "will": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "per": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "fp": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "speedQuarter": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "move": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "mods"
+                      ]
+                    },
+                    "maxItems": 40,
+                    "default": []
                   }
                 },
                 "required": [
@@ -9073,65 +9094,86 @@
                       "maximum": 50,
                       "default": 0
                     },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
+                    "tempEffects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "mods": {
+                            "type": "object",
+                            "properties": {
+                              "st": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "dx": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "iq": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "ht": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "hp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "will": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "per": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "fp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "speedQuarter": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "move": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "mods"
+                        ]
+                      },
+                      "maxItems": 40,
+                      "default": []
                     },
                     "dismissedWarnings": {
                       "type": "array",
@@ -10190,65 +10232,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -11360,65 +11423,86 @@
                     "maximum": 50,
                     "default": 0
                   },
-                  "tempSt": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempDx": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempIq": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempHt": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempHpMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempWillMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempPerMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempFpMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempSpeedQuarterMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
-                  },
-                  "tempMoveMod": {
-                    "type": "integer",
-                    "minimum": -50,
-                    "maximum": 50,
-                    "default": 0
+                  "tempEffects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "mods": {
+                          "type": "object",
+                          "properties": {
+                            "st": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "dx": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "iq": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "ht": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "hp": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "will": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "per": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "fp": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "speedQuarter": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            },
+                            "move": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 50
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "mods"
+                      ]
+                    },
+                    "maxItems": 40,
+                    "default": []
                   }
                 }
               }
@@ -11550,65 +11634,86 @@
                       "maximum": 50,
                       "default": 0
                     },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
+                    "tempEffects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "mods": {
+                            "type": "object",
+                            "properties": {
+                              "st": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "dx": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "iq": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "ht": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "hp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "will": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "per": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "fp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "speedQuarter": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "move": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "mods"
+                        ]
+                      },
+                      "maxItems": 40,
+                      "default": []
                     },
                     "dismissedWarnings": {
                       "type": "array",
@@ -12736,65 +12841,86 @@
                       "maximum": 50,
                       "default": 0
                     },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
+                    "tempEffects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "mods": {
+                            "type": "object",
+                            "properties": {
+                              "st": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "dx": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "iq": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "ht": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "hp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "will": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "per": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "fp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "speedQuarter": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "move": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "mods"
+                        ]
+                      },
+                      "maxItems": 40,
+                      "default": []
                     },
                     "dismissedWarnings": {
                       "type": "array",
@@ -14073,65 +14199,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -15421,65 +15568,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -16550,65 +16718,86 @@
                       "maximum": 50,
                       "default": 0
                     },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
+                    "tempEffects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "mods": {
+                            "type": "object",
+                            "properties": {
+                              "st": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "dx": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "iq": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "ht": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "hp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "will": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "per": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "fp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "speedQuarter": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "move": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "mods"
+                        ]
+                      },
+                      "maxItems": 40,
+                      "default": []
                     },
                     "dismissedWarnings": {
                       "type": "array",
@@ -17831,65 +18020,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -19122,65 +19332,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -20251,65 +20482,86 @@
                       "maximum": 50,
                       "default": 0
                     },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
+                    "tempEffects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "mods": {
+                            "type": "object",
+                            "properties": {
+                              "st": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "dx": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "iq": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "ht": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "hp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "will": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "per": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "fp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "speedQuarter": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "move": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "mods"
+                        ]
+                      },
+                      "maxItems": 40,
+                      "default": []
                     },
                     "dismissedWarnings": {
                       "type": "array",
@@ -21556,65 +21808,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -22873,65 +23146,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -24002,65 +24296,86 @@
                       "maximum": 50,
                       "default": 0
                     },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
+                    "tempEffects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "mods": {
+                            "type": "object",
+                            "properties": {
+                              "st": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "dx": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "iq": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "ht": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "hp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "will": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "per": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "fp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "speedQuarter": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "move": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "mods"
+                        ]
+                      },
+                      "maxItems": 40,
+                      "default": []
                     },
                     "dismissedWarnings": {
                       "type": "array",
@@ -25622,65 +25937,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -27254,65 +27590,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",
@@ -28383,65 +28740,86 @@
                       "maximum": 50,
                       "default": 0
                     },
-                    "tempSt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempDx": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempIq": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHt": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempHpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempWillMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempPerMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempFpMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempSpeedQuarterMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
-                    },
-                    "tempMoveMod": {
-                      "type": "integer",
-                      "minimum": -50,
-                      "maximum": 50,
-                      "default": 0
+                    "tempEffects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "mods": {
+                            "type": "object",
+                            "properties": {
+                              "st": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "dx": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "iq": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "ht": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "hp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "will": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "per": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "fp": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "speedQuarter": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              },
+                              "move": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 50
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "mods"
+                        ]
+                      },
+                      "maxItems": 40,
+                      "default": []
                     },
                     "dismissedWarnings": {
                       "type": "array",
@@ -29613,65 +29991,86 @@
                           "maximum": 50,
                           "default": 0
                         },
-                        "tempSt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempDx": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempIq": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHt": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempHpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempWillMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempPerMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempFpMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempSpeedQuarterMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
-                        },
-                        "tempMoveMod": {
-                          "type": "integer",
-                          "minimum": -50,
-                          "maximum": 50,
-                          "default": 0
+                        "tempEffects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "mods": {
+                                "type": "object",
+                                "properties": {
+                                  "st": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "dx": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "iq": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "ht": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "hp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "will": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "per": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "fp": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "speedQuarter": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  },
+                                  "move": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 50
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "mods"
+                            ]
+                          },
+                          "maxItems": 40,
+                          "default": []
                         },
                         "dismissedWarnings": {
                           "type": "array",

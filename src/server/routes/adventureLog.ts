@@ -23,6 +23,7 @@ import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { type DbAdventureLogEntry, adventureLogEntries, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
 router.use('/campaigns/*', requireActiveUser);
@@ -179,14 +180,7 @@ router.openapi(
     const updated = await withAudit(user.id, undefined, async (tx) => {
       const [row] = await tx
         .update(adventureLogEntries)
-        .set({
-          ...(body.sessionDate !== undefined ? { sessionDate: body.sessionDate } : {}),
-          ...(body.title !== undefined ? { title: body.title } : {}),
-          ...(body.body !== undefined ? { body: body.body } : {}),
-          ...(body.visibility !== undefined ? { visibility: body.visibility } : {}),
-          ...(body.xpAwards !== undefined ? { xpAwards: body.xpAwards } : {}),
-          updatedAt: new Date(),
-        })
+        .set(buildPatchSet(body))
         .where(eq(adventureLogEntries.id, entryId))
         .returning();
       if (!row) throw new HTTPException(500, { message: 'update failed' });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../constants/skills.ts';
-import { isoTimestamp, uuid } from './common.ts';
+import { timestamps, uuid } from './common.ts';
 
 export const skillAttributeEnum = z.enum(SKILL_ATTRIBUTES);
 export const skillDifficultyEnum = z.enum(SKILL_DIFFICULTIES);
@@ -26,8 +26,7 @@ export const skillOut = z.object({
    * attribute default (attr-4/-5/-6 per B173); null for a 0-point
    * Very Hard skill, which has no attribute default. */
   level: z.number().int().nullable(),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const skillCreate = z.object({
