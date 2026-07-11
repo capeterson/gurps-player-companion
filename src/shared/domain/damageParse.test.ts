@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { DamageDice } from '../constants/damage.ts';
 import {
   type DamageMode,
+  canTargetVitals,
   formatDamageDice,
   parseDamageSpec,
   resolveDamage,
@@ -137,5 +138,38 @@ describe('resolveDamage + formatDamageDice round trip', () => {
       raw: 'bad',
     };
     expect(resolveDamage(badMode, thrust, swing)).toBeNull();
+  });
+});
+
+describe('canTargetVitals', () => {
+  it('allows impaling variants (B399)', () => {
+    expect(canTargetVitals('imp')).toBe(true);
+    expect(canTargetVitals('Imp')).toBe(true);
+  });
+
+  it('allows all piercing variants (B399)', () => {
+    expect(canTargetVitals('pi')).toBe(true);
+    expect(canTargetVitals('pi-')).toBe(true);
+    expect(canTargetVitals('pi+')).toBe(true);
+    expect(canTargetVitals('pi++')).toBe(true);
+  });
+
+  it('is case-insensitive and tolerates surrounding whitespace', () => {
+    expect(canTargetVitals('  PI+ ')).toBe(true);
+  });
+
+  it('excludes burning damage — tight-beam cannot be inferred from free text', () => {
+    expect(canTargetVitals('burn')).toBe(false);
+  });
+
+  it('excludes cutting, crushing, toxic, and other non-imp/pi types', () => {
+    expect(canTargetVitals('cut')).toBe(false);
+    expect(canTargetVitals('cr')).toBe(false);
+    expect(canTargetVitals('tox')).toBe(false);
+    expect(canTargetVitals('special-homebrew')).toBe(false);
+  });
+
+  it('returns false for null (no parseable damage type)', () => {
+    expect(canTargetVitals(null)).toBe(false);
   });
 });

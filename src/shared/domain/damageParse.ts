@@ -136,3 +136,19 @@ export function resolveDamage(
 
   return { dice, type: mode.type, armorDivisor: mode.armorDivisor };
 }
+
+/**
+ * Can an attack of this damage type target the vitals or an eye (B399)?
+ * Per B399, only impaling (imp) and piercing (pi, pi-, pi+, pi++) attacks
+ * may target the vitals, plus tight-beam burning attacks (e.g. a laser).
+ * "Tight-beam" is not something that can be inferred from the free-text
+ * `type` string alone (nothing in weapon data distinguishes a tight-beam
+ * burn from an area burn), so — deliberately conservative — this helper
+ * treats every "burn" mode as NOT vitals-capable rather than guessing.
+ * Everything else (cut, cr, tox, homebrew types, ...) is also excluded.
+ */
+export function canTargetVitals(type: string | null): boolean {
+  if (type == null) return false;
+  const normalized = type.trim().toLowerCase();
+  return normalized.startsWith('imp') || normalized.startsWith('pi');
+}

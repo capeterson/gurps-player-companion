@@ -5,7 +5,11 @@ import {
   HIT_LOCATION_AIM_PENALTY,
   type HitLocation,
 } from '../../../../shared/constants/hitLocations.ts';
-import { parseDamageSpec, resolveDamage } from '../../../../shared/domain/damageParse.ts';
+import {
+  canTargetVitals,
+  parseDamageSpec,
+  resolveDamage,
+} from '../../../../shared/domain/damageParse.ts';
 import { matchSkillForWeapon } from '../../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { RollableRow } from './RollableRow.tsx';
@@ -31,6 +35,17 @@ function hitLocationLabel(loc: HitLocation): string {
 }
 
 const HIT_LOCATION_PRESETS: readonly RollPreset[] = HIT_LOCATIONS.map((loc) => ({
+  label: hitLocationLabel(loc),
+  mod: HIT_LOCATION_AIM_PENALTY[loc],
+}));
+
+// Vitals and eye presets, excluded per-weapon when none of the weapon's
+// damage modes can target them (B399: only imp/pi attacks, or a
+// tight-beam burn we can't infer from free text — see canTargetVitals).
+const VITALS_ONLY_LOCATIONS = new Set<HitLocation>(['vitals', 'eye']);
+const HIT_LOCATION_PRESETS_NO_VITALS: readonly RollPreset[] = HIT_LOCATIONS.filter(
+  (loc) => !VITALS_ONLY_LOCATIONS.has(loc),
+).map((loc) => ({
   label: hitLocationLabel(loc),
   mod: HIT_LOCATION_AIM_PENALTY[loc],
 }));
@@ -86,6 +101,15 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
               : (wd.damage ?? '—');
           const stWarn = wd.stRequired != null && wd.stRequired > character.derived.effectiveSt;
           const matched = matchSkillForWeapon(w.name, skillCandidates);
+          // Only offer the vitals/eye presets when at least one of the
+          // weapon's parsed damage modes can target them (B399). A
+          // weapon with no parseable modes at all (free-text homebrew
+          // damage) keeps the full preset list rather than being
+          // punished for not parsing.
+          const canHitVitals = modes.length === 0 || modes.some((m) => canTargetVitals(m.type));
+          const hitLocationPresets = canHitVitals
+            ? HIT_LOCATION_PRESETS
+            : HIT_LOCATION_PRESETS_NO_VITALS;
 
           return (
             <div key={w.id} className="space-y-1.5 rounded-lg border border-base-300/60 p-3">
@@ -105,7 +129,7 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
                 <RollableRow
                   label={matched.name}
                   baseTarget={matched.level}
-                  presets={HIT_LOCATION_PRESETS}
+                  presets={hitLocationPresets}
                   openRoll={openRoll}
                 />
               ) : (
