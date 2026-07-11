@@ -72,9 +72,11 @@ export function usePoolBumpers(
     // render snapshot, so rapid same-frame taps each compound
     // instead of overwriting the prior tap.  bumpPool gives us the
     // soft-cap "double-press to override" rule for free; we still
-    // clamp the lower bound at 4×max death-check zone.
+    // clamp the lower bound at -5×max — automatic death is certain at
+    // -5×HP (B419/B423), so the tracker has no reason to record HP
+    // below that threshold.
     const result = bumpPool(hpRef.current, d, hpMax, hpBlockedAtRef.current);
-    const next = Math.max(-hpMax * 4, result.next);
+    const next = Math.max(-hpMax * 5, result.next);
     hpBlockedAtRef.current = result.lastBlockedAt;
     if (next === hpRef.current) return; // pure block, no patch needed
     hpRef.current = next;

@@ -175,6 +175,14 @@ export function CombatModal({ character, canWrite, onClose }: CombatModalProps) 
             </div>
           </div>
           <PoolMeter current={fp} max={fpMax} tone="fp" height="md" ariaLabel="Fatigue points" />
+          <p className="num mt-2 text-[11px] text-dim">
+            at −{fpMax} further FP costs come off HP instead (B426)
+          </p>
+          {fp === -fpMax && (
+            <p className="mt-1 text-[11px] text-warning">
+              FP floor reached — further fatigue costs 1 HP per FP (B426)
+            </p>
+          )}
           {canWrite && (
             <>
               <div className="mt-2.5 flex gap-1.5">
