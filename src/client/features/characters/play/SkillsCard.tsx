@@ -49,7 +49,19 @@ export function SkillsCard({ character, canWrite, openRoll }: SkillsCardProps) {
       ) : (
         <div className="space-y-1.5">
           {skills.map((s) => (
-            <RollableRow key={s.id} label={s.name} baseTarget={s.level} openRoll={openRoll} />
+            <RollableRow
+              key={s.id}
+              label={s.name}
+              baseTarget={s.level}
+              openRoll={openRoll}
+              sublabel={
+                s.points <= 0 ? (
+                  <span className="block text-[11px] text-base-content/60">
+                    attribute default (B173) — not all skills may be attempted untrained
+                  </span>
+                ) : undefined
+              }
+            />
           ))}
         </div>
       )}
