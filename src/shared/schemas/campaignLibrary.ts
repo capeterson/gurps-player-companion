@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoTimestamp, uuid } from './common.ts';
+import { timestamps, uuid } from './common.ts';
 import { armorData, weaponData } from './inventory.ts';
 import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
 import { spellDifficulty } from './spell.ts';
@@ -19,8 +19,7 @@ export const libraryTraitOut = z.object({
   source: z.string().max(40).nullable(),
   availableModifiers: z.array(traitModifier).default([]),
   tags: tagList,
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const libraryTraitCreate = z.object({
@@ -47,8 +46,7 @@ export const librarySkillOut = z.object({
   defaultSpecialization: z.string().max(160).nullable(),
   prerequisites: z.string().max(20_000).nullable(),
   situationalModifiers: z.array(situationalModifier).default([]),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const librarySkillCreate = z.object({
@@ -87,8 +85,7 @@ export const librarySpellOut = z.object({
   prerequisites: z.string().max(2000).nullable(),
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const librarySpellCreate = z.object({
@@ -120,8 +117,7 @@ export const libraryItemOut = z.object({
   isArmor: z.boolean(),
   armor: armorData.nullable(),
   weaponData: weaponData.nullable(),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const libraryItemCreate = z.object({

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { POSTURES } from '../constants/combat.ts';
-import { isoTimestamp, uuid } from './common.ts';
+import { timestamps, uuid } from './common.ts';
 
 export const postureEnum = z.enum(POSTURES);
 
@@ -12,8 +12,7 @@ export const combatStateOut = z.object({
   conditions: z.array(z.string().min(1).max(80)),
   maneuver: z.string().max(80).nullable(),
   posture: postureEnum,
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const combatStateUpdate = z

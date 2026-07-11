@@ -9,6 +9,7 @@ import {
   applyModifierToggle,
 } from '../../../components/ui/LibraryModifierPicker.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import {
@@ -273,11 +274,9 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
   const pointsField = useDraftField<number>({
     name: `${trait.name} points`,
     serverValue: trait.points,
-    parse: (s) => {
-      const n = Number(s);
-      if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
-      return n;
-    },
+    // Unbounded (no min/max) — matches the previous inline validator,
+    // which only checked "is this an integer."
+    parse: intParser(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
     onSave: (v) => patchTrait('points', v),
     flashKey: makeFlashKey('character_trait', trait.id, 'points'),
   });

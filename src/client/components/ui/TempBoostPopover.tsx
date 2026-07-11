@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { formatScaled } from '../../../shared/format/number.ts';
 
 interface ModifierField {
   /** Currently committed integer value (raw units). */
@@ -57,7 +58,10 @@ export function TempBoostPopover({
 }: TempBoostPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
-  const fmt = (n: number) => (displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n));
+  const fmt = (n: number) => formatScaled(n, displayScale);
+  // Not formatScaled: `d` here is already in display units (pre-scaled),
+  // so this only conditionally fixes precision — it must not re-multiply
+  // by displayScale like formatScaled does.
   const fmtInput = (d: number) => (displayScale !== 1 ? d.toFixed(2) : String(d));
   const step = displayScale !== 1 ? displayScale : 1;
   const stepStr = displayScale !== 1 ? displayScale.toFixed(2) : '1';
@@ -83,7 +87,7 @@ export function TempBoostPopover({
     f != null && ((f.min !== undefined && raw < f.min) || (f.max !== undefined && raw > f.max));
   const tempOOR = outOfRange(temp, tempState.rawDelta);
   const permOOR = perm ? outOfRange(perm, permState.rawDelta) : false;
-  const fmtBound = (n: number) => (displayScale !== 1 ? (n * displayScale).toFixed(2) : String(n));
+  const fmtBound = (n: number) => formatScaled(n, displayScale);
   const rangeMsg = (f: ModifierField): string =>
     `must be between ${fmtBound(f.min ?? Number.NEGATIVE_INFINITY)} and ${fmtBound(f.max ?? Number.POSITIVE_INFINITY)}`;
 

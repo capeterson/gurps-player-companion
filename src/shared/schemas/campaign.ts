@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { email } from './auth.ts';
-import { isoTimestamp, revision, uuid } from './common.ts';
+import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 
 export const campaignName = z.string().min(1).max(120).trim();
 export const campaignDescription = z.string().max(20_000).nullable();
@@ -37,8 +37,7 @@ export const campaignOut = z.object({
    */
   shareCharacterSheets: z.boolean(),
   members: z.array(campaignMemberOut),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
   revision,
 });
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { combatStateOut } from './combat.ts';
-import { isoTimestamp, revision, uuid } from './common.ts';
+import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 import { inventoryItemOut } from './inventory.ts';
 import { skillOut } from './skill.ts';
 import { spellOut } from './spell.ts';
@@ -145,8 +145,7 @@ export const characterDetail = z.object({
   ...characterIdentityShape,
   ...characterAttributesShape,
   dismissedWarnings: z.array(z.string()),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
   revision,
   derived: derivedStatsOut,
   points: pointBreakdownOut,

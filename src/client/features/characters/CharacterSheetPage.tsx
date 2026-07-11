@@ -10,6 +10,7 @@ import {
   secondarySpent,
 } from '../../../shared/domain/attributeTooltips.ts';
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
+import { formatScaled } from '../../../shared/format/number.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { ConditionChip } from '../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
@@ -20,6 +21,12 @@ import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
+import {
+  intParser,
+  nullableIntParser,
+  nullableTextParser,
+  scaledIntParser,
+} from '../../lib/parsers.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch, newBatchId } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
@@ -80,51 +87,6 @@ interface MeResponse {
   displayName: string;
 }
 
-function intParser(min: number, max: number) {
-  return (s: string): number => {
-    const n = Number(s);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
-    if (n < min || n > max) throw new Error(`must be between ${min} and ${max}`);
-    return n;
-  };
-}
-
-/**
- * Like intParser but the underlying value is stored in raw integer units
- * while the user-facing input shows values multiplied by `scale`.
- * e.g. scale=0.25 lets the user type "1.25" while storing the integer 5.
- */
-function scaledIntParser(scale: number, min: number, max: number) {
-  return (s: string): number => {
-    const f = Number.parseFloat(s);
-    if (!Number.isFinite(f)) throw new Error('number only');
-    const quotient = f / scale;
-    const n = Math.round(quotient);
-    // Reject values that aren't exact multiples of scale (e.g. 0.13 when scale=0.25).
-    if (Math.abs(n - quotient) > 1e-9) throw new Error(`must be a multiple of ${scale.toFixed(2)}`);
-    const lo = (min * scale).toFixed(2);
-    const hi = (max * scale).toFixed(2);
-    if (n < min || n > max) throw new Error(`must be between ${lo} and ${hi}`);
-    return n;
-  };
-}
-
-function nullableTextParser(s: string): string | null {
-  const t = s.trim();
-  return t.length === 0 ? null : t;
-}
-
-function nullableIntParser(min: number, max: number) {
-  return (s: string): number | null => {
-    const t = s.trim();
-    if (t.length === 0) return null;
-    const n = Number(t);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
-    if (n < min || n > max) throw new Error(`must be between ${min} and ${max}`);
-    return n;
-  };
-}
-
 type AttrField =
   | 'st'
   | 'dx'
@@ -182,12 +144,12 @@ function AttrInput({
   const draft = useDraftField<number>({
     name: label,
     serverValue: value,
-    format: (v) => (displayScale !== 1 ? (v * displayScale).toFixed(2) : String(v)),
+    format: (v) => formatScaled(v, displayScale),
     parse: displayScale !== 1 ? scaledIntParser(displayScale, min, max) : intParser(min, max),
     ...fieldSave,
   });
   if (!canWrite) {
-    const display = displayScale !== 1 ? (value * displayScale).toFixed(2) : String(value);
+    const display = formatScaled(value, displayScale);
     if (size === 'sm') {
       return (
         <span className="num" aria-label={label}>
@@ -362,11 +324,14 @@ function StatTooltipContent({
   );
 }
 
-/** Render a signed delta with an optional display scale. */
+/**
+ * Render a signed delta with an optional display scale. Delegates
+ * magnitude formatting to the shared `formatScaled` helper, which uses
+ * an ASCII hyphen-minus for negative values (was U+2212 '−').
+ */
 function fmtSignedDelta(value: number, scale = 1): string {
-  const display = Math.abs(value) * scale;
-  const text = scale !== 1 ? display.toFixed(2) : String(display);
-  return value >= 0 ? `+${text}` : `−${text}`;
+  const text = formatScaled(Math.abs(value), scale);
+  return value >= 0 ? `+${text}` : `-${text}`;
 }
 
 /**
@@ -498,7 +463,7 @@ function SecondaryModCell({
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
-  const fmtRaw = (v: number) => (modScale ? (v * modScale).toFixed(2) : String(v));
+  const fmtRaw = (v: number) => formatScaled(v, modScale ?? 1);
   const baseRaw = derived - modValue - tempValue;
   const adjusted = modValue !== 0 || tempValue !== 0;
   const displayValue = derivedDisplay ?? String(derived);

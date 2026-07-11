@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoDate, isoTimestamp, uuid } from './common.ts';
+import { isoDate, timestamps, uuid } from './common.ts';
 
 export const visibilityEnum = z.enum(['campaign', 'private']);
 
@@ -18,8 +18,7 @@ export const adventureLogOut = z.object({
   body: z.string().default(''),
   visibility: visibilityEnum,
   xpAwards: z.array(xpAward).default([]),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const adventureLogCreate = z.object({
