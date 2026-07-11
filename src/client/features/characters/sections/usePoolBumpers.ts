@@ -66,34 +66,52 @@ export function usePoolBumpers(
     };
   }, []);
 
+  function flashHpDamage() {
+    setFlashHp(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashHp(false), 500);
+  }
+
   function bumpHp(d: number) {
     if (!canWrite || hpMax <= 0) return;
     // Compose against the latest-intended value (hpRef), not the
     // render snapshot, so rapid same-frame taps each compound
     // instead of overwriting the prior tap.  bumpPool gives us the
     // soft-cap "double-press to override" rule for free; we still
-    // clamp the lower bound at 4×max death-check zone.
+    // clamp the lower bound at -5×max — automatic death is certain at
+    // -5×HP (B419/B423), so the tracker has no reason to record HP
+    // below that threshold.
     const result = bumpPool(hpRef.current, d, hpMax, hpBlockedAtRef.current);
-    const next = Math.max(-hpMax * 4, result.next);
+    const next = Math.max(-hpMax * 5, result.next);
     hpBlockedAtRef.current = result.lastBlockedAt;
     if (next === hpRef.current) return; // pure block, no patch needed
     hpRef.current = next;
     void patchCombat('currentHp', next);
-    if (d < 0) {
-      setFlashHp(true);
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setFlashHp(false), 500);
-    }
+    if (d < 0) flashHpDamage();
   }
 
   function bumpFp(d: number) {
     if (!canWrite || fpMax <= 0) return;
     const result = bumpPool(fpRef.current, d, fpMax, fpBlockedAtRef.current);
     const next = Math.max(-fpMax, result.next);
+    const hpCost = Math.max(0, next - result.next);
     fpBlockedAtRef.current = result.lastBlockedAt;
-    if (next === fpRef.current) return;
-    fpRef.current = next;
-    void patchCombat('currentFp', next);
+    if (next !== fpRef.current) {
+      fpRef.current = next;
+      void patchCombat('currentFp', next);
+    }
+
+    // Once FP reaches -FP, further fatigue costs HP one-for-one (B426).
+    // Apply overflow from a decrement that crosses the floor as well as
+    // subsequent decrements made while already at the floor.
+    if (hpCost > 0) {
+      const nextHp = Math.max(-hpMax * 5, hpRef.current - hpCost);
+      if (nextHp !== hpRef.current) {
+        hpRef.current = nextHp;
+        void patchCombat('currentHp', nextHp);
+        flashHpDamage();
+      }
+    }
   }
 
   // Resets update the ref *first* (same as the bumpers) so a bump that

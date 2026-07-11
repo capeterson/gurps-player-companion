@@ -20,9 +20,10 @@ function makeCharacter(
   return {
     id: 'char-1',
     skills: [
-      { id: 's1', name: 'Axe/Mace', level: 12 },
-      { id: 's2', name: 'Broadsword', level: 15 },
-      { id: 's3', name: 'Unusable (VH, 0 pts)', level: null },
+      { id: 's1', name: 'Axe/Mace', level: 12, points: 2 },
+      { id: 's2', name: 'Broadsword', level: 15, points: 4 },
+      { id: 's3', name: 'Unusable (VH, 0 pts)', level: null, points: 0 },
+      { id: 's4', name: 'Streetwise', level: 9, points: 0 },
     ],
     spells: overrides.spells ?? [],
     traits: overrides.traits ?? [],
@@ -39,10 +40,23 @@ describe('SkillsCard', () => {
     render(<SkillsCard character={makeCharacter()} canWrite={true} openRoll={vi.fn()} />);
 
     const rows = screen.getAllByRole('button');
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('Broadsword');
     expect(rows[1]).toHaveTextContent('Axe/Mace');
+    expect(rows[2]).toHaveTextContent('Streetwise');
     expect(screen.queryByText(/Unusable/)).not.toBeInTheDocument();
+  });
+
+  it('marks a 0-point skill as an unlearned/attribute-default roll', () => {
+    render(<SkillsCard character={makeCharacter()} canWrite={true} openRoll={vi.fn()} />);
+
+    const row = screen.getByRole('button', { name: /Streetwise/ });
+    expect(row).toHaveTextContent(
+      'attribute default (B173) — not all skills may be attempted untrained',
+    );
+
+    const trained = screen.getByRole('button', { name: /Broadsword/ });
+    expect(trained).not.toHaveTextContent('attribute default');
   });
 
   it('tapping a skill row calls openRoll with its computed level as the target', () => {

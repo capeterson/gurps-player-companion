@@ -112,15 +112,15 @@ describe('usePoolBumpers', () => {
     expect(patchCombat).not.toHaveBeenCalled();
   });
 
-  it('clamps HP damage at the -4×max death-check floor and FP at -1×max', () => {
+  it('clamps HP damage at the -5×max automatic-death floor (B419) and FP at -1×max', () => {
     const patchCombat = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() => usePoolBumpers(makeCharacter(10, 12), true, patchCombat));
 
     act(() => {
-      // 11 × -5 = -55 raw, but the floor is -40 (=-4×10).
-      for (let i = 0; i < 11; i++) result.current.bumpHp(-5);
+      // 13 × -5 from hp=10 would reach -55 raw, but the floor is -50 (=-5×10).
+      for (let i = 0; i < 13; i++) result.current.bumpHp(-5);
     });
-    expect(patchCombat).toHaveBeenLastCalledWith('currentHp', -40);
+    expect(patchCombat).toHaveBeenLastCalledWith('currentHp', -50);
 
     patchCombat.mockClear();
     act(() => {
@@ -128,5 +128,36 @@ describe('usePoolBumpers', () => {
       for (let i = 0; i < 5; i++) result.current.bumpFp(-5);
     });
     expect(patchCombat).toHaveBeenLastCalledWith('currentFp', -12);
+  });
+
+  it('charges FP loss that crosses the FP floor to HP one-for-one', () => {
+    const patchCombat = vi.fn().mockResolvedValue(undefined);
+    const character = makeCharacter(10, 12);
+    character.combat = { currentHp: 7, currentFp: -10 } as CharacterDetail['combat'];
+    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
+
+    act(() => {
+      result.current.bumpFp(-5);
+    });
+
+    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentFp', -12);
+    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 4);
+    expect(result.current.flashHp).toBe(true);
+  });
+
+  it('charges further FP loss at the FP floor to HP without emitting a redundant FP patch', () => {
+    const patchCombat = vi.fn().mockResolvedValue(undefined);
+    const character = makeCharacter(10, 12);
+    character.combat = { currentHp: 7, currentFp: -12 } as CharacterDetail['combat'];
+    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
+
+    act(() => {
+      result.current.bumpFp(-1);
+      result.current.bumpFp(-5);
+    });
+
+    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentHp', 6);
+    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 1);
+    expect(patchCombat).toHaveBeenCalledTimes(2);
   });
 });

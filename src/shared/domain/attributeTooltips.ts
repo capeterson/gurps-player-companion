@@ -30,7 +30,7 @@ export function attrNextCost(key: PrimaryAttribute): number {
 /** What raising or lowering each primary attribute affects. */
 export const ATTR_INFLUENCE: Record<PrimaryAttribute, string[]> = {
   ST: [
-    'HP (default = ST)',
+    "HP (default = base ST; temp ST doesn't add HP)",
     'Basic Lift = ST²/5 lbs',
     'Thrust & Swing damage',
     'Many physical skills (lifting, climbing, swimming)',
@@ -47,7 +47,7 @@ export const ATTR_INFLUENCE: Record<PrimaryAttribute, string[]> = {
     'All mental skills (sciences, social, magic)',
   ],
   HT: [
-    'FP (default = HT)',
+    "FP (default = base HT; temp HT doesn't add FP)",
     'Basic Speed = (DX + HT)/4',
     'Resistance to disease, poison, knockdown, fatigue',
   ],

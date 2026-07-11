@@ -79,9 +79,11 @@ export interface DerivedStats {
   readonly effectiveDx: number;
   readonly effectiveIq: number;
   readonly effectiveHt: number;
+  /** From base ST (not effectiveSt) + hpMod + temporary HP effects. */
   readonly hp: number;
   readonly will: number;
   readonly per: number;
+  /** From base HT (not effectiveHt) + fpMod + temporary FP effects. */
   readonly fp: number;
   readonly basicSpeedQuarters: number;
   readonly basicSpeed: number;
@@ -101,10 +103,16 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
   const effectiveIq = attrs.iq + t.iq;
   const effectiveHt = attrs.ht + t.ht;
 
-  const hp = effectiveSt + attrs.hpMod + t.hp;
+  // HP and FP are derived from BASE ST/HT, not effective (temp-boosted)
+  // ST/HT. Canonical temporary attribute boosts (e.g. Might/Vigor spells,
+  // M37) explicitly do NOT change HP or FP maxima -- only effects on the
+  // dedicated HP/FP axes do that. Temp ST still drives
+  // Basic Lift, thrust/swing damage, and effectiveSt itself (exactly
+  // what a Might-type boost is meant to affect).
+  const hp = attrs.st + attrs.hpMod + t.hp;
   const will = effectiveIq + attrs.willMod + t.will;
   const per = effectiveIq + attrs.perMod + t.per;
-  const fp = effectiveHt + attrs.fpMod + t.fp;
+  const fp = attrs.ht + attrs.fpMod + t.fp;
 
   const basicSpeedQuarters = effectiveDx + effectiveHt + attrs.speedQuarterMod + t.speedQuarter;
   const basicSpeed = basicSpeedQuarters / 4;

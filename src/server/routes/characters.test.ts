@@ -446,10 +446,11 @@ describe('PATCH /api/v1/characters/{id}', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.tempEffects).toEqual(tempEffects);
-    // st 10 + 2 (Might) = 12; hp = effectiveSt(12) + hpMod(0) + 3 (manual) = 15.
+    // Might raises effective ST to 12 without changing HP; the explicit
+    // HP +3 effect raises HP from its base-ST value of 10 to 13 (M37).
     const derived = body.derived as Record<string, unknown>;
     expect(derived.effectiveSt).toBe(12);
-    expect(derived.hp).toBe(15);
+    expect(derived.hp).toBe(13);
 
     // Re-fetch to confirm it persisted, not just echoed on the PATCH response.
     const getRes = await app.request(`/api/v1/characters/${character.id}`, {

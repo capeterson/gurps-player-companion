@@ -44,17 +44,36 @@ describe('computeDerived', () => {
     expect(d.basicLift).toBe(20); // 10*10/5
   });
 
-  it('applies temporary boosts to derived stats only', () => {
+  it('temp ST/DX boost Basic Lift, effective ST, and Basic Speed, but never HP (B419/M37)', () => {
     const d = computeDerived({
       ...baseAttrs,
       tempEffects: tempEffectsOf({ st: 5, dx: 1 }),
     });
-    expect(d.hp).toBe(15);
+    // Temp ST is exactly what a Might-type boost affects: Basic Lift,
+    // thrust/swing damage, and effectiveSt. It must NOT cascade into HP.
+    expect(d.hp).toBe(10); // base ST (10), unaffected by the temporary ST effect
+    expect(d.effectiveSt).toBe(15);
     expect(d.basicLift).toBe(45); // 15*15/5
     expect(d.basicSpeedQuarters).toBe(21); // (10+1)+(10) = 21
     expect(d.basicSpeed).toBe(5.25);
     expect(d.basicMove).toBe(5);
     expect(d.dodge).toBe(8);
+  });
+
+  it('temp HT boosts Basic Speed but never FP', () => {
+    const d = computeDerived({ ...baseAttrs, tempEffects: tempEffectsOf({ ht: 4 }) });
+    expect(d.fp).toBe(10); // base HT (10), unaffected by the temporary HT effect
+    expect(d.effectiveHt).toBe(14);
+    expect(d.basicSpeedQuarters).toBe(24); // 10 + (10+4)
+  });
+
+  it('temporary effects on the dedicated HP/FP axes change HP/FP', () => {
+    const d = computeDerived({
+      ...baseAttrs,
+      tempEffects: tempEffectsOf({ hp: 3, fp: -2 }),
+    });
+    expect(d.hp).toBe(13);
+    expect(d.fp).toBe(8);
   });
 
   it('handles ST=20 / DX=12 / IQ=14 / HT=12 with various mods', () => {
@@ -125,7 +144,7 @@ describe('computeDerived', () => {
       ],
     });
     expect(d.effectiveSt).toBe(14);
-    expect(d.hp).toBe(14);
+    expect(d.hp).toBe(10);
   });
 });
 
