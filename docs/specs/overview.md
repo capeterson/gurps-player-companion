@@ -65,8 +65,15 @@ on any sheet the viewer can edit — their own — it always shows).
   (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
   disadvantage / quirk cap warnings.
-- **Temporary stat boosts.** Transient DX+2-style bumps with a "revert all"
-  gesture, tracked distinctly from permanent edits.
+- **Temporary effects.** A structured list of named, transient buffs
+  (`characters.temp_effects`, one JSONB list replacing the old per-stat
+  scalar columns) — each entry bundles per-axis modifiers (e.g. "Might
+  potion" → ST +2, HT +1). The ✦ modifier popovers on each stat still give
+  quick steppers, backed by a reserved `manual` sentinel entry in the same
+  list; named effects are added/removed individually from a compact list
+  under the Attributes panel. "Revert all temporary buffs" clears the whole
+  list in one patch. Tracked distinctly from permanent edits; never counts
+  toward point cost.
 - **Traits** (advantages/disadvantages/perks/quirks) with modifier math:
   percent modifiers sum, the net is clamped at -80% (B110), the result
   rounds against the character (B102), then flat modifiers add.

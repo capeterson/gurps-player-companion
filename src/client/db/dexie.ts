@@ -26,6 +26,7 @@
  */
 
 import Dexie, { type Table } from 'dexie';
+import type { TempEffect } from '../../shared/schemas/character.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
 
 /**
@@ -54,16 +55,10 @@ export interface LocalCharacter {
   fpMod: number;
   speedQuarterMod: number;
   moveMod: number;
-  tempSt: number;
-  tempDx: number;
-  tempIq: number;
-  tempHt: number;
-  tempHpMod: number;
-  tempWillMod: number;
-  tempPerMod: number;
-  tempFpMod: number;
-  tempSpeedQuarterMod: number;
-  tempMoveMod: number;
+  /** Optional: rows written before migration 0017 (or not yet synced
+   * since) may lack this column; readers default missing values to
+   * `[]`. Not indexed -- no store version bump needed. */
+  tempEffects?: TempEffect[];
   dismissedWarnings: string[];
   createdAt: string;
   updatedAt: string;

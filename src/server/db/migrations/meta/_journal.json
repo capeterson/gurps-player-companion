@@ -120,6 +120,13 @@
       "when": 1782000100000,
       "tag": "0016_mana_and_spell_library",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1783731540902,
+      "tag": "0017_temp_effects",
+      "breakpoints": true
     }
   ]
 }

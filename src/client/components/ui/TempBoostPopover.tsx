@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { formatScaled } from '../../../shared/format/number.ts';
+import { formatScaled, formatSigned } from '../../../shared/format/number.ts';
 
 interface ModifierField {
   /** Currently committed integer value (raw units). */
@@ -38,6 +38,14 @@ interface TempBoostPopoverProps {
   perm?: ModifierField | undefined;
   /** Tooltip-style cost hint shown beside the perm mod input. */
   permCostLabel?: string | undefined;
+  /**
+   * Sum of every NAMED (non-manual) temporary effect's contribution to
+   * this axis (raw units). The Temporary section here only edits the
+   * reserved 'manual' effect -- named effects come from the effects
+   * list -- so this is shown read-only, and folded into the effective
+   * total, so "base + perm + manual + named = effective" stays legible.
+   */
+  namedTempContribution?: number | undefined;
 }
 
 interface FieldState {
@@ -55,6 +63,7 @@ export function TempBoostPopover({
   displayScale = 1,
   perm,
   permCostLabel,
+  namedTempContribution = 0,
 }: TempBoostPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -81,7 +90,8 @@ export function TempBoostPopover({
   const [tempState, setTempRaw] = useField(temp.value);
   const [permState, setPermRaw] = useField(perm?.value ?? 0);
 
-  const effective = baseValue + (perm ? permState.rawDelta : 0) + tempState.rawDelta;
+  const effective =
+    baseValue + (perm ? permState.rawDelta : 0) + tempState.rawDelta + namedTempContribution;
   const offStep = tempState.offStep || (perm ? permState.offStep : false);
   const outOfRange = (f: ModifierField | undefined, raw: number): boolean =>
     f != null && ((f.min !== undefined && raw < f.min) || (f.max !== undefined && raw > f.max));
@@ -172,6 +182,11 @@ export function TempBoostPopover({
         inputMode={displayScale !== 1 ? 'decimal' : 'numeric'}
         ariaLabel={`Temporary ${label} delta`}
       />
+      {namedTempContribution !== 0 && (
+        <p className="text-[11px] text-muted mb-2">
+          {formatSigned(namedTempContribution)} from effects
+        </p>
+      )}
       <div className="num text-[11px] text-muted mb-3">
         {fmt(baseValue)}
         {perm && (
@@ -182,7 +197,8 @@ export function TempBoostPopover({
           </>
         )}{' '}
         + ({tempState.delta >= 0 ? '+' : ''}
-        {fmtInput(tempState.delta)}) ={' '}
+        {fmtInput(tempState.delta)})
+        {namedTempContribution !== 0 && <> + ({formatSigned(namedTempContribution)})</>} ={' '}
         <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
       {offStep && <p className="text-[11px] text-error mb-2">must be a multiple of {stepStr}</p>}

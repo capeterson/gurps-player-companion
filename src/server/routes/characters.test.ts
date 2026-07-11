@@ -318,6 +318,71 @@ describe('GET /api/v1/characters/{id} — access matrix', () => {
   });
 });
 
+describe('POST /api/v1/sync/cursor — minimal-view masking includes tempEffects', () => {
+  it("a fellow member with only minimal access gets tempEffects: [] in the cursor row, never the owner's real effects", async () => {
+    const gm = await registerUser('cursor-mask-gm');
+    const owner = await registerUser('cursor-mask-owner');
+    const viewer = await registerUser('cursor-mask-viewer');
+    const campaign = await createCampaign(gm.accessToken, { shareCharacterSheets: false });
+    await addMember(gm.accessToken, campaign.id as string, owner.email);
+    await addMember(gm.accessToken, campaign.id as string, viewer.email);
+    const character = await createCharacter(owner.accessToken, {
+      name: 'Secretly Buffed',
+      campaignId: campaign.id,
+      st: 17,
+    });
+    await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        tempEffects: [{ id: 'e1', name: 'Might', mods: { st: 4 } }],
+      }),
+    });
+
+    const res = await app.request('/api/v1/sync/cursor', {
+      method: 'POST',
+      headers: jsonHeaders(viewer.accessToken),
+      body: JSON.stringify({ cursors: [{ entityClass: 'character', sinceRevision: 0 }] }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      changes: Array<{ entityId: string; data?: Record<string, unknown> }>;
+    };
+    const change = body.changes.find((c) => c.entityId === character.id);
+    expect(change).toBeDefined();
+    expect(change?.data?.tempEffects).toEqual([]);
+    expect(change?.data?.st).toBe(10);
+  });
+
+  it('the owner still sees their own real tempEffects through the same cursor pull', async () => {
+    const gm = await registerUser('cursor-owner-gm');
+    const owner = await registerUser('cursor-owner-owner');
+    const campaign = await createCampaign(gm.accessToken, { shareCharacterSheets: false });
+    await addMember(gm.accessToken, campaign.id as string, owner.email);
+    const character = await createCharacter(owner.accessToken, {
+      name: 'Openly Buffed',
+      campaignId: campaign.id,
+    });
+    const tempEffects = [{ id: 'e1', name: 'Might', mods: { st: 4 } }];
+    await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ tempEffects }),
+    });
+
+    const res = await app.request('/api/v1/sync/cursor', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ cursors: [{ entityClass: 'character', sinceRevision: 0 }] }),
+    });
+    const body = (await res.json()) as {
+      changes: Array<{ entityId: string; data?: Record<string, unknown> }>;
+    };
+    const change = body.changes.find((c) => c.entityId === character.id);
+    expect(change?.data?.tempEffects).toEqual(tempEffects);
+  });
+});
+
 describe('PATCH /api/v1/characters/{id}', () => {
   it('owner can update attributes and identity fields', async () => {
     const { accessToken } = await registerUser('patch-owner');
@@ -364,6 +429,50 @@ describe('PATCH /api/v1/characters/{id}', () => {
       body: JSON.stringify({ campaignId: otherCampaign.id }),
     });
     expect(res.status).toBe(403);
+  });
+
+  it('round-trips tempEffects: PATCH persists the array and folds it into derived stats', async () => {
+    const { accessToken } = await registerUser('patch-temp-effects');
+    const character = await createCharacter(accessToken, { name: 'Buffed', st: 10 });
+    const tempEffects = [
+      { id: 'e1', name: 'Might', mods: { st: 2, ht: 1 } },
+      { id: 'manual', name: 'Manual adjustment', mods: { hp: 3 } },
+    ];
+    const res = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ tempEffects }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.tempEffects).toEqual(tempEffects);
+    // st 10 + 2 (Might) = 12; hp = effectiveSt(12) + hpMod(0) + 3 (manual) = 15.
+    const derived = body.derived as Record<string, unknown>;
+    expect(derived.effectiveSt).toBe(12);
+    expect(derived.hp).toBe(15);
+
+    // Re-fetch to confirm it persisted, not just echoed on the PATCH response.
+    const getRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    const getBody = (await getRes.json()) as Record<string, unknown>;
+    expect(getBody.tempEffects).toEqual(tempEffects);
+  });
+
+  it('422s on an invalid tempEffects array (per-axis sum out of [-50, 50])', async () => {
+    const { accessToken } = await registerUser('patch-temp-effects-invalid');
+    const character = await createCharacter(accessToken, { name: 'Overbuffed' });
+    const res = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        tempEffects: [
+          { id: 'e1', name: 'A', mods: { st: 30 } },
+          { id: 'e2', name: 'B', mods: { st: 30 } },
+        ],
+      }),
+    });
+    expect(res.status).toBe(422);
   });
 });
 

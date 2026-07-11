@@ -56,16 +56,7 @@ export function characterAttrsFromRow(c: DbCharacter): CharacterAttrs {
     fpMod: c.fpMod,
     speedQuarterMod: c.speedQuarterMod,
     moveMod: c.moveMod,
-    tempSt: c.tempSt,
-    tempDx: c.tempDx,
-    tempIq: c.tempIq,
-    tempHt: c.tempHt,
-    tempHpMod: c.tempHpMod,
-    tempWillMod: c.tempWillMod,
-    tempPerMod: c.tempPerMod,
-    tempFpMod: c.tempFpMod,
-    tempSpeedQuarterMod: c.tempSpeedQuarterMod,
-    tempMoveMod: c.tempMoveMod,
+    tempEffects: c.tempEffects ?? [],
   };
 }
 

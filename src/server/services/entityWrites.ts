@@ -71,16 +71,7 @@ export function characterInsertValues(
     fpMod: body.fpMod,
     speedQuarterMod: body.speedQuarterMod,
     moveMod: body.moveMod,
-    tempSt: body.tempSt,
-    tempDx: body.tempDx,
-    tempIq: body.tempIq,
-    tempHt: body.tempHt,
-    tempHpMod: body.tempHpMod,
-    tempWillMod: body.tempWillMod,
-    tempPerMod: body.tempPerMod,
-    tempFpMod: body.tempFpMod,
-    tempSpeedQuarterMod: body.tempSpeedQuarterMod,
-    tempMoveMod: body.tempMoveMod,
+    tempEffects: body.tempEffects ?? [],
   };
 }
 
