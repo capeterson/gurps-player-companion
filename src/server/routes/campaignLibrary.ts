@@ -51,6 +51,7 @@ import {
   campaignLibraryTraits,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
 router.use('/campaigns/*', requireActiveUser);
@@ -260,11 +261,7 @@ router.openapi(
     const { id, traitId } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body);
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
         .update(campaignLibraryTraits)
@@ -375,11 +372,7 @@ router.openapi(
     const { id, skillId } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body);
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
         .update(campaignLibrarySkills)
@@ -491,11 +484,7 @@ router.openapi(
     const { id, spellId } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body);
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
         .update(campaignLibrarySpells)
@@ -607,15 +596,7 @@ router.openapi(
     const { id, itemId } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      if (k === 'weightLbs' || k === 'cost') {
-        updates[k] = String(v);
-        continue;
-      }
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body, { stringifyKeys: ['weightLbs', 'cost'] });
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
         .update(campaignLibraryItems)

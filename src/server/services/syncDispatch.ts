@@ -49,6 +49,7 @@ import {
   inventoryItems,
 } from '../db/schema.ts';
 import { characterAttrsFromRow } from './characterSummary.ts';
+import { buildPatchSet } from './patchSet.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
 /**
@@ -874,11 +875,7 @@ async function dispatchCombat(
     body = combatStateUpdate.parse(op.attemptedValue) as Record<string, unknown>;
   }
 
-  const setOnUpdate: Record<string, unknown> = { updatedAt: new Date() };
-  for (const [k, v] of Object.entries(body)) {
-    if (v === undefined) continue;
-    setOnUpdate[k] = v;
-  }
+  const setOnUpdate = buildPatchSet(body);
   // Default the missing pool to the character's derived value, not the
   // literal 10.  Without this, a per-field patch on a character with
   // no combat row yet (e.g. a first-cast spending FP from CastSpellDialog)
@@ -935,6 +932,12 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
     // Whole-body patch: validate against the partial schema and apply
     // every present field.  Used for create-style upserts (combat) and
     // for legacy clients that don't bother with per-field paths.
+    //
+    // Deliberately NOT built with `buildPatchSet`: `valueTransform` is
+    // async and per-field (e.g. the character dispatcher re-validates a
+    // patched `campaignId` against the actor's membership before it's
+    // allowed through), which `buildPatchSet`'s synchronous
+    // value-copy-or-stringify shape can't express.
     const validator = FIELD_VALIDATORS[entityClass];
     const body = validator.parse(op.attemptedValue);
     const updates: Record<string, unknown> = { updatedAt: new Date() };

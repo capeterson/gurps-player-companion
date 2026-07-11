@@ -214,6 +214,10 @@ src/
     auth/        jwt, password, webauthn (passkeys), apiKey, session,
                  middleware, permissions (the authz helpers)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
+                 (incl. loadCharacterDetail, the shared character-detail
+                 loader), characterAccess (resolveCharacterView, the
+                 shared full/minimal/forbidden decision), patchSet
+                 (buildPatchSet, the shared PATCH-body-to-`.set()` helper)
     db/          schema.ts (Drizzle), migrations/ (hand-written SQL for
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)

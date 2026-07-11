@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
+import { desc, eq, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   type CharacterMinimalOut,
@@ -16,72 +16,16 @@ import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
-import {
-  campaignMemberships,
-  campaigns,
-  characterSkills,
-  characterSpells,
-  characterTraits,
-  characters,
-  combatStates,
-  inventoryItems,
-} from '../db/schema.ts';
+import { campaignMemberships, campaigns, characters } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
-import { buildCharacterDetail } from '../services/characterSummary.ts';
+import { resolveCharacterView } from '../services/characterAccess.ts';
+import { loadCharacterDetail } from '../services/characterSummary.ts';
+import { buildPatchSet } from '../services/patchSet.ts';
 import { decideCharacterAccess } from './sync.ts';
 
 const router = createOpenApiApp();
 router.use('/characters', requireActiveUser);
 router.use('/characters/*', requireActiveUser);
-
-async function loadFullCharacter(id: string) {
-  const db = getDb();
-  const [c] = await db.select().from(characters).where(eq(characters.id, id));
-  if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, spells, inventory, combat, campaign] = await Promise.all([
-    db
-      .select()
-      .from(characterTraits)
-      .where(eq(characterTraits.characterId, id))
-      .orderBy(asc(characterTraits.kind), asc(characterTraits.name)),
-    db
-      .select()
-      .from(characterSkills)
-      .where(eq(characterSkills.characterId, id))
-      .orderBy(asc(characterSkills.name)),
-    db
-      .select()
-      .from(characterSpells)
-      .where(eq(characterSpells.characterId, id))
-      .orderBy(asc(characterSpells.name)),
-    db
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.characterId, id))
-      .orderBy(asc(inventoryItems.name)),
-    db
-      .select()
-      .from(combatStates)
-      .where(eq(combatStates.characterId, id))
-      .then((r) => r[0] ?? null),
-    c.campaignId
-      ? db
-          .select()
-          .from(campaigns)
-          .where(eq(campaigns.id, c.campaignId))
-          .then((r) => r[0] ?? null)
-      : Promise.resolve(null),
-  ]);
-  return buildCharacterDetail({
-    character: c,
-    traits,
-    skills,
-    spells,
-    inventory,
-    combat,
-    campaign,
-  });
-}
 
 /**
  * Project the row + parent campaign down to the minimal "readily
@@ -106,33 +50,6 @@ async function loadMinimalCharacter(id: string): Promise<CharacterMinimalOut> {
     techLevel: c.techLevel,
     updatedAt: c.updatedAt.toISOString(),
   };
-}
-
-/**
- * Decide whether `userId` should see the full sheet or the minimal
- * view of the given character.  Owners always see full; non-owner
- * members of a campaign see minimal iff the campaign has flipped
- * `shareCharacterSheets` to false.  Characters not attached to any
- * campaign always render full to anyone with read access (the
- * non-campaign access path is "owner only" anyway, gated upstream).
- */
-async function shouldUseMinimalView(
-  characterRow: { ownerId: string; campaignId: string | null },
-  userId: string,
-): Promise<boolean> {
-  if (characterRow.ownerId === userId) return false;
-  if (!characterRow.campaignId) return false;
-  const db = getDb();
-  const [camp] = await db
-    .select({ share: campaigns.shareCharacterSheets, ownerId: campaigns.ownerId })
-    .from(campaigns)
-    .where(eq(campaigns.id, characterRow.campaignId));
-  if (!camp) return false;
-  // The campaign owner sees the full sheet too — they're the GM and
-  // need every detail to run encounters.  Other members see minimal
-  // when the campaign has share-sheets off.
-  if (camp.ownerId === userId) return false;
-  return camp.share === false;
 }
 
 router.openapi(
@@ -277,7 +194,7 @@ router.openapi(
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    return c.json(await loadFullCharacter(created.id), 201);
+    return c.json(await loadCharacterDetail(created.id), 201);
   },
 );
 
@@ -304,10 +221,11 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
-    if (await shouldUseMinimalView(access.character, user.id)) {
+    const view = await resolveCharacterView(user.id, access.character);
+    if (view === 'minimal') {
       return c.json(await loadMinimalCharacter(id), 200);
     }
-    return c.json(await loadFullCharacter(id), 200);
+    return c.json(await loadCharacterDetail(id), 200);
   },
 );
 
@@ -337,15 +255,11 @@ router.openapi(
     if (body.campaignId !== undefined && body.campaignId !== null) {
       await loadCampaignOr403(body.campaignId, user.id);
     }
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [k, v] of Object.entries(body)) {
-      if (v === undefined) continue;
-      updates[k] = v;
-    }
+    const updates = buildPatchSet(body);
     await withAudit(user.id, undefined, (tx) =>
       tx.update(characters).set(updates).where(eq(characters.id, id)),
     );
-    return c.json(await loadFullCharacter(id), 200);
+    return c.json(await loadCharacterDetail(id), 200);
   },
 );
 
@@ -404,10 +318,8 @@ router.openapi(
         .set({ dismissedWarnings: [...current], updatedAt: new Date() })
         .where(eq(characters.id, id)),
     );
-    return c.json(await loadFullCharacter(id), 200);
+    return c.json(await loadCharacterDetail(id), 200);
   },
 );
 
-// Combat-state convenience touch — also forces import resolution.
-export const _internal = combatStates;
 export const charactersRouter = router;

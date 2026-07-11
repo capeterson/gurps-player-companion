@@ -27,13 +27,12 @@ import { type InvitationOut, invitationOut, inviteRequest } from '../../shared/s
 import { uuid } from '../../shared/schemas/common.ts';
 import { campaignInvitationNotificationPayload } from '../../shared/schemas/notification.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
-import { requireCampaignAdmin } from '../auth/permissions.ts';
+import { requireCampaignAdmin, tryLoadCampaignRole } from '../auth/permissions.ts';
 import { loadConfig } from '../config.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
-  type DbCampaign,
   type DbCampaignInvitation,
   type DbUser,
   NOTIFICATION_TYPE_CAMPAIGN_INVITATION,
@@ -111,22 +110,6 @@ async function findUserByHandle(handle: string): Promise<DbUser | null> {
   return byName[0] ?? null;
 }
 
-async function membershipRole(
-  campaignId: string,
-  userId: string,
-): Promise<DbCampaign['ownerId'] extends string ? 'owner' | 'member' | 'manager' | null : never> {
-  const db = getDb();
-  const camp = await db.select().from(campaigns).where(eq(campaigns.id, campaignId));
-  if (camp[0]?.ownerId === userId) return 'owner';
-  const m = await db
-    .select()
-    .from(campaignMemberships)
-    .where(
-      and(eq(campaignMemberships.campaignId, campaignId), eq(campaignMemberships.userId, userId)),
-    );
-  return (m[0]?.role as 'member' | 'manager' | undefined) ?? null;
-}
-
 router.openapi(
   createRoute({
     method: 'post',
@@ -177,7 +160,7 @@ router.openapi(
     if (target.id === campaign.ownerId) {
       throw new HTTPException(409, { message: 'that user is already the owner of this campaign' });
     }
-    const existingRole = await membershipRole(campaignId, target.id);
+    const existingRole = await tryLoadCampaignRole(campaignId, target.id);
     if (existingRole !== null && existingRole !== 'owner') {
       throw new HTTPException(409, { message: 'user is already a member of this campaign' });
     }
