@@ -127,6 +127,13 @@
       "when": 1783731540902,
       "tag": "0017_temp_effects",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783731600000,
+      "tag": "0018_gm_character_editing",
+      "breakpoints": true
     }
   ]
 }

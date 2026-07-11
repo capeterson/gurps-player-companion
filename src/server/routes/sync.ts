@@ -191,6 +191,8 @@ export interface CharacterAccessInputCampaign {
   readonly id: string;
   readonly ownerId: string;
   readonly shareCharacterSheets: boolean;
+  readonly allowGmCharacterEditing?: boolean;
+  readonly viewerRole?: 'owner' | 'manager' | 'member' | null;
 }
 
 /**
@@ -231,6 +233,10 @@ export function decideCharacterAccess(args: {
       out.set(r.id, 'full');
       continue;
     }
+    if (camp.allowGmCharacterEditing && camp.viewerRole === 'manager') {
+      out.set(r.id, 'full');
+      continue;
+    }
     out.set(r.id, camp.shareCharacterSheets ? 'full' : 'minimal');
   }
   return out;
@@ -264,8 +270,17 @@ async function loadCharacterAccess(
         id: campaigns.id,
         ownerId: campaigns.ownerId,
         shareCharacterSheets: campaigns.shareCharacterSheets,
+        allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
+        viewerRole: campaignMemberships.role,
       })
       .from(campaigns)
+      .leftJoin(
+        campaignMemberships,
+        and(
+          eq(campaignMemberships.campaignId, campaigns.id),
+          eq(campaignMemberships.userId, userId),
+        ),
+      )
       .where(inArray(campaigns.id, relevantCampaignIds));
   }
   return decideCharacterAccess({

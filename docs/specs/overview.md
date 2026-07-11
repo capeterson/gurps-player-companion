@@ -174,7 +174,7 @@ loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
 interaction rules.
 
 ### Campaigns
-Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/library`.
+Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/gm`, `/campaigns/:id/library`.
 
 - Create/edit campaigns with **point target, disadvantage cap, quirk cap,
   mana level**, and the **share-character-sheets** toggle.
@@ -196,7 +196,15 @@ Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/library`.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private).
 - **Campaign history view**: campaign-level audit log (settings, membership,
-  library, log), plus an owner-only roll-up across member characters.
+  library, log), plus an owner/manager roll-up across member characters.
+- **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
+  view with a responsive grid of compact, read-only character cards backed by
+  the local Dexie character model, plus a five-second character-history feed.
+  Newly observed changes remain highlighted for 30 seconds. Cards open the full
+  sheet in a new tab; a dense-display toggle fits larger parties.
+- **Optional GM character editing**: an owner-controlled, default-off campaign
+  setting lets owners and managers edit player-owned sheets through the normal
+  local-first outbox. REST and sync use the same central write decision.
 
 ### Cross-cutting UI
 - **Sync status indicator** (header): honest pending/syncing/offline/error

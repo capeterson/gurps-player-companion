@@ -16,6 +16,7 @@
 
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
+import type { CampaignMemberOut } from '../../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { type LocalCampaign, getLocalDb } from '../../db/dexie.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
@@ -30,6 +31,9 @@ export interface CampaignSummary {
   quirkCap: number | null;
   manaLevel: 'none' | 'low' | 'normal' | 'high' | 'very_high';
   shareCharacterSheets: boolean;
+  allowGmCharacterEditing: boolean;
+  viewerRole?: 'owner' | 'manager' | 'member';
+  members?: CampaignMemberOut[];
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -63,15 +67,16 @@ export function useCharacterAccess(
   const campaign = character ? campaigns?.find((c) => c.id === character.campaignId) : undefined;
 
   const isOwner = character != null && myId !== null && myId === character.ownerId;
-  const canWrite = isOwner;
+  const isGm = myId !== null && campaign != null && myId === campaign.ownerId;
+  const isStaff = isGm || campaign?.viewerRole === 'manager';
+  const canWrite = isOwner || (isStaff && campaign?.allowGmCharacterEditing === true);
 
   // Minimal-view gate: when the character belongs to a campaign that
   // has flipped `shareCharacterSheets` off, members other than the
   // character's owner and the campaign GM see only the "readily
   // apparent" identity bits. Owners and GMs always see the full sheet.
-  const isGm = myId !== null && campaign != null && myId === campaign.ownerId;
   const sharesSheets = campaign?.shareCharacterSheets !== false; // undefined → default true
-  const isMinimal = character != null && !isOwner && !isGm && campaign != null && !sharesSheets;
+  const isMinimal = character != null && !canWrite && !isGm && campaign != null && !sharesSheets;
 
   return { myId, isOwner, isGm, canWrite, isMinimal, campaign };
 }
@@ -91,6 +96,8 @@ function toCampaignSummary(row: LocalCampaign): CampaignSummary {
     // field is missing (see `sharesSheets`/mana-level fallbacks above).
     manaLevel: row.manaLevel ?? 'normal',
     shareCharacterSheets: row.shareCharacterSheets ?? true,
+    allowGmCharacterEditing: row.allowGmCharacterEditing ?? false,
+    ...(row.viewerRole !== undefined ? { viewerRole: row.viewerRole } : {}),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     revision: row.revision,

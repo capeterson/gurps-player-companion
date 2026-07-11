@@ -51,6 +51,31 @@ describe('decideCharacterAccess', () => {
     expect(out.get('c1')).toBe('full');
   });
 
+  it('returns full for a manager only when staff editing is enabled', () => {
+    const base = {
+      id: 'camp1',
+      ownerId: GM,
+      shareCharacterSheets: false,
+      viewerRole: 'manager' as const,
+    };
+    const characters = [{ id: 'c1', ownerId: OWNER, campaignId: 'camp1' }];
+
+    expect(
+      decideCharacterAccess({
+        viewerId: VIEWER,
+        characters,
+        campaigns: [{ ...base, allowGmCharacterEditing: false }],
+      }).get('c1'),
+    ).toBe('minimal');
+    expect(
+      decideCharacterAccess({
+        viewerId: VIEWER,
+        characters,
+        campaigns: [{ ...base, allowGmCharacterEditing: true }],
+      }).get('c1'),
+    ).toBe('full');
+  });
+
   it('returns "full" for the character owner regardless of share', () => {
     const out = decideCharacterAccess({
       viewerId: OWNER,

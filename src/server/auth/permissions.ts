@@ -124,7 +124,8 @@ export interface CharacterAccess {
 
 /**
  * Load a character if the user can read it.  `canWrite` is true if the
- * user is the owner; campaign members can read but not write.
+ * user is the owner, or campaign staff editing is enabled for an
+ * owner/manager. Other campaign members can read but not write.
  */
 export async function loadCharacterOr403(
   characterId: string,
@@ -136,16 +137,14 @@ export async function loadCharacterOr403(
   if (!character) throw new HTTPException(404, { message: 'character not found' });
   if (character.ownerId === userId) return { character, canWrite: true };
   if (character.campaignId) {
-    const memberships = await db
-      .select()
-      .from(campaignMemberships)
-      .where(
-        and(
-          eq(campaignMemberships.campaignId, character.campaignId),
-          eq(campaignMemberships.userId, userId),
-        ),
-      );
-    if (memberships[0]) return { character, canWrite: false };
+    const access = await lookupCampaignRole(character.campaignId, userId);
+    if (access?.role) {
+      const isStaff = access.role === 'owner' || access.role === 'manager';
+      return {
+        character,
+        canWrite: access.campaign.allowGmCharacterEditing && isStaff,
+      };
+    }
   }
   throw new HTTPException(403, { message: 'forbidden' });
 }
@@ -153,5 +152,5 @@ export async function loadCharacterOr403(
 export function assertWrite(access: CharacterAccess): asserts access is CharacterAccess & {
   canWrite: true;
 } {
-  if (!access.canWrite) throw new HTTPException(403, { message: 'owner only' });
+  if (!access.canWrite) throw new HTTPException(403, { message: 'character editing not allowed' });
 }

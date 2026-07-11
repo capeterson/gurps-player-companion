@@ -1472,6 +1472,9 @@
                       "shareCharacterSheets": {
                         "type": "boolean"
                       },
+                      "allowGmCharacterEditing": {
+                        "type": "boolean"
+                      },
                       "members": {
                         "type": "array",
                         "items": {
@@ -1528,6 +1531,7 @@
                       "disadvantageCap",
                       "quirkCap",
                       "shareCharacterSheets",
+                      "allowGmCharacterEditing",
                       "members",
                       "createdAt",
                       "updatedAt",
@@ -1607,6 +1611,9 @@
                   },
                   "shareCharacterSheets": {
                     "type": "boolean"
+                  },
+                  "allowGmCharacterEditing": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -1668,6 +1675,9 @@
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
+                    "allowGmCharacterEditing": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -1724,6 +1734,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "shareCharacterSheets",
+                    "allowGmCharacterEditing",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -1830,6 +1841,9 @@
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
+                    "allowGmCharacterEditing": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -1886,6 +1900,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "shareCharacterSheets",
+                    "allowGmCharacterEditing",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -1985,6 +2000,9 @@
                   },
                   "shareCharacterSheets": {
                     "type": "boolean"
+                  },
+                  "allowGmCharacterEditing": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -2043,6 +2061,9 @@
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
+                    "allowGmCharacterEditing": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -2099,6 +2120,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "shareCharacterSheets",
+                    "allowGmCharacterEditing",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -2272,6 +2294,9 @@
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
+                    "allowGmCharacterEditing": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -2328,6 +2353,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "shareCharacterSheets",
+                    "allowGmCharacterEditing",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -2475,6 +2501,9 @@
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
+                    "allowGmCharacterEditing": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -2531,6 +2560,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "shareCharacterSheets",
+                    "allowGmCharacterEditing",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -2732,6 +2762,9 @@
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
+                    "allowGmCharacterEditing": {
+                      "type": "boolean"
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -2788,6 +2821,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "shareCharacterSheets",
+                    "allowGmCharacterEditing",
                     "members",
                     "createdAt",
                     "updatedAt",

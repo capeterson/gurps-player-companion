@@ -68,6 +68,7 @@ const CAMPAIGN_FIELD_LABELS: Record<string, string> = {
   disadvantageCap: 'Disadvantage cap',
   quirkCap: 'Quirk cap',
   shareCharacterSheets: 'Sheet sharing',
+  allowGmCharacterEditing: 'GM character editing',
   ownerId: 'Owner',
 };
 
@@ -358,6 +359,8 @@ function summarizeCampaign(
     const label = CAMPAIGN_FIELD_LABELS[c.field] ?? humanizeFieldKey(c.field);
     if (c.field === 'shareCharacterSheets') {
       msgs.push(`Sheet sharing ${c.newValue ? 'enabled' : 'disabled'}`);
+    } else if (c.field === 'allowGmCharacterEditing') {
+      msgs.push(`GM character editing ${c.newValue ? 'enabled' : 'disabled'}`);
     } else {
       msgs.push(`${label} ${displayValue(c.oldValue)} → ${displayValue(c.newValue)}`);
     }

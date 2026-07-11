@@ -247,6 +247,8 @@ export const campaigns = pgTable('campaigns', {
    * keep their previous behaviour.
    */
   shareCharacterSheets: boolean('share_character_sheets').notNull().default(true),
+  /** Owner/manager edits of member-owned character sheets; opt-in. */
+  allowGmCharacterEditing: boolean('allow_gm_character_editing').notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   revision: revision(),

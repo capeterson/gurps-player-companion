@@ -36,6 +36,8 @@ export const campaignOut = z.object({
    * sheet regardless.
    */
   shareCharacterSheets: z.boolean(),
+  /** Allow campaign owners and managers to edit member-owned characters. */
+  allowGmCharacterEditing: z.boolean(),
   members: z.array(campaignMemberOut),
   ...timestamps,
   revision,
@@ -49,6 +51,7 @@ export const campaignCreate = z.object({
   quirkCap: z.number().int().min(0).max(50).nullable().optional(),
   manaLevel: z.enum(MANA_LEVELS).optional(),
   shareCharacterSheets: z.boolean().optional(),
+  allowGmCharacterEditing: z.boolean().optional(),
 });
 
 export const campaignUpdate = campaignCreate.partial();
