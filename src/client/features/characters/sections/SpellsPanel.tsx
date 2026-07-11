@@ -11,9 +11,9 @@ import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.t
 import { useFieldFlash } from '../../../hooks/useFieldFlash.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
-import { RollSheet } from '../play/RollSheet.tsx';
-import type { RollRequest } from '../play/rollTypes.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
+import { RollSheet } from './RollSheet.tsx';
+import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
   useEntityNameField,

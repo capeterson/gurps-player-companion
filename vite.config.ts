@@ -92,6 +92,18 @@ export default defineConfig({
     port: 3000,
     host: true,
     strictPort: true,
+    hmr: {
+      // Vite runs inside Docker; the HMR client must connect back
+      // through the host-mapped port, not the container's internal
+      // address. On Windows the default auto-detected HMR host/port
+      // resolves to the container's internal IP, which the browser
+      // can't reach. A custom path avoids the @hono/vite-dev-server
+      // middleware intercepting the WS upgrade at `/`.
+      host: process.env.VITE_HMR_HOST ?? 'localhost',
+      port: Number(process.env.VITE_HMR_PORT ?? 3000),
+      protocol: process.env.VITE_HMR_PROTOCOL === 'wss' ? 'wss' : 'ws',
+      path: '/vite-hmr',
+    },
   },
   plugins: [
     react(),

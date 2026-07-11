@@ -1,10 +1,10 @@
 /**
  * SkillsPanel — the "Lvl" cell as a tappable roll target.
  *
- * A computed level opens the shared Play Mode roll sheet at that
- * target (rolls mutate nothing, so this works identically for
- * read-only viewers); a null level (0-point Very Hard skill, which has
- * no attribute default per B173) stays plain, non-interactive text.
+ * A computed level opens the shared roll sheet at that target
+ * (rolls mutate nothing, so this works identically for read-only
+ * viewers); a null level (0-point Very Hard skill, which has no
+ * attribute default per B173) stays plain, non-interactive text.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

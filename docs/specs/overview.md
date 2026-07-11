@@ -55,27 +55,37 @@ checklists for extending sync/history) live in
 Route `/characters/:id`. Tabbed sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), tabs:
 **Combat, Identity, Traits, Skills, Magic, Inventory, Notes, History**
-(on a read-only view of a non-magical character the Magic tab is hidden;
+(the Combat tab is first — it's the live-gameplay surface a player
+touches mid-session, front-loaded so one tap lands there; on a
+read-only view of a non-magical character the Magic tab is hidden, and
 on any sheet the viewer can edit — their own — it always shows).
 
-- **Attributes & derived stats.** ST/DX/IQ/HT drive HP, FP, Will, Per, Basic
-  Speed, Basic Move, Dodge, basic **thrust/swing damage** (B16 table, shown
-  as "Thr / Sw" on the derived card), etc. Temporary ST/HT boosts affect
-  their normal derived values but not maximum HP/FP; only the dedicated
-  temporary HP/FP modifiers change those maxima (M37). Basic Lift rounds to
-  the nearest whole number once it reaches 10 (B15). All GURPS math is pure
-  and shared (`src/shared/domain/`).
+- **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
+  Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
+  damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary** card
+  surfaces the six secondary stats (HP, Will, Per, FP, Basic Speed, Basic
+  Move) with their effective values and per-stat ✦ temp-modifier
+  popovers. The **Status** card shows the current HP/FP pools (with
+  meters) plus the derived combat values not displayed elsewhere —
+  Dodge, Basic Lift, and Thr / Sw — while pool mutations live only in
+  the Combat tab so independently mounted editors cannot race. The
+  sheet's top row no longer duplicates the six secondary numbers. Temporary ST/HT boosts
+  affect their normal derived values but not maximum HP/FP; only the
+  dedicated temporary HP/FP modifiers change those maxima (M37). Basic
+  Lift rounds to the nearest whole number once it reaches 10 (B15). All
+  GURPS math is pure and shared (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
   disadvantage / quirk cap warnings.
-- **Temporary effects.** A structured list of named, transient buffs
-  (`characters.temp_effects`, one JSONB list replacing the old per-stat
-  scalar columns) — each entry bundles per-axis modifiers (e.g. "Might
-  potion" → ST +2, HT +1). The ✦ modifier popovers on each stat still give
-  quick steppers, backed by a reserved `manual` sentinel entry in the same
-  list; named effects are added/removed individually from a compact list
-  under the Attributes panel. "Revert all temporary buffs" clears the whole
-  list in one patch. Tracked distinctly from permanent edits; never counts
-  toward point cost.
+- **Temporary effects.** Per-stat ✦ modifier popovers are the single
+  way to add temp modifiers, backed by a reserved `manual` sentinel
+  entry in the `characters.temp_effects` JSONB list. There is no longer
+  any named-effects list or add form — the `manual` entry is the only
+  entry that ever gets written, keyed by axis (ST/DX/IQ/HT/HP/Will/Per/
+  FP/Speed/Move). "Revert all temporary buffs" clears the whole list in
+  one patch. Tracked distinctly from permanent edits; never counts
+  toward point cost. (Legacy named effects from before the add form was
+  removed still exist in the DB and contribute to derived totals, but
+  have no UI surface — "Revert all" clears them too.)
 - **Traits** (advantages/disadvantages/perks/quirks) with modifier math:
   percent modifiers sum, the net is clamped at -80% (B110), the result
   rounds against the character (B102), then flat modifiers add.
@@ -83,9 +93,9 @@ on any sheet the viewer can edit — their own — it always shows).
   shows its **attribute default** (attr-4/-5/-6 for E/A/H per B173);
   0-point Very Hard skills have no default, so their level renders as
   an em dash (`level` is null in the API). A computed level is a
-  tappable roll target: it opens the same Play Mode roll sheet used
-  everywhere else on the character (dispatch only, so read-only
-  viewers can roll too); null-level rows stay plain text.
+  tappable roll target: it opens the same roll sheet used everywhere
+  else on the character (dispatch only, so read-only viewers can roll
+  too); null-level rows stay plain text.
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
   Spells have no default: a 0-point (legacy) spell row has a null level,
@@ -96,14 +106,63 @@ on any sheet the viewer can edit — their own — it always shows).
   encumbrance, armor and weapon data, cost/weight rollups. Encumbered
   Move floors at 1 while the load is legal and reads 0 past the 10×BL
   carry cap (B17).
-- **Combat tracker**: HP/FP pools, posture, hit-location model, and the
-  full 12-entry common-condition set (normalized against legacy
-  Capitalized entries so old data still lights the right chip). Shows
-  reeling and death-check thresholds (B419/B423) in one caption, and
-  pulses a "suggested" highlight on the Reeling chip — never
-  auto-applied — when HP drops below ⅓ max and it isn't set yet. HP can
-  be tracked down to the certain-death floor at -5×HP; FP floors at -FP,
-  with further fatigue charged against HP one-for-one (B426).
+- **Combat tab (live-gameplay surface)**. The first tab on the sheet
+  (`src/client/features/characters/sections/combat/CombatTab.tsx`),
+  consolidating everything a player touches mid-session onto one inline
+  surface. There is no combat modal or separate live-gameplay route; the
+  player taps between live combat and the editable sheet without a route
+  hop:
+  - **Pools** — HP/FP with bumpers/reset, posture chips, and all 12
+    common-condition chips (normalized against legacy Capitalized entries
+    so old data still lights the right chip). Surfaces reeling
+    *and* death-check thresholds (B419/B423) in one caption, pulses a
+    "suggested" highlight on the Reeling chip when HP drops below ⅓ max
+    and it isn't set yet — never auto-applied — and tracks HP down to
+    the certain-death floor at −5×HP; FP floors at −FP, with further
+    fatigue charged against HP one-for-one (B426). One shared
+    `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
+    sticky mobile bottom bar so a fast tap on both surfaces never races;
+    `useConditionsToggle` mirrors the same latest-intended-ref pattern
+    so two rapid condition taps before Dexie re-renders don't coalesce
+    into one outbox patch and drop the first tap.
+  - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
+    chip shows its blurb; tapping it again clears to no maneuver), plus
+    a "Custom…" free-text fallback using the same `useDraftField`
+    pattern as the sheet's Status card.
+  - **Defenses** — Dodge (with the encumbrance-penalty breakdown and no
+    invented minimum; situational active-defense bonuses remain
+    unmodeled), Parry per equipped weapon (computed from the matched
+    skill when one is found, else the raw library string), and Block
+    when a Shield skill is known. Every numeric defense opens the roll
+    sheet.
+  - **Attacks** — one row per equipped weapon: resolved damage dice (ST
+    thrust/swing + the weapon's modifiers), reach, an over-ST warning
+    badge, and the best-matching skill as a rollable row with
+    hit-location preset chips (aim penalties, B398-399). Vitals presets
+    appear only for impaling and piercing attacks, and the eye preset
+    only for impaling, piercing, and tight-beam burning attacks.
+  - **Skills / Spells** — every skill and spell with a non-null computed
+    level, each rollable; spells also get a "Cast" button that reuses
+    the `CastSpellDialog`. Casting is gated by the shared
+    `characterCanCast` helper (the one mana gate; don't fork it) — the
+    button is disabled with a compact notice when the campaign's mana
+    level hasn't synced yet or the ambient mana forbids casting here.
+    Rolling a spell row stays unrestricted (ephemeral, no cost).
+  - **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
+    stepper (−10..+10) plus single-select preset chips, a "Roll 3d6"
+    button, and a result panel (dice, total, success/margin, crit
+    badge) built on the shared `evaluateRoll`. Defense rows route
+    through the same success-roll evaluator as skills — GURPS defenses
+    actually use a different crit table, an accepted simplification for
+    this pass.
+  - **Roll history strip** — a collapsible, session-only log of this
+    character's rolls this visit (newest first, capped at 20 entries).
+    **Never persisted** — no Dexie table, no localStorage — so it carries
+    none of the sync/purge/history obligations a durable entity would
+    (deliberate: reloading the page clears it). The sheet's Skills and
+    Magic tabs share the same roll sheet (`.RollSheet` /
+    `RollableRow` live under `sections/`) so tapping a skill/spell level
+    in those tables opens the identical roller.
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
@@ -113,68 +172,6 @@ on any sheet the viewer can edit — their own — it always shows).
 Every editable input on the sheet is **draft-on-blur** and never silently
 loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
 interaction rules.
-
-### Play Mode (live-gameplay surface)
-Route `/characters/:id/play`
-(`src/client/features/characters/play/PlayModePage.tsx`). Reached from a
-"⚔ Play" link on the sheet header, an "Open Play Mode" link in the Combat
-modal, or a per-card "Play" action on HomePage's recent-characters list.
-Redirects back to the sheet route for the share-gated minimal view (Play
-Mode has nothing to show there).
-
-A condensed, table-friendly layout for the middle of a session — no
-editable identity/traits/inventory fields, just what a player touches
-mid-combat:
-
-- **Pools** — HP/FP with the same bumper/reset controls as the Combat
-  modal (one shared `usePoolBumpers` instance so a sticky mobile bottom
-  bar and the in-page card never race each other), posture, and all 12
-  common condition chips (the Combat modal shares this same full set).
-  Surfaces reeling *and* death-check thresholds (B419/B423) in one
-  caption, and pulses a "suggested" highlight on the Reeling chip when
-  HP drops below ⅓ max and it isn't set yet — never auto-applied.
-  Condition chip taps compose against a latest-intended ref
-  (`useConditionsToggle`, shared by PoolsCard and the Combat modal), the
-  same pattern `usePoolBumpers` uses for HP/FP, so two rapid taps before
-  Dexie re-renders don't coalesce into a single outbox patch and drop
-  the first tap.
-- **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
-  chip shows its blurb; tapping it again clears to no maneuver), plus a
-  "Custom…" free-text fallback using the same `useDraftField` pattern as
-  the sheet's Combat panel.
-- **Defenses** — Dodge (with the encumbrance-penalty breakdown and no
-  invented minimum; situational active-defense bonuses remain unmodeled), Parry
-  per equipped weapon with a parry string (computed from the matched
-  skill when one is found, else the raw library string), and Block when
-  a Shield skill is known. Every numeric defense opens the roll sheet.
-- **Attacks** — one row per equipped weapon: resolved damage dice (ST
-  thrust/swing + the weapon's modifiers), reach, an over-ST warning
-  badge, and the best-matching skill as a rollable row with hit-location
-  preset chips (aim penalties, B398-399). Vitals presets appear only for
-  impaling and piercing attacks, and the eye preset only for impaling,
-  piercing, and tight-beam burning attacks.
-- **Skills / Spells** — every skill and spell with a non-null computed
-  level (0-point/no-default entries are the full sheet's job), each
-  rollable; spells also get a "Cast" button that reuses the sheet's
-  `CastSpellDialog` as-is. Casting is gated by the same ambient-mana
-  rule as the sheet's SpellsPanel — both call the shared
-  `characterCanCast` helper in `shared/domain/spellCalc.ts` (the one
-  mana gate; don't fork it) — the button is disabled with a compact
-  notice when the campaign's mana level hasn't synced yet or the
-  ambient mana forbids casting here. Rolling a spell row stays
-  unrestricted (it's ephemeral, no cost).
-- **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
-  stepper (−10..+10) plus single-select preset chips (picking a second
-  preset replaces the first), a deliberately unobtrusive "Roll 3d6"
-  button, and a result panel (dice, total, success/margin, crit badge)
-  built on the shared `evaluateRoll`. Defense rows are routed through
-  the same success-roll evaluator as skills — GURPS defenses actually
-  use a different crit table, an accepted simplification for this pass.
-- **Roll history strip** — a collapsible, session-only log of this
-  character's rolls this visit (newest first, capped at 20 entries).
-  **Never persisted** — no Dexie table, no localStorage — so it carries
-  none of the sync/purge/history obligations a durable entity would
-  (deliberate: reloading the page clears it).
 
 ### Campaigns
 Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/library`.
@@ -247,16 +244,14 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, library, log, settings, history, home)
-      characters/play/  Play Mode — the live-gameplay surface
-                 (PlayModePage + PoolsCard/ManeuverCard/DefensesCard/
-                 AttacksCard/SkillsCard/RollableRow/RollSheet/
-                 RollHistoryStrip + the ephemeral rollHistory store)
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Inventory: useAddEntityForm (the add
                  form), useEntityRowPatch (per-row field patch dispatch),
                  useClampedJsonbBumper (powerstone/magic-item charge
-                 steppers), useTempEffects (the named temporary-effects
-                 list backing the Attributes panel's modifier popovers)
+                 steppers), useTempEffects (the temporary-effects list
+                 backing the Attributes panel's modifier popovers), shared
+                 RollSheet/RollableRow/rollHistory primitives, and combat/
+                 (CombatTab + Pools/Maneuver/Defenses/Attacks/Skills cards)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth)

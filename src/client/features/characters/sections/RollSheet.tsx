@@ -1,11 +1,11 @@
 /**
- * RollSheet — the actual dice roller.  Rendered by PlayModePage
- * whenever `rollRequest` is non-null.  Bottom sheet on mobile
+ * RollSheet — the actual dice roller. Rendered by the Combat tab
+ * whenever `rollRequest` is non-null. Bottom sheet on mobile
  * (`.roll-sheet-back` overrides `.modal-back`'s centering to anchor
  * to the bottom edge below the `md` breakpoint), centered dialog on
  * larger screens.
  *
- * Every defense row in Play Mode (Dodge/Parry/Block) is also routed
+ * Every defense row in the Combat tab (Dodge/Parry/Block) is also routed
  * through this sheet with `evaluateRoll` as-is. GURPS defenses don't
  * actually use the skill-roll crit table (a defense "critical" is a
  * roll of 3-4 automatic success or 17-18 automatic failure,
@@ -123,7 +123,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     <div
       className="modal-back roll-sheet-back"
       // biome-ignore lint/a11y/useSemanticElements: fixed-position aria-roled div, same
-      // pattern as CombatModal — Escape is wired via the global keydown listener above.
+      // pattern as the other modal dialogs — Escape is wired via the global keydown listener above.
       role="dialog"
       aria-modal="true"
       aria-label={`Roll ${request.label}`}

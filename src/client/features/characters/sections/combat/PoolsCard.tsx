@@ -1,22 +1,22 @@
 /**
- * Play Mode — HP/FP pools, posture, and conditions.
+ * Combat tab — HP/FP pools, posture, and conditions.
  *
- * Shares ONE `usePoolBumpers` instance with the page's sticky mobile
- * bottom bar (lifted to PlayModePage) so rapid taps across both UIs
+ * Shares ONE `usePoolBumpers` instance with the Combat tab's sticky mobile
+ * bottom bar (lifted to CombatTab) so rapid taps across both UIs
  * compound against the same latest-intended ref instead of a second
  * instance racing the first and dropping a tap.
  */
 
-import { COMMON_CONDITIONS, POSTURES } from '../../../../shared/constants/combat.ts';
-import { conditionLabel, conditionsInclude } from '../../../../shared/domain/conditions.ts';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { Bumper } from '../../../components/ui/Bumper.tsx';
-import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
-import { OverflowBadge } from '../../../components/ui/OverflowBadge.tsx';
-import { PoolMeter } from '../../../components/ui/PoolMeter.tsx';
-import { hpVarFor } from '../sections/hpColor.ts';
-import { useConditionsToggle } from '../sections/useConditionsToggle.ts';
-import type { PoolBumpers } from '../sections/usePoolBumpers.ts';
+import { COMMON_CONDITIONS, POSTURES } from '../../../../../shared/constants/combat.ts';
+import { conditionLabel, conditionsInclude } from '../../../../../shared/domain/conditions.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { Bumper } from '../../../../components/ui/Bumper.tsx';
+import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
+import { OverflowBadge } from '../../../../components/ui/OverflowBadge.tsx';
+import { PoolMeter } from '../../../../components/ui/PoolMeter.tsx';
+import { hpVarFor } from '../hpColor.ts';
+import { useConditionsToggle } from '../useConditionsToggle.ts';
+import type { PoolBumpers } from '../usePoolBumpers.ts';
 
 export interface PoolsCardProps {
   character: CharacterDetail;
@@ -34,7 +34,7 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers }: PoolsCa
   const hpColor = hpVarFor(hpMax > 0 ? hp / hpMax : 0);
   const fpColor = hpVarFor(fpMax > 0 ? fp / fpMax : 0);
   // Reeling starts when HP drops BELOW 1/3 of max (B419), so the
-  // highest reeling value is ceil(max/3) - 1 — same convention as CombatModal.
+  // highest reeling value is ceil(max/3) - 1.
   const reelingThreshold = Math.ceil(hpMax / 3) - 1;
   const reelingSuggested =
     canWrite && hpMax > 0 && hp < Math.ceil(hpMax / 3) && !conditionsInclude(conditions, 'reeling');

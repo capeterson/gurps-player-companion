@@ -8,8 +8,8 @@ import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
-import { RollSheet } from '../play/RollSheet.tsx';
-import type { RollRequest } from '../play/rollTypes.ts';
+import { RollSheet } from './RollSheet.tsx';
+import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
   useEntityNameField,

@@ -1,8 +1,7 @@
 /**
  * Per-field patch helper for the `character_combat` entity, backed by
- * the local Dexie outbox. Shared by the in-sheet CombatPanel and the
- * CombatModal (and any future combat surface, e.g. Play Mode) so the
- * ensure-row + enqueue logic stays single-sourced.
+ * the local Dexie outbox. Shared by the in-sheet StatusPanel and the
+ * Combat tab so the ensure-row + enqueue logic stays single-sourced.
  */
 
 import { useCallback } from 'react';

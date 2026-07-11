@@ -1,19 +1,18 @@
-import { Link } from 'react-router-dom';
-import { damageForSt, formatDamageDice } from '../../../../shared/constants/damage.ts';
+import { damageForSt, formatDamageDice } from '../../../../../shared/constants/damage.ts';
 import {
   HIT_LOCATIONS,
   HIT_LOCATION_AIM_PENALTY,
   type HitLocation,
-} from '../../../../shared/constants/hitLocations.ts';
+} from '../../../../../shared/constants/hitLocations.ts';
 import {
   canTargetVitals,
   parseDamageSpec,
   resolveDamage,
-} from '../../../../shared/domain/damageParse.ts';
-import { matchSkillForWeapon } from '../../../../shared/domain/defenseCalc.ts';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { RollableRow } from './RollableRow.tsx';
-import type { RollPreset, RollRequest } from './rollTypes.ts';
+} from '../../../../../shared/domain/damageParse.ts';
+import { matchSkillForWeapon } from '../../../../../shared/domain/defenseCalc.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { RollableRow } from '../RollableRow.tsx';
+import type { RollPreset, RollRequest } from '../rollTypes.ts';
 
 function capitalize(s: string): string {
   return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
@@ -68,11 +67,7 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
       <section className="card space-y-2 p-5">
         <p className="label-eyebrow">Attacks</p>
         <p className="text-sm text-base-content/60">
-          No equipped weapons —{' '}
-          <Link to={`/characters/${character.id}`} className="link link-hover">
-            equip items in the Inventory tab
-          </Link>
-          .
+          No equipped weapons — equip items in the Inventory tab.
         </p>
       </section>
     );

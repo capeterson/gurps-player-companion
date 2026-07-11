@@ -7,8 +7,8 @@
  * offline cache the REST `/campaigns` query hadn't resolved yet, so
  * `useCharacterAccess(character, campaigns.data, meId)` found no
  * campaign row and `isMinimal` came back `false` for a non-owner who
- * should have been share-gated — Play Mode (and the sheet page)
- * rendered full content until the REST list caught up.
+ * should have been share-gated — the sheet page rendered full
+ * content until the REST list caught up.
  *
  * `useCharacterAccessLocal` fixes this by reading campaign rows from
  * Dexie (which the sync cursor already pulls read-only, rule S0) via
