@@ -48,6 +48,13 @@ import {
   characterAttrsFromRow,
   loadCharacterDetail,
 } from '../services/characterSummary.ts';
+import {
+  combatUpsertValues,
+  inventoryInsertValues,
+  skillInsertValues,
+  spellInsertValues,
+  traitInsertValues,
+} from '../services/entityWrites.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
@@ -108,16 +115,7 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characterTraits)
-        .values({
-          characterId: id,
-          kind: body.kind,
-          name: body.name,
-          points: body.points ?? 0,
-          level: body.level ?? null,
-          notes: body.notes ?? null,
-          modifiers: body.modifiers ?? [],
-          libraryTraitId: body.libraryTraitId ?? null,
-        })
+        .values(traitInsertValues(body, { characterId: id }))
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -236,17 +234,7 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characterSkills)
-        .values({
-          characterId: id,
-          name: body.name,
-          attribute: body.attribute,
-          difficulty: body.difficulty,
-          points: body.points ?? 1,
-          techLevel: body.techLevel ?? null,
-          specialization: body.specialization ?? null,
-          notes: body.notes ?? null,
-          librarySkillId: body.librarySkillId ?? null,
-        })
+        .values(skillInsertValues(body, { characterId: id }))
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -374,20 +362,7 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characterSpells)
-        .values({
-          characterId: id,
-          name: body.name,
-          college: body.college ?? null,
-          difficulty: body.difficulty ?? 'H',
-          points: body.points ?? 1,
-          baseEnergyCost: body.baseEnergyCost ?? 1,
-          maintenanceCost: body.maintenanceCost ?? null,
-          castingTime: body.castingTime ?? null,
-          duration: body.duration ?? null,
-          prerequisites: body.prerequisites ?? null,
-          notes: body.notes ?? null,
-          librarySpellId: body.librarySpellId ?? null,
-        })
+        .values(spellInsertValues(body, { characterId: id }))
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -611,27 +586,7 @@ router.openapi(
       // a fresh row's id can't appear in any existing parent chain.
       const [row] = await tx
         .insert(inventoryItems)
-        .values({
-          characterId: id,
-          name: body.name,
-          quantity: body.quantity ?? 1,
-          weightLbs: String(body.weightLbs ?? 0),
-          cost: String(body.cost ?? 0),
-          notes: body.notes ?? null,
-          parentId: body.parentId ?? null,
-          externalLocation: body.externalLocation ?? null,
-          worn: body.worn ?? false,
-          equipped: body.equipped ?? false,
-          isContainer: body.isContainer ?? false,
-          hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
-          weightReductionPercent: body.weightReductionPercent ?? 0,
-          isArmor: body.isArmor ?? false,
-          armor: body.armor ?? null,
-          weaponData: body.weaponData ?? null,
-          powerstoneData: body.powerstoneData ?? null,
-          magicItemData: body.magicItemData ?? null,
-          libraryItemId: body.libraryItemId ?? null,
-        })
+        .values(inventoryInsertValues(body, { characterId: id }))
         .returning();
       return row;
     });
@@ -842,14 +797,7 @@ router.openapi(
     const [row] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(combatStates)
-        .values({
-          characterId: id,
-          currentHp: body.currentHp ?? derived.hp,
-          currentFp: body.currentFp ?? derived.fp,
-          conditions: body.conditions ?? [],
-          maneuver: body.maneuver ?? null,
-          posture: body.posture ?? 'standing',
-        })
+        .values(combatUpsertValues(body, { characterId: id, derived }))
         .onConflictDoUpdate({
           target: combatStates.characterId,
           set: setOnUpdate,

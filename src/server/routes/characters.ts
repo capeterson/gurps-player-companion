@@ -20,6 +20,7 @@ import { campaignMemberships, campaigns, characters } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { resolveCharacterView } from '../services/characterAccess.ts';
 import { loadCharacterDetail } from '../services/characterSummary.ts';
+import { characterInsertValues } from '../services/entityWrites.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import { decideCharacterAccess } from './sync.ts';
 
@@ -160,37 +161,7 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characters)
-        .values({
-          ownerId: user.id,
-          campaignId: body.campaignId ?? null,
-          name: body.name,
-          playerName: body.playerName ?? null,
-          height: body.height ?? null,
-          weight: body.weight ?? null,
-          age: body.age ?? null,
-          appearance: body.appearance ?? null,
-          techLevel: body.techLevel ?? null,
-          st: body.st,
-          dx: body.dx,
-          iq: body.iq,
-          ht: body.ht,
-          hpMod: body.hpMod,
-          willMod: body.willMod,
-          perMod: body.perMod,
-          fpMod: body.fpMod,
-          speedQuarterMod: body.speedQuarterMod,
-          moveMod: body.moveMod,
-          tempSt: body.tempSt,
-          tempDx: body.tempDx,
-          tempIq: body.tempIq,
-          tempHt: body.tempHt,
-          tempHpMod: body.tempHpMod,
-          tempWillMod: body.tempWillMod,
-          tempPerMod: body.tempPerMod,
-          tempFpMod: body.tempFpMod,
-          tempSpeedQuarterMod: body.tempSpeedQuarterMod,
-          tempMoveMod: body.tempMoveMod,
-        })
+        .values(characterInsertValues(body, { ownerId: user.id }))
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
