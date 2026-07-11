@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { SPELL_DIFFICULTIES, type SpellDifficulty } from '../../../../shared/constants/skills.ts';
-import { canCastInMana, hasMagery } from '../../../../shared/domain/spellCalc.ts';
+import { characterCanCast, hasMagery } from '../../../../shared/domain/spellCalc.ts';
 import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
@@ -224,6 +225,7 @@ interface SpellRowProps {
 
 function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: SpellRowProps) {
   const toasts = useToasts();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   // A spell with no points has no skill level (spells have no default
   // in GURPS), so there is nothing to roll against — hold Cast/Maintain
   // for that row even when the ambient mana allows casting.
@@ -398,15 +400,24 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: Sp
           <button
             type="button"
             className="btn btn-ghost btn-xs"
-            onClick={() => {
-              if (confirm(`Delete spell "${spell.name}"?`)) void removeSpell();
-            }}
+            onClick={() => setConfirmDelete(true)}
             aria-label={`Delete spell ${spell.name}`}
           >
             ✕
           </button>
         )}
       </span>
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete spell "${spell.name}"?`}
+        confirmLabel="Delete"
+        tone="error"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void removeSpell();
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </li>
   );
 }
@@ -475,8 +486,7 @@ export function SpellsPanel({
   // Hold casting entirely while the campaign row (and thus the real
   // mana level) hasn't reached the local store: the builder's 'normal'
   // fallback must not let a no-mana campaign spend FP on first load.
-  const castable =
-    character.manaLevelKnown && canCastInMana(characterHasMagery, character.manaLevel);
+  const castable = characterCanCast(character);
 
   return (
     <section className="card space-y-3 p-5">

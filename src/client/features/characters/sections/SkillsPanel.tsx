@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
@@ -188,6 +189,7 @@ interface SkillRowProps {
 
 function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   const toasts = useToasts();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const patchSkill = (field: string, value: unknown) =>
     enqueueFieldPatch({
@@ -269,14 +271,23 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
         <button
           type="button"
           className="btn btn-ghost btn-xs"
-          onClick={() => {
-            if (confirm(`Delete skill "${skill.name}"?`)) void removeSkill();
-          }}
+          onClick={() => setConfirmDelete(true)}
           aria-label={`Delete skill ${skill.name}`}
         >
           ✕
         </button>
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete skill "${skill.name}"?`}
+        confirmLabel="Delete"
+        tone="error"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void removeSkill();
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </li>
   );
 }

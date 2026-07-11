@@ -3,6 +3,7 @@ import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { TraitOut } from '../../../../shared/schemas/trait.ts';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import {
   LibraryModifierPicker,
@@ -251,6 +252,7 @@ interface TraitRowProps {
 
 function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
   const toasts = useToasts();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const patchTrait = (field: string, value: unknown) =>
     enqueueFieldPatch({
@@ -355,14 +357,23 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
         <button
           type="button"
           className="btn btn-ghost btn-xs"
-          onClick={() => {
-            if (confirm(`Delete trait "${trait.name}"?`)) void removeTrait();
-          }}
+          onClick={() => setConfirmDelete(true)}
           aria-label={`Delete trait ${trait.name}`}
         >
           ✕
         </button>
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete trait "${trait.name}"?`}
+        confirmLabel="Delete"
+        tone="error"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void removeTrait();
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </li>
   );
 }
