@@ -62,7 +62,7 @@ describe('ManeuverCard', () => {
       </Wrap>,
     );
 
-    expect(screen.getByText(/NO defenses this turn/)).toBeInTheDocument();
+    expect(screen.getByText(/NO defenses; move half forward only/)).toBeInTheDocument();
   });
 
   it('with no stored maneuver, the custom input shows an empty string, not the literal "null"', () => {

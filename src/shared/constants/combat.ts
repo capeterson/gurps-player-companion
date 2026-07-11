@@ -41,7 +41,7 @@ export const MANEUVERS = [
   {
     id: 'change_posture',
     label: 'Change Posture',
-    blurb: 'Stand, kneel, crouch, or lie down; step allowed',
+    blurb: 'Stand, kneel, or lie down; no step (crouching is a free action)',
   },
   { id: 'aim', label: 'Aim', blurb: 'Ranged accuracy bonus builds up while held' },
   { id: 'evaluate', label: 'Evaluate', blurb: '+1 to hit that foe in melee next turn (max +3)' },
@@ -54,7 +54,7 @@ export const MANEUVERS = [
   {
     id: 'all_out_attack',
     label: 'All-Out Attack',
-    blurb: '+4 to hit or double attack; NO defenses this turn',
+    blurb: '+4 melee/+1 ranged to hit, or double attack; NO defenses; move half forward only',
   },
   {
     id: 'move_and_attack',
