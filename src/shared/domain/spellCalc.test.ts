@@ -209,6 +209,7 @@ function makeTrait(name: string, level: number | null = null): TraitOut {
     name,
     points: 0,
     level,
+    variantName: null,
     notes: null,
     modifiers: [],
     libraryTraitId: null,

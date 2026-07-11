@@ -17,6 +17,7 @@ import {
   TEMP_STAT_AXES,
   type TempStatAxis,
 } from '../../../shared/schemas/character.ts';
+import { EffectSourcesList } from '../../components/ui/EffectSourcesList.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
@@ -35,6 +36,7 @@ import {
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
+import { ActiveConditionsPanel } from './sections/ActiveConditionsPanel.tsx';
 import { HistoryPanel } from './sections/HistoryPanel.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
@@ -892,6 +894,7 @@ function StatusPanel({
   canWrite: boolean;
 }) {
   const d = character.derived;
+  const effects = character.effects;
   const combat = character.combat;
   const currentHp = combat?.currentHp ?? d.hp;
   const currentFp = combat?.currentFp ?? d.fp;
@@ -959,7 +962,9 @@ function StatusPanel({
             <InfoTooltip
               content={
                 <span>
-                  <strong>Dodge</strong> = Basic Speed + 3, then encumbrance penalty applies.
+                  <strong>Dodge</strong> = Basic Speed + 3 + trait bonuses, then encumbrance penalty
+                  applies.
+                  <EffectSourcesList effects={effects} targets="dodge" introLabel="Trait sources" />
                 </span>
               }
             >
@@ -967,6 +972,73 @@ function StatusPanel({
             </InfoTooltip>
           }
           value={d.dodge}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Parry mod</strong> is added to per-weapon parry rolls (weapon parry =
+                  (skill/2)+3 + this mod). Hides when zero.
+                  <EffectSourcesList effects={effects} targets="parry" introLabel="Trait sources" />
+                </span>
+              }
+            >
+              <span>Parry +</span>
+            </InfoTooltip>
+          }
+          value={d.parryMod >= 0 ? `+${d.parryMod}` : d.parryMod}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Block mod</strong> is added to per-shield block rolls. Hides when zero.
+                  <EffectSourcesList effects={effects} targets="block" introLabel="Trait sources" />
+                </span>
+              }
+            >
+              <span>Block +</span>
+            </InfoTooltip>
+          }
+          value={d.blockMod >= 0 ? `+${d.blockMod}` : d.blockMod}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Trait DR</strong> stacks with armor DR. Per-location DR is not yet
+                  modeled — this is a global value.
+                  <EffectSourcesList effects={effects} targets="dr" introLabel="Trait sources" />
+                </span>
+              }
+            >
+              <span>DR (trait)</span>
+            </InfoTooltip>
+          }
+          value={d.traitDr}
+        />
+        <Stat
+          label={
+            <InfoTooltip
+              content={
+                <span>
+                  <strong>Fright check</strong> is rolled against Will + this mod. Combat Reflexes
+                  (+6), High Pain Threshold, etc. contribute here.
+                  <EffectSourcesList
+                    effects={effects}
+                    targets="fright_check"
+                    introLabel="Trait sources"
+                  />
+                </span>
+              }
+            >
+              <span>Fright +</span>
+            </InfoTooltip>
+          }
+          value={d.frightCheckMod >= 0 ? `+${d.frightCheckMod}` : d.frightCheckMod}
         />
         <Stat
           label={
@@ -1505,6 +1577,7 @@ export function CharacterSheetPage() {
         <div className="grid grid-cols-1 gap-4">
           <PointsPanel character={character} />
           <EncumbrancePanel character={character} />
+          <ActiveConditionsPanel character={character} canWrite={canWrite} />
         </div>
       </div>
 

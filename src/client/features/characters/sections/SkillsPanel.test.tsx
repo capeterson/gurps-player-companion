@@ -29,6 +29,7 @@ function makeSkill(overrides: Partial<SkillOut> = {}): SkillOut {
     notes: null,
     librarySkillId: null,
     level: 14,
+    effectiveLevel: 14,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,

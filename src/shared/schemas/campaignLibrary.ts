@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { timestamps, uuid } from './common.ts';
+import { traitEffect } from './effects.ts';
 import { armorData, weaponData } from './inventory.ts';
 import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
 import { spellDifficulty } from './spell.ts';
-import { traitKindEnum, traitModifier } from './trait.ts';
+import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
 
 const tagList = z.array(z.string().min(1).max(40)).default([]);
 
@@ -15,9 +16,25 @@ export const libraryTraitOut = z.object({
   name: z.string().min(1).max(160),
   kind: traitKindEnum,
   basePoints: z.number().int(),
+  /**
+   * Cost per level above level 0.  When non-null the trait is "leveled"
+   * and `points = basePoints + level * pointsPerLevel` (Magery: base 5 +
+   * 10/level; Acute Vision: base 0 + 2/level; Damage Resistance: base 0
+   * + 5/level).  Null for fixed-cost traits like Combat Reflexes.
+   */
+  pointsPerLevel: z.number().int().min(-1000).max(1000).nullable(),
+  /** Optional level cap; UI clamps the picker. */
+  maxLevel: z.number().int().min(1).max(99).nullable(),
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
   availableModifiers: z.array(traitModifier).default([]),
+  /**
+   * Named alternative forms of the trait.  Character picks at most one
+   * variant; the variant's cost adjustment applies after level scaling
+   * and before per-instance modifiers.
+   */
+  variants: z.array(traitVariant).default([]),
+  effects: z.array(traitEffect).default([]),
   tags: tagList,
   ...timestamps,
 });
@@ -26,9 +43,13 @@ export const libraryTraitCreate = z.object({
   name: z.string().min(1).max(160).trim(),
   kind: traitKindEnum,
   basePoints: z.number().int().min(-1000).max(1000).default(0),
+  pointsPerLevel: z.number().int().min(-1000).max(1000).nullable().optional(),
+  maxLevel: z.number().int().min(1).max(99).nullable().optional(),
   description: z.string().max(20_000).nullable().optional(),
   source: z.string().max(40).trim().nullable().optional(),
   availableModifiers: z.array(traitModifier).default([]),
+  variants: z.array(traitVariant).default([]),
+  effects: z.array(traitEffect).default([]),
   tags: tagList,
 });
 
@@ -46,6 +67,7 @@ export const librarySkillOut = z.object({
   defaultSpecialization: z.string().max(160).nullable(),
   prerequisites: z.string().max(20_000).nullable(),
   situationalModifiers: z.array(situationalModifier).default([]),
+  effects: z.array(traitEffect).default([]),
   ...timestamps,
 });
 
@@ -59,6 +81,7 @@ export const librarySkillCreate = z.object({
   defaultSpecialization: z.string().max(160).nullable().optional(),
   prerequisites: z.string().max(20_000).nullable().optional(),
   situationalModifiers: z.array(situationalModifier).default([]),
+  effects: z.array(traitEffect).default([]),
 });
 
 export const librarySkillUpdate = librarySkillCreate.partial();
@@ -155,7 +178,13 @@ export const importResult = z.object({
 
 // ---------- YAML doc shape (versioned) ----------
 
-export const libraryYamlVersion = z.literal(1);
+/**
+ * v1 docs (pre-effects) and v2 docs (effects on traits/skills) both parse.
+ * Schema unions on a literal version field so older library files keep
+ * round-tripping without mutation.  v1 docs that omit `effects` get the
+ * default empty array via libraryTraitCreate / librarySkillCreate.
+ */
+export const libraryYamlVersion = z.union([z.literal(1), z.literal(2)]);
 
 export const libraryYamlDoc = z.object({
   version: libraryYamlVersion,

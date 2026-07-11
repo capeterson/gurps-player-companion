@@ -15,8 +15,13 @@
 
 import type { ManaLevel } from '../constants/magic.ts';
 import type { SpellDifficulty } from '../constants/skills.ts';
-import type { CharacterDetail, TempEffect } from '../schemas/character.ts';
+import type {
+  CharacterDetail,
+  ResolvedEffectOut,
+  TempEffect,
+} from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
+import type { TraitEffect } from '../schemas/effects.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
 import type { SkillOut } from '../schemas/skill.ts';
 import type { SpellOut } from '../schemas/spell.ts';
@@ -38,6 +43,11 @@ import {
   mageryLevel,
   manaSkillModifier,
 } from './spellCalc.ts';
+import {
+  applyEffectsToAttrs,
+  resolveEffects,
+  skillBonusFor,
+} from './traitEffects.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
 /**
@@ -72,6 +82,8 @@ export interface CharacterDetailInputCharacter {
    * may lack this column; adapters default it to `[]`. */
   tempEffects?: TempEffect[];
   dismissedWarnings: string[];
+  /** Optional — defaults to []. Pre-Phase-2 rows may not have this field. */
+  activeConditionGroups?: string[];
   createdAt: Date | string;
   updatedAt: Date | string;
   revision: number | bigint;
@@ -84,9 +96,17 @@ export interface CharacterDetailInputTrait {
   name: string;
   points: number;
   level: number | null;
+  /** Selected library variant name, or null for the base form. */
+  variantName?: string | null;
   notes: string | null;
   modifiers: unknown[] | null;
   libraryTraitId: string | null;
+  /**
+   * Effect declarations from the matching library_trait row, joined by
+   * libraryTraitId at fetch time.  Empty array if the trait has no
+   * library reference or the library entry has no declared effects.
+   */
+  libraryEffects?: TraitEffect[];
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -102,6 +122,8 @@ export interface CharacterDetailInputSkill {
   specialization: string | null;
   notes: string | null;
   librarySkillId: string | null;
+  /** Library skill effects, joined by librarySkillId.  Defaults to []. */
+  libraryEffects?: TraitEffect[];
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -198,6 +220,13 @@ function characterAttrsFromRow(c: CharacterDetailInputCharacter): CharacterAttrs
     speedQuarterMod: c.speedQuarterMod,
     moveMod: c.moveMod,
     tempEffects: c.tempEffects ?? [],
+    // Trait-effect deltas; resolveEffects + applyEffectsToAttrs populate
+    // these in buildCharacterDetail before computeDerived runs.
+    dodgeMod: 0,
+    parryMod: 0,
+    blockMod: 0,
+    drMod: 0,
+    frightCheckMod: 0,
   };
 }
 
@@ -222,6 +251,7 @@ export function buildTraitOut(trait: CharacterDetailInputTrait): TraitOut {
     name: trait.name,
     points: trait.points,
     level: trait.level,
+    variantName: trait.variantName ?? null,
     notes: trait.notes,
     modifiers: (trait.modifiers ?? []) as TraitModifier[],
     libraryTraitId: trait.libraryTraitId,
@@ -247,7 +277,9 @@ export function buildCombatStateOut(state: CharacterDetailInputCombat): CombatSt
 export function buildSkillOut(
   skill: CharacterDetailInputSkill,
   derived: ReturnType<typeof computeDerived>,
+  skillBonus: number = 0,
 ): SkillOut {
+  const level = computeSkillLevel(skill.attribute, skill.difficulty, skill.points, derived);
   return {
     id: skill.id,
     characterId: skill.characterId,
@@ -259,7 +291,10 @@ export function buildSkillOut(
     specialization: skill.specialization,
     notes: skill.notes,
     librarySkillId: skill.librarySkillId,
-    level: computeSkillLevel(skill.attribute, skill.difficulty, skill.points, derived),
+    level,
+    // level is null for a 0-point Very Hard skill (no attribute default);
+    // effectiveLevel mirrors that — no bonus target to apply against.
+    effectiveLevel: level === null ? null : level + skillBonus,
     createdAt: toIso(skill.createdAt),
     updatedAt: toIso(skill.updatedAt),
   };
@@ -342,7 +377,31 @@ export function buildSpellOut(
 
 export function buildCharacterDetail(input: CharacterDetailInput): CharacterDetail {
   const { character, traits, skills, spells, inventory, combat, campaign } = input;
-  const attrs = characterAttrsFromRow(character);
+  const baseAttrs = characterAttrsFromRow(character);
+
+  // Resolve trait/skill effects FIRST.  Each character trait/skill carries
+  // its libraryEffects (joined by libraryTraitId/librarySkillId at fetch
+  // time).  Active conditional groups gate which effects are "on".
+  const activeGroups = new Set(character.activeConditionGroups ?? []);
+  const resolved = resolveEffects(
+    traits.map((t) => ({
+      id: t.id,
+      name: t.name,
+      level: t.level,
+      libraryEffects: t.libraryEffects ?? [],
+    })),
+    skills.map((s) => ({
+      id: s.id,
+      name: s.name,
+      libraryEffects: s.libraryEffects ?? [],
+    })),
+    activeGroups,
+  );
+
+  // Apply effects to attrs, THEN compute derived stats — so dodge / parry
+  // / block / dr already include the trait contributions when the UI
+  // reads them.
+  const attrs = applyEffectsToAttrs(baseAttrs, resolved);
   const derived = computeDerived(attrs);
 
   const traitInputs: CharacterTraitInput[] = traits.map((t) => ({
@@ -356,13 +415,17 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     ...skills.map((s) => ({ points: s.points })),
     ...spells.map((s) => ({ points: s.points })),
   ];
-  const points = computePointBreakdown(attrs, traitInputs, skillInputs);
+  // Use BASE attrs for point cost — trait-granted bonuses are paid for
+  // by the trait itself, not double-billed against attribute spend.
+  const points = computePointBreakdown(baseAttrs, traitInputs, skillInputs);
 
   const weights = computeWeights(inventory.map(inventoryRowFor));
   const encumbrance = computeEncumbrance(weights.playerWeightLbs, derived.basicLift);
   const inventoryOut = inventory.map((i) => buildInventoryItemOut(i, weights.perItem));
   const traitsOut = traits.map(buildTraitOut);
-  const skillsOut = skills.map((s) => buildSkillOut(s, derived));
+  const skillsOut = skills.map((s) =>
+    buildSkillOut(s, derived, skillBonusFor(s.name, resolved).total),
+  );
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
   // A character in a campaign whose row we don't have yet (client-side,
@@ -372,6 +435,22 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const manaLevelKnown = character.campaignId == null || campaign != null;
   const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery, manaLevel));
   const combatOut = combat ? buildCombatStateOut(combat) : null;
+
+  // Strip the unused `sourceCharacterRecordId` field name — the schema
+  // calls it `sourceId` for brevity.  resolveEffects already emits sourceId.
+  const effectsOut: ResolvedEffectOut[] = resolved.map((e) => ({
+    sourceKind: e.sourceKind,
+    sourceName: e.sourceName,
+    sourceId: e.sourceId,
+    target: e.target,
+    value: e.value,
+    skillName: e.skillName,
+    skillSpecialty: e.skillSpecialty,
+    hitLocation: e.hitLocation,
+    conditionGroup: e.conditionGroup,
+    conditionLabel: e.conditionLabel,
+    active: e.active,
+  }));
 
   const caps: CampaignCaps = {
     pointTarget: campaign?.pointTarget ?? null,
@@ -420,6 +499,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     moveMod: character.moveMod,
     tempEffects: character.tempEffects ?? [],
     dismissedWarnings: character.dismissedWarnings,
+    activeConditionGroups: character.activeConditionGroups ?? [],
     createdAt: toIso(character.createdAt),
     updatedAt: toIso(character.updatedAt),
     revision: Number(character.revision),
@@ -434,5 +514,6 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     spells: spellsOut,
     inventory: inventoryOut,
     combat: combatOut,
+    effects: effectsOut,
   };
 }

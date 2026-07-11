@@ -122,3 +122,10 @@ dist
 
 # Local YAML fixtures (gitignored; generate from yaml-export skill)
 *.yaml.local
+
+# Sourcebook content extracted from copyrighted PDFs (personal/local use only)
+bootstrap/sourcebook_library.yaml
+bootstrap/_sourcebook_chunks/
+
+# Local docker-compose overrides (per-worktree port remaps, etc.)
+docker-compose.override.yml

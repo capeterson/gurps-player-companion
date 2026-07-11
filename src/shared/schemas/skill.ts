@@ -26,6 +26,13 @@ export const skillOut = z.object({
    * attribute default (attr-4/-5/-6 per B173); null for a 0-point
    * Very Hard skill, which has no attribute default. */
   level: z.number().int().nullable(),
+  /**
+   * Server-computed: `level` + sum of active skill-target trait effects
+   * (e.g. Talents, Magery's blanket bonus to all spell skills).  Null
+   * when `level` is null (0-point Very Hard); otherwise `level` when
+   * no matching effects apply.
+   */
+  effectiveLevel: z.number().int().nullable(),
   ...timestamps,
 });
 

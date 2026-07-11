@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import type { TraitOut } from '../../../../shared/schemas/trait.ts';
+import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import {
@@ -44,11 +44,40 @@ interface TraitSnapshot {
   kind: TraitKind;
   points: number;
   pointsRaw: string;
+  /** Trait level (when the library entry has pointsPerLevel). */
+  level: number | null;
+  /** Selected library variant name, or null for the base form. */
+  variantName: string | null;
   libraryTraitId: string | null;
   /** When non-empty, list of selected library modifier names to write into trait.modifiers. */
   selectedModifierNames: readonly string[];
   /** Snapshot of the picked trait's catalogue entry (for resolving modifier metadata at create time). */
   pickedTrait: LibraryTraitOut | null;
+}
+
+/**
+ * Combine basePoints + level*pointsPerLevel + variant adjustment + modifier
+ * percent/flat into a final cost.  Mirrors computeLeveledTraitCost in
+ * shared/domain/modifierMath.ts but uses the UI's `computeTraitCost`
+ * (Math.ceil rounding) for consistency with the existing modifier picker.
+ */
+function previewLeveledCost(
+  basePoints: number,
+  pointsPerLevel: number | null | undefined,
+  level: number | null,
+  variant: TraitVariant | null,
+  selectedModifiers: ReadonlyArray<{ costType: 'percent' | 'flat'; costValue: number }>,
+): number {
+  const leveled = basePoints + (pointsPerLevel ?? 0) * (level ?? 0);
+  let withVariant = leveled;
+  if (variant?.pointCostMultiplier !== undefined) {
+    withVariant =
+      leveled >= 0
+        ? Math.ceil(leveled * variant.pointCostMultiplier)
+        : Math.floor(leveled * variant.pointCostMultiplier);
+  }
+  if (variant?.pointCostDelta !== undefined) withVariant += variant.pointCostDelta;
+  return computeTraitCost(withVariant, selectedModifiers);
 }
 
 function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) {
@@ -61,6 +90,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
   const [pickedTrait, setPickedTrait] = useState<LibraryTraitOut | null>(null);
   const [selectedModifiers, setSelectedModifiers] = useState<readonly string[]>([]);
+  /** Level input draft (string for tolerance to mid-edit blank value). */
+  const [levelDraft, setLevelDraft] = useState<string>('');
+  /** Selected variant name; null = base form. */
+  const [variantName, setVariantName] = useState<string | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibraryTraitOut>('traits', campaignId);
   const { creating, submit: submitEntity } = useAddEntityForm({
@@ -69,13 +102,25 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
     label: 'trait',
   });
 
+  const isLeveled = pickedTrait?.pointsPerLevel != null;
+  const hasVariants = (pickedTrait?.variants?.length ?? 0) > 0;
+  const parsedLevel = (() => {
+    const n = Number.parseInt(levelDraft, 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  })();
+  const selectedVariant: TraitVariant | null =
+    pickedTrait?.variants?.find((v) => v.name === variantName) ?? null;
+
   // Live cost preview when the picker is open: re-derives points from
-  // the selected modifier names, so the form's `points` field stays in
-  // sync with what the user is toggling.
+  // level + variant + selected modifier names, so the form's `points`
+  // field stays in sync with what the user is toggling.
   const livePoints =
     pickedTrait !== null
-      ? computeTraitCost(
+      ? previewLeveledCost(
           pickedTrait.basePoints,
+          pickedTrait.pointsPerLevel ?? null,
+          isLeveled ? parsedLevel : null,
+          selectedVariant,
           pickedTrait.availableModifiers
             .filter((m) => selectedModifiers.includes(m.name))
             .map((m) => ({ costType: m.costType, costValue: m.costValue })),
@@ -95,6 +140,8 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         kind: snap.kind,
         points: snap.points,
         characterId,
+        ...(snap.level !== null ? { level: snap.level } : {}),
+        ...(snap.variantName !== null ? { variantName: snap.variantName } : {}),
         ...(snap.libraryTraitId ? { libraryTraitId: snap.libraryTraitId } : {}),
         ...(modifiers.length > 0 ? { modifiers } : {}),
       },
@@ -112,6 +159,8 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         setPickedLibraryId(null);
         setPickedTrait(null);
         setSelectedModifiers([]);
+        setLevelDraft('');
+        setVariantName(null);
       },
     );
   }
@@ -130,18 +179,28 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         // anything.  If they haven't (livePoints === pickedTrait.basePoints
         // and selectedModifiers is empty), the field still works.
         const pParsed = Number(points);
-        const submittedPoints =
-          livePoints !== null && selectedModifiers.length > 0
-            ? livePoints
-            : Number.isFinite(pParsed)
-              ? pParsed
-              : 0;
+        // Prefer the leveled/variant/modifier-aware live preview whenever
+        // the library context provides one — the user's intent is "what
+        // the picker / level / variant says".  Falls back to the typed
+        // Pts field for plain non-library traits.
+        const usePreview =
+          livePoints !== null &&
+          (selectedModifiers.length > 0 ||
+            isLeveled ||
+            selectedVariant !== null);
+        const submittedPoints = usePreview
+          ? (livePoints as number)
+          : Number.isFinite(pParsed)
+            ? pParsed
+            : 0;
         void submit({
           name: name.trim(),
           nameRaw: name,
           kind,
           points: submittedPoints,
           pointsRaw: points,
+          level: isLeveled ? parsedLevel : null,
+          variantName,
           libraryTraitId: pickedLibraryId,
           selectedModifierNames: selectedModifiers,
           pickedTrait,
@@ -173,6 +232,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                 setPickedLibraryId(opt.id);
                 setPickedTrait(opt);
                 setSelectedModifiers([]);
+                // Default level to 1 for leveled traits (most useful starting
+                // value); leave blank otherwise so the input stays out of the way.
+                setLevelDraft(opt.pointsPerLevel != null ? '1' : '');
+                setVariantName(null);
               }}
               fetchOptions={fetchOptions}
               getOptionKey={(o) => o.id}
@@ -214,21 +277,93 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
             ))}
           </select>
         </label>
+        {isLeveled && (
+          <label className="form-control w-20">
+            <span
+              className="label-text text-xs"
+              title={
+                pickedTrait?.maxLevel != null
+                  ? `Leveled trait — max ${pickedTrait.maxLevel} (${pickedTrait.pointsPerLevel} pts/level)`
+                  : `Leveled trait (${pickedTrait?.pointsPerLevel} pts/level)`
+              }
+            >
+              Level
+            </span>
+            <input
+              type="number"
+              min="0"
+              max={pickedTrait?.maxLevel ?? 99}
+              className="input input-bordered input-sm num"
+              value={levelDraft}
+              onChange={(e) => setLevelDraft(e.target.value)}
+              aria-label="Trait level"
+            />
+          </label>
+        )}
         <label className="form-control w-20">
           <span className="label-text text-xs">Pts</span>
           <input
             className="input input-bordered input-sm num"
-            value={points}
+            value={livePoints !== null ? String(livePoints) : points}
+            readOnly={livePoints !== null}
             onChange={(e) => setPoints(e.target.value)}
+            title={
+              livePoints !== null
+                ? 'Computed from base + level + variant + modifiers. Edit those inputs to change.'
+                : 'Free-form point cost.'
+            }
           />
         </label>
         <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
           {creating ? 'Adding…' : 'Add'}
         </button>
       </div>
+      {hasVariants && pickedTrait !== null && (
+        <label className="form-control">
+          <span className="label-text text-xs">Variant</span>
+          <select
+            className="select select-bordered select-sm"
+            value={variantName ?? ''}
+            onChange={(e) => setVariantName(e.target.value || null)}
+          >
+            <option value="">(base form)</option>
+            {pickedTrait.variants.map((v) => {
+              const adj: string[] = [];
+              if (v.pointCostMultiplier !== undefined) {
+                adj.push(`×${v.pointCostMultiplier}`);
+              }
+              if (v.pointCostDelta !== undefined) {
+                adj.push(`${v.pointCostDelta >= 0 ? '+' : ''}${v.pointCostDelta} pts`);
+              }
+              const adjStr = adj.length > 0 ? ` (${adj.join(', ')})` : '';
+              return (
+                <option key={v.name} value={v.name}>
+                  {v.name}
+                  {adjStr}
+                </option>
+              );
+            })}
+          </select>
+          {selectedVariant?.description && (
+            <span className="mt-1 text-[11px] text-dim leading-snug">
+              {selectedVariant.description}
+            </span>
+          )}
+        </label>
+      )}
       {pickedTrait !== null && pickedTrait.availableModifiers.length > 0 && (
         <LibraryModifierPicker
-          basePoints={pickedTrait.basePoints}
+          basePoints={
+            // Show base+level+variant cost so modifier percentages preview
+            // against the right starting figure.
+            previewLeveledCost(
+              pickedTrait.basePoints,
+              pickedTrait.pointsPerLevel ?? null,
+              isLeveled ? parsedLevel : null,
+              selectedVariant,
+              [],
+            )
+          }
           available={pickedTrait.availableModifiers}
           selectedNames={selectedModifiers}
           onToggle={(modName) =>
@@ -299,9 +434,31 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
             data-flash-parity={nameField.inputProps['data-flash-parity']}
           />
         ) : (
-          <span className="font-medium">{trait.name}</span>
+          <span className="font-medium">
+            {trait.name}
+            {trait.level != null && trait.level > 0 && (
+              <span className="ml-1 text-base-content/70 num">{trait.level}</span>
+            )}
+            {trait.variantName && (
+              <span className="ml-1 text-[11px] text-base-content/60 italic">
+                ({trait.variantName})
+              </span>
+            )}
+          </span>
         )}
-        <p className="text-xs text-base-content/60 capitalize">{trait.kind.replace('_', ' ')}</p>
+        <p className="text-xs text-base-content/60 capitalize">
+          {trait.kind.replace('_', ' ')}
+          {trait.level != null && trait.level > 0 && canWrite && (
+            <span className="ml-2 not-italic normal-case">
+              <span className="text-warning">level {trait.level}</span>
+            </span>
+          )}
+          {trait.variantName && canWrite && (
+            <span className="ml-2 not-italic normal-case italic text-base-content/70">
+              {trait.variantName}
+            </span>
+          )}
+        </p>
         {canWrite ? (
           <textarea
             aria-label={`${trait.name} notes`}

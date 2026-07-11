@@ -15,7 +15,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { buildCharacterDetail } from '../../../shared/domain/characterDetail.ts';
 import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
+import type { TraitEffect } from '../../../shared/schemas/effects.ts';
 import { getLocalDb } from '../../db/dexie.ts';
+import { useLibraryEffectMaps } from './useLibraryEffectMaps.ts';
 
 /**
  * `undefined` while the live query is still mounting; `null` for
@@ -25,7 +27,38 @@ import { getLocalDb } from '../../db/dexie.ts';
  */
 export type CharacterDetailResult = CharacterDetail | null | undefined;
 
-export function useCharacterDetail(id: string | undefined): CharacterDetailResult {
+export interface UseCharacterDetailOptions {
+  /**
+   * Library trait id → effects[] map.  When omitted (the default), the
+   * hook fetches the campaign library itself via `useLibraryEffectMaps`
+   * and joins effects automatically.  Pass an explicit map here only if
+   * you need to override the auto-fetch (e.g. in tests).
+   */
+  readonly libraryTraitEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
+  readonly librarySkillEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
+}
+
+export function useCharacterDetail(
+  id: string | undefined,
+  options: UseCharacterDetailOptions = {},
+): CharacterDetailResult {
+  // Pre-fetch the campaignId so the library hook can run with the
+  // correct key.  Two live queries are cheap; the second depends on the
+  // library maps which themselves depend on this campaignId.
+  const campaignId = useLiveQuery(async () => {
+    if (!id) return null;
+    const c = await getLocalDb().characters.get(id);
+    return c?.campaignId ?? null;
+  }, [id]);
+
+  const autoMaps = useLibraryEffectMaps(campaignId ?? null);
+  const traitEffects = options.libraryTraitEffects ?? autoMaps.libraryTraitEffects;
+  const skillEffects = options.librarySkillEffects ?? autoMaps.librarySkillEffects;
+  // Stable-ish key derived from map sizes — React Query keeps the same
+  // Map identity across renders unless data changes, so this re-derives
+  // only when the underlying library payload mutates.
+  const traitMapKey = traitEffects ? traitEffects.size : 0;
+  const skillMapKey = skillEffects ? skillEffects.size : 0;
   return useLiveQuery(async () => {
     if (!id) return null;
     const db = getLocalDb();
@@ -41,8 +74,20 @@ export function useCharacterDetail(id: string | undefined): CharacterDetailResul
     ]);
     return buildCharacterDetail({
       character,
-      traits,
-      skills,
+      traits: traits.map((t) => ({
+        ...t,
+        libraryEffects:
+          t.libraryTraitId && traitEffects?.has(t.libraryTraitId)
+            ? [...(traitEffects.get(t.libraryTraitId) ?? [])]
+            : [],
+      })),
+      skills: skills.map((s) => ({
+        ...s,
+        libraryEffects:
+          s.librarySkillId && skillEffects?.has(s.librarySkillId)
+            ? [...(skillEffects.get(s.librarySkillId) ?? [])]
+            : [],
+      })),
       spells,
       inventory,
       combat: combat ?? null,
@@ -55,7 +100,7 @@ export function useCharacterDetail(id: string | undefined): CharacterDetailResul
           }
         : null,
     });
-  }, [id]);
+  }, [id, traitMapKey, skillMapKey]);
 }
 
 export type CharacterListResult = CharacterListItem[] | undefined;

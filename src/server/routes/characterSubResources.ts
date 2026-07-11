@@ -812,4 +812,91 @@ router.openapi(
   },
 );
 
+// ===================== CONDITION TOGGLES =====================
+
+const conditionGroupParam = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[a-z][a-z0-9_]*$/, 'must be lower_snake_case');
+
+const conditionGroupsResponse = z.object({
+  activeConditionGroups: z.array(z.string()),
+  character: characterDetail,
+});
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/characters/{id}/conditions/{group}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Toggle a trait/skill effect condition group ON for a character',
+    request: {
+      params: z.object({ id: uuid, group: conditionGroupParam }),
+    },
+    responses: {
+      200: {
+        description: 'Updated active group set + refreshed character',
+        content: { 'application/json': { schema: conditionGroupsResponse } },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, group } = c.req.valid('param');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const db = getDb();
+    const [row] = await db.select().from(characters).where(eq(characters.id, id));
+    if (!row) throw new HTTPException(404, { message: 'character not found' });
+    const current = new Set(row.activeConditionGroups ?? []);
+    current.add(group);
+    const next = Array.from(current).sort();
+    await db
+      .update(characters)
+      .set({ activeConditionGroups: next, updatedAt: new Date() })
+      .where(eq(characters.id, id));
+    return c.json({ activeConditionGroups: next, character: await loadCharacterDetail(id) }, 200);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/characters/{id}/conditions/{group}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Toggle a trait/skill effect condition group OFF (idempotent)',
+    request: {
+      params: z.object({ id: uuid, group: conditionGroupParam }),
+    },
+    responses: {
+      200: {
+        description: 'Updated active group set + refreshed character',
+        content: { 'application/json': { schema: conditionGroupsResponse } },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, group } = c.req.valid('param');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const db = getDb();
+    const [row] = await db.select().from(characters).where(eq(characters.id, id));
+    if (!row) throw new HTTPException(404, { message: 'character not found' });
+    const current = (row.activeConditionGroups ?? []).filter((g) => g !== group);
+    await db
+      .update(characters)
+      .set({ activeConditionGroups: current, updatedAt: new Date() })
+      .where(eq(characters.id, id));
+    return c.json({ activeConditionGroups: current, character: await loadCharacterDetail(id) }, 200);
+  },
+);
+
 export const characterSubResourcesRouter = router;
