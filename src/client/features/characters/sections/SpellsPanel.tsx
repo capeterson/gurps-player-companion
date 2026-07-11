@@ -10,10 +10,11 @@ import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../../hooks/useFieldFlash.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { enqueueCreate, enqueueDelete, newClientId } from '../../../sync/outbox.ts';
+import { enqueueDelete } from '../../../sync/outbox.ts';
 import { RollSheet } from '../play/RollSheet.tsx';
 import type { RollRequest } from '../play/rollTypes.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
+import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
   useEntityNameField,
   useEntityPointsField,
@@ -42,64 +43,58 @@ interface SpellSnapshot {
 }
 
 function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) {
-  const toasts = useToasts();
   const [name, setName] = useState('');
   const [college, setCollege] = useState('');
   const [difficulty, setDifficulty] = useState<SpellDifficulty>('H');
   const [points, setPoints] = useState('1');
   const [baseEnergyCost, setBaseEnergyCost] = useState('1');
-  const [creating, setCreating] = useState(false);
   // Full library row when the name was picked from the autocomplete;
   // carries book fields (maintenance, casting time, ...) into the create.
   const [picked, setPicked] = useState<LibrarySpellOut | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibrarySpellOut>('spells', campaignId);
+  const { creating, submit: submitEntity } = useAddEntityForm({
+    entityClass: 'character_spell',
+    characterId,
+    label: 'spell',
+  });
 
   async function submit(snap: SpellSnapshot) {
-    setCreating(true);
-    try {
-      await enqueueCreate({
-        entityClass: 'character_spell',
-        entityId: newClientId(),
-        humanName: 'spell',
+    await submitEntity(
+      {
+        name: snap.name,
+        college: snap.college === '' ? null : snap.college,
+        difficulty: snap.difficulty,
+        points: snap.points,
+        baseEnergyCost: snap.baseEnergyCost,
+        ...(snap.library
+          ? {
+              maintenanceCost: snap.library.maintenanceCost,
+              castingTime: snap.library.castingTime,
+              duration: snap.library.duration,
+              prerequisites: snap.library.prerequisites,
+              notes: snap.library.description,
+              librarySpellId: snap.library.id,
+            }
+          : {}),
         characterId,
-        attemptedValue: {
-          name: snap.name,
-          college: snap.college === '' ? null : snap.college,
-          difficulty: snap.difficulty,
-          points: snap.points,
-          baseEnergyCost: snap.baseEnergyCost,
-          ...(snap.library
-            ? {
-                maintenanceCost: snap.library.maintenanceCost,
-                castingTime: snap.library.castingTime,
-                duration: snap.library.duration,
-                prerequisites: snap.library.prerequisites,
-                notes: snap.library.description,
-                librarySpellId: snap.library.id,
-              }
-            : {}),
-          characterId,
-        },
-      });
-      // Per AGENTS.md: only clear fields whose value still matches the
-      // snapshot we sent.  We use functional setters so the comparison
-      // runs against the *live* state at completion time, not the
-      // closure-captured value from the render that submitted; that
-      // way a field the user has typed into during the await isn't
-      // wiped, which is exactly the quick-edit loss this guard exists
-      // to prevent.
-      setName((cur) => (cur === snap.nameRaw ? '' : cur));
-      setCollege((cur) => (cur === snap.collegeRaw ? '' : cur));
-      setDifficulty((cur) => (cur === snap.difficulty ? 'H' : cur));
-      setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
-      setBaseEnergyCost((cur) => (cur === snap.baseEnergyCostRaw ? '1' : cur));
-      setPicked((cur) => (cur?.id === snap.library?.id ? null : cur));
-    } catch (err) {
-      toasts.push(`Couldn't add spell — ${(err as Error).message}`, { kind: 'error' });
-    } finally {
-      setCreating(false);
-    }
+      },
+      () => {
+        // Per AGENTS.md: only clear fields whose value still matches the
+        // snapshot we sent.  We use functional setters so the comparison
+        // runs against the *live* state at completion time, not the
+        // closure-captured value from the render that submitted; that
+        // way a field the user has typed into during the await isn't
+        // wiped, which is exactly the quick-edit loss this guard exists
+        // to prevent.
+        setName((cur) => (cur === snap.nameRaw ? '' : cur));
+        setCollege((cur) => (cur === snap.collegeRaw ? '' : cur));
+        setDifficulty((cur) => (cur === snap.difficulty ? 'H' : cur));
+        setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
+        setBaseEnergyCost((cur) => (cur === snap.baseEnergyCostRaw ? '1' : cur));
+        setPicked((cur) => (cur?.id === snap.library?.id ? null : cur));
+      },
+    );
   }
 
   if (!canWrite) return null;

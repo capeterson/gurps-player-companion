@@ -7,9 +7,10 @@ import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { enqueueCreate, enqueueDelete, newClientId } from '../../../sync/outbox.ts';
+import { enqueueDelete } from '../../../sync/outbox.ts';
 import { RollSheet } from '../play/RollSheet.tsx';
 import type { RollRequest } from '../play/rollTypes.ts';
+import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
   useEntityNameField,
   useEntityPointsField,
@@ -39,45 +40,43 @@ interface SkillSnapshot {
 }
 
 function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) {
-  const toasts = useToasts();
   const [name, setName] = useState('');
   const [attribute, setAttribute] = useState<SkillAttribute>('DX');
   const [difficulty, setDifficulty] = useState<SkillDifficulty>('A');
   const [points, setPoints] = useState('1');
-  const [creating, setCreating] = useState(false);
   const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
+  const { creating, submit: submitEntity } = useAddEntityForm({
+    entityClass: 'character_skill',
+    characterId,
+    label: 'skill',
+  });
 
   async function submit(snap: SkillSnapshot) {
-    setCreating(true);
-    try {
-      await enqueueCreate({
-        entityClass: 'character_skill',
-        entityId: newClientId(),
-        humanName: 'skill',
+    await submitEntity(
+      {
+        name: snap.name,
+        attribute: snap.attribute,
+        difficulty: snap.difficulty,
+        points: snap.points,
         characterId,
-        attemptedValue: {
-          name: snap.name,
-          attribute: snap.attribute,
-          difficulty: snap.difficulty,
-          points: snap.points,
-          characterId,
-          ...(snap.librarySkillId ? { librarySkillId: snap.librarySkillId } : {}),
-        },
-      });
-      // Per AGENTS.md (rule 1: never silently discard user edits): only
-      // clear fields whose current value still matches the snapshot we
-      // submitted.  If the user has started typing the next skill while
-      // this enqueue was in flight, leave that draft alone.
-      if (name === snap.nameRaw) setName('');
-      if (points === snap.pointsRaw) setPoints('1');
-      setPickedLibraryId(null);
-    } catch (err) {
-      toasts.push(`Couldn't add skill — ${(err as Error).message}`, { kind: 'error' });
-    } finally {
-      setCreating(false);
-    }
+        ...(snap.librarySkillId ? { librarySkillId: snap.librarySkillId } : {}),
+      },
+      () => {
+        // Per AGENTS.md (rule 1: never silently discard user edits): only
+        // clear fields whose current value still matches the snapshot we
+        // submitted.  We use functional setters so the comparison runs
+        // against the *live* state at completion time, not the
+        // closure-captured value from the render that submitted; that
+        // way a field the user has typed into during the await isn't
+        // wiped, which is exactly the quick-edit loss this guard exists
+        // to prevent.
+        setName((cur) => (cur === snap.nameRaw ? '' : cur));
+        setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
+        setPickedLibraryId(null);
+      },
+    );
   }
 
   if (!canWrite) return null;

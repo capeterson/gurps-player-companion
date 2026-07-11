@@ -12,7 +12,8 @@ import {
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { enqueueCreate, enqueueDelete, newClientId } from '../../../sync/outbox.ts';
+import { enqueueDelete } from '../../../sync/outbox.ts';
+import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
   useEntityNameField,
   useEntityPointsField,
@@ -51,11 +52,9 @@ interface TraitSnapshot {
 }
 
 function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) {
-  const toasts = useToasts();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<TraitKind>('advantage');
   const [points, setPoints] = useState('0');
-  const [creating, setCreating] = useState(false);
   // When the user picks a library entry both the id (for the FK) and
   // the full entry (for the modifier picker) are captured here.  The
   // entry is dropped whenever the user types past the prefilled name.
@@ -64,6 +63,11 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const [selectedModifiers, setSelectedModifiers] = useState<readonly string[]>([]);
 
   const { fetchOptions } = useLibraryFetcher<LibraryTraitOut>('traits', campaignId);
+  const { creating, submit: submitEntity } = useAddEntityForm({
+    entityClass: 'character_trait',
+    characterId,
+    label: 'trait',
+  });
 
   // Live cost preview when the picker is open: re-derives points from
   // the selected modifier names, so the form's `points` field stays in
@@ -79,42 +83,37 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
       : null;
 
   async function submit(snap: TraitSnapshot) {
-    setCreating(true);
-    try {
-      const modifiers =
-        snap.pickedTrait !== null
-          ? snap.pickedTrait.availableModifiers.filter((m) =>
-              snap.selectedModifierNames.includes(m.name),
-            )
-          : [];
-      await enqueueCreate({
-        entityClass: 'character_trait',
-        entityId: newClientId(),
-        humanName: 'trait',
+    const modifiers =
+      snap.pickedTrait !== null
+        ? snap.pickedTrait.availableModifiers.filter((m) =>
+            snap.selectedModifierNames.includes(m.name),
+          )
+        : [];
+    await submitEntity(
+      {
+        name: snap.name,
+        kind: snap.kind,
+        points: snap.points,
         characterId,
-        attemptedValue: {
-          name: snap.name,
-          kind: snap.kind,
-          points: snap.points,
-          characterId,
-          ...(snap.libraryTraitId ? { libraryTraitId: snap.libraryTraitId } : {}),
-          ...(modifiers.length > 0 ? { modifiers } : {}),
-        },
-      });
-      // Per AGENTS.md (rule 1: never silently discard user edits): only
-      // clear fields whose current value still matches the snapshot we
-      // submitted.  If the user has started typing the next trait while
-      // this enqueue was in flight, leave that draft alone.
-      if (name === snap.nameRaw) setName('');
-      if (points === snap.pointsRaw) setPoints('0');
-      setPickedLibraryId(null);
-      setPickedTrait(null);
-      setSelectedModifiers([]);
-    } catch (err) {
-      toasts.push(`Couldn't add trait — ${(err as Error).message}`, { kind: 'error' });
-    } finally {
-      setCreating(false);
-    }
+        ...(snap.libraryTraitId ? { libraryTraitId: snap.libraryTraitId } : {}),
+        ...(modifiers.length > 0 ? { modifiers } : {}),
+      },
+      () => {
+        // Per AGENTS.md (rule 1: never silently discard user edits): only
+        // clear fields whose current value still matches the snapshot we
+        // submitted.  We use functional setters so the comparison runs
+        // against the *live* state at completion time, not the
+        // closure-captured value from the render that submitted; that
+        // way a field the user has typed into during the await isn't
+        // wiped, which is exactly the quick-edit loss this guard exists
+        // to prevent.
+        setName((cur) => (cur === snap.nameRaw ? '' : cur));
+        setPoints((cur) => (cur === snap.pointsRaw ? '0' : cur));
+        setPickedLibraryId(null);
+        setPickedTrait(null);
+        setSelectedModifiers([]);
+      },
+    );
   }
 
   if (!canWrite) return null;
