@@ -150,11 +150,12 @@ mid-combat:
   level (0-point/no-default entries are the full sheet's job), each
   rollable; spells also get a "Cast" button that reuses the sheet's
   `CastSpellDialog` as-is. Casting is gated by the same ambient-mana
-  rule as the sheet's SpellsPanel (`manaLevelKnown` +
-  `canCastInMana`/`hasMagery` from `shared/domain/spellCalc.ts`) — the
-  button is disabled with a compact notice when the campaign's mana
-  level hasn't synced yet or the ambient mana forbids casting here.
-  Rolling a spell row stays unrestricted (it's ephemeral, no cost).
+  rule as the sheet's SpellsPanel — both call the shared
+  `characterCanCast` helper in `shared/domain/spellCalc.ts` (the one
+  mana gate; don't fork it) — the button is disabled with a compact
+  notice when the campaign's mana level hasn't synced yet or the
+  ambient mana forbids casting here. Rolling a spell row stays
+  unrestricted (it's ephemeral, no cost).
 - **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
   stepper (−10..+10) plus single-select preset chips (picking a second
   preset replaces the first), a deliberately unobtrusive "Roll 3d6"
