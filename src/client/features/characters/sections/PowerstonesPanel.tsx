@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
 import { totalPowerstoneEnergy } from '../../../../shared/domain/spellCalc.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueFieldPatch } from '../../../sync/outbox.ts';
+import type {
+  InventoryItemOut,
+  MagicItemData,
+  PowerstoneData,
+} from '../../../../shared/schemas/inventory.ts';
+import { useClampedJsonbBumper } from './useClampedJsonbBumper.ts';
 
 interface PowerstoneRowProps {
   item: InventoryItemOut;
@@ -13,47 +15,28 @@ interface PowerstoneRowProps {
 
 function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
   const data = item.powerstoneData;
-  // Latest-intended currentEnergy. Without this ref, two rapid -/+ taps
-  // both read the same render-time `data.currentEnergy` and enqueue
-  // duplicate patches, dropping one click. Mirrors the CombatModal pool
-  // bumper pattern. Ref is read directly off the prop on every render,
-  // which is safe because Dexie's local-first writes mean the prop
-  // already reflects the latest committed intent before the next
-  // synchronous click handler runs.
-  const propEnergy = data?.currentEnergy ?? 0;
-  const currentRef = useRef(propEnergy);
-  useEffect(() => {
-    currentRef.current = propEnergy;
-  }, [propEnergy]);
-
-  if (!data) return null;
-  const ratio = data.maxEnergy > 0 ? data.currentEnergy / data.maxEnergy : 0;
 
   // Powerstone charge is editable nested JSON; we patch the whole
   // `powerstoneData` field as a single unit to keep the orchestrator's
   // per-field validation happy (the field validator parses the full
   // shape, and we always send a fresh, valid copy).
-  const setEnergyTo = (next: number) => {
-    if (!canWrite) return;
-    const clamped = Math.max(0, Math.min(data.maxEnergy, Math.round(next)));
-    if (clamped === currentRef.current) return;
-    currentRef.current = clamped;
-    const updated: PowerstoneData = {
-      maxEnergy: data.maxEnergy,
+  const { setTo: setEnergyTo, bump: bumpEnergy } = useClampedJsonbBumper<PowerstoneData>({
+    characterId,
+    entityId: item.id,
+    fieldPath: 'powerstoneData',
+    humanName: `${item.name} charge`,
+    current: data?.currentEnergy ?? 0,
+    max: data?.maxEnergy ?? 0,
+    canWrite,
+    buildValue: (clamped) => ({
+      maxEnergy: data?.maxEnergy ?? 0,
       currentEnergy: clamped,
-      ...(data.notes != null ? { notes: data.notes } : {}),
-    };
-    void enqueueFieldPatch({
-      entityClass: 'character_inventory',
-      entityId: item.id,
-      fieldPath: 'powerstoneData',
-      attemptedValue: updated,
-      humanName: `${item.name} charge`,
-      flashKey: makeFlashKey('character_inventory', item.id, 'powerstoneData'),
-      characterId,
-    });
-  };
-  const bumpEnergy = (delta: number) => setEnergyTo(currentRef.current + delta);
+      ...(data?.notes != null ? { notes: data.notes } : {}),
+    }),
+  });
+
+  if (!data) return null;
+  const ratio = data.maxEnergy > 0 ? data.currentEnergy / data.maxEnergy : 0;
 
   return (
     <li className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
@@ -181,38 +164,23 @@ interface MagicItemRowProps {
 
 function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
   const data = item.magicItemData;
-  // Latest-intended chargesCurrent so two rapid Use/Refill clicks
-  // compose instead of dropping one. Same rationale as PowerstoneRow.
-  const propCharges = data?.chargesCurrent ?? 0;
-  const chargesRef = useRef(propCharges);
-  useEffect(() => {
-    chargesRef.current = propCharges;
-  }, [propCharges]);
-
-  if (!data) return null;
-  const charged = data.mode === 'charged';
+  const charged = data?.mode === 'charged';
 
   // For "charged" items only, we expose -/+ controls on chargesCurrent.
   // Same patch-the-whole-jsonb pattern as powerstone, since the field
   // validator parses the entire object shape.
-  const setChargesTo = (next: number) => {
-    if (!canWrite || !charged) return;
-    const max = data.chargesMax ?? 0;
-    const clamped = Math.max(0, Math.min(max, Math.round(next)));
-    if (clamped === chargesRef.current) return;
-    chargesRef.current = clamped;
-    const updated = { ...data, chargesCurrent: clamped };
-    void enqueueFieldPatch({
-      entityClass: 'character_inventory',
-      entityId: item.id,
-      fieldPath: 'magicItemData',
-      attemptedValue: updated,
-      humanName: `${item.name} charges`,
-      flashKey: makeFlashKey('character_inventory', item.id, 'magicItemData'),
-      characterId,
-    });
-  };
-  const bumpCharges = (delta: number) => setChargesTo(chargesRef.current + delta);
+  const { setTo: setChargesTo, bump: bumpCharges } = useClampedJsonbBumper<MagicItemData>({
+    characterId,
+    entityId: item.id,
+    fieldPath: 'magicItemData',
+    humanName: `${item.name} charges`,
+    current: data?.chargesCurrent ?? 0,
+    max: data?.chargesMax ?? 0,
+    canWrite: canWrite && charged,
+    buildValue: (clamped) => ({ ...(data as MagicItemData), chargesCurrent: clamped }),
+  });
+
+  if (!data) return null;
 
   return (
     <li className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
