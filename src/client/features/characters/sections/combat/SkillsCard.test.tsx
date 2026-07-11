@@ -6,7 +6,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { SkillsCard } from './SkillsCard.tsx';
 
 function makeCharacter(

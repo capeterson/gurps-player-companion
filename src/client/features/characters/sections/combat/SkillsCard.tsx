@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { characterCanCast } from '../../../../shared/domain/spellCalc.ts';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import type { SpellOut } from '../../../../shared/schemas/spell.ts';
-import { CastSpellDialog } from '../sections/CastSpellDialog.tsx';
-import { RollableRow } from './RollableRow.tsx';
-import type { RollRequest } from './rollTypes.ts';
+import { characterCanCast } from '../../../../../shared/domain/spellCalc.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type { SpellOut } from '../../../../../shared/schemas/spell.ts';
+import { CastSpellDialog } from '../CastSpellDialog.tsx';
+import { RollableRow } from '../RollableRow.tsx';
+import type { RollRequest } from '../rollTypes.ts';
 
 export interface SkillsCardProps {
   character: CharacterDetail;

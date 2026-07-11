@@ -1,10 +1,10 @@
 /**
- * Temporary-effects list state machine for the Attributes/Secondary
- * panels. Owns the latest-intended-array ref for the same reason
+ * Temporary-effects state machine for the Attributes/Secondary panels.
+ * Owns the latest-intended-array ref for the same reason
  * `useConditionsToggle` does (see that hook's comments for the general
  * pattern): the whole `tempEffects` array is patched as ONE field
  * (S2/S3 -- raw array value, whole-array coalescing), so two rapid
- * mutations (bump ST in the popover, then add a named effect before
+ * mutations (bump ST in one popover, then bump HT in another before
  * the first save round-trips through Dexie) must each compose against
  * the OTHER's just-enqueued result, not the same render-time
  * `character.tempEffects` snapshot -- otherwise the outbox's same-field
@@ -12,10 +12,10 @@
  * and silently drop it.
  *
  * Shared by every consumer that can mutate temp effects (both stat
- * panels, the effects list) via ONE hook instance lifted to
- * CharacterSheetPage and passed down as a prop -- calling this hook
- * more than once per character would give each call site its own ref,
- * reintroducing the exact race the ref exists to prevent.
+ * panels) via ONE hook instance lifted to CharacterSheetPage and passed
+ * down as a prop -- calling this hook more than once per character
+ * would give each call site its own ref, reintroducing the exact race
+ * the ref exists to prevent.
  */
 
 import { useEffect, useRef } from 'react';
@@ -31,7 +31,13 @@ import {
 } from '../../../../shared/schemas/character.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { flashBus, makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueFieldPatch, newClientId } from '../../../sync/outbox.ts';
+import { enqueueFieldPatch } from '../../../sync/outbox.ts';
+
+/** The per-axis modifier bag of one effect. Zod-inferred, so optional
+ * axes admit an explicit `undefined` -- which is what makes it (and not
+ * `Partial<Record<TempStatAxis, number>>`) assignable under
+ * exactOptionalPropertyTypes. */
+export type TempEffectMods = TempEffect['mods'];
 
 /**
  * Turn a `tempEffectsField.safeParse` failure into a short, human
@@ -53,12 +59,6 @@ function describeTempEffectsFailure(error: z.ZodError): string {
   return error.issues[0]?.message ?? 'invalid temporary effects';
 }
 
-/** The per-axis modifier bag of one effect. Zod-inferred, so optional
- * axes admit an explicit `undefined` -- which is what makes it (and not
- * `Partial<Record<TempStatAxis, number>>`) assignable under
- * exactOptionalPropertyTypes. */
-export type TempEffectMods = TempEffect['mods'];
-
 export interface TempEffectsApi {
   /** Render from this (Dexie-backed via the character prop), same as today. */
   readonly effects: readonly TempEffect[];
@@ -75,10 +75,6 @@ export interface TempEffectsApi {
    * UI call sites fire-and-forget it like every other outbox mutation.
    */
   setManualAxis(axis: TempStatAxis, value: number): Promise<void>;
-  /** Append a new named effect with a client-generated id. */
-  addEffect(name: string, mods: TempEffectMods): Promise<void>;
-  /** Remove one effect (named or manual) by id. */
-  removeEffect(id: string): Promise<void>;
   /** Replace the whole list with `[]` in a single patch -- this is the
    * "revert all temporary buffs" gesture. */
   clearAll(): Promise<void>;
@@ -156,20 +152,6 @@ export function useTempEffects(
     return commit(next);
   }
 
-  function addEffect(name: string, mods: TempEffectMods): Promise<void> {
-    if (!canMutate) return Promise.resolve();
-    const trimmed = name.trim();
-    if (!trimmed) return Promise.resolve();
-    const next = [...effectsRef.current, { id: newClientId(), name: trimmed, mods }];
-    return commit(next);
-  }
-
-  function removeEffect(id: string): Promise<void> {
-    if (!canMutate) return Promise.resolve();
-    const next = effectsRef.current.filter((e) => e.id !== id);
-    return commit(next);
-  }
-
   function clearAll(): Promise<void> {
     if (!canMutate) return Promise.resolve();
     if (effectsRef.current.length === 0) return Promise.resolve();
@@ -181,8 +163,6 @@ export function useTempEffects(
     totals: sumTempMods(effects),
     flashKey,
     setManualAxis,
-    addEffect,
-    removeEffect,
     clearAll,
   };
 }

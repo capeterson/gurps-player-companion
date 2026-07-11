@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { MANEUVERS } from '../../../../shared/constants/combat.ts';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { ConditionChip } from '../../../components/ui/ConditionChip.tsx';
-import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
+import { MANEUVERS } from '../../../../../shared/constants/combat.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
+import { DRAFT_FIELD_CLASS, useDraftField } from '../../../../hooks/useDraftField.ts';
+import { makeFlashKey } from '../../../../sync/flashBus.ts';
 
-// Mirrors CharacterSheetPage's CombatPanel maneuver field exactly (S10:
+// Mirrors CharacterSheetPage's StatusPanel maneuver field exactly (S10:
 // one draft-on-blur pattern, don't fork it) — same nullable-text parser
 // and flash-bus key convention. The 3-line parser itself isn't shared
 // anywhere, so it's duplicated rather than exported for one caller.
@@ -29,7 +29,7 @@ export function ManeuverCard({ character, canWrite, patchCombat }: ManeuverCardP
   );
 
   // serverValue is `?? ''`, not `?? null` — matches CharacterSheetPage's
-  // CombatPanel maneuverField exactly. useDraftField's default `format`
+  // StatusPanel maneuverField exactly. useDraftField's default `format`
   // is `String(v)`, which renders a literal null as the string "null";
   // an unedited custom-maneuver input would then show and could persist
   // that literal text.

@@ -7,9 +7,9 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type { RollRequest } from '../rollTypes.ts';
 import { AttacksCard } from './AttacksCard.tsx';
-import type { RollRequest } from './rollTypes.ts';
 
 /** Pull the `presets` array out of an openRoll mock's first call. */
 function presetsFrom(openRoll: ReturnType<typeof vi.fn>): readonly { label: string }[] {

@@ -11,7 +11,7 @@ export interface RollableRowProps {
 }
 
 /**
- * Shared row for every rollable value in Play Mode (skills, spells,
+ * Shared row for every rollable value in the Combat tab (skills, spells,
  * defenses, weapon attacks). The target number is the dominant visual
  * element by design — a player at the table with physical dice reads
  * it at a glance before deciding whether to even open the roll sheet.

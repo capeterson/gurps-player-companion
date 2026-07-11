@@ -1,5 +1,5 @@
 /**
- * Ephemeral session-only roll log for Play Mode.
+ * Ephemeral session-only roll log for the Combat tab.
  *
  * Deliberately NOT persisted — no Dexie table, no localStorage. A
  * physical-dice roll has no server-side meaning and carries none of
@@ -9,7 +9,7 @@
  * reload clearing the log is the intended behaviour, not a bug.
  *
  * Exposed via `useSyncExternalStore` so every `RollHistoryStrip`
- * instance (there's normally just one per Play Mode page) re-renders
+ * instance (there's normally just one per Combat tab) re-renders
  * the moment a roll lands, without React state living outside a
  * component.
  */

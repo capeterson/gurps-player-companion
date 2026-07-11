@@ -1,8 +1,8 @@
 /**
- * Conditions-array toggle state machine, shared by PoolsCard (Play
- * Mode) and CombatModal (the full sheet's FAB tracker). Owns the
- * latest-intended-value ref for the same reason usePoolBumpers owns
- * one for HP/FP — see that hook's comments for the general pattern.
+ * Conditions-array toggle state machine, used by the Combat tab's
+ * PoolsCard. Owns the latest-intended-value ref for the same reason
+ * usePoolBumpers owns one for HP/FP — see that hook's comments for the
+ * general pattern.
  *
  * Posture is single-valued (last write wins) and needs no such ref;
  * only the conditions *array* is at risk of a compose-against-stale-

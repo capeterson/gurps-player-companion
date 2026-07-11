@@ -4,8 +4,8 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import type { PoolBumpers } from '../sections/usePoolBumpers.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type { PoolBumpers } from '../usePoolBumpers.ts';
 import { PoolsCard } from './PoolsCard.tsx';
 
 function makeCharacter(hpMax: number, conditions: string[] = []): CharacterDetail {

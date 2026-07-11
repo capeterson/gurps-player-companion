@@ -14,11 +14,9 @@ import { formatScaled } from '../../../shared/format/number.ts';
 import {
   type CharacterDetail,
   MANUAL_TEMP_EFFECT_ID,
-  TEMP_AXIS_LABELS,
   TEMP_STAT_AXES,
   type TempStatAxis,
 } from '../../../shared/schemas/character.ts';
-import { ConditionChip } from '../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
@@ -33,25 +31,21 @@ import {
   nullableTextParser,
   scaledIntParser,
 } from '../../lib/parsers.ts';
-import { useToasts } from '../../lib/toast.tsx';
+
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
-import { CombatModal } from './sections/CombatModal.tsx';
 import { HistoryPanel } from './sections/HistoryPanel.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { SpellsPanel } from './sections/SpellsPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
+import { CombatTab } from './sections/combat/CombatTab.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCombatPatch } from './sections/useCombatPatch.ts';
-import {
-  type TempEffectMods,
-  type TempEffectsApi,
-  useTempEffects,
-} from './sections/useTempEffects.ts';
+import { type TempEffectsApi, useTempEffects } from './sections/useTempEffects.ts';
 import { type CampaignSummary, useCharacterAccessLocal } from './useCharacterAccess.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 import { useMirrorCampaigns } from './useMirrorCampaigns.ts';
@@ -82,16 +76,6 @@ interface CountByTab {
   Traits?: number;
   Magic?: number;
 }
-
-const POSTURES = [
-  'standing',
-  'prone',
-  'kneeling',
-  'crawling',
-  'sitting',
-  'crouching',
-  'lying',
-] as const;
 
 interface MeResponse {
   id: string;
@@ -205,7 +189,6 @@ function ModifierButton({
   characterId,
   tempTotal,
   tempManual,
-  tempNamed,
   onApplyTempManual,
   tempFlashKey,
   permField,
@@ -217,14 +200,12 @@ function ModifierButton({
   /** Raw base before perm mod and temp (display-scaled inside the popover). */
   baseValue: number;
   characterId: string;
-  /** `totals[axis]` from useTempEffects -- manual + every named effect. */
+  /** `totals[axis]` from useTempEffects -- the total temp contribution
+   * to this axis (just the manual entry now that named effects are gone). */
   tempTotal: number;
   /** The 'manual' effect's axis value -- what this popover's Temporary
    * section actually edits. */
   tempManual: number;
-  /** `tempTotal - tempManual` -- contribution from named effects, shown
-   * read-only in the popover. */
-  tempNamed: number;
   onApplyTempManual: (next: number) => void;
   /** Shared across every axis -- all of them patch the same `tempEffects` field. */
   tempFlashKey: string;
@@ -279,7 +260,7 @@ function ModifierButton({
             min: -50,
             max: 50,
           }}
-          namedTempContribution={tempNamed}
+          otherTemp={tempTotal - tempManual}
           perm={
             permSaver && permValue !== undefined
               ? {
@@ -377,7 +358,6 @@ function PrimaryAttrCell({
   const tempTotal = tempEffects.totals[axis];
   const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
   const tempManual = manualEffect?.mods[axis] ?? 0;
-  const tempNamed = tempTotal - tempManual;
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
       <InfoTooltip
@@ -434,7 +414,6 @@ function PrimaryAttrCell({
             label={label}
             tempTotal={tempTotal}
             tempManual={tempManual}
-            tempNamed={tempNamed}
             onApplyTempManual={(v) => tempEffects.setManualAxis(axis, v)}
             tempFlashKey={tempEffects.flashKey}
             baseValue={baseValue}
@@ -486,7 +465,6 @@ function SecondaryModCell({
   const tempTotal = tempEffects.totals[axis];
   const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
   const tempManual = manualEffect?.mods[axis] ?? 0;
-  const tempNamed = tempTotal - tempManual;
   const baseRaw = derived - modValue - tempTotal;
   const adjusted = modValue !== 0 || tempTotal !== 0;
   const displayValue = derivedDisplay ?? String(derived);
@@ -533,7 +511,6 @@ function SecondaryModCell({
             characterId={characterId}
             tempTotal={tempTotal}
             tempManual={tempManual}
-            tempNamed={tempNamed}
             onApplyTempManual={(v) => tempEffects.setManualAxis(axis, v)}
             tempFlashKey={tempEffects.flashKey}
             permField={modField}
@@ -742,138 +719,6 @@ function IdentityPanel({
  * `SecondaryModCell`'s `modScale={0.25}` for the same axis so the row
  * and the "±N from effects" caption agree (PR #46 review finding).
  */
-export function formatEffectMods(mods: TempEffectMods): string {
-  const parts: string[] = [];
-  for (const axis of TEMP_STAT_AXES) {
-    const v = mods[axis];
-    if (v === undefined || v === 0) continue;
-    const scale = axis === 'speedQuarter' ? 0.25 : 1;
-    parts.push(`${TEMP_AXIS_LABELS[axis]} ${fmtSignedDelta(v, scale)}`);
-  }
-  return parts.join(', ');
-}
-
-/**
- * Named-effects list + compact add form, rendered under the Attributes
- * panel's revert-all button. The 'manual' entry (driven by the ✦
- * popovers) shows read-only here -- it has no remove button because
- * the popovers already manage it via "Clear".
- *
- * Rendered for every viewer who HAS effect data, including full
- * read-only viewers (e.g. a GM) -- only the add form and the per-row
- * remove buttons are gated on `canWrite` (PR #46 review finding: this
- * used to gate the whole list, hiding named effects from read-only
- * viewers entirely). Share-gate minimal viewers already receive
- * `tempEffects: []` from the server, so there's nothing to leak here.
- */
-function TempEffectsList({
-  tempEffects,
-  canWrite,
-}: {
-  tempEffects: TempEffectsApi;
-  canWrite: boolean;
-}) {
-  const toasts = useToasts();
-  const flash = useFieldFlash(tempEffects.flashKey);
-  const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
-  const namedEffects = tempEffects.effects.filter((e) => e.id !== MANUAL_TEMP_EFFECT_ID);
-  const [name, setName] = useState('');
-  const [axis, setAxis] = useState<TempStatAxis>('st');
-  const [amount, setAmount] = useState('');
-
-  function submitAdd(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    // Speed is stored in quarter-Speed-point units (mods.speedQuarter),
-    // but the input reads in whole Speed points -- e.g. typing "1"
-    // means "+1 Speed" and must store 4 quarters, not 1 (PR #46 review:
-    // this used to write the raw parsed integer straight into
-    // mods.speedQuarter, silently storing 1/4 of the intended boost).
-    // scaledIntParser both does the ×4 conversion and rejects amounts
-    // that aren't exact quarter-steps.
-    let n: number;
-    try {
-      n =
-        axis === 'speedQuarter'
-          ? scaledIntParser(0.25, -50, 50)(amount)
-          : intParser(-50, 50)(amount);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'invalid amount';
-      toasts.push(`Couldn't add effect — ${msg}`, { kind: 'error' });
-      return;
-    }
-    if (n === 0) return;
-    tempEffects.addEffect(name, { [axis]: n });
-    setName('');
-    setAmount('');
-  }
-
-  return (
-    <div
-      className="mt-3 space-y-1.5"
-      data-flashing={flash['data-flashing']}
-      data-flash-parity={flash['data-flash-parity']}
-    >
-      {manualEffect && formatEffectMods(manualEffect.mods) && (
-        <div className="num text-[11px] text-base-content/60">
-          Manual adjustment — {formatEffectMods(manualEffect.mods)}
-        </div>
-      )}
-      {namedEffects.map((effect) => (
-        <div key={effect.id} className="flex items-center justify-between gap-2 text-[11px]">
-          <span className="num truncate">
-            {effect.name} — {formatEffectMods(effect.mods)}
-          </span>
-          {canWrite && (
-            <button
-              type="button"
-              onClick={() => tempEffects.removeEffect(effect.id)}
-              aria-label={`Remove ${effect.name}`}
-              className="btn btn-ghost btn-xs px-1.5"
-            >
-              ×
-            </button>
-          )}
-        </div>
-      ))}
-      {canWrite && (
-        <form onSubmit={submitAdd} className="flex items-center gap-1.5">
-          <input
-            aria-label="New effect name"
-            placeholder="Effect name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="input input-bordered input-xs flex-1 min-w-0"
-          />
-          <select
-            aria-label="Effect axis"
-            value={axis}
-            onChange={(e) => setAxis(e.target.value as TempStatAxis)}
-            className="select select-bordered select-xs"
-          >
-            {TEMP_STAT_AXES.map((a) => (
-              <option key={a} value={a}>
-                {TEMP_AXIS_LABELS[a]}
-              </option>
-            ))}
-          </select>
-          <input
-            aria-label="Effect amount"
-            type="number"
-            step={axis === 'speedQuarter' ? 0.25 : 1}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="num input input-bordered input-xs w-14"
-          />
-          <button type="submit" className="btn btn-ghost btn-xs">
-            Add
-          </button>
-        </form>
-      )}
-    </div>
-  );
-}
-
 function AttributesPanel({
   character,
   canWrite,
@@ -940,9 +785,6 @@ function AttributesPanel({
         >
           Revert all temporary buffs
         </button>
-      )}
-      {(canWrite || tempEffects.effects.length > 0) && (
-        <TempEffectsList tempEffects={tempEffects} canWrite={canWrite} />
       )}
     </StatCard>
   );
@@ -1033,97 +875,85 @@ function SecondaryModsPanel({
   );
 }
 
-function DerivedPanel({ character }: { character: CharacterDetail }) {
+/**
+ * Status card — current HP/FP pools (editable) plus the derived combat
+ * stats that aren't already surfaced by the Secondary card (Dodge,
+ * Basic Lift, Thr/Sw). Formerly two surfaces: the "Derived" read-only
+ * card and the old "Combat" tab's HP/FP + posture/maneuver block. The
+ * combat tab is gone (the combat modal and Play mode handle posture,
+ * maneuver, conditions, and pool bumpers better); HP/FP editing lives
+ * here so the always-visible sheet shows the player's current pools.
+ */
+function StatusPanel({
+  character,
+  canWrite,
+}: {
+  character: CharacterDetail;
+  canWrite: boolean;
+}) {
   const d = character.derived;
+  const combat = character.combat;
+  const currentHp = combat?.currentHp ?? d.hp;
+  const currentFp = combat?.currentFp ?? d.fp;
+
+  const patchCombat = useCombatPatch(character);
+  const hpField = useDraftField<number>({
+    name: 'current HP',
+    serverValue: currentHp,
+    parse: intParser(-1000, 1000),
+    onSave: (v) => patchCombat('currentHp', v),
+    flashKey: makeFlashKey('character_combat', character.id, 'currentHp'),
+  });
+  const fpField = useDraftField<number>({
+    name: 'current FP',
+    serverValue: currentFp,
+    parse: intParser(-1000, 1000),
+    onSave: (v) => patchCombat('currentFp', v),
+    flashKey: makeFlashKey('character_combat', character.id, 'currentFp'),
+  });
+
+  const hpRatio = d.hp > 0 ? currentHp / d.hp : 0;
+  const fpRatio = d.fp > 0 ? currentFp / d.fp : 0;
+  const hpColor = hpVarFor(hpRatio);
+  const fpColor = hpVarFor(fpRatio);
+
   return (
-    <StatCard title="Derived">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Stat
-          label={
-            <InfoTooltip
-              content={
-                <span>
-                  <strong>HP</strong> defaults to ST. The current pool can be pushed past max with
-                  the double-press override in the combat panel.
-                </span>
-              }
-            >
-              <span>HP</span>
-            </InfoTooltip>
-          }
-          value={d.hp}
-        />
-        <Stat
-          label={
-            <InfoTooltip
-              content={
-                <span>
-                  <strong>Will</strong> defaults to IQ; the secondary mod shifts it independently.
-                </span>
-              }
-            >
-              <span>Will</span>
-            </InfoTooltip>
-          }
-          value={d.will}
-        />
-        <Stat
-          label={
-            <InfoTooltip
-              content={
-                <span>
-                  <strong>Per</strong> defaults to IQ; sense rolls use this, not raw IQ.
-                </span>
-              }
-            >
-              <span>Per</span>
-            </InfoTooltip>
-          }
-          value={d.per}
-        />
-        <Stat
-          label={
-            <InfoTooltip
-              content={
-                <span>
-                  <strong>FP</strong> defaults to HT. Spent on running, spellcasting, extra-effort.
-                </span>
-              }
-            >
-              <span>FP</span>
-            </InfoTooltip>
-          }
-          value={d.fp}
-        />
-        <Stat
-          label={
-            <InfoTooltip
-              content={
-                <span>
-                  <strong>Basic Speed</strong> = (DX + HT)/4. Drives Dodge and Basic Move.
-                </span>
-              }
-            >
-              <span>Basic Speed</span>
-            </InfoTooltip>
-          }
-          value={d.basicSpeed.toFixed(2)}
-        />
-        <Stat
-          label={
-            <InfoTooltip
-              content={
-                <span>
-                  <strong>Basic Move</strong> drops the fractional part of Basic Speed, then applies
-                  any secondary +Move.
-                </span>
-              }
-            >
-              <span>Basic Move</span>
-            </InfoTooltip>
-          }
-          value={d.basicMove}
-        />
+    <StatCard title="Status">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <p className="label-eyebrow">HP</p>
+          <div className="flex items-baseline gap-1">
+            {canWrite ? (
+              <input
+                aria-label="current HP"
+                className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right w-20 ${hpColor} font-display text-2xl`}
+                {...hpField.inputProps}
+              />
+            ) : (
+              <span className={`num font-display text-2xl ${hpColor}`}>{currentHp}</span>
+            )}
+            <span className="text-base-content/60 num">/ {d.hp}</span>
+          </div>
+          <PoolMeter current={currentHp} max={d.hp} tone="hp" ariaLabel="Hit points" />
+        </div>
+        <div className="space-y-1.5">
+          <p className="label-eyebrow">FP</p>
+          <div className="flex items-baseline gap-1">
+            {canWrite ? (
+              <input
+                aria-label="current FP"
+                className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right w-20 ${fpColor} font-display text-2xl`}
+                {...fpField.inputProps}
+              />
+            ) : (
+              <span className={`num font-display text-2xl ${fpColor}`}>{currentFp}</span>
+            )}
+            <span className="text-base-content/60 num">/ {d.fp}</span>
+          </div>
+          <PoolMeter current={currentFp} max={d.fp} tone="fp" ariaLabel="Fatigue points" />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4 mt-4">
         <Stat
           label={
             <InfoTooltip
@@ -1454,154 +1284,6 @@ function WarningsPanel({
   );
 }
 
-function CombatPanel({
-  character,
-  canWrite,
-}: {
-  character: CharacterDetail;
-  canWrite: boolean;
-}) {
-  const combat = character.combat;
-  const currentHp = combat?.currentHp ?? character.derived.hp;
-  const currentFp = combat?.currentFp ?? character.derived.fp;
-  const posture = combat?.posture ?? 'standing';
-  const maneuver = combat?.maneuver ?? '';
-
-  // Ensure-row + outbox enqueue logic is shared with CombatModal (and
-  // future combat surfaces) via useCombatPatch — see that hook for the
-  // materialize-default-row rationale.
-  const patchCombat = useCombatPatch(character);
-
-  const hpField = useDraftField<number>({
-    name: 'current HP',
-    serverValue: currentHp,
-    parse: intParser(-1000, 1000),
-    onSave: (v) => patchCombat('currentHp', v),
-    flashKey: makeFlashKey('character_combat', character.id, 'currentHp'),
-  });
-  const fpField = useDraftField<number>({
-    name: 'current FP',
-    serverValue: currentFp,
-    parse: intParser(-1000, 1000),
-    onSave: (v) => patchCombat('currentFp', v),
-    flashKey: makeFlashKey('character_combat', character.id, 'currentFp'),
-  });
-  const maneuverField = useDraftField<string | null>({
-    name: 'maneuver',
-    serverValue: maneuver,
-    parse: nullableTextParser,
-    onSave: (v) => patchCombat('maneuver', v),
-    flashKey: makeFlashKey('character_combat', character.id, 'maneuver'),
-  });
-
-  const setPosture = {
-    isPending: false,
-    mutate: (p: (typeof POSTURES)[number]) => {
-      void patchCombat('posture', p);
-    },
-  };
-
-  const hpRatio = character.derived.hp > 0 ? currentHp / character.derived.hp : 0;
-  const fpRatio = character.derived.fp > 0 ? currentFp / character.derived.fp : 0;
-  const hpColor =
-    hpRatio >= 1
-      ? 'text-hp-full'
-      : hpRatio >= 0.67
-        ? 'text-hp-good'
-        : hpRatio >= 0.34
-          ? 'text-hp-warn'
-          : hpRatio > 0
-            ? 'text-hp-low'
-            : 'text-hp-crit';
-  const fpColor =
-    fpRatio >= 1
-      ? 'text-hp-full'
-      : fpRatio >= 0.67
-        ? 'text-hp-good'
-        : fpRatio >= 0.34
-          ? 'text-hp-warn'
-          : 'text-hp-low';
-
-  return (
-    <section className="card p-5 space-y-3">
-      <p className="label-eyebrow">Combat</p>
-      <h2 className="font-display text-2xl">Current state</h2>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <p className="label-eyebrow">HP</p>
-          <div className="flex items-baseline gap-1">
-            {canWrite ? (
-              <input
-                aria-label="current HP"
-                className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right w-20 ${hpColor} font-display text-2xl`}
-                {...hpField.inputProps}
-              />
-            ) : (
-              <span className={`num font-display text-2xl ${hpColor}`}>{currentHp}</span>
-            )}
-            <span className="text-base-content/60 num">/ {character.derived.hp}</span>
-          </div>
-          <PoolMeter
-            current={currentHp}
-            max={character.derived.hp}
-            tone="hp"
-            ariaLabel="Hit points"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <p className="label-eyebrow">FP</p>
-          <div className="flex items-baseline gap-1">
-            {canWrite ? (
-              <input
-                aria-label="current FP"
-                className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right w-20 ${fpColor} font-display text-2xl`}
-                {...fpField.inputProps}
-              />
-            ) : (
-              <span className={`num font-display text-2xl ${fpColor}`}>{currentFp}</span>
-            )}
-            <span className="text-base-content/60 num">/ {character.derived.fp}</span>
-          </div>
-          <PoolMeter
-            current={currentFp}
-            max={character.derived.fp}
-            tone="fp"
-            ariaLabel="Fatigue points"
-          />
-        </div>
-      </div>
-      <div>
-        <p className="label-eyebrow">Posture</p>
-        <div className="flex flex-wrap gap-1">
-          {POSTURES.map((p) => (
-            <ConditionChip
-              key={p}
-              label={p}
-              active={posture === p}
-              onClick={() => canWrite && setPosture.mutate(p)}
-              disabled={!canWrite || setPosture.isPending}
-              className="capitalize"
-            />
-          ))}
-        </div>
-      </div>
-      <div className="form-control">
-        <span className="label-text-alt label-eyebrow">Active maneuver</span>
-        {canWrite ? (
-          <input
-            aria-label="maneuver"
-            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm`}
-            placeholder="e.g. Attack, All-Out Defense…"
-            {...maneuverField.inputProps}
-          />
-        ) : (
-          <span>{maneuver || '—'}</span>
-        )}
-      </div>
-    </section>
-  );
-}
-
 /**
  * Identity hero — the design's full-width header on the sheet view:
  * eyebrow kicker → big display-font name (drop-cap fires automatically)
@@ -1685,7 +1367,6 @@ function IdentityHero({
 export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [tab, setTab] = useState<SheetTab>('Combat');
-  const [combatOpen, setCombatOpen] = useState(false);
 
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -1797,12 +1478,6 @@ export function CharacterSheetPage() {
   const showMagicTab = hasMagery(character.traits) || magicTabCount > 0 || canWrite;
   const visibleTabs = showMagicTab ? SHEET_TABS : SHEET_TABS.filter((t) => t !== 'Magic');
 
-  const hpRatio =
-    character.derived.hp > 0
-      ? (character.combat?.currentHp ?? character.derived.hp) / character.derived.hp
-      : 0;
-  const fabHpColor = hpVarFor(hpRatio);
-
   return (
     <div className="space-y-6">
       <nav className="flex items-center gap-2 text-sm">
@@ -1817,9 +1492,6 @@ export function CharacterSheetPage() {
             read-only
           </span>
         )}
-        <Link to={`/characters/${character.id}/play`} className="btn btn-ghost btn-xs ml-auto">
-          <span aria-hidden="true">⚔</span> Play
-        </Link>
       </nav>
 
       <IdentityHero character={character} pointTarget={pointTarget} canWrite={canWrite} />
@@ -1829,7 +1501,7 @@ export function CharacterSheetPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AttributesPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
         <SecondaryModsPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
-        <DerivedPanel character={character} />
+        <StatusPanel character={character} canWrite={canWrite} />
         <div className="grid grid-cols-1 gap-4">
           <PointsPanel character={character} />
           <EncumbrancePanel character={character} />
@@ -1854,7 +1526,7 @@ export function CharacterSheetPage() {
       </div>
 
       <div>
-        {tab === 'Combat' && <CombatPanel character={character} canWrite={canWrite} />}
+        {tab === 'Combat' && <CombatTab character={character} canWrite={canWrite} />}
         {tab === 'Identity' && (
           <IdentityPanel
             character={character}
@@ -1875,31 +1547,6 @@ export function CharacterSheetPage() {
         {tab === 'Notes' && <NotesPanel character={character} canWrite={canWrite} />}
         {tab === 'History' && <HistoryPanel characterId={character.id} />}
       </div>
-
-      <button
-        type="button"
-        className="combat-fab"
-        onClick={() => setCombatOpen(true)}
-        aria-label="Open combat tracker"
-      >
-        <span aria-hidden="true">⚔</span>
-        <span>Combat</span>
-        <span aria-hidden="true" className="text-primary-content/60">
-          ·
-        </span>
-        <span className="num" style={{ color: fabHpColor }}>
-          {character.combat?.currentHp ?? character.derived.hp}
-        </span>
-        <span className="num text-primary-content/60">/ {character.derived.hp}</span>
-      </button>
-
-      {combatOpen && (
-        <CombatModal
-          character={character}
-          canWrite={canWrite}
-          onClose={() => setCombatOpen(false)}
-        />
-      )}
     </div>
   );
 }

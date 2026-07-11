@@ -1,7 +1,7 @@
 /**
- * useTempEffects — the temporary-effects list state machine shared by
- * the Attributes/Secondary panels and the effects list. Load-bearing
- * semantics mirrored from useConditionsToggle.test.ts and outbox.test.ts:
+ * useTempEffects — the temporary-effects state machine shared by
+ * the Attributes/Secondary panels. Load-bearing semantics mirrored
+ * from useConditionsToggle.test.ts and outbox.test.ts:
  *
  *   1. A mutation writes the local Dexie row AND enqueues exactly one
  *      outbox patch carrying the raw new array (S2/S3).
@@ -27,9 +27,8 @@ import { useTempEffects } from './useTempEffects.ts';
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000d001';
 
-// useTempEffects now calls useToasts() (fix for PR #46 review finding 2:
-// over-cap mutations must toast immediately), so every renderHook call
-// needs a ToastProvider in the tree.
+// useTempEffects calls useToasts(), so every renderHook call needs a
+// ToastProvider in the tree.
 function wrapper({ children }: { children: ReactNode }) {
   return <ToastProvider>{children}</ToastProvider>;
 }
@@ -78,16 +77,18 @@ afterEach(async () => {
 });
 
 describe('useTempEffects', () => {
-  it('addEffect writes Dexie + enqueues one patch with the raw array', async () => {
+  it('setManualAxis writes Dexie + enqueues one patch with the raw array', async () => {
     await seedCharacter([]);
     const { result } = renderHook(() => useTempEffects(makeCharacter([]), true), { wrapper });
 
     await act(async () => {
-      await result.current.addEffect('Might', { st: 2 });
+      await result.current.setManualAxis('st', 2);
     });
 
     const row = await getLocalDb().characters.get(CHAR_ID);
-    expect(row?.tempEffects).toEqual([{ id: expect.any(String), name: 'Might', mods: { st: 2 } }]);
+    expect(row?.tempEffects).toEqual([
+      { id: 'manual', name: 'Manual adjustment', mods: { st: 2 } },
+    ]);
 
     const ops = await getLocalDb().outbox.toArray();
     expect(ops).toHaveLength(1);
@@ -96,7 +97,7 @@ describe('useTempEffects', () => {
     expect(ops[0]?.attemptedValue).toEqual(row?.tempEffects);
   });
 
-  it('two rapid mutations compose — the second sees the first result, not the stale prop', async () => {
+  it('two rapid setManualAxis calls compose — the second sees the first result, not the stale prop', async () => {
     await seedCharacter([]);
     const { result } = renderHook(() => useTempEffects(makeCharacter([]), true), { wrapper });
 
@@ -105,24 +106,24 @@ describe('useTempEffects', () => {
     // (empty) render-time array and the outbox's same-field coalescing
     // (S3) would drop the first.
     await act(async () => {
-      const p1 = result.current.addEffect('Might', { st: 2 });
+      const p1 = result.current.setManualAxis('st', 2);
       const p2 = result.current.setManualAxis('ht', 1);
       await Promise.all([p1, p2]);
     });
 
     const row = await getLocalDb().characters.get(CHAR_ID);
-    expect(row?.tempEffects).toHaveLength(2);
-    expect(row?.tempEffects?.some((e) => e.name === 'Might')).toBe(true);
-    expect(row?.tempEffects?.some((e) => e.id === 'manual')).toBe(true);
+    expect(row?.tempEffects).toEqual([
+      { id: 'manual', name: 'Manual adjustment', mods: { st: 2, ht: 1 } },
+    ]);
 
-    // Only one outbox row survives (coalesced), and it carries BOTH effects.
+    // Only one outbox row survives (coalesced), and it carries BOTH axes.
     const ops = await getLocalDb().outbox.toArray();
     expect(ops).toHaveLength(1);
     expect(ops[0]?.attemptedValue).toEqual(row?.tempEffects);
   });
 
   it('clearAll enqueues a single [] patch', async () => {
-    const existing: TempEffect[] = [{ id: 'e1', name: 'Might', mods: { st: 2 } }];
+    const existing: TempEffect[] = [{ id: 'manual', name: 'Manual adjustment', mods: { st: 2 } }];
     await seedCharacter(existing);
     const { result } = renderHook(() => useTempEffects(makeCharacter(existing), true), { wrapper });
 
@@ -142,7 +143,7 @@ describe('useTempEffects', () => {
     const { result } = renderHook(() => useTempEffects(makeCharacter([]), false), { wrapper });
 
     await act(async () => {
-      await result.current.addEffect('Might', { st: 2 });
+      await result.current.setManualAxis('st', 2);
     });
 
     expect(await getLocalDb().outbox.count()).toBe(0);
@@ -193,7 +194,7 @@ describe('useTempEffects', () => {
 
     getSyncOrchestrator().start();
     await act(async () => {
-      await result.current.addEffect('Might', { st: 2 });
+      await result.current.setManualAxis('st', 2);
     });
 
     // Wait for the orchestrator to drain the op, hear back "rejected",
@@ -219,15 +220,11 @@ describe('useTempEffects', () => {
     unsubscribe();
   });
 
-  it('rejects an over-cap addEffect locally: no Dexie write, no outbox row, toast fired', async () => {
-    // PR #46 review finding 2: an offline user could previously stack
-    // rapid-tap boosts past tempEffectsField's per-axis ±50 SUM cap and
-    // live with invalid derived stats until a much-later server
-    // rejection. Fix: validate in the shared commit path before ANY
-    // local write. Each individual effect here is within the per-mod
-    // [-50, 50] bound (tempAxisMod) -- it's the COMBINED st total across
-    // both effects (30 + 30 = 60) that trips tempEffectsField's
-    // superRefine cap, exercising the "combined X modifier" message path.
+  it('rejects an over-cap setManualAxis locally: no Dexie write, no outbox row, toast fired', async () => {
+    // Validate in the shared commit path before ANY local write. A
+    // legacy named effect at st:30 plus a manual st:30 would make the
+    // combined st total 60 > 50, exercising the "combined X modifier"
+    // message path in describeTempEffectsFailure.
     const existing: TempEffect[] = [{ id: 'e1', name: 'Potion', mods: { st: 30 } }];
     await seedCharacter(existing);
     const { result } = renderHook(() => useTempEffects(makeCharacter(existing), true), {
@@ -243,7 +240,7 @@ describe('useTempEffects', () => {
     );
 
     await act(async () => {
-      await result.current.addEffect('Overload', { st: 30 });
+      await result.current.setManualAxis('st', 30);
     });
 
     expect(await getLocalDb().characters.get(CHAR_ID)).toMatchObject({ tempEffects: existing });

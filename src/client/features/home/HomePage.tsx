@@ -81,12 +81,6 @@ export function HomePage() {
                     ST {c.st} · DX {c.dx} · IQ {c.iq} · HT {c.ht}
                   </p>
                 </Link>
-                <Link
-                  to={`/characters/${c.id}/play`}
-                  className="btn btn-ghost btn-xs mt-1 self-start"
-                >
-                  <span aria-hidden="true">⚔</span> Play
-                </Link>
               </div>
             ))}
           </div>

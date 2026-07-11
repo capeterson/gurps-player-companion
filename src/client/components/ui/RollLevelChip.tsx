@@ -1,6 +1,6 @@
 /**
  * Tappable skill/spell level for a table row's "Lvl" column. A computed
- * level opens the Play Mode roll sheet for that target (dispatch only —
+ * level opens the shared roll sheet for that target (dispatch only —
  * it mutates nothing, so read-only viewers can roll too); a null level
  * (e.g. a 0-point Very Hard skill, which has no attribute default —
  * B173/B170) stays a plain em-dash, matching the pre-existing display.

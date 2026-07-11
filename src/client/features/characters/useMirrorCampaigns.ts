@@ -4,9 +4,11 @@
  * The sync cursor only pulls the character-family entity classes
  * (`ALL_ENTITY_CLASSES`); campaigns are read-only and have no outbox
  * path, so this `/campaigns` fetch is the only route campaign rows
- * have into the local store. Both the character sheet and Play Mode
- * need it — whichever one a session opens first should still populate
- * Dexie so the other reads a warm cache offline.
+ * have into the local store. The character sheet reads it (the Combat
+ * tab's Skills card needs the campaign's mana level), and the sheet is
+ * the sole surface; this fetch is how a sheet opened offline-first on
+ * a cold cache still resolves the share gate and mana level (S0 —
+ * campaigns are pulled read-only via sync, no outbox path).
  *
  * Campaigns have no outbox mutations, so a plain upsert can't clobber
  * pending local intent (rule S4): there's never a pending patch on a

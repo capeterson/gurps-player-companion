@@ -2,9 +2,9 @@
    Arcane component primitives
 
    Ports of the design handoff's reusable surface classes (`.chip`,
-   `.row`, `.panel-tabs`, `.combat-fab`, `.hp-bar`) so that callers
-   in Tailwind/JSX get the design's exact spacing, radius, and
-   colour rules without re-declaring them in every component.
+   `.row`, `.panel-tabs`, `.hp-bar`) so that callers in Tailwind/JSX
+   get the design's exact spacing, radius, and colour rules without
+   re-declaring them in every component.
 
    Tokens consumed (defined in theme.css):
      --color-base-100/200/300, --color-base-content, --color-primary,
@@ -127,37 +127,6 @@
   transition: width 0.35s cubic-bezier(0.2, 0.7, 0.3, 1), background 0.25s;
 }
 
-/* ---- Combat FAB -------------------------------------------- */
-/* Sticky pill anchored bottom-right of the character sheet. Lives
-   above content (z 20) but below the modal backdrop (z 50). */
-.combat-fab {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  z-index: 20;
-  background: var(--color-primary);
-  color: var(--color-primary-content);
-  border-radius: 9999px;
-  padding: 0.75rem 1.375rem;
-  font-family: var(--font-sans);
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  box-shadow: var(--shadow-glow);
-  font-size: 0.875rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: transform 0.08s;
-}
-.combat-fab:hover {
-  transform: translateY(-1px);
-}
-.combat-fab .num {
-  font-family: var(--font-num);
-  font-variant-numeric: tabular-nums;
-}
-
 /* ---- Modal backdrop ---------------------------------------- */
 .modal-back {
   position: fixed;
@@ -194,8 +163,8 @@
   color: var(--hp-crit);
 }
 
-/* ---- Roll sheet backdrop (Play Mode) ------------------------ */
-/* `.modal-back` centers its content by default; Play Mode's roll
+/* ---- Roll sheet backdrop (Combat tab) ----------------------- */
+/* `.modal-back` centers its content by default; the Combat tab's roll
    sheet reads better as a bottom drawer on small screens (thumb
    reach) and a centered dialog everywhere else. Applied alongside
    `.modal-back` — same specificity, source order after it wins. */
@@ -210,8 +179,8 @@
   }
 }
 
-/* ---- Play Mode sticky bottom bar (mobile only) --------------- */
-.play-bottom-bar {
+/* ---- Combat tab sticky bottom bar (mobile only) ------------- */
+.combat-bottom-bar {
   position: sticky;
   bottom: 0;
   z-index: 10;

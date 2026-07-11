@@ -14,11 +14,6 @@ function formatRelative(iso: string): string {
   return `${d}d ago`;
 }
 
-function EntityChip({ entityClass }: { entityClass: string }) {
-  const label = entityClass.replace('character_', '').replace('campaign_', '').replace('_', ' ');
-  return <span className="chip text-[10px] px-1.5 py-0 opacity-60 capitalize">{label}</span>;
-}
-
 function SingleRow({ event }: { event: HistoryEventOut }) {
   return (
     <div className="flex items-start gap-2 py-2 px-3 border-b border-base-200 last:border-0 hover:bg-base-200/40 transition-colors text-sm">
@@ -27,7 +22,6 @@ function SingleRow({ event }: { event: HistoryEventOut }) {
       </span>
       <span className="flex-1 min-w-0">
         <span className="text-base-content">{event.summary}</span>
-        <EntityChip entityClass={event.entityClass} />
       </span>
       {event.actorDisplayName && (
         <span className="text-base-content/50 text-xs truncate max-w-24 shrink-0 pt-0.5">

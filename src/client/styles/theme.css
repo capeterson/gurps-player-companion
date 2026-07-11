@@ -32,8 +32,8 @@
 @import "tailwindcss";
 
 /* Reusable surface primitives (chip, row, panel-tab, hp-bar,
-   combat-fab, modal-back, bumper). Defined separately so callers
-   compose them with Tailwind utilities without re-declaring rules. */
+   modal-back, bumper). Defined separately so callers compose them
+   with Tailwind utilities without re-declaring rules. */
 @import "./components.css";
 
 @plugin "daisyui" {

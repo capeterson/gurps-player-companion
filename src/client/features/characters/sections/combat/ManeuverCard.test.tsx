@@ -6,8 +6,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { ToastProvider } from '../../../lib/toast.tsx';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { ToastProvider } from '../../../../lib/toast.tsx';
 import { ManeuverCard } from './ManeuverCard.tsx';
 
 function Wrap({ children }: { children: ReactNode }) {

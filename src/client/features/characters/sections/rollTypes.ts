@@ -1,6 +1,6 @@
 /**
  * Shared shape for "open the roll sheet for X" requests, passed down
- * from PlayModePage to every card and up from RollableRow taps.
+ * from the combat tab to every card and up from RollableRow taps.
  */
 
 export interface RollPreset {

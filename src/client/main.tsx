@@ -16,7 +16,6 @@ import { CampaignLibraryPage } from './features/campaigns/CampaignLibraryPage.ts
 import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
-import { PlayModePage } from './features/characters/play/PlayModePage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
 import { LibraryPage } from './features/library/LibraryPage.tsx';
 import { LogPage } from './features/log/LogPage.tsx';
@@ -68,7 +67,6 @@ const router = createBrowserRouter([
           { path: '/', element: <HomePage /> },
           { path: '/characters', element: <CharactersPage /> },
           { path: '/characters/:id', element: <CharacterSheetPage /> },
-          { path: '/characters/:id/play', element: <PlayModePage /> },
           { path: '/campaigns', element: <CampaignsPage /> },
           { path: '/campaigns/:id', element: <CampaignDetailPage /> },
           { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },

@@ -1,8 +1,8 @@
 /**
- * HP/FP bumper state machine for combat trackers (CombatModal today,
- * Play Mode tomorrow). Owns the latest-intended-value refs, the
- * soft-cap "double-press to override" state, the death-check-zone
- * floors, and the damage flash — everything except rendering.
+ * HP/FP bumper state machine for the Combat tab. Owns the
+ * latest-intended-value refs, the soft-cap "double-press to override"
+ * state, the death-check-zone floors, and the damage flash — everything
+ * except rendering.
  *
  * Patches flow through the `patchCombat` callback the caller provides
  * (see useCombatPatch), so this hook never talks to the outbox

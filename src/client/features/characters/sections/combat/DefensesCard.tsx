@@ -4,10 +4,10 @@ import {
   matchSkillForWeapon,
   parryFromSkill,
   parseParryString,
-} from '../../../../shared/domain/defenseCalc.ts';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { RollableRow } from './RollableRow.tsx';
-import type { RollRequest } from './rollTypes.ts';
+} from '../../../../../shared/domain/defenseCalc.ts';
+import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { RollableRow } from '../RollableRow.tsx';
+import type { RollRequest } from '../rollTypes.ts';
 
 export interface DefensesCardProps {
   character: CharacterDetail;
