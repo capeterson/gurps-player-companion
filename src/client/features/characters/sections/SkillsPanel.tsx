@@ -5,17 +5,16 @@ import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
-import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
-import {
-  enqueueCreate,
-  enqueueDelete,
-  enqueueFieldPatch,
-  newClientId,
-} from '../../../sync/outbox.ts';
+import { enqueueCreate, enqueueDelete, newClientId } from '../../../sync/outbox.ts';
 import { RollSheet } from '../play/RollSheet.tsx';
 import type { RollRequest } from '../play/rollTypes.ts';
+import {
+  useEntityNameField,
+  useEntityPointsField,
+  useEntityRowPatch,
+} from './useEntityRowPatch.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per', 'Other'] as const;
@@ -191,37 +190,15 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const patchSkill = (field: string, value: unknown) =>
-    enqueueFieldPatch({
-      entityClass: 'character_skill',
-      entityId: skill.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: `${skill.name} ${field}`,
-      flashKey: makeFlashKey('character_skill', skill.id, field),
-      characterId,
-    });
+  const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, skill.name);
 
-  const nameField = useDraftField<string>({
-    name: `${skill.name} name`,
-    serverValue: skill.name,
-    parse: (s) => s.trim(),
-    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: (v) => patchSkill('name', v),
-    flashKey: makeFlashKey('character_skill', skill.id, 'name'),
-  });
-  const pointsField = useDraftField<number>({
-    name: `${skill.name} points`,
-    serverValue: skill.points,
-    parse: (s) => {
-      const n = Number(s);
-      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
-        throw new Error('non-negative integer only');
-      }
-      return n;
-    },
-    onSave: (v) => patchSkill('points', v),
-    flashKey: makeFlashKey('character_skill', skill.id, 'points'),
+  const nameField = useEntityNameField(rowPatch, skill.name);
+  const pointsField = useEntityPointsField(rowPatch, skill.name, skill.points, (s) => {
+    const n = Number(s);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+      throw new Error('non-negative integer only');
+    }
+    return n;
   });
 
   const removeSkill = async () => {

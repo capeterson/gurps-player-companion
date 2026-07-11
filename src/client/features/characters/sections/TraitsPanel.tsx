@@ -12,13 +12,12 @@ import {
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
+import { enqueueCreate, enqueueDelete, newClientId } from '../../../sync/outbox.ts';
 import {
-  enqueueCreate,
-  enqueueDelete,
-  enqueueFieldPatch,
-  newClientId,
-} from '../../../sync/outbox.ts';
+  useEntityNameField,
+  useEntityPointsField,
+  useEntityRowPatch,
+} from './useEntityRowPatch.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const TRAIT_KINDS = [
@@ -254,40 +253,23 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const patchTrait = (field: string, value: unknown) =>
-    enqueueFieldPatch({
-      entityClass: 'character_trait',
-      entityId: trait.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: `${trait.name} ${field}`,
-      flashKey: makeFlashKey('character_trait', trait.id, field),
-      characterId,
-    });
+  const rowPatch = useEntityRowPatch('character_trait', trait.id, characterId, trait.name);
 
-  const nameField = useDraftField<string>({
-    name: `${trait.name} name`,
-    serverValue: trait.name,
-    parse: (s) => s.trim(),
-    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: (v) => patchTrait('name', v),
-    flashKey: makeFlashKey('character_trait', trait.id, 'name'),
-  });
-  const pointsField = useDraftField<number>({
-    name: `${trait.name} points`,
-    serverValue: trait.points,
-    // Unbounded (no min/max) — matches the previous inline validator,
-    // which only checked "is this an integer."
-    parse: intParser(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
-    onSave: (v) => patchTrait('points', v),
-    flashKey: makeFlashKey('character_trait', trait.id, 'points'),
-  });
+  const nameField = useEntityNameField(rowPatch, trait.name);
+  // Unbounded (no min/max) — matches the previous inline validator,
+  // which only checked "is this an integer."
+  const pointsField = useEntityPointsField(
+    rowPatch,
+    trait.name,
+    trait.points,
+    intParser(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+  );
   const notesField = useDraftField<string | null>({
     name: `${trait.name} notes`,
     serverValue: trait.notes ?? '',
     parse: (s) => (s.trim().length === 0 ? null : s),
-    onSave: (v) => patchTrait('notes', v),
-    flashKey: makeFlashKey('character_trait', trait.id, 'notes'),
+    onSave: (v) => rowPatch.patch('notes', v),
+    flashKey: rowPatch.flashKey('notes'),
   });
 
   const removeTrait = async () => {

@@ -10,16 +10,15 @@ import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../../hooks/useFieldFlash.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
-import {
-  enqueueCreate,
-  enqueueDelete,
-  enqueueFieldPatch,
-  newClientId,
-} from '../../../sync/outbox.ts';
+import { enqueueCreate, enqueueDelete, newClientId } from '../../../sync/outbox.ts';
 import { RollSheet } from '../play/RollSheet.tsx';
 import type { RollRequest } from '../play/rollTypes.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
+import {
+  useEntityNameField,
+  useEntityPointsField,
+  useEntityRowPatch,
+} from './useEntityRowPatch.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 interface AddSpellFormProps {
@@ -233,40 +232,17 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: Sp
   // The difficulty select commits instantly (no draft state), so it
   // wires the rollback flash through useFieldFlash directly (AGENTS.md
   // rule 2 / S5: a rejected patch must pulse the input it reverts).
-  const difficultyFlash = useFieldFlash(makeFlashKey('character_spell', spell.id, 'difficulty'));
+  const rowPatch = useEntityRowPatch('character_spell', spell.id, characterId, spell.name);
+  const difficultyFlash = useFieldFlash(rowPatch.flashKey('difficulty'));
 
-  const patchSpell = (field: string, value: unknown) =>
-    enqueueFieldPatch({
-      entityClass: 'character_spell',
-      entityId: spell.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: `${spell.name} ${field}`,
-      flashKey: makeFlashKey('character_spell', spell.id, field),
-      characterId,
-    });
-
-  const nameField = useDraftField<string>({
-    name: `${spell.name} name`,
-    serverValue: spell.name,
-    parse: (s) => s.trim(),
-    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: (v) => patchSpell('name', v),
-    flashKey: makeFlashKey('character_spell', spell.id, 'name'),
-  });
-  const pointsField = useDraftField<number>({
-    name: `${spell.name} points`,
-    serverValue: spell.points,
-    parse: (s) => {
-      const n = Number(s);
-      // Spells have no default in GURPS — knowing one takes >= 1 point.
-      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
-        throw new Error('positive integer only');
-      }
-      return n;
-    },
-    onSave: (v) => patchSpell('points', v),
-    flashKey: makeFlashKey('character_spell', spell.id, 'points'),
+  const nameField = useEntityNameField(rowPatch, spell.name);
+  const pointsField = useEntityPointsField(rowPatch, spell.name, spell.points, (s) => {
+    const n = Number(s);
+    // Spells have no default in GURPS — knowing one takes >= 1 point.
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) {
+      throw new Error('positive integer only');
+    }
+    return n;
   });
   const costField = useDraftField<number>({
     name: `${spell.name} base cost`,
@@ -278,8 +254,8 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: Sp
       }
       return n;
     },
-    onSave: (v) => patchSpell('baseEnergyCost', v),
-    flashKey: makeFlashKey('character_spell', spell.id, 'baseEnergyCost'),
+    onSave: (v) => rowPatch.patch('baseEnergyCost', v),
+    flashKey: rowPatch.flashKey('baseEnergyCost'),
   });
 
   const removeSpell = async () => {
@@ -315,7 +291,7 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: Sp
           data-flashing={difficultyFlash['data-flashing']}
           data-flash-parity={difficultyFlash['data-flash-parity']}
           value={spell.difficulty}
-          onChange={(e) => void patchSpell('difficulty', e.target.value as SpellDifficulty)}
+          onChange={(e) => void rowPatch.patch('difficulty', e.target.value as SpellDifficulty)}
         >
           {SPELL_DIFFICULTIES.map((d) => (
             <option key={d}>{d}</option>
