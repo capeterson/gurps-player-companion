@@ -60,9 +60,11 @@ on any sheet the viewer can edit — their own — it always shows).
 
 - **Attributes & derived stats.** ST/DX/IQ/HT drive HP, FP, Will, Per, Basic
   Speed, Basic Move, Dodge, basic **thrust/swing damage** (B16 table, shown
-  as "Thr / Sw" on the derived card), etc. Basic Lift rounds to the nearest
-  whole number once it reaches 10 (B15). All GURPS math is pure and shared
-  (`src/shared/domain/`).
+  as "Thr / Sw" on the derived card), etc. Temporary ST/HT boosts affect
+  their normal derived values but not maximum HP/FP; only the dedicated
+  temporary HP/FP modifiers change those maxima (M37). Basic Lift rounds to
+  the nearest whole number once it reaches 10 (B15). All GURPS math is pure
+  and shared (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
   disadvantage / quirk cap warnings.
 - **Temporary stat boosts.** Transient DX+2-style bumps with a "revert all"
@@ -92,7 +94,9 @@ on any sheet the viewer can edit — their own — it always shows).
   Capitalized entries so old data still lights the right chip). Shows
   reeling and death-check thresholds (B419/B423) in one caption, and
   pulses a "suggested" highlight on the Reeling chip — never
-  auto-applied — when HP drops below ⅓ max and it isn't set yet.
+  auto-applied — when HP drops below ⅓ max and it isn't set yet. HP can
+  be tracked down to the certain-death floor at -5×HP; FP floors at -FP,
+  with further fatigue charged against HP one-for-one (B426).
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
@@ -131,14 +135,17 @@ mid-combat:
   chip shows its blurb; tapping it again clears to no maneuver), plus a
   "Custom…" free-text fallback using the same `useDraftField` pattern as
   the sheet's Combat panel.
-- **Defenses** — Dodge (with the encumbrance-penalty breakdown), Parry
+- **Defenses** — Dodge (with the encumbrance-penalty breakdown and no
+  invented minimum; situational active-defense bonuses remain unmodeled), Parry
   per equipped weapon with a parry string (computed from the matched
   skill when one is found, else the raw library string), and Block when
   a Shield skill is known. Every numeric defense opens the roll sheet.
 - **Attacks** — one row per equipped weapon: resolved damage dice (ST
   thrust/swing + the weapon's modifiers), reach, an over-ST warning
   badge, and the best-matching skill as a rollable row with hit-location
-  preset chips (aim penalties, B398-399).
+  preset chips (aim penalties, B398-399). Vitals presets appear only for
+  impaling and piercing attacks, and the eye preset only for impaling,
+  piercing, and tight-beam burning attacks.
 - **Skills / Spells** — every skill and spell with a non-null computed
   level (0-point/no-default entries are the full sheet's job), each
   rollable; spells also get a "Cast" button that reuses the sheet's

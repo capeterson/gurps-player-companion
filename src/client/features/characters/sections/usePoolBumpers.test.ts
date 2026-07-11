@@ -129,4 +129,35 @@ describe('usePoolBumpers', () => {
     });
     expect(patchCombat).toHaveBeenLastCalledWith('currentFp', -12);
   });
+
+  it('charges FP loss that crosses the FP floor to HP one-for-one', () => {
+    const patchCombat = vi.fn().mockResolvedValue(undefined);
+    const character = makeCharacter(10, 12);
+    character.combat = { currentHp: 7, currentFp: -10 } as CharacterDetail['combat'];
+    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
+
+    act(() => {
+      result.current.bumpFp(-5);
+    });
+
+    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentFp', -12);
+    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 4);
+    expect(result.current.flashHp).toBe(true);
+  });
+
+  it('charges further FP loss at the FP floor to HP without emitting a redundant FP patch', () => {
+    const patchCombat = vi.fn().mockResolvedValue(undefined);
+    const character = makeCharacter(10, 12);
+    character.combat = { currentHp: 7, currentFp: -12 } as CharacterDetail['combat'];
+    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
+
+    act(() => {
+      result.current.bumpFp(-1);
+      result.current.bumpFp(-5);
+    });
+
+    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentHp', 6);
+    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 1);
+    expect(patchCombat).toHaveBeenCalledTimes(2);
+  });
 });
