@@ -91,7 +91,11 @@ data-leak hole (this is exactly what Codex review on PR #22 caught).
    - The response also carries authoritative `accessible.characterIds` /
      `campaignIds` so the client can prune rows that fell out of access
      (tombstones can't reach ex-members).
-   - `GET /characters/{id}` applies the same gate via `shouldUseMinimalView`.
+   - `GET /characters/{id}` and `GET /characters/{id}/history` apply the
+     same gate via `resolveCharacterView()` in
+     `src/server/services/characterAccess.ts`, which owns the membership
+     check and then delegates the full/minimal choice to
+     `decideCharacterAccess()`.
    - `GET /characters` (the list) masks `st/dx/iq/ht` to the 10/10/10/10
      baseline for rows the viewer may only see in `minimal` form, using the
      same `decideCharacterAccess` decision.

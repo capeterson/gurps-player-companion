@@ -10,8 +10,8 @@ export const isoTimestamp = z.string().datetime({ offset: true });
 /** ISO 8601 date string (no time). */
 export const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-/** Decimal stored as a JS number with up to 2 decimal places. */
-export const decimal2 = z.number().finite();
+/** Shared shape for the common `createdAt`/`updatedAt` pair on out-schemas. */
+export const timestamps = { createdAt: isoTimestamp, updatedAt: isoTimestamp } as const;
 
 export const revision = z.number().int().nonnegative();
 

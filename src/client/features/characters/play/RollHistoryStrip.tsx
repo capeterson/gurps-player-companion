@@ -1,12 +1,9 @@
 import { useState } from 'react';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import { useRollHistory } from './rollHistory.ts';
 
 export interface RollHistoryStripProps {
   characterId: string;
-}
-
-function fmtSigned(n: number): string {
-  return n >= 0 ? `+${n}` : String(n);
 }
 
 /** Collapsible strip of this session's rolls for one character, newest first. */
@@ -41,7 +38,7 @@ export function RollHistoryStrip({ characterId }: RollHistoryStripProps) {
                   <span className="num flex shrink-0 items-center gap-2 text-xs text-base-content/70">
                     <span>vs {r.target}</span>
                     <span className="font-semibold text-base-content">{r.total}</span>
-                    <span>{fmtSigned(r.margin)}</span>
+                    <span>{formatSigned(r.margin)}</span>
                     {r.crit && (
                       <span
                         className={`badge badge-xs ${r.crit === 'success' ? 'badge-success' : 'badge-error'}`}

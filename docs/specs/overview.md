@@ -65,8 +65,15 @@ on any sheet the viewer can edit — their own — it always shows).
   (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
   disadvantage / quirk cap warnings.
-- **Temporary stat boosts.** Transient DX+2-style bumps with a "revert all"
-  gesture, tracked distinctly from permanent edits.
+- **Temporary effects.** A structured list of named, transient buffs
+  (`characters.temp_effects`, one JSONB list replacing the old per-stat
+  scalar columns) — each entry bundles per-axis modifiers (e.g. "Might
+  potion" → ST +2, HT +1). The ✦ modifier popovers on each stat still give
+  quick steppers, backed by a reserved `manual` sentinel entry in the same
+  list; named effects are added/removed individually from a compact list
+  under the Attributes panel. "Revert all temporary buffs" clears the whole
+  list in one patch. Tracked distinctly from permanent edits; never counts
+  toward point cost.
 - **Traits** (advantages/disadvantages/perks/quirks) with modifier math:
   percent modifiers sum, the net is clamped at -80% (B110), the result
   rounds against the character (B102), then flat modifiers add.
@@ -143,11 +150,12 @@ mid-combat:
   level (0-point/no-default entries are the full sheet's job), each
   rollable; spells also get a "Cast" button that reuses the sheet's
   `CastSpellDialog` as-is. Casting is gated by the same ambient-mana
-  rule as the sheet's SpellsPanel (`manaLevelKnown` +
-  `canCastInMana`/`hasMagery` from `shared/domain/spellCalc.ts`) — the
-  button is disabled with a compact notice when the campaign's mana
-  level hasn't synced yet or the ambient mana forbids casting here.
-  Rolling a spell row stays unrestricted (it's ephemeral, no cost).
+  rule as the sheet's SpellsPanel — both call the shared
+  `characterCanCast` helper in `shared/domain/spellCalc.ts` (the one
+  mana gate; don't fork it) — the button is disabled with a compact
+  notice when the campaign's mana level hasn't synced yet or the
+  ambient mana forbids casting here. Rolling a spell row stays
+  unrestricted (it's ephemeral, no cost).
 - **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
   stepper (−10..+10) plus single-select preset chips (picking a second
   preset replaces the first), a deliberately unobtrusive "Roll 3d6"
@@ -210,10 +218,22 @@ src/
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,
-                 health)
+                 health). campaignLibrary.ts is now a thin factory wiring:
+                 campaignLibraryEntities.ts (per-entity-kind config: schemas,
+                 DTO/insert/update mappers, natural key) and
+                 campaignLibraryCrud.ts (generic POST/PATCH/DELETE route
+                 registration + YAML upsert-by-key loop) consumed once per
+                 entity kind.
     auth/        jwt, password, webauthn (passkeys), apiKey, session,
-                 middleware, permissions (the authz helpers)
+                 middleware, permissions (the authz helpers, incl.
+                 tryLoadCampaignRole)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
+                 (incl. loadCharacterDetail, the shared character-detail
+                 loader), characterAccess (resolveCharacterView, the
+                 shared full/minimal/forbidden decision), patchSet
+                 (buildPatchSet, the shared PATCH-body-to-`.set()` helper),
+                 entityWrites (per-entity insert/upsert-values builders
+                 shared by REST and the sync dispatcher — AGENTS.md S12)
     db/          schema.ts (Drizzle), migrations/ (hand-written SQL for
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
@@ -224,14 +244,25 @@ src/
                  (PlayModePage + PoolsCard/ManeuverCard/DefensesCard/
                  AttacksCard/SkillsCard/RollableRow/RollSheet/
                  RollHistoryStrip + the ephemeral rollHistory store)
+      characters/sections/  Sheet-panel form plumbing shared across
+                 Traits/Skills/Spells/Inventory: useAddEntityForm (the add
+                 form), useEntityRowPatch (per-row field patch dispatch),
+                 useClampedJsonbBumper (powerstone/magic-item charge
+                 steppers), useTempEffects (the named temporary-effects
+                 list backing the Attributes panel's modifier popovers)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth)
-    hooks/       useDraftField (canonical draft-on-blur), useDraftToggle, ...
+    hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
+                 useFlashState (shared flash-pulse primitive the draft
+                 hooks build on), ...
     components/  Shared UI (sync indicator, notifications bell, ui/*)
     admin/       Separate admin SPA entry
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol)
+    format/      number.ts — formatSigned/formatScaled, the shared
+                 sign/scale number formatters used by both client display
+                 code and shared warning text
     domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
                  traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
                  success-roll evaluation), damageParse (weapon damage-string

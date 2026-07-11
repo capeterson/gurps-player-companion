@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isoTimestamp, uuid } from './common.ts';
+import { timestamps, uuid } from './common.ts';
 
 export const armorData = z.object({
   /** Hit-location strings; well-known values are in shared/constants/hitLocations.ts. */
@@ -100,8 +100,7 @@ export const inventoryItemOut = z.object({
   libraryItemId: uuid.nullable(),
   /** Server-computed convenience field. */
   effectiveWeightLbs: z.number(),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const inventoryItemCreate = z.object({

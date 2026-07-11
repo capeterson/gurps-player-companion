@@ -10,9 +10,10 @@
  *  - DnD between rows / character / stashed targets, with valid/invalid
  *    visual feedback
  *
- * Mutations route through this repo's outbox (`enqueueCreate` /
- * `enqueueDelete` / `enqueueFieldPatch`) instead of the original
- * TanStack `useMutation` calls; everything else mirrors the source.
+ * Mutations route through this repo's outbox (`useAddEntityForm`'s
+ * `enqueueCreate`, plus direct `enqueueDelete` / `enqueueFieldPatch`
+ * calls) instead of the original TanStack `useMutation` calls;
+ * everything else mirrors the source.
  */
 
 import { type FormEvent, type ReactNode, useMemo, useRef, useState } from 'react';
@@ -28,15 +29,11 @@ import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.
 import { useRangeSelect } from '../../../hooks/useRangeSelect.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
-import {
-  enqueueCreate,
-  enqueueDelete,
-  enqueueFieldPatch,
-  newClientId,
-} from '../../../sync/outbox.ts';
+import { enqueueDelete, enqueueFieldPatch } from '../../../sync/outbox.ts';
 import { InventoryRow } from './InventoryRow.tsx';
 import { ItemEditDialog } from './ItemEditDialog.tsx';
 import { buildTree, descendantsOf, flattenDFS } from './inventoryTree.ts';
+import { useAddEntityForm } from './useAddEntityForm.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const LEVEL_LABELS = ['None', 'Light', 'Medium', 'Heavy', 'X-Heavy'] as const;
@@ -96,7 +93,11 @@ export function InventoryPanel({
   const [newIsArmor, setNewIsArmor] = useState(false);
   const [newWorn, setNewWorn] = useState(false);
   const [newEquipped, setNewEquipped] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const { creating, submit: submitNewItem } = useAddEntityForm({
+    entityClass: 'character_inventory',
+    characterId,
+    label: 'item',
+  });
 
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [editing, setEditing] = useState<InventoryItemOut | null>(null);
@@ -202,62 +203,53 @@ export function InventoryPanel({
         ? pickedLibraryItem.armor
         : null;
 
-    setCreating(true);
-    try {
-      // Include every column on the LocalCharacterInventory row so the
-      // encumbrance computation (which reads e.g. hideawayCapacityLbs from
-      // the Dexie row) doesn't see `undefined` values and emit NaN.
-      await enqueueCreate({
-        entityClass: 'character_inventory',
-        entityId: newClientId(),
-        humanName: 'item',
+    // Include every column on the LocalCharacterInventory row so the
+    // encumbrance computation (which reads e.g. hideawayCapacityLbs from
+    // the Dexie row) doesn't see `undefined` values and emit NaN.
+    await submitNewItem(
+      {
         characterId,
-        attemptedValue: {
-          characterId,
-          name: name.trim(),
-          quantity: Math.max(1, parsedQty),
-          weightLbs: parsedWeight,
-          cost: parsedCost,
-          notes: null,
-          parentId: parent,
-          externalLocation: null,
-          worn: parent === null && newWorn,
-          equipped: newEquipped,
-          isContainer: newIsContainer,
-          hideawayCapacityLbs: 0,
-          weightReductionPercent: 0,
-          isArmor: newIsArmor,
-          armor: newIsArmor
-            ? (armorFromLibrary ?? {
-                locations: [],
-                dr: 0,
-                drCrushing: null,
-                flexible: false,
-                frontOnly: false,
-                backOnly: false,
-                notes: null,
-              })
-            : null,
-          weaponData: null,
-          libraryItemId: linkedLibraryId,
-        },
-      });
-      setName('');
-      setQty('1');
-      setWeight('');
-      setCost('');
-      setParentId('');
-      setNewIsContainer(false);
-      setNewIsArmor(false);
-      setNewWorn(false);
-      setNewEquipped(false);
-      setMoreOpen(false);
-      setPickedLibraryItem(null);
-    } catch (err) {
-      toasts.push(`Couldn't add item — ${(err as Error).message}`, { kind: 'error' });
-    } finally {
-      setCreating(false);
-    }
+        name: name.trim(),
+        quantity: Math.max(1, parsedQty),
+        weightLbs: parsedWeight,
+        cost: parsedCost,
+        notes: null,
+        parentId: parent,
+        externalLocation: null,
+        worn: parent === null && newWorn,
+        equipped: newEquipped,
+        isContainer: newIsContainer,
+        hideawayCapacityLbs: 0,
+        weightReductionPercent: 0,
+        isArmor: newIsArmor,
+        armor: newIsArmor
+          ? (armorFromLibrary ?? {
+              locations: [],
+              dr: 0,
+              drCrushing: null,
+              flexible: false,
+              frontOnly: false,
+              backOnly: false,
+              notes: null,
+            })
+          : null,
+        weaponData: null,
+        libraryItemId: linkedLibraryId,
+      },
+      () => {
+        setName('');
+        setQty('1');
+        setWeight('');
+        setCost('');
+        setParentId('');
+        setNewIsContainer(false);
+        setNewIsArmor(false);
+        setNewWorn(false);
+        setNewEquipped(false);
+        setMoreOpen(false);
+        setPickedLibraryItem(null);
+      },
+    );
   }
 
   // Containers eligible as a bulk-move target — exclude every selected item

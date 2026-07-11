@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
+import type { TraitOut } from '../schemas/trait.ts';
 import {
   canCastInMana,
+  characterCanCast,
   computeSpellLevel,
   costReduction,
   effectiveCastingCost,
@@ -195,6 +197,42 @@ describe('mana levels (B235)', () => {
     expect(isFreeCastingMana('very_high')).toBe(true);
     expect(isFreeCastingMana('high')).toBe(false);
     expect(isFreeCastingMana('normal')).toBe(false);
+  });
+});
+
+/** Minimal-but-fully-typed TraitOut fixture — only `name`/`level` matter here. */
+function makeTrait(name: string, level: number | null = null): TraitOut {
+  return {
+    id: 'trait-1',
+    characterId: 'char-1',
+    kind: 'advantage',
+    name,
+    points: 0,
+    level,
+    notes: null,
+    modifiers: [],
+    libraryTraitId: null,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  };
+}
+
+describe('characterCanCast', () => {
+  it('holds casting entirely while manaLevelKnown is false, even in high mana', () => {
+    expect(characterCanCast({ traits: [], manaLevel: 'high', manaLevelKnown: false })).toBe(false);
+  });
+
+  it('delegates to canCastInMana + hasMagery once manaLevelKnown is true', () => {
+    expect(characterCanCast({ traits: [], manaLevel: 'normal', manaLevelKnown: true })).toBe(false);
+    expect(
+      characterCanCast({
+        traits: [makeTrait('Magery')],
+        manaLevel: 'normal',
+        manaLevelKnown: true,
+      }),
+    ).toBe(true);
+    expect(characterCanCast({ traits: [], manaLevel: 'high', manaLevelKnown: true })).toBe(true);
+    expect(characterCanCast({ traits: [], manaLevel: 'none', manaLevelKnown: true })).toBe(false);
   });
 });
 

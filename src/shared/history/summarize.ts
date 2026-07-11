@@ -4,6 +4,8 @@
  * client-side (for detail expansion).  No imports from server or client code.
  */
 
+import { formatSigned } from '../format/number.ts';
+import { MANUAL_TEMP_EFFECT_ID } from '../schemas/character.ts';
 import type { HistoryEventOut } from '../schemas/history.ts';
 
 // ---------- field-label maps ----------
@@ -21,6 +23,17 @@ const ATTR_LABELS: Record<string, string> = {
   moveMod: 'Move mod',
 };
 
+/**
+ * Labels for the ten scalar `temp*` columns that `characters` used to
+ * carry before migration 0017 replaced them with the single
+ * `temp_effects` jsonb list. Those columns are gone from the live
+ * schema, but `entity_history` rows written before the migration are
+ * append-only jsonb snapshots that still have `temp_dx` (etc.) keys
+ * forever -- this map keeps old history entries readable rather than
+ * falling through to the generic "N attributes updated" message. Do
+ * NOT delete this even though no current write path produces these
+ * keys.
+ */
 const TEMP_ATTR_LABELS: Record<string, string> = {
   tempSt: 'Temp ST',
   tempDx: 'Temp DX',
@@ -32,6 +45,20 @@ const TEMP_ATTR_LABELS: Record<string, string> = {
   tempFpMod: 'Temp FP mod',
   tempSpeedQuarterMod: 'Temp Speed mod',
   tempMoveMod: 'Temp Move mod',
+};
+
+/** Axis key -> display label for `temp_effects` mods (see TempStatAxis). */
+const TEMP_EFFECT_AXIS_LABELS: Record<string, string> = {
+  st: 'ST',
+  dx: 'DX',
+  iq: 'IQ',
+  ht: 'HT',
+  hp: 'HP',
+  will: 'Will',
+  per: 'Per',
+  fp: 'FP',
+  speedQuarter: 'Speed',
+  move: 'Move',
 };
 
 const CAMPAIGN_FIELD_LABELS: Record<string, string> = {
@@ -118,6 +145,81 @@ function displayValue(v: unknown): string {
   return String(v);
 }
 
+// ---------- temp_effects diffing ----------
+
+interface TempEffectRow {
+  id: string;
+  name: string;
+  mods: Record<string, unknown>;
+}
+
+function asTempEffectList(v: unknown): TempEffectRow[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((e) => {
+    const row = (e ?? {}) as Record<string, unknown>;
+    return {
+      id: String(row.id ?? ''),
+      name: String(row.name ?? 'effect'),
+      mods: (row.mods ?? {}) as Record<string, unknown>,
+    };
+  });
+}
+
+function formatEffectMods(mods: Record<string, unknown>): string {
+  const parts: string[] = [];
+  for (const [axis, label] of Object.entries(TEMP_EFFECT_AXIS_LABELS)) {
+    const v = mods[axis];
+    if (typeof v === 'number' && v !== 0) parts.push(`${label} ${formatSigned(v)}`);
+  }
+  return parts.join(', ');
+}
+
+/**
+ * Summarize a `temp_effects` array diff. Cases, in priority order:
+ *   1. new list empty, old list non-empty -> "Temporary effects cleared"
+ *   2. the only id that changed is the 'manual' sentinel -> a delta-style
+ *      "Temporary adjustment: ..." line (mirrors the old scalar
+ *      temp-boost summary the ✦ popovers used to produce)
+ *   3. exactly one NAMED (non-manual) effect added, nothing else changed
+ *      -> "Temporary effect added: Name (mods)"
+ *   4. exactly one named effect removed, nothing else changed ->
+ *      "Temporary effect removed: Name"
+ *   5. anything else (multiple adds/removes, a named effect's mods
+ *      edited in place, etc.) -> generic "Temporary effects updated"
+ */
+function summarizeTempEffects(oldValue: unknown, newValue: unknown): string {
+  const oldList = asTempEffectList(oldValue);
+  const newList = asTempEffectList(newValue);
+  if (newList.length === 0 && oldList.length > 0) return 'Temporary effects cleared';
+
+  const oldById = new Map(oldList.map((e) => [e.id, e]));
+  const newById = new Map(newList.map((e) => [e.id, e]));
+  const allIds = new Set([...oldById.keys(), ...newById.keys()]);
+  const changedIds = [...allIds].filter(
+    (id) => JSON.stringify(oldById.get(id)) !== JSON.stringify(newById.get(id)),
+  );
+
+  if (changedIds.length === 1) {
+    const id = changedIds[0] as string;
+    const before = oldById.get(id);
+    const after = newById.get(id);
+    if (id === MANUAL_TEMP_EFFECT_ID) {
+      const modsText = after ? formatEffectMods(after.mods) : '';
+      return modsText ? `Temporary adjustment: ${modsText}` : 'Temporary adjustment cleared';
+    }
+    if (after && !before) {
+      const modsText = formatEffectMods(after.mods);
+      return modsText
+        ? `Temporary effect added: ${after.name} (${modsText})`
+        : `Temporary effect added: ${after.name}`;
+    }
+    if (before && !after) {
+      return `Temporary effect removed: ${before.name}`;
+    }
+  }
+  return 'Temporary effects updated';
+}
+
 // ---------- per-entity-class summarizers ----------
 
 function summarizeCharacter(
@@ -131,6 +233,7 @@ function summarizeCharacter(
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Character updated';
   const c = changes[0] as FieldChange;
+  if (c.field === 'tempEffects') return summarizeTempEffects(c.oldValue, c.newValue);
   // Temp boost: delta-style label
   if (c.field in TEMP_ATTR_LABELS) {
     const label = TEMP_ATTR_LABELS[c.field];

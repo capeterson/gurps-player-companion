@@ -10,7 +10,14 @@ import {
   secondarySpent,
 } from '../../../shared/domain/attributeTooltips.ts';
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
-import type { CharacterDetail } from '../../../shared/schemas/character.ts';
+import { formatScaled } from '../../../shared/format/number.ts';
+import {
+  type CharacterDetail,
+  MANUAL_TEMP_EFFECT_ID,
+  TEMP_AXIS_LABELS,
+  TEMP_STAT_AXES,
+  type TempStatAxis,
+} from '../../../shared/schemas/character.ts';
 import { ConditionChip } from '../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
@@ -20,8 +27,15 @@ import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
+import {
+  intParser,
+  nullableIntParser,
+  nullableTextParser,
+  scaledIntParser,
+} from '../../lib/parsers.ts';
+import { useToasts } from '../../lib/toast.tsx';
 import { makeFlashKey } from '../../sync/flashBus.ts';
-import { enqueueFieldPatch, newBatchId } from '../../sync/outbox.ts';
+import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
 import { CombatModal } from './sections/CombatModal.tsx';
 import { HistoryPanel } from './sections/HistoryPanel.tsx';
@@ -33,6 +47,11 @@ import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCombatPatch } from './sections/useCombatPatch.ts';
+import {
+  type TempEffectMods,
+  type TempEffectsApi,
+  useTempEffects,
+} from './sections/useTempEffects.ts';
 import { type CampaignSummary, useCharacterAccessLocal } from './useCharacterAccess.ts';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 import { useMirrorCampaigns } from './useMirrorCampaigns.ts';
@@ -80,72 +99,17 @@ interface MeResponse {
   displayName: string;
 }
 
-function intParser(min: number, max: number) {
-  return (s: string): number => {
-    const n = Number(s);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
-    if (n < min || n > max) throw new Error(`must be between ${min} and ${max}`);
-    return n;
-  };
-}
-
-/**
- * Like intParser but the underlying value is stored in raw integer units
- * while the user-facing input shows values multiplied by `scale`.
- * e.g. scale=0.25 lets the user type "1.25" while storing the integer 5.
- */
-function scaledIntParser(scale: number, min: number, max: number) {
-  return (s: string): number => {
-    const f = Number.parseFloat(s);
-    if (!Number.isFinite(f)) throw new Error('number only');
-    const quotient = f / scale;
-    const n = Math.round(quotient);
-    // Reject values that aren't exact multiples of scale (e.g. 0.13 when scale=0.25).
-    if (Math.abs(n - quotient) > 1e-9) throw new Error(`must be a multiple of ${scale.toFixed(2)}`);
-    const lo = (min * scale).toFixed(2);
-    const hi = (max * scale).toFixed(2);
-    if (n < min || n > max) throw new Error(`must be between ${lo} and ${hi}`);
-    return n;
-  };
-}
-
-function nullableTextParser(s: string): string | null {
-  const t = s.trim();
-  return t.length === 0 ? null : t;
-}
-
-function nullableIntParser(min: number, max: number) {
-  return (s: string): number | null => {
-    const t = s.trim();
-    if (t.length === 0) return null;
-    const n = Number(t);
-    if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
-    if (n < min || n > max) throw new Error(`must be between ${min} and ${max}`);
-    return n;
-  };
-}
-
 type AttrField =
   | 'st'
   | 'dx'
   | 'iq'
   | 'ht'
-  | 'tempSt'
-  | 'tempDx'
-  | 'tempIq'
-  | 'tempHt'
   | 'hpMod'
   | 'willMod'
   | 'perMod'
   | 'fpMod'
   | 'speedQuarterMod'
-  | 'moveMod'
-  | 'tempHpMod'
-  | 'tempWillMod'
-  | 'tempPerMod'
-  | 'tempFpMod'
-  | 'tempSpeedQuarterMod'
-  | 'tempMoveMod';
+  | 'moveMod';
 
 interface AttrInputProps {
   label: string;
@@ -182,12 +146,12 @@ function AttrInput({
   const draft = useDraftField<number>({
     name: label,
     serverValue: value,
-    format: (v) => (displayScale !== 1 ? (v * displayScale).toFixed(2) : String(v)),
+    format: (v) => formatScaled(v, displayScale),
     parse: displayScale !== 1 ? scaledIntParser(displayScale, min, max) : intParser(min, max),
     ...fieldSave,
   });
   if (!canWrite) {
-    const display = displayScale !== 1 ? (value * displayScale).toFixed(2) : String(value);
+    const display = formatScaled(value, displayScale);
     if (size === 'sm') {
       return (
         <span className="num" aria-label={label}>
@@ -239,8 +203,11 @@ function ModifierButton({
   label,
   baseValue,
   characterId,
-  tempField,
-  tempValue,
+  tempTotal,
+  tempManual,
+  tempNamed,
+  onApplyTempManual,
+  tempFlashKey,
   permField,
   permValue,
   permCostLabel,
@@ -250,8 +217,17 @@ function ModifierButton({
   /** Raw base before perm mod and temp (display-scaled inside the popover). */
   baseValue: number;
   characterId: string;
-  tempField: AttrField;
-  tempValue: number;
+  /** `totals[axis]` from useTempEffects -- manual + every named effect. */
+  tempTotal: number;
+  /** The 'manual' effect's axis value -- what this popover's Temporary
+   * section actually edits. */
+  tempManual: number;
+  /** `tempTotal - tempManual` -- contribution from named effects, shown
+   * read-only in the popover. */
+  tempNamed: number;
+  onApplyTempManual: (next: number) => void;
+  /** Shared across every axis -- all of them patch the same `tempEffects` field. */
+  tempFlashKey: string;
   /** Optional permanent-modifier field; omit for primary attributes. */
   permField?: AttrField;
   permValue?: number;
@@ -259,13 +235,12 @@ function ModifierButton({
   displayScale?: number | undefined;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
-  const tempSaver = buildSave(tempField, { humanName: `${label} temp` });
   const permSaver = permField ? buildSave(permField, { humanName: `${label} mod` }) : null;
-  const tempFlash = useFieldFlash(tempSaver.flashKey);
+  const tempFlash = useFieldFlash(tempFlashKey);
   const permFlash = useFieldFlash(permSaver?.flashKey);
   const [open, setOpen] = useState(false);
   const permActive = permValue !== undefined && permValue !== 0;
-  const active = tempValue !== 0 || permActive;
+  const active = tempTotal !== 0 || permActive;
   const flashing = tempFlash.flashing || permFlash.flashing ? 'true' : 'false';
   const parity = tempFlash.flashing
     ? tempFlash['data-flash-parity']
@@ -296,16 +271,15 @@ function ModifierButton({
           label={label}
           baseValue={baseValue}
           temp={{
-            value: tempValue,
-            onApply: (v) => {
-              void tempSaver.onSave(v);
-            },
+            value: tempManual,
+            onApply: onApplyTempManual,
             // Mirrors the bounds the legacy inline AttrInput enforced;
             // keeps a stray "100" from corrupting Dexie before the
             // server's mod-schema rejects it.
             min: -50,
             max: 50,
           }}
+          namedTempContribution={tempNamed}
           perm={
             permSaver && permValue !== undefined
               ? {
@@ -362,11 +336,14 @@ function StatTooltipContent({
   );
 }
 
-/** Render a signed delta with an optional display scale. */
+/**
+ * Render a signed delta with an optional display scale. Delegates
+ * magnitude formatting to the shared `formatScaled` helper, which uses
+ * an ASCII hyphen-minus for negative values (was U+2212 '−').
+ */
 function fmtSignedDelta(value: number, scale = 1): string {
-  const display = Math.abs(value) * scale;
-  const text = scale !== 1 ? display.toFixed(2) : String(display);
-  return value >= 0 ? `+${text}` : `−${text}`;
+  const text = formatScaled(Math.abs(value), scale);
+  return value >= 0 ? `+${text}` : `-${text}`;
 }
 
 /**
@@ -380,8 +357,8 @@ function PrimaryAttrCell({
   label,
   base,
   baseValue,
-  temp,
-  tempValue,
+  axis,
+  tempEffects,
   effective,
   min,
   characterId,
@@ -390,13 +367,17 @@ function PrimaryAttrCell({
   label: 'ST' | 'DX' | 'IQ' | 'HT';
   base: AttrField;
   baseValue: number;
-  temp: AttrField;
-  tempValue: number;
+  axis: TempStatAxis;
+  tempEffects: TempEffectsApi;
   effective: number;
   min: number;
   characterId: string;
   canWrite: boolean;
 }) {
+  const tempTotal = tempEffects.totals[axis];
+  const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
+  const tempManual = manualEffect?.mods[axis] ?? 0;
+  const tempNamed = tempTotal - tempManual;
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
       <InfoTooltip
@@ -412,11 +393,11 @@ function PrimaryAttrCell({
         <span className="label-eyebrow">{label}</span>
       </InfoTooltip>
       <span className="flex items-baseline gap-2">
-        {tempValue !== 0 ? (
+        {tempTotal !== 0 ? (
           <>
             <span
               className="num text-2xl font-semibold text-warning"
-              title={`Effective ${effective} (base ${baseValue} ${fmtSignedDelta(tempValue)})`}
+              title={`Effective ${effective} (base ${baseValue} ${fmtSignedDelta(tempTotal)})`}
             >
               {effective}
             </span>
@@ -432,7 +413,7 @@ function PrimaryAttrCell({
                 width="w-12 sm:w-9"
                 size="sm"
               />
-              <span className="text-warning">{fmtSignedDelta(tempValue)}</span>
+              <span className="text-warning">{fmtSignedDelta(tempTotal)}</span>
             </span>
           </>
         ) : (
@@ -451,8 +432,11 @@ function PrimaryAttrCell({
         {canWrite && (
           <ModifierButton
             label={label}
-            tempField={temp}
-            tempValue={tempValue}
+            tempTotal={tempTotal}
+            tempManual={tempManual}
+            tempNamed={tempNamed}
+            onApplyTempManual={(v) => tempEffects.setManualAxis(axis, v)}
+            tempFlashKey={tempEffects.flashKey}
             baseValue={baseValue}
             characterId={characterId}
           />
@@ -474,8 +458,8 @@ function SecondaryModCell({
   label,
   modField,
   modValue,
-  tempField,
-  tempValue,
+  axis,
+  tempEffects,
   derived,
   derivedDisplay,
   modScale,
@@ -486,8 +470,8 @@ function SecondaryModCell({
   label: string;
   modField: AttrField;
   modValue: number;
-  tempField: AttrField;
-  tempValue: number;
+  axis: TempStatAxis;
+  tempEffects: TempEffectsApi;
   derived: number;
   /** Optional override for the derived display (e.g. "5.50" for Speed). */
   derivedDisplay?: string;
@@ -498,13 +482,17 @@ function SecondaryModCell({
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
-  const fmtRaw = (v: number) => (modScale ? (v * modScale).toFixed(2) : String(v));
-  const baseRaw = derived - modValue - tempValue;
-  const adjusted = modValue !== 0 || tempValue !== 0;
+  const fmtRaw = (v: number) => formatScaled(v, modScale ?? 1);
+  const tempTotal = tempEffects.totals[axis];
+  const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
+  const tempManual = manualEffect?.mods[axis] ?? 0;
+  const tempNamed = tempTotal - tempManual;
+  const baseRaw = derived - modValue - tempTotal;
+  const adjusted = modValue !== 0 || tempTotal !== 0;
   const displayValue = derivedDisplay ?? String(derived);
   const breakdown = `base ${fmtRaw(baseRaw)}${
     modValue !== 0 ? ` ${fmtSignedDelta(modValue, modScale ?? 1)}` : ''
-  }${tempValue !== 0 ? ` ${fmtSignedDelta(tempValue, modScale ?? 1)}` : ''}`;
+  }${tempTotal !== 0 ? ` ${fmtSignedDelta(tempTotal, modScale ?? 1)}` : ''}`;
 
   return (
     <div className="flex flex-col gap-0.5 min-w-0">
@@ -533,8 +521,8 @@ function SecondaryModCell({
             {modValue !== 0 && (
               <span className="text-warning">{fmtSignedDelta(modValue, modScale ?? 1)}</span>
             )}
-            {tempValue !== 0 && (
-              <span className="text-warning">{fmtSignedDelta(tempValue, modScale ?? 1)}</span>
+            {tempTotal !== 0 && (
+              <span className="text-warning">{fmtSignedDelta(tempTotal, modScale ?? 1)}</span>
             )}
           </span>
         )}
@@ -543,8 +531,11 @@ function SecondaryModCell({
             label={label}
             baseValue={baseRaw}
             characterId={characterId}
-            tempField={tempField}
-            tempValue={tempValue}
+            tempTotal={tempTotal}
+            tempManual={tempManual}
+            tempNamed={tempNamed}
+            onApplyTempManual={(v) => tempEffects.setManualAxis(axis, v)}
+            tempFlashKey={tempEffects.flashKey}
             permField={modField}
             permValue={modValue}
             permCostLabel={info.nextCostLabel}
@@ -744,55 +735,155 @@ function IdentityPanel({
   );
 }
 
-/** All temp-modifier fields on a character. Used for the "Revert all" bulk action. */
-const TEMP_FIELDS: readonly AttrField[] = [
-  'tempSt',
-  'tempDx',
-  'tempIq',
-  'tempHt',
-  'tempHpMod',
-  'tempWillMod',
-  'tempPerMod',
-  'tempFpMod',
-  'tempSpeedQuarterMod',
-  'tempMoveMod',
-];
-
-/** True when any temporary modifier on the character is non-zero. */
-function anyTempActive(c: CharacterDetail): boolean {
-  return TEMP_FIELDS.some((f) => (c as unknown as Record<AttrField, number>)[f] !== 0);
+/**
+ * "ST +2, HT +1" -- every axis an effect touches, signed and labeled.
+ * `speedQuarter` is stored in quarter-Speed-point units (S2/S3 raw
+ * value); scale it back to whole Speed points for display, mirroring
+ * `SecondaryModCell`'s `modScale={0.25}` for the same axis so the row
+ * and the "±N from effects" caption agree (PR #46 review finding).
+ */
+export function formatEffectMods(mods: TempEffectMods): string {
+  const parts: string[] = [];
+  for (const axis of TEMP_STAT_AXES) {
+    const v = mods[axis];
+    if (v === undefined || v === 0) continue;
+    const scale = axis === 'speedQuarter' ? 0.25 : 1;
+    parts.push(`${TEMP_AXIS_LABELS[axis]} ${fmtSignedDelta(v, scale)}`);
+  }
+  return parts.join(', ');
 }
 
 /**
- * Enqueue a per-field patch for every temp field that's currently
- * non-zero, setting it back to 0. Each goes through the standard
- * outbox path so an offline bulk-revert is durable.
+ * Named-effects list + compact add form, rendered under the Attributes
+ * panel's revert-all button. The 'manual' entry (driven by the ✦
+ * popovers) shows read-only here -- it has no remove button because
+ * the popovers already manage it via "Clear".
+ *
+ * Rendered for every viewer who HAS effect data, including full
+ * read-only viewers (e.g. a GM) -- only the add form and the per-row
+ * remove buttons are gated on `canWrite` (PR #46 review finding: this
+ * used to gate the whole list, hiding named effects from read-only
+ * viewers entirely). Share-gate minimal viewers already receive
+ * `tempEffects: []` from the server, so there's nothing to leak here.
  */
-function revertAllTemps(c: CharacterDetail): void {
-  const batchId = newBatchId();
-  for (const f of TEMP_FIELDS) {
-    const value = (c as unknown as Record<AttrField, number>)[f];
-    if (value === 0) continue;
-    void enqueueFieldPatch({
-      entityClass: 'character',
-      entityId: c.id,
-      fieldPath: f,
-      attemptedValue: 0,
-      humanName: `${f} temp`,
-      flashKey: makeFlashKey('character', c.id, f),
-      batchId,
-    });
+function TempEffectsList({
+  tempEffects,
+  canWrite,
+}: {
+  tempEffects: TempEffectsApi;
+  canWrite: boolean;
+}) {
+  const toasts = useToasts();
+  const flash = useFieldFlash(tempEffects.flashKey);
+  const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
+  const namedEffects = tempEffects.effects.filter((e) => e.id !== MANUAL_TEMP_EFFECT_ID);
+  const [name, setName] = useState('');
+  const [axis, setAxis] = useState<TempStatAxis>('st');
+  const [amount, setAmount] = useState('');
+
+  function submitAdd(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    // Speed is stored in quarter-Speed-point units (mods.speedQuarter),
+    // but the input reads in whole Speed points -- e.g. typing "1"
+    // means "+1 Speed" and must store 4 quarters, not 1 (PR #46 review:
+    // this used to write the raw parsed integer straight into
+    // mods.speedQuarter, silently storing 1/4 of the intended boost).
+    // scaledIntParser both does the ×4 conversion and rejects amounts
+    // that aren't exact quarter-steps.
+    let n: number;
+    try {
+      n =
+        axis === 'speedQuarter'
+          ? scaledIntParser(0.25, -50, 50)(amount)
+          : intParser(-50, 50)(amount);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'invalid amount';
+      toasts.push(`Couldn't add effect — ${msg}`, { kind: 'error' });
+      return;
+    }
+    if (n === 0) return;
+    tempEffects.addEffect(name, { [axis]: n });
+    setName('');
+    setAmount('');
   }
+
+  return (
+    <div
+      className="mt-3 space-y-1.5"
+      data-flashing={flash['data-flashing']}
+      data-flash-parity={flash['data-flash-parity']}
+    >
+      {manualEffect && formatEffectMods(manualEffect.mods) && (
+        <div className="num text-[11px] text-base-content/60">
+          Manual adjustment — {formatEffectMods(manualEffect.mods)}
+        </div>
+      )}
+      {namedEffects.map((effect) => (
+        <div key={effect.id} className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="num truncate">
+            {effect.name} — {formatEffectMods(effect.mods)}
+          </span>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => tempEffects.removeEffect(effect.id)}
+              aria-label={`Remove ${effect.name}`}
+              className="btn btn-ghost btn-xs px-1.5"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      ))}
+      {canWrite && (
+        <form onSubmit={submitAdd} className="flex items-center gap-1.5">
+          <input
+            aria-label="New effect name"
+            placeholder="Effect name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="input input-bordered input-xs flex-1 min-w-0"
+          />
+          <select
+            aria-label="Effect axis"
+            value={axis}
+            onChange={(e) => setAxis(e.target.value as TempStatAxis)}
+            className="select select-bordered select-xs"
+          >
+            {TEMP_STAT_AXES.map((a) => (
+              <option key={a} value={a}>
+                {TEMP_AXIS_LABELS[a]}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="Effect amount"
+            type="number"
+            step={axis === 'speedQuarter' ? 0.25 : 1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="num input input-bordered input-xs w-14"
+          />
+          <button type="submit" className="btn btn-ghost btn-xs">
+            Add
+          </button>
+        </form>
+      )}
+    </div>
+  );
 }
 
 function AttributesPanel({
   character,
   canWrite,
+  tempEffects,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
+  tempEffects: TempEffectsApi;
 }) {
-  const tempActive = canWrite && anyTempActive(character);
+  const tempActive = canWrite && TEMP_STAT_AXES.some((axis) => tempEffects.totals[axis] !== 0);
   return (
     <StatCard title="Attributes" points={character.points.attributes}>
       <div className="grid grid-cols-2 gap-3.5">
@@ -800,8 +891,8 @@ function AttributesPanel({
           label="ST"
           base="st"
           baseValue={character.st}
-          temp="tempSt"
-          tempValue={character.tempSt}
+          axis="st"
+          tempEffects={tempEffects}
           effective={character.derived.effectiveSt}
           min={1}
           characterId={character.id}
@@ -811,8 +902,8 @@ function AttributesPanel({
           label="DX"
           base="dx"
           baseValue={character.dx}
-          temp="tempDx"
-          tempValue={character.tempDx}
+          axis="dx"
+          tempEffects={tempEffects}
           effective={character.derived.effectiveDx}
           min={1}
           characterId={character.id}
@@ -822,8 +913,8 @@ function AttributesPanel({
           label="IQ"
           base="iq"
           baseValue={character.iq}
-          temp="tempIq"
-          tempValue={character.tempIq}
+          axis="iq"
+          tempEffects={tempEffects}
           effective={character.derived.effectiveIq}
           min={1}
           characterId={character.id}
@@ -833,8 +924,8 @@ function AttributesPanel({
           label="HT"
           base="ht"
           baseValue={character.ht}
-          temp="tempHt"
-          tempValue={character.tempHt}
+          axis="ht"
+          tempEffects={tempEffects}
           effective={character.derived.effectiveHt}
           min={1}
           characterId={character.id}
@@ -844,11 +935,14 @@ function AttributesPanel({
       {tempActive && (
         <button
           type="button"
-          onClick={() => revertAllTemps(character)}
+          onClick={() => tempEffects.clearAll()}
           className="num mt-3 h-7 w-full rounded-lg border border-dashed border-warning/60 text-[11px] text-warning hover:bg-warning/10 transition-colors"
         >
           Revert all temporary buffs
         </button>
+      )}
+      {(canWrite || tempEffects.effects.length > 0) && (
+        <TempEffectsList tempEffects={tempEffects} canWrite={canWrite} />
       )}
     </StatCard>
   );
@@ -857,9 +951,11 @@ function AttributesPanel({
 function SecondaryModsPanel({
   character,
   canWrite,
+  tempEffects,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
+  tempEffects: TempEffectsApi;
 }) {
   return (
     <StatCard title="Secondary" points={character.points.secondary}>
@@ -868,8 +964,8 @@ function SecondaryModsPanel({
           label="HP"
           modField="hpMod"
           modValue={character.hpMod}
-          tempField="tempHpMod"
-          tempValue={character.tempHpMod}
+          axis="hp"
+          tempEffects={tempEffects}
           derived={character.derived.hp}
           infoKey="hp"
           characterId={character.id}
@@ -879,8 +975,8 @@ function SecondaryModsPanel({
           label="Will"
           modField="willMod"
           modValue={character.willMod}
-          tempField="tempWillMod"
-          tempValue={character.tempWillMod}
+          axis="will"
+          tempEffects={tempEffects}
           derived={character.derived.will}
           infoKey="will"
           characterId={character.id}
@@ -890,8 +986,8 @@ function SecondaryModsPanel({
           label="Per"
           modField="perMod"
           modValue={character.perMod}
-          tempField="tempPerMod"
-          tempValue={character.tempPerMod}
+          axis="per"
+          tempEffects={tempEffects}
           derived={character.derived.per}
           infoKey="per"
           characterId={character.id}
@@ -901,8 +997,8 @@ function SecondaryModsPanel({
           label="FP"
           modField="fpMod"
           modValue={character.fpMod}
-          tempField="tempFpMod"
-          tempValue={character.tempFpMod}
+          axis="fp"
+          tempEffects={tempEffects}
           derived={character.derived.fp}
           infoKey="fp"
           characterId={character.id}
@@ -912,8 +1008,8 @@ function SecondaryModsPanel({
           label="Speed"
           modField="speedQuarterMod"
           modValue={character.speedQuarterMod}
-          tempField="tempSpeedQuarterMod"
-          tempValue={character.tempSpeedQuarterMod}
+          axis="speedQuarter"
+          tempEffects={tempEffects}
           derived={character.derived.basicSpeedQuarters}
           derivedDisplay={character.derived.basicSpeed.toFixed(2)}
           modScale={0.25}
@@ -925,8 +1021,8 @@ function SecondaryModsPanel({
           label="Move"
           modField="moveMod"
           modValue={character.moveMod}
-          tempField="tempMoveMod"
-          tempValue={character.tempMoveMod}
+          axis="move"
+          tempEffects={tempEffects}
           derived={character.derived.basicMove}
           infoKey="move"
           characterId={character.id}
@@ -1628,6 +1724,15 @@ export function CharacterSheetPage() {
   // hook degrades gracefully while `character` is still loading.
   const access = useCharacterAccessLocal(character, me.data?.id);
 
+  // Lifted to ONE hook instance shared by AttributesPanel,
+  // SecondaryModsPanel, and the effects list (see useTempEffects.ts's
+  // header comment for why -- calling it once per consumer would give
+  // each its own latest-intended-array ref, reintroducing the compose
+  // race the ref exists to prevent). Called before the early returns
+  // below for the same Rules-of-Hooks reason as `access`; the hook
+  // tolerates `character` still being null/undefined.
+  const tempEffects = useTempEffects(character, access.canWrite);
+
   if (character === undefined) {
     return <p className="text-muted">Loading…</p>;
   }
@@ -1722,8 +1827,8 @@ export function CharacterSheetPage() {
       <WarningsPanel character={character} canWrite={canWrite} />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AttributesPanel character={character} canWrite={canWrite} />
-        <SecondaryModsPanel character={character} canWrite={canWrite} />
+        <AttributesPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
+        <SecondaryModsPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
         <DerivedPanel character={character} />
         <div className="grid grid-cols-1 gap-4">
           <PointsPanel character={character} />

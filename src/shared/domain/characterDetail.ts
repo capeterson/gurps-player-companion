@@ -15,7 +15,7 @@
 
 import type { ManaLevel } from '../constants/magic.ts';
 import type { SpellDifficulty } from '../constants/skills.ts';
-import type { CharacterDetail } from '../schemas/character.ts';
+import type { CharacterDetail, TempEffect } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
 import type { SkillOut } from '../schemas/skill.ts';
@@ -68,16 +68,9 @@ export interface CharacterDetailInputCharacter {
   fpMod: number;
   speedQuarterMod: number;
   moveMod: number;
-  tempSt: number;
-  tempDx: number;
-  tempIq: number;
-  tempHt: number;
-  tempHpMod: number;
-  tempWillMod: number;
-  tempPerMod: number;
-  tempFpMod: number;
-  tempSpeedQuarterMod: number;
-  tempMoveMod: number;
+  /** Optional: stale local Dexie rows and pre-migration server rows
+   * may lack this column; adapters default it to `[]`. */
+  tempEffects?: TempEffect[];
   dismissedWarnings: string[];
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -204,16 +197,7 @@ function characterAttrsFromRow(c: CharacterDetailInputCharacter): CharacterAttrs
     fpMod: c.fpMod,
     speedQuarterMod: c.speedQuarterMod,
     moveMod: c.moveMod,
-    tempSt: c.tempSt,
-    tempDx: c.tempDx,
-    tempIq: c.tempIq,
-    tempHt: c.tempHt,
-    tempHpMod: c.tempHpMod,
-    tempWillMod: c.tempWillMod,
-    tempPerMod: c.tempPerMod,
-    tempFpMod: c.tempFpMod,
-    tempSpeedQuarterMod: c.tempSpeedQuarterMod,
-    tempMoveMod: c.tempMoveMod,
+    tempEffects: c.tempEffects ?? [],
   };
 }
 
@@ -434,16 +418,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     fpMod: character.fpMod,
     speedQuarterMod: character.speedQuarterMod,
     moveMod: character.moveMod,
-    tempSt: character.tempSt,
-    tempDx: character.tempDx,
-    tempIq: character.tempIq,
-    tempHt: character.tempHt,
-    tempHpMod: character.tempHpMod,
-    tempWillMod: character.tempWillMod,
-    tempPerMod: character.tempPerMod,
-    tempFpMod: character.tempFpMod,
-    tempSpeedQuarterMod: character.tempSpeedQuarterMod,
-    tempMoveMod: character.tempMoveMod,
+    tempEffects: character.tempEffects ?? [],
     dismissedWarnings: character.dismissedWarnings,
     createdAt: toIso(character.createdAt),
     updatedAt: toIso(character.updatedAt),

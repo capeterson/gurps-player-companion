@@ -115,6 +115,103 @@ describe('summarizeEvent character', () => {
   });
 });
 
+// ---------- summarizeEvent — character.tempEffects ----------
+
+describe('summarizeEvent character tempEffects', () => {
+  it('one named effect added: "Temporary effect added: Might (ST +2, HT +1)"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { tempEffects: [] },
+      newRow: { tempEffects: [{ id: 'e1', name: 'Might', mods: { st: 2, ht: 1 } }] },
+    });
+    expect(summary).toBe('Temporary effect added: Might (ST +2, HT +1)');
+  });
+
+  it('one named effect removed: "Temporary effect removed: Might"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { tempEffects: [{ id: 'e1', name: 'Might', mods: { st: 2 } }] },
+      newRow: { tempEffects: [] },
+    });
+    // A single-effect list going to empty hits the "cleared" branch
+    // (higher priority than "removed"), which is still an accurate,
+    // human-readable summary.
+    expect(summary).toBe('Temporary effects cleared');
+  });
+
+  it('one named effect removed out of several: "Temporary effect removed: Might"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: {
+        tempEffects: [
+          { id: 'e1', name: 'Might', mods: { st: 2 } },
+          { id: 'e2', name: 'Haste', mods: { move: 1 } },
+        ],
+      },
+      newRow: { tempEffects: [{ id: 'e2', name: 'Haste', mods: { move: 1 } }] },
+    });
+    expect(summary).toBe('Temporary effect removed: Might');
+  });
+
+  it('list cleared entirely: "Temporary effects cleared"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: {
+        tempEffects: [
+          { id: 'e1', name: 'Might', mods: { st: 2 } },
+          { id: 'e2', name: 'Haste', mods: { move: 1 } },
+        ],
+      },
+      newRow: { tempEffects: [] },
+    });
+    expect(summary).toBe('Temporary effects cleared');
+  });
+
+  it('manual entry mods changed: "Temporary adjustment: ST +2"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { tempEffects: [{ id: 'manual', name: 'Manual adjustment', mods: {} }] },
+      newRow: {
+        tempEffects: [{ id: 'manual', name: 'Manual adjustment', mods: { st: 2 } }],
+      },
+    });
+    expect(summary).toBe('Temporary adjustment: ST +2');
+  });
+
+  it('manual entry added fresh: still summarized as a manual adjustment, not "effect added"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { tempEffects: [] },
+      newRow: {
+        tempEffects: [{ id: 'manual', name: 'Manual adjustment', mods: { ht: -1 } }],
+      },
+    });
+    expect(summary).toBe('Temporary adjustment: HT -1');
+  });
+
+  it('multiple simultaneous changes fall back to the generic message', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { tempEffects: [{ id: 'e1', name: 'Might', mods: { st: 2 } }] },
+      newRow: {
+        tempEffects: [
+          { id: 'e1', name: 'Might', mods: { st: 2 } },
+          { id: 'e2', name: 'Haste', mods: { move: 1 } },
+          { id: 'manual', name: 'Manual adjustment', mods: { ht: 1 } },
+        ],
+      },
+    });
+    expect(summary).toBe('Temporary effects updated');
+  });
+});
+
 // ---------- summarizeEvent — character_trait ----------
 
 describe('summarizeEvent character_trait', () => {

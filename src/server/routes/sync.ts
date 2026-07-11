@@ -601,16 +601,10 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     fpMod: 0,
     speedQuarterMod: 0,
     moveMod: 0,
-    tempSt: 0,
-    tempDx: 0,
-    tempIq: 0,
-    tempHt: 0,
-    tempHpMod: 0,
-    tempWillMod: 0,
-    tempPerMod: 0,
-    tempFpMod: 0,
-    tempSpeedQuarterMod: 0,
-    tempMoveMod: 0,
+    // Share-gate critical: a minimal viewer must never receive another
+    // player's named/manual temp effects, so this collapses to empty
+    // rather than passing `row.tempEffects` through.
+    tempEffects: [],
     dismissedWarnings: [],
   };
 }

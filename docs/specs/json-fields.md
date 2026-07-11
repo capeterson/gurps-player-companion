@@ -29,6 +29,7 @@ The two deliberate exceptions (`notifications.payload`,
 | Table.column | Shape schema (`src/shared/schemas/`) | Validated at |
 |---|---|---|
 | `characters.dismissed_warnings` | `dismissedWarningsField` (character.ts) — `string[]` of warning codes | REST `/characters/{id}/warnings/dismiss` (`dismissWarningRequest`, one code at a time); sync patch `fieldPath: 'dismissedWarnings'` via `characterSyncPatch` |
+| `characters.temp_effects` | `tempEffectsField` (character.ts) — `TempEffect[]`, max 40, `{ id, name, mods }` with `mods` a strict per-axis object (`TEMP_STAT_AXES`); `superRefine` enforces unique ids and a per-axis SUM across all effects within [-50, 50]. The `id: 'manual'` sentinel (`MANUAL_TEMP_EFFECT_ID`) is the entry the ✦ modifier popovers write to; other ids are client uuids for named effects. | REST character create/update (`characterCreate` / `characterUpdate`, via `characterAttributesShape`); sync patch `fieldPath: 'tempEffects'` (whole-array replace) via `characterSyncPatch`. Share-gate masked to `[]` for minimal-view characters (`projectCharacterRow` in `routes/sync.ts`). |
 | `character_traits.modifiers` | `traitModifier[]` (trait.ts) | REST trait create/update (`traitCreate` / `traitUpdate`); sync per-field validator |
 | `inventory_items.armor` | `armorData` (inventory.ts), nullable | REST inventory create/update (`inventoryItemCreate` / `inventoryItemUpdate`); sync per-field validator |
 | `inventory_items.weapon_data` | `weaponData` (inventory.ts), nullable | same as `armor` |

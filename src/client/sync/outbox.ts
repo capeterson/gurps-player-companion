@@ -71,24 +71,61 @@ export async function enqueueFieldPatch(args: EnqueueFieldPatchArgs): Promise<vo
   const ckey = coalesceKey(args.entityId, args.fieldPath);
   const now = new Date().toISOString();
   await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
-    // 1. Capture the current local value as prevValue so a later
-    //    server rejection can revert without the caller tracking it.
-    //    Done inside the transaction so a concurrent local write
-    //    can't sneak between the read and the patch.
-    const prev = args.prevValue ?? (await readFieldValue(args));
+    // 1. Find any pending/transient_retry op(s) for the same field so we
+    //    can coalesce them away -- AND, critically, carry forward the
+    //    OLDEST one's prevValue instead of re-reading the local row.
+    //    Bug this guards against (PR #46 review): the local row already
+    //    holds the about-to-be-deleted op's optimistic attemptedValue,
+    //    so reading "current local value" here would capture that
+    //    unsynced intermediate value as the surviving op's prevValue.
+    //    If the surviving op is later rejected, the orchestrator writes
+    //    prevValue straight back into the row (S2) -- rolling back to a
+    //    value the server never actually had, which then only heals on
+    //    a later cursor pull (S4's pending-op skip no longer protects
+    //    it once the outbox row is gone). Carrying forward the oldest
+    //    delete's prevValue keeps rollback anchored to the last
+    //    server-confirmed value through any number of coalesced taps.
+    //    Affects every rapid-tap surface that patches a field more than
+    //    once in quick succession (conditions toggles, pool bumpers,
+    //    temp-effect steppers).
+    const dupes = await db.outbox.where('coalesceKey').equals(ckey).toArray();
+    const coalescable = dupes.filter(
+      (d) => d.status === 'pending' || d.status === 'transient_retry',
+    );
+    let carriedPrev: { value: unknown } | undefined;
+    if (coalescable.length > 0) {
+      // enqueueFieldPatch runs inside a Dexie transaction, so in
+      // practice at most one coalescable dupe exists at a time; sort
+      // defensively by enqueuedAt in case that invariant is ever
+      // violated, so we always carry forward the OLDEST value.
+      const oldest = coalescable.reduce((a, b) => (a.enqueuedAt <= b.enqueuedAt ? a : b));
+      carriedPrev = { value: oldest.prevValue };
+    }
+    for (const d of coalescable) {
+      await db.outbox.delete(d.clientOpId);
+    }
+
+    // 2. prevValue precedence: an explicit caller override always wins
+    //    (e.g. the orchestrator's stale_base self-heal passes the
+    //    server-confirmed current value when refreshing a superseding
+    //    op -- see orchestrator.ts's `newerPending` branch, which
+    //    applies the exact same "carry the true original value forward"
+    //    idea by hand). Otherwise carry forward the oldest coalesced
+    //    op's prevValue. Only when nothing was pending for this field
+    //    do we fall back to reading the local row fresh -- there's
+    //    nothing to coalesce, so the local row's current value IS the
+    //    last-synced value.
+    const prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
+    // baseRevision does NOT need the same carry-forward treatment:
+    // applyLocalPatch (step 3 below) only ever touches `fieldPath` and
+    // `updatedAt` on the local row, never `revision` -- local writes
+    // don't bump it. So re-reading the local row's revision here
+    // returns exactly the same last-known-server revision the coalesced
+    // op captured, unless a cursor pull landed a newer one in between,
+    // in which case picking up the fresher revision is correct, not a
+    // bug.
     const baseRev = args.baseRevision ?? (await readEntityRevision(args));
 
-    // 2. Coalesce any pending patch for the same field (latest wins).
-    //    We only replace `pending`/`transient_retry` rows; in_flight
-    //    rows are mid-send and will settle before our orchestrator
-    //    drains the new one.  rejected/applied rows are keepsakes
-    //    (audit + persistent toast) and shouldn't be touched.
-    const dupes = await db.outbox.where('coalesceKey').equals(ckey).toArray();
-    for (const d of dupes) {
-      if (d.status === 'pending' || d.status === 'transient_retry') {
-        await db.outbox.delete(d.clientOpId);
-      }
-    }
     // 3. Apply the local row mutation immediately so `useLiveQuery`
     //    sees the user's typed value before the server even hears
     //    about it.  For child entities we need to know which parent

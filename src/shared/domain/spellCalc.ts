@@ -16,6 +16,7 @@
 
 import type { ManaLevel } from '../constants/magic.ts';
 import type { SpellDifficulty } from '../constants/skills.ts';
+import type { CharacterDetail } from '../schemas/character.ts';
 import { skillOffset } from './skillCalc.ts';
 
 /** Minimal trait shape the magic helpers need. */
@@ -111,6 +112,22 @@ export function canCastInMana(casterHasMagery: boolean, mana: ManaLevel): boolea
 /** In very high mana, spells cost no energy to cast or maintain (B235). */
 export function isFreeCastingMana(mana: ManaLevel): boolean {
   return mana === 'very_high';
+}
+
+/**
+ * The one mana gate — don't fork. Whether this character can cast
+ * spells at all right now: `canCastInMana` gated on Magery, held
+ * entirely while `manaLevelKnown` is false so the builder's 'normal'
+ * fallback can't let a no-mana campaign (or a sheet that hasn't
+ * synced the real campaign row yet) spend FP/HP/powerstone charges on
+ * a bogus level. Every casting-gate check in the client (SpellsPanel,
+ * SkillsCard, ...) must call this instead of re-deriving the
+ * expression inline.
+ */
+export function characterCanCast(
+  c: Pick<CharacterDetail, 'traits' | 'manaLevel' | 'manaLevelKnown'>,
+): boolean {
+  return c.manaLevelKnown && canCastInMana(hasMagery(c.traits), c.manaLevel);
 }
 
 /**

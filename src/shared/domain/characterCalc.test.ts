@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'bun:test';
+import type { TempEffect, TempStatAxis } from '../schemas/character.ts';
 import {
   type CharacterAttrs,
   computeAttributePoints,
   computeDerived,
   computePointBreakdown,
   computeSecondaryPoints,
+  sumTempMods,
 } from './characterCalc.ts';
 
 const baseAttrs: CharacterAttrs = {
@@ -18,17 +20,15 @@ const baseAttrs: CharacterAttrs = {
   fpMod: 0,
   speedQuarterMod: 0,
   moveMod: 0,
-  tempSt: 0,
-  tempDx: 0,
-  tempIq: 0,
-  tempHt: 0,
-  tempHpMod: 0,
-  tempWillMod: 0,
-  tempPerMod: 0,
-  tempFpMod: 0,
-  tempSpeedQuarterMod: 0,
-  tempMoveMod: 0,
+  tempEffects: [],
 };
+
+/** Build a single-effect `tempEffects` array from scalar-style mods --
+ * lets the numeric-identity tests below reuse the old scalar fixtures
+ * almost verbatim. */
+function tempEffectsOf(mods: Partial<Record<TempStatAxis, number>>): TempEffect[] {
+  return [{ id: 'e1', name: 'Test effect', mods }];
+}
 
 describe('computeDerived', () => {
   it('produces canonical values for an unmodified ST10/DX10/IQ10/HT10 character', () => {
@@ -45,7 +45,10 @@ describe('computeDerived', () => {
   });
 
   it('applies temporary boosts to derived stats only', () => {
-    const d = computeDerived({ ...baseAttrs, tempSt: 5, tempDx: 1 });
+    const d = computeDerived({
+      ...baseAttrs,
+      tempEffects: tempEffectsOf({ st: 5, dx: 1 }),
+    });
     expect(d.hp).toBe(15);
     expect(d.basicLift).toBe(45); // 15*15/5
     expect(d.basicSpeedQuarters).toBe(21); // (10+1)+(10) = 21
@@ -96,7 +99,7 @@ describe('computeDerived', () => {
     expect(st13.thrust).toBe('1d');
     expect(st13.swing).toBe('2d-1');
     // Temp ST boosts shift damage too.
-    const st15 = computeDerived({ ...baseAttrs, tempSt: 5 });
+    const st15 = computeDerived({ ...baseAttrs, tempEffects: tempEffectsOf({ st: 5 }) });
     expect(st15.thrust).toBe('1d+1');
     expect(st15.swing).toBe('2d+1');
   });
@@ -105,10 +108,73 @@ describe('computeDerived', () => {
     const d = computeDerived({
       ...baseAttrs,
       speedQuarterMod: 2,
-      tempSpeedQuarterMod: 1,
+      tempEffects: tempEffectsOf({ speedQuarter: 1 }),
     });
     expect(d.basicSpeedQuarters).toBe(23);
     expect(d.basicSpeed).toBe(5.75);
+  });
+
+  it('multiple effects on the same axis sum before being applied', () => {
+    // Two named effects each giving ST +2 should behave identically to
+    // one effect giving ST +4 -- computeDerived sums via sumTempMods.
+    const d = computeDerived({
+      ...baseAttrs,
+      tempEffects: [
+        { id: 'e1', name: 'Potion', mods: { st: 2 } },
+        { id: 'e2', name: 'Blessing', mods: { st: 2 } },
+      ],
+    });
+    expect(d.effectiveSt).toBe(14);
+    expect(d.hp).toBe(14);
+  });
+});
+
+describe('sumTempMods', () => {
+  it('returns all-zero totals for an empty effects list', () => {
+    const totals = sumTempMods([]);
+    expect(totals).toEqual({
+      st: 0,
+      dx: 0,
+      iq: 0,
+      ht: 0,
+      hp: 0,
+      will: 0,
+      per: 0,
+      fp: 0,
+      speedQuarter: 0,
+      move: 0,
+    });
+  });
+
+  it('sums per-axis across multiple effects, defaulting missing axes to 0', () => {
+    const totals = sumTempMods([
+      { id: 'e1', name: 'Might', mods: { st: 2, ht: 1 } },
+      { id: 'e2', name: 'Haste', mods: { move: 2, st: 3 } },
+    ]);
+    expect(totals.st).toBe(5);
+    expect(totals.ht).toBe(1);
+    expect(totals.move).toBe(2);
+    expect(totals.dx).toBe(0);
+  });
+
+  it('a tempEffects array summing to the same per-axis totals as an old-scalar fixture yields identical DerivedStats', () => {
+    const legacyScalarStyle = computeDerived({
+      ...baseAttrs,
+      st: 14,
+      hpMod: 1,
+      tempEffects: tempEffectsOf({ st: 3, hp: 2, move: 1 }),
+    });
+    const splitAcrossEffects = computeDerived({
+      ...baseAttrs,
+      st: 14,
+      hpMod: 1,
+      tempEffects: [
+        { id: 'a', name: 'A', mods: { st: 3 } },
+        { id: 'b', name: 'B', mods: { hp: 2 } },
+        { id: 'c', name: 'C', mods: { move: 1 } },
+      ],
+    });
+    expect(splitAcrossEffects).toEqual(legacyScalarStyle);
   });
 });
 

@@ -2,6 +2,13 @@
  * Pure schema/dispatcher tests that do NOT require a live Postgres.
  * The DB-dependent paths (apply, stale_base, conflict, etc.) are
  * exercised manually via the docker-compose dev stack.
+ *
+ * The `POST /api/v1/sync/operations` describe block below is the one
+ * exception: field-writability parity (AGENTS.md S12.3 -- the sync
+ * whitelist must match what the client is allowed to enqueue) can only
+ * be observed by actually running an op through `dispatchOperation`'s
+ * DB-backed `patchEntity` path, so it goes through the same
+ * `createApp` + live-Postgres harness `routes/characters.test.ts` uses.
  */
 
 import { describe, expect, it } from 'bun:test';
@@ -10,6 +17,8 @@ import {
   syncOperationsRequest,
   syncOperationsResponse,
 } from '../../shared/schemas/sync.ts';
+import { createApp } from '../app.ts';
+import { type AppConfig, resetConfigCache } from '../config.ts';
 import { dispatchOperation } from './syncDispatch.ts';
 
 describe('sync schemas', () => {
@@ -113,5 +122,142 @@ describe('dispatchOperation (DB-free branches)', () => {
     );
     expect(outcome.status).toBe('rejected');
     expect(outcome.reason).toMatch(/not deletable/);
+  });
+});
+
+// ---------- field-writability parity (AGENTS.md S12.3) ----------
+
+const testConfig: AppConfig = {
+  environment: 'test',
+  port: 0,
+  host: '127.0.0.1',
+  databaseUrl: 'postgres://gurps:gurps@localhost:5432/gurps',
+  jwtSecret: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
+  jwtAccessTtlMinutes: 15,
+  jwtRefreshTtlDays: 14,
+  apiKeyPepper: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
+  corsOrigins: [],
+  resendApiKey: undefined,
+  resendFromEmail: undefined,
+  appBaseUrl: undefined,
+};
+
+process.env.DATABASE_URL = testConfig.databaseUrl;
+process.env.JWT_SECRET = testConfig.jwtSecret;
+process.env.ENVIRONMENT = testConfig.environment;
+resetConfigCache();
+
+const app = createApp(testConfig);
+
+function bearer(token: string) {
+  return { Authorization: `Bearer ${token}` };
+}
+
+function jsonHeaders(token: string) {
+  return { ...bearer(token), 'content-type': 'application/json' };
+}
+
+async function registerUser(suffix: string) {
+  const email = `sync-dispatch-test-${suffix}-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+  const res = await app.request('/api/v1/auth/register', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password: 'TestPassword1!', displayName: `Test ${suffix}` }),
+  });
+  const body = (await res.json()) as { accessToken: string };
+  return { accessToken: body.accessToken };
+}
+
+async function createCharacter(accessToken: string): Promise<{ id: string; revision: number }> {
+  const res = await app.request('/api/v1/characters', {
+    method: 'POST',
+    headers: jsonHeaders(accessToken),
+    body: JSON.stringify({ name: `Sync dispatch test ${Date.now()}-${Math.random()}` }),
+  });
+  const body = (await res.json()) as { id: string; revision: number };
+  return body;
+}
+
+describe('POST /api/v1/sync/operations -- character field writability parity', () => {
+  it('accepts a valid tempEffects array patch', async () => {
+    const { accessToken } = await registerUser('temp-effects-ok');
+    const character = await createCharacter(accessToken);
+    const res = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: '0193b3c0-f1f0-7000-8000-0000000000a1',
+            entityClass: 'character',
+            entityId: character.id,
+            command: 'patch',
+            fieldPath: 'tempEffects',
+            attemptedValue: [{ id: 'e1', name: 'Might', mods: { st: 2, ht: 1 } }],
+            baseRevision: character.revision,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ status: string }> };
+    expect(body.outcomes[0]?.status).toBe('applied');
+  });
+
+  it('rejects an invalid tempEffects array (unknown axis key)', async () => {
+    const { accessToken } = await registerUser('temp-effects-bad');
+    const character = await createCharacter(accessToken);
+    const res = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: '0193b3c0-f1f0-7000-8000-0000000000a2',
+            entityClass: 'character',
+            entityId: character.id,
+            command: 'patch',
+            fieldPath: 'tempEffects',
+            attemptedValue: [{ id: 'e1', name: 'Might', mods: { strength: 2 } }],
+            baseRevision: character.revision,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ status: string }> };
+    expect(body.outcomes[0]?.status).toBe('rejected');
+  });
+
+  it('rejects tempSt as no longer writable -- the scalar field was replaced by tempEffects', async () => {
+    const { accessToken } = await registerUser('temp-st-gone');
+    const character = await createCharacter(accessToken);
+    const res = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: '0193b3c0-f1f0-7000-8000-0000000000a3',
+            entityClass: 'character',
+            entityId: character.id,
+            command: 'patch',
+            fieldPath: 'tempSt',
+            attemptedValue: 5,
+            baseRevision: character.revision,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ status: string; reason?: string }> };
+    expect(body.outcomes[0]?.status).toBe('rejected');
+    expect(body.outcomes[0]?.reason).toMatch(/not writable/);
   });
 });

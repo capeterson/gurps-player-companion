@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from 'react';
 import { type CritKind, evaluateRoll, roll3d6 } from '../../../../shared/domain/diceRoll.ts';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import { newClientId } from '../../../sync/outbox.ts';
 import { pushRoll } from './rollHistory.ts';
 import type { RollRequest } from './rollTypes.ts';
@@ -31,10 +32,6 @@ const MOD_MAX = 10;
 
 function clampMod(n: number): number {
   return Math.max(MOD_MIN, Math.min(MOD_MAX, n));
-}
-
-function fmtSigned(n: number): string {
-  return n >= 0 ? `+${n}` : String(n);
 }
 
 interface RollResult {
@@ -178,7 +175,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
             −
           </button>
           <span className="num w-20 text-center text-sm text-base-content/70">
-            {request.baseTarget} {fmtSigned(modifier)}
+            {request.baseTarget} {formatSigned(modifier)}
           </span>
           <button
             type="button"
@@ -230,7 +227,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
             <p className="num text-3xl font-bold">{result.total}</p>
             <p className="text-xs text-base-content/60">vs {result.target}</p>
             <p className={`text-sm font-medium ${result.success ? 'text-success' : 'text-error'}`}>
-              {result.success ? 'Success' : 'Failure'} · margin {fmtSigned(result.margin)}
+              {result.success ? 'Success' : 'Failure'} · margin {formatSigned(result.margin)}
             </p>
             {result.crit && (
               <span

@@ -3,20 +3,22 @@ import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { TraitOut } from '../../../../shared/schemas/trait.ts';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import {
   LibraryModifierPicker,
   applyModifierToggle,
 } from '../../../components/ui/LibraryModifierPicker.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
+import { enqueueDelete } from '../../../sync/outbox.ts';
+import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
-  enqueueCreate,
-  enqueueDelete,
-  enqueueFieldPatch,
-  newClientId,
-} from '../../../sync/outbox.ts';
+  useEntityNameField,
+  useEntityPointsField,
+  useEntityRowPatch,
+} from './useEntityRowPatch.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
 const TRAIT_KINDS = [
@@ -50,11 +52,9 @@ interface TraitSnapshot {
 }
 
 function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) {
-  const toasts = useToasts();
   const [name, setName] = useState('');
   const [kind, setKind] = useState<TraitKind>('advantage');
   const [points, setPoints] = useState('0');
-  const [creating, setCreating] = useState(false);
   // When the user picks a library entry both the id (for the FK) and
   // the full entry (for the modifier picker) are captured here.  The
   // entry is dropped whenever the user types past the prefilled name.
@@ -63,6 +63,11 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const [selectedModifiers, setSelectedModifiers] = useState<readonly string[]>([]);
 
   const { fetchOptions } = useLibraryFetcher<LibraryTraitOut>('traits', campaignId);
+  const { creating, submit: submitEntity } = useAddEntityForm({
+    entityClass: 'character_trait',
+    characterId,
+    label: 'trait',
+  });
 
   // Live cost preview when the picker is open: re-derives points from
   // the selected modifier names, so the form's `points` field stays in
@@ -78,42 +83,37 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
       : null;
 
   async function submit(snap: TraitSnapshot) {
-    setCreating(true);
-    try {
-      const modifiers =
-        snap.pickedTrait !== null
-          ? snap.pickedTrait.availableModifiers.filter((m) =>
-              snap.selectedModifierNames.includes(m.name),
-            )
-          : [];
-      await enqueueCreate({
-        entityClass: 'character_trait',
-        entityId: newClientId(),
-        humanName: 'trait',
+    const modifiers =
+      snap.pickedTrait !== null
+        ? snap.pickedTrait.availableModifiers.filter((m) =>
+            snap.selectedModifierNames.includes(m.name),
+          )
+        : [];
+    await submitEntity(
+      {
+        name: snap.name,
+        kind: snap.kind,
+        points: snap.points,
         characterId,
-        attemptedValue: {
-          name: snap.name,
-          kind: snap.kind,
-          points: snap.points,
-          characterId,
-          ...(snap.libraryTraitId ? { libraryTraitId: snap.libraryTraitId } : {}),
-          ...(modifiers.length > 0 ? { modifiers } : {}),
-        },
-      });
-      // Per AGENTS.md (rule 1: never silently discard user edits): only
-      // clear fields whose current value still matches the snapshot we
-      // submitted.  If the user has started typing the next trait while
-      // this enqueue was in flight, leave that draft alone.
-      if (name === snap.nameRaw) setName('');
-      if (points === snap.pointsRaw) setPoints('0');
-      setPickedLibraryId(null);
-      setPickedTrait(null);
-      setSelectedModifiers([]);
-    } catch (err) {
-      toasts.push(`Couldn't add trait — ${(err as Error).message}`, { kind: 'error' });
-    } finally {
-      setCreating(false);
-    }
+        ...(snap.libraryTraitId ? { libraryTraitId: snap.libraryTraitId } : {}),
+        ...(modifiers.length > 0 ? { modifiers } : {}),
+      },
+      () => {
+        // Per AGENTS.md (rule 1: never silently discard user edits): only
+        // clear fields whose current value still matches the snapshot we
+        // submitted.  We use functional setters so the comparison runs
+        // against the *live* state at completion time, not the
+        // closure-captured value from the render that submitted; that
+        // way a field the user has typed into during the await isn't
+        // wiped, which is exactly the quick-edit loss this guard exists
+        // to prevent.
+        setName((cur) => (cur === snap.nameRaw ? '' : cur));
+        setPoints((cur) => (cur === snap.pointsRaw ? '0' : cur));
+        setPickedLibraryId(null);
+        setPickedTrait(null);
+        setSelectedModifiers([]);
+      },
+    );
   }
 
   if (!canWrite) return null;
@@ -250,43 +250,25 @@ interface TraitRowProps {
 
 function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
   const toasts = useToasts();
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const patchTrait = (field: string, value: unknown) =>
-    enqueueFieldPatch({
-      entityClass: 'character_trait',
-      entityId: trait.id,
-      fieldPath: field,
-      attemptedValue: value,
-      humanName: `${trait.name} ${field}`,
-      flashKey: makeFlashKey('character_trait', trait.id, field),
-      characterId,
-    });
+  const rowPatch = useEntityRowPatch('character_trait', trait.id, characterId, trait.name);
 
-  const nameField = useDraftField<string>({
-    name: `${trait.name} name`,
-    serverValue: trait.name,
-    parse: (s) => s.trim(),
-    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: (v) => patchTrait('name', v),
-    flashKey: makeFlashKey('character_trait', trait.id, 'name'),
-  });
-  const pointsField = useDraftField<number>({
-    name: `${trait.name} points`,
-    serverValue: trait.points,
-    parse: (s) => {
-      const n = Number(s);
-      if (!Number.isFinite(n) || !Number.isInteger(n)) throw new Error('integer only');
-      return n;
-    },
-    onSave: (v) => patchTrait('points', v),
-    flashKey: makeFlashKey('character_trait', trait.id, 'points'),
-  });
+  const nameField = useEntityNameField(rowPatch, trait.name);
+  // Unbounded (no min/max) — matches the previous inline validator,
+  // which only checked "is this an integer."
+  const pointsField = useEntityPointsField(
+    rowPatch,
+    trait.name,
+    trait.points,
+    intParser(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+  );
   const notesField = useDraftField<string | null>({
     name: `${trait.name} notes`,
     serverValue: trait.notes ?? '',
     parse: (s) => (s.trim().length === 0 ? null : s),
-    onSave: (v) => patchTrait('notes', v),
-    flashKey: makeFlashKey('character_trait', trait.id, 'notes'),
+    onSave: (v) => rowPatch.patch('notes', v),
+    flashKey: rowPatch.flashKey('notes'),
   });
 
   const removeTrait = async () => {
@@ -356,14 +338,23 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
         <button
           type="button"
           className="btn btn-ghost btn-xs"
-          onClick={() => {
-            if (confirm(`Delete trait "${trait.name}"?`)) void removeTrait();
-          }}
+          onClick={() => setConfirmDelete(true)}
           aria-label={`Delete trait ${trait.name}`}
         >
           ✕
         </button>
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Delete trait "${trait.name}"?`}
+        confirmLabel="Delete"
+        tone="error"
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void removeTrait();
+        }}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </li>
   );
 }

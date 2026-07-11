@@ -35,7 +35,11 @@ async function registerAndLogin(
   await page.goto('/register');
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/display name/i).fill('E2E User');
-  await page.getByLabel(/^password$/i).fill(password);
+  // RegisterPage's label is "Password (min 8 chars)" — anchor to the
+  // start only so the hint text doesn't break the match, and rely on
+  // there being no "Confirm password" field on this form to keep it
+  // unambiguous.
+  await page.getByLabel(/^password\b/i).fill(password);
   await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
   await expect(page).toHaveURL(/(\/|\/characters)$/, { timeout: 15_000 });
 }
@@ -77,8 +81,20 @@ test.describe('BUG-1: canWrite is correct offline', () => {
     // Wait for the sync indicator to settle on "Synced".
     await expect(page.getByLabel(/all changes saved/i)).toBeVisible({ timeout: 15_000 });
 
-    // Simulate going offline.
-    await goOffline(page);
+    // Simulate offline for the *API*, not the whole browser network stack.
+    // The suite runs against `bun run dev` (Vite dev server), which has no
+    // service worker precaching the app shell — that's only generated for
+    // a production build (`vite-plugin-pwa`'s `devOptions.enabled` is off).
+    // A real `context.setOffline(true)` + `page.reload()` would therefore
+    // fail with ERR_INTERNET_DISCONNECTED before the app ever runs, which
+    // tests the dev server's lack of a SW rather than the bug this test
+    // guards: canWrite falling back to the JWT sub when `/auth/me` can't
+    // be reached. Aborting just the API traffic reproduces that condition
+    // — the app genuinely gets no response from `/auth/me` — while still
+    // letting the browser fetch its own JS/CSS/HTML, standing in for the
+    // SW-cached shell a production build would serve offline.
+    await page.route('**/api/v1/**', (route) => route.abort());
+    await page.evaluate(() => window.dispatchEvent(new Event('offline')));
 
     // Reload the page — /auth/me will fail, but the character should still be editable.
     await page.reload();
@@ -89,6 +105,7 @@ test.describe('BUG-1: canWrite is correct offline', () => {
     await expect(nameInput).not.toBeDisabled();
 
     // Restore network state.
+    await page.unroute('**/api/v1/**');
     await goOnline(page);
   });
 
@@ -99,6 +116,16 @@ test.describe('BUG-1: canWrite is correct offline', () => {
     const email = `e2e-new-char-${SUFFIX()}@example.com`;
     await registerAndLogin(page, email);
     await page.goto('/characters');
+
+    // `goto` is a hard navigation, so it remounts the SPA and restarts the
+    // mandatory SyncBootstrapGate pull — which itself is a `/sync/**` call.
+    // Wait for that bootstrap to actually resolve (the heading only renders
+    // once the gate clears) before blocking sync traffic below; otherwise
+    // the block races the bootstrap's own cursor-pull and can abort it,
+    // leaving the app stuck on "Bringing local data in sync…" forever.
+    await expect(page.getByRole('heading', { name: /your characters/i })).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Block all sync requests so the create never round-trips.
     await context.route('**/api/v1/sync/**', (route) => route.abort());
@@ -160,7 +187,12 @@ test.describe('BUG-2: SyncBootstrapGate never flashes empty content', () => {
     });
 
     // Sign out
-    await page.getByRole('button', { name: /open user menu/i }).click();
+    // The user-menu trigger is a <summary aria-label="Open user menu">
+    // inside a <details> dropdown, not a <button>: Chromium's accessibility
+    // tree exposes <summary> with role "generic" (the <details> itself gets
+    // role "group"), so getByRole('button', ...) never matches it. Its
+    // aria-label still makes it reachable via getByLabel.
+    await page.getByLabel(/open user menu/i).click();
     await page.getByRole('link', { name: /settings/i }).click();
     // Log out via the user menu — sign out button might be in settings or nav
     await page.goto('/login');

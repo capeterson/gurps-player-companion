@@ -29,7 +29,7 @@ export interface ModifiedCost {
   readonly total: number;
 }
 
-export function computeTraitCost(
+export function computeModifiedCost(
   basePoints: number,
   modifiers: readonly TraitModifier[],
 ): ModifiedCost {

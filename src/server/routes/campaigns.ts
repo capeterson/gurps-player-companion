@@ -27,6 +27,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
 router.use('/campaigns', requireActiveUser);
@@ -240,18 +241,7 @@ router.openapi(
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
         .update(campaigns)
-        .set({
-          ...(body.name !== undefined ? { name: body.name } : {}),
-          ...(body.description !== undefined ? { description: body.description } : {}),
-          ...(body.pointTarget !== undefined ? { pointTarget: body.pointTarget } : {}),
-          ...(body.disadvantageCap !== undefined ? { disadvantageCap: body.disadvantageCap } : {}),
-          ...(body.quirkCap !== undefined ? { quirkCap: body.quirkCap } : {}),
-          ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
-          ...(body.shareCharacterSheets !== undefined
-            ? { shareCharacterSheets: body.shareCharacterSheets }
-            : {}),
-          updatedAt: new Date(),
-        })
+        .set(buildPatchSet(body))
         .where(eq(campaigns.id, id))
         .returning();
       if (!updated) throw new HTTPException(500, { message: 'update failed' });

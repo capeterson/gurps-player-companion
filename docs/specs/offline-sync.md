@@ -126,6 +126,11 @@ rule that has been broken at least once.
   index of `entityId|fieldPath`; a new pending patch for a key **replaces** the
   existing pending/`transient_retry` op rather than stacking — otherwise an old
   value could replay over a newer one. `create`/`delete` are never coalesced.
+  The replacement op's `prevValue` carries forward the OLDEST coalesced op's
+  `prevValue`, not a fresh read of the local row — the local row already
+  reflects the deleted op's optimistic value, so re-reading it would anchor a
+  later rejection's rollback to an unsynced intermediate value instead of the
+  true last-synced one (`enqueueFieldPatch` in `outbox.ts`).
 - **Server pulls never clobber local intent** (S4). `applyServerRow` skips any
   field with a pending/in-flight op for the same `(entityId, fieldPath)`. Never
   re-sync a whole draft from a server cache on refetch.

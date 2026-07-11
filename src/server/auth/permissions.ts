@@ -20,13 +20,17 @@ import {
 
 export type CampaignRole = DbCampaignMembership['role'];
 
-export async function loadCampaignOr403(
+interface CampaignRoleLookup {
+  readonly campaign: DbCampaign;
+  /** `null` means "campaign exists but `userId` has no role on it." */
+  readonly role: CampaignRole | null;
+}
+
+/** Shared query behind both `loadCampaignOr403` and `tryLoadCampaignRole`. */
+async function lookupCampaignRole(
   campaignId: string,
   userId: string,
-): Promise<{
-  campaign: DbCampaign;
-  role: CampaignRole;
-}> {
+): Promise<CampaignRoleLookup | null> {
   const db = getDb();
   const rows = await db
     .select({ campaign: campaigns, membership: campaignMemberships })
@@ -37,12 +41,38 @@ export async function loadCampaignOr403(
     )
     .where(eq(campaigns.id, campaignId));
   const row = rows[0];
-  if (!row) throw new HTTPException(404, { message: 'campaign not found' });
-  if (row.campaign.ownerId === userId) {
-    return { campaign: row.campaign, role: 'owner' };
-  }
-  if (!row.membership) throw new HTTPException(403, { message: 'forbidden' });
-  return { campaign: row.campaign, role: row.membership.role };
+  if (!row) return null;
+  const role: CampaignRole | null =
+    row.campaign.ownerId === userId ? 'owner' : (row.membership?.role ?? null);
+  return { campaign: row.campaign, role };
+}
+
+export async function loadCampaignOr403(
+  campaignId: string,
+  userId: string,
+): Promise<{
+  campaign: DbCampaign;
+  role: CampaignRole;
+}> {
+  const result = await lookupCampaignRole(campaignId, userId);
+  if (!result) throw new HTTPException(404, { message: 'campaign not found' });
+  if (result.role === null) throw new HTTPException(403, { message: 'forbidden' });
+  return { campaign: result.campaign, role: result.role };
+}
+
+/**
+ * Non-throwing role lookup: `null` covers both "campaign doesn't exist"
+ * and "`userId` has no role on it" — for callers that only need to
+ * know membership status (e.g. "is this invitee already a member?")
+ * rather than distinguish 404-vs-403, so they don't need to wrap
+ * `loadCampaignOr403` in a try/catch just to get a boolean-ish answer.
+ */
+export async function tryLoadCampaignRole(
+  campaignId: string,
+  userId: string,
+): Promise<CampaignRole | null> {
+  const result = await lookupCampaignRole(campaignId, userId);
+  return result?.role ?? null;
 }
 
 export async function requireSuperuser(userId: string): Promise<void> {

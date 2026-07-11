@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { SPELL_DIFFICULTIES } from '../constants/skills.ts';
-import { isoTimestamp, uuid } from './common.ts';
+import { timestamps, uuid } from './common.ts';
 
 /**
  * GURPS 4e spells.  Mechanically a spell is an IQ skill (Hard for
@@ -43,8 +43,7 @@ export const spellOut = z.object({
   /** Server-computed: maintenance cost after the same skill discount.
    * Null when the spell has no maintenance cost recorded. */
   effectiveMaintenanceCost: z.number().int().nullable(),
-  createdAt: isoTimestamp,
-  updatedAt: isoTimestamp,
+  ...timestamps,
 });
 
 export const spellCreate = z.object({
