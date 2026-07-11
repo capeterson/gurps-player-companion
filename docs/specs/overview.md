@@ -218,14 +218,22 @@ src/
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,
-                 health)
+                 health). campaignLibrary.ts is now a thin factory wiring:
+                 campaignLibraryEntities.ts (per-entity-kind config: schemas,
+                 DTO/insert/update mappers, natural key) and
+                 campaignLibraryCrud.ts (generic POST/PATCH/DELETE route
+                 registration + YAML upsert-by-key loop) consumed once per
+                 entity kind.
     auth/        jwt, password, webauthn (passkeys), apiKey, session,
-                 middleware, permissions (the authz helpers)
+                 middleware, permissions (the authz helpers, incl.
+                 tryLoadCampaignRole)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
                  (incl. loadCharacterDetail, the shared character-detail
                  loader), characterAccess (resolveCharacterView, the
                  shared full/minimal/forbidden decision), patchSet
-                 (buildPatchSet, the shared PATCH-body-to-`.set()` helper)
+                 (buildPatchSet, the shared PATCH-body-to-`.set()` helper),
+                 entityWrites (per-entity insert/upsert-values builders
+                 shared by REST and the sync dispatcher — AGENTS.md S12)
     db/          schema.ts (Drizzle), migrations/ (hand-written SQL for
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
@@ -236,14 +244,25 @@ src/
                  (PlayModePage + PoolsCard/ManeuverCard/DefensesCard/
                  AttacksCard/SkillsCard/RollableRow/RollSheet/
                  RollHistoryStrip + the ephemeral rollHistory store)
+      characters/sections/  Sheet-panel form plumbing shared across
+                 Traits/Skills/Spells/Inventory: useAddEntityForm (the add
+                 form), useEntityRowPatch (per-row field patch dispatch),
+                 useClampedJsonbBumper (powerstone/magic-item charge
+                 steppers), useTempEffects (the named temporary-effects
+                 list backing the Attributes panel's modifier popovers)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth)
-    hooks/       useDraftField (canonical draft-on-blur), useDraftToggle, ...
+    hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
+                 useFlashState (shared flash-pulse primitive the draft
+                 hooks build on), ...
     components/  Shared UI (sync indicator, notifications bell, ui/*)
     admin/       Separate admin SPA entry
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol)
+    format/      number.ts — formatSigned/formatScaled, the shared
+                 sign/scale number formatters used by both client display
+                 code and shared warning text
     domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
                  traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
                  success-roll evaluation), damageParse (weapon damage-string
