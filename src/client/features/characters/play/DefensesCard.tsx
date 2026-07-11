@@ -122,6 +122,11 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
           No parryable weapons or shield equipped — Dodge is always available.
         </p>
       )}
+
+      <p className="text-[11px] text-base-content/50">
+        Trait bonuses (Combat Reflexes, Enhanced Defenses) and shield DB are not included — add them
+        as a modifier when rolling.
+      </p>
     </section>
   );
 }

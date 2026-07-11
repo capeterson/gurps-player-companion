@@ -13,10 +13,10 @@ describe('effectiveDodge', () => {
     expect(effectiveDodge(9, 0)).toBe(9);
   });
 
-  it('floors at 1 rather than going to zero or negative', () => {
-    expect(effectiveDodge(2, -4)).toBe(1);
-    expect(effectiveDodge(1, -1)).toBe(1);
-    expect(effectiveDodge(3, -3)).toBe(1);
+  it('does not floor at 1 — RAW has no min-1 rule for encumbered Dodge', () => {
+    expect(effectiveDodge(2, -4)).toBe(-2);
+    expect(effectiveDodge(1, -1)).toBe(0);
+    expect(effectiveDodge(3, -3)).toBe(0);
   });
 });
 

@@ -2,17 +2,20 @@
  * GURPS 4e active defense math (Basic Set p. 374-376).
  *
  *   - Dodge = floor(Basic Speed) + 3 (B17), then encumbrance applies a
- *     penalty (B17, B419). `encumbrance.ts`'s `dodgePenalty` is stored
- *     as a negative or zero number (e.g. -2 for Medium encumbrance),
- *     so it's simply added here; the result is floored at 1 (a
- *     character can never have less than Dodge 1).
+ *     penalty (B17). `encumbrance.ts`'s `dodgePenalty` is stored as a
+ *     negative or zero number (e.g. -2 for Medium encumbrance), so
+ *     it's simply added here. RAW gives no floor for encumbered Dodge —
+ *     the min-1 rules in the book apply to Move under encumbrance (B17)
+ *     and to Move/Dodge halved by low FP/HP (B426/B419), not to
+ *     encumbrance's effect on Dodge itself — so this does not clamp the
+ *     result.
  *   - Parry = floor(skill/2) + 3 + weapon parry modifier (B376).
  *   - Block = floor(skill/2) + 3 (B375).
  */
 
-/** Dodge after encumbrance, floored at 1 (B17/B419). `encumbrancePenalty` must be <= 0. */
+/** Dodge after encumbrance (B17). `encumbrancePenalty` must be <= 0. */
 export function effectiveDodge(dodge: number, encumbrancePenalty: number): number {
-  return Math.max(1, dodge + encumbrancePenalty);
+  return dodge + encumbrancePenalty;
 }
 
 /** Parry score from a weapon skill level and the weapon's parry modifier (B376). */
