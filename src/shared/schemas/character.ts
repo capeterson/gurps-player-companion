@@ -25,6 +25,21 @@ export const TEMP_STAT_AXES = [
 ] as const;
 export type TempStatAxis = (typeof TEMP_STAT_AXES)[number];
 
+/** Axis key -> display label. Shared by the effects-list rows, the add
+ * form's axis select, and the client-side cap-violation toast message. */
+export const TEMP_AXIS_LABELS: Record<TempStatAxis, string> = {
+  st: 'ST',
+  dx: 'DX',
+  iq: 'IQ',
+  ht: 'HT',
+  hp: 'HP',
+  will: 'Will',
+  per: 'Per',
+  fp: 'FP',
+  speedQuarter: 'Speed',
+  move: 'Move',
+};
+
 /**
  * Sentinel id for the single "manual adjustment" effect: the
  * always-present bucket the ✦ modifier popovers write to directly

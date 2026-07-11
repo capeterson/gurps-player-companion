@@ -10,10 +10,11 @@ import {
   secondarySpent,
 } from '../../../shared/domain/attributeTooltips.ts';
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
-import { formatScaled, formatSigned } from '../../../shared/format/number.ts';
+import { formatScaled } from '../../../shared/format/number.ts';
 import {
   type CharacterDetail,
   MANUAL_TEMP_EFFECT_ID,
+  TEMP_AXIS_LABELS,
   TEMP_STAT_AXES,
   type TempStatAxis,
 } from '../../../shared/schemas/character.ts';
@@ -32,6 +33,7 @@ import {
   nullableTextParser,
   scaledIntParser,
 } from '../../lib/parsers.ts';
+import { useToasts } from '../../lib/toast.tsx';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
@@ -733,26 +735,20 @@ function IdentityPanel({
   );
 }
 
-/** Axis key -> display label, for the effects-list rows and the add form's select. */
-const TEMP_AXIS_LABELS: Record<TempStatAxis, string> = {
-  st: 'ST',
-  dx: 'DX',
-  iq: 'IQ',
-  ht: 'HT',
-  hp: 'HP',
-  will: 'Will',
-  per: 'Per',
-  fp: 'FP',
-  speedQuarter: 'Speed',
-  move: 'Move',
-};
-
-/** "ST +2, HT +1" -- every axis an effect touches, signed and labeled. */
-function formatEffectMods(mods: TempEffectMods): string {
+/**
+ * "ST +2, HT +1" -- every axis an effect touches, signed and labeled.
+ * `speedQuarter` is stored in quarter-Speed-point units (S2/S3 raw
+ * value); scale it back to whole Speed points for display, mirroring
+ * `SecondaryModCell`'s `modScale={0.25}` for the same axis so the row
+ * and the "±N from effects" caption agree (PR #46 review finding).
+ */
+export function formatEffectMods(mods: TempEffectMods): string {
   const parts: string[] = [];
   for (const axis of TEMP_STAT_AXES) {
     const v = mods[axis];
-    if (v !== undefined && v !== 0) parts.push(`${TEMP_AXIS_LABELS[axis]} ${formatSigned(v)}`);
+    if (v === undefined || v === 0) continue;
+    const scale = axis === 'speedQuarter' ? 0.25 : 1;
+    parts.push(`${TEMP_AXIS_LABELS[axis]} ${fmtSignedDelta(v, scale)}`);
   }
   return parts.join(', ');
 }
@@ -762,8 +758,22 @@ function formatEffectMods(mods: TempEffectMods): string {
  * panel's revert-all button. The 'manual' entry (driven by the ✦
  * popovers) shows read-only here -- it has no remove button because
  * the popovers already manage it via "Clear".
+ *
+ * Rendered for every viewer who HAS effect data, including full
+ * read-only viewers (e.g. a GM) -- only the add form and the per-row
+ * remove buttons are gated on `canWrite` (PR #46 review finding: this
+ * used to gate the whole list, hiding named effects from read-only
+ * viewers entirely). Share-gate minimal viewers already receive
+ * `tempEffects: []` from the server, so there's nothing to leak here.
  */
-function TempEffectsList({ tempEffects }: { tempEffects: TempEffectsApi }) {
+function TempEffectsList({
+  tempEffects,
+  canWrite,
+}: {
+  tempEffects: TempEffectsApi;
+  canWrite: boolean;
+}) {
+  const toasts = useToasts();
   const flash = useFieldFlash(tempEffects.flashKey);
   const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
   const namedEffects = tempEffects.effects.filter((e) => e.id !== MANUAL_TEMP_EFFECT_ID);
@@ -773,8 +783,26 @@ function TempEffectsList({ tempEffects }: { tempEffects: TempEffectsApi }) {
 
   function submitAdd(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const n = Number.parseInt(amount, 10);
-    if (!name.trim() || !Number.isFinite(n) || n === 0) return;
+    if (!name.trim()) return;
+    // Speed is stored in quarter-Speed-point units (mods.speedQuarter),
+    // but the input reads in whole Speed points -- e.g. typing "1"
+    // means "+1 Speed" and must store 4 quarters, not 1 (PR #46 review:
+    // this used to write the raw parsed integer straight into
+    // mods.speedQuarter, silently storing 1/4 of the intended boost).
+    // scaledIntParser both does the ×4 conversion and rejects amounts
+    // that aren't exact quarter-steps.
+    let n: number;
+    try {
+      n =
+        axis === 'speedQuarter'
+          ? scaledIntParser(0.25, -50, 50)(amount)
+          : intParser(-50, 50)(amount);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'invalid amount';
+      toasts.push(`Couldn't add effect — ${msg}`, { kind: 'error' });
+      return;
+    }
+    if (n === 0) return;
     tempEffects.addEffect(name, { [axis]: n });
     setName('');
     setAmount('');
@@ -796,47 +824,52 @@ function TempEffectsList({ tempEffects }: { tempEffects: TempEffectsApi }) {
           <span className="num truncate">
             {effect.name} — {formatEffectMods(effect.mods)}
           </span>
-          <button
-            type="button"
-            onClick={() => tempEffects.removeEffect(effect.id)}
-            aria-label={`Remove ${effect.name}`}
-            className="btn btn-ghost btn-xs px-1.5"
-          >
-            ×
-          </button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => tempEffects.removeEffect(effect.id)}
+              aria-label={`Remove ${effect.name}`}
+              className="btn btn-ghost btn-xs px-1.5"
+            >
+              ×
+            </button>
+          )}
         </div>
       ))}
-      <form onSubmit={submitAdd} className="flex items-center gap-1.5">
-        <input
-          aria-label="New effect name"
-          placeholder="Effect name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="input input-bordered input-xs flex-1 min-w-0"
-        />
-        <select
-          aria-label="Effect axis"
-          value={axis}
-          onChange={(e) => setAxis(e.target.value as TempStatAxis)}
-          className="select select-bordered select-xs"
-        >
-          {TEMP_STAT_AXES.map((a) => (
-            <option key={a} value={a}>
-              {TEMP_AXIS_LABELS[a]}
-            </option>
-          ))}
-        </select>
-        <input
-          aria-label="Effect amount"
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="num input input-bordered input-xs w-14"
-        />
-        <button type="submit" className="btn btn-ghost btn-xs">
-          Add
-        </button>
-      </form>
+      {canWrite && (
+        <form onSubmit={submitAdd} className="flex items-center gap-1.5">
+          <input
+            aria-label="New effect name"
+            placeholder="Effect name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="input input-bordered input-xs flex-1 min-w-0"
+          />
+          <select
+            aria-label="Effect axis"
+            value={axis}
+            onChange={(e) => setAxis(e.target.value as TempStatAxis)}
+            className="select select-bordered select-xs"
+          >
+            {TEMP_STAT_AXES.map((a) => (
+              <option key={a} value={a}>
+                {TEMP_AXIS_LABELS[a]}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="Effect amount"
+            type="number"
+            step={axis === 'speedQuarter' ? 0.25 : 1}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="num input input-bordered input-xs w-14"
+          />
+          <button type="submit" className="btn btn-ghost btn-xs">
+            Add
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -908,7 +941,9 @@ function AttributesPanel({
           Revert all temporary buffs
         </button>
       )}
-      {canWrite && <TempEffectsList tempEffects={tempEffects} />}
+      {(canWrite || tempEffects.effects.length > 0) && (
+        <TempEffectsList tempEffects={tempEffects} canWrite={canWrite} />
+      )}
     </StatCard>
   );
 }

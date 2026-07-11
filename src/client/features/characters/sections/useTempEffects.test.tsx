@@ -14,16 +14,25 @@
  *   4. clearAll enqueues a single `[]` patch.
  */
 
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail, TempEffect } from '../../../../shared/schemas/character.ts';
 import { getLocalDb, resetLocalDb } from '../../../db/dexie.ts';
+import { ToastProvider } from '../../../lib/toast.tsx';
 import { tokenStore } from '../../../lib/tokenStore.ts';
 import { flashBus } from '../../../sync/flashBus.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from '../../../sync/orchestrator.ts';
 import { useTempEffects } from './useTempEffects.ts';
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000d001';
+
+// useTempEffects now calls useToasts() (fix for PR #46 review finding 2:
+// over-cap mutations must toast immediately), so every renderHook call
+// needs a ToastProvider in the tree.
+function wrapper({ children }: { children: ReactNode }) {
+  return <ToastProvider>{children}</ToastProvider>;
+}
 
 function makeCharacter(tempEffects: TempEffect[] = []): CharacterDetail {
   return { id: CHAR_ID, tempEffects } as unknown as CharacterDetail;
@@ -71,7 +80,7 @@ afterEach(async () => {
 describe('useTempEffects', () => {
   it('addEffect writes Dexie + enqueues one patch with the raw array', async () => {
     await seedCharacter([]);
-    const { result } = renderHook(() => useTempEffects(makeCharacter([]), true));
+    const { result } = renderHook(() => useTempEffects(makeCharacter([]), true), { wrapper });
 
     await act(async () => {
       await result.current.addEffect('Might', { st: 2 });
@@ -89,7 +98,7 @@ describe('useTempEffects', () => {
 
   it('two rapid mutations compose — the second sees the first result, not the stale prop', async () => {
     await seedCharacter([]);
-    const { result } = renderHook(() => useTempEffects(makeCharacter([]), true));
+    const { result } = renderHook(() => useTempEffects(makeCharacter([]), true), { wrapper });
 
     // Both calls fire before either's Dexie transaction settles — without
     // the latest-intended ref, both would compose against the same
@@ -115,7 +124,7 @@ describe('useTempEffects', () => {
   it('clearAll enqueues a single [] patch', async () => {
     const existing: TempEffect[] = [{ id: 'e1', name: 'Might', mods: { st: 2 } }];
     await seedCharacter(existing);
-    const { result } = renderHook(() => useTempEffects(makeCharacter(existing), true));
+    const { result } = renderHook(() => useTempEffects(makeCharacter(existing), true), { wrapper });
 
     await act(async () => {
       await result.current.clearAll();
@@ -130,7 +139,7 @@ describe('useTempEffects', () => {
 
   it('ignores mutations when canWrite is false', async () => {
     await seedCharacter([]);
-    const { result } = renderHook(() => useTempEffects(makeCharacter([]), false));
+    const { result } = renderHook(() => useTempEffects(makeCharacter([]), false), { wrapper });
 
     await act(async () => {
       await result.current.addEffect('Might', { st: 2 });
@@ -180,7 +189,7 @@ describe('useTempEffects', () => {
       },
     );
 
-    const { result } = renderHook(() => useTempEffects(makeCharacter([]), true));
+    const { result } = renderHook(() => useTempEffects(makeCharacter([]), true), { wrapper });
 
     getSyncOrchestrator().start();
     await act(async () => {
@@ -207,6 +216,43 @@ describe('useTempEffects', () => {
     });
 
     getSyncOrchestrator().stop();
+    unsubscribe();
+  });
+
+  it('rejects an over-cap addEffect locally: no Dexie write, no outbox row, toast fired', async () => {
+    // PR #46 review finding 2: an offline user could previously stack
+    // rapid-tap boosts past tempEffectsField's per-axis ±50 SUM cap and
+    // live with invalid derived stats until a much-later server
+    // rejection. Fix: validate in the shared commit path before ANY
+    // local write. Each individual effect here is within the per-mod
+    // [-50, 50] bound (tempAxisMod) -- it's the COMBINED st total across
+    // both effects (30 + 30 = 60) that trips tempEffectsField's
+    // superRefine cap, exercising the "combined X modifier" message path.
+    const existing: TempEffect[] = [{ id: 'e1', name: 'Potion', mods: { st: 30 } }];
+    await seedCharacter(existing);
+    const { result } = renderHook(() => useTempEffects(makeCharacter(existing), true), {
+      wrapper,
+    });
+
+    const flashEvents: string[] = [];
+    const unsubscribe = flashBus.subscribe(
+      'character:0193b3c0-f1f0-7000-8000-00000000d001:tempEffects',
+      (e) => {
+        flashEvents.push(e.reason);
+      },
+    );
+
+    await act(async () => {
+      await result.current.addEffect('Overload', { st: 30 });
+    });
+
+    expect(await getLocalDb().characters.get(CHAR_ID)).toMatchObject({ tempEffects: existing });
+    expect(await getLocalDb().outbox.count()).toBe(0);
+    expect(
+      screen.getByText(/Couldn't save temporary effects — exceed the ±50 cap for ST/),
+    ).toBeInTheDocument();
+    expect(flashEvents).toContain('exceed the ±50 cap for ST');
+
     unsubscribe();
   });
 });

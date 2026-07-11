@@ -3,8 +3,11 @@
  * rule from AGENTS.md, plus the parallel-different-fields case.
  */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type OutboxEntry, getLocalDb, resetLocalDb } from '../db/dexie.ts';
+import { tokenStore } from '../lib/tokenStore.ts';
+import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
 import {
   MAX_ATTEMPTS,
   backoffMs,
@@ -14,8 +17,18 @@ import {
 } from './outbox.ts';
 
 afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  tokenStore.clear();
+  resetSyncOrchestratorForTests();
   await resetLocalDb();
 });
+
+function jwtForUser(userId: string): string {
+  const enc = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `${enc({ alg: 'none', typ: 'JWT' })}.${enc({ sub: userId })}.signature`;
+}
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000c001';
 
@@ -105,6 +118,149 @@ describe('enqueueFieldPatch', () => {
     });
     const op = (await getLocalDb().outbox.toArray())[0];
     expect(op?.prevValue).toBe(10);
+  });
+
+  it('coalescing preserves the ORIGINAL prevValue, not the intermediate optimistic value', async () => {
+    // PR #46 review finding: two rapid same-field patches must leave the
+    // surviving op's prevValue pointing at the value the field had
+    // BEFORE either patch -- not at the first patch's (about-to-be-
+    // deleted) attemptedValue, which is what a naive re-read of the
+    // local row would capture (the local row already reflects the
+    // first patch by the time the second one runs).
+    await seedCharacter(); // st starts at 10
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+    });
+    const ops = await getLocalDb().outbox.toArray();
+    expect(ops).toHaveLength(1);
+    expect(ops[0]?.attemptedValue).toBe(12);
+    // Must be 10 (the original), not 11 (the coalesced-away op's value).
+    expect(ops[0]?.prevValue).toBe(10);
+  });
+
+  it('a three-way coalesce still carries forward the ORIGINAL prevValue', async () => {
+    await seedCharacter(); // st starts at 10
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 13,
+    });
+    const ops = await getLocalDb().outbox.toArray();
+    expect(ops).toHaveLength(1);
+    expect(ops[0]?.attemptedValue).toBe(13);
+    expect(ops[0]?.prevValue).toBe(10);
+  });
+
+  it('an explicit args.prevValue override still wins over the carried-forward value', async () => {
+    // The orchestrator's stale_base self-heal path (orchestrator.ts)
+    // deliberately passes the server-confirmed current value as
+    // `prevValue` when re-enqueueing a patch; that override must not be
+    // clobbered by the coalescing carry-forward logic.
+    await seedCharacter();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 99,
+    });
+    const ops = await getLocalDb().outbox.toArray();
+    expect(ops).toHaveLength(1);
+    expect(ops[0]?.prevValue).toBe(99);
+  });
+});
+
+describe('coalescing + orchestrator rollback', () => {
+  it('rejection after coalescing restores the ORIGINAL pre-edit value, not an intermediate one', async () => {
+    // End-to-end version of the two prior coalescing tests: drive the
+    // surviving op through the real orchestrator and confirm the
+    // rollback lands on 10 (the true last-synced value), not 11 (the
+    // first tap's optimistic value that a naive re-read would have
+    // captured as prevValue).
+    await seedCharacter(); // st starts at 10
+    tokenStore.write({
+      accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+    });
+    // Sanity: the local row shows the latest optimistic value pre-sync.
+    expect((await getLocalDb().characters.get(CHAR_ID))?.st).toBe(12);
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'rejected' as const,
+          reason: 'st rejected in test',
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) {
+        return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const row = await getLocalDb().characters.get(CHAR_ID);
+        expect(row?.st).toBe(10);
+      });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
   });
 });
 

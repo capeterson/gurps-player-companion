@@ -26,7 +26,11 @@
  */
 
 import Dexie, { type Table } from 'dexie';
-import type { TempEffect } from '../../shared/schemas/character.ts';
+import {
+  MANUAL_TEMP_EFFECT_ID,
+  type TempEffect,
+  type TempStatAxis,
+} from '../../shared/schemas/character.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
 
 /**
@@ -288,6 +292,59 @@ export interface RejectionRecord {
   dismissedAt?: string | undefined;
 }
 
+/**
+ * Legacy (pre-migration-0017) scalar temp-modifier columns -> the axis
+ * they map to in the `tempEffects` array shape. Mirrors the server's
+ * backfill in `src/server/db/migrations/0017_temp_effects.sql` exactly,
+ * so a local row that was written before that migration (and hasn't
+ * been re-synced since) reconstructs the same 'manual' effect the
+ * server would have produced.
+ */
+const LEGACY_TEMP_SCALAR_TO_AXIS: Readonly<Record<string, TempStatAxis>> = {
+  tempSt: 'st',
+  tempDx: 'dx',
+  tempIq: 'iq',
+  tempHt: 'ht',
+  tempHpMod: 'hp',
+  tempWillMod: 'will',
+  tempPerMod: 'per',
+  tempFpMod: 'fp',
+  tempSpeedQuarterMod: 'speedQuarter',
+  tempMoveMod: 'move',
+};
+
+/**
+ * v4 upgrade step: rewrite one local `characters` row in place so a row
+ * persisted by the pre-redesign app -- which still carries nonzero
+ * `tempSt`/`tempDx`/etc scalar fields and no `tempEffects` -- synthesizes
+ * the equivalent 'manual' effect instead of silently losing its active
+ * boosts (readers default a missing `tempEffects` to `[]`, so the
+ * offline UI would show the character as unbuffed until a cursor pull
+ * happened to replace the row).  Rows that already have `tempEffects`
+ * (synced after 0017) are left untouched.  The legacy keys are deleted
+ * either way so they don't linger as dead weight on the row.
+ *
+ * Exported (and kept side-effect-free beyond mutating `row`) so it can
+ * be unit-tested directly without standing up a full cross-version
+ * Dexie/fake-indexeddb upgrade harness -- see dexie.test.ts.
+ */
+export function migrateLegacyTempScalarsRow(row: Record<string, unknown>): void {
+  if (row.tempEffects === undefined) {
+    const mods: Partial<Record<TempStatAxis, number>> = {};
+    for (const [legacyKey, axis] of Object.entries(LEGACY_TEMP_SCALAR_TO_AXIS)) {
+      const v = row[legacyKey];
+      if (typeof v === 'number' && v !== 0) mods[axis] = v;
+    }
+    row.tempEffects =
+      Object.keys(mods).length > 0
+        ? [{ id: MANUAL_TEMP_EFFECT_ID, name: 'Manual adjustment', mods } satisfies TempEffect]
+        : [];
+  }
+  for (const legacyKey of Object.keys(LEGACY_TEMP_SCALAR_TO_AXIS)) {
+    delete row[legacyKey];
+  }
+}
+
 class LocalDb extends Dexie {
   characters!: Table<LocalCharacter, string>;
   characterTraits!: Table<LocalCharacterTrait, string>;
@@ -331,6 +388,25 @@ class LocalDb extends Dexie {
     this.version(3).stores({
       outbox: 'clientOpId, status, coalesceKey, enqueuedAt, entityId, [status+enqueuedAt]',
     });
+    // v4 migrates local `characters` rows still shaped by the
+    // pre-redesign app (nonzero temp_* scalar columns, no
+    // `tempEffects`) into the new array shape -- see
+    // `migrateLegacyTempScalarsRow` above. Not an index change, so
+    // `.stores()` just repeats `characters`' unchanged definition
+    // (Dexie requires a `.stores()` call to anchor the version); the
+    // actual work happens in `.upgrade()`.
+    this.version(4)
+      .stores({
+        characters: 'id, ownerId, campaignId, updatedAt, revision',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('characters')
+          .toCollection()
+          .modify((row: Record<string, unknown>) => {
+            migrateLegacyTempScalarsRow(row);
+          });
+      });
   }
 }
 

@@ -19,15 +19,39 @@
  */
 
 import { useEffect, useRef } from 'react';
+import type { z } from 'zod';
 import { sumTempMods } from '../../../../shared/domain/characterCalc.ts';
 import {
   type CharacterDetail,
   MANUAL_TEMP_EFFECT_ID,
+  TEMP_AXIS_LABELS,
   type TempEffect,
   type TempStatAxis,
+  tempEffectsField,
 } from '../../../../shared/schemas/character.ts';
-import { makeFlashKey } from '../../../sync/flashBus.ts';
+import { useToasts } from '../../../lib/toast.tsx';
+import { flashBus, makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueFieldPatch, newClientId } from '../../../sync/outbox.ts';
+
+/**
+ * Turn a `tempEffectsField.safeParse` failure into a short, human
+ * message for the "Couldn't save temporary effects — …" toast. Only
+ * special-cases the per-axis ±50 cap (`superRefine` in
+ * `tempEffectsField`) since that's the constraint an offline rapid-tap
+ * gesture is realistically going to hit; anything else (duplicate id,
+ * max-40-effects) falls back to the raw zod issue message rather than
+ * building out a full message catalog for constraints a UI gesture
+ * can't actually trigger.
+ */
+function describeTempEffectsFailure(error: z.ZodError): string {
+  const capIssue = error.issues.find((i) => /^combined \w+ modifier/.test(i.message));
+  if (capIssue) {
+    const axis = /^combined (\w+) modifier/.exec(capIssue.message)?.[1] as TempStatAxis | undefined;
+    const label = axis ? (TEMP_AXIS_LABELS[axis] ?? axis) : 'a stat';
+    return `exceed the ±50 cap for ${label}`;
+  }
+  return error.issues[0]?.message ?? 'invalid temporary effects';
+}
 
 /** The per-axis modifier bag of one effect. Zod-inferred, so optional
  * axes admit an explicit `undefined` -- which is what makes it (and not
@@ -75,13 +99,37 @@ export function useTempEffects(
   const effects = character?.tempEffects ?? [];
   const flashKey = makeFlashKey('character', characterId, 'tempEffects');
   const canMutate = canWrite && character != null;
+  const toasts = useToasts();
 
   const effectsRef = useRef(effects);
   useEffect(() => {
     effectsRef.current = effects;
   }, [effects]);
 
+  /**
+   * Shared commit path for every mutator below. Validates `next`
+   * against `tempEffectsField` (the same schema the server enforces --
+   * per-axis ±50 sums, max 40 effects, unique ids) BEFORE writing to
+   * Dexie or the outbox (PR #46 review finding: an offline user could
+   * previously stack rapid-tap boosts past the ±50 cap and live with
+   * invalid derived stats until the server rejected the patch much
+   * later). On failure we do NOT touch `effectsRef` or Dexie -- the
+   * rejected mutation is discarded entirely, mirroring how
+   * `useDraftField`'s `rollback` treats a parse/validate failure
+   * (immediate UX, no outbox involvement). Because this hook doesn't
+   * own the rendering component's flash state (it's shared across every
+   * temp-effect surface via `flashKey`), we go through `flashBus.emit`
+   * the same way the orchestrator does for an async server rejection,
+   * rather than a local `useFlashState` trigger.
+   */
   function commit(next: TempEffect[]): Promise<void> {
+    const result = tempEffectsField.safeParse(next);
+    if (!result.success) {
+      const reason = describeTempEffectsFailure(result.error);
+      toasts.push(`Couldn't save temporary effects — ${reason}`, { kind: 'error' });
+      flashBus.emit({ key: flashKey, reason });
+      return Promise.resolve();
+    }
     effectsRef.current = next;
     return enqueueFieldPatch({
       entityClass: 'character',

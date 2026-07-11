@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { formatScaled, formatSigned } from '../../../shared/format/number.ts';
+import { formatScaled } from '../../../shared/format/number.ts';
 
 interface ModifierField {
   /** Currently committed integer value (raw units). */
@@ -68,6 +68,15 @@ export function TempBoostPopover({
   const ref = useRef<HTMLDivElement>(null);
 
   const fmt = (n: number) => formatScaled(n, displayScale);
+  // Signed variant of `fmt` for deltas -- `formatScaled` already
+  // preserves the sign of `n` (n * displayScale), so this only needs to
+  // add the leading "+" for non-negative values. Used for
+  // `namedTempContribution`, which arrives in RAW units (see the prop
+  // doc below) and must be scaled just like every other raw value here
+  // (PR #46 review: this used to go through the unscaled `formatSigned`,
+  // so a Speed axis's "±N from effects" caption showed raw quarter-steps
+  // instead of whole Speed points).
+  const fmtSigned = (n: number) => (n >= 0 ? `+${fmt(n)}` : fmt(n));
   // Not formatScaled: `d` here is already in display units (pre-scaled),
   // so this only conditionally fixes precision — it must not re-multiply
   // by displayScale like formatScaled does.
@@ -184,7 +193,7 @@ export function TempBoostPopover({
       />
       {namedTempContribution !== 0 && (
         <p className="text-[11px] text-muted mb-2">
-          {formatSigned(namedTempContribution)} from effects
+          {fmtSigned(namedTempContribution)} from effects
         </p>
       )}
       <div className="num text-[11px] text-muted mb-3">
@@ -198,7 +207,7 @@ export function TempBoostPopover({
         )}{' '}
         + ({tempState.delta >= 0 ? '+' : ''}
         {fmtInput(tempState.delta)})
-        {namedTempContribution !== 0 && <> + ({formatSigned(namedTempContribution)})</>} ={' '}
+        {namedTempContribution !== 0 && <> + ({fmtSigned(namedTempContribution)})</>} ={' '}
         <span className="text-base-content font-semibold">{fmt(effective)}</span>
       </div>
       {offStep && <p className="text-[11px] text-error mb-2">must be a multiple of {stepStr}</p>}
