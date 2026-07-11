@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToasts } from '../lib/toast.tsx';
-import { flashBus } from '../sync/flashBus.ts';
+import { useFlashState } from './useFlashState.ts';
 
 export interface UseDraftToggleOptions {
   readonly name: string;
@@ -43,8 +43,6 @@ export interface UseDraftToggleReturn {
   };
 }
 
-const FLASH_MS = 1400;
-
 function defaultOnError(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
@@ -56,8 +54,6 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
   const toasts = useToasts();
   const [checked, setChecked] = useState(serverValue);
   const [isSaving, setIsSaving] = useState(false);
-  const [flashing, setFlashing] = useState(false);
-  const [flashParity, setFlashParity] = useState<'0' | '1'>('0');
 
   // The most recently CONFIRMED authoritative value.  Updated by an
   // incoming server prop change OR a successful save.  Mirrors the
@@ -67,7 +63,6 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
   const lastCommittedRef = useRef(serverValue);
   const inflightRef = useRef<{ value: boolean } | null>(null);
   const queuedRef = useRef<{ value: boolean } | null>(null);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
 
   const onSaveRef = useRef(onSave);
@@ -91,35 +86,21 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     };
   }, []);
 
   // Async rollback subscription (orchestrator → flashBus → here).  See
   // useDraftField for the full reasoning; for the toggle we just
   // re-snap to the last committed value and pulse the flash class.
-  useEffect(() => {
-    if (!flashKey) return;
-    return flashBus.subscribe(flashKey, () => {
-      if (!isMountedRef.current) return;
-      setChecked(lastCommittedRef.current);
-      setFlashing(true);
-      setFlashParity((p) => (p === '0' ? '1' : '0'));
-      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-      flashTimerRef.current = setTimeout(() => {
-        if (isMountedRef.current) setFlashing(false);
-      }, FLASH_MS);
-    });
-  }, [flashKey]);
-
-  const flashRollback = useCallback(() => {
-    setFlashing(true);
-    setFlashParity((p) => (p === '0' ? '1' : '0'));
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = setTimeout(() => {
-      if (isMountedRef.current) setFlashing(false);
-    }, FLASH_MS);
-  }, []);
+  // Flash state (parity, timer, flashBus subscription) is shared via
+  // useFlashState; only the checked-revert side effect is specific here.
+  const {
+    flashing,
+    flashProps,
+    trigger: flashRollback,
+  } = useFlashState(flashKey, () => {
+    setChecked(lastCommittedRef.current);
+  });
 
   const performSave = useCallback(
     async (value: boolean): Promise<void> => {
@@ -193,9 +174,6 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
     toggle,
     isSaving,
     flashing,
-    flashProps: {
-      'data-flashing': flashing ? 'true' : 'false',
-      'data-flash-parity': flashParity,
-    },
+    flashProps,
   };
 }

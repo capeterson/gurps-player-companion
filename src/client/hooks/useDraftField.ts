@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToasts } from '../lib/toast.tsx';
-import { flashBus } from '../sync/flashBus.ts';
+import { useFlashState } from './useFlashState.ts';
 
 export interface UseDraftFieldOptions<V> {
   /** Human-readable field name used in toast messages, e.g. "ST". */
@@ -90,8 +90,6 @@ export interface UseDraftFieldReturn {
   };
 }
 
-const FLASH_MS = 1400;
-
 function defaultOnError(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
@@ -115,8 +113,6 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   const [draft, setDraft] = useState(() => format(serverValue));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [flashParity, setFlashParity] = useState<'0' | '1'>('0');
-  const [flashing, setFlashing] = useState(false);
 
   // Refs mirror state so the long-lived performSave closure sees current values.
   const draftRef = useRef(draft);
@@ -139,7 +135,6 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   // might re-edit back to the prior value, and a stale comparison
   // would skip the PATCH and drop the edit silently.
   const lastCommittedRef = useRef<V>(serverValue);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
 
   // Cache the option callbacks in refs so identity changes between renders
@@ -177,7 +172,6 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     };
   }, []);
 
@@ -186,32 +180,19 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   // has already reverted the underlying Dexie row to the prior value;
   // we just need to surface the visual rollback (revert the draft +
   // flash).  The accompanying persistent toast comes from the
-  // orchestrator, so we don't push one here.
-  useEffect(() => {
-    if (!flashKey) return;
-    return flashBus.subscribe(flashKey, () => {
-      if (!isMountedRef.current) return;
-      const formatted = formatRef.current(lastCommittedRef.current);
-      setDraft(formatted);
-      draftRef.current = formatted;
-      dirtyRef.current = false;
-      setFlashing(true);
-      setFlashParity((p) => (p === '0' ? '1' : '0'));
-      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-      flashTimerRef.current = setTimeout(() => {
-        if (isMountedRef.current) setFlashing(false);
-      }, FLASH_MS);
-    });
-  }, [flashKey]);
-
-  const flashRollback = useCallback(() => {
-    setFlashing(true);
-    setFlashParity((p) => (p === '0' ? '1' : '0'));
-    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
-    flashTimerRef.current = setTimeout(() => {
-      if (isMountedRef.current) setFlashing(false);
-    }, FLASH_MS);
-  }, []);
+  // orchestrator, so we don't push one here.  Flash state (parity,
+  // timer, flashBus subscription) is shared via useFlashState; only the
+  // draft-revert side effect is specific to this hook.
+  const {
+    flashing,
+    flashProps,
+    trigger: flashRollback,
+  } = useFlashState(flashKey, () => {
+    const formatted = formatRef.current(lastCommittedRef.current);
+    setDraft(formatted);
+    draftRef.current = formatted;
+    dirtyRef.current = false;
+  });
 
   /**
    * Used for parse / validate failures only — these never start an
@@ -377,8 +358,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       value: draft,
       onChange: (e) => setValue(e.target.value),
       onBlur: commit,
-      'data-flashing': flashing ? 'true' : 'false',
-      'data-flash-parity': flashParity,
+      ...flashProps,
     },
   };
 }

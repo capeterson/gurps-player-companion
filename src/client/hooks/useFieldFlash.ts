@@ -10,12 +10,12 @@
  * have no draft to revert. This hook covers the "flash only" half of
  * that contract — combine the returned props with `DRAFT_FIELD_CLASS`
  * on any element to make it pulse on rejection.
+ *
+ * The underlying flash/parity/timer state machine lives in
+ * `useFlashState`, shared with `useDraftField` and `useDraftToggle`.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { flashBus } from '../sync/flashBus.ts';
-
-const FLASH_MS = 1400;
+import { useFlashState } from './useFlashState.ts';
 
 export interface UseFieldFlashReturn {
   readonly flashing: boolean;
@@ -24,38 +24,6 @@ export interface UseFieldFlashReturn {
 }
 
 export function useFieldFlash(flashKey: string | undefined): UseFieldFlashReturn {
-  const [flashing, setFlashing] = useState(false);
-  const [parity, setParity] = useState<'0' | '1'>('0');
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!flashKey) return;
-    return flashBus.subscribe(flashKey, () => {
-      if (!mountedRef.current) return;
-      setFlashing(true);
-      // Parity alternates so back-to-back rejections re-trigger the
-      // animation; without it the second event lands on the same
-      // keyframe name and the browser ignores it.
-      setParity((p) => (p === '0' ? '1' : '0'));
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        if (mountedRef.current) setFlashing(false);
-      }, FLASH_MS);
-    });
-  }, [flashKey]);
-
-  return {
-    flashing,
-    'data-flashing': flashing ? 'true' : 'false',
-    'data-flash-parity': parity,
-  };
+  const { flashing, flashProps } = useFlashState(flashKey);
+  return { flashing, ...flashProps };
 }
