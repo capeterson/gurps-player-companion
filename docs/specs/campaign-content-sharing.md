@@ -22,8 +22,8 @@ A campaign (`campaigns` table) has one **owner** and a set of
 
 | Role | Capabilities |
 |---|---|
-| `owner` (GM) | Everything: edit settings, manage all members and roles, transfer ownership, delete the campaign, edit the library, always sees every member character in full. |
-| `manager` | Invite at the `member` tier, cancel pending invitations, and remove members (`requireCampaignAdmin`). Cannot add members directly, change roles, promote to manager, transfer ownership, or edit campaign settings / the library — those are owner-only. |
+| `owner` (GM) | Everything: edit settings, manage all members and roles, transfer ownership, delete the campaign, edit the library, always sees every member character in full. May edit player-owned characters when `allowGmCharacterEditing` is enabled. |
+| `manager` | Invite at the `member` tier, cancel pending invitations, remove members (`requireCampaignAdmin`), use the GM dashboard/change feed, and edit player-owned characters when `allowGmCharacterEditing` is enabled. Cannot add members directly, change roles, promote to manager, transfer ownership, or edit campaign settings / the library — those are owner-only. |
 | `member` | Belongs to the campaign; can read shared content and their own character. |
 
 Authorization is centralized in `src/server/auth/permissions.ts`:
@@ -38,7 +38,10 @@ Endpoints (`src/server/routes/campaigns.ts`):
 
 Campaign settings that shape shared play: `pointTarget`, `disadvantageCap`,
 `quirkCap`, `manaLevel` (the campaign's ambient mana, which shapes
-spellcasting for member characters), and `shareCharacterSheets`.
+spellcasting for member characters), `shareCharacterSheets`, and the default-off
+`allowGmCharacterEditing` switch. The latter grants owners/managers normal sheet
+editing through the character outbox and server `assertWrite` path; it does not
+create a dashboard-specific mutation path.
 
 ### Invitations
 
@@ -64,14 +67,17 @@ It decides, for every viewer, whether they get a **`full`** or **`minimal`** vie
 of each character in the campaign.
 
 ```
-full     — owner of the character, the campaign GM (owner), OR any member
-           of a campaign with shareCharacterSheets = true.
+full     — owner of the character, the campaign GM (owner), any member
+           of a campaign with shareCharacterSheets = true, OR a manager when
+           allowGmCharacterEditing = true.
 minimal  — a non-GM member of a campaign with shareCharacterSheets = false.
            (public columns only — no traits/skills/spells/inventory/combat.)
 ```
 
 Owner and GM checks **short-circuit** the share flag, so flipping it never
 restricts the GM's own visibility, nor a player's view of their own sheet.
+An enabled manager editor also receives a full view because edit permission
+cannot safely operate on a minimal projection.
 
 ### Enforced in two places — keep them in lockstep
 
@@ -113,6 +119,20 @@ data-leak hole (this is exactly what Codex review on PR #22 caught).
 `decideCharacterAccess` (+ `projectCharacterRow`) and `characterIdsToMinimize`,
 and their tests. History-detail redaction follows the same gate — `minimal`
 viewers get no character-history detail (see history-tracking.md Risks).
+
+The authenticated `/campaigns` response is mirrored into Dexie with the current
+viewer's role. This lets `useCharacterAccessLocal` and the minimal-view sweep
+make the same manager-editing decision while offline. Missing legacy
+`allowGmCharacterEditing` values default to `false`.
+
+## GM campaign dashboard
+
+`/campaigns/{id}/gm` is an authenticated PWA route for owners and managers. It
+builds compact character summaries from the existing Dexie character-family
+stores via `buildCharacterDetail`; there is no bespoke dashboard character
+payload and no WebSocket row streaming. The activity rail polls the existing
+campaign character-history endpoint every five seconds and visually fades newly
+observed events over 30 seconds.
 
 ## The campaign library
 

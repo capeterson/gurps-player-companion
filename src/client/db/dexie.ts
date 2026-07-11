@@ -179,6 +179,10 @@ export interface LocalCampaign {
    * `true` (the safe default = full sharing on).
    */
   shareCharacterSheets?: boolean;
+  /** Missing on older rows; defaults to disabled. */
+  allowGmCharacterEditing?: boolean;
+  /** Viewer-specific role mirrored from the authenticated campaigns response. */
+  viewerRole?: 'owner' | 'manager' | 'member';
   createdAt: string;
   updatedAt: string;
   revision: number;

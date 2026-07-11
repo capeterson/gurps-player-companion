@@ -190,10 +190,10 @@ router.openapi(
     const { id: campaignId } = c.req.valid('param');
     const { before, limit, detail, scope } = c.req.valid('query');
 
-    const { campaign } = await loadCampaignOr403(campaignId, user.id);
+    const { role } = await loadCampaignOr403(campaignId, user.id);
 
-    // scope=character is GM-only (campaign owner only).
-    if (scope === 'character' && campaign.ownerId !== user.id) {
+    // Character roll-up is available to campaign staff running the game.
+    if (scope === 'character' && role !== 'owner' && role !== 'manager') {
       throw new HTTPException(403, { message: 'forbidden' });
     }
 

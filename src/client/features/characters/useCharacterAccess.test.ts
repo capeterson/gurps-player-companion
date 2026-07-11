@@ -39,7 +39,11 @@ function makeCharacter(campaignId: string | null, ownerId = OWNER_ID): Character
   } as unknown as CharacterDetail;
 }
 
-async function seedCampaign(overrides: { shareCharacterSheets: boolean }): Promise<void> {
+async function seedCampaign(overrides: {
+  shareCharacterSheets: boolean;
+  allowGmCharacterEditing?: boolean;
+  viewerRole?: 'owner' | 'manager' | 'member';
+}): Promise<void> {
   const db = getLocalDb();
   await db.campaigns.put({
     id: CAMPAIGN_ID,
@@ -51,6 +55,8 @@ async function seedCampaign(overrides: { shareCharacterSheets: boolean }): Promi
     quirkCap: null,
     manaLevel: 'normal',
     shareCharacterSheets: overrides.shareCharacterSheets,
+    allowGmCharacterEditing: overrides.allowGmCharacterEditing ?? false,
+    ...(overrides.viewerRole ? { viewerRole: overrides.viewerRole } : {}),
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     revision: 1,
@@ -100,6 +106,20 @@ describe('useCharacterAccessLocal', () => {
     await waitFor(() => {
       expect(result.current.accessPending).toBe(false);
     });
+    expect(result.current.isMinimal).toBe(false);
+  });
+
+  it('lets a mirrored manager edit without applying the minimal-view gate', async () => {
+    await seedCampaign({
+      shareCharacterSheets: false,
+      allowGmCharacterEditing: true,
+      viewerRole: 'manager',
+    });
+    const character = makeCharacter(CAMPAIGN_ID);
+    const { result } = renderHook(() => useCharacterAccessLocal(character, OTHER_MEMBER_ID));
+
+    await waitFor(() => expect(result.current.accessPending).toBe(false));
+    expect(result.current.canWrite).toBe(true);
     expect(result.current.isMinimal).toBe(false);
   });
 

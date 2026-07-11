@@ -59,6 +59,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   );
   const [manaLevel, setManaLevel] = useState<ManaLevel>(campaign.manaLevel);
   const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets);
+  const [allowGmEditing, setAllowGmEditing] = useState(campaign.allowGmCharacterEditing);
   const [error, setError] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<CampaignMemberOut | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -73,6 +74,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     setQuirkCap(campaign.quirkCap == null ? '' : String(campaign.quirkCap));
     setManaLevel(campaign.manaLevel);
     setShareSheets(campaign.shareCharacterSheets);
+    setAllowGmEditing(campaign.allowGmCharacterEditing);
     setError(null);
   }, [open, campaign]);
 
@@ -138,6 +140,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       quirkCap: qcVal,
       manaLevel,
       shareCharacterSheets: shareSheets,
+      allowGmCharacterEditing: allowGmEditing,
     });
   };
 
@@ -173,71 +176,95 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
             </button>
           </header>
 
-          <div className="grid grid-cols-3 gap-2">
-            <label className="form-control">
-              <span className="label-text text-xs">Point target</span>
-              <input
-                className="input input-bordered input-sm num"
-                value={pointTarget}
-                onChange={(e) => setPointTarget(e.target.value)}
-                placeholder="—"
-              />
-            </label>
-            <label className="form-control">
-              <span className="label-text text-xs">Disadv. cap</span>
-              <input
-                className="input input-bordered input-sm num"
-                value={disadCap}
-                onChange={(e) => setDisadCap(e.target.value)}
-                placeholder="—"
-              />
-            </label>
-            <label className="form-control">
-              <span className="label-text text-xs">Quirk cap</span>
-              <input
-                className="input input-bordered input-sm num"
-                value={quirkCap}
-                onChange={(e) => setQuirkCap(e.target.value)}
-                placeholder="—"
-              />
-            </label>
-          </div>
+          {viewerRole === 'owner' && (
+            <div className="grid grid-cols-3 gap-2">
+              <label className="form-control">
+                <span className="label-text text-xs">Point target</span>
+                <input
+                  className="input input-bordered input-sm num"
+                  value={pointTarget}
+                  onChange={(e) => setPointTarget(e.target.value)}
+                  placeholder="—"
+                />
+              </label>
+              <label className="form-control">
+                <span className="label-text text-xs">Disadv. cap</span>
+                <input
+                  className="input input-bordered input-sm num"
+                  value={disadCap}
+                  onChange={(e) => setDisadCap(e.target.value)}
+                  placeholder="—"
+                />
+              </label>
+              <label className="form-control">
+                <span className="label-text text-xs">Quirk cap</span>
+                <input
+                  className="input input-bordered input-sm num"
+                  value={quirkCap}
+                  onChange={(e) => setQuirkCap(e.target.value)}
+                  placeholder="—"
+                />
+              </label>
+            </div>
+          )}
 
-          <label className="form-control">
-            <span className="label-text text-xs">Mana level</span>
-            <select
-              className="select select-bordered select-sm"
-              value={manaLevel}
-              onChange={(e) => setManaLevel(e.target.value as ManaLevel)}
-            >
-              {MANA_LEVELS.map((m) => (
-                <option key={m} value={m}>
-                  {MANA_LEVEL_LABELS[m]}
-                </option>
-              ))}
-            </select>
-            <span className="label-text-alt text-xs text-base-content/60">
-              Low mana is −5 to every spell; high or better lets non-mages cast; very high makes
-              casting free. Applied to every character sheet in this campaign.
-            </span>
-          </label>
-
-          <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
-            <input
-              type="checkbox"
-              className="checkbox checkbox-sm mt-0.5"
-              checked={shareSheets}
-              onChange={(e) => setShareSheets(e.target.checked)}
-            />
-            <span className="flex-1">
-              <span className="block text-sm font-medium">Share character sheets</span>
-              <span className="block text-xs text-base-content/60">
-                When off, fellow members see only "readily apparent" details (name, height, weight,
-                age, appearance, TL) instead of the full sheet. The owner and you (the GM) always
-                see the full sheet.
+          {viewerRole === 'owner' && (
+            <label className="form-control">
+              <span className="label-text text-xs">Mana level</span>
+              <select
+                className="select select-bordered select-sm"
+                value={manaLevel}
+                onChange={(e) => setManaLevel(e.target.value as ManaLevel)}
+              >
+                {MANA_LEVELS.map((m) => (
+                  <option key={m} value={m}>
+                    {MANA_LEVEL_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+              <span className="label-text-alt text-xs text-base-content/60">
+                Low mana is −5 to every spell; high or better lets non-mages cast; very high makes
+                casting free. Applied to every character sheet in this campaign.
               </span>
-            </span>
-          </label>
+            </label>
+          )}
+
+          {viewerRole === 'owner' && (
+            <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm mt-0.5"
+                checked={shareSheets}
+                onChange={(e) => setShareSheets(e.target.checked)}
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-medium">Share character sheets</span>
+                <span className="block text-xs text-base-content/60">
+                  When off, fellow members see only "readily apparent" details (name, height,
+                  weight, age, appearance, TL) instead of the full sheet. The owner and you (the GM)
+                  always see the full sheet.
+                </span>
+              </span>
+            </label>
+          )}
+
+          {viewerRole === 'owner' && (
+            <label className="cursor-pointer flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm mt-0.5"
+                checked={allowGmEditing}
+                onChange={(e) => setAllowGmEditing(e.target.checked)}
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-medium">Allow GM character editing</span>
+                <span className="block text-xs text-base-content/60">
+                  Lets campaign owners and managers edit player-owned character sheets. Players
+                  still control their own sheets, and all changes remain visible in history.
+                </span>
+              </span>
+            </label>
+          )}
 
           {error && <p className="alert alert-error text-sm">{error}</p>}
 
@@ -293,9 +320,11 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
             <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary btn-sm" disabled={update.isPending}>
-              {update.isPending ? 'Saving…' : 'Save'}
-            </button>
+            {viewerRole === 'owner' && (
+              <button type="submit" className="btn btn-primary btn-sm" disabled={update.isPending}>
+                {update.isPending ? 'Saving…' : 'Save'}
+              </button>
+            )}
           </div>
         </form>
       </dialog>

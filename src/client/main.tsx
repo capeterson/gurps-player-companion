@@ -14,6 +14,7 @@ import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
 import { CampaignDetailPage } from './features/campaigns/CampaignDetailPage.tsx';
 import { CampaignLibraryPage } from './features/campaigns/CampaignLibraryPage.tsx';
 import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
+import { GmCampaignDashboardPage } from './features/campaigns/GmCampaignDashboardPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
@@ -70,6 +71,7 @@ const router = createBrowserRouter([
           { path: '/campaigns', element: <CampaignsPage /> },
           { path: '/campaigns/:id', element: <CampaignDetailPage /> },
           { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },
+          { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
           { path: '/log', element: <LogPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/settings', element: <SettingsPage /> },

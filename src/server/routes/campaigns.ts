@@ -67,6 +67,7 @@ function campaignToOut(row: DbCampaign, members: readonly MemberRow[]) {
     quirkCap: row.quirkCap,
     manaLevel: row.manaLevel,
     shareCharacterSheets: row.shareCharacterSheets,
+    allowGmCharacterEditing: row.allowGmCharacterEditing,
     members: members.map((m) => ({
       userId: m.userId,
       email: m.email,
@@ -174,6 +175,9 @@ router.openapi(
           ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
           ...(body.shareCharacterSheets !== undefined
             ? { shareCharacterSheets: body.shareCharacterSheets }
+            : {}),
+          ...(body.allowGmCharacterEditing !== undefined
+            ? { allowGmCharacterEditing: body.allowGmCharacterEditing }
             : {}),
         })
         .returning();

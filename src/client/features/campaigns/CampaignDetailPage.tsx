@@ -76,6 +76,11 @@ export function CampaignDetailPage() {
             Library
           </Link>
           {canManage && (
+            <Link to={`/campaigns/${c.id}/gm`} className="btn btn-primary btn-sm">
+              GM View
+            </Link>
+          )}
+          {canManage && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"

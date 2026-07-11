@@ -56,6 +56,7 @@ export async function resolveCharacterView(
       id: campaigns.id,
       ownerId: campaigns.ownerId,
       shareCharacterSheets: campaigns.shareCharacterSheets,
+      allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
     })
     .from(campaigns)
     .where(eq(campaigns.id, character.campaignId));
@@ -64,7 +65,7 @@ export async function resolveCharacterView(
   const isCampaignOwner = camp.ownerId === viewerId;
   if (!isCampaignOwner) {
     const [membership] = await db
-      .select({ userId: campaignMemberships.userId })
+      .select({ userId: campaignMemberships.userId, role: campaignMemberships.role })
       .from(campaignMemberships)
       .where(
         and(
@@ -73,6 +74,7 @@ export async function resolveCharacterView(
         ),
       );
     if (!membership) return 'forbidden';
+    Object.assign(camp, { viewerRole: membership.role });
   }
 
   const mode = decideCharacterAccess({

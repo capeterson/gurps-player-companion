@@ -17,27 +17,38 @@
 
 import { useEffect } from 'react';
 import { getLocalDb } from '../../db/dexie.ts';
+import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import type { CampaignSummary } from './useCharacterAccess.ts';
 
 export function useMirrorCampaigns(campaigns: CampaignSummary[] | undefined): void {
   useEffect(() => {
     if (!campaigns || campaigns.length === 0) return;
     const db = getLocalDb();
+    const viewerId = readUserIdFromToken();
     void db.campaigns.bulkPut(
-      campaigns.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        ownerId: c.ownerId,
-        pointTarget: c.pointTarget,
-        disadvantageCap: c.disadvantageCap,
-        quirkCap: c.quirkCap,
-        manaLevel: c.manaLevel,
-        shareCharacterSheets: c.shareCharacterSheets,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-        revision: c.revision,
-      })),
+      campaigns.map((c) => {
+        const memberRole = c.members?.find((member) => member.userId === viewerId)?.role;
+        return {
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          ownerId: c.ownerId,
+          pointTarget: c.pointTarget,
+          disadvantageCap: c.disadvantageCap,
+          quirkCap: c.quirkCap,
+          manaLevel: c.manaLevel,
+          shareCharacterSheets: c.shareCharacterSheets,
+          allowGmCharacterEditing: c.allowGmCharacterEditing,
+          ...(c.ownerId === viewerId
+            ? { viewerRole: 'owner' as const }
+            : memberRole
+              ? { viewerRole: memberRole }
+              : {}),
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+          revision: c.revision,
+        };
+      }),
     );
   }, [campaigns]);
 }

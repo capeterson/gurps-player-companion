@@ -55,6 +55,23 @@ describe('characterIdsToMinimize', () => {
     ]).toEqual([]);
   });
 
+  it('keeps private rows for a manager when staff editing is enabled', () => {
+    const out = characterIdsToMinimize({
+      viewerId: ME,
+      characters: [{ id: 'c1', ownerId: THEM, campaignId: 'camp1' }],
+      campaigns: [
+        {
+          id: 'camp1',
+          ownerId: GM,
+          shareCharacterSheets: false,
+          allowGmCharacterEditing: true,
+          viewerRole: 'manager',
+        },
+      ],
+    });
+    expect([...out]).toEqual([]);
+  });
+
   it('treats absent share field as default-true (back-compat with old Dexie rows)', () => {
     // Dexie campaigns written before the new column existed will have
     // `shareCharacterSheets: undefined`. We must not start purging

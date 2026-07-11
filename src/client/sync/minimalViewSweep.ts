@@ -38,6 +38,8 @@ export interface SweepInputCampaign {
    * which is the schema default).
    */
   readonly shareCharacterSheets?: boolean;
+  readonly allowGmCharacterEditing?: boolean;
+  readonly viewerRole?: 'owner' | 'manager' | 'member';
 }
 
 /**
@@ -59,6 +61,7 @@ export function characterIdsToMinimize(args: {
     const camp = campaignById.get(ch.campaignId);
     if (!camp) continue;
     if (camp.ownerId === args.viewerId) continue; // GM sees everything
+    if (camp.allowGmCharacterEditing && camp.viewerRole === 'manager') continue;
     if (camp.shareCharacterSheets === false) out.add(ch.id);
   }
   return out;

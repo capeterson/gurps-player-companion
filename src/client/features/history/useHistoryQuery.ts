@@ -31,8 +31,12 @@ export function useCharacterHistory(characterId: string) {
   });
 }
 
-export function useCampaignHistory(campaignId: string, scope?: 'campaign' | 'character') {
-  return useInfiniteQuery({
+export function useCampaignHistory(
+  campaignId: string,
+  scope?: 'campaign' | 'character',
+  refetchInterval?: number,
+) {
+  return useInfiniteQuery<HistoryPage, Error>({
     queryKey: ['history', 'campaign', campaignId, scope],
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams();
@@ -47,5 +51,6 @@ export function useCampaignHistory(campaignId: string, scope?: 'campaign' | 'cha
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: campaignId.length > 0,
+    ...(refetchInterval !== undefined ? { refetchInterval } : {}),
   });
 }
