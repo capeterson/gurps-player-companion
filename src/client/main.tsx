@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
+import { AboutPage } from './features/about/AboutPage.tsx';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
           { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
           { path: '/log', element: <LogPage /> },
           { path: '/library', element: <LibraryPage /> },
+          { path: '/about', element: <AboutPage /> },
           { path: '/settings', element: <SettingsPage /> },
         ],
       },
