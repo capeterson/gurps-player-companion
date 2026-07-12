@@ -7,12 +7,15 @@ import { api } from '../../lib/api.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 import { GmChangeFeed } from './GmChangeFeed.tsx';
 import { GmCharacterCard } from './GmCharacterCard.tsx';
+import { SkillLookupDialog } from './SkillLookupDialog.tsx';
 import { useCampaignCharacterDetails } from './useCampaignCharacterDetails.ts';
 
 export function GmCampaignDashboardPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [dense, setDense] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [lookupOpen, setLookupOpen] = useState(false);
+  const [lookup, setLookup] = useState<string | null>(null);
   const me = useQuery({ queryKey: ['auth', 'me'], queryFn: () => api<{ id: string }>('/auth/me') });
   const campaign = useQuery({
     queryKey: ['campaigns', id],
@@ -65,6 +68,13 @@ export function GmCampaignDashboardPage() {
             <Link to={`/campaigns/${id}`} className="btn btn-ghost btn-sm">
               Adventure log
             </Link>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setLookupOpen(true)}
+            >
+              Skill lookup
+            </button>
             {canManage && (
               <button
                 type="button"
@@ -101,7 +111,12 @@ export function GmCampaignDashboardPage() {
             className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 ${dense ? 'gap-2' : 'gap-4'}`}
           >
             {characters?.map((character) => (
-              <GmCharacterCard key={character.id} character={character} dense={dense} />
+              <GmCharacterCard
+                key={character.id}
+                character={character}
+                dense={dense}
+                lookup={lookup}
+              />
             ))}
           </div>
         </section>
@@ -120,6 +135,15 @@ export function GmCampaignDashboardPage() {
           campaign={c}
           viewerRole={viewerRole}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {lookupOpen && (
+        <SkillLookupDialog
+          open
+          characters={characters ?? []}
+          onClose={() => setLookupOpen(false)}
+          onSelect={setLookup}
         />
       )}
     </div>
