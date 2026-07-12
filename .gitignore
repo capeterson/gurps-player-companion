@@ -129,3 +129,4 @@ bootstrap/_sourcebook_chunks/
 
 # Local docker-compose overrides (per-worktree port remaps, etc.)
 docker-compose.override.yml
+docker-compose.claude-agent.yml
