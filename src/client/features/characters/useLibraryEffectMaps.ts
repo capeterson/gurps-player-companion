@@ -5,7 +5,10 @@
  * effects the same way the server does — without needing to add the
  * library tables to the Dexie sync surface.
  *
- * Cache is shared with `useLibraryFetcher` (same queryKey).
+ * Cache is shared with `useLibraryFetcher` and LibraryPage (same
+ * queryKey) — LibraryPage's CRUD mutations invalidate
+ * `['campaigns', campaignId, 'library']`, so a GM's library edit
+ * re-fetches this query and open sheets re-derive with fresh effects.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -33,7 +36,7 @@ export function useLibraryEffectMaps(campaignId: string | null | undefined): Lib
   const enabled = typeof campaignId === 'string' && campaignId.length > 0;
   const query = useQuery({
     enabled,
-    queryKey: ['campaignLibrary', campaignId ?? null],
+    queryKey: ['campaigns', campaignId ?? null, 'library'],
     queryFn: async (): Promise<LibraryPayload> => {
       if (!campaignId) return { traits: [], skills: [] };
       try {

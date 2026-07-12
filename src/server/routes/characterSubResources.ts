@@ -849,15 +849,27 @@ router.openapi(
     const { id, group } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const current = new Set(access.character.activeConditionGroups ?? []);
-    current.add(group);
-    const next = Array.from(current).sort();
-    await withAudit(user.id, undefined, (tx) =>
-      tx
+    // Read-modify-write under a row lock INSIDE the audit transaction:
+    // deriving `next` from the permission-check snapshot would let two
+    // concurrent toggles (different groups, two tabs) overwrite each
+    // other — the later write would resurrect the earlier snapshot and
+    // silently drop the other tab's just-activated group.
+    const next = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx
+        .select({ activeConditionGroups: characters.activeConditionGroups })
+        .from(characters)
+        .where(eq(characters.id, id))
+        .for('update');
+      if (!row) throw new HTTPException(404, { message: 'character not found' });
+      const current = new Set(row.activeConditionGroups ?? []);
+      current.add(group);
+      const updated = Array.from(current).sort();
+      await tx
         .update(characters)
-        .set({ activeConditionGroups: next, updatedAt: new Date() })
-        .where(eq(characters.id, id)),
-    );
+        .set({ activeConditionGroups: updated, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+      return updated;
+    });
     return c.json({ activeConditionGroups: next, character: await loadCharacterDetail(id) }, 200);
   },
 );
@@ -886,17 +898,23 @@ router.openapi(
     const { id, group } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const current = (access.character.activeConditionGroups ?? []).filter((g) => g !== group);
-    await withAudit(user.id, undefined, (tx) =>
-      tx
+    // Same locked read-modify-write as the POST handler above — see the
+    // comment there for the concurrent-toggle race this prevents.
+    const next = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx
+        .select({ activeConditionGroups: characters.activeConditionGroups })
+        .from(characters)
+        .where(eq(characters.id, id))
+        .for('update');
+      if (!row) throw new HTTPException(404, { message: 'character not found' });
+      const updated = (row.activeConditionGroups ?? []).filter((g) => g !== group);
+      await tx
         .update(characters)
-        .set({ activeConditionGroups: current, updatedAt: new Date() })
-        .where(eq(characters.id, id)),
-    );
-    return c.json(
-      { activeConditionGroups: current, character: await loadCharacterDetail(id) },
-      200,
-    );
+        .set({ activeConditionGroups: updated, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+      return updated;
+    });
+    return c.json({ activeConditionGroups: next, character: await loadCharacterDetail(id) }, 200);
   },
 );
 
