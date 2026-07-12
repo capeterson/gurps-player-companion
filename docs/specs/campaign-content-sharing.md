@@ -113,7 +113,7 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
    - `character` upserts are emitted for every accessible character, but
      `minimal` rows are run through `projectCharacterRow` first — this drops
      every private column's **real value** (stats, mods, `tempEffects`,
-     `dismissedWarnings`) and ships only the public identity fields plus the
+     `dismissedWarnings`, `activeConditionGroups`) and ships only the public identity fields plus the
      insured-safe defaults the NOT NULL columns still need (`st=10`, etc.). The
      client's `applyServerRow` merge uses the masked payload to overwrite the
      local row, purging any stale real values that were cached before access
@@ -146,7 +146,8 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
    - deletes child rows (traits / skills / spells / inventory / combat), AND
    - **rewrites each minimal character's row down to identity-only fields**,
      blanking `st`/`dx`/`iq`/`ht`/`hpMod`/`willMod`/`perMod`/`fpMod`/
-      `speedQuarterMod`/`moveMod`/`tempEffects`/`dismissedWarnings` to safe
+      `speedQuarterMod`/`moveMod`/`tempEffects`/`dismissedWarnings`/
+      `activeConditionGroups` to safe
       defaults. Masked rows carry a local-only marker; when access returns to
       `full`, the orchestrator resets the character-family cursors and pulls
       from revision zero once to restore the real parent and child rows.

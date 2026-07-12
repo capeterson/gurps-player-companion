@@ -162,6 +162,7 @@ describe('enforceMinimalViewLocally — character row rewrite', () => {
     expect(row?.moveMod).toBe(0);
     expect(row?.tempEffects).toEqual([]);
     expect(row?.dismissedWarnings).toEqual([]);
+    expect(row?.activeConditionGroups).toEqual([]);
     // Child rows also dropped.
     expect(await db.characterTraits.where('characterId').equals(CHAR_ID).count()).toBe(0);
     expect(await db.characterCombat.get(CHAR_ID)).toBeUndefined();

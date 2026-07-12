@@ -238,9 +238,17 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
         <span className="num text-right">{skill.points}</span>
       )}
       <RollLevelChip
-        level={skill.level}
+        level={skill.effectiveLevel ?? skill.level}
         name={skill.name}
-        title={skill.points <= 0 ? 'No points invested — attribute default (B173)' : undefined}
+        title={
+          skill.points <= 0
+            ? 'No points invested — attribute default (B173)'
+            : skill.effectiveLevel != null &&
+                skill.level != null &&
+                skill.effectiveLevel !== skill.level
+              ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
+              : undefined
+        }
         onRoll={(level) => onRoll({ label: skill.name, baseTarget: level })}
       />
       {canWrite && (

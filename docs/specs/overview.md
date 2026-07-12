@@ -383,7 +383,7 @@ Things that repeatedly surprise people working in this repo:
    `characterIdsToMinimize` + the orchestrator's character-row rewrite
    (`minimalViewSweep.ts` + `orchestrator.ts`) purges already-cached private
    child rows **and** rewrites cached character rows down to identity so
-   stale `st`/`hpMod`/`tempEffects` can't be recovered locally; and the
+   stale `st`/`hpMod`/`tempEffects`/`activeConditionGroups` can't be recovered locally; and the
    UI discovery surfaces filter minimal rows off `/characters` and onto the
    campaign detail page. Changing one without the others reopens a leak
    hole.

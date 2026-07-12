@@ -1124,6 +1124,7 @@ class SyncOrchestrator {
             moveMod: 0,
             tempEffects: [],
             dismissedWarnings: [],
+            activeConditionGroups: [],
             updatedAt: now,
             minimalViewMasked: true,
           });

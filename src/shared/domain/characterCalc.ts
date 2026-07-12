@@ -40,6 +40,18 @@ export interface CharacterAttrs {
   readonly moveMod: number;
 
   readonly tempEffects: readonly TempEffect[];
+
+  /**
+   * Defense / DR / fright-check modifiers contributed by trait & skill
+   * effects (see domain/traitEffects.ts). These are NOT user-edited
+   * like `tempEffects` above — they're derived from the character's
+   * attached library traits and default to 0 when no effects apply.
+   */
+  readonly dodgeMod: number;
+  readonly parryMod: number;
+  readonly blockMod: number;
+  readonly drMod: number;
+  readonly frightCheckMod: number;
 }
 
 /**
@@ -94,6 +106,16 @@ export interface DerivedStats {
   readonly thrust: string;
   /** Basic swing damage from ST, e.g. "1d" (B16). */
   readonly swing: string;
+  /** Active dodge before encumbrance penalty, including dodgeMod from effects. */
+  readonly dodgeBase: number;
+  /** Per-weapon parry depends on weapon skill, but the +N from traits is global. */
+  readonly parryMod: number;
+  /** Per-shield block depends on Shield skill; the +N from traits is global. */
+  readonly blockMod: number;
+  /** Damage resistance contributed by traits (e.g. Damage Resistance), not armor. */
+  readonly traitDr: number;
+  /** Aggregate fright-check bonus from traits (Combat Reflexes, etc.). */
+  readonly frightCheckMod: number;
 }
 
 export function computeDerived(attrs: CharacterAttrs): DerivedStats {
@@ -117,7 +139,11 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
   const basicSpeedQuarters = effectiveDx + effectiveHt + attrs.speedQuarterMod + t.speedQuarter;
   const basicSpeed = basicSpeedQuarters / 4;
   const basicMove = Math.floor(basicSpeed) + attrs.moveMod + t.move;
-  const dodge = Math.floor(basicSpeed) + 3;
+  // Dodge base = floor(BasicSpeed) + 3 + trait-supplied dodgeMod. The
+  // `dodge` field stays as an alias for dodgeBase so existing UI keeps
+  // working; encumbrance penalty is still applied separately downstream.
+  const dodgeBase = Math.floor(basicSpeed) + 3 + attrs.dodgeMod;
+  const dodge = dodgeBase;
   // Basic Lift = ST²/5; round to the nearest whole number once BL
   // reaches 10 (B15).  Below 10 the fraction is kept as printed.
   const rawBasicLift = (effectiveSt * effectiveSt) / 5;
@@ -137,9 +163,14 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
     basicSpeed,
     basicMove,
     dodge,
+    dodgeBase,
     basicLift,
     thrust: formatDamageDice(damage.thrust),
     swing: formatDamageDice(damage.swing),
+    parryMod: attrs.parryMod,
+    blockMod: attrs.blockMod,
+    traitDr: attrs.drMod,
+    frightCheckMod: attrs.frightCheckMod,
   };
 }
 

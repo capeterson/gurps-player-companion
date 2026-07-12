@@ -335,7 +335,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 1');
+    expect(yaml).toContain('version: 2');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');

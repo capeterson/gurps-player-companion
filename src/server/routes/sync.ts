@@ -656,6 +656,7 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     // these collapse to empty rather than passing the real lists through.
     tempEffects: [],
     dismissedWarnings: [],
+    activeConditionGroups: [],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     revision: row.revision,

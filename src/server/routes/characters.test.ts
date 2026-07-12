@@ -360,6 +360,7 @@ describe('POST /api/v1/sync/cursor — minimal-view masking includes tempEffects
     expect(change?.data?.ht).toBe(10);
     expect(change?.data?.tempEffects).toEqual([]);
     expect(change?.data?.dismissedWarnings).toEqual([]);
+    expect(change?.data?.activeConditionGroups).toEqual([]);
   });
 
   it('the owner still sees their own real tempEffects through the same cursor pull', async () => {
