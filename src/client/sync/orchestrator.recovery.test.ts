@@ -156,9 +156,7 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
       refreshToken: 'refresh',
       accessTokenExpiresIn: 0,
     });
-    vi.spyOn(window.navigator, 'onLine', 'get')
-      .mockReturnValueOnce(true)
-      .mockReturnValue(false);
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValueOnce(true).mockReturnValue(false);
 
     await expect(getSyncOrchestrator().clearLocalAndFullResync('user-1')).rejects.toThrow(
       'Fresh server data could not be downloaded',
