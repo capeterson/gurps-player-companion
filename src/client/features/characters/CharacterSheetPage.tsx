@@ -1009,8 +1009,8 @@ function StatusPanel({
             <InfoTooltip
               content={
                 <span>
-                  <strong>Trait DR</strong> stacks with armor DR. Per-location DR is not yet
-                  modeled — this is a global value.
+                  <strong>Trait DR</strong> stacks with armor DR. Per-location DR is not yet modeled
+                  — this is a global value.
                   <EffectSourcesList effects={effects} targets="dr" introLabel="Trait sources" />
                 </span>
               }

@@ -219,16 +219,17 @@ export function applyEffectsToAttrs(
     }
   }
 
-  const tempEffects = Object.keys(axisMods).length === 0
-    ? attrs.tempEffects
-    : [
-        ...attrs.tempEffects,
-        {
-          id: TRAIT_EFFECTS_SENTINEL_ID,
-          name: 'Trait effects',
-          mods: axisMods as CharacterAttrs['tempEffects'][number]['mods'],
-        },
-      ];
+  const tempEffects =
+    Object.keys(axisMods).length === 0
+      ? attrs.tempEffects
+      : [
+          ...attrs.tempEffects,
+          {
+            id: TRAIT_EFFECTS_SENTINEL_ID,
+            name: 'Trait effects',
+            mods: axisMods as CharacterAttrs['tempEffects'][number]['mods'],
+          },
+        ];
 
   return {
     ...attrs,

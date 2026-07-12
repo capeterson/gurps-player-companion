@@ -185,9 +185,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         // Pts field for plain non-library traits.
         const usePreview =
           livePoints !== null &&
-          (selectedModifiers.length > 0 ||
-            isLeveled ||
-            selectedVariant !== null);
+          (selectedModifiers.length > 0 || isLeveled || selectedVariant !== null);
         const submittedPoints = usePreview
           ? (livePoints as number)
           : Number.isFinite(pParsed)

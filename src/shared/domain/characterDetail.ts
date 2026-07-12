@@ -15,11 +15,7 @@
 
 import type { ManaLevel } from '../constants/magic.ts';
 import type { SpellDifficulty } from '../constants/skills.ts';
-import type {
-  CharacterDetail,
-  ResolvedEffectOut,
-  TempEffect,
-} from '../schemas/character.ts';
+import type { CharacterDetail, ResolvedEffectOut, TempEffect } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { TraitEffect } from '../schemas/effects.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
@@ -43,11 +39,7 @@ import {
   mageryLevel,
   manaSkillModifier,
 } from './spellCalc.ts';
-import {
-  applyEffectsToAttrs,
-  resolveEffects,
-  skillBonusFor,
-} from './traitEffects.ts';
+import { applyEffectsToAttrs, resolveEffects, skillBonusFor } from './traitEffects.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
 /**
@@ -277,7 +269,7 @@ export function buildCombatStateOut(state: CharacterDetailInputCombat): CombatSt
 export function buildSkillOut(
   skill: CharacterDetailInputSkill,
   derived: ReturnType<typeof computeDerived>,
-  skillBonus: number = 0,
+  skillBonus = 0,
 ): SkillOut {
   const level = computeSkillLevel(skill.attribute, skill.difficulty, skill.points, derived);
   return {

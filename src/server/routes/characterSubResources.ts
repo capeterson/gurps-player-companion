@@ -895,7 +895,10 @@ router.openapi(
       .update(characters)
       .set({ activeConditionGroups: current, updatedAt: new Date() })
       .where(eq(characters.id, id));
-    return c.json({ activeConditionGroups: current, character: await loadCharacterDetail(id) }, 200);
+    return c.json(
+      { activeConditionGroups: current, character: await loadCharacterDetail(id) },
+      200,
+    );
   },
 );
 

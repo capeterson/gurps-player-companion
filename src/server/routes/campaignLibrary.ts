@@ -103,7 +103,6 @@ registerLibraryCrud(router, skillEntity);
 registerLibraryCrud(router, spellEntity);
 registerLibraryCrud(router, itemEntity);
 
-
 // ===================== YAML EXPORT =====================
 
 function slugify(name: string): string {

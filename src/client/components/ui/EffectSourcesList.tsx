@@ -41,7 +41,11 @@ export function EffectSourcesList({ effects, targets, introLabel }: Props) {
             </span>{' '}
             <span>{eff.sourceName}</span>
             {eff.conditionLabel && (
-              <span className="text-dim"> ({eff.conditionLabel}{eff.active ? '' : ', inactive'})</span>
+              <span className="text-dim">
+                {' '}
+                ({eff.conditionLabel}
+                {eff.active ? '' : ', inactive'})
+              </span>
             )}
           </div>
         );

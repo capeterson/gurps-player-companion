@@ -29,8 +29,6 @@ import {
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import { getDb } from '../db/client.ts';
 import {
-  campaignLibrarySkills,
-  campaignLibraryTraits,
   type DbCampaign,
   type DbCharacter,
   type DbCharacterSkill,
@@ -38,6 +36,8 @@ import {
   type DbCharacterTrait,
   type DbCombatState,
   type DbInventoryItem,
+  campaignLibrarySkills,
+  campaignLibraryTraits,
   campaigns,
   characterSkills,
   characterSpells,

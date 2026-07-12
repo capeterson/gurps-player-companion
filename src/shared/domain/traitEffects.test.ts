@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 import type { TraitEffect } from '../schemas/effects.ts';
 import { type CharacterAttrs, computeDerived } from './characterCalc.ts';
 import {
-  type CharacterSkillWithEffects,
   type CharacterTraitWithEffects,
   applyEffectsToAttrs,
   distinctConditionGroups,
@@ -67,9 +66,7 @@ describe('resolveEffects', () => {
 
   it('scales per_level effects by trait.level', () => {
     const traits = [
-      trait('t1', 'Acute Vision', 3, [
-        { target: 'per', value: 1, scaling: 'per_level' },
-      ]),
+      trait('t1', 'Acute Vision', 3, [{ target: 'per', value: 1, scaling: 'per_level' }]),
     ];
     const out = resolveEffects(traits, [], new Set());
     expect(out[0]?.value).toBe(3);
@@ -77,9 +74,7 @@ describe('resolveEffects', () => {
 
   it('treats null/0 level as level 1 for per_level scaling', () => {
     const traits = [
-      trait('t1', 'Enhanced Dodge', null, [
-        { target: 'dodge', value: 1, scaling: 'per_level' },
-      ]),
+      trait('t1', 'Enhanced Dodge', null, [{ target: 'dodge', value: 1, scaling: 'per_level' }]),
     ];
     const out = resolveEffects(traits, [], new Set());
     expect(out[0]?.value).toBe(1);
@@ -132,9 +127,7 @@ describe('applyEffectsToAttrs', () => {
 
   it('routes primary-attr effects through temp* channels so derived stats flow through computeDerived', () => {
     const traits = [
-      trait('t1', 'Enhanced ST', 2, [
-        { target: 'st', value: 1, scaling: 'per_level' },
-      ]),
+      trait('t1', 'Enhanced ST', 2, [{ target: 'st', value: 1, scaling: 'per_level' }]),
     ];
     const eff = resolveEffects(traits, [], new Set());
     const out = applyEffectsToAttrs(baseAttrs, eff);
@@ -190,9 +183,7 @@ describe('applyEffectsToAttrs', () => {
 
   it('end-to-end: Combat Reflexes increases dodge by 1 via computeDerived', () => {
     const traits = [
-      trait('t1', 'Combat Reflexes', null, [
-        { target: 'dodge', value: 1, scaling: 'flat' },
-      ]),
+      trait('t1', 'Combat Reflexes', null, [{ target: 'dodge', value: 1, scaling: 'flat' }]),
     ];
     const eff = resolveEffects(traits, [], new Set());
     const attrs = applyEffectsToAttrs(baseAttrs, eff);
@@ -204,10 +195,6 @@ describe('applyEffectsToAttrs', () => {
 });
 
 describe('skillBonusFor', () => {
-  function skill(id: string, name: string, effects: TraitEffect[]): CharacterSkillWithEffects {
-    return { id, name, libraryEffects: effects };
-  }
-
   it('matches by base skill name (case-insensitive, specialty-stripped)', () => {
     const traits = [
       trait('t1', 'Outdoorsman', 2, [
@@ -224,9 +211,7 @@ describe('skillBonusFor', () => {
 
   it('wildcard skillName="*" matches every skill', () => {
     const traits = [
-      trait('t1', 'Magery', 3, [
-        { target: 'skill', value: 1, scaling: 'flat', skillName: '*' },
-      ]),
+      trait('t1', 'Magery', 3, [{ target: 'skill', value: 1, scaling: 'flat', skillName: '*' }]),
     ];
     const eff = resolveEffects(traits, [], new Set());
     expect(skillBonusFor('Fireball', eff).total).toBe(1);

@@ -378,10 +378,7 @@ export const characters = pgTable(
      * until the user toggles their group ON via /characters/{id}/conditions.
      * See src/shared/schemas/effects.ts.
      */
-    activeConditionGroups: jsonb('active_condition_groups')
-      .$type<string[]>()
-      .notNull()
-      .default([]),
+    activeConditionGroups: jsonb('active_condition_groups').$type<string[]>().notNull().default([]),
 
     createdAt: createdAt(),
     updatedAt: updatedAt(),

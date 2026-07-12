@@ -10,8 +10,8 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { distinctConditionGroups } from '../../../../shared/domain/traitEffects.ts';
+import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { StatCard } from '../../../components/ui/StatCard.tsx';
 import { api } from '../../../lib/api.ts';
 
@@ -23,10 +23,7 @@ interface Props {
 export function ActiveConditionsPanel({ character, canWrite }: Props) {
   const queryClient = useQueryClient();
 
-  const groups = useMemo(
-    () => distinctConditionGroups(character.effects),
-    [character.effects],
-  );
+  const groups = useMemo(() => distinctConditionGroups(character.effects), [character.effects]);
 
   const toggle = useMutation({
     mutationFn: async ({ group, on }: { group: string; on: boolean }) => {
@@ -62,9 +59,7 @@ export function ActiveConditionsPanel({ character, canWrite }: Props) {
               className="checkbox checkbox-sm"
               checked={g.active}
               disabled={!canWrite || toggle.isPending}
-              onChange={(e) =>
-                toggle.mutate({ group: g.group, on: e.currentTarget.checked })
-              }
+              onChange={(e) => toggle.mutate({ group: g.group, on: e.currentTarget.checked })}
             />
           </label>
         ))}

@@ -9,10 +9,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import type {
-  LibrarySkillOut,
-  LibraryTraitOut,
-} from '../../../shared/schemas/campaignLibrary.ts';
+import type { LibrarySkillOut, LibraryTraitOut } from '../../../shared/schemas/campaignLibrary.ts';
 import type { TraitEffect } from '../../../shared/schemas/effects.ts';
 import { ApiError, api } from '../../lib/api.ts';
 
