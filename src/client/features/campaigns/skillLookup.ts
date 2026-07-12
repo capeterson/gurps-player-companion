@@ -1,6 +1,6 @@
+import type { SkillAttribute } from '../../../shared/constants/skills.ts';
 import { attributeLevelFor } from '../../../shared/domain/skillCalc.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
-import type { SkillAttribute } from '../../../shared/constants/skills.ts';
 
 /** Core stats offered as quick picks in the skill lookup, in display order. */
 export const STAT_LOOKUP_NAMES: SkillAttribute[] = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per'];

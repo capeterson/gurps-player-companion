@@ -12,9 +12,9 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
+import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { LibraryAutocomplete } from '../../components/ui/LibraryAutocomplete.tsx';
 import { useDialogState } from '../../hooks/useDialogState.ts';
-import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { STAT_LOOKUP_NAMES } from './skillLookup.ts';
 
 interface Props {
@@ -66,12 +66,7 @@ export function SkillLookupDialog({ open, characters, onClose, onSelect }: Props
   if (!open) return null;
 
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      className="modal-back"
-      aria-labelledby="skill-lookup-title"
-    >
+    <dialog ref={ref} onClose={onClose} className="modal-back" aria-labelledby="skill-lookup-title">
       <div className="card relative w-[24rem] max-w-[calc(100vw-3rem)] p-5 gap-3">
         <header className="flex items-baseline justify-between">
           <div>
@@ -80,7 +75,12 @@ export function SkillLookupDialog({ open, characters, onClose, onSelect }: Props
               Skill lookup
             </h2>
           </div>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={onClose}
+            aria-label="Close"
+          >
             ×
           </button>
         </header>
