@@ -849,16 +849,15 @@ router.openapi(
     const { id, group } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
-    const [row] = await db.select().from(characters).where(eq(characters.id, id));
-    if (!row) throw new HTTPException(404, { message: 'character not found' });
-    const current = new Set(row.activeConditionGroups ?? []);
+    const current = new Set(access.character.activeConditionGroups ?? []);
     current.add(group);
     const next = Array.from(current).sort();
-    await db
-      .update(characters)
-      .set({ activeConditionGroups: next, updatedAt: new Date() })
-      .where(eq(characters.id, id));
+    await withAudit(user.id, undefined, (tx) =>
+      tx
+        .update(characters)
+        .set({ activeConditionGroups: next, updatedAt: new Date() })
+        .where(eq(characters.id, id)),
+    );
     return c.json({ activeConditionGroups: next, character: await loadCharacterDetail(id) }, 200);
   },
 );
@@ -887,14 +886,13 @@ router.openapi(
     const { id, group } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
-    const [row] = await db.select().from(characters).where(eq(characters.id, id));
-    if (!row) throw new HTTPException(404, { message: 'character not found' });
-    const current = (row.activeConditionGroups ?? []).filter((g) => g !== group);
-    await db
-      .update(characters)
-      .set({ activeConditionGroups: current, updatedAt: new Date() })
-      .where(eq(characters.id, id));
+    const current = (access.character.activeConditionGroups ?? []).filter((g) => g !== group);
+    await withAudit(user.id, undefined, (tx) =>
+      tx
+        .update(characters)
+        .set({ activeConditionGroups: current, updatedAt: new Date() })
+        .where(eq(characters.id, id)),
+    );
     return c.json(
       { activeConditionGroups: current, character: await loadCharacterDetail(id) },
       200,

@@ -9,6 +9,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import type { LibrarySkillOut, LibraryTraitOut } from '../../../shared/schemas/campaignLibrary.ts';
 import type { TraitEffect } from '../../../shared/schemas/effects.ts';
 import { ApiError, api } from '../../lib/api.ts';
@@ -47,24 +48,26 @@ export function useLibraryEffectMaps(campaignId: string | null | undefined): Lib
     staleTime: 30_000,
   });
 
-  if (!query.data) {
-    return {
-      libraryTraitEffects: EMPTY_MAP,
-      librarySkillEffects: EMPTY_MAP,
-      isLoading: query.isLoading,
-    };
-  }
-  const traitMap = new Map<string, ReadonlyArray<TraitEffect>>();
-  for (const t of query.data.traits) {
-    if (t.effects && t.effects.length > 0) traitMap.set(t.id, t.effects);
-  }
-  const skillMap = new Map<string, ReadonlyArray<TraitEffect>>();
-  for (const s of query.data.skills) {
-    if (s.effects && s.effects.length > 0) skillMap.set(s.id, s.effects);
-  }
-  return {
-    libraryTraitEffects: traitMap,
-    librarySkillEffects: skillMap,
-    isLoading: false,
-  };
+  // Memoized on query.data so the returned Maps keep a stable identity
+  // until the library payload actually changes — consumers pass them
+  // straight into `useLiveQuery` deps, where a fresh Map per render
+  // would re-run the query every render and a size-based key would miss
+  // edits that change an effect's value without changing the entry count.
+  const data = query.data;
+  const maps = useMemo(() => {
+    if (!data) {
+      return { libraryTraitEffects: EMPTY_MAP, librarySkillEffects: EMPTY_MAP };
+    }
+    const traitMap = new Map<string, ReadonlyArray<TraitEffect>>();
+    for (const t of data.traits) {
+      if (t.effects && t.effects.length > 0) traitMap.set(t.id, t.effects);
+    }
+    const skillMap = new Map<string, ReadonlyArray<TraitEffect>>();
+    for (const s of data.skills) {
+      if (s.effects && s.effects.length > 0) skillMap.set(s.id, s.effects);
+    }
+    return { libraryTraitEffects: traitMap, librarySkillEffects: skillMap };
+  }, [data]);
+
+  return { ...maps, isLoading: data ? false : query.isLoading };
 }

@@ -621,6 +621,10 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     // rather than passing `row.tempEffects` through.
     tempEffects: [],
     dismissedWarnings: [],
+    // Condition-group ids reveal which trait effects the character has
+    // and has toggled on; the REST minimal view (loadMinimalCharacter)
+    // never includes them, so the sync projection must not either.
+    activeConditionGroups: [],
   };
 }
 

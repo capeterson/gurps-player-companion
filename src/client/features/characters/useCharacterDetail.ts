@@ -54,11 +54,6 @@ export function useCharacterDetail(
   const autoMaps = useLibraryEffectMaps(campaignId ?? null);
   const traitEffects = options.libraryTraitEffects ?? autoMaps.libraryTraitEffects;
   const skillEffects = options.librarySkillEffects ?? autoMaps.librarySkillEffects;
-  // Stable-ish key derived from map sizes — React Query keeps the same
-  // Map identity across renders unless data changes, so this re-derives
-  // only when the underlying library payload mutates.
-  const traitMapKey = traitEffects ? traitEffects.size : 0;
-  const skillMapKey = skillEffects ? skillEffects.size : 0;
   return useLiveQuery(async () => {
     if (!id) return null;
     const db = getLocalDb();
@@ -100,7 +95,11 @@ export function useCharacterDetail(
           }
         : null,
     });
-  }, [id, traitMapKey, skillMapKey]);
+    // The maps are memoized on the library query's data (see
+    // useLibraryEffectMaps), so their identity changes exactly when the
+    // library payload does — including value-only edits a size-based
+    // key would miss.
+  }, [id, traitEffects, skillEffects]);
 }
 
 export type CharacterListResult = CharacterListItem[] | undefined;
