@@ -232,11 +232,13 @@ router.openapi(
  * Called when an invitation is cancelled, accepted, or rejected so the
  * invitee's bell doesn't keep showing a stale Accept/Decline pair.
  */
-async function markInvitationNotificationsRead(invitationId: string): Promise<void> {
-  await getDb()
-    .update(notifications)
-    .set({ readAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(notifications.relatedId, invitationId), isNull(notifications.readAt)));
+async function markInvitationNotificationsRead(actorId: string, invitationId: string): Promise<void> {
+  await withAudit(actorId, undefined, (tx) =>
+    tx
+      .update(notifications)
+      .set({ readAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(notifications.relatedId, invitationId), isNull(notifications.readAt))),
+  );
 }
 
 router.openapi(
@@ -335,7 +337,7 @@ router.openapi(
     if (updated.length === 0) {
       throw new HTTPException(409, { message: 'invitation already decided' });
     }
-    await markInvitationNotificationsRead(invitationId);
+    await markInvitationNotificationsRead(user.id, invitationId);
     return c.body(null, 204);
   },
 );
@@ -464,7 +466,7 @@ router.openapi(
     if (!flipped) {
       throw new HTTPException(409, { message: 'invitation already decided' });
     }
-    await markInvitationNotificationsRead(invitationId);
+    await markInvitationNotificationsRead(user.id, invitationId);
     const out = await loadInvitationOut(invitationId);
     if (!out) throw new HTTPException(500, { message: 'invitation vanished' });
     return c.json(out, 200);
@@ -521,7 +523,7 @@ router.openapi(
     if (updated.length === 0) {
       throw new HTTPException(409, { message: 'invitation already decided' });
     }
-    await markInvitationNotificationsRead(invitationId);
+    await markInvitationNotificationsRead(user.id, invitationId);
     const out = await loadInvitationOut(invitationId);
     if (!out) throw new HTTPException(500, { message: 'invitation vanished' });
     return c.json(out, 200);

@@ -849,16 +849,18 @@ router.openapi(
     const { id, group } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
-    const [row] = await db.select().from(characters).where(eq(characters.id, id));
-    if (!row) throw new HTTPException(404, { message: 'character not found' });
-    const current = new Set(row.activeConditionGroups ?? []);
-    current.add(group);
-    const next = Array.from(current).sort();
-    await db
-      .update(characters)
-      .set({ activeConditionGroups: next, updatedAt: new Date() })
-      .where(eq(characters.id, id));
+    const next = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx.select().from(characters).where(eq(characters.id, id));
+      if (!row) throw new HTTPException(404, { message: 'character not found' });
+      const current = new Set(row.activeConditionGroups ?? []);
+      current.add(group);
+      const sorted = Array.from(current).sort();
+      await tx
+        .update(characters)
+        .set({ activeConditionGroups: sorted, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+      return sorted;
+    });
     return c.json({ activeConditionGroups: next, character: await loadCharacterDetail(id) }, 200);
   },
 );
@@ -887,16 +889,18 @@ router.openapi(
     const { id, group } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
-    const [row] = await db.select().from(characters).where(eq(characters.id, id));
-    if (!row) throw new HTTPException(404, { message: 'character not found' });
-    const current = (row.activeConditionGroups ?? []).filter((g) => g !== group);
-    await db
-      .update(characters)
-      .set({ activeConditionGroups: current, updatedAt: new Date() })
-      .where(eq(characters.id, id));
+    const remaining = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx.select().from(characters).where(eq(characters.id, id));
+      if (!row) throw new HTTPException(404, { message: 'character not found' });
+      const filtered = (row.activeConditionGroups ?? []).filter((g) => g !== group);
+      await tx
+        .update(characters)
+        .set({ activeConditionGroups: filtered, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+      return filtered;
+    });
     return c.json(
-      { activeConditionGroups: current, character: await loadCharacterDetail(id) },
+      { activeConditionGroups: remaining, character: await loadCharacterDetail(id) },
       200,
     );
   },
