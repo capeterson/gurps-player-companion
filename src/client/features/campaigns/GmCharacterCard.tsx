@@ -1,3 +1,4 @@
+import { effectiveDodge } from '../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 
 interface Props {
@@ -68,7 +69,7 @@ export function GmCharacterCard({ character, dense }: Props) {
 
       <dl className="grid grid-cols-4 gap-2 text-center text-xs">
         <Stat label="Move" value={derived.basicMove} />
-        <Stat label="Dodge" value={derived.dodge - encumbrance.dodgePenalty} />
+        <Stat label="Dodge" value={effectiveDodge(derived.dodge, encumbrance.dodgePenalty)} />
         <Stat label="Will" value={derived.will} />
         <Stat label="Per" value={derived.per} />
       </dl>
