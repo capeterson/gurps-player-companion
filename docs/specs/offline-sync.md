@@ -133,9 +133,11 @@ deletes are reinserted. Reverting a speculative character also removes its
 dependent child rows and operations. If a newer same-field edit supersedes the
 failed attempt, that newer value remains queued and visible while its rollback
 anchor is repaired to the last server value. The rollback produces a toast and
-field flash. The confirmed “Abandon local changes and re-sync from server”
-recovery wipes every local store, including this journal, and bootstraps again
-from revision zero.
+field flash. Reverting a speculative inventory container recursively removes
+its locally-created descendants and their queued operations. The confirmed
+“Abandon local changes and re-sync from server” recovery is unavailable while
+offline; while online it wipes every local store, including this journal, and
+bootstraps again from revision zero.
 
 ## Invariants that make it correct
 

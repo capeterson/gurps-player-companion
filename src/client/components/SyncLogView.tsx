@@ -11,10 +11,11 @@ import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
 interface SyncLogViewProps {
   open: boolean;
   onClose: () => void;
+  online: boolean;
   storageMessage?: string;
 }
 
-export function SyncLogView({ open, onClose, storageMessage }: SyncLogViewProps) {
+export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogViewProps) {
   const ref = useDialogState(open);
   const toasts = useToasts();
   const outbox = useLiveQuery(
@@ -167,10 +168,16 @@ export function SyncLogView({ open, onClose, storageMessage }: SyncLogViewProps)
             <button
               type="button"
               className="btn btn-error btn-outline btn-sm"
+              disabled={!online}
               onClick={() => setResyncOpen(true)}
             >
               Abandon local changes and re-sync from server
             </button>
+            {!online && (
+              <p className="mt-2 text-xs text-warning">
+                Reconnect before abandoning local changes so a fresh server copy can be downloaded.
+              </p>
+            )}
           </footer>
         </div>
         <form method="dialog" className="modal-backdrop">

@@ -132,6 +132,40 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
       ]),
     );
   });
+
+  it('refuses to clear local data while offline', async () => {
+    await seedEveryStore();
+    tokenStore.write({
+      accessToken: jwtForUser('user-1'),
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 0,
+    });
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+
+    await expect(getSyncOrchestrator().clearLocalAndFullResync('user-1')).rejects.toThrow(
+      'Cannot resync while offline',
+    );
+
+    expect(await getLocalDb().characters.get('char-1')).toMatchObject({ name: 'Old' });
+    expect(await getLocalDb().outbox.get('op-1')).toBeTruthy();
+  });
+
+  it('fails recovery if connectivity drops before the forced pull runs', async () => {
+    tokenStore.write({
+      accessToken: jwtForUser('user-1'),
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 0,
+    });
+    vi.spyOn(window.navigator, 'onLine', 'get')
+      .mockReturnValueOnce(true)
+      .mockReturnValue(false);
+
+    await expect(getSyncOrchestrator().clearLocalAndFullResync('user-1')).rejects.toThrow(
+      'Fresh server data could not be downloaded',
+    );
+
+    expect(await getLocalDb().syncMeta.get('bootstrap:user-1')).toBeUndefined();
+  });
 });
 
 describe('SyncOrchestrator.revertFailedOperation', () => {
@@ -267,6 +301,102 @@ describe('SyncOrchestrator.revertFailedOperation', () => {
       attemptedValue: 'Newest local',
       prevValue: 'Server',
     });
+  });
+
+  it('removes nested inventory rows and operations with a reverted container create', async () => {
+    const db = getLocalDb();
+    await db.characterInventory.bulkPut([
+      { id: 'container', characterId: 'char-1', parentId: null, name: 'Bag', revision: -1 },
+      { id: 'child', characterId: 'char-1', parentId: 'container', name: 'Pouch', revision: -1 },
+      { id: 'grandchild', characterId: 'char-1', parentId: 'child', name: 'Coin', revision: -1 },
+      {
+        id: 'existing',
+        characterId: 'char-1',
+        parentId: 'container',
+        name: 'Renamed existing item',
+        revision: 2,
+      },
+    ] as never);
+    await db.outbox.bulkPut([
+      {
+        clientOpId: 'container-create',
+        entityClass: 'character_inventory',
+        entityId: 'container',
+        command: 'create',
+        coalesceKey: 'container|',
+        attemptedValue: { parentId: null },
+        parentId: 'char-1',
+        validationVersion: 1,
+        status: 'transient_retry',
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+        attemptCount: 4,
+      },
+      {
+        clientOpId: 'child-create',
+        entityClass: 'character_inventory',
+        entityId: 'child',
+        command: 'create',
+        coalesceKey: 'child|',
+        attemptedValue: { parentId: 'container' },
+        parentId: 'char-1',
+        validationVersion: 1,
+        status: 'pending',
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+        attemptCount: 0,
+      },
+      {
+        clientOpId: 'grandchild-create',
+        entityClass: 'character_inventory',
+        entityId: 'grandchild',
+        command: 'create',
+        coalesceKey: 'grandchild|',
+        attemptedValue: { parentId: 'child' },
+        parentId: 'char-1',
+        validationVersion: 1,
+        status: 'pending',
+        enqueuedAt: '2026-01-01T00:00:02.000Z',
+        attemptCount: 0,
+      },
+      {
+        clientOpId: 'existing-move',
+        entityClass: 'character_inventory',
+        entityId: 'existing',
+        command: 'patch',
+        coalesceKey: 'existing|parentId',
+        fieldPath: 'parentId',
+        attemptedValue: 'container',
+        prevValue: null,
+        parentId: 'char-1',
+        validationVersion: 1,
+        status: 'pending',
+        enqueuedAt: '2026-01-01T00:00:03.000Z',
+        attemptCount: 0,
+      },
+      {
+        clientOpId: 'existing-name',
+        entityClass: 'character_inventory',
+        entityId: 'existing',
+        command: 'patch',
+        coalesceKey: 'existing|name',
+        fieldPath: 'name',
+        attemptedValue: 'Renamed existing item',
+        prevValue: 'Existing item',
+        parentId: 'char-1',
+        validationVersion: 1,
+        status: 'pending',
+        enqueuedAt: '2026-01-01T00:00:04.000Z',
+        attemptCount: 0,
+      },
+    ]);
+
+    await getSyncOrchestrator().revertFailedOperation('container-create');
+
+    expect(await db.characterInventory.toArray()).toEqual([
+      expect.objectContaining({ id: 'existing', parentId: null, name: 'Renamed existing item' }),
+    ]);
+    expect(await db.outbox.toArray()).toEqual([
+      expect.objectContaining({ clientOpId: 'existing-name' }),
+    ]);
   });
 
   it('reinserts an optimistically deleted row when it is reverted', async () => {

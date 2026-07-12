@@ -71,6 +71,20 @@ describe('SyncStatusIndicator recovery action', () => {
     expect(screen.getByRole('heading', { name: 'Sync log' })).toBeInTheDocument();
   });
 
+  it('disables destructive recovery while offline', async () => {
+    const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const user = userEvent.setup();
+    renderIndicator();
+
+    await user.click(screen.getByLabelText('All changes saved (offline)'));
+
+    expect(
+      screen.getByRole('button', { name: /abandon local changes and re-sync/i }),
+    ).toBeDisabled();
+    expect(screen.getByText(/Reconnect before abandoning local changes/i)).toBeInTheDocument();
+    online.mockRestore();
+  });
+
   it('requires confirmation before calling the recovery method', async () => {
     tokenStore.write({
       accessToken: jwtForUser('user-1'),

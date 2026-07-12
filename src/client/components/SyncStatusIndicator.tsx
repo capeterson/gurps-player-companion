@@ -78,7 +78,12 @@ export function SyncStatusIndicator() {
           {badge}
         </button>
       </span>
-      <SyncLogView open={logOpen} onClose={() => setLogOpen(false)} storageMessage={storageMsg} />
+      <SyncLogView
+        open={logOpen}
+        onClose={() => setLogOpen(false)}
+        online={online}
+        storageMessage={storageMsg}
+      />
     </>
   );
 }

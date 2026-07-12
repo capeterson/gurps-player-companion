@@ -302,7 +302,7 @@ class SyncOrchestrator {
    * connection self-heals instead of leaving the gate spinning until
    * a manual reload.
    */
-  async bootstrap(userId: string, forceCursorPull = false): Promise<void> {
+  async bootstrap(userId: string, forceCursorPull = false): Promise<boolean> {
     // Captured for `enforceMinimalViewLocally` — the periodic
     // cursor-pull doesn't otherwise know who's logged in.
     this.currentUserId = userId;
@@ -329,10 +329,11 @@ class SyncOrchestrator {
     } finally {
       if (!completed) this.scheduleBootstrapRetry(userId);
     }
-    if (!completed) return;
+    if (!completed) return false;
     // Re-emit any persistent rejection toasts that survived the
     // reload so the user doesn't lose an open error.
     await this.replayRejectionToasts();
+    return true;
   }
 
   /**
@@ -365,6 +366,9 @@ class SyncOrchestrator {
     if (!tokenStore.read()) {
       throw new Error('Cannot resync without an authenticated session');
     }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw new Error('Cannot resync while offline');
+    }
 
     const wasStarted = this.started;
     this.recoveryInProgress = true;
@@ -376,7 +380,8 @@ class SyncOrchestrator {
         await this.clearAllLocalStores();
         syncStateStore.reset('syncing');
         this.currentUserId = userId;
-        await this.bootstrap(userId, true);
+        const completed = await this.bootstrap(userId, true);
+        if (!completed) throw new Error('Fresh server data could not be downloaded');
       });
     } finally {
       this.recoveryInProgress = false;
@@ -993,23 +998,67 @@ class SyncOrchestrator {
 
   private async discardSpeculativeCreate(op: OutboxEntry): Promise<void> {
     const db = getLocalDb();
-    const relatedOps = await db.outbox
+    const relatedEntityIds = new Set([op.entityId]);
+    if (op.entityClass === 'character_inventory') {
+      let parents = [op.entityId];
+      while (parents.length > 0) {
+        const children = await db.characterInventory.where('parentId').anyOf(parents).toArray();
+        parents = children.map((child) => child.id).filter((id) => !relatedEntityIds.has(id));
+        for (const id of parents) relatedEntityIds.add(id);
+      }
+    }
+    const candidateOps = await db.outbox
       .filter(
         (candidate) =>
-          candidate.entityId === op.entityId ||
+          relatedEntityIds.has(candidate.entityId) ||
           (op.entityClass === 'character' && candidate.parentId === op.entityId),
       )
       .toArray();
 
+    let speculativeInventoryIds: Set<string> | undefined;
     if (op.entityClass === 'character') {
       await db.characterTraits.where('characterId').equals(op.entityId).delete();
       await db.characterSkills.where('characterId').equals(op.entityId).delete();
       await db.characterSpells.where('characterId').equals(op.entityId).delete();
       await db.characterInventory.where('characterId').equals(op.entityId).delete();
       await db.characterCombat.delete(op.entityId);
+    } else if (op.entityClass === 'character_inventory') {
+      speculativeInventoryIds = new Set(
+        candidateOps
+          .filter((candidate) => candidate.command === 'create')
+          .map((candidate) => candidate.entityId),
+      );
+      speculativeInventoryIds.add(op.entityId);
+
+      for (const candidate of candidateOps) {
+        if (
+          !speculativeInventoryIds.has(candidate.entityId) &&
+          candidate.command === 'patch' &&
+          candidate.fieldPath === 'parentId'
+        ) {
+          await this.revertField(
+            candidate.entityClass,
+            candidate.entityId,
+            candidate.fieldPath,
+            candidate.prevValue,
+          );
+        }
+      }
+      await db.characterInventory.bulkDelete([...speculativeInventoryIds]);
+    } else {
+      await this.deleteLocal(op.entityClass, op.entityId);
     }
-    await this.deleteLocal(op.entityClass, op.entityId);
-    await db.outbox.bulkDelete(relatedOps.map((candidate) => candidate.clientOpId));
+    if (op.entityClass === 'character') await this.deleteLocal(op.entityClass, op.entityId);
+    const discardedOpIds = candidateOps
+      .filter(
+        (candidate) =>
+          op.entityClass !== 'character_inventory' ||
+          speculativeInventoryIds?.has(candidate.entityId) ||
+          candidate.fieldPath === 'parentId' ||
+          candidate.entityId === op.entityId,
+      )
+      .map((candidate) => candidate.clientOpId);
+    await db.outbox.bulkDelete(discardedOpIds);
   }
 
   private async reinsertLocal(entityClass: EntityClass, prevValue: unknown): Promise<void> {
