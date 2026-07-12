@@ -884,9 +884,13 @@ function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormP
       name: name.trim(),
       kind,
       basePoints: Number.isNaN(basePoints) ? 0 : basePoints,
+      pointsPerLevel: initial?.pointsPerLevel ?? null,
+      maxLevel: initial?.maxLevel ?? null,
       description: description.trim() || null,
       source: source.trim() || null,
       availableModifiers: modifiers,
+      variants: initial?.variants ?? [],
+      effects: initial?.effects ?? [],
       tags: initial?.tags ?? [],
     });
   }
@@ -1166,6 +1170,7 @@ function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormP
       description: description.trim() || null,
       source: source.trim() || null,
       situationalModifiers: initial?.situationalModifiers ?? [],
+      effects: initial?.effects ?? [],
     });
   }
 

@@ -134,6 +134,20 @@
       "when": 1783731600000,
       "tag": "0018_gm_character_editing",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783800000000,
+      "tag": "0019_trait_effects",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783800100000,
+      "tag": "0020_trait_levels_variants",
+      "breakpoints": true
     }
   ]
 }

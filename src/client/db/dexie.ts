@@ -64,6 +64,8 @@ export interface LocalCharacter {
    * `[]`. Not indexed -- no store version bump needed. */
   tempEffects?: TempEffect[];
   dismissedWarnings: string[];
+  /** Trait/skill effect condition groups currently toggled ON. */
+  activeConditionGroups: string[];
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -76,6 +78,8 @@ export interface LocalCharacterTrait {
   name: string;
   points: number;
   level: number | null;
+  /** Selected library variant name, or null for the base form. */
+  variantName: string | null;
   notes: string | null;
   modifiers: unknown[];
   libraryTraitId: string | null;

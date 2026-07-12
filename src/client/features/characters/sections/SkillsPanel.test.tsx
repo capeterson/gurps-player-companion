@@ -17,7 +17,7 @@ import { ToastProvider } from '../../../lib/toast.tsx';
 import { SkillsPanel } from './SkillsPanel.tsx';
 
 function makeSkill(overrides: Partial<SkillOut> = {}): SkillOut {
-  return {
+  const base: SkillOut = {
     id: 'skill-1',
     characterId: 'char-1',
     name: 'Broadsword',
@@ -29,10 +29,18 @@ function makeSkill(overrides: Partial<SkillOut> = {}): SkillOut {
     notes: null,
     librarySkillId: null,
     level: 14,
+    effectiveLevel: 14,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
   };
+  // Mirror the server: effectiveLevel tracks level's null-ness by default
+  // (no trait bonuses to apply against a missing attribute default).
+  // Callers can still pass effectiveLevel explicitly to override.
+  if (overrides.effectiveLevel === undefined && 'level' in overrides) {
+    base.effectiveLevel = overrides.level ?? null;
+  }
+  return base;
 }
 
 function makeCharacter(skills: SkillOut[]): CharacterDetail {

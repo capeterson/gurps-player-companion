@@ -16,7 +16,12 @@ import {
   libraryYamlDoc,
 } from '../schemas/campaignLibrary.ts';
 
-export const LIBRARY_YAML_VERSION = 1;
+/**
+ * Current YAML doc version emitted by `emitLibraryYaml`.  v2 added the
+ * `effects` arrays to traits/skills (see schemas/effects.ts).  The parser
+ * still accepts v1 docs (effects defaults to `[]`).
+ */
+export const LIBRARY_YAML_VERSION = 2 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {

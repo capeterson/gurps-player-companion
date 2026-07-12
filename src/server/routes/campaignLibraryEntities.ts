@@ -104,9 +104,13 @@ export interface LibraryEntityConfig<
 function traitEditableFields(body: LibraryTraitCreate) {
   return {
     basePoints: body.basePoints ?? 0,
+    pointsPerLevel: body.pointsPerLevel ?? null,
+    maxLevel: body.maxLevel ?? null,
     description: body.description ?? null,
     source: body.source ?? null,
     availableModifiers: body.availableModifiers ?? [],
+    variants: body.variants ?? [],
+    effects: body.effects ?? [],
     tags: body.tags ?? [],
   };
 }
@@ -139,9 +143,13 @@ export const traitEntity: LibraryEntityConfig<
       name: row.name,
       kind: row.kind,
       basePoints: row.basePoints,
+      pointsPerLevel: row.pointsPerLevel,
+      maxLevel: row.maxLevel,
       description: row.description,
       source: row.source,
       availableModifiers: row.availableModifiers ?? [],
+      variants: row.variants ?? [],
+      effects: row.effects ?? [],
       tags: row.tags ?? [],
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -159,9 +167,13 @@ export const traitEntity: LibraryEntityConfig<
       name: row.name,
       kind: row.kind,
       basePoints: row.basePoints,
+      pointsPerLevel: row.pointsPerLevel ?? undefined,
+      maxLevel: row.maxLevel ?? undefined,
       description: row.description ?? undefined,
       source: row.source ?? undefined,
       availableModifiers: row.availableModifiers ?? [],
+      variants: row.variants ?? [],
+      effects: row.effects ?? [],
       tags: row.tags ?? [],
     }),
 };
@@ -178,6 +190,7 @@ function skillEditableFields(body: LibrarySkillCreate) {
     defaultSpecialization: body.defaultSpecialization ?? null,
     prerequisites: body.prerequisites ?? null,
     situationalModifiers: body.situationalModifiers ?? [],
+    effects: body.effects ?? [],
   };
 }
 
@@ -215,6 +228,7 @@ export const skillEntity: LibraryEntityConfig<
       defaultSpecialization: row.defaultSpecialization,
       prerequisites: row.prerequisites,
       situationalModifiers: row.situationalModifiers ?? [],
+      effects: row.effects ?? [],
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
@@ -236,6 +250,7 @@ export const skillEntity: LibraryEntityConfig<
       defaultSpecialization: row.defaultSpecialization ?? undefined,
       prerequisites: row.prerequisites ?? undefined,
       situationalModifiers: row.situationalModifiers ?? [],
+      effects: row.effects ?? [],
     }),
 };
 

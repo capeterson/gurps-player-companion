@@ -19,6 +19,11 @@ const baseAttrs: CharacterAttrs = {
   speedQuarterMod: 0,
   moveMod: 0,
   tempEffects: [],
+  dodgeMod: 0,
+  parryMod: 0,
+  blockMod: 0,
+  drMod: 0,
+  frightCheckMod: 0,
 };
 
 describe('skillDefaultOffset', () => {
