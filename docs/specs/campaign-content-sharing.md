@@ -64,14 +64,17 @@ Client surfaces: `CampaignInvitePanel`, `CampaignMembersPanel`,
 
 The core privacy control. Each campaign has a boolean **`shareCharacterSheets`**.
 It decides, for every viewer, whether they get a **`full`** or **`minimal`** view
-of each character in the campaign.
+of each character in the campaign, and **where** the viewer is allowed to
+discover that character at all.
 
 ```
 full     — owner of the character, the campaign GM (owner), any member
            of a campaign with shareCharacterSheets = true, OR a manager when
            allowGmCharacterEditing = true.
 minimal  — a non-GM member of a campaign with shareCharacterSheets = false.
-           (public columns only — no traits/skills/spells/inventory/combat.)
+           Identity only — no stats, no temp effects, no HP/FP, no
+           traits/skills/spells/inventory/combat, no dismissed warnings,
+           no history.
 ```
 
 Owner and GM checks **short-circuit** the share flag, so flipping it never
@@ -79,18 +82,44 @@ restricts the GM's own visibility, nor a player's view of their own sheet.
 An enabled manager editor also receives a full view because edit permission
 cannot safely operate on a minimal projection.
 
-### Enforced in two places — keep them in lockstep
+### Discovery: where minimal characters appear
+
+A character the viewer may only see in `minimal` form is **never listed on the
+top-level `/characters` page** (the "your characters" surface). Minimal
+characters are discoverable only from the **campaign detail page**
+(`/campaigns/:id`), which renders a "Characters" section listing every member
+character in that campaign. Clicking a row opens the existing
+`/characters/:id` route which renders `CharacterMinimalView` for minimal
+viewers. This keeps the player's "your characters" page uncluttered with
+other players' sheets while still letting a campaign member browse the party
+roster from the campaign itself.
+
+The local-first character row stays in IndexedDB so the minimal-view detail
+page can render offline; the Characters page filters it with the same local
+access decision as the privacy sweep (see `useCharactersList`).
+
+### Enforced in three places — keep them in lockstep
 
 This gate is defence-in-depth. Changing one side without the other reopens a
-data-leak hole (this is exactly what Codex review on PR #22 caught).
+data-leak hole (this is exactly what Codex review on PR #22 caught, and the
+identity-only tightening closed a second leak where stale cached private
+fields on the character row itself — `st`, `hpMod`, `tempEffects`, etc. —
+remained readable in IndexedDB after access was downgraded to `minimal`).
 
 1. **Server — what leaves the database.**
    `decideCharacterAccess()` in `src/server/routes/sync.ts` is the pure
    decision (`full` vs `minimal`) and is unit-tested without Postgres. On
    `POST /sync/cursor`:
    - `character` upserts are emitted for every accessible character, but
-     `minimal` rows are run through `projectCharacterRow` first so only
-     public columns ship.
+     `minimal` rows are run through `projectCharacterRow` first — this drops
+     every private column's **real value** (stats, mods, `tempEffects`,
+     `dismissedWarnings`, `activeConditionGroups`) and ships only the public identity fields plus the
+     insured-safe defaults the NOT NULL columns still need (`st=10`, etc.). The
+     client's `applyServerRow` merge uses the masked payload to overwrite the
+     local row, purging any stale real values that were cached before access
+     was downgraded (the projection keeps the default-valued keys present
+     precisely because `applyServerRow` is a merge — omitting them would leave
+     the stale real values in place).
    - Child classes (traits / skills / spells / inventory / combat) are scoped
      to `fullAccessCharacterIds` only — a `minimal` viewer never pulls another
      player's private rows at all.
@@ -102,27 +131,55 @@ data-leak hole (this is exactly what Codex review on PR #22 caught).
      `src/server/services/characterAccess.ts`, which owns the membership
      check and then delegates the full/minimal choice to
      `decideCharacterAccess()`.
-   - `GET /characters` (the list) masks `st/dx/iq/ht` to the 10/10/10/10
-     baseline for rows the viewer may only see in `minimal` form, using the
-     same `decideCharacterAccess` decision.
+   - `GET /characters` (the list) **excludes** rows the viewer may only see
+     in `minimal` form — those rows are discoverable from the campaign
+     detail page only. Owner rows and full-view member rows are listed as
+     before.
 
 2. **Client — what stays in IndexedDB.**
    `characterIdsToMinimize()` in `src/client/sync/minimalViewSweep.ts` mirrors
-   the server decision and computes which characters' **already-cached** private
-   child rows must be purged from Dexie. The orchestrator runs the sweep after
+   the server decision and computes which characters' **already-cached**
+   private data must be purged from Dexie. The orchestrator runs the sweep after
    **every** `/sync/cursor` pull and on **bootstrap**, so a fresh
-   `shareCharacterSheets = false` flip lands by the next sync tick at latest —
-   without it, private rows cached before the flip would remain recoverable in
-   IndexedDB.
+   `shareCharacterSheets = false` flip lands by the next sync tick at latest.
+   The sweep now:
+   - deletes child rows (traits / skills / spells / inventory / combat), AND
+   - **rewrites each minimal character's row down to identity-only fields**,
+     blanking `st`/`dx`/`iq`/`ht`/`hpMod`/`willMod`/`perMod`/`fpMod`/
+      `speedQuarterMod`/`moveMod`/`tempEffects`/`dismissedWarnings`/
+      `activeConditionGroups` to safe
+      defaults. Masked rows carry a local-only marker; when access returns to
+      `full`, the orchestrator resets the character-family cursors and pulls
+      from revision zero once to restore the real parent and child rows.
+      Without this rewrite the row keeps whatever real values were
+     synced before access was downgraded, and `useCharacterDetail`/`buildCharacterDetail`
+     would keep deriving real HP/FP/derived from those stale cached fields
+     even when the UI falls through to the full sheet (e.g. while the local
+     campaign row hasn't resolved yet, or for an account that doesn't have
+     the campaign row at all).
 
-**Rule:** any change to the sharing decision must update **both**
-`decideCharacterAccess` (+ `projectCharacterRow`) and `characterIdsToMinimize`,
-and their tests. History-detail redaction follows the same gate — `minimal`
-viewers get no character-history detail (see history-tracking.md Risks).
+3. **Client — what the UI surfaces.**
+    - The `/characters` page reads Dexie and applies
+      `characterIdsToMinimize`, so minimal characters stay hidden while
+      full-share and editable manager rows remain listed. (The local-first row
+      stays in Dexie so `CharacterMinimalView` can render the share-gated
+      detail page offline.)
+   - The `/campaigns/:id` page renders a "Characters" section that reads
+     Dexie rows where `campaignId === campaignId` and deep-links each row
+     to `/characters/:id`, which renders `CharacterMinimalView` for
+     minimal viewers.
 
-The authenticated `/campaigns` response is mirrored into Dexie with the current
-viewer's role. This lets `useCharacterAccessLocal` and the minimal-view sweep
-make the same manager-editing decision while offline. Missing legacy
+**Rule:** any change to the sharing decision must update **all three**
+surfaces together: `decideCharacterAccess` + `projectCharacterRow` (server
+sync emission), `characterIdsToMinimize` + the orchestrator's character-row
+rewrite (local purge), and the list-filter / campaign-browse UI (discovery).
+History-detail redaction follows the same gate — `minimal` viewers get no
+character-history detail (see history-tracking.md Risks).
+
+Both `/sync/cursor` campaign rows and the authenticated `/campaigns` response
+are mirrored into Dexie with the current viewer's role. This lets
+`useCharacterAccessLocal` and the minimal-view sweep make the same
+manager-editing decision during bootstrap and while offline. Missing legacy
 `allowGmCharacterEditing` values default to `false`.
 
 ## GM campaign dashboard

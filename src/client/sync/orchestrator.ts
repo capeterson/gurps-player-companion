@@ -266,7 +266,19 @@ class SyncOrchestrator {
       // (campaign was just flipped to shareCharacterSheets=false). The
       // server stops emitting them as upserts; this sweep cleans up
       // what's already in Dexie.
-      await this.enforceMinimalViewLocally();
+      const needsRehydrate = await this.enforceMinimalViewLocally();
+      if (needsRehydrate) {
+        const db = getLocalDb();
+        await db.syncCursors.bulkDelete([
+          'character',
+          'character_trait',
+          'character_skill',
+          'character_spell',
+          'character_inventory',
+          'character_combat',
+        ]);
+        return await this.pullInner(force);
+      }
       // Prune characters/campaigns the viewer has lost access to
       // entirely (removed from a campaign, campaign deleted, character
       // moved out of a shared campaign). Tombstones can't reach ex-
@@ -1030,9 +1042,9 @@ class SyncOrchestrator {
    * window and we don't want to mis-classify the empty user as
    * "non-owner non-GM of every campaign."
    */
-  private async enforceMinimalViewLocally(): Promise<void> {
+  private async enforceMinimalViewLocally(): Promise<boolean> {
     const viewerId = this.currentUserId;
-    if (!viewerId) return;
+    if (!viewerId) return false;
     const db = getLocalDb();
     const [chars, camps] = await Promise.all([db.characters.toArray(), db.campaigns.toArray()]);
     const ids = characterIdsToMinimize({
@@ -1040,13 +1052,37 @@ class SyncOrchestrator {
       characters: chars,
       campaigns: camps,
     });
-    if (ids.size === 0) return;
+    const restored = chars.filter(
+      (character) => character.minimalViewMasked && !ids.has(character.id),
+    );
+    if (restored.length > 0) {
+      await db.characters.bulkPut(
+        restored.map((character) => ({ ...character, minimalViewMasked: false })),
+      );
+    }
+    if (ids.size === 0) return restored.length > 0;
     const idArray = [...ids];
-    // One transaction across the child tables so the purge is atomic —
-    // can't have skills present and traits gone halfway.
+    // One transaction across the character row + every child table so
+    // the purge is atomic — can't have skills present and the parent
+    // row still carrying its real stats halfway through.
+    //
+    // The character-row rewrite is the **client half** of the share
+    // gate (docs/specs/campaign-content-sharing.md). The server's
+    // `projectCharacterRow` ships identity-only fields for minimal
+    // rows, but `applyServerRow` is merge-into-existing — without this
+    // rewrite the local row retains whatever `st` / `hpMod` /
+    // `tempEffects` etc. were synced BEFORE the share flip (a share
+    // flip bumps the campaign row's revision, not the character row's,
+    // so the cursor doesn't repull the masked projection). The client
+    // would then derive real HP/FP/derived from those stale caches and
+    // — if the local campaign row hasn't resolved yet (or the viewer
+    // isn't a campaign member at all, e.g. a stale-IndexedDB account)
+    // — `useCharacterAccessLocal.isMinimal` returns false and the full
+    // sheet renders with the leaked real values.
     await db.transaction(
       'rw',
       [
+        db.characters,
         db.characterTraits,
         db.characterSkills,
         db.characterSpells,
@@ -1063,8 +1099,39 @@ class SyncOrchestrator {
         // isn't indexed on this store, and the resulting SchemaError
         // used to abort the sweep and wedge the pull in 'error'.)
         await db.characterCombat.bulkDelete(idArray);
+        // Rewrite each minimal character's row down to identity-only
+        // fields, mirroring `projectCharacterRow` on the server. The
+        // identity columns (id / ownerId / campaignId / name /
+        // playerName / height / weight / age / appearance / techLevel /
+        // timestamps / revision) are preserved; every private column
+        // is reset to its schema default so derived stats and the
+        // combat tab can't recover the masked character's real state.
+        const now = new Date().toISOString();
+        for (const id of idArray) {
+          const existing = await db.characters.get(id);
+          if (!existing) continue;
+          await db.characters.put({
+            ...existing,
+            st: 10,
+            dx: 10,
+            iq: 10,
+            ht: 10,
+            hpMod: 0,
+            willMod: 0,
+            perMod: 0,
+            fpMod: 0,
+            speedQuarterMod: 0,
+            moveMod: 0,
+            tempEffects: [],
+            dismissedWarnings: [],
+            activeConditionGroups: [],
+            updatedAt: now,
+            minimalViewMasked: true,
+          });
+        }
       },
     );
+    return restored.length > 0;
   }
 
   /**

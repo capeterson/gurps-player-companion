@@ -15,6 +15,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { api } from '../../lib/api.ts';
+import { useCampaignCharactersList } from '../characters/useCharacterDetail.ts';
 import { LogPage } from '../log/LogPage.tsx';
 import { CampaignHistoryPanel } from './CampaignHistoryPanel.tsx';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
@@ -32,6 +33,14 @@ export function CampaignDetailPage() {
     queryFn: () => api<CampaignOut>(`/campaigns/${id}`),
     enabled: typeof id === 'string' && id.length > 0,
   });
+  // Campaign roster — every member character in this campaign, browsable
+  // from the campaign page regardless of the share gate. Per
+  // docs/specs/campaign-content-sharing.md this is the ONLY discovery
+  // surface for a campaign-shared character the viewer only sees minimally;
+  // `/characters` filters them out by ownership.
+  const roster = useCampaignCharactersList(
+    typeof id === 'string' && id.length > 0 ? id : undefined,
+  );
 
   if (!id) return <p className="alert alert-error">Missing campaign id.</p>;
   if (campaign.isLoading) return <p className="text-sm text-base-content/60">Loading…</p>;
@@ -92,6 +101,37 @@ export function CampaignDetailPage() {
           )}
         </div>
       </header>
+
+      {/* Campaign roster — browseable from the campaign page. Member
+          characters minimal viewers see deep-link to
+          /characters/:id, which renders CharacterMinimalView for them. */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold">Characters</h2>
+        {roster === undefined ? (
+          <p className="text-sm text-base-content/60">Loading…</p>
+        ) : roster.length === 0 ? (
+          <p className="text-sm text-base-content/60">No characters in this campaign yet.</p>
+        ) : (
+          <ul className="grid md:grid-cols-2 gap-3">
+            {roster.map((ch) => (
+              <li key={ch.id}>
+                <Link
+                  to={`/characters/${ch.id}`}
+                  className="card block p-4 transition hover:border-border-strong"
+                >
+                  <div className="flex items-baseline justify-between">
+                    <p className="font-display text-xl">{ch.name}</p>
+                    <span className="label-eyebrow">TL {ch.techLevel ?? '—'}</span>
+                  </div>
+                  <p className="text-sm text-base-content/70">
+                    {ch.playerName ?? 'Player not specified'}
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Embedded adventure log scoped to this campaign. */}
       <LogPage campaignId={c.id} />
