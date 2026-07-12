@@ -232,7 +232,10 @@ router.openapi(
  * Called when an invitation is cancelled, accepted, or rejected so the
  * invitee's bell doesn't keep showing a stale Accept/Decline pair.
  */
-async function markInvitationNotificationsRead(actorId: string, invitationId: string): Promise<void> {
+async function markInvitationNotificationsRead(
+  actorId: string,
+  invitationId: string,
+): Promise<void> {
   await withAudit(actorId, undefined, (tx) =>
     tx
       .update(notifications)

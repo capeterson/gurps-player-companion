@@ -82,7 +82,6 @@ function findMatchingParenEnd(source: string, openParenIndex: number): number {
       i += 2;
       while (i < n && !(source[i] === '*' && source[i + 1] === '/')) i++;
       i++;
-      continue;
     }
   }
   return -1;
@@ -138,7 +137,10 @@ function findBareWrites(source: string, filename: string): string[] {
   const masked = maskWithAuditCalls(source);
   const aliases = findGetDbAliases(source);
   const targets = ['getDb\\(\\)', ...aliases];
-  const pattern = new RegExp(`\\b(?:${targets.join('|')})\\s*\\.\\s*(insert|update|delete)\\s*\\(`, 'g');
+  const pattern = new RegExp(
+    `\\b(?:${targets.join('|')})\\s*\\.\\s*(insert|update|delete)\\s*\\(`,
+    'g',
+  );
   const sourceLines = source.split('\n');
   let m: RegExpExecArray | null = pattern.exec(masked);
   while (m) {
