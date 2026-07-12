@@ -878,11 +878,10 @@ function SecondaryModsPanel({
 /**
  * Status card — current HP/FP pools (editable) plus the derived combat
  * stats that aren't already surfaced by the Secondary card (Dodge,
- * Basic Lift, Thr/Sw). Formerly two surfaces: the "Derived" read-only
- * card and the old "Combat" tab's HP/FP + posture/maneuver block. The
- * combat tab is gone (the combat modal and Play mode handle posture,
- * maneuver, conditions, and pool bumpers better); HP/FP editing lives
- * here so the always-visible sheet shows the player's current pools.
+ * Basic Lift, Thr/Sw). HP/FP editing lives here so the always-visible
+ * sheet shows the player's current pools; the Combat tab's PoolsCard
+ * is the second editing surface (with ±1/±5 bumpers), both sharing
+ * the same `useCombatPatch` path.
  */
 function StatusPanel({
   character,

@@ -183,6 +183,9 @@ export function InventoryRow(props: InventoryRowProps) {
                   </span>
                 </span>
               )}
+              {item.weaponData != null && (
+                <span className="badge badge-sm badge-ghost">Weapon</span>
+              )}
             </span>
           </div>
           {isRoot && !item.worn && item.externalLocation && (

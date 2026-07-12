@@ -1,8 +1,14 @@
 /**
  * CombatTab — the live-gameplay surface, rendered as the first tab on
- * the character sheet. Pools, maneuver, defenses, attacks, skills, and
- * a session roll log, all inline on `/characters/:id` so the player
- * taps between live combat and the editable sheet without a route hop.
+ * the character sheet. Pools, DR summary, maneuver, defenses, attacks,
+ * and a roll log, all inline on `/characters/:id` so the player taps
+ * between live combat and the editable sheet without a route hop.
+ *
+ * Two-column "state vs. action" layout: the left column holds
+ * state-only cards (Pools, DR summary); the right column stacks the
+ * action cards (Maneuver, Defenses, Attacks). The roll history strip
+ * spans full width below. On mobile it collapses to a single column in
+ * the same order.
  *
  * `usePoolBumpers` is lifted here so the in-grid PoolsCard and the
  * sticky mobile bottom bar share one instance — a second instance would
@@ -19,9 +25,9 @@ import { useCombatPatch } from '../useCombatPatch.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
 import { AttacksCard } from './AttacksCard.tsx';
 import { DefensesCard } from './DefensesCard.tsx';
+import { DrSummaryCard } from './DrSummaryCard.tsx';
 import { ManeuverCard } from './ManeuverCard.tsx';
 import { PoolsCard } from './PoolsCard.tsx';
-import { SkillsCard } from './SkillsCard.tsx';
 
 export interface CombatTabProps {
   character: CharacterDetail;
@@ -42,21 +48,24 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
 
   return (
     <div className="space-y-4 pb-4">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <PoolsCard
-          character={character}
-          canWrite={canWrite}
-          patchCombat={patchCombat}
-          bumpers={bumpers}
-        />
-        <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
-        <DefensesCard character={character} openRoll={openRoll} />
-        <AttacksCard character={character} openRoll={openRoll} />
-        <SkillsCard character={character} canWrite={canWrite} openRoll={openRoll} />
-        <div className="md:col-span-2 xl:col-span-3">
-          <RollHistoryStrip characterId={character.id} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4">
+          <PoolsCard
+            character={character}
+            canWrite={canWrite}
+            patchCombat={patchCombat}
+            bumpers={bumpers}
+          />
+          <DrSummaryCard character={character} />
+        </div>
+        <div className="space-y-4">
+          <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
+          <DefensesCard character={character} openRoll={openRoll} />
+          <AttacksCard character={character} openRoll={openRoll} />
         </div>
       </div>
+
+      <RollHistoryStrip characterId={character.id} />
 
       {/* Sticky bottom bar, mobile only. Shares the SAME usePoolBumpers
           instance as PoolsCard (lifted above) — a second instance here

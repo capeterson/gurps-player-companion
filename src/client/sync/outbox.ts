@@ -215,22 +215,30 @@ async function readFieldValue(args: EnqueueFieldPatchArgs): Promise<unknown> {
 
 async function readEntityRevision(args: EnqueueFieldPatchArgs): Promise<number | undefined> {
   const db = getLocalDb();
+  let rev: number | undefined;
   switch (args.entityClass) {
     case 'character':
-      return (await db.characters.get(args.entityId))?.revision;
+      rev = (await db.characters.get(args.entityId))?.revision;
+      break;
     case 'character_trait':
-      return (await db.characterTraits.get(args.entityId))?.revision;
+      rev = (await db.characterTraits.get(args.entityId))?.revision;
+      break;
     case 'character_skill':
-      return (await db.characterSkills.get(args.entityId))?.revision;
+      rev = (await db.characterSkills.get(args.entityId))?.revision;
+      break;
     case 'character_spell':
-      return (await db.characterSpells.get(args.entityId))?.revision;
+      rev = (await db.characterSpells.get(args.entityId))?.revision;
+      break;
     case 'character_inventory':
-      return (await db.characterInventory.get(args.entityId))?.revision;
+      rev = (await db.characterInventory.get(args.entityId))?.revision;
+      break;
     case 'character_combat':
-      return (await db.characterCombat.get(args.entityId))?.revision;
+      rev = (await db.characterCombat.get(args.entityId))?.revision;
+      break;
     default:
       return undefined;
   }
+  return rev === -1 ? undefined : rev;
 }
 
 export interface EnqueueCreateArgs<T> {

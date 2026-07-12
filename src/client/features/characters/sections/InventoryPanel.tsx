@@ -91,6 +91,7 @@ export function InventoryPanel({
   const [moreOpen, setMoreOpen] = useState(false);
   const [newIsContainer, setNewIsContainer] = useState(false);
   const [newIsArmor, setNewIsArmor] = useState(false);
+  const [newIsWeapon, setNewIsWeapon] = useState(false);
   const [newWorn, setNewWorn] = useState(false);
   const [newEquipped, setNewEquipped] = useState(false);
   const { creating, submit: submitNewItem } = useAddEntityForm({
@@ -113,6 +114,7 @@ export function InventoryPanel({
     if (opt.weightLbs != null) setWeight(String(opt.weightLbs));
     if (opt.cost != null) setCost(String(opt.cost));
     if (opt.isArmor) setNewIsArmor(true);
+    if (opt.weaponData != null) setNewIsWeapon(true);
   }
 
   async function patchField(
@@ -202,6 +204,8 @@ export function InventoryPanel({
       linkedLibraryId && pickedLibraryItem?.isArmor && pickedLibraryItem.armor
         ? pickedLibraryItem.armor
         : null;
+    const weaponFromLibrary =
+      linkedLibraryId && pickedLibraryItem?.weaponData ? pickedLibraryItem.weaponData : null;
 
     // Include every column on the LocalCharacterInventory row so the
     // encumbrance computation (which reads e.g. hideawayCapacityLbs from
@@ -233,7 +237,7 @@ export function InventoryPanel({
               notes: null,
             })
           : null,
-        weaponData: null,
+        weaponData: newIsWeapon ? (weaponFromLibrary ?? null) : null,
         libraryItemId: linkedLibraryId,
       },
       () => {
@@ -244,6 +248,7 @@ export function InventoryPanel({
         setParentId('');
         setNewIsContainer(false);
         setNewIsArmor(false);
+        setNewIsWeapon(false);
         setNewWorn(false);
         setNewEquipped(false);
         setMoreOpen(false);
@@ -859,6 +864,15 @@ export function InventoryPanel({
                 />
                 <span>Armor</span>
               </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={newIsWeapon}
+                  onChange={(e) => setNewIsWeapon(e.target.checked)}
+                />
+                <span>Weapon</span>
+              </label>
               {parentId === '' && (
                 <label className="flex items-center gap-2">
                   <input
@@ -879,9 +893,10 @@ export function InventoryPanel({
                 />
                 <span>Equipped</span>
               </label>
-              {(newIsContainer || newIsArmor) && (
+              {(newIsContainer || newIsArmor || newIsWeapon) && (
                 <span className="text-base-content/40">
-                  Save first; tune capacity / DR / locations from the row's Edit menu.
+                  Save first; tune capacity / DR / locations / weapon stats from the row's Edit
+                  menu.
                 </span>
               )}
             </div>

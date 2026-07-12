@@ -6,11 +6,10 @@ export interface RollHistoryStripProps {
   characterId: string;
 }
 
-/** Collapsible strip of this session's rolls for one character, newest first. */
+/** Collapsible strip of this character's recent rolls, newest first. */
 export function RollHistoryStrip({ characterId }: RollHistoryStripProps) {
   const [open, setOpen] = useState(true);
-  const all = useRollHistory();
-  const rolls = all.filter((r) => r.characterId === characterId);
+  const rolls = useRollHistory(characterId);
 
   return (
     <section className="card space-y-2 p-5">
@@ -27,7 +26,7 @@ export function RollHistoryStrip({ characterId }: RollHistoryStripProps) {
       </button>
       {open && (
         <>
-          <p className="text-[11px] text-base-content/50">Session only — cleared on reload.</p>
+          <p className="text-[11px] text-base-content/50">Last 100 rolls — saved on this device.</p>
           {rolls.length === 0 ? (
             <p className="text-xs text-base-content/60">No rolls yet this session.</p>
           ) : (
