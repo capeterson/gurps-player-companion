@@ -39,7 +39,7 @@ import {
   coalesceKey,
   getLocalDb,
 } from '../db/dexie.ts';
-import { api } from '../lib/api.ts';
+import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
 import { characterIdsToMinimize } from './minimalViewSweep.ts';
@@ -52,6 +52,7 @@ import {
   setOutboxStatus,
 } from './outbox.ts';
 import { syncStateStore } from './state.ts';
+import { appendSyncLog } from './syncLog.ts';
 
 const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character',
@@ -313,7 +314,7 @@ class SyncOrchestrator {
    * connection self-heals instead of leaving the gate spinning until
    * a manual reload.
    */
-  async bootstrap(userId: string, forceCursorPull = false): Promise<void> {
+  async bootstrap(userId: string, forceCursorPull = false): Promise<boolean> {
     // Captured for `enforceMinimalViewLocally` — the periodic
     // cursor-pull doesn't otherwise know who's logged in.
     this.currentUserId = userId;
@@ -340,10 +341,11 @@ class SyncOrchestrator {
     } finally {
       if (!completed) this.scheduleBootstrapRetry(userId);
     }
-    if (!completed) return;
+    if (!completed) return false;
     // Re-emit any persistent rejection toasts that survived the
     // reload so the user doesn't lose an open error.
     await this.replayRejectionToasts();
+    return true;
   }
 
   /**
@@ -376,6 +378,9 @@ class SyncOrchestrator {
     if (!tokenStore.read()) {
       throw new Error('Cannot resync without an authenticated session');
     }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw new Error('Cannot resync while offline');
+    }
 
     const wasStarted = this.started;
     this.recoveryInProgress = true;
@@ -387,7 +392,8 @@ class SyncOrchestrator {
         await this.clearAllLocalStores();
         syncStateStore.reset('syncing');
         this.currentUserId = userId;
-        await this.bootstrap(userId, true);
+        const completed = await this.bootstrap(userId, true);
+        if (!completed) throw new Error('Fresh server data could not be downloaded');
       });
     } finally {
       this.recoveryInProgress = false;
@@ -397,6 +403,71 @@ class SyncOrchestrator {
         this.wake();
       }
     }
+  }
+
+  /** Explicitly discard one repeatedly failing optimistic operation. */
+  async revertFailedOperation(
+    clientOpId: string,
+  ): Promise<OutboxEntry & { preservedNewerEdit?: boolean }> {
+    let reverted: (OutboxEntry & { preservedNewerEdit?: boolean }) | undefined;
+    await runWithLock(DRAIN_LOCK, async () => {
+      const db = getLocalDb();
+      const op = await db.outbox.get(clientOpId);
+      if (!op) throw new Error('This change is no longer pending');
+      if ((op.status !== 'transient_retry' && op.status !== 'pending') || op.attemptCount < 4) {
+        throw new Error('This change is not eligible to be reverted');
+      }
+      let preservedNewerEdit = false;
+      if (op.command === 'patch' && op.fieldPath !== undefined) {
+        const superseding = await db.outbox
+          .where('coalesceKey')
+          .equals(op.coalesceKey)
+          .filter(
+            (candidate) =>
+              candidate.clientOpId !== op.clientOpId &&
+              (candidate.status === 'pending' ||
+                candidate.status === 'in_flight' ||
+                candidate.status === 'transient_retry'),
+          )
+          .toArray();
+        const latest = superseding.sort((a, b) => b.enqueuedAt.localeCompare(a.enqueuedAt))[0];
+        if (latest) {
+          preservedNewerEdit = true;
+          await this.revertField(op.entityClass, op.entityId, op.fieldPath, latest.attemptedValue);
+          await db.outbox.update(latest.clientOpId, {
+            prevValue: op.prevValue,
+            baseRevision: op.baseRevision,
+          });
+        } else {
+          await this.revertField(op.entityClass, op.entityId, op.fieldPath, op.prevValue);
+        }
+      } else if (op.command === 'create') {
+        await this.discardSpeculativeCreate(op);
+      } else if (op.command === 'delete') {
+        await this.reinsertLocal(op.entityClass, op.prevValue);
+      }
+      await db.outbox.delete(op.clientOpId);
+      await appendSyncLog({
+        direction: 'local',
+        result: 'reverted',
+        entityClass: op.entityClass,
+        entityId: op.entityId,
+        command: op.command,
+        fieldPath: op.fieldPath,
+        humanName: op.humanName,
+      });
+      if (op.fieldPath) {
+        flashBus.emit({
+          key: op.flashKey ?? makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
+          reason: 'Local change reverted by user',
+        });
+      }
+      reverted = preservedNewerEdit ? { ...op, preservedNewerEdit } : op;
+    });
+    if (!reverted) throw new Error('Could not revert this change');
+    this.wake();
+    this.refreshIndicator(await countPending());
+    return reverted;
   }
 
   /** Wipe Dexie and reset state -- called on logout. */
@@ -522,6 +593,7 @@ class SyncOrchestrator {
             attemptCount: next,
             nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
             serverReason: err instanceof Error ? err.message : 'network error',
+            lastError: errorDetails(err),
           });
         }
         syncStateStore.set('error');
@@ -548,11 +620,12 @@ class SyncOrchestrator {
       if (!outcome) {
         // Server didn't return an outcome for this op.  Treat as
         // transient -- the ack got lost; we'll retry the same op.
-        const next = op.attemptCount;
+        const next = op.attemptCount + 1;
         await setOutboxStatus(op.clientOpId, 'transient_retry', {
           attemptCount: next,
           nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
           serverReason: 'no outcome returned',
+          lastError: { reason: 'no outcome returned', response: outcomes },
         });
         continue;
       }
@@ -563,6 +636,16 @@ class SyncOrchestrator {
           if (typeof outcome.newRevision === 'number') {
             await this.stampRevision(op.entityClass, op.entityId, outcome.newRevision);
           }
+          await appendSyncLog({
+            direction: 'push',
+            result: 'synced',
+            entityClass: op.entityClass,
+            entityId: op.entityId,
+            command: op.command,
+            fieldPath: op.fieldPath,
+            humanName: op.humanName,
+            details: outcome,
+          });
           await db.outbox.delete(op.clientOpId);
           break;
         }
@@ -653,10 +736,12 @@ class SyncOrchestrator {
           // with no reconciliation path; retrying self-heals as soon
           // as the server recovers.  The indicator honestly shows
           // 'syncing' the whole time because the op stays counted.
+          const next = op.attemptCount + 1;
           await setOutboxStatus(op.clientOpId, 'transient_retry', {
-            attemptCount: op.attemptCount,
-            nextEarliestAttemptAt: new Date(Date.now() + backoffMs(op.attemptCount)).toISOString(),
+            attemptCount: next,
+            nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
             serverReason: outcome.reason,
+            lastError: outcome,
           });
           break;
         }
@@ -799,6 +884,16 @@ class SyncOrchestrator {
       }
       await this.persistCursors(res.nextCursor);
     });
+    for (const change of res.changes) {
+      await appendSyncLog({
+        direction: 'pull',
+        result: 'synced',
+        entityClass: change.entityClass,
+        entityId: change.entityId,
+        command: change.command,
+        details: { revision: change.revision },
+      });
+    }
   }
 
   private async persistCursors(
@@ -911,6 +1006,71 @@ class SyncOrchestrator {
       default:
         return;
     }
+  }
+
+  private async discardSpeculativeCreate(op: OutboxEntry): Promise<void> {
+    const db = getLocalDb();
+    const relatedEntityIds = new Set([op.entityId]);
+    if (op.entityClass === 'character_inventory') {
+      let parents = [op.entityId];
+      while (parents.length > 0) {
+        const children = await db.characterInventory.where('parentId').anyOf(parents).toArray();
+        parents = children.map((child) => child.id).filter((id) => !relatedEntityIds.has(id));
+        for (const id of parents) relatedEntityIds.add(id);
+      }
+    }
+    const candidateOps = await db.outbox
+      .filter(
+        (candidate) =>
+          relatedEntityIds.has(candidate.entityId) ||
+          (op.entityClass === 'character' && candidate.parentId === op.entityId),
+      )
+      .toArray();
+
+    let speculativeInventoryIds: Set<string> | undefined;
+    if (op.entityClass === 'character') {
+      await db.characterTraits.where('characterId').equals(op.entityId).delete();
+      await db.characterSkills.where('characterId').equals(op.entityId).delete();
+      await db.characterSpells.where('characterId').equals(op.entityId).delete();
+      await db.characterInventory.where('characterId').equals(op.entityId).delete();
+      await db.characterCombat.delete(op.entityId);
+    } else if (op.entityClass === 'character_inventory') {
+      speculativeInventoryIds = new Set(
+        candidateOps
+          .filter((candidate) => candidate.command === 'create')
+          .map((candidate) => candidate.entityId),
+      );
+      speculativeInventoryIds.add(op.entityId);
+
+      for (const candidate of candidateOps) {
+        if (
+          !speculativeInventoryIds.has(candidate.entityId) &&
+          candidate.command === 'patch' &&
+          candidate.fieldPath === 'parentId'
+        ) {
+          await this.revertField(
+            candidate.entityClass,
+            candidate.entityId,
+            candidate.fieldPath,
+            candidate.prevValue,
+          );
+        }
+      }
+      await db.characterInventory.bulkDelete([...speculativeInventoryIds]);
+    } else {
+      await this.deleteLocal(op.entityClass, op.entityId);
+    }
+    if (op.entityClass === 'character') await this.deleteLocal(op.entityClass, op.entityId);
+    const discardedOpIds = candidateOps
+      .filter(
+        (candidate) =>
+          op.entityClass !== 'character_inventory' ||
+          speculativeInventoryIds?.has(candidate.entityId) ||
+          candidate.fieldPath === 'parentId' ||
+          candidate.entityId === op.entityId,
+      )
+      .map((candidate) => candidate.clientOpId);
+    await db.outbox.bulkDelete(discardedOpIds);
   }
 
   private async reinsertLocal(entityClass: EntityClass, prevValue: unknown): Promise<void> {
@@ -1251,6 +1411,14 @@ function toEnvelope(op: OutboxEntry): OperationEnvelope {
     batchId: op.batchId,
     createdAt: op.enqueuedAt,
   };
+}
+
+function errorDetails(err: unknown): unknown {
+  if (err instanceof ApiError) {
+    return { name: err.name, message: err.message, status: err.status, body: err.body };
+  }
+  if (err instanceof Error) return { name: err.name, message: err.message, stack: err.stack };
+  return err;
 }
 
 /**

@@ -220,8 +220,11 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   local-first outbox. REST and sync use the same central write decision.
 
 ### Cross-cutting UI
-- **Sync status indicator** (header): honest pending/syncing/offline/error
-  state.
+- **Sync status indicator and log** (header): honest pending/syncing/offline/error
+  state. Clicking it opens the local sync log, with current unsynced changes,
+  the latest 1,000 pushed/pulled changes and timestamps, repeatedly failing
+  changes with diagnostics and an explicit revert action, plus a confirmed
+  emergency action to abandon local changes and pull a fresh server copy.
 - **Notifications bell**: invitations and other events.
 - **Themeable** (light/dark; "Arcane" DaisyUI theme), installable PWA, works
   offline for the character surface.
@@ -280,7 +283,7 @@ src/
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...
-    components/  Shared UI (sync indicator, notifications bell, ui/*)
+    components/  Shared UI (sync indicator/log, notifications bell, ui/*)
     admin/       Separate admin SPA entry
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol)
