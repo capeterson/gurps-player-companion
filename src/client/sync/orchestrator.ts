@@ -39,7 +39,7 @@ import {
   coalesceKey,
   getLocalDb,
 } from '../db/dexie.ts';
-import { api } from '../lib/api.ts';
+import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
 import { characterIdsToMinimize } from './minimalViewSweep.ts';
@@ -52,6 +52,7 @@ import {
   setOutboxStatus,
 } from './outbox.ts';
 import { syncStateStore } from './state.ts';
+import { appendSyncLog } from './syncLog.ts';
 
 const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character',
@@ -387,6 +388,49 @@ class SyncOrchestrator {
     }
   }
 
+  /** Explicitly discard one repeatedly failing optimistic operation. */
+  async revertFailedOperation(clientOpId: string): Promise<OutboxEntry> {
+    let reverted: OutboxEntry | undefined;
+    await runWithLock(DRAIN_LOCK, async () => {
+      const db = getLocalDb();
+      const op = await db.outbox.get(clientOpId);
+      if (!op) throw new Error('This change is no longer pending');
+      if ((op.status !== 'transient_retry' && op.status !== 'pending') || op.attemptCount < 4) {
+        throw new Error('This change is not eligible to be reverted');
+      }
+      if (op.command === 'patch' && op.fieldPath !== undefined) {
+        await this.revertField(op.entityClass, op.entityId, op.fieldPath, op.prevValue);
+      } else if (op.command === 'create') {
+        await this.deleteLocal(op.entityClass, op.entityId);
+      } else if (op.command === 'delete') {
+        await this.reinsertLocal(op.entityClass, op.prevValue);
+      }
+      await db.outbox.delete(op.clientOpId);
+      await appendSyncLog({
+        direction: 'local',
+        result: 'reverted',
+        entityClass: op.entityClass,
+        entityId: op.entityId,
+        command: op.command,
+        fieldPath: op.fieldPath,
+        humanName: op.humanName,
+        value: op.prevValue,
+        details: { discardedValue: op.attemptedValue, lastError: op.lastError },
+      });
+      if (op.fieldPath) {
+        flashBus.emit({
+          key: op.flashKey ?? makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
+          reason: 'Local change reverted by user',
+        });
+      }
+      reverted = op;
+    });
+    if (!reverted) throw new Error('Could not revert this change');
+    this.wake();
+    this.refreshIndicator(await countPending());
+    return reverted;
+  }
+
   /** Wipe Dexie and reset state -- called on logout. */
   async purge(): Promise<void> {
     this.currentUserId = null;
@@ -510,6 +554,7 @@ class SyncOrchestrator {
             attemptCount: next,
             nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
             serverReason: err instanceof Error ? err.message : 'network error',
+            lastError: errorDetails(err),
           });
         }
         syncStateStore.set('error');
@@ -536,11 +581,12 @@ class SyncOrchestrator {
       if (!outcome) {
         // Server didn't return an outcome for this op.  Treat as
         // transient -- the ack got lost; we'll retry the same op.
-        const next = op.attemptCount;
+        const next = op.attemptCount + 1;
         await setOutboxStatus(op.clientOpId, 'transient_retry', {
           attemptCount: next,
           nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
           serverReason: 'no outcome returned',
+          lastError: { reason: 'no outcome returned', response: outcomes },
         });
         continue;
       }
@@ -551,6 +597,17 @@ class SyncOrchestrator {
           if (typeof outcome.newRevision === 'number') {
             await this.stampRevision(op.entityClass, op.entityId, outcome.newRevision);
           }
+          await appendSyncLog({
+            direction: 'push',
+            result: 'synced',
+            entityClass: op.entityClass,
+            entityId: op.entityId,
+            command: op.command,
+            fieldPath: op.fieldPath,
+            humanName: op.humanName,
+            value: op.attemptedValue,
+            details: outcome,
+          });
           await db.outbox.delete(op.clientOpId);
           break;
         }
@@ -641,10 +698,12 @@ class SyncOrchestrator {
           // with no reconciliation path; retrying self-heals as soon
           // as the server recovers.  The indicator honestly shows
           // 'syncing' the whole time because the op stays counted.
+          const next = op.attemptCount + 1;
           await setOutboxStatus(op.clientOpId, 'transient_retry', {
-            attemptCount: op.attemptCount,
-            nextEarliestAttemptAt: new Date(Date.now() + backoffMs(op.attemptCount)).toISOString(),
+            attemptCount: next,
+            nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
             serverReason: outcome.reason,
+            lastError: outcome,
           });
           break;
         }
@@ -787,6 +846,17 @@ class SyncOrchestrator {
       }
       await this.persistCursors(res.nextCursor);
     });
+    for (const change of res.changes) {
+      await appendSyncLog({
+        direction: 'pull',
+        result: 'synced',
+        entityClass: change.entityClass,
+        entityId: change.entityId,
+        command: change.command,
+        value: change.data,
+        details: { revision: change.revision },
+      });
+    }
   }
 
   private async persistCursors(
@@ -1184,6 +1254,14 @@ function toEnvelope(op: OutboxEntry): OperationEnvelope {
     batchId: op.batchId,
     createdAt: op.enqueuedAt,
   };
+}
+
+function errorDetails(err: unknown): unknown {
+  if (err instanceof ApiError) {
+    return { name: err.name, message: err.message, status: err.status, body: err.body };
+  }
+  if (err instanceof Error) return { name: err.name, message: err.message, stack: err.stack };
+  return err;
 }
 
 /**

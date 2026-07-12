@@ -16,20 +16,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { formatBytes, readLocalDbStatus } from '../lib/localDbStatus.ts';
-import { useToasts } from '../lib/toast.tsx';
-import { readUserIdFromToken } from '../lib/tokenStore.ts';
-import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { useSyncIndicatorState } from '../sync/useSyncIndicatorState.ts';
-import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
+import { SyncLogView } from './SyncLogView.tsx';
 
 export function SyncStatusIndicator() {
   const state = useSyncIndicatorState();
   const meta = STATE_META[state];
-  const toasts = useToasts();
-
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [resetting, setResetting] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
   useEffect(() => {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
@@ -67,89 +61,24 @@ export function SyncStatusIndicator() {
   const tip = storageMsg ? `${statusMsg}  ·  ${storageMsg}` : statusMsg;
 
   const badge = (
-    <output
-      className={`badge ${meta.badgeClass} badge-sm`}
-      aria-live="polite"
-      aria-label={online ? meta.ariaLabel : `${meta.ariaLabel} (offline)`}
-    >
+    <span className={`badge ${meta.badgeClass} badge-sm`} aria-hidden="true">
       {meta.icon}
-    </output>
+    </span>
   );
-
-  if (state !== 'error') {
-    return (
-      <span className="tooltip tooltip-bottom" data-tip={tip}>
-        {badge}
-      </span>
-    );
-  }
-
-  const handleConfirmReset = async () => {
-    const userId = readUserIdFromToken();
-    if (!userId) {
-      toasts.push("Couldn't resync — no authenticated user was found", { kind: 'error' });
-      setConfirmOpen(false);
-      return;
-    }
-    setResetting(true);
-    try {
-      await getSyncOrchestrator().clearLocalAndFullResync(userId);
-      toasts.push('Local data cleared and resynced', { kind: 'success' });
-      setConfirmOpen(false);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'resync failed';
-      toasts.push(`Couldn't resync — ${message}`, { kind: 'error' });
-    } finally {
-      setResetting(false);
-    }
-  };
 
   return (
     <>
-      <div className="dropdown dropdown-end">
+      <span className="tooltip tooltip-bottom" data-tip={tip}>
         <button
           type="button"
           className="btn btn-ghost btn-xs min-h-0 px-1"
           aria-label={online ? meta.ariaLabel : `${meta.ariaLabel} (offline)`}
+          onClick={() => setLogOpen(true)}
         >
           {badge}
         </button>
-        <div
-          role="tooltip"
-          className="dropdown-content z-40 mt-2 w-72 rounded-box border border-base-300 bg-base-100 p-3 text-sm shadow-lg"
-        >
-          <p className="font-medium">Some changes couldn't sync.</p>
-          <p className="mt-1 text-base-content/70">
-            If sync is unrecoverably stuck, you can discard local pending edits and pull a fresh
-            copy from the server.
-          </p>
-          {storageMsg && <p className="mt-2 text-xs text-base-content/60">{storageMsg}</p>}
-          <button
-            type="button"
-            className="btn btn-warning btn-sm mt-3 w-full"
-            disabled={resetting}
-            onClick={() => setConfirmOpen(true)}
-          >
-            {resetting ? 'Resyncing…' : 'Clear local data and resync'}
-          </button>
-        </div>
-      </div>
-      <ConfirmDialog
-        open={confirmOpen}
-        title="Clear local data and resync?"
-        confirmLabel={resetting ? 'Resyncing…' : 'Clear and resync'}
-        cancelLabel="Keep local data"
-        tone="error"
-        onConfirm={() => {
-          if (!resetting) void handleConfirmReset();
-        }}
-        onCancel={() => {
-          if (!resetting) setConfirmOpen(false);
-        }}
-      >
-        This will discard any pending offline edits stored on this device, clear local sync data,
-        and download a fresh copy from the server.
-      </ConfirmDialog>
+      </span>
+      <SyncLogView open={logOpen} onClose={() => setLogOpen(false)} storageMessage={storageMsg} />
     </>
   );
 }

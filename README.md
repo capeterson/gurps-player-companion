@@ -54,9 +54,9 @@ This starts three services:
 | `migrate`| —    | One-shot: `bun install` + `bun run db:migrate`, then exits. |
 | `app`    | 3000 | Vite dev server (with HMR) hosting the Hono API via `@hono/vite-dev-server`. Single port, single process. |
 
-Open **<http://localhost:3000>** for the UI; the API is on the same
+Open **<http://localhost:3001>** for the UI; the API is on the same
 origin at `/api/v1/...` (e.g.
-[`/api/v1/healthz`](http://localhost:3000/api/v1/healthz)).
+[`/api/v1/healthz`](http://localhost:3001/api/v1/healthz)).
 
 The `migrate` service populates a shared `bun_modules` volume on first
 boot — subsequent `up` runs reuse it and skip the install.
@@ -114,10 +114,10 @@ applies migrations baked into the image, and `app`. The `app` service
 will not start until `migrate` exits 0. The Bun runtime serves the
 built React client and the API on the same port.
 
-Open <http://localhost:3000>. Verify health:
+Open <http://localhost:3001>. Verify health:
 
 ```sh
-curl -fsS http://localhost:3000/api/v1/healthz
+curl -fsS http://localhost:3001/api/v1/healthz
 # => {"ok":true}
 ```
 

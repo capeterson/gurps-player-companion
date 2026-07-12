@@ -110,9 +110,13 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
     expect(counts.syncMeta).toBe(1);
     expect(counts.tombstones).toBe(0);
     expect(counts.rejectionToasts).toBe(0);
+    expect(counts.syncLog).toBe(1);
     expect(await db.characters.get('char-fresh')).toMatchObject({ name: 'Fresh', revision: 1 });
     expect(await db.syncMeta.get('bootstrap:user-1')).toBeTruthy();
     expect(await db.syncCursors.get('character')).toMatchObject({ revision: 1 });
+    expect(await db.syncLog.toArray()).toEqual([
+      expect.objectContaining({ direction: 'pull', result: 'synced', entityId: 'char-fresh' }),
+    ]);
 
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body.cursors).toEqual(
@@ -125,5 +129,88 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
         expect.objectContaining({ entityClass: 'character_combat', sinceRevision: 0 }),
       ]),
     );
+  });
+});
+
+describe('SyncOrchestrator.revertFailedOperation', () => {
+  it('restores a failed patch and records the explicit local revert', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      id: 'char-1',
+      ownerId: 'user-1',
+      name: 'Local',
+      revision: 1,
+    } as never);
+    await db.outbox.put({
+      clientOpId: 'op-revert',
+      entityClass: 'character',
+      entityId: 'char-1',
+      command: 'patch',
+      coalesceKey: 'char-1|name',
+      fieldPath: 'name',
+      attemptedValue: 'Local',
+      prevValue: 'Server',
+      validationVersion: 1,
+      status: 'transient_retry',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 4,
+      lastError: { status: 503 },
+    });
+
+    await getSyncOrchestrator().revertFailedOperation('op-revert');
+
+    expect(await db.characters.get('char-1')).toMatchObject({ name: 'Server' });
+    expect(await db.outbox.get('op-revert')).toBeUndefined();
+    expect(await db.syncLog.toArray()).toEqual([
+      expect.objectContaining({ direction: 'local', result: 'reverted', entityId: 'char-1' }),
+    ]);
+  });
+
+  it('removes a speculative create when it is reverted', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      id: 'char-new',
+      ownerId: 'user-1',
+      name: 'Local',
+      revision: -1,
+    } as never);
+    await db.outbox.put({
+      clientOpId: 'create-revert',
+      entityClass: 'character',
+      entityId: 'char-new',
+      command: 'create',
+      coalesceKey: 'char-new|',
+      attemptedValue: {},
+      validationVersion: 1,
+      status: 'transient_retry',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 4,
+    });
+
+    await getSyncOrchestrator().revertFailedOperation('create-revert');
+
+    expect(await db.characters.get('char-new')).toBeUndefined();
+  });
+
+  it('reinserts an optimistically deleted row when it is reverted', async () => {
+    const db = getLocalDb();
+    const previous = { id: 'char-old', ownerId: 'user-1', name: 'Restored', revision: 2 };
+    await db.outbox.put({
+      clientOpId: 'delete-revert',
+      entityClass: 'character',
+      entityId: 'char-old',
+      command: 'delete',
+      coalesceKey: 'char-old|',
+      attemptedValue: null,
+      prevValue: previous,
+      validationVersion: 1,
+      status: 'transient_retry',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 4,
+    });
+
+    await getSyncOrchestrator().revertFailedOperation('delete-revert');
+
+    expect(await db.characters.get('char-old')).toMatchObject({ name: 'Restored', revision: 2 });
   });
 });
