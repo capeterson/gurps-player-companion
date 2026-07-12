@@ -17,6 +17,7 @@ import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
 import { GmCampaignDashboardPage } from './features/campaigns/GmCampaignDashboardPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
 import { CharactersPage } from './features/characters/CharactersPage.tsx';
+import { AboutPage } from './features/about/AboutPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
 import { LibraryPage } from './features/library/LibraryPage.tsx';
 import { LogPage } from './features/log/LogPage.tsx';
@@ -74,6 +75,7 @@ const router = createBrowserRouter([
           { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
           { path: '/log', element: <LogPage /> },
           { path: '/library', element: <LibraryPage /> },
+          { path: '/about', element: <AboutPage /> },
           { path: '/settings', element: <SettingsPage /> },
         ],
       },
