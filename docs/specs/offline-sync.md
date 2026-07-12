@@ -35,7 +35,7 @@ works offline.**
 
 | Piece | File | Role |
 |---|---|---|
-| Local DB | `src/client/db/dexie.ts` | IndexedDB stores + the `outbox`, `syncCursors`, `syncMeta`, `tombstones`, `rejectionToasts`. The UI's source of truth. |
+| Local DB | `src/client/db/dexie.ts` | IndexedDB stores + the `outbox`, `syncCursors`, `syncMeta`, `tombstones`, `rejectionToasts`, and bounded `syncLog`. The UI's source of truth. |
 | Outbox helpers | `src/client/sync/outbox.ts` | `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` — write the local row and the queued op in **one Dexie transaction**. Coalescing lives here. |
 | Orchestrator | `src/client/sync/orchestrator.ts` | Long-lived singleton: drains the outbox, pulls the cursor, applies outcomes, bootstraps, emits sync state, handles online/offline + backoff + multi-tab locks. The only module that talks to `/sync/*`. |
 | Sync state | `src/client/sync/state.ts` | `SyncStateStore` the indicator subscribes to. |
@@ -43,6 +43,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -112,6 +113,31 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
 | network error | Whole batch reverts to `transient_retry`; loop retries. |
+
+## Local sync log and recovery
+
+The `syncLog` Dexie store is a device-local operational journal, separate from
+the server-side entity history. Successful outbox outcomes are recorded as
+`push`, cursor changes as `pull`, and explicit user rollbacks as `local`. It is
+pruned to the newest 1,000 records. Pull entries retain metadata and revision
+only, never cursor row payloads, so later access downgrades cannot leave private
+sheet data in the journal. Journal writes are best-effort: quota or IndexedDB
+failures never block outbox settlement. Pending state is never copied into the
+log; the sync view reads the authoritative outbox directly, including attempt
+count, backoff timing, and the raw operation outcome or HTTP/network error.
+
+After four consecutive attempts, a pending operation is promoted as a repeated
+failure. The user may explicitly revert it under the same cross-tab drain lock:
+patches restore `prevValue`, speculative creates are removed, and optimistic
+deletes are reinserted. Reverting a speculative character also removes its
+dependent child rows and operations. If a newer same-field edit supersedes the
+failed attempt, that newer value remains queued and visible while its rollback
+anchor is repaired to the last server value. The rollback produces a toast and
+field flash. Reverting a speculative inventory container recursively removes
+its locally-created descendants and their queued operations. The confirmed
+“Abandon local changes and re-sync from server” recovery is unavailable while
+offline; while online it wipes every local store, including this journal, and
+bootstraps again from revision zero.
 
 ## Invariants that make it correct
 
