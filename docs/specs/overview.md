@@ -198,7 +198,8 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   traits/skills/spells/inventory/combat, or history). Enforced on the server
   sync emission, the local Dexie purge, and the UI discovery surfaces: minimal
   characters are **excluded from `/characters`** and browsable only from the
-  campaign detail page. See campaign-content-sharing.md.
+  campaign detail page; full-share and editable-manager rows remain listed.
+  See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells, and
   items, editable by the owner and **importable/exportable as versioned YAML**
   for sharing between campaigns. The catalog editor lives at

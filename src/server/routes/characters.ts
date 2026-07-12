@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { desc, eq, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   type CharacterMinimalOut,
@@ -101,8 +101,17 @@ router.openapi(
               id: campaigns.id,
               ownerId: campaigns.ownerId,
               shareCharacterSheets: campaigns.shareCharacterSheets,
+              allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
+              viewerRole: campaignMemberships.role,
             })
             .from(campaigns)
+            .leftJoin(
+              campaignMemberships,
+              and(
+                eq(campaignMemberships.campaignId, campaigns.id),
+                eq(campaignMemberships.userId, user.id),
+              ),
+            )
             .where(inArray(campaigns.id, relevantCampaignIds));
     const accessModes = decideCharacterAccess({
       viewerId: user.id,

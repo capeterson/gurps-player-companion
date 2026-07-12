@@ -95,8 +95,8 @@ other players' sheets while still letting a campaign member browse the party
 roster from the campaign itself.
 
 The local-first character row stays in IndexedDB so the minimal-view detail
-page can render offline; the Characters page filters it out client-side by
-`ownerId === currentUserId` (see `useCharactersList`).
+page can render offline; the Characters page filters it with the same local
+access decision as the privacy sweep (see `useCharactersList`).
 
 ### Enforced in three places — keep them in lockstep
 
@@ -146,8 +146,11 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
    - deletes child rows (traits / skills / spells / inventory / combat), AND
    - **rewrites each minimal character's row down to identity-only fields**,
      blanking `st`/`dx`/`iq`/`ht`/`hpMod`/`willMod`/`perMod`/`fpMod`/
-     `speedQuarterMod`/`moveMod`/`tempEffects`/`dismissedWarnings` to safe
-     defaults. Without this rewrite the row keeps whatever real values were
+      `speedQuarterMod`/`moveMod`/`tempEffects`/`dismissedWarnings` to safe
+      defaults. Masked rows carry a local-only marker; when access returns to
+      `full`, the orchestrator resets the character-family cursors and pulls
+      from revision zero once to restore the real parent and child rows.
+      Without this rewrite the row keeps whatever real values were
      synced before access was downgraded, and `useCharacterDetail`/`buildCharacterDetail`
      would keep deriving real HP/FP/derived from those stale cached fields
      even when the UI falls through to the full sheet (e.g. while the local
@@ -155,11 +158,11 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
      the campaign row at all).
 
 3. **Client — what the UI surfaces.**
-   - The `/characters` page reads Dexie but filters rows by
-     `ownerId === currentUserId`, so campaign-shared minimal characters
-     never appear in the "your characters" list. (The local-first row stays
-     in Dexie so `CharacterMinimalView` can render the share-gated detail
-     page offline.)
+    - The `/characters` page reads Dexie and applies
+      `characterIdsToMinimize`, so minimal characters stay hidden while
+      full-share and editable manager rows remain listed. (The local-first row
+      stays in Dexie so `CharacterMinimalView` can render the share-gated
+      detail page offline.)
    - The `/campaigns/:id` page renders a "Characters" section that reads
      Dexie rows where `campaignId === campaignId` and deep-links each row
      to `/characters/:id`, which renders `CharacterMinimalView` for
@@ -172,9 +175,10 @@ rewrite (local purge), and the list-filter / campaign-browse UI (discovery).
 History-detail redaction follows the same gate — `minimal` viewers get no
 character-history detail (see history-tracking.md Risks).
 
-The authenticated `/campaigns` response is mirrored into Dexie with the current
-viewer's role. This lets `useCharacterAccessLocal` and the minimal-view sweep
-make the same manager-editing decision while offline. Missing legacy
+Both `/sync/cursor` campaign rows and the authenticated `/campaigns` response
+are mirrored into Dexie with the current viewer's role. This lets
+`useCharacterAccessLocal` and the minimal-view sweep make the same
+manager-editing decision during bootstrap and while offline. Missing legacy
 `allowGmCharacterEditing` values default to `false`.
 
 ## GM campaign dashboard

@@ -218,4 +218,66 @@ describe('enforceMinimalViewLocally — character row rewrite', () => {
     expect(row?.tempEffects).toEqual([{ id: 'e1', name: 'Might', mods: { st: 4 } }]);
     expect(await db.characterTraits.where('characterId').equals(CHAR_ID).count()).toBe(1);
   });
+
+  it('rehydrates a previously masked row when access returns to full', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      ...realCharacterRow(),
+      st: 10,
+      tempEffects: [],
+      minimalViewMasked: true,
+    } as never);
+    await db.campaigns.put({ ...shareOffCampaignRow(), shareCharacterSheets: true } as never);
+    await db.syncCursors.bulkPut([
+      { entityClass: 'character', revision: 99 },
+      { entityClass: 'character_trait', revision: 99 },
+    ]);
+
+    loginAs(VIEWER_ID);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        cursorResponse([], { characterIds: [CHAR_ID], campaignIds: [CAMPAIGN_ID] }),
+      )
+      .mockResolvedValueOnce(
+        cursorResponse(
+          [
+            {
+              entityClass: 'character',
+              entityId: CHAR_ID,
+              command: 'upsert',
+              revision: 5,
+              data: realCharacterRow(),
+            },
+            {
+              entityClass: 'character_trait',
+              entityId: 't-1',
+              command: 'upsert',
+              revision: 1,
+              data: { id: 't-1', characterId: CHAR_ID, name: 'Recovered', revision: 1 },
+            },
+          ],
+          { characterIds: [CHAR_ID], campaignIds: [CAMPAIGN_ID] },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getSyncOrchestrator().bootstrap(VIEWER_ID);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+      cursors: Array<{ entityClass: string; sinceRevision: number }>;
+    };
+    expect(
+      secondRequest.cursors
+        .filter(({ entityClass }) => entityClass.startsWith('character'))
+        .every(({ sinceRevision }) => sinceRevision === 0),
+    ).toBe(true);
+    expect(await db.characters.get(CHAR_ID)).toMatchObject({
+      st: 17,
+      tempEffects: [{ id: 'e1', name: 'Might', mods: { st: 4 } }],
+      minimalViewMasked: false,
+    });
+    expect(await db.characterTraits.get('t-1')).toMatchObject({ name: 'Recovered' });
+  });
 });

@@ -502,8 +502,15 @@ async function fetchClassUpserts(args: {
       // REST routes; there is no /sync/operations dispatcher for them.
       if (accessibleCampaignIds.length === 0) return [];
       const rows = await db
-        .select()
+        .select({ campaign: campaigns, viewerRole: campaignMemberships.role })
         .from(campaigns)
+        .leftJoin(
+          campaignMemberships,
+          and(
+            eq(campaignMemberships.campaignId, campaigns.id),
+            eq(campaignMemberships.userId, userId),
+          ),
+        )
         .where(
           and(
             gt(campaigns.revision, sinceRevision),
@@ -512,7 +519,12 @@ async function fetchClassUpserts(args: {
         )
         .orderBy(asc(campaigns.revision))
         .limit(limit);
-      return rows.map((row) => upsertChange('campaign', row.id, Number(row.revision), row));
+      return rows.map(({ campaign, viewerRole }) =>
+        upsertChange('campaign', campaign.id, Number(campaign.revision), {
+          ...campaign,
+          viewerRole: campaign.ownerId === userId ? 'owner' : viewerRole,
+        }),
+      );
     }
     default:
       // Other entity classes (library, adventure log) are not synced

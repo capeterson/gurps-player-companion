@@ -67,6 +67,8 @@ export interface LocalCharacter {
   createdAt: string;
   updatedAt: string;
   revision: number;
+  /** Local-only marker used to rehydrate a row when minimal access returns to full. */
+  minimalViewMasked?: boolean;
 }
 
 export interface LocalCharacterTrait {
