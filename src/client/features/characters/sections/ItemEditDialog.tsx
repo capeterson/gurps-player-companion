@@ -7,6 +7,7 @@ import type {
   MagicItemData,
   MagicItemMode,
   PowerstoneData,
+  WeaponData,
 } from '../../../../shared/schemas/inventory.ts';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
@@ -42,6 +43,16 @@ function defaultMagicItem(): MagicItemData {
     chargesMax: 10,
     chargesCurrent: 10,
     energyCost: null,
+    notes: null,
+  };
+}
+
+function defaultWeapon(): WeaponData {
+  return {
+    damage: '',
+    reach: null,
+    parry: null,
+    stRequired: null,
     notes: null,
   };
 }
@@ -88,6 +99,10 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
   const [miCurRaw, setMiCurRaw] = useState('10');
   const [miEnergyRaw, setMiEnergyRaw] = useState('');
 
+  const [isWeapon, setIsWeapon] = useState(false);
+  const [weapon, setWeapon] = useState<WeaponData>(defaultWeapon());
+  const [stRequiredRaw, setStRequiredRaw] = useState('');
+
   useEffect(() => {
     if (!item) return;
     setName(item.name);
@@ -119,6 +134,10 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
     setMiMaxRaw(String(mi?.chargesMax ?? 10));
     setMiCurRaw(String(mi?.chargesCurrent ?? 10));
     setMiEnergyRaw(mi?.energyCost == null ? '' : String(mi.energyCost));
+    const wd = item.weaponData;
+    setIsWeapon(wd != null);
+    setWeapon(wd ?? defaultWeapon());
+    setStRequiredRaw(wd?.stRequired == null ? '' : String(wd.stRequired));
   }, [item]);
 
   if (!item) return null;
@@ -193,6 +212,18 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
         ...(magicItem.notes != null && magicItem.notes !== '' ? { notes: magicItem.notes } : {}),
       };
     }
+    let weaponPatch: WeaponData | null = null;
+    if (isWeapon) {
+      const stNum =
+        stRequiredRaw === '' ? null : Math.max(0, Math.floor(Number(stRequiredRaw)) || 0);
+      weaponPatch = {
+        damage: weapon.damage?.trim() || undefined,
+        reach: weapon.reach?.trim() || null,
+        parry: weapon.parry?.trim() || null,
+        stRequired: stNum,
+        notes: weapon.notes?.trim() || null,
+      };
+    }
     const patch: InventoryItemUpdate = {
       name: name.trim(),
       quantity: parsedQty,
@@ -208,6 +239,7 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
       weightReductionPercent: isContainer ? reduction : 0,
       isArmor,
       armor: isArmor ? armor : null,
+      weaponData: weaponPatch,
       powerstoneData: powerstonePatch,
       magicItemData: magicItemPatch,
     };
@@ -489,6 +521,85 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
                     onChange={(e) =>
                       setArmor((a) => ({
                         ...a,
+                        notes: e.target.value === '' ? null : e.target.value,
+                      }))
+                    }
+                    className="input input-sm input-bordered"
+                  />
+                </label>
+              </div>
+            )}
+          </fieldset>
+
+          <fieldset className="border border-base-300/60 rounded-xl p-3">
+            <legend className="px-2 label-eyebrow">Weapon</legend>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={isWeapon}
+                onChange={(e) => setIsWeapon(e.target.checked)}
+              />
+              <span>This item is a weapon</span>
+            </label>
+            {isWeapon && (
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <label className="sm:col-span-2 flex flex-col gap-1">
+                    <span className="label-eyebrow">Damage</span>
+                    <input
+                      value={weapon.damage ?? ''}
+                      onChange={(e) => setWeapon((w) => ({ ...w, damage: e.target.value }))}
+                      className="input input-sm input-bordered"
+                      placeholder="sw+1 cut / thr+1 cr"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Reach</span>
+                    <input
+                      value={weapon.reach ?? ''}
+                      onChange={(e) =>
+                        setWeapon((w) => ({
+                          ...w,
+                          reach: e.target.value === '' ? null : e.target.value,
+                        }))
+                      }
+                      className="input input-sm input-bordered"
+                      placeholder="1"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Parry</span>
+                    <input
+                      value={weapon.parry ?? ''}
+                      onChange={(e) =>
+                        setWeapon((w) => ({
+                          ...w,
+                          parry: e.target.value === '' ? null : e.target.value,
+                        }))
+                      }
+                      className="input input-sm input-bordered"
+                      placeholder="0"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">ST required</span>
+                    <input
+                      value={stRequiredRaw}
+                      inputMode="numeric"
+                      onChange={(e) => setStRequiredRaw(e.target.value)}
+                      className="num input input-sm input-bordered text-right"
+                      placeholder="—"
+                    />
+                  </label>
+                </div>
+                <label className="flex flex-col gap-1">
+                  <span className="label-eyebrow">Weapon notes</span>
+                  <input
+                    value={weapon.notes ?? ''}
+                    onChange={(e) =>
+                      setWeapon((w) => ({
+                        ...w,
                         notes: e.target.value === '' ? null : e.target.value,
                       }))
                     }

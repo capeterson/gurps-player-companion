@@ -103,15 +103,21 @@ on any sheet the viewer can edit — their own — it always shows).
   cast dialog suggests drawing from a single powerstone and warns when
   energy is allocated from more than one (B481).
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
-  encumbrance, armor and weapon data, cost/weight rollups. Encumbered
-  Move floors at 1 while the load is legal and reads 0 past the 10×BL
-  carry cap (B17).
+  encumbrance, armor and weapon data, cost/weight rollups. Equipped
+  armor DR is aggregated per hit location on the Combat tab's Armor DR
+  card. Weapon data (damage, reach, parry, ST required) is editable
+  from the item edit dialog — mirroring the armor/powerstone/magic-item
+  fieldset pattern — and copied from campaign library items on the
+  inventory add form. Encumbered Move floors at 1 while the load is
+  legal and reads 0 past the 10×BL carry cap (B17).
 - **Combat tab (live-gameplay surface)**. The first tab on the sheet
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
-  hop:
+  hop. Two-column "state vs. action" layout: the left column holds
+  Pools and Armor DR; the right column stacks Maneuver, Defenses (with
+  Move), and Attacks; the roll history strip spans full width below.
   - **Pools** — HP/FP with bumpers/reset, posture chips, and all 12
     common-condition chips (normalized against legacy Capitalized entries
     so old data still lights the right chip). Surfaces reeling
@@ -121,48 +127,47 @@ on any sheet the viewer can edit — their own — it always shows).
     the certain-death floor at −5×HP; FP floors at −FP, with further
     fatigue charged against HP one-for-one (B426). One shared
     `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
-    sticky mobile bottom bar so a fast tap on both surfaces never races;
+    sticky mobile bottom bar so a fast tap on both UIs never races;
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
     so two rapid condition taps before Dexie re-renders don't coalesce
     into one outbox patch and drop the first tap.
+  - **Armor DR** — aggregates equipped armor DR per hit location
+    (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
+    hit-location aim presets. Crushing-specific DR is shown where it
+    differs from the default.
   - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
     chip shows its blurb; tapping it again clears to no maneuver), plus
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
-  - **Defenses** — Dodge (with the encumbrance-penalty breakdown and no
-    invented minimum; situational active-defense bonuses remain
-    unmodeled), Parry per equipped weapon (computed from the matched
-    skill when one is found, else the raw library string), and Block
-    when a Shield skill is known. Every numeric defense opens the roll
-    sheet.
+  - **Defenses** — Move (read-only, net of encumbrance), Dodge (with
+    the encumbrance-penalty breakdown and no invented minimum;
+    situational active-defense bonuses remain unmodeled), Parry per
+    equipped weapon (computed from the matched skill when one is found,
+    else the raw library string), and Block when a Shield skill is
+    known. Every numeric defense opens the roll sheet.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
     thrust/swing + the weapon's modifiers), reach, an over-ST warning
     badge, and the best-matching skill as a rollable row with
     hit-location preset chips (aim penalties, B398-399). Vitals presets
     appear only for impaling and piercing attacks, and the eye preset
     only for impaling, piercing, and tight-beam burning attacks.
-  - **Skills / Spells** — every skill and spell with a non-null computed
-    level, each rollable; spells also get a "Cast" button that reuses
-    the `CastSpellDialog`. Casting is gated by the shared
-    `characterCanCast` helper (the one mana gate; don't fork it) — the
-    button is disabled with a compact notice when the campaign's mana
-    level hasn't synced yet or the ambient mana forbids casting here.
-    Rolling a spell row stays unrestricted (ephemeral, no cost).
   - **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
     stepper (−10..+10) plus single-select preset chips, a "Roll 3d6"
     button, and a result panel (dice, total, success/margin, crit
     badge) built on the shared `evaluateRoll`. Defense rows route
     through the same success-roll evaluator as skills — GURPS defenses
     actually use a different crit table, an accepted simplification for
-    this pass.
-  - **Roll history strip** — a collapsible, session-only log of this
-    character's rolls this visit (newest first, capped at 20 entries).
-    **Never persisted** — no Dexie table, no localStorage — so it carries
-    none of the sync/purge/history obligations a durable entity would
-    (deliberate: reloading the page clears it). The sheet's Skills and
-    Magic tabs share the same roll sheet (`.RollSheet` /
-    `RollableRow` live under `sections/`) so tapping a skill/spell level
-    in those tables opens the identical roller.
+    this pass. The sheet's Skills and Magic tabs share the same roll
+    sheet (`.RollSheet` / `RollableRow` live under `sections/`) so
+    tapping a skill/spell level in those tables opens the identical
+    roller.
+  - **Roll history strip** — a collapsible log of this character's
+    recent rolls (newest first, capped at 100 entries per character).
+    Persisted to `localStorage` (keyed `gurps:rollHistory:<characterId>`)
+    so the log survives page reloads, but **not sync'd to the server**
+    and carrying no sync/purge/history obligations. Cleared on logout
+    (`clearAllRollHistory`) so account switching on the same device
+    doesn't leak roll labels.
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
@@ -256,10 +261,11 @@ src/
                  Traits/Skills/Spells/Inventory: useAddEntityForm (the add
                  form), useEntityRowPatch (per-row field patch dispatch),
                  useClampedJsonbBumper (powerstone/magic-item charge
-                 steppers), useTempEffects (the temporary-effects list
-                 backing the Attributes panel's modifier popovers), shared
-                 RollSheet/RollableRow/rollHistory primitives, and combat/
-                 (CombatTab + Pools/Maneuver/Defenses/Attacks/Skills cards)
+                  steppers), useTempEffects (the temporary-effects list
+                  backing the Attributes panel's modifier popovers), shared
+                  RollSheet/RollableRow/rollHistory (per-character
+                  localStorage roll log) primitives, and combat/
+                  (CombatTab + Pools/Maneuver/Defenses/Attacks/DrSummary cards)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth)
@@ -273,12 +279,14 @@ src/
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text
-    domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
-                 traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
-                 success-roll evaluation), damageParse (weapon damage-string
-                 parsing/resolution), defenseCalc (Dodge/Parry/Block +
-                 weapon-to-skill matching), conditions (snake_case condition
-                 normalization, tolerant of legacy Capitalized entries))
+     domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
+                  traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
+                  success-roll evaluation), damageParse (weapon damage-string
+                  parsing/resolution), defenseCalc (Dodge/Parry/Block +
+                  weapon-to-skill matching), armorDr (equipped-armor DR
+                  aggregation per hit location), conditions (snake_case
+                  condition normalization, tolerant of legacy Capitalized
+                  entries))
     constants/   attributes, skills, traits, combat (postures, common
                  conditions, maneuvers), hitLocations (+ aim penalties), magic
     yaml/        library.ts — round-trippable campaign-library YAML codec

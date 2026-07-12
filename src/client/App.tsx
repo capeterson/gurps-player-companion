@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
+import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
 import { api } from './lib/api.ts';
 import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
 import type { ThemeName } from './lib/theme.ts';
@@ -82,6 +83,9 @@ export function App() {
     // the same device never leaks the previous user's rows into a
     // useLiveQuery render.
     await getSyncOrchestrator().purge();
+    // Clear the browser-local roll history too — roll labels are
+    // character/scene context the next user shouldn't see.
+    clearAllRollHistory();
     navigate('/login');
   }
 

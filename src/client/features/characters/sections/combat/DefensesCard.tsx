@@ -30,6 +30,19 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       ? `${character.derived.dodge} base − ${-character.encumbrance.dodgePenalty} ${character.encumbrance.label} encumbrance`
       : undefined;
 
+  const e = character.encumbrance;
+  const d = character.derived;
+  const overCarryCap = e.ratio > 10;
+  const moveFloor = d.basicMove > 0 ? 1 : 0;
+  const moveNet = overCarryCap
+    ? 0
+    : Math.max(moveFloor, Math.floor(d.basicMove * e.moveMultiplier));
+  const movePenalty = d.basicMove - moveNet;
+  const moveCaption =
+    character.encumbrance.moveMultiplier !== 1
+      ? `${d.basicMove} base − ${movePenalty} ${e.label} encumbrance`
+      : undefined;
+
   const skillCandidates = character.skills.map((s) => ({ name: s.name, level: s.level }));
 
   const equippedItems = character.inventory.filter((i) => i.equipped);
@@ -73,6 +86,17 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
           failure on 17-18, independent of score). We route them through
           the same evaluateRoll as skills anyway — an accepted
           simplification for this pass rather than a second rules table. */}
+
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-base-300/60 px-3 py-2">
+        <span className="min-w-0 truncate text-sm font-medium">Move</span>
+        <span className="num shrink-0 text-sm text-base-content">
+          {moveNet}
+          {moveCaption && (
+            <span className="block text-[11px] text-base-content/60">{moveCaption}</span>
+          )}
+        </span>
+      </div>
+
       <RollableRow
         label="Dodge"
         baseTarget={dodge}
