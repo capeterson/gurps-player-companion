@@ -180,6 +180,10 @@ interaction rules.
 
 ### Campaigns
 Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/gm`, `/campaigns/:id/library`.
+The campaign detail page (`/campaigns/:id`) hosts the browseable character
+roster for the campaign — every member character in the campaign is listed
+there, regardless of the share gate; rows a viewer only sees minimally deep-link
+to `/characters/:id`, which renders `CharacterMinimalView`.
 
 - Create/edit campaigns with **point target, disadvantage cap, quirk cap,
   mana level**, and the **share-character-sheets** toggle.
@@ -190,8 +194,11 @@ Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/gm`, `/campaigns/:id/libr
   accept/reject, notifications.
 - **Character-sheet sharing gate** (`shareCharacterSheets`): when off, only the
   owner (GM) and a character's own player see full sheets; other members get a
-  "minimal view" (public columns only). Enforced on both server and client —
-  see campaign-content-sharing.md.
+  "minimal view" (identity columns only — no stats, temp effects, HP/FP,
+  traits/skills/spells/inventory/combat, or history). Enforced on the server
+  sync emission, the local Dexie purge, and the UI discovery surfaces: minimal
+  characters are **excluded from `/characters`** and browsable only from the
+  campaign detail page. See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells, and
   items, editable by the owner and **importable/exportable as versioned YAML**
   for sharing between campaigns. The catalog editor lives at
@@ -369,10 +376,15 @@ Things that repeatedly surprise people working in this repo:
    can attribute the change. History capture sits *below* both via Postgres
    triggers.
 
-6. **The share gate is enforced twice.** `decideCharacterAccess` (server,
-   `sync.ts`) decides `full` vs `minimal`; `characterIdsToMinimize`
-   (`minimalViewSweep.ts`) purges already-cached private rows from Dexie when
-   access is downgraded. Changing one without the other reopens a data-leak
+6. **The share gate is enforced three ways.** `decideCharacterAccess`
+   (server, `sync.ts`) decides `full` vs `minimal` and the server
+   `projectCharacterRow` ships only identity fields for minimal rows;
+   `characterIdsToMinimize` + the orchestrator's character-row rewrite
+   (`minimalViewSweep.ts` + `orchestrator.ts`) purges already-cached private
+   child rows **and** rewrites cached character rows down to identity so
+   stale `st`/`hpMod`/`tempEffects` can't be recovered locally; and the
+   UI discovery surfaces filter minimal rows off `/characters` and onto the
+   campaign detail page. Changing one without the others reopens a leak
    hole.
 
 7. **Dev + tests run in Docker/Bun.** There is no host `bun` requirement. `bun

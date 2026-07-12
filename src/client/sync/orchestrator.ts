@@ -1042,11 +1042,27 @@ class SyncOrchestrator {
     });
     if (ids.size === 0) return;
     const idArray = [...ids];
-    // One transaction across the child tables so the purge is atomic —
-    // can't have skills present and traits gone halfway.
+    // One transaction across the character row + every child table so
+    // the purge is atomic — can't have skills present and the parent
+    // row still carrying its real stats halfway through.
+    //
+    // The character-row rewrite is the **client half** of the share
+    // gate (docs/specs/campaign-content-sharing.md). The server's
+    // `projectCharacterRow` ships identity-only fields for minimal
+    // rows, but `applyServerRow` is merge-into-existing — without this
+    // rewrite the local row retains whatever `st` / `hpMod` /
+    // `tempEffects` etc. were synced BEFORE the share flip (a share
+    // flip bumps the campaign row's revision, not the character row's,
+    // so the cursor doesn't repull the masked projection). The client
+    // would then derive real HP/FP/derived from those stale caches and
+    // — if the local campaign row hasn't resolved yet (or the viewer
+    // isn't a campaign member at all, e.g. a stale-IndexedDB account)
+    // — `useCharacterAccessLocal.isMinimal` returns false and the full
+    // sheet renders with the leaked real values.
     await db.transaction(
       'rw',
       [
+        db.characters,
         db.characterTraits,
         db.characterSkills,
         db.characterSpells,
@@ -1063,6 +1079,34 @@ class SyncOrchestrator {
         // isn't indexed on this store, and the resulting SchemaError
         // used to abort the sweep and wedge the pull in 'error'.)
         await db.characterCombat.bulkDelete(idArray);
+        // Rewrite each minimal character's row down to identity-only
+        // fields, mirroring `projectCharacterRow` on the server. The
+        // identity columns (id / ownerId / campaignId / name /
+        // playerName / height / weight / age / appearance / techLevel /
+        // timestamps / revision) are preserved; every private column
+        // is reset to its schema default so derived stats and the
+        // combat tab can't recover the masked character's real state.
+        const now = new Date().toISOString();
+        for (const id of idArray) {
+          const existing = await db.characters.get(id);
+          if (!existing) continue;
+          await db.characters.put({
+            ...existing,
+            st: 10,
+            dx: 10,
+            iq: 10,
+            ht: 10,
+            hpMod: 0,
+            willMod: 0,
+            perMod: 0,
+            fpMod: 0,
+            speedQuarterMod: 0,
+            moveMod: 0,
+            tempEffects: [],
+            dismissedWarnings: [],
+            updatedAt: now,
+          });
+        }
       },
     );
   }

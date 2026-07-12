@@ -161,7 +161,7 @@ describe('GET /api/v1/characters (list)', () => {
     expect(body.every((c) => c.id !== undefined)).toBe(true);
   });
 
-  it('masks ST/DX/IQ/HT to 10 for a fellow member when shareCharacterSheets=false, but not for the owner viewing their own row', async () => {
+  it('excludes minimal-view characters for a fellow member when shareCharacterSheets=false (browsable only from the campaign page)', async () => {
     const gm = await registerUser('list-mask-gm');
     const owner = await registerUser('list-mask-owner');
     const viewer = await registerUser('list-mask-viewer');
@@ -186,24 +186,22 @@ describe('GET /api/v1/characters (list)', () => {
     expect(ownerRow?.st).toBe(15);
     expect(ownerRow?.dx).toBe(14);
 
-    // GM sees real stats too.
+    // GM sees real stats too — owner/GM short-circuit the share gate.
     const gmListRes = await app.request('/api/v1/characters', { headers: bearer(gm.accessToken) });
     const gmList = (await gmListRes.json()) as Record<string, unknown>[];
     const gmRow = gmList.find((c) => c.id === character.id);
     expect(gmRow?.st).toBe(15);
 
-    // Fellow member sees the row (name, id, etc.) but stats masked to 10.
+    // Fellow member does NOT see the masked character on /characters at
+    // all — it's browsable from the campaign detail page instead (see
+    // docs/specs/campaign-content-sharing.md "Discovery: where minimal
+    // characters appear").
     const viewerListRes = await app.request('/api/v1/characters', {
       headers: bearer(viewer.accessToken),
     });
     const viewerList = (await viewerListRes.json()) as Record<string, unknown>[];
     const viewerRow = viewerList.find((c) => c.id === character.id);
-    expect(viewerRow).toBeDefined();
-    expect(viewerRow?.st).toBe(10);
-    expect(viewerRow?.dx).toBe(10);
-    expect(viewerRow?.iq).toBe(10);
-    expect(viewerRow?.ht).toBe(10);
-    expect(viewerRow?.name).toBe('Masked One');
+    expect(viewerRow).toBeUndefined();
   });
 
   it('does not mask when shareCharacterSheets=true', async () => {
@@ -319,7 +317,7 @@ describe('GET /api/v1/characters/{id} — access matrix', () => {
 });
 
 describe('POST /api/v1/sync/cursor — minimal-view masking includes tempEffects', () => {
-  it("a fellow member with only minimal access gets tempEffects: [] in the cursor row, never the owner's real effects", async () => {
+  it("a fellow member with only minimal access gets an identity-only cursor row, never the owner's real stats, mods, tempEffects, or dismissed warnings", async () => {
     const gm = await registerUser('cursor-mask-gm');
     const owner = await registerUser('cursor-mask-owner');
     const viewer = await registerUser('cursor-mask-viewer');
@@ -336,6 +334,7 @@ describe('POST /api/v1/sync/cursor — minimal-view masking includes tempEffects
       headers: jsonHeaders(owner.accessToken),
       body: JSON.stringify({
         tempEffects: [{ id: 'e1', name: 'Might', mods: { st: 4 } }],
+        dismissedWarnings: ['over-buffed'],
       }),
     });
 
@@ -350,8 +349,17 @@ describe('POST /api/v1/sync/cursor — minimal-view masking includes tempEffects
     };
     const change = body.changes.find((c) => c.entityId === character.id);
     expect(change).toBeDefined();
-    expect(change?.data?.tempEffects).toEqual([]);
+    // Identity columns ship verbatim.
+    expect(change?.data?.id).toBe(character.id);
+    expect(change?.data?.name).toBe('Secretly Buffed');
+    expect(change?.data?.campaignId).toBe(campaign.id);
+    // Private columns are masked to safe defaults — never the real values.
     expect(change?.data?.st).toBe(10);
+    expect(change?.data?.dx).toBe(10);
+    expect(change?.data?.iq).toBe(10);
+    expect(change?.data?.ht).toBe(10);
+    expect(change?.data?.tempEffects).toEqual([]);
+    expect(change?.data?.dismissedWarnings).toEqual([]);
   });
 
   it('the owner still sees their own real tempEffects through the same cursor pull', async () => {

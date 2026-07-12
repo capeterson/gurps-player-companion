@@ -587,20 +587,43 @@ function upsertChange(
 }
 
 /**
- * Project a character row down to the public "readily apparent" columns
- * for sync emission to a non-GM viewer of a campaign with
- * shareCharacterSheets=false. The viewer's IndexedDB will receive a row
- * with the right id / ownerId / campaignId / public identity bits, but
- * with private fields blanked to safe defaults so derived stats and
- * personal notes can't be reconstructed locally.
+ * Project a character row down to the **identity-only** payload for sync
+ * emission to a non-GM viewer of a campaign with
+ * shareCharacterSheets=false. The viewer's IndexedDB receives a row that
+ * carries id / ownerId / campaignId / public identity bits, plus the
+ * schema-default values for the columns the row still needs to satisfy
+ * `LocalCharacter`. Every private column is set to its safe default so:
  *
- * Owner+ownerId stays so the client-side gate (`shouldUseMinimalView`
- * mirror in CharacterSheetPage) recognises this as someone else's
- * character and renders the minimal view instead of the full sheet.
+ *   - `buildCharacterDetail` (used on the client) produces only the
+ *     10/10/10/10 baseline derived stats if any code path falls through
+ *     to it, never the real numbers that were cached before access was
+ *     downgraded;
+ *   - the orchestrator's `applyServerRow` overwrites the local Dexie row
+ *     with this masked payload, purging the stale `st=15 / hpMod=2 /
+ *     tempEffects=[real buffs]` that were synced while the viewer had
+ *     full access (the previous behaviour only blanked fields when the
+ *     cursor re-emitted the row, which it doesn't do on a share-flag
+ *     flip because the character row's own revision doesn't advance).
+ *
+ * This is the **server half** of the share gate. The client half
+ * (`enforceMinimalViewLocally`) mirrors it by rewriting the cached row
+ * down to the same identity-only set after every cursor pull; both
+ * must stay in lockstep per AGENTS.md's share-gate invariant.
  */
 function projectCharacterRow(row: DbCharacter): DbCharacter {
+  // Drop every private column by replacing the row with a mask that
+  // supplies the schema defaults for NOT NULL numeric / jsonb columns.
   return {
-    ...row,
+    id: row.id,
+    ownerId: row.ownerId,
+    campaignId: row.campaignId,
+    name: row.name,
+    playerName: row.playerName,
+    height: row.height,
+    weight: row.weight,
+    age: row.age,
+    appearance: row.appearance,
+    techLevel: row.techLevel,
     // Stat defaults so the row stays schema-valid (notNull columns).
     // The minimal view never reads these, but if a future code path
     // ever falls through to buildCharacterDetail with this row it
@@ -617,10 +640,13 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     speedQuarterMod: 0,
     moveMod: 0,
     // Share-gate critical: a minimal viewer must never receive another
-    // player's named/manual temp effects, so this collapses to empty
-    // rather than passing `row.tempEffects` through.
+    // player's named/manual temp effects or dismissed warnings, so
+    // these collapse to empty rather than passing the real lists through.
     tempEffects: [],
     dismissedWarnings: [],
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    revision: row.revision,
   };
 }
 
