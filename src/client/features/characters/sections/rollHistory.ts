@@ -124,12 +124,14 @@ function getSnapshot(characterId: string): readonly RollHistoryEntry[] {
   return cache.get(characterId) ?? [];
 }
 
+const EMPTY_ENTRIES: readonly RollHistoryEntry[] = [];
+
 /** This character's rolls, newest first, persisted to localStorage. */
 export function useRollHistory(characterId: string): readonly RollHistoryEntry[] {
   return useSyncExternalStore(
     subscribe,
     () => getSnapshot(characterId),
-    () => [] as readonly RollHistoryEntry[],
+    () => EMPTY_ENTRIES,
   );
 }
 

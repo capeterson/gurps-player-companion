@@ -28,7 +28,7 @@ export function RollHistoryStrip({ characterId }: RollHistoryStripProps) {
         <>
           <p className="text-[11px] text-base-content/50">Last 100 rolls — saved on this device.</p>
           {rolls.length === 0 ? (
-            <p className="text-xs text-base-content/60">No rolls yet this session.</p>
+            <p className="text-xs text-base-content/60">No rolls yet.</p>
           ) : (
             <ul className="space-y-1">
               {rolls.map((r) => (

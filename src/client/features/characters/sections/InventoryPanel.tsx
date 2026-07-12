@@ -206,6 +206,17 @@ export function InventoryPanel({
         : null;
     const weaponFromLibrary =
       linkedLibraryId && pickedLibraryItem?.weaponData ? pickedLibraryItem.weaponData : null;
+    //  Mirrors the armor-from-library / default-armor fallback: checking
+    //  "Weapon" without a library pick still creates a real (empty) weapon
+    //  so AttacksCard recognises the row immediately — otherwise the user
+    //  would check "Weapon", save, and see no weapon until they open Edit.
+    const weaponDefault = {
+      damage: undefined,
+      reach: null,
+      parry: null,
+      stRequired: null,
+      notes: null,
+    };
 
     // Include every column on the LocalCharacterInventory row so the
     // encumbrance computation (which reads e.g. hideawayCapacityLbs from
@@ -237,7 +248,7 @@ export function InventoryPanel({
               notes: null,
             })
           : null,
-        weaponData: newIsWeapon ? (weaponFromLibrary ?? null) : null,
+        weaponData: newIsWeapon ? (weaponFromLibrary ?? weaponDefault) : null,
         libraryItemId: linkedLibraryId,
       },
       () => {
