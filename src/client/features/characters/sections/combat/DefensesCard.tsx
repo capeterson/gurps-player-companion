@@ -43,7 +43,12 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       ? `${d.basicMove} base − ${movePenalty} ${e.label} encumbrance`
       : undefined;
 
-  const skillCandidates = character.skills.map((s) => ({ name: s.name, level: s.level }));
+  // effectiveLevel folds in trait/skill effect bonuses (skillBonusFor) —
+  // Parry/Block derive from the same final skill level SkillsPanel shows.
+  const skillCandidates = character.skills.map((s) => ({
+    name: s.name,
+    level: s.effectiveLevel ?? s.level,
+  }));
 
   const equippedItems = character.inventory.filter((i) => i.equipped);
   const weapons = equippedItems.filter((i) => i.weaponData != null);

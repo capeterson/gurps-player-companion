@@ -13,6 +13,19 @@ export function GmChangeFeed({ campaignId, characterNames }: Props) {
   const initialized = useRef(false);
   const observed = useRef(new Set<string>());
   const [highlighted, setHighlighted] = useState(() => new Set<string>());
+  const fadeTimers = useRef(new Set<number>());
+
+  // Un-highlight timers must NOT be cleared by the effect below re-running
+  // (it re-runs on every render — `events` is rebuilt each time — so a
+  // per-effect cleanup would cancel the fade whenever the 5s poll
+  // re-rendered within the 30s window, leaving rows highlighted forever).
+  // They're only cleared on unmount.
+  useEffect(() => {
+    const timers = fadeTimers.current;
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!initialized.current) {
@@ -25,13 +38,14 @@ export function GmChangeFeed({ campaignId, characterNames }: Props) {
     for (const event of fresh) observed.current.add(event.id);
     setHighlighted((current) => new Set([...current, ...fresh.map((event) => event.id)]));
     const timer = window.setTimeout(() => {
+      fadeTimers.current.delete(timer);
       setHighlighted((current) => {
         const next = new Set(current);
         for (const event of fresh) next.delete(event.id);
         return next;
       });
     }, 30_000);
-    return () => window.clearTimeout(timer);
+    fadeTimers.current.add(timer);
   }, [events]);
 
   return (

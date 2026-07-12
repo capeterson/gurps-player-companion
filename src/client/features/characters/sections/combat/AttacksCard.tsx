@@ -60,7 +60,12 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
   // already-formatted thrust/swing strings (e.g. "1d-2") — same table
   // (constants/damage.ts), one fewer round-trip through string parsing.
   const { thrust, swing } = damageForSt(character.derived.effectiveSt);
-  const skillCandidates = character.skills.map((s) => ({ name: s.name, level: s.level }));
+  // effectiveLevel folds in trait/skill effect bonuses (skillBonusFor) —
+  // the same value SkillsPanel rolls against, so attack rolls agree.
+  const skillCandidates = character.skills.map((s) => ({
+    name: s.name,
+    level: s.effectiveLevel ?? s.level,
+  }));
 
   if (weapons.length === 0) {
     return (
