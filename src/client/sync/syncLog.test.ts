@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { SYNC_LOG_RETENTION, appendSyncLog } from './syncLog.ts';
 
@@ -33,5 +33,23 @@ describe('sync log', () => {
     expect(await db.syncLog.count()).toBe(SYNC_LOG_RETENTION);
     expect(await db.syncLog.get('entry-0000')).toBeUndefined();
     expect(await db.syncLog.get('newest')).toBeTruthy();
+  });
+
+  it('does not throw when diagnostic persistence fails', async () => {
+    const put = vi
+      .spyOn(getLocalDb().syncLog, 'put')
+      .mockRejectedValue(new Error('quota exceeded'));
+
+    await expect(
+      appendSyncLog({
+        direction: 'push',
+        result: 'synced',
+        entityClass: 'character',
+        entityId: 'character-1',
+        command: 'patch',
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(put).toHaveBeenCalledOnce();
   });
 });

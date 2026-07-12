@@ -37,9 +37,12 @@ export function SyncLogView({ open, onClose, storageMessage }: SyncLogViewProps)
     setWorking(true);
     try {
       const op = await getSyncOrchestrator().revertFailedOperation(revertTarget.clientOpId);
-      toasts.push(`${changeName(op)} reverted to the last server-synced value`, {
-        kind: 'success',
-      });
+      toasts.push(
+        op.preservedNewerEdit
+          ? `${changeName(op)} failed attempt removed; newer local edit kept`
+          : `${changeName(op)} reverted to the last server-synced value`,
+        { kind: 'success' },
+      );
       setRevertTarget(null);
     } catch (err) {
       toasts.push(`Couldn't revert change — ${errorMessage(err)}`, { kind: 'error' });

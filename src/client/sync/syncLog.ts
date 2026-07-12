@@ -10,13 +10,17 @@ export type NewSyncLogEntry = Omit<SyncLogEntry, 'id' | 'occurredAt'> & {
 };
 
 export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
-  const db = getLocalDb();
-  await db.syncLog.put({
-    ...entry,
-    id: entry.id ?? newClientId(),
-    occurredAt: entry.occurredAt ?? new Date().toISOString(),
-  });
-  await pruneSyncLog();
+  try {
+    const db = getLocalDb();
+    await db.syncLog.put({
+      ...entry,
+      id: entry.id ?? newClientId(),
+      occurredAt: entry.occurredAt ?? new Date().toISOString(),
+    });
+    await pruneSyncLog();
+  } catch {
+    // Diagnostic persistence must never interrupt outbox settlement.
+  }
 }
 
 export async function pruneSyncLog(): Promise<void> {

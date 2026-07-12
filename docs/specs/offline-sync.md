@@ -119,16 +119,23 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 The `syncLog` Dexie store is a device-local operational journal, separate from
 the server-side entity history. Successful outbox outcomes are recorded as
 `push`, cursor changes as `pull`, and explicit user rollbacks as `local`. It is
-pruned to the newest 1,000 records. Pending state is never copied into the log;
-the sync view reads the authoritative outbox directly, including attempt count,
-backoff timing, and the raw operation outcome or HTTP/network error.
+pruned to the newest 1,000 records. Pull entries retain metadata and revision
+only, never cursor row payloads, so later access downgrades cannot leave private
+sheet data in the journal. Journal writes are best-effort: quota or IndexedDB
+failures never block outbox settlement. Pending state is never copied into the
+log; the sync view reads the authoritative outbox directly, including attempt
+count, backoff timing, and the raw operation outcome or HTTP/network error.
 
 After four consecutive attempts, a pending operation is promoted as a repeated
 failure. The user may explicitly revert it under the same cross-tab drain lock:
 patches restore `prevValue`, speculative creates are removed, and optimistic
-deletes are reinserted. The rollback produces a toast and field flash. The
-confirmed “Abandon local changes and re-sync from server” recovery wipes every
-local store, including this journal, and bootstraps again from revision zero.
+deletes are reinserted. Reverting a speculative character also removes its
+dependent child rows and operations. If a newer same-field edit supersedes the
+failed attempt, that newer value remains queued and visible while its rollback
+anchor is repaired to the last server value. The rollback produces a toast and
+field flash. The confirmed “Abandon local changes and re-sync from server”
+recovery wipes every local store, including this journal, and bootstraps again
+from revision zero.
 
 ## Invariants that make it correct
 

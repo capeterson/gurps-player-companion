@@ -271,7 +271,6 @@ export interface SyncLogEntry {
   command: OperationCommand;
   fieldPath?: string | undefined;
   humanName?: string | undefined;
-  value?: unknown;
   occurredAt: string;
   details?: unknown;
 }

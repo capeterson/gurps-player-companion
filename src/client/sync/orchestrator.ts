@@ -389,8 +389,10 @@ class SyncOrchestrator {
   }
 
   /** Explicitly discard one repeatedly failing optimistic operation. */
-  async revertFailedOperation(clientOpId: string): Promise<OutboxEntry> {
-    let reverted: OutboxEntry | undefined;
+  async revertFailedOperation(
+    clientOpId: string,
+  ): Promise<OutboxEntry & { preservedNewerEdit?: boolean }> {
+    let reverted: (OutboxEntry & { preservedNewerEdit?: boolean }) | undefined;
     await runWithLock(DRAIN_LOCK, async () => {
       const db = getLocalDb();
       const op = await db.outbox.get(clientOpId);
@@ -398,10 +400,32 @@ class SyncOrchestrator {
       if ((op.status !== 'transient_retry' && op.status !== 'pending') || op.attemptCount < 4) {
         throw new Error('This change is not eligible to be reverted');
       }
+      let preservedNewerEdit = false;
       if (op.command === 'patch' && op.fieldPath !== undefined) {
-        await this.revertField(op.entityClass, op.entityId, op.fieldPath, op.prevValue);
+        const superseding = await db.outbox
+          .where('coalesceKey')
+          .equals(op.coalesceKey)
+          .filter(
+            (candidate) =>
+              candidate.clientOpId !== op.clientOpId &&
+              (candidate.status === 'pending' ||
+                candidate.status === 'in_flight' ||
+                candidate.status === 'transient_retry'),
+          )
+          .toArray();
+        const latest = superseding.sort((a, b) => b.enqueuedAt.localeCompare(a.enqueuedAt))[0];
+        if (latest) {
+          preservedNewerEdit = true;
+          await this.revertField(op.entityClass, op.entityId, op.fieldPath, latest.attemptedValue);
+          await db.outbox.update(latest.clientOpId, {
+            prevValue: op.prevValue,
+            baseRevision: op.baseRevision,
+          });
+        } else {
+          await this.revertField(op.entityClass, op.entityId, op.fieldPath, op.prevValue);
+        }
       } else if (op.command === 'create') {
-        await this.deleteLocal(op.entityClass, op.entityId);
+        await this.discardSpeculativeCreate(op);
       } else if (op.command === 'delete') {
         await this.reinsertLocal(op.entityClass, op.prevValue);
       }
@@ -414,8 +438,6 @@ class SyncOrchestrator {
         command: op.command,
         fieldPath: op.fieldPath,
         humanName: op.humanName,
-        value: op.prevValue,
-        details: { discardedValue: op.attemptedValue, lastError: op.lastError },
       });
       if (op.fieldPath) {
         flashBus.emit({
@@ -423,7 +445,7 @@ class SyncOrchestrator {
           reason: 'Local change reverted by user',
         });
       }
-      reverted = op;
+      reverted = preservedNewerEdit ? { ...op, preservedNewerEdit } : op;
     });
     if (!reverted) throw new Error('Could not revert this change');
     this.wake();
@@ -605,7 +627,6 @@ class SyncOrchestrator {
             command: op.command,
             fieldPath: op.fieldPath,
             humanName: op.humanName,
-            value: op.attemptedValue,
             details: outcome,
           });
           await db.outbox.delete(op.clientOpId);
@@ -853,7 +874,6 @@ class SyncOrchestrator {
         entityClass: change.entityClass,
         entityId: change.entityId,
         command: change.command,
-        value: change.data,
         details: { revision: change.revision },
       });
     }
@@ -969,6 +989,27 @@ class SyncOrchestrator {
       default:
         return;
     }
+  }
+
+  private async discardSpeculativeCreate(op: OutboxEntry): Promise<void> {
+    const db = getLocalDb();
+    const relatedOps = await db.outbox
+      .filter(
+        (candidate) =>
+          candidate.entityId === op.entityId ||
+          (op.entityClass === 'character' && candidate.parentId === op.entityId),
+      )
+      .toArray();
+
+    if (op.entityClass === 'character') {
+      await db.characterTraits.where('characterId').equals(op.entityId).delete();
+      await db.characterSkills.where('characterId').equals(op.entityId).delete();
+      await db.characterSpells.where('characterId').equals(op.entityId).delete();
+      await db.characterInventory.where('characterId').equals(op.entityId).delete();
+      await db.characterCombat.delete(op.entityId);
+    }
+    await this.deleteLocal(op.entityClass, op.entityId);
+    await db.outbox.bulkDelete(relatedOps.map((candidate) => candidate.clientOpId));
   }
 
   private async reinsertLocal(entityClass: EntityClass, prevValue: unknown): Promise<void> {
