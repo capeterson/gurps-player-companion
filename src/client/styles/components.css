@@ -78,10 +78,20 @@
 }
 
 /* ---- Panel tabs (in-card tab bar) -------------------------- */
+/* Scrolls horizontally instead of wrapping/overflowing the page —
+   on narrow screens the full tab set (Combat..History) is wider
+   than the viewport, and without this the flex row forces the
+   whole page to overflow horizontally. */
 .panel-tabs {
   display: flex;
   gap: 0.125rem;
   border-bottom: 1px solid var(--color-base-300);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.panel-tabs::-webkit-scrollbar {
+  display: none;
 }
 .panel-tab {
   padding: 0.625rem 1.125rem;
@@ -99,6 +109,8 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .panel-tab:hover {
   color: var(--color-base-content);
