@@ -690,6 +690,16 @@ class SyncOrchestrator {
             if (newRevision !== undefined && fieldUnchanged) {
               await this.stampRevision(op.entityClass, op.entityId, newRevision);
               await db.outbox.delete(op.clientOpId);
+              await appendSyncLog({
+                direction: 'push',
+                result: 'requeued',
+                entityClass: op.entityClass,
+                entityId: op.entityId,
+                command: op.command,
+                fieldPath: op.fieldPath,
+                humanName: op.humanName,
+                details: { serverReason: outcome.reason, newRevision },
+              });
               // Guard 2: no newer pending op for this field already queued.
               const ckey = coalesceKey(op.entityId, op.fieldPath);
               const newerPending = await db.outbox
@@ -736,6 +746,23 @@ class SyncOrchestrator {
           // with no reconciliation path; retrying self-heals as soon
           // as the server recovers.  The indicator honestly shows
           // 'syncing' the whole time because the op stays counted.
+          if (op.status !== 'transient_retry') {
+            // Log only on the transition INTO retry -- op.status here
+            // still reflects the pre-drain DB state (setOutboxStatus
+            // above doesn't mutate this in-memory object), so this
+            // fires once per failure streak rather than flushing the
+            // 1,000-row journal on every retry of a stubborn op.
+            await appendSyncLog({
+              direction: 'push',
+              result: 'retrying',
+              entityClass: op.entityClass,
+              entityId: op.entityId,
+              command: op.command,
+              fieldPath: op.fieldPath,
+              humanName: op.humanName,
+              details: { serverReason: outcome.reason, attemptCount: op.attemptCount + 1 },
+            });
+          }
           const next = op.attemptCount + 1;
           await setOutboxStatus(op.clientOpId, 'transient_retry', {
             attemptCount: next,
@@ -786,6 +813,16 @@ class SyncOrchestrator {
         reason: outcome.reason ?? 'sync rejected',
       });
     }
+    await appendSyncLog({
+      direction: 'push',
+      result: 'rolled_back',
+      entityClass: op.entityClass,
+      entityId: op.entityId,
+      command: op.command,
+      fieldPath: op.fieldPath,
+      humanName: op.humanName,
+      details: outcome,
+    });
     await db.outbox.delete(op.clientOpId);
   }
 
@@ -822,6 +859,16 @@ class SyncOrchestrator {
         reason: outcome.reason ?? 'sync failed',
       });
     }
+    await appendSyncLog({
+      direction: 'push',
+      result: 'rolled_back',
+      entityClass: op.entityClass,
+      entityId: op.entityId,
+      command: op.command,
+      fieldPath: op.fieldPath,
+      humanName: op.humanName,
+      details: outcome,
+    });
     await db.outbox.delete(op.clientOpId);
   }
 

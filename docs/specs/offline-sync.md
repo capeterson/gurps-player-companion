@@ -43,7 +43,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
-| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -77,6 +77,28 @@ works offline.**
    never poisons the batch. HTTP status is always 200; per-op outcomes live in
    `outcomes[].status`. Optimistic concurrency uses `baseRevision`; a mismatch
    returns `stale_base` plus the latest entity.
+
+   Rapid same-entity edits (e.g. add an item, then mark it as a weapon, then
+   tweak its stats) get enqueued client-side with the **same** `baseRevision`,
+   since nothing has been acked yet to advance it. Applying such a burst
+   straight through would stale-base every op after the first, one per drain
+   round trip. `createBatchRevisionChains()` in `src/server/routes/sync.ts`
+   fixes this with a **batch-local revision fast-forward**: it tracks, per
+   `${entityClass}|${entityId}`, the `(firstBase, latest)` range produced by
+   `patch` ops already applied earlier in the *same request*, and rewrites a
+   later op's `baseRevision` to `latest` when its original base falls in
+   `[firstBase, latest)`. Those intermediate revisions were produced by this
+   same client's own prior op in the burst — not a conflict — because
+   per-field coalescing (S3) guarantees no two ops in one burst patch the same
+   field, so array order is exactly this client's intended order. `create`
+   outcomes never seed or extend a chain (a *replayed* create can return a
+   revision that already embeds a foreign write, which would be unsafe to
+   fast-forward past); `character_combat` has no `baseRevision` check at all
+   (unconditional upsert), so the fast-forward is inert for it. A foreign
+   write landing mid-batch still pushes the DB revision above the chain's
+   `latest`, so the rewritten base is still stale and `stale_base` fires
+   normally — the client's `stale_base` self-heal (below) remains the
+   fallback for that case and for bursts spanning more than one 50-op batch.
 4. **Apply outcome.** The orchestrator stamps the new revision on `applied`,
    reverts + toasts + flashes on rejection, and adopts `latestEntity` on
    conflict/stale (then flashes).
@@ -109,7 +131,7 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 | `rejected` | Revert the field/row; persistent toast + input flash. |
 | `unauthorized` | Same as rejected; toast names the permission failure. |
 | `conflict` | Server returns `latestEntity`; client adopts it, then flashes. |
-| `stale_base` | Same as conflict — `baseRevision` was behind the server. |
+| `stale_base` | Same as conflict — `baseRevision` was behind the server. If `latestEntity` shows the field unchanged, the client re-enqueues the op with the fresh revision instead of rolling back (the self-heal below); the server's batch-local fast-forward means a same-client burst now settles in one round trip rather than needing this self-heal per op. |
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
 | network error | Whole batch reverts to `transient_retry`; loop retries. |
@@ -118,13 +140,39 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 
 The `syncLog` Dexie store is a device-local operational journal, separate from
 the server-side entity history. Successful outbox outcomes are recorded as
-`push`, cursor changes as `pull`, and explicit user rollbacks as `local`. It is
-pruned to the newest 1,000 records. Pull entries retain metadata and revision
-only, never cursor row payloads, so later access downgrades cannot leave private
-sheet data in the journal. Journal writes are best-effort: quota or IndexedDB
-failures never block outbox settlement. Pending state is never copied into the
-log; the sync view reads the authoritative outbox directly, including attempt
-count, backoff timing, and the raw operation outcome or HTTP/network error.
+`push` with `result: 'synced'`, cursor changes as `pull`, and explicit user
+rollbacks as `local` with `result: 'reverted'`. Three more `result` values are
+diagnostics-only, logged by `applyOutcomes` in the orchestrator:
+
+- `requeued` — the `stale_base` self-heal deleted a stale op and re-enqueued it
+  with the server's fresh revision (see the batch-local fast-forward above;
+  this is the trace of "burst of edits kept stale-basing" for a debug dump).
+- `rolled_back` — a `rejected`/`unauthorized`/`conflict`/`suspended` outcome
+  reverted the local row; `details` carries the raw server outcome.
+- `retrying` — an op transitioned into `transient_retry`. Logged **once per
+  failure streak** (on the transition into retry, not on every subsequent
+  retry attempt) so a stubbornly-failing op can't flush the 1,000-row journal;
+  the live retry state (attempt count, backoff timing) is always visible via
+  the outbox rows themselves.
+
+It is pruned to the newest 1,000 records. Pull entries retain metadata and
+revision only, never cursor row payloads, so later access downgrades cannot
+leave private sheet data in the journal. Journal writes are best-effort: quota
+or IndexedDB failures never block outbox settlement. Pending state is never
+copied into the log; the sync view reads the authoritative outbox directly,
+including attempt count, backoff timing, and the raw operation outcome or
+HTTP/network error.
+
+**Download sync debug log.** The sync-log dialog's footer has a "Download sync
+debug log" button (`buildSyncDebugDump()` in `src/client/sync/debugDump.ts`)
+that assembles a JSON file for players to attach to bug reports: a metadata
+header (timestamp, user agent, online state, derived userId, sync indicator
+state, pending-op counts, per-store row counts), the full `outbox`,
+`rejectionToasts`, `syncLog`, and `syncCursors` tables. It deliberately
+excludes every entity store (characters, traits, skills, inventory, etc.) and
+the access/refresh tokens — a dump attached to a support request must not leak
+other players' cached sheets or session credentials. Assembly is pure Dexie
+reads with no network calls, so it works offline.
 
 After four consecutive attempts, a pending operation is promoted as a repeated
 failure. The user may explicitly revert it under the same cross-tab drain lock:
@@ -170,6 +218,10 @@ rule that has been broken at least once.
 - **WebSockets are acceleration, not correctness** (S8). WS frames carry no row
   data — they only invalidate. A client that loses WS forever still converges
   via the periodic cursor pull.
+- **`character_combat` has no optimistic-concurrency check.** Its dispatcher is
+  an unconditional upsert (last write wins) — it never checks `baseRevision`
+  and can never return `stale_base`. This is pre-existing and out of scope for
+  the batch-local fast-forward above, which is inert for combat patches.
 - **Bootstrap before UI** (tenet 7). First login pulls the full snapshot into
   Dexie before first paint; a `bootstrap:<userId>` flag in `syncMeta`
   short-circuits it thereafter.
@@ -181,7 +233,8 @@ rule that has been broken at least once.
 
 The orchestrator recovers from partial/interrupted states rather than assuming
 a clean world (see `orchestrator.recovery.test.ts`,
-`orchestrator.selfheal.test.ts`, `orchestrator.prune.test.ts`):
+`orchestrator.selfheal.test.ts`, `orchestrator.prune.test.ts`,
+`orchestrator.log.test.ts`):
 
 - **Stale in-flight recovery** — ops stuck `in_flight` (e.g. a tab closed
   mid-drain) are recovered to drainable on the next cycle.
