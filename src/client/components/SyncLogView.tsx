@@ -183,17 +183,17 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
             {storageMessage && (
               <p className="mb-3 text-xs text-base-content/60">{storageMessage}</p>
             )}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
-                className="btn btn-outline btn-sm"
+                className="btn btn-outline btn-sm h-auto whitespace-normal py-2"
                 onClick={() => void downloadDebugLog()}
               >
                 Download sync debug log
               </button>
               <button
                 type="button"
-                className="btn btn-error btn-outline btn-sm"
+                className="btn btn-error btn-outline btn-sm h-auto whitespace-normal py-2"
                 disabled={!online}
                 onClick={() => setResyncOpen(true)}
               >
