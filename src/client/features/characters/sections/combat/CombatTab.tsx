@@ -55,6 +55,7 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
             canWrite={canWrite}
             patchCombat={patchCombat}
             bumpers={bumpers}
+            openRoll={openRoll}
           />
           <DrSummaryCard character={character} />
         </div>

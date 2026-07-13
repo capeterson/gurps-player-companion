@@ -12,9 +12,12 @@ import { conditionLabel, conditionsInclude } from '../../../../../shared/domain/
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { Bumper } from '../../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
+import { InfoTooltip } from '../../../../components/ui/InfoTooltip.tsx';
 import { OverflowBadge } from '../../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../../components/ui/PoolMeter.tsx';
+import { RollableRow } from '../RollableRow.tsx';
 import { hpVarFor } from '../hpColor.ts';
+import type { RollRequest } from '../rollTypes.ts';
 import { useConditionsToggle } from '../useConditionsToggle.ts';
 import type { PoolBumpers } from '../usePoolBumpers.ts';
 
@@ -23,9 +26,10 @@ export interface PoolsCardProps {
   canWrite: boolean;
   patchCombat: (field: string, value: unknown) => Promise<void>;
   bumpers: PoolBumpers;
+  openRoll: (req: RollRequest) => void;
 }
 
-export function PoolsCard({ character, canWrite, patchCombat, bumpers }: PoolsCardProps) {
+export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll }: PoolsCardProps) {
   const combat = character.combat;
   const posture = combat?.posture ?? 'standing';
   const { conditions, toggle } = useConditionsToggle(character, canWrite, patchCombat);
@@ -38,6 +42,8 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers }: PoolsCa
   const reelingThreshold = Math.ceil(hpMax / 3) - 1;
   const reelingSuggested =
     canWrite && hpMax > 0 && hp < Math.ceil(hpMax / 3) && !conditionsInclude(conditions, 'reeling');
+  // Death checks start the moment HP drops to 0 or below (B419).
+  const deathCheckRequired = hpMax > 0 && hp <= 0;
 
   function setPosture(p: string) {
     if (!canWrite) return;
@@ -69,6 +75,18 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers }: PoolsCa
           reeling at {reelingThreshold} · death checks from −{hpMax} · certain death at −{5 * hpMax}{' '}
           (B419/B423)
         </p>
+        {deathCheckRequired && (
+          <div className="mt-2">
+            <RollableRow
+              label="Death check"
+              baseTarget={character.derived.effectiveHt}
+              openRoll={openRoll}
+              sublabel={
+                <span className="block text-[11px] text-base-content/60">HT roll — B419</span>
+              }
+            />
+          </div>
+        )}
         {canWrite && (
           <>
             <div className="mt-3 flex gap-1.5">
@@ -188,7 +206,14 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers }: PoolsCa
           })}
         </div>
         {reelingSuggested && (
-          <p className="mt-1.5 text-[11px] text-warning">Reeling suggested — B419</p>
+          <p className="mt-1.5 text-[11px] text-warning">
+            <InfoTooltip
+              content={`HP (${hp}) has dropped below ⅓ of max (${reelingThreshold + 1}) — GURPS applies Reeling until HP rises back above that line (B419). While Reeling, Move and Dodge are both halved (round up).`}
+            >
+              Reeling suggested
+            </InfoTooltip>{' '}
+            — B419
+          </p>
         )}
       </div>
     </section>
