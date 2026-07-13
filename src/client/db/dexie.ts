@@ -271,7 +271,14 @@ export interface OutboxEntry {
 export interface SyncLogEntry {
   id: string;
   direction: 'push' | 'pull' | 'local';
-  result: 'synced' | 'reverted';
+  /**
+   * `requeued` and `retrying` are diagnostics-only transitions logged by
+   * the orchestrator's stale_base self-heal and transient-retry paths
+   * respectively (`retrying` only on the transition INTO transient_retry,
+   * so a forever-retrying op can't flush the journal). They're not
+   * terminal outcomes like `synced`/`reverted`/`rolled_back`.
+   */
+  result: 'synced' | 'reverted' | 'requeued' | 'rolled_back' | 'retrying';
   entityClass: EntityClass;
   entityId: string;
   command: OperationCommand;
