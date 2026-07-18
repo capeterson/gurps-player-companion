@@ -44,6 +44,12 @@ const THR_SW_RE = /^(thr|thrust|sw|swing)([+-]\d+)?$/i;
 const EXPLICIT_DICE_RE = /^(\d+)d([+-]\d+)?$/i;
 const ARMOR_DIVISOR_RE = /\(([^)]+)\)/;
 
+// No GURPS weapon or ST-derived thrust/swing realistically exceeds a
+// couple dozen dice; free-text damage is player-typed (or imported),
+// so an explicit NdM mode above this is treated as unparseable rather
+// than allocating/rolling an absurd die count on the UI thread.
+const MAX_EXPLICIT_DICE = 100;
+
 /**
  * Parse a single trimmed mode token (one segment of a `/`-separated
  * damage spec) into a `DamageMode`, or `null` if it doesn't match the
@@ -82,7 +88,7 @@ function parseMode(rawMode: string): DamageMode | null {
   if (diceMatch) {
     const dice = Number.parseInt(diceMatch[1] as string, 10);
     const adds = diceMatch[2] ? Number.parseInt(diceMatch[2], 10) : 0;
-    if (!Number.isFinite(dice) || dice <= 0) return null;
+    if (!Number.isFinite(dice) || dice <= 0 || dice > MAX_EXPLICIT_DICE) return null;
     return {
       base: { dice, adds },
       adds: 0,
@@ -138,6 +144,20 @@ export function resolveDamage(
 }
 
 /**
+ * Minimum basic damage after adds (B378): attacks that wound by edge or
+ * point — cutting, impaling, and every piercing variant (pi-/pi/pi+/
+ * pi++) — always do at least 1 point of basic damage; anything else
+ * (cr, burn, homebrew, untyped) can bottom out at 0.
+ */
+export function minBasicDamageFor(type: string | null): number {
+  if (type == null) return 0;
+  const normalized = type.trim().toLowerCase();
+  return normalized.startsWith('cut') || normalized.startsWith('imp') || normalized.startsWith('pi')
+    ? 1
+    : 0;
+}
+
+/**
  * Can an attack of this damage type target the vitals or an eye (B399)?
  * Per B399, only impaling (imp) and piercing (pi, pi-, pi+, pi++) attacks
  * may target the vitals, plus tight-beam burning attacks (e.g. a laser).
@@ -147,17 +167,6 @@ export function resolveDamage(
  * treats every "burn" mode as NOT vitals-capable rather than guessing.
  * Everything else (cut, cr, tox, homebrew types, ...) is also excluded.
  */
-/**
- * Minimum basic damage after adds (B378): attacks that wound by edge or
- * point (cut/imp) always do at least 1 point of basic damage; anything
- * else (cr, burn, homebrew, untyped) can bottom out at 0.
- */
-export function minBasicDamageFor(type: string | null): number {
-  if (type == null) return 0;
-  const normalized = type.trim().toLowerCase();
-  return normalized.startsWith('cut') || normalized.startsWith('imp') ? 1 : 0;
-}
-
 export function canTargetVitals(type: string | null): boolean {
   if (type == null) return false;
   const normalized = type.trim().toLowerCase();

@@ -17,6 +17,7 @@
  */
 
 import { type FormEvent, type ReactNode, useMemo, useRef, useState } from 'react';
+import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import type { LibraryItemOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type {
@@ -921,7 +922,7 @@ export function InventoryPanel({
       <ItemEditDialog
         open={editing !== null}
         item={editing}
-        skillNames={character.skills.map((s) => s.name)}
+        skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
         onCancel={() => setEditing(null)}
         onSubmit={(patch) => {
           if (editing) {

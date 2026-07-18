@@ -41,9 +41,13 @@ export interface RollSheetProps {
   onClose: () => void;
 }
 
-// -15 (not -10) so the deepest range-penalty preset (-12, B550) is not
-// silently clamped to a different value than its chip advertises.
-const MOD_MIN = -15;
+// -25 (not -10) so the deepest range-penalty preset (-12, B550) is not
+// silently clamped to a different value than its chip advertises, AND
+// there's headroom to further compose it with the ± stepper toward a
+// deep hit-location penalty (e.g. 200 yd + Eye = -12 + -9 = -21) —
+// presets are single-select (see applyPreset), so stacking a second
+// penalty on top of a chosen preset is the stepper's job.
+const MOD_MIN = -25;
 const MOD_MAX = 10;
 
 function clampMod(n: number): number {

@@ -85,6 +85,21 @@ export interface MatchedSkill {
 }
 
 /**
+ * Display/match name for a skill row: "Guns (Pistol)" when a
+ * specialization is set, else the bare name. Two skill rows can share
+ * the same `name` with different `specialization` (e.g. "Guns"/Pistol
+ * vs "Guns"/Rifle) — every `SkillCandidate` fed into
+ * `matchSkillForWeapon` / `resolveWeaponSkill` should be built with
+ * this so the two remain distinguishable, both in the weapon-skill
+ * picker's suggestions and in what an explicit binding actually
+ * matches against.
+ */
+export function skillDisplayName(name: string, specialization: string | null | undefined): string {
+  const spec = specialization?.trim();
+  return spec ? `${name} (${spec})` : name;
+}
+
+/**
  * Find the best skill on a character's sheet to use for a given
  * weapon's Parry/Block, matching by name. Exact (case-insensitive)
  * name matches win; failing that, a substring match either direction

@@ -6,11 +6,12 @@
  * Deliberately partial, matching `damageParse.ts`'s lenient-by-contract
  * stance: the B379 core table plus the high-traffic location overrides
  * (skull/eye ×4, vitals ×3 for imp/pi, neck cr/cut, limb & extremity
- * caps). Not modeled: tight-beam burning ×2 vs vitals/eye (can't be
- * told apart from area burn in free text), huge-piercing vs homebrew
- * hybrids, diffuse/homogenous injury tolerance, and blunt trauma.
- * Unknown/homebrew damage types get ×1; unknown/custom locations get
- * the type's base multiplier.
+ * caps). The skull's natural DR 2 (B400) is added on top of any armor
+ * at that location. Not modeled: tight-beam burning ×2 vs vitals/eye
+ * (can't be told apart from area burn in free text), huge-piercing vs
+ * homebrew hybrids, diffuse/homogenous injury tolerance, and blunt
+ * trauma. Unknown/homebrew damage types get ×1; unknown/custom
+ * locations get the type's base multiplier.
  *
  * Pure TS (shared domain) — runs in Bun, browser, and service worker.
  */
@@ -72,19 +73,26 @@ export function woundingMultiplier(type: string | null, location: string): numbe
 }
 
 /**
- * Parse an armor-divisor string as stored by `damageParse.ts` ("2",
- * "0.5", "10") into a positive number, or null for missing/garbage.
+ * Parse an armor-divisor string into a positive number, or null for
+ * missing/garbage. Accepts both the bare form stored by
+ * `damageParse.ts` ("2", "0.5", "10") and the parenthesized book
+ * notation players naturally type/copy into the incoming-damage
+ * dialog ("(2)", "(0.5)").
  */
 export function parseArmorDivisor(raw: string | null | undefined): number | null {
   if (raw == null) return null;
-  const trimmed = raw.trim();
+  const trimmed = raw
+    .trim()
+    .replace(/^\((.+)\)$/, '$1')
+    .trim();
   if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
   const value = Number.parseFloat(trimmed);
   return value > 0 ? value : null;
 }
 
 export interface DamageApplication {
-  /** Aggregated DR at the location (crushing override honored for 'cr'). */
+  /** Aggregated DR at the location (crushing override honored for 'cr'),
+   *  plus the skull's natural DR 2 (B400) when the location is 'skull'. */
   readonly drAtLocation: number;
   /** DR after the armor divisor: floor(dr / divisor). A fractional
    *  divisor like (0.5) *increases* effective DR (B102). */
@@ -109,8 +117,10 @@ export function applyDamage(
 ): DamageApplication {
   const entry = drMap.get(location);
   const t = normalizeType(type);
-  const drAtLocation =
-    t === 'cr' && entry?.drCrushing != null ? entry.drCrushing : (entry?.dr ?? 0);
+  const armorDr = t === 'cr' && entry?.drCrushing != null ? entry.drCrushing : (entry?.dr ?? 0);
+  // The skull is naturally DR 2 (B400), stacking with any helmet DR.
+  const naturalDr = location === 'skull' ? 2 : 0;
+  const drAtLocation = armorDr + naturalDr;
 
   const divisor = parseArmorDivisor(armorDivisor);
   const effectiveDr = divisor != null ? Math.floor(drAtLocation / divisor) : drAtLocation;

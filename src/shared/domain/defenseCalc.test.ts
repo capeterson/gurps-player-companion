@@ -7,6 +7,7 @@ import {
   parseParryString,
   pickShield,
   resolveWeaponSkill,
+  skillDisplayName,
   stShortfallPenalty,
 } from './defenseCalc.ts';
 
@@ -125,12 +126,48 @@ describe('parseParryString', () => {
   });
 });
 
+describe('skillDisplayName', () => {
+  it('appends the specialization in parens when present', () => {
+    expect(skillDisplayName('Guns', 'Pistol')).toBe('Guns (Pistol)');
+  });
+
+  it('trims whitespace-only or blank specialization down to the bare name', () => {
+    expect(skillDisplayName('Guns', '')).toBe('Guns');
+    expect(skillDisplayName('Guns', '   ')).toBe('Guns');
+    expect(skillDisplayName('Guns', null)).toBe('Guns');
+    expect(skillDisplayName('Guns', undefined)).toBe('Guns');
+  });
+});
+
 describe('resolveWeaponSkill', () => {
   const skills = [
     { name: 'Broadsword', level: 14 },
     { name: 'Shortsword', level: 12 },
     { name: 'Katana Drawing', level: 16 },
   ];
+
+  it('binds to a specialization-disambiguated candidate built via skillDisplayName', () => {
+    // Two "Guns" rows with different specializations would be indistinguishable
+    // if callers fed resolveWeaponSkill the bare skill.name for each — the
+    // caller is expected to build candidates with skillDisplayName so the
+    // rifle can bind specifically to "Guns (Rifle)" and not the pistol row.
+    const gunSkills = [
+      { name: skillDisplayName('Guns', 'Pistol'), level: 12 },
+      { name: skillDisplayName('Guns', 'Rifle'), level: 15 },
+    ];
+    expect(resolveWeaponSkill('Hunting Rifle', 'Guns (Rifle)', gunSkills)).toEqual({
+      kind: 'matched',
+      name: 'Guns (Rifle)',
+      level: 15,
+      explicit: true,
+    });
+    expect(resolveWeaponSkill('Derringer', 'Guns (Pistol)', gunSkills)).toEqual({
+      kind: 'matched',
+      name: 'Guns (Pistol)',
+      level: 12,
+      explicit: true,
+    });
+  });
 
   it('resolves an explicit binding by exact case-insensitive name', () => {
     expect(resolveWeaponSkill('Excalibur', 'broadsword', skills)).toEqual({

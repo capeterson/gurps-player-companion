@@ -12,6 +12,7 @@ import {
 } from '../../../../../shared/domain/damageParse.ts';
 import {
   resolveWeaponSkill,
+  skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
@@ -89,7 +90,7 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
   // effectiveLevel folds in trait/skill effect bonuses (skillBonusFor) —
   // the same value SkillsPanel rolls against, so attack rolls agree.
   const skillCandidates = character.skills.map((s) => ({
-    name: s.name,
+    name: skillDisplayName(s.name, s.specialization),
     level: s.effectiveLevel ?? s.level,
   }));
 

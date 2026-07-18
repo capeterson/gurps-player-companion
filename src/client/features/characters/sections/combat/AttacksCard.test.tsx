@@ -109,6 +109,40 @@ describe('AttacksCard', () => {
     expect(screen.queryByRole('button', { name: /Katana\b.*\d/ })).not.toBeInTheDocument();
   });
 
+  it('binds to the correct specialization when two skill rows share a name', () => {
+    const openRoll = vi.fn();
+    // Two "Guns" rows distinguished only by specialization; the rifle must
+    // bind to its own (lower-level) row, not the higher-level pistol row.
+    const character = {
+      id: 'char-1',
+      derived: { effectiveSt: 10 },
+      skills: [
+        { id: 's1', name: 'Guns', specialization: 'Pistol', level: 15 },
+        { id: 's2', name: 'Guns', specialization: 'Rifle', level: 12 },
+      ],
+      inventory: [
+        {
+          id: 'w1',
+          name: 'Hunting Rifle',
+          equipped: true,
+          weaponData: {
+            damage: '6d pi',
+            reach: null,
+            parry: null,
+            stRequired: null,
+            skill: 'Guns (Rifle)',
+            ranged: null,
+          },
+        },
+      ],
+    } as unknown as CharacterDetail;
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Guns \(Rifle\)/ }));
+    const call = openRoll.mock.calls[0] as [RollRequest];
+    expect(call[0].baseTarget).toBe(12);
+  });
+
   it('subtracts the ST shortfall from the roll target (B270)', () => {
     const openRoll = vi.fn();
     // stRequired 12 vs effective ST 10 => −2; Broadsword 14 rolls at 12.

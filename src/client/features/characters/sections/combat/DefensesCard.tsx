@@ -5,6 +5,7 @@ import {
   parseParryString,
   pickShield,
   resolveWeaponSkill,
+  skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
@@ -61,7 +62,7 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   // effectiveLevel folds in trait/skill effect bonuses (skillBonusFor) —
   // Parry/Block derive from the same final skill level SkillsPanel shows.
   const skillCandidates = character.skills.map((s) => ({
-    name: s.name,
+    name: skillDisplayName(s.name, s.specialization),
     level: s.effectiveLevel ?? s.level,
   }));
 

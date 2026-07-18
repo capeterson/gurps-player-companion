@@ -67,6 +67,12 @@ describe('parseArmorDivisor', () => {
     expect(parseArmorDivisor('0.5')).toBe(0.5);
   });
 
+  it('parses the parenthesized book notation', () => {
+    expect(parseArmorDivisor('(2)')).toBe(2);
+    expect(parseArmorDivisor('(0.5)')).toBe(0.5);
+    expect(parseArmorDivisor(' (10) ')).toBe(10);
+  });
+
   it('returns null for missing or unparseable input', () => {
     expect(parseArmorDivisor(null)).toBeNull();
     expect(parseArmorDivisor(undefined)).toBeNull();
@@ -128,5 +134,21 @@ describe('applyDamage', () => {
     const result = applyDamage(3, 'cut', 'torso', drMap({ torso: { dr: 5 } }), null);
     expect(result.penetrating).toBe(0);
     expect(result.injury).toBe(0);
+  });
+
+  it('adds the skull natural DR 2 even when unarmored (B400)', () => {
+    // 2 cr to a bare skull: fully stopped by the natural DR 2.
+    const result = applyDamage(2, 'cr', 'skull', drMap({}), null);
+    expect(result.drAtLocation).toBe(2);
+    expect(result.penetrating).toBe(0);
+    expect(result.injury).toBe(0);
+  });
+
+  it('stacks the skull natural DR 2 with helmet armor', () => {
+    // Helmet DR 4 + natural 2 = 6; 10 imp -> 4 penetrating x4 (skull) = 16.
+    const result = applyDamage(10, 'imp', 'skull', drMap({ skull: { dr: 4 } }), null);
+    expect(result.drAtLocation).toBe(6);
+    expect(result.penetrating).toBe(4);
+    expect(result.injury).toBe(16);
   });
 });

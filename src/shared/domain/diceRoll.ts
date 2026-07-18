@@ -58,8 +58,11 @@ export interface DamageRollResult {
 /**
  * Roll NdM+adds damage dice (B269). `minDamage` clamps the final total:
  * B378 gives crushing attacks a minimum of 0 and everything that can
- * wound by edge/point (cut/imp) a minimum of 1 — pass
- * `minBasicDamageFor(type)` from `damageParse.ts`.
+ * wound by edge or point (cut/imp/pi variants) a minimum of 1 — pass
+ * `minBasicDamageFor(type)` from `damageParse.ts`. `dice.dice` is
+ * assumed pre-clamped to a sane count (see AttacksCard/RollSheet,
+ * which cap it before offering the roll) — this function does not
+ * itself guard against an absurd die count.
  */
 export function rollDamageDice(
   dice: { readonly dice: number; readonly adds: number },
