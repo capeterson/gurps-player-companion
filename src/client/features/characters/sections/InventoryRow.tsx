@@ -183,8 +183,52 @@ export function InventoryRow(props: InventoryRowProps) {
                   </span>
                 </span>
               )}
-              {item.weaponData != null && (
-                <span className="badge badge-sm badge-ghost">Weapon</span>
+              {item.weaponData != null &&
+                (item.weaponData.db != null ? (
+                  <span className="badge badge-sm badge-ghost">
+                    Shield DB {item.weaponData.db}
+                    {item.weaponData.skill && (
+                      <span className="text-base-content/50 text-[10px] ml-1">
+                        {item.weaponData.skill}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="badge badge-sm badge-ghost">
+                    Weapon
+                    {(item.weaponData.damage ||
+                      item.weaponData.skill ||
+                      item.weaponData.ranged != null) && (
+                      <span className="text-base-content/50 text-[10px] ml-1">
+                        {[
+                          item.weaponData.damage || null,
+                          item.weaponData.ranged != null ? 'ranged' : null,
+                          item.weaponData.skill ? `· ${item.weaponData.skill}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                      </span>
+                    )}
+                  </span>
+                ))}
+              {item.powerstoneData != null && (
+                <span className="badge badge-sm badge-ghost">
+                  Powerstone
+                  <span className="text-base-content/50 text-[10px] ml-1">
+                    {item.powerstoneData.currentEnergy}/{item.powerstoneData.maxEnergy}
+                  </span>
+                </span>
+              )}
+              {item.magicItemData != null && (
+                <span className="badge badge-sm badge-ghost">
+                  Magic
+                  <span className="text-base-content/50 text-[10px] ml-1">
+                    {item.magicItemData.spellName}
+                    {item.magicItemData.mode === 'charged' &&
+                      item.magicItemData.chargesCurrent != null &&
+                      ` ${item.magicItemData.chargesCurrent}/${item.magicItemData.chargesMax ?? '—'}`}
+                  </span>
+                </span>
               )}
             </span>
           </div>

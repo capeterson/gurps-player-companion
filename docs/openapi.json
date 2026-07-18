@@ -5607,6 +5607,56 @@
                                 "minimum": 0,
                                 "maximum": 99
                               },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
+                              },
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
@@ -8243,6 +8293,56 @@
                         "minimum": 0,
                         "maximum": 99
                       },
+                      "skill": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 160
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
+                      },
+                      "ranged": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "acc": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 20
+                          },
+                          "range": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "rof": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "shots": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "bulk": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": -12,
+                            "maximum": 0
+                          },
+                          "recoil": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 1,
+                            "maximum": 9
+                          }
+                        }
+                      },
                       "notes": {
                         "type": "string",
                         "nullable": true,
@@ -8378,6 +8478,56 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 99
+                        },
+                        "skill": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 160
+                        },
+                        "db": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 4
+                        },
+                        "ranged": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "acc": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 20
+                            },
+                            "range": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "rof": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 20
+                            },
+                            "shots": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 20
+                            },
+                            "bulk": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": -12,
+                              "maximum": 0
+                            },
+                            "recoil": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 1,
+                              "maximum": 9
+                            }
+                          }
                         },
                         "notes": {
                           "type": "string",
@@ -8576,6 +8726,56 @@
                         "minimum": 0,
                         "maximum": 99
                       },
+                      "skill": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 160
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
+                      },
+                      "ranged": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "acc": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 20
+                          },
+                          "range": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "rof": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "shots": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "bulk": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": -12,
+                            "maximum": 0
+                          },
+                          "recoil": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 1,
+                            "maximum": 9
+                          }
+                        }
+                      },
                       "notes": {
                         "type": "string",
                         "nullable": true,
@@ -8708,6 +8908,56 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 99
+                        },
+                        "skill": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 160
+                        },
+                        "db": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 4
+                        },
+                        "ranged": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "acc": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 20
+                            },
+                            "range": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "rof": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 20
+                            },
+                            "shots": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 20
+                            },
+                            "bulk": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": -12,
+                              "maximum": 0
+                            },
+                            "recoil": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 1,
+                              "maximum": 9
+                            }
+                          }
                         },
                         "notes": {
                           "type": "string",
@@ -10890,6 +11140,56 @@
                                 "minimum": 0,
                                 "maximum": 99
                               },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
+                              },
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
@@ -12141,6 +12441,56 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 99
+                                  },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
                                   },
                                   "notes": {
                                     "type": "string",
@@ -13658,6 +14008,56 @@
                                 "minimum": 0,
                                 "maximum": 99
                               },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
+                              },
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
@@ -14978,6 +15378,56 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 99
+                              },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
                               },
                               "notes": {
                                 "type": "string",
@@ -16463,6 +16913,56 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 99
+                                  },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
                                   },
                                   "notes": {
                                     "type": "string",
@@ -17960,6 +18460,56 @@
                                     "minimum": 0,
                                     "maximum": 99
                                   },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
+                                  },
                                   "notes": {
                                     "type": "string",
                                     "nullable": true,
@@ -19223,6 +19773,56 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 99
+                              },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
                               },
                               "notes": {
                                 "type": "string",
@@ -20644,6 +21244,56 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 99
+                                  },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
                                   },
                                   "notes": {
                                     "type": "string",
@@ -22076,6 +22726,56 @@
                                     "minimum": 0,
                                     "maximum": 99
                                   },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
+                                  },
                                   "notes": {
                                     "type": "string",
                                     "nullable": true,
@@ -23339,6 +24039,56 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 99
+                              },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
                               },
                               "notes": {
                                 "type": "string",
@@ -24779,6 +25529,56 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 99
+                                  },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
                                   },
                                   "notes": {
                                     "type": "string",
@@ -26232,6 +27032,56 @@
                                     "minimum": 0,
                                     "maximum": 99
                                   },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
+                                  },
                                   "notes": {
                                     "type": "string",
                                     "nullable": true,
@@ -27496,6 +28346,56 @@
                                 "minimum": 0,
                                 "maximum": 99
                               },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
+                              },
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
@@ -27972,6 +28872,56 @@
                         "minimum": 0,
                         "maximum": 99
                       },
+                      "skill": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 160
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
+                      },
+                      "ranged": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "acc": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 20
+                          },
+                          "range": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "rof": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "shots": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "bulk": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": -12,
+                            "maximum": 0
+                          },
+                          "recoil": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 1,
+                            "maximum": 9
+                          }
+                        }
+                      },
                       "notes": {
                         "type": "string",
                         "nullable": true,
@@ -28212,6 +29162,56 @@
                               "nullable": true,
                               "minimum": 0,
                               "maximum": 99
+                            },
+                            "skill": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 160
+                            },
+                            "db": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 4
+                            },
+                            "ranged": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "acc": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 20
+                                },
+                                "range": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 40
+                                },
+                                "rof": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 20
+                                },
+                                "shots": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 20
+                                },
+                                "bulk": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": -12,
+                                  "maximum": 0
+                                },
+                                "recoil": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 1,
+                                  "maximum": 9
+                                }
+                              }
                             },
                             "notes": {
                               "type": "string",
@@ -29250,6 +30250,56 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 99
+                                  },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
                                   },
                                   "notes": {
                                     "type": "string",
@@ -29742,6 +30792,56 @@
                         "minimum": 0,
                         "maximum": 99
                       },
+                      "skill": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 160
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
+                      },
+                      "ranged": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "acc": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 20
+                          },
+                          "range": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 40
+                          },
+                          "rof": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "shots": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 20
+                          },
+                          "bulk": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": -12,
+                            "maximum": 0
+                          },
+                          "recoil": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 1,
+                            "maximum": 9
+                          }
+                        }
+                      },
                       "notes": {
                         "type": "string",
                         "nullable": true,
@@ -29979,6 +31079,56 @@
                               "nullable": true,
                               "minimum": 0,
                               "maximum": 99
+                            },
+                            "skill": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 160
+                            },
+                            "db": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 4
+                            },
+                            "ranged": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "acc": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 20
+                                },
+                                "range": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 40
+                                },
+                                "rof": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 20
+                                },
+                                "shots": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 20
+                                },
+                                "bulk": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": -12,
+                                  "maximum": 0
+                                },
+                                "recoil": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 1,
+                                  "maximum": 9
+                                }
+                              }
                             },
                             "notes": {
                               "type": "string",
@@ -31017,6 +32167,56 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 99
+                                  },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
                                   },
                                   "notes": {
                                     "type": "string",
@@ -32281,6 +33481,56 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 99
+                              },
+                              "skill": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 160
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
+                              },
+                              "ranged": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "acc": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 20
+                                  },
+                                  "range": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "rof": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "shots": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 20
+                                  },
+                                  "bulk": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": -12,
+                                    "maximum": 0
+                                  },
+                                  "recoil": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 1,
+                                    "maximum": 9
+                                  }
+                                }
                               },
                               "notes": {
                                 "type": "string",
@@ -33647,6 +34897,56 @@
                                     "minimum": 0,
                                     "maximum": 99
                                   },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
+                                  },
                                   "notes": {
                                     "type": "string",
                                     "nullable": true,
@@ -34924,6 +36224,56 @@
                                     "minimum": 0,
                                     "maximum": 99
                                   },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
+                                  },
                                   "notes": {
                                     "type": "string",
                                     "nullable": true,
@@ -36198,6 +37548,56 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 99
+                                  },
+                                  "skill": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 160
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
+                                  },
+                                  "ranged": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                      "acc": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 20
+                                      },
+                                      "range": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 40
+                                      },
+                                      "rof": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "shots": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 20
+                                      },
+                                      "bulk": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": -12,
+                                        "maximum": 0
+                                      },
+                                      "recoil": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1,
+                                        "maximum": 9
+                                      }
+                                    }
                                   },
                                   "notes": {
                                     "type": "string",

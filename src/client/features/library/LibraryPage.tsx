@@ -302,7 +302,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <header className="flex items-end justify-between gap-4">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="label-eyebrow">
             Campaign · {currentCampaign?.name ?? 'No campaign selected'}

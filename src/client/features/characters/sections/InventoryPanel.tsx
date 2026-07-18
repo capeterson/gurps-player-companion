@@ -17,6 +17,7 @@
  */
 
 import { type FormEvent, type ReactNode, useMemo, useRef, useState } from 'react';
+import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import type { LibraryItemOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type {
@@ -30,6 +31,7 @@ import { useRangeSelect } from '../../../hooks/useRangeSelect.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueDelete, enqueueFieldPatch } from '../../../sync/outbox.ts';
+import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
 import { ItemEditDialog } from './ItemEditDialog.tsx';
 import { buildTree, descendantsOf, flattenDFS } from './inventoryTree.ts';
@@ -215,6 +217,9 @@ export function InventoryPanel({
       reach: null,
       parry: null,
       stRequired: null,
+      skill: null,
+      db: null,
+      ranged: null,
       notes: null,
     };
 
@@ -857,33 +862,21 @@ export function InventoryPanel({
           </div>
           {moreOpen && (
             <div className="flex flex-wrap items-center gap-4 border-t border-base-300/60 pt-2 text-xs">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={newIsContainer}
-                  onChange={(e) => setNewIsContainer(e.target.checked)}
-                />
-                <span>Container</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={newIsArmor}
-                  onChange={(e) => setNewIsArmor(e.target.checked)}
-                />
-                <span>Armor</span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={newIsWeapon}
-                  onChange={(e) => setNewIsWeapon(e.target.checked)}
-                />
-                <span>Weapon</span>
-              </label>
+              <FacetChipRow
+                facets={['container', 'armor', 'weapon']}
+                active={{
+                  container: newIsContainer,
+                  armor: newIsArmor,
+                  weapon: newIsWeapon,
+                  powerstone: false,
+                  magicItem: false,
+                }}
+                onToggle={(facet, next) => {
+                  if (facet === 'container') setNewIsContainer(next);
+                  else if (facet === 'armor') setNewIsArmor(next);
+                  else if (facet === 'weapon') setNewIsWeapon(next);
+                }}
+              />
               {parentId === '' && (
                 <label className="flex items-center gap-2">
                   <input
@@ -929,6 +922,7 @@ export function InventoryPanel({
       <ItemEditDialog
         open={editing !== null}
         item={editing}
+        skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
         onCancel={() => setEditing(null)}
         onSubmit={(patch) => {
           if (editing) {

@@ -22,12 +22,17 @@ export interface RollHistoryEntry {
   readonly at: Date;
   readonly characterId: string;
   readonly label: string;
-  /** Effective target the roll was made against (base + modifier). */
-  readonly target: number;
-  readonly dice: readonly [number, number, number];
+  /** Absent on entries stored before damage rolls existed => 'check'. */
+  readonly kind?: 'check' | 'damage';
+  /** Effective target the roll was made against (base + modifier). Check rolls only. */
+  readonly target?: number;
+  readonly dice: readonly number[];
   readonly total: number;
-  readonly margin: number;
-  readonly crit: CritKind;
+  /** Check rolls only. */
+  readonly margin?: number;
+  readonly crit?: CritKind;
+  /** Damage rolls only: type suffix for display (e.g. "cut"). */
+  readonly damageType?: string | null;
 }
 
 const MAX_ENTRIES = 100;
@@ -38,11 +43,14 @@ interface StoredEntry {
   readonly at: string;
   readonly characterId: string;
   readonly label: string;
-  readonly target: number;
-  readonly dice: readonly [number, number, number];
+  /** Missing on entries persisted before damage rolls existed. */
+  readonly kind?: 'check' | 'damage';
+  readonly target?: number;
+  readonly dice: readonly number[];
   readonly total: number;
-  readonly margin: number;
-  readonly crit: CritKind;
+  readonly margin?: number;
+  readonly crit?: CritKind;
+  readonly damageType?: string | null;
 }
 
 function storageKey(characterId: string): string {

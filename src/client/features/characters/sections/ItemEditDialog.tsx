@@ -7,10 +7,13 @@ import type {
   MagicItemData,
   MagicItemMode,
   PowerstoneData,
+  RangedData,
   WeaponData,
 } from '../../../../shared/schemas/inventory.ts';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
+import { FACET_LABELS, type Facet, FacetChipRow } from './FacetChips.tsx';
 
 const REDUCTIONS = [0, 25, 50] as const;
 const MAGIC_ITEM_MODES: readonly MagicItemMode[] = ['charged', 'powered', 'continuous'];
@@ -53,6 +56,9 @@ function defaultWeapon(): WeaponData {
     reach: null,
     parry: null,
     stRequired: null,
+    skill: null,
+    db: null,
+    ranged: null,
     notes: null,
   };
 }
@@ -60,11 +66,19 @@ function defaultWeapon(): WeaponData {
 export interface ItemEditDialogProps {
   open: boolean;
   item: InventoryItemOut | null;
+  /** Character's skill names, for the weapon governing-skill datalist. */
+  skillNames?: readonly string[];
   onSubmit: (patch: InventoryItemUpdate) => void;
   onCancel: () => void;
 }
 
-export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialogProps) {
+export function ItemEditDialog({
+  open,
+  item,
+  skillNames = [],
+  onSubmit,
+  onCancel,
+}: ItemEditDialogProps) {
   const ref = useDialogState(open);
   const toasts = useToasts();
 
@@ -103,6 +117,17 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
   const [weapon, setWeapon] = useState<WeaponData>(defaultWeapon());
   const [stRequiredRaw, setStRequiredRaw] = useState('');
 
+  // A facet whose removal would clear data waits on a confirm.
+  const [pendingRemoval, setPendingRemoval] = useState<Facet | null>(null);
+  const [dbRaw, setDbRaw] = useState('');
+  const [isRanged, setIsRanged] = useState(false);
+  const [accRaw, setAccRaw] = useState('');
+  const [rangeRaw, setRangeRaw] = useState('');
+  const [rofRaw, setRofRaw] = useState('');
+  const [shotsRaw, setShotsRaw] = useState('');
+  const [bulkRaw, setBulkRaw] = useState('');
+  const [recoilRaw, setRecoilRaw] = useState('');
+
   useEffect(() => {
     if (!item) return;
     setName(item.name);
@@ -138,6 +163,15 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
     setIsWeapon(wd != null);
     setWeapon(wd ?? defaultWeapon());
     setStRequiredRaw(wd?.stRequired == null ? '' : String(wd.stRequired));
+    setDbRaw(wd?.db == null ? '' : String(wd.db));
+    const rg = wd?.ranged ?? null;
+    setIsRanged(rg != null);
+    setAccRaw(rg?.acc == null ? '' : String(rg.acc));
+    setRangeRaw(rg?.range ?? '');
+    setRofRaw(rg?.rof ?? '');
+    setShotsRaw(rg?.shots ?? '');
+    setBulkRaw(rg?.bulk == null ? '' : String(rg.bulk));
+    setRecoilRaw(rg?.recoil == null ? '' : String(rg.recoil));
   }, [item]);
 
   if (!item) return null;
@@ -158,6 +192,42 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
     if (!trimmed) return;
     toggleLocation(trimmed, true);
     setCustomLocation('');
+  }
+
+  const facetSetters: Record<Facet, (v: boolean) => void> = {
+    container: setIsContainer,
+    armor: setIsArmor,
+    weapon: setIsWeapon,
+    powerstone: setIsPowerstone,
+    magicItem: setIsMagicItem,
+  };
+
+  // Whether the item, as loaded, already carried structured data for a
+  // facet — i.e. removing it now would discard something on Save.
+  function facetHasData(facet: Facet): boolean {
+    if (!item) return false;
+    switch (facet) {
+      case 'container':
+        return item.isContainer;
+      case 'armor':
+        return item.armor != null;
+      case 'weapon':
+        return item.weaponData != null;
+      case 'powerstone':
+        return item.powerstoneData != null;
+      case 'magicItem':
+        return item.magicItemData != null;
+    }
+  }
+
+  function toggleFacet(facet: Facet, next: boolean) {
+    // Removing a data-bearing facet asks first; the data is only nulled
+    // at Save, so Cancel (of the whole dialog) is still a full escape.
+    if (!next && facetHasData(facet)) {
+      setPendingRemoval(facet);
+      return;
+    }
+    facetSetters[facet](next);
   }
 
   function handleSubmit(e: FormEvent) {
@@ -216,11 +286,25 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
     if (isWeapon) {
       const stNum =
         stRequiredRaw === '' ? null : Math.max(0, Math.floor(Number(stRequiredRaw)) || 0);
+      const dbNum = dbRaw === '' ? null : Math.max(0, Math.min(4, Math.floor(Number(dbRaw)) || 0));
+      const rangedPatch: RangedData | null = isRanged
+        ? {
+            acc: accRaw === '' ? null : Math.max(0, Math.floor(Number(accRaw)) || 0),
+            range: rangeRaw.trim() || null,
+            rof: rofRaw.trim() || null,
+            shots: shotsRaw.trim() || null,
+            bulk: bulkRaw === '' ? null : Math.min(0, Math.floor(Number(bulkRaw)) || 0),
+            recoil: recoilRaw === '' ? null : Math.max(1, Math.floor(Number(recoilRaw)) || 1),
+          }
+        : null;
       weaponPatch = {
         damage: weapon.damage?.trim() || undefined,
         reach: weapon.reach?.trim() || null,
         parry: weapon.parry?.trim() || null,
         stRequired: stNum,
+        skill: weapon.skill?.trim() || null,
+        db: dbNum,
+        ranged: rangedPatch,
         notes: weapon.notes?.trim() || null,
       };
     }
@@ -247,536 +331,629 @@ export function ItemEditDialog({ open, item, onSubmit, onCancel }: ItemEditDialo
   }
 
   return (
-    <dialog ref={ref} className="modal" onClose={onCancel} onCancel={onCancel}>
-      <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-2xl">
-        <h3 className="font-display text-xl font-semibold">Edit item</h3>
-        <form onSubmit={handleSubmit} className="mt-3 space-y-4 text-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
-            <label className="sm:col-span-3 flex flex-col gap-1">
-              <span className="label-eyebrow">Name</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="input input-sm input-bordered"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Qty</span>
-              <input
-                value={quantity}
-                inputMode="numeric"
-                onChange={(e) => setQuantity(e.target.value)}
-                className="num input input-sm input-bordered text-right"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Weight (lb)</span>
-              <input
-                value={weight}
-                inputMode="decimal"
-                onChange={(e) => setWeight(e.target.value)}
-                className="num input input-sm input-bordered text-right"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Cost</span>
-              <input
-                value={cost}
-                inputMode="decimal"
-                onChange={(e) => setCost(e.target.value)}
-                className="num input input-sm input-bordered text-right"
-              />
-            </label>
-            <label className="sm:col-span-6 flex flex-col gap-1">
-              <span className="label-eyebrow">Notes</span>
-              <input
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="input input-sm input-bordered"
-              />
-            </label>
-          </div>
+    <>
+      <dialog ref={ref} className="modal" onClose={onCancel} onCancel={onCancel}>
+        <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-2xl">
+          <h3 className="font-display text-xl font-semibold">Edit item</h3>
+          <form onSubmit={handleSubmit} className="mt-3 space-y-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+              <label className="sm:col-span-3 flex flex-col gap-1">
+                <span className="label-eyebrow">Name</span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="input input-sm input-bordered"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="label-eyebrow">Qty</span>
+                <input
+                  value={quantity}
+                  inputMode="numeric"
+                  onChange={(e) => setQuantity(e.target.value)}
+                  className="num input input-sm input-bordered text-right"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="label-eyebrow">Weight (lb)</span>
+                <input
+                  value={weight}
+                  inputMode="decimal"
+                  onChange={(e) => setWeight(e.target.value)}
+                  className="num input input-sm input-bordered text-right"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="label-eyebrow">Cost</span>
+                <input
+                  value={cost}
+                  inputMode="decimal"
+                  onChange={(e) => setCost(e.target.value)}
+                  className="num input input-sm input-bordered text-right"
+                />
+              </label>
+              <label className="sm:col-span-6 flex flex-col gap-1">
+                <span className="label-eyebrow">Notes</span>
+                <input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="input input-sm input-bordered"
+                />
+              </label>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-4 border-t border-base-300/60 pt-3">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={equipped}
-                onChange={(e) => setEquipped(e.target.checked)}
-              />
-              <span>Equipped</span>
-            </label>
-            {isRoot && (
+            <div className="flex flex-wrap items-center gap-4 border-t border-base-300/60 pt-3">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   className="checkbox checkbox-sm"
-                  checked={worn}
-                  onChange={(e) => setWorn(e.target.checked)}
+                  checked={equipped}
+                  onChange={(e) => setEquipped(e.target.checked)}
                 />
-                <span>Worn</span>
+                <span>Equipped</span>
               </label>
-            )}
-            {isRoot && !worn && (
-              <label className="flex flex-1 items-center gap-2 min-w-[200px]">
-                <span className="label-eyebrow shrink-0">External location</span>
-                <input
-                  value={externalLocation}
-                  onChange={(e) => setExternalLocation(e.target.value)}
-                  className="input input-sm input-bordered flex-1"
-                  placeholder="e.g. Wagon, Inn room"
-                />
-              </label>
-            )}
-          </div>
-
-          <fieldset className="border border-base-300/60 rounded-xl p-3">
-            <legend className="px-2 label-eyebrow">Container</legend>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={isContainer}
-                onChange={(e) => setIsContainer(e.target.checked)}
-              />
-              <span>This item is a container</span>
-            </label>
-            {isContainer && (
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1">
-                  <span className="label-eyebrow">Hideaway capacity (lb)</span>
+              {isRoot && (
+                <label className="flex items-center gap-2">
                   <input
-                    value={hideaway}
-                    inputMode="decimal"
-                    onChange={(e) => setHideaway(e.target.value)}
-                    className="num input input-sm input-bordered text-right"
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={worn}
+                    onChange={(e) => setWorn(e.target.checked)}
+                  />
+                  <span>Worn</span>
+                </label>
+              )}
+              {isRoot && !worn && (
+                <label className="flex flex-1 items-center gap-2 min-w-[200px]">
+                  <span className="label-eyebrow shrink-0">External location</span>
+                  <input
+                    value={externalLocation}
+                    onChange={(e) => setExternalLocation(e.target.value)}
+                    className="input input-sm input-bordered flex-1"
+                    placeholder="e.g. Wagon, Inn room"
                   />
                 </label>
-                <div className="flex flex-col gap-1">
-                  <span className="label-eyebrow">Lighten</span>
-                  <div className="join">
-                    {REDUCTIONS.map((r) => (
+              )}
+            </div>
+
+            <div className="space-y-1.5 border-t border-base-300/60 pt-3">
+              <span className="label-eyebrow">Categories</span>
+              <FacetChipRow
+                active={{
+                  container: isContainer,
+                  armor: isArmor,
+                  weapon: isWeapon,
+                  powerstone: isPowerstone,
+                  magicItem: isMagicItem,
+                }}
+                onToggle={toggleFacet}
+              />
+            </div>
+
+            {isContainer && (
+              <fieldset className="border border-base-300/60 rounded-xl p-3">
+                <legend className="px-2 label-eyebrow">Container</legend>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Hideaway capacity (lb)</span>
+                    <input
+                      value={hideaway}
+                      inputMode="decimal"
+                      onChange={(e) => setHideaway(e.target.value)}
+                      className="num input input-sm input-bordered text-right"
+                    />
+                  </label>
+                  <div className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Lighten</span>
+                    <div className="join">
+                      {REDUCTIONS.map((r) => (
+                        <button
+                          type="button"
+                          key={r}
+                          className={`btn btn-sm join-item ${reduction === r ? 'btn-primary' : ''}`}
+                          onClick={() => setReduction(r)}
+                        >
+                          {r}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {Number(quantity) > 1 && (
+                    <p className="sm:col-span-2 text-warning text-xs">
+                      Stack of containers — hideaway / lighten only apply once on the worn root.
+                    </p>
+                  )}
+                </div>
+              </fieldset>
+            )}
+
+            {isArmor && (
+              <fieldset className="border border-base-300/60 rounded-xl p-3">
+                <legend className="px-2 label-eyebrow">Armor</legend>
+                <div className="mt-3 space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">DR</span>
+                      <input
+                        value={drRaw}
+                        inputMode="numeric"
+                        onChange={(e) => {
+                          setDrRaw(e.target.value);
+                          const v = Number(e.target.value);
+                          setArmor((a) => ({
+                            ...a,
+                            dr: Math.max(0, Math.floor(Number.isFinite(v) ? v : 0)),
+                          }));
+                        }}
+                        className="num input input-sm input-bordered text-right"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Crushing DR</span>
+                      <input
+                        value={drCrushingRaw}
+                        inputMode="numeric"
+                        placeholder="same"
+                        onChange={(e) => {
+                          setDrCrushingRaw(e.target.value);
+                          const raw = e.target.value;
+                          const v = Number(raw);
+                          setArmor((a) => ({
+                            ...a,
+                            drCrushing:
+                              raw === ''
+                                ? null
+                                : Math.max(0, Math.floor(Number.isFinite(v) ? v : 0)),
+                          }));
+                        }}
+                        className="num input input-sm input-bordered text-right"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={armor.flexible}
+                        onChange={(e) => setArmor((a) => ({ ...a, flexible: e.target.checked }))}
+                      />
+                      <span>Flexible</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={armor.frontOnly}
+                        onChange={(e) => setArmor((a) => ({ ...a, frontOnly: e.target.checked }))}
+                      />
+                      <span>Front only</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={armor.backOnly}
+                        onChange={(e) => setArmor((a) => ({ ...a, backOnly: e.target.checked }))}
+                      />
+                      <span>Back only</span>
+                    </label>
+                  </div>
+                  <div>
+                    <span className="label-eyebrow">Locations</span>
+                    <div className="mt-1 grid grid-cols-2 sm:grid-cols-3 gap-1">
+                      {HIT_LOCATIONS.map((loc: HitLocation) => {
+                        const checked = armor.locations.includes(loc);
+                        return (
+                          <label key={loc} className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-xs"
+                              checked={checked}
+                              onChange={(e) => toggleLocation(loc, e.target.checked)}
+                            />
+                            <span>{loc.replace('_', ' ')}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {armor.locations.some((l) => !HIT_LOCATIONS.includes(l as HitLocation)) && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {armor.locations
+                          .filter((l) => !HIT_LOCATIONS.includes(l as HitLocation))
+                          .map((l) => (
+                            <button
+                              key={l}
+                              type="button"
+                              className="badge badge-sm badge-ghost gap-1"
+                              onClick={() => toggleLocation(l, false)}
+                              aria-label={`Remove custom location ${l}`}
+                            >
+                              {l} ✕
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={customLocation}
+                        onChange={(e) => setCustomLocation(e.target.value)}
+                        className="input input-xs input-bordered flex-1"
+                        placeholder="Custom location (homebrew)"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addCustomLocation();
+                          }
+                        }}
+                      />
                       <button
                         type="button"
-                        key={r}
-                        className={`btn btn-sm join-item ${reduction === r ? 'btn-primary' : ''}`}
-                        onClick={() => setReduction(r)}
+                        className="btn btn-xs"
+                        onClick={addCustomLocation}
+                        disabled={!customLocation.trim()}
                       >
-                        {r}%
+                        Add
                       </button>
-                    ))}
+                    </div>
                   </div>
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Armor notes</span>
+                    <input
+                      value={armor.notes ?? ''}
+                      onChange={(e) =>
+                        setArmor((a) => ({
+                          ...a,
+                          notes: e.target.value === '' ? null : e.target.value,
+                        }))
+                      }
+                      className="input input-sm input-bordered"
+                    />
+                  </label>
                 </div>
-                {Number(quantity) > 1 && (
-                  <p className="sm:col-span-2 text-warning text-xs">
-                    Stack of containers — hideaway / lighten only apply once on the worn root.
-                  </p>
-                )}
-              </div>
+              </fieldset>
             )}
-          </fieldset>
 
-          <fieldset className="border border-base-300/60 rounded-xl p-3">
-            <legend className="px-2 label-eyebrow">Armor</legend>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={isArmor}
-                onChange={(e) => setIsArmor(e.target.checked)}
-              />
-              <span>This item provides DR</span>
-            </label>
-            {isArmor && (
-              <div className="mt-3 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">DR</span>
-                    <input
-                      value={drRaw}
-                      inputMode="numeric"
-                      onChange={(e) => {
-                        setDrRaw(e.target.value);
-                        const v = Number(e.target.value);
-                        setArmor((a) => ({
-                          ...a,
-                          dr: Math.max(0, Math.floor(Number.isFinite(v) ? v : 0)),
-                        }));
-                      }}
-                      className="num input input-sm input-bordered text-right"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">Crushing DR</span>
-                    <input
-                      value={drCrushingRaw}
-                      inputMode="numeric"
-                      placeholder="same"
-                      onChange={(e) => {
-                        setDrCrushingRaw(e.target.value);
-                        const raw = e.target.value;
-                        const v = Number(raw);
-                        setArmor((a) => ({
-                          ...a,
-                          drCrushing:
-                            raw === '' ? null : Math.max(0, Math.floor(Number.isFinite(v) ? v : 0)),
-                        }));
-                      }}
-                      className="num input input-sm input-bordered text-right"
-                    />
-                  </label>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-sm"
-                      checked={armor.flexible}
-                      onChange={(e) => setArmor((a) => ({ ...a, flexible: e.target.checked }))}
-                    />
-                    <span>Flexible</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-sm"
-                      checked={armor.frontOnly}
-                      onChange={(e) => setArmor((a) => ({ ...a, frontOnly: e.target.checked }))}
-                    />
-                    <span>Front only</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-sm"
-                      checked={armor.backOnly}
-                      onChange={(e) => setArmor((a) => ({ ...a, backOnly: e.target.checked }))}
-                    />
-                    <span>Back only</span>
-                  </label>
-                </div>
-                <div>
-                  <span className="label-eyebrow">Locations</span>
-                  <div className="mt-1 grid grid-cols-2 sm:grid-cols-3 gap-1">
-                    {HIT_LOCATIONS.map((loc: HitLocation) => {
-                      const checked = armor.locations.includes(loc);
-                      return (
-                        <label key={loc} className="flex items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-xs"
-                            checked={checked}
-                            onChange={(e) => toggleLocation(loc, e.target.checked)}
-                          />
-                          <span>{loc.replace('_', ' ')}</span>
-                        </label>
-                      );
-                    })}
+            {isWeapon && (
+              <fieldset className="border border-base-300/60 rounded-xl p-3">
+                <legend className="px-2 label-eyebrow">Weapon</legend>
+                <div className="mt-3 space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <label className="sm:col-span-2 flex flex-col gap-1">
+                      <span className="label-eyebrow">Damage</span>
+                      <input
+                        value={weapon.damage ?? ''}
+                        onChange={(e) => setWeapon((w) => ({ ...w, damage: e.target.value }))}
+                        className="input input-sm input-bordered"
+                        placeholder="sw+1 cut / thr+1 cr"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Reach</span>
+                      <input
+                        value={weapon.reach ?? ''}
+                        onChange={(e) =>
+                          setWeapon((w) => ({
+                            ...w,
+                            reach: e.target.value === '' ? null : e.target.value,
+                          }))
+                        }
+                        className="input input-sm input-bordered"
+                        placeholder="1"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Parry</span>
+                      <input
+                        value={weapon.parry ?? ''}
+                        onChange={(e) =>
+                          setWeapon((w) => ({
+                            ...w,
+                            parry: e.target.value === '' ? null : e.target.value,
+                          }))
+                        }
+                        className="input input-sm input-bordered"
+                        placeholder="0"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">ST required</span>
+                      <input
+                        value={stRequiredRaw}
+                        inputMode="numeric"
+                        onChange={(e) => setStRequiredRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                        placeholder="—"
+                      />
+                    </label>
                   </div>
-                  {armor.locations.some((l) => !HIT_LOCATIONS.includes(l as HitLocation)) && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {armor.locations
-                        .filter((l) => !HIT_LOCATIONS.includes(l as HitLocation))
-                        .map((l) => (
-                          <button
-                            key={l}
-                            type="button"
-                            className="badge badge-sm badge-ghost gap-1"
-                            onClick={() => toggleLocation(l, false)}
-                            aria-label={`Remove custom location ${l}`}
-                          >
-                            {l} ✕
-                          </button>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <label className="sm:col-span-3 flex flex-col gap-1">
+                      <span className="label-eyebrow">Skill</span>
+                      <input
+                        value={weapon.skill ?? ''}
+                        list="weapon-skill-options"
+                        onChange={(e) =>
+                          setWeapon((w) => ({
+                            ...w,
+                            skill: e.target.value === '' ? null : e.target.value,
+                          }))
+                        }
+                        className="input input-sm input-bordered"
+                        placeholder="e.g. Broadsword"
+                      />
+                      <span className="text-[11px] text-base-content/50">
+                        Governs attack &amp; parry rolls. Leave blank to match by weapon name.
+                      </span>
+                      <datalist id="weapon-skill-options">
+                        {skillNames.map((n) => (
+                          <option key={n} value={n} />
                         ))}
+                      </datalist>
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Shield DB</span>
+                      <input
+                        value={dbRaw}
+                        inputMode="numeric"
+                        onChange={(e) => setDbRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                        placeholder="—"
+                      />
+                    </label>
+                  </div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm"
+                      checked={isRanged}
+                      onChange={(e) => setIsRanged(e.target.checked)}
+                    />
+                    <span>This weapon can attack at range</span>
+                  </label>
+                  {isRanged && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Acc</span>
+                        <input
+                          value={accRaw}
+                          inputMode="numeric"
+                          onChange={(e) => setAccRaw(e.target.value)}
+                          className="num input input-sm input-bordered text-right"
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Range</span>
+                        <input
+                          value={rangeRaw}
+                          onChange={(e) => setRangeRaw(e.target.value)}
+                          className="input input-sm input-bordered"
+                          placeholder="100/150"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">RoF</span>
+                        <input
+                          value={rofRaw}
+                          onChange={(e) => setRofRaw(e.target.value)}
+                          className="input input-sm input-bordered"
+                          placeholder="1"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Shots</span>
+                        <input
+                          value={shotsRaw}
+                          onChange={(e) => setShotsRaw(e.target.value)}
+                          className="input input-sm input-bordered"
+                          placeholder="9+1(3)"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Bulk</span>
+                        <input
+                          value={bulkRaw}
+                          inputMode="numeric"
+                          onChange={(e) => setBulkRaw(e.target.value)}
+                          className="num input input-sm input-bordered text-right"
+                          placeholder="−4"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Recoil</span>
+                        <input
+                          value={recoilRaw}
+                          inputMode="numeric"
+                          onChange={(e) => setRecoilRaw(e.target.value)}
+                          className="num input input-sm input-bordered text-right"
+                          placeholder="1"
+                        />
+                      </label>
                     </div>
                   )}
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      value={customLocation}
-                      onChange={(e) => setCustomLocation(e.target.value)}
-                      className="input input-xs input-bordered flex-1"
-                      placeholder="Custom location (homebrew)"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addCustomLocation();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-xs"
-                      onClick={addCustomLocation}
-                      disabled={!customLocation.trim()}
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-                <label className="flex flex-col gap-1">
-                  <span className="label-eyebrow">Armor notes</span>
-                  <input
-                    value={armor.notes ?? ''}
-                    onChange={(e) =>
-                      setArmor((a) => ({
-                        ...a,
-                        notes: e.target.value === '' ? null : e.target.value,
-                      }))
-                    }
-                    className="input input-sm input-bordered"
-                  />
-                </label>
-              </div>
-            )}
-          </fieldset>
-
-          <fieldset className="border border-base-300/60 rounded-xl p-3">
-            <legend className="px-2 label-eyebrow">Weapon</legend>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={isWeapon}
-                onChange={(e) => setIsWeapon(e.target.checked)}
-              />
-              <span>This item is a weapon</span>
-            </label>
-            {isWeapon && (
-              <div className="mt-3 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <label className="sm:col-span-2 flex flex-col gap-1">
-                    <span className="label-eyebrow">Damage</span>
-                    <input
-                      value={weapon.damage ?? ''}
-                      onChange={(e) => setWeapon((w) => ({ ...w, damage: e.target.value }))}
-                      className="input input-sm input-bordered"
-                      placeholder="sw+1 cut / thr+1 cr"
-                    />
-                  </label>
                   <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">Reach</span>
+                    <span className="label-eyebrow">Weapon notes</span>
                     <input
-                      value={weapon.reach ?? ''}
+                      value={weapon.notes ?? ''}
                       onChange={(e) =>
                         setWeapon((w) => ({
                           ...w,
-                          reach: e.target.value === '' ? null : e.target.value,
+                          notes: e.target.value === '' ? null : e.target.value,
                         }))
                       }
                       className="input input-sm input-bordered"
-                      placeholder="1"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">Parry</span>
-                    <input
-                      value={weapon.parry ?? ''}
-                      onChange={(e) =>
-                        setWeapon((w) => ({
-                          ...w,
-                          parry: e.target.value === '' ? null : e.target.value,
-                        }))
-                      }
-                      className="input input-sm input-bordered"
-                      placeholder="0"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">ST required</span>
-                    <input
-                      value={stRequiredRaw}
-                      inputMode="numeric"
-                      onChange={(e) => setStRequiredRaw(e.target.value)}
-                      className="num input input-sm input-bordered text-right"
-                      placeholder="—"
                     />
                   </label>
                 </div>
-                <label className="flex flex-col gap-1">
-                  <span className="label-eyebrow">Weapon notes</span>
-                  <input
-                    value={weapon.notes ?? ''}
-                    onChange={(e) =>
-                      setWeapon((w) => ({
-                        ...w,
-                        notes: e.target.value === '' ? null : e.target.value,
-                      }))
-                    }
-                    className="input input-sm input-bordered"
-                  />
-                </label>
-              </div>
+              </fieldset>
             )}
-          </fieldset>
 
-          <fieldset className="border border-base-300/60 rounded-xl p-3">
-            <legend className="px-2 label-eyebrow">Powerstone</legend>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={isPowerstone}
-                onChange={(e) => setIsPowerstone(e.target.checked)}
-              />
-              <span>This item is a powerstone</span>
-            </label>
             {isPowerstone && (
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <label className="flex flex-col gap-1">
-                  <span className="label-eyebrow">Max energy</span>
-                  <input
-                    value={psMaxRaw}
-                    inputMode="numeric"
-                    onChange={(e) => setPsMaxRaw(e.target.value)}
-                    className="num input input-sm input-bordered text-right"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="label-eyebrow">Current charge</span>
-                  <input
-                    value={psCurRaw}
-                    inputMode="numeric"
-                    onChange={(e) => setPsCurRaw(e.target.value)}
-                    className="num input input-sm input-bordered text-right"
-                  />
-                </label>
-                <label className="sm:col-span-3 flex flex-col gap-1">
-                  <span className="label-eyebrow">Stone notes</span>
-                  <input
-                    value={powerstone.notes ?? ''}
-                    onChange={(e) =>
-                      setPowerstone((p) => ({
-                        ...p,
-                        notes: e.target.value === '' ? null : e.target.value,
-                      }))
-                    }
-                    className="input input-sm input-bordered"
-                    placeholder="e.g. Manastone, attuned to fire"
-                  />
-                </label>
-              </div>
-            )}
-          </fieldset>
-
-          <fieldset className="border border-base-300/60 rounded-xl p-3">
-            <legend className="px-2 label-eyebrow">Magic item</legend>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={isMagicItem}
-                onChange={(e) => setIsMagicItem(e.target.checked)}
-              />
-              <span>This item casts a spell</span>
-            </label>
-            {isMagicItem && (
-              <div className="mt-3 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <fieldset className="border border-base-300/60 rounded-xl p-3">
+                <legend className="px-2 label-eyebrow">Powerstone</legend>
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">Spell</span>
+                    <span className="label-eyebrow">Max energy</span>
                     <input
-                      value={magicItem.spellName}
-                      onChange={(e) => setMagicItem((m) => ({ ...m, spellName: e.target.value }))}
-                      className="input input-sm input-bordered"
-                      placeholder="e.g. Fireball"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">Enchanter skill</span>
-                    <input
-                      value={miSkillRaw}
+                      value={psMaxRaw}
                       inputMode="numeric"
-                      onChange={(e) => setMiSkillRaw(e.target.value)}
+                      onChange={(e) => setPsMaxRaw(e.target.value)}
                       className="num input input-sm input-bordered text-right"
                     />
                   </label>
                   <label className="flex flex-col gap-1">
-                    <span className="label-eyebrow">Mode</span>
-                    <select
-                      className="select select-sm select-bordered"
-                      value={magicItem.mode}
+                    <span className="label-eyebrow">Current charge</span>
+                    <input
+                      value={psCurRaw}
+                      inputMode="numeric"
+                      onChange={(e) => setPsCurRaw(e.target.value)}
+                      className="num input input-sm input-bordered text-right"
+                    />
+                  </label>
+                  <label className="sm:col-span-3 flex flex-col gap-1">
+                    <span className="label-eyebrow">Stone notes</span>
+                    <input
+                      value={powerstone.notes ?? ''}
+                      onChange={(e) =>
+                        setPowerstone((p) => ({
+                          ...p,
+                          notes: e.target.value === '' ? null : e.target.value,
+                        }))
+                      }
+                      className="input input-sm input-bordered"
+                      placeholder="e.g. Manastone, attuned to fire"
+                    />
+                  </label>
+                </div>
+              </fieldset>
+            )}
+
+            {isMagicItem && (
+              <fieldset className="border border-base-300/60 rounded-xl p-3">
+                <legend className="px-2 label-eyebrow">Magic item</legend>
+                <div className="mt-3 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Spell</span>
+                      <input
+                        value={magicItem.spellName}
+                        onChange={(e) => setMagicItem((m) => ({ ...m, spellName: e.target.value }))}
+                        className="input input-sm input-bordered"
+                        placeholder="e.g. Fireball"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Enchanter skill</span>
+                      <input
+                        value={miSkillRaw}
+                        inputMode="numeric"
+                        onChange={(e) => setMiSkillRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Mode</span>
+                      <select
+                        className="select select-sm select-bordered"
+                        value={magicItem.mode}
+                        onChange={(e) =>
+                          setMagicItem((m) => ({
+                            ...m,
+                            mode: e.target.value as MagicItemMode,
+                          }))
+                        }
+                      >
+                        {MAGIC_ITEM_MODES.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {magicItem.mode === 'charged' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Max charges</span>
+                        <input
+                          value={miMaxRaw}
+                          inputMode="numeric"
+                          onChange={(e) => setMiMaxRaw(e.target.value)}
+                          className="num input input-sm input-bordered text-right"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Current charges</span>
+                        <input
+                          value={miCurRaw}
+                          inputMode="numeric"
+                          onChange={(e) => setMiCurRaw(e.target.value)}
+                          className="num input input-sm input-bordered text-right"
+                        />
+                      </label>
+                    </div>
+                  )}
+                  {magicItem.mode === 'powered' && (
+                    <label className="flex flex-col gap-1 max-w-[14rem]">
+                      <span className="label-eyebrow">Energy / use (FP)</span>
+                      <input
+                        value={miEnergyRaw}
+                        inputMode="numeric"
+                        onChange={(e) => setMiEnergyRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                        placeholder="e.g. 1"
+                      />
+                    </label>
+                  )}
+                  <label className="flex flex-col gap-1">
+                    <span className="label-eyebrow">Item notes</span>
+                    <input
+                      value={magicItem.notes ?? ''}
                       onChange={(e) =>
                         setMagicItem((m) => ({
                           ...m,
-                          mode: e.target.value as MagicItemMode,
+                          notes: e.target.value === '' ? null : e.target.value,
                         }))
                       }
-                    >
-                      {MAGIC_ITEM_MODES.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                {magicItem.mode === 'charged' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-1">
-                      <span className="label-eyebrow">Max charges</span>
-                      <input
-                        value={miMaxRaw}
-                        inputMode="numeric"
-                        onChange={(e) => setMiMaxRaw(e.target.value)}
-                        className="num input input-sm input-bordered text-right"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="label-eyebrow">Current charges</span>
-                      <input
-                        value={miCurRaw}
-                        inputMode="numeric"
-                        onChange={(e) => setMiCurRaw(e.target.value)}
-                        className="num input input-sm input-bordered text-right"
-                      />
-                    </label>
-                  </div>
-                )}
-                {magicItem.mode === 'powered' && (
-                  <label className="flex flex-col gap-1 max-w-[14rem]">
-                    <span className="label-eyebrow">Energy / use (FP)</span>
-                    <input
-                      value={miEnergyRaw}
-                      inputMode="numeric"
-                      onChange={(e) => setMiEnergyRaw(e.target.value)}
-                      className="num input input-sm input-bordered text-right"
-                      placeholder="e.g. 1"
+                      className="input input-sm input-bordered"
                     />
                   </label>
-                )}
-                <label className="flex flex-col gap-1">
-                  <span className="label-eyebrow">Item notes</span>
-                  <input
-                    value={magicItem.notes ?? ''}
-                    onChange={(e) =>
-                      setMagicItem((m) => ({
-                        ...m,
-                        notes: e.target.value === '' ? null : e.target.value,
-                      }))
-                    }
-                    className="input input-sm input-bordered"
-                  />
-                </label>
-              </div>
+                </div>
+              </fieldset>
             )}
-          </fieldset>
 
-          <div className="modal-action">
-            <button type="button" onClick={onCancel} className="btn btn-ghost">
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              Save
-            </button>
-          </div>
+            <div className="modal-action">
+              <button type="button" onClick={onCancel} className="btn btn-ghost">
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary">
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button type="button" onClick={onCancel}>
+            close
+          </button>
         </form>
-      </div>
-      <form method="dialog" className="modal-backdrop">
-        <button type="button" onClick={onCancel}>
-          close
-        </button>
-      </form>
-    </dialog>
+      </dialog>
+
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        title={`Remove the ${pendingRemoval ? FACET_LABELS[pendingRemoval] : ''} category?`}
+        confirmLabel="Remove"
+        tone="error"
+        onConfirm={() => {
+          if (pendingRemoval) facetSetters[pendingRemoval](false);
+          setPendingRemoval(null);
+        }}
+        onCancel={() => setPendingRemoval(null)}
+      >
+        Its {pendingRemoval ? FACET_LABELS[pendingRemoval].toLowerCase() : ''} data will be cleared
+        when you save. Cancel the edit to keep it.
+      </ConfirmDialog>
+    </>
   );
 }

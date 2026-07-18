@@ -5,6 +5,13 @@
  * to the bottom edge below the `md` breakpoint), centered dialog on
  * larger screens.
  *
+ * Two variants share the shell:
+ *   - Check rolls (default): 3d6 vs an effective target, the ± steppers
+ *     adjust the target modifier, presets replace it (single-select).
+ *   - Damage rolls (`request.damage` present): NdM+adds with no target;
+ *     the ± steppers adjust the flat adds (e.g. All-Out Attack +2) and
+ *     presets are hidden.
+ *
  * Every defense row in the Combat tab (Dodge/Parry/Block) is also routed
  * through this sheet with `evaluateRoll` as-is. GURPS defenses don't
  * actually use the skill-roll crit table (a defense "critical" is a
@@ -15,7 +22,14 @@
  */
 
 import { useEffect, useState } from 'react';
-import { type CritKind, evaluateRoll, roll3d6 } from '../../../../shared/domain/diceRoll.ts';
+import { formatDamageDice } from '../../../../shared/constants/damage.ts';
+import { minBasicDamageFor } from '../../../../shared/domain/damageParse.ts';
+import {
+  type CritKind,
+  evaluateRoll,
+  roll3d6,
+  rollDamageDice,
+} from '../../../../shared/domain/diceRoll.ts';
 import { formatSigned } from '../../../../shared/format/number.ts';
 import { newClientId } from '../../../sync/outbox.ts';
 import { pushRoll } from './rollHistory.ts';
@@ -27,7 +41,13 @@ export interface RollSheetProps {
   onClose: () => void;
 }
 
-const MOD_MIN = -10;
+// -25 (not -10) so the deepest range-penalty preset (-12, B550) is not
+// silently clamped to a different value than its chip advertises, AND
+// there's headroom to further compose it with the ± stepper toward a
+// deep hit-location penalty (e.g. 200 yd + Eye = -12 + -9 = -21) —
+// presets are single-select (see applyPreset), so stacking a second
+// penalty on top of a chosen preset is the stepper's job.
+const MOD_MIN = -25;
 const MOD_MAX = 10;
 
 function clampMod(n: number): number {
@@ -45,6 +65,13 @@ interface RollResult {
   readonly target: number;
 }
 
+interface DamageResult {
+  readonly rolls: readonly number[];
+  readonly total: number;
+  /** Formula the roll was made with, self-describing like `target` above. */
+  readonly formula: string;
+}
+
 export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   const [modifier, setModifier] = useState(0);
   // Single-select: picking a preset REPLACES the modifier with its
@@ -55,6 +82,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   // need its own UI to show which presets are contributing.
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [result, setResult] = useState<RollResult | null>(null);
+  const [damageResult, setDamageResult] = useState<DamageResult | null>(null);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -64,7 +92,15 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const damage = request.damage;
   const effectiveTarget = request.baseTarget + modifier;
+  // For damage rolls the modifier is flat adds on top of the dice.
+  const effectiveDice = damage
+    ? { dice: damage.dice.dice, adds: damage.dice.adds + modifier }
+    : null;
+  const damageSuffix = damage
+    ? `${damage.damageType ? ` ${damage.damageType}` : ''}${damage.armorDivisor ? ` (${damage.armorDivisor})` : ''}`
+    : '';
 
   function applyPreset(label: string, mod: number) {
     // Changing the effective target invalidates any displayed result --
@@ -82,12 +118,14 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
 
   function step(delta: number) {
     setResult(null);
+    setDamageResult(null);
     setActivePreset(null);
     setModifier((m) => clampMod(m + delta));
   }
 
   function resetModifier() {
     setResult(null);
+    setDamageResult(null);
     setActivePreset(null);
     setModifier(0);
   }
@@ -96,6 +134,22 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     // Pushed to session history directly in this click handler — never
     // in an effect — so a StrictMode double-invoke can't double-log a
     // roll, and "Roll again" is just another call to the same handler.
+    if (damage && effectiveDice) {
+      const rolled = rollDamageDice(effectiveDice, minBasicDamageFor(damage.damageType));
+      const formula = `${formatDamageDice(effectiveDice)}${damageSuffix}`;
+      setDamageResult({ rolls: rolled.rolls, total: rolled.total, formula });
+      pushRoll({
+        id: newClientId(),
+        at: new Date(),
+        characterId,
+        label: request.label,
+        kind: 'damage',
+        dice: rolled.rolls,
+        total: rolled.total,
+        damageType: damage.damageType,
+      });
+      return;
+    }
     const { dice, total } = roll3d6();
     const outcome = evaluateRoll(effectiveTarget, total);
     setResult({
@@ -111,6 +165,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
       at: new Date(),
       characterId,
       label: request.label,
+      kind: 'check',
       target: effectiveTarget,
       dice,
       total,
@@ -142,7 +197,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
         }}
       >
         <div className="mb-3 flex items-center justify-between">
-          <p className="label-eyebrow">Roll</p>
+          <p className="label-eyebrow">{damage ? 'Roll damage' : 'Roll'}</p>
           <button
             type="button"
             onClick={onClose}
@@ -156,13 +211,26 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
         <h2 className="mb-3 font-display text-2xl font-semibold">{request.label}</h2>
 
         <div className="mb-3 flex items-baseline justify-center rounded-2xl border border-base-300/60 py-4">
-          <span
-            className="num font-bold leading-none"
-            style={{ fontSize: '4rem' }}
-            aria-label={`Effective target ${effectiveTarget}`}
-          >
-            {effectiveTarget}
-          </span>
+          {damage && effectiveDice ? (
+            <span
+              className="num font-bold leading-none"
+              style={{ fontSize: '2.5rem' }}
+              aria-label={`Damage formula ${formatDamageDice(effectiveDice)}${damageSuffix}`}
+            >
+              {formatDamageDice(effectiveDice)}
+              {damageSuffix && (
+                <span className="text-base-content/60 text-2xl">{damageSuffix}</span>
+              )}
+            </span>
+          ) : (
+            <span
+              className="num font-bold leading-none"
+              style={{ fontSize: '4rem' }}
+              aria-label={`Effective target ${effectiveTarget}`}
+            >
+              {effectiveTarget}
+            </span>
+          )}
         </div>
 
         <div className="mb-3 flex items-center justify-center gap-3">
@@ -170,18 +238,20 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
             type="button"
             className="btn btn-circle btn-sm"
             onClick={() => step(-1)}
-            aria-label="Decrease modifier"
+            aria-label={damage ? 'Decrease damage adds' : 'Decrease modifier'}
           >
             −
           </button>
           <span className="num w-20 text-center text-sm text-base-content/70">
-            {request.baseTarget} {formatSigned(modifier)}
+            {damage
+              ? `adds ${formatSigned(modifier)}`
+              : `${request.baseTarget} ${formatSigned(modifier)}`}
           </span>
           <button
             type="button"
             className="btn btn-circle btn-sm"
             onClick={() => step(1)}
-            aria-label="Increase modifier"
+            aria-label={damage ? 'Increase damage adds' : 'Increase modifier'}
           >
             +
           </button>
@@ -192,7 +262,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
           )}
         </div>
 
-        {request.presets && request.presets.length > 0 && (
+        {!damage && request.presets && request.presets.length > 0 && (
           <div className="mb-3 flex flex-wrap justify-center gap-1.5">
             {request.presets.map((p) => (
               <button
@@ -208,8 +278,32 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
         )}
 
         <button type="button" className="btn w-full" onClick={doRoll}>
-          {result ? 'Roll again' : 'Roll 3d6'}
+          {damage
+            ? damageResult
+              ? 'Roll again'
+              : `Roll ${effectiveDice ? formatDamageDice(effectiveDice) : 'damage'}`
+            : result
+              ? 'Roll again'
+              : 'Roll 3d6'}
         </button>
+
+        {damageResult && (
+          <div className="mt-3 space-y-1.5 rounded-2xl border border-base-300/60 p-4 text-center">
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {damageResult.rolls.map((die, i) => (
+                <span
+                  // biome-ignore lint/suspicious/noArrayIndexKey: dice faces have no identity beyond position.
+                  key={i}
+                  className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold"
+                >
+                  {die}
+                </span>
+              ))}
+            </div>
+            <p className="num text-3xl font-bold">{damageResult.total}</p>
+            <p className="text-xs text-base-content/60">{damageResult.formula}</p>
+          </div>
+        )}
 
         {result && (
           <div className="mt-3 space-y-1.5 rounded-2xl border border-base-300/60 p-4 text-center">
