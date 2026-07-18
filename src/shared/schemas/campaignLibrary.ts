@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { MANA_LEVELS } from '../constants/magic.ts';
 import { timestamps, uuid } from './common.ts';
 import { traitEffect } from './effects.ts';
-import { armorData, weaponData } from './inventory.ts';
+import { armorData, magicItemData, powerstoneData, weaponData } from './inventory.ts';
 import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
 import { spellDifficulty } from './spell.ts';
 import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
@@ -140,6 +141,11 @@ export const libraryItemOut = z.object({
   isArmor: z.boolean(),
   armor: armorData.nullable(),
   weaponData: weaponData.nullable(),
+  isContainer: z.boolean(),
+  hideawayCapacityLbs: z.number().min(0).max(1_000_000),
+  weightReductionPercent: z.number().int().min(0).max(100),
+  powerstoneData: powerstoneData.nullable(),
+  magicItemData: magicItemData.nullable(),
   ...timestamps,
 });
 
@@ -154,6 +160,11 @@ export const libraryItemCreate = z.object({
   isArmor: z.boolean().default(false),
   armor: armorData.nullable().optional(),
   weaponData: weaponData.nullable().optional(),
+  isContainer: z.boolean().default(false),
+  hideawayCapacityLbs: z.number().min(0).max(1_000_000).default(0),
+  weightReductionPercent: z.number().int().min(0).max(100).default(0),
+  powerstoneData: powerstoneData.nullable().optional(),
+  magicItemData: magicItemData.nullable().optional(),
 });
 
 export const libraryItemUpdate = libraryItemCreate.partial();
@@ -174,17 +185,23 @@ export const importResult = z.object({
   skills: importSectionResult,
   spells: importSectionResult,
   items: importSectionResult,
+  /** Whether the opt-in `applyCampaignSettings` flag actually updated the
+   * campaigns row (false when the flag was off or the doc had no `campaign`
+   * block). */
+  campaignSettingsApplied: z.boolean(),
 });
 
 // ---------- YAML doc shape (versioned) ----------
 
 /**
- * v1 docs (pre-effects) and v2 docs (effects on traits/skills) both parse.
- * Schema unions on a literal version field so older library files keep
- * round-tripping without mutation.  v1 docs that omit `effects` get the
- * default empty array via libraryTraitCreate / librarySkillCreate.
+ * v1 docs (pre-effects), v2 docs (effects on traits/skills), and v3 docs
+ * (container/powerstone/magic-item item fields + campaign.manaLevel) all
+ * parse.  Schema unions on a literal version field so older library files
+ * keep round-tripping without mutation.  v1/v2 docs that omit the newer
+ * fields get their defaults (empty array / false / null) via the
+ * library*Create schemas.
  */
-export const libraryYamlVersion = z.union([z.literal(1), z.literal(2)]);
+export const libraryYamlVersion = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 
 export const libraryYamlDoc = z.object({
   version: libraryYamlVersion,
@@ -195,6 +212,8 @@ export const libraryYamlDoc = z.object({
       pointTarget: z.number().int().nullable().optional(),
       disadvantageCap: z.number().int().nullable().optional(),
       quirkCap: z.number().int().nullable().optional(),
+      /** Ambient mana level (Basic Set p. 235); reuses the campaign schema's enum. */
+      manaLevel: z.enum(MANA_LEVELS).optional(),
     })
     .optional(),
   library: z.object({

@@ -28,6 +28,7 @@ import { requireCampaignOwner } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import { withAudit } from '../db/auditContext.ts';
 import type { getDb } from '../db/client.ts';
+import { isUniqueViolation } from '../db/errors.ts';
 import { type createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import type { LibraryEntityConfig, LibraryTable } from './campaignLibraryEntities.ts';
@@ -129,6 +130,7 @@ export function registerLibraryCrud<
       responses: {
         201: { description: 'Created', content: { 'application/json': { schema: cfg.outSchema } } },
         403: errorResponse('Forbidden'),
+        409: errorResponse('Duplicate name'),
       },
     }),
     async (c: LibraryReqCtx<IdParams, TCreate>) => {
@@ -136,14 +138,24 @@ export function registerLibraryCrud<
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
       await requireCampaignOwner(id, user.id);
-      const row = await withAudit(user.id, undefined, async (tx) => {
-        const [inserted] = (await tx
-          .insert(asTable(cfg.table))
-          .values(cfg.toInsertValues(id, body))
-          .returning()) as TTable['$inferSelect'][];
-        if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
-        return inserted;
-      });
+      let row: TTable['$inferSelect'];
+      try {
+        row = await withAudit(user.id, undefined, async (tx) => {
+          const [inserted] = (await tx
+            .insert(asTable(cfg.table))
+            .values(cfg.toInsertValues(id, body))
+            .returning()) as TTable['$inferSelect'][];
+          if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
+          return inserted;
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw new HTTPException(409, {
+            message: `a ${cfg.entityLabel} with that name already exists`,
+          });
+        }
+        throw err;
+      }
       return c.json(cfg.toOut(row), 201);
     },
   );
@@ -163,6 +175,7 @@ export function registerLibraryCrud<
         200: { description: 'Updated', content: { 'application/json': { schema: cfg.outSchema } } },
         403: errorResponse('Forbidden'),
         404: errorResponse('Not found'),
+        409: errorResponse('Duplicate name'),
       },
     }),
     async (c: LibraryReqCtx<ItemParams<TParamName>, TUpdate>) => {
@@ -176,15 +189,25 @@ export function registerLibraryCrud<
         body as Record<string, unknown>,
         cfg.stringifyKeys ? { stringifyKeys: cfg.stringifyKeys } : undefined,
       );
-      const row = await withAudit(user.id, undefined, async (tx) => {
-        const [updated] = (await tx
-          .update(asTable(cfg.table))
-          .set(updates)
-          .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
-          .returning()) as TTable['$inferSelect'][];
-        if (!updated) throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
-        return updated;
-      });
+      let row: TTable['$inferSelect'];
+      try {
+        row = await withAudit(user.id, undefined, async (tx) => {
+          const [updated] = (await tx
+            .update(asTable(cfg.table))
+            .set(updates)
+            .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
+            .returning()) as TTable['$inferSelect'][];
+          if (!updated) throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+          return updated;
+        });
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw new HTTPException(409, {
+            message: `a ${cfg.entityLabel} with that name already exists`,
+          });
+        }
+        throw err;
+      }
       return c.json(cfg.toOut(row), 200);
     },
   );

@@ -38,7 +38,9 @@ import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignMember, requireCampaignOwner } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
+import { campaigns } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { buildPatchSet } from '../services/patchSet.ts';
 import { registerLibraryCrud, selectLibrarySection, upsertByKey } from './campaignLibraryCrud.ts';
 import { itemEntity, skillEntity, spellEntity, traitEntity } from './campaignLibraryEntities.ts';
 
@@ -153,6 +155,7 @@ router.openapi(
         pointTarget: campaign.pointTarget ?? undefined,
         disadvantageCap: campaign.disadvantageCap ?? undefined,
         quirkCap: campaign.quirkCap ?? undefined,
+        manaLevel: campaign.manaLevel,
       },
       traits: traits.map(traitEntity.rowToCreate),
       skills: skills.map(skillEntity.rowToCreate),
@@ -174,6 +177,11 @@ const importBody = z.object({
     .min(1)
     .max(20 * 1024 * 1024),
   mode: importMode.default('merge'),
+  /** Opt-in: apply the doc's `campaign` block (description/pointTarget/
+   * disadvantageCap/quirkCap/manaLevel) to the campaigns row.  Never
+   * touches `name`.  Default off so a routine content import can't
+   * silently rewrite campaign settings. */
+  applyCampaignSettings: z.boolean().default(false),
 });
 
 router.openapi(
@@ -199,7 +207,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const { yaml, mode } = c.req.valid('json');
+    const { yaml, mode, applyCampaignSettings } = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
 
     let doc: ReturnType<typeof parseLibraryYaml>;
@@ -223,7 +231,30 @@ router.openapi(
       // off `incoming === undefined`.)
       const spells = await upsertByKey(tx, spellEntity, id, doc.library.spells, mode);
       const items = await upsertByKey(tx, itemEntity, id, doc.library.items, mode);
-      return { mode, traits, skills, spells, items };
+
+      // Opt-in campaign-settings apply: only fields actually present in
+      // the doc get copied (undefined = leave alone); `name` is never
+      // touched.  `campaignSettingsApplied` reports whether anything
+      // actually changed (flag on, `campaign` block present, and at
+      // least one recognized field in it).
+      let campaignSettingsApplied = false;
+      if (applyCampaignSettings && doc.campaign) {
+        const { description, pointTarget, disadvantageCap, quirkCap, manaLevel } = doc.campaign;
+        const patch = buildPatchSet({
+          description,
+          pointTarget,
+          disadvantageCap,
+          quirkCap,
+          manaLevel,
+        });
+        if (Object.keys(patch).length > 1) {
+          // more than just the always-present `updatedAt`
+          await tx.update(campaigns).set(patch).where(eq(campaigns.id, id));
+          campaignSettingsApplied = true;
+        }
+      }
+
+      return { mode, traits, skills, spells, items, campaignSettingsApplied };
     });
     return c.json(result, 200);
   },

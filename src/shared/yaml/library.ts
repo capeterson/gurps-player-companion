@@ -2,7 +2,7 @@
  * Campaign library YAML codec.  Round-trippable: import → export → diff
  * yields the same bytes (canonical sort + ordered keys).
  *
- * The YAML shape is the contract in docs/specs/yaml/campaign-library.md.
+ * The YAML shape is documented in docs/specs/campaign-content-sharing.md.
  * Schema validation is in shared/schemas/campaignLibrary.ts (Zod).
  */
 
@@ -18,10 +18,12 @@ import {
 
 /**
  * Current YAML doc version emitted by `emitLibraryYaml`.  v2 added the
- * `effects` arrays to traits/skills (see schemas/effects.ts).  The parser
- * still accepts v1 docs (effects defaults to `[]`).
+ * `effects` arrays to traits/skills (see schemas/effects.ts).  v3 added
+ * container/powerstone/magic-item fields on items and `manaLevel` in the
+ * campaign block.  The parser still accepts v1/v2 docs (new fields
+ * default/absent).
  */
-export const LIBRARY_YAML_VERSION = 2 as const;
+export const LIBRARY_YAML_VERSION = 3 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
