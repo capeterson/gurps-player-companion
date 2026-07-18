@@ -1,16 +1,21 @@
+import { effectiveDodge } from '../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
+import { resolveSkillLookup } from './skillLookup.ts';
 
 interface Props {
   character: CharacterDetail;
   dense: boolean;
+  /** Name of the skill or stat currently selected via the GM skill lookup, if any. */
+  lookup?: string | null;
 }
 
-export function GmCharacterCard({ character, dense }: Props) {
+export function GmCharacterCard({ character, dense, lookup }: Props) {
   const { derived, combat, encumbrance } = character;
   const currentHp = combat?.currentHp ?? derived.hp;
   const currentFp = combat?.currentFp ?? derived.fp;
   const hpPercent = Math.max(0, Math.min(100, (currentHp / Math.max(1, derived.hp)) * 100));
   const fpPercent = Math.max(0, Math.min(100, (currentFp / Math.max(1, derived.fp)) * 100));
+  const lookupResult = lookup ? resolveSkillLookup(character, lookup) : null;
 
   return (
     <article className={`card border border-base-300 bg-base-100 ${dense ? 'p-3' : 'p-4'} gap-3`}>
@@ -32,6 +37,17 @@ export function GmCharacterCard({ character, dense }: Props) {
           Open ↗
         </a>
       </header>
+
+      {lookup && (
+        <div className="flex items-center justify-between rounded-md bg-primary/10 px-2 py-1.5 text-xs">
+          <span className="truncate font-medium">{lookupResult?.label ?? lookup}</span>
+          {lookupResult ? (
+            <strong className="num text-sm">{lookupResult.level ?? '—'}</strong>
+          ) : (
+            <span className="text-base-content/50">not known</span>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-1 text-center">
         {[
@@ -68,7 +84,7 @@ export function GmCharacterCard({ character, dense }: Props) {
 
       <dl className="grid grid-cols-4 gap-2 text-center text-xs">
         <Stat label="Move" value={derived.basicMove} />
-        <Stat label="Dodge" value={derived.dodge - encumbrance.dodgePenalty} />
+        <Stat label="Dodge" value={effectiveDodge(derived.dodge, encumbrance.dodgePenalty)} />
         <Stat label="Will" value={derived.will} />
         <Stat label="Per" value={derived.per} />
       </dl>

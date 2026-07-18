@@ -64,9 +64,13 @@ export interface LocalCharacter {
    * `[]`. Not indexed -- no store version bump needed. */
   tempEffects?: TempEffect[];
   dismissedWarnings: string[];
+  /** Trait/skill effect condition groups currently toggled ON. */
+  activeConditionGroups: string[];
   createdAt: string;
   updatedAt: string;
   revision: number;
+  /** Local-only marker used to rehydrate a row when minimal access returns to full. */
+  minimalViewMasked?: boolean;
 }
 
 export interface LocalCharacterTrait {
@@ -76,6 +80,8 @@ export interface LocalCharacterTrait {
   name: string;
   points: number;
   level: number | null;
+  /** Selected library variant name, or null for the base form. */
+  variantName: string | null;
   notes: string | null;
   modifiers: unknown[];
   libraryTraitId: string | null;
@@ -265,7 +271,14 @@ export interface OutboxEntry {
 export interface SyncLogEntry {
   id: string;
   direction: 'push' | 'pull' | 'local';
-  result: 'synced' | 'reverted';
+  /**
+   * `requeued` and `retrying` are diagnostics-only transitions logged by
+   * the orchestrator's stale_base self-heal and transient-retry paths
+   * respectively (`retrying` only on the transition INTO transient_retry,
+   * so a forever-retrying op can't flush the journal). They're not
+   * terminal outcomes like `synced`/`reverted`/`rolled_back`.
+   */
+  result: 'synced' | 'reverted' | 'requeued' | 'rolled_back' | 'retrying';
   entityClass: EntityClass;
   entityId: string;
   command: OperationCommand;

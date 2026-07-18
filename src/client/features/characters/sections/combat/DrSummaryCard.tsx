@@ -5,6 +5,7 @@
  * choosing where to aim.
  */
 
+import { useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import {
   type DrByLocation,
@@ -12,6 +13,7 @@ import {
   aggregateDrByLocation,
 } from '../../../../../shared/domain/armorDr.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
 
 interface DrEntry extends DrByLocation {
   readonly loc: string;
@@ -32,18 +34,47 @@ function locationLabel(loc: string): string {
 
 export interface DrSummaryCardProps {
   character: CharacterDetail;
+  canWrite?: boolean;
+  hpMax?: number;
+  bumpHp?: (delta: number) => void;
 }
 
-export function DrSummaryCard({ character }: DrSummaryCardProps) {
+export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryCardProps) {
   const map: DrByLocationMap = aggregateDrByLocation(character.inventory);
+  const [damageOpen, setDamageOpen] = useState(false);
+
+  // The incoming-damage helper only makes sense when it can actually
+  // mutate HP — no bumper (e.g. a read-only viewer), no button.
+  const damageButton =
+    canWrite && bumpHp && hpMax != null ? (
+      <button type="button" className="btn btn-ghost btn-xs" onClick={() => setDamageOpen(true)}>
+        Incoming damage…
+      </button>
+    ) : null;
+
+  const damageDialog =
+    canWrite && bumpHp && hpMax != null ? (
+      <IncomingDamageDialog
+        open={damageOpen}
+        character={character}
+        canWrite={canWrite}
+        hpMax={hpMax}
+        bumpHp={bumpHp}
+        onClose={() => setDamageOpen(false)}
+      />
+    ) : null;
 
   if (map.size === 0) {
     return (
       <section className="card space-y-2 p-5">
-        <p className="label-eyebrow">Armor DR</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="label-eyebrow">Armor DR</p>
+          {damageButton}
+        </div>
         <p className="text-sm text-base-content/60">
           No equipped armor — add armor in the Inventory tab.
         </p>
+        {damageDialog}
       </section>
     );
   }
@@ -58,7 +89,10 @@ export function DrSummaryCard({ character }: DrSummaryCardProps) {
 
   return (
     <section className="card space-y-2 p-5">
-      <p className="label-eyebrow">Armor DR</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="label-eyebrow">Armor DR</p>
+        {damageButton}
+      </div>
       <ul className="space-y-0.5 text-sm">
         {wellKnown.map((entry) => (
           <li key={entry.loc} className="flex items-baseline justify-between gap-2">
@@ -78,6 +112,7 @@ export function DrSummaryCard({ character }: DrSummaryCardProps) {
           </li>
         ))}
       </ul>
+      {damageDialog}
     </section>
   );
 }

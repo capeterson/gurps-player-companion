@@ -105,11 +105,19 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
   encumbrance, armor and weapon data, cost/weight rollups. Equipped
   armor DR is aggregated per hit location on the Combat tab's Armor DR
-  card. Weapon data (damage, reach, parry, ST required) is editable
-  from the item edit dialog — mirroring the armor/powerstone/magic-item
-  fieldset pattern — and copied from campaign library items on the
-  inventory add form. Encumbered Move floors at 1 while the load is
-  legal and reads 0 past the 10×BL carry cap (B17).
+  card. An item's categories (container/armor/weapon/powerstone/magic
+  item) are **derived facet chips** (`FacetChips.tsx`) rather than
+  independent checkboxes — clicking an inactive chip (`+ Weapon`)
+  turns the facet on and reveals its fieldset; clicking an active chip
+  turns it off, confirming first if the facet already carries data.
+  The same chip row appears in the item edit dialog and the inventory
+  add form's "More options" expander. Weapon data (damage, reach,
+  parry, ST required, governing **skill**, shield **Defense Bonus**,
+  and an optional **ranged** stat block — Acc/Range/RoF/Shots/Bulk/
+  Recoil) is editable from the item edit dialog, and copied from
+  campaign library items on the inventory add form. Encumbered Move
+  floors at 1 while the load is legal and reads 0 past the 10×BL carry
+  cap (B17).
 - **Combat tab (live-gameplay surface)**. The first tab on the sheet
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
   consolidating everything a player touches mid-session onto one inline
@@ -134,35 +142,66 @@ on any sheet the viewer can edit — their own — it always shows).
   - **Armor DR** — aggregates equipped armor DR per hit location
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
     hit-location aim presets. Crushing-specific DR is shown where it
-    differs from the default.
+    differs from the default. An **"Incoming damage…"** button opens a
+    dialog (`IncomingDamageDialog.tsx`) that resolves a hit against the
+    character's own DR: basic damage − DR(location, honoring an armor
+    divisor and the skull's natural DR 2, B400) → penetrating ×
+    wounding multiplier (B379/B398-400) = injury
+    (`src/shared/domain/injuryCalc.ts`), applied to HP through the same
+    shared `usePoolBumpers` instance as the rest of the tab. Crippling
+    is surfaced as a hint only, never auto-applied.
   - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
     chip shows its blurb; tapping it again clears to no maneuver), plus
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
   - **Defenses** — Move (read-only, net of encumbrance), Dodge (with
     the encumbrance-penalty breakdown and no invented minimum;
-    situational active-defense bonuses remain unmodeled), Parry per
-    equipped weapon (computed from the matched skill when one is found,
-    else the raw library string), and Block when a Shield skill is
-    known. Every numeric defense opens the roll sheet.
+    situational trait-based active-defense bonuses remain unmodeled),
+    Parry per equipped weapon, and Block. A weapon's governing skill is
+    resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
+    an explicit `weaponData.skill` binding (exact case-insensitive
+    name match, shown as "Skill 'X' not on sheet" if missing) takes
+    priority; unset falls back to fuzzy name-matching the weapon's own
+    name against the sheet's skills. The ST-shortfall penalty (B270,
+    −1/point under `stRequired`) is subtracted from the matched level
+    before Parry is computed. **Block** is derived from an actually-
+    equipped shield — an item whose `weaponData.db` (Defense Bonus) is
+    set, picked by `pickShield` — not merely the presence of a
+    "Shield"-named skill; that shield's DB then adds to Dodge, every
+    Parry, and Block (B287). Every numeric defense opens the roll sheet.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
-    thrust/swing + the weapon's modifiers), reach, an over-ST warning
-    badge, and the best-matching skill as a rollable row with
-    hit-location preset chips (aim penalties, B398-399). Vitals presets
-    appear only for impaling and piercing attacks, and the eye preset
-    only for impaling, piercing, and tight-beam burning attacks.
-  - **Roll sheet** — an ephemeral bottom-sheet/dialog roller: modifier
-    stepper (−10..+10) plus single-select preset chips, a "Roll 3d6"
-    button, and a result panel (dice, total, success/margin, crit
-    badge) built on the shared `evaluateRoll`. Defense rows route
-    through the same success-roll evaluator as skills — GURPS defenses
-    actually use a different crit table, an accepted simplification for
-    this pass. The sheet's Skills and Magic tabs share the same roll
-    sheet (`.RollSheet` / `RollableRow` live under `sections/`) so
+    thrust/swing + the weapon's modifiers) as **tappable chips that
+    roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
+    1-point floor from B378), reach, an ST-shortfall badge/caption
+    (B270, applied to the roll target), a ranged stat line (Acc/Range/
+    RoF/Shots/Bulk/Recoil) when the weapon has one, and the resolved
+    skill as a rollable row with hit-location preset chips (aim
+    penalties, B398-399) plus, for ranged weapons, an Aim(+Acc) preset
+    and the B550 speed/range-penalty presets. Vitals presets appear
+    only for impaling and piercing attacks, and the eye preset only for
+    impaling, piercing, and tight-beam burning attacks.
+  - **Roll sheet** — an ephemeral bottom-sheet/dialog roller with two
+    variants sharing one shell. The default **check** variant: modifier
+    stepper (−25..+10 — deep enough that a 200 yd range preset, B550,
+    can still be topped up toward a deep hit-location penalty via the
+    stepper) plus single-select preset chips, a "Roll 3d6" button, and
+    a result panel (dice, total, success/margin, crit badge) built on
+    the shared `evaluateRoll`. Defense rows route through the same
+    success-roll evaluator as skills — GURPS defenses actually use a
+    different crit table, an accepted simplification for this pass.
+    The **damage** variant (triggered by a `RollRequest.damage` payload,
+    e.g. from an Attacks card damage chip) rolls NdM+adds instead of
+    3d6-vs-target: the stepper adjusts flat adds, presets are hidden,
+    and the result shows the individual dice plus total with no
+    success/crit call. The sheet's Skills and Magic tabs share the same
+    roll sheet (`.RollSheet` / `RollableRow` live under `sections/`) so
     tapping a skill/spell level in those tables opens the identical
     roller.
   - **Roll history strip** — a collapsible log of this character's
-    recent rolls (newest first, capped at 100 entries per character).
+    recent rolls (newest first, capped at 100 entries per character),
+    rendering both check entries (target/margin/crit) and damage
+    entries (dice + total + type) distinctly; entries persisted before
+    damage rolls existed have no `kind` and deserialize as checks.
     Persisted to `localStorage` (keyed `gurps:rollHistory:<characterId>`)
     so the log survives page reloads, but **not sync'd to the server**
     and carrying no sync/purge/history obligations. Cleared on logout
@@ -180,6 +219,10 @@ interaction rules.
 
 ### Campaigns
 Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/gm`, `/campaigns/:id/library`.
+The campaign detail page (`/campaigns/:id`) hosts the browseable character
+roster for the campaign — every member character in the campaign is listed
+there, regardless of the share gate; rows a viewer only sees minimally deep-link
+to `/characters/:id`, which renders `CharacterMinimalView`.
 
 - Create/edit campaigns with **point target, disadvantage cap, quirk cap,
   mana level**, and the **share-character-sheets** toggle.
@@ -190,8 +233,12 @@ Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/gm`, `/campaigns/:id/libr
   accept/reject, notifications.
 - **Character-sheet sharing gate** (`shareCharacterSheets`): when off, only the
   owner (GM) and a character's own player see full sheets; other members get a
-  "minimal view" (public columns only). Enforced on both server and client —
-  see campaign-content-sharing.md.
+  "minimal view" (identity columns only — no stats, temp effects, HP/FP,
+  traits/skills/spells/inventory/combat, or history). Enforced on the server
+  sync emission, the local Dexie purge, and the UI discovery surfaces: minimal
+  characters are **excluded from `/characters`** and browsable only from the
+  campaign detail page; full-share and editable-manager rows remain listed.
+  See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells, and
   items, editable by the owner and **importable/exportable as versioned YAML**
   for sharing between campaigns. The catalog editor lives at
@@ -290,14 +337,21 @@ src/
                  code and shared warning text
      domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
-                  success-roll evaluation), damageParse (weapon damage-string
-                  parsing/resolution), defenseCalc (Dodge/Parry/Block +
-                  weapon-to-skill matching), armorDr (equipped-armor DR
+                  success-roll evaluation + NdM damage-dice rolling),
+                  damageParse (weapon damage-string parsing/resolution +
+                  the cut/imp/piercing 1-point damage floor), defenseCalc
+                  (Dodge/Parry/Block, explicit-or-fuzzy weapon-to-skill
+                  matching via `resolveWeaponSkill`, `skillDisplayName` for
+                  specialization-disambiguated skill names, ST-shortfall
+                  penalty, equipped-shield picking), injuryCalc (incoming-
+                  damage DR/divisor/wounding-multiplier resolution for the
+                  Armor DR card's damage dialog), armorDr (equipped-armor DR
                   aggregation per hit location), conditions (snake_case
                   condition normalization, tolerant of legacy Capitalized
                   entries))
     constants/   attributes, skills, traits, combat (postures, common
-                 conditions, maneuvers), hitLocations (+ aim penalties), magic
+                 conditions, maneuvers), hitLocations (+ aim penalties),
+                 rangePenalty (B550 speed/range roll presets), magic
     yaml/        library.ts — round-trippable campaign-library YAML codec
     history/     summarize.ts — shared history one-liner formatter
   sw/            Service worker registration (app-shell precache + a few
@@ -378,10 +432,15 @@ Things that repeatedly surprise people working in this repo:
    can attribute the change. History capture sits *below* both via Postgres
    triggers.
 
-6. **The share gate is enforced twice.** `decideCharacterAccess` (server,
-   `sync.ts`) decides `full` vs `minimal`; `characterIdsToMinimize`
-   (`minimalViewSweep.ts`) purges already-cached private rows from Dexie when
-   access is downgraded. Changing one without the other reopens a data-leak
+6. **The share gate is enforced three ways.** `decideCharacterAccess`
+   (server, `sync.ts`) decides `full` vs `minimal` and the server
+   `projectCharacterRow` ships only identity fields for minimal rows;
+   `characterIdsToMinimize` + the orchestrator's character-row rewrite
+   (`minimalViewSweep.ts` + `orchestrator.ts`) purges already-cached private
+   child rows **and** rewrites cached character rows down to identity so
+   stale `st`/`hpMod`/`tempEffects`/`activeConditionGroups` can't be recovered locally; and the
+   UI discovery surfaces filter minimal rows off `/characters` and onto the
+   campaign detail page. Changing one without the others reopens a leak
    hole.
 
 7. **Dev + tests run in Docker/Bun.** There is no host `bun` requirement. `bun

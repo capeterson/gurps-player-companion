@@ -17,6 +17,8 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq, gt, inArray, or } from 'drizzle-orm';
 import {
   type EntityClass,
+  type OperationEnvelope,
+  type OperationOutcome,
   type SyncCursorChange,
   syncCursorRequest,
   syncCursorResponse,
@@ -74,8 +76,27 @@ router.openapi(
     // Apply ops in array order so e.g. (create trait X, patch trait X)
     // works.  Each op runs in dispatchOperation's own try/catch so a
     // failure on op N does not roll back ops 1..N-1.
+    //
+    // Rapid same-entity edits (e.g. add item -> mark as weapon -> tweak
+    // stats) get enqueued client-side with the SAME baseRevision, since
+    // nothing has been acked yet to advance it. Applying them in one
+    // batch would otherwise stale_base every op after the first, once
+    // per drain. `chains` fast-forwards each op's baseRevision past
+    // revisions produced by earlier applied ops in *this same request*
+    // -- those aren't conflicts, they're this client's own prior op in
+    // the burst. Per-field coalescing (AGENTS.md rule S3) guarantees no
+    // two ops in a burst patch the same field, so array order here is
+    // exactly this client's intended order. A foreign write landing
+    // mid-batch still pushes the DB revision above the chain's `latest`,
+    // so the rewritten base is still stale and stale_base fires as
+    // normal -- the client's stale_base self-heal remains the fallback
+    // for that case and for bursts spanning more than one 50-op batch.
+    const chains = createBatchRevisionChains();
     for (const op of operations) {
-      outcomes.push(await dispatchOperation({ userId: user.id, batchId: op.batchId }, op));
+      const effective = chains.rewrite(op);
+      const outcome = await dispatchOperation({ userId: user.id, batchId: op.batchId }, effective);
+      chains.record(op, outcome);
+      outcomes.push(outcome);
     }
     return c.json({ outcomes }, 200);
   },
@@ -165,6 +186,74 @@ router.openapi(
 );
 
 // ---------- helpers ----------
+
+interface RevisionChain {
+  /** The ORIGINAL (pre-rewrite) baseRevision of the op that founded this chain. */
+  readonly firstBase: number;
+  /** newRevision of the most recent applied patch in the chain. */
+  latest: number;
+}
+
+/**
+ * Tracks per-entity revision chains produced by earlier ops in one
+ * `/sync/operations` request, so later same-entity patches stamped
+ * against the same (now-stale) base don't come back `stale_base` one
+ * at a time across repeated drains. See the call site in the POST
+ * handler above for the full rationale.
+ *
+ * Deliberately excludes `create` (and `delete`) outcomes:
+ *   - A patch enqueued right after an unacked create carries
+ *     `baseRevision === undefined` and already skips the server's
+ *     stale check entirely, so seeding the chain from a create buys
+ *     nothing in the normal flow.
+ *   - A *replayed* create (`resolveReplayedCreate`) returns the row's
+ *     CURRENT revision, which may already embed a concurrent foreign
+ *     write. Seeding `latest` from it could fast-forward a later
+ *     patch's base past that foreign write and mask a real conflict.
+ * Excluding creates keeps the invariant provable: every revision in
+ * `(firstBase, latest]` was produced by a patch this same client
+ * queued and this same request applied.
+ */
+export function createBatchRevisionChains() {
+  const chains = new Map<string, RevisionChain>();
+
+  const key = (op: OperationEnvelope) => `${op.entityClass}|${op.entityId}`;
+
+  return {
+    /**
+     * Returns the envelope to actually dispatch: a copy with
+     * `baseRevision` fast-forwarded to the chain's `latest` when the
+     * op's original base falls within `[firstBase, latest)`, otherwise
+     * the original op untouched.
+     */
+    rewrite(op: OperationEnvelope): OperationEnvelope {
+      if (op.command !== 'patch' || op.baseRevision === undefined) return op;
+      const chain = chains.get(key(op));
+      if (!chain) return op;
+      if (op.baseRevision >= chain.firstBase && op.baseRevision < chain.latest) {
+        return { ...op, baseRevision: chain.latest };
+      }
+      return op;
+    },
+
+    /**
+     * Records an outcome to extend/seed the chain. MUST be called with
+     * the ORIGINAL op (not the `rewrite`d copy) so `firstBase` reflects
+     * the client's true original base, not an already-fast-forwarded one.
+     */
+    record(op: OperationEnvelope, outcome: OperationOutcome): void {
+      if (op.command !== 'patch' || op.baseRevision === undefined) return;
+      if (outcome.status !== 'applied' || typeof outcome.newRevision !== 'number') return;
+      const k = key(op);
+      const existing = chains.get(k);
+      if (!existing) {
+        chains.set(k, { firstBase: op.baseRevision, latest: outcome.newRevision });
+      } else {
+        existing.latest = Math.max(existing.latest, outcome.newRevision);
+      }
+    },
+  };
+}
 
 async function listAccessibleCampaignIds(userId: string): Promise<string[]> {
   const db = getDb();
@@ -502,8 +591,15 @@ async function fetchClassUpserts(args: {
       // REST routes; there is no /sync/operations dispatcher for them.
       if (accessibleCampaignIds.length === 0) return [];
       const rows = await db
-        .select()
+        .select({ campaign: campaigns, viewerRole: campaignMemberships.role })
         .from(campaigns)
+        .leftJoin(
+          campaignMemberships,
+          and(
+            eq(campaignMemberships.campaignId, campaigns.id),
+            eq(campaignMemberships.userId, userId),
+          ),
+        )
         .where(
           and(
             gt(campaigns.revision, sinceRevision),
@@ -512,7 +608,12 @@ async function fetchClassUpserts(args: {
         )
         .orderBy(asc(campaigns.revision))
         .limit(limit);
-      return rows.map((row) => upsertChange('campaign', row.id, Number(row.revision), row));
+      return rows.map(({ campaign, viewerRole }) =>
+        upsertChange('campaign', campaign.id, Number(campaign.revision), {
+          ...campaign,
+          viewerRole: campaign.ownerId === userId ? 'owner' : viewerRole,
+        }),
+      );
     }
     default:
       // Other entity classes (library, adventure log) are not synced
@@ -587,20 +688,43 @@ function upsertChange(
 }
 
 /**
- * Project a character row down to the public "readily apparent" columns
- * for sync emission to a non-GM viewer of a campaign with
- * shareCharacterSheets=false. The viewer's IndexedDB will receive a row
- * with the right id / ownerId / campaignId / public identity bits, but
- * with private fields blanked to safe defaults so derived stats and
- * personal notes can't be reconstructed locally.
+ * Project a character row down to the **identity-only** payload for sync
+ * emission to a non-GM viewer of a campaign with
+ * shareCharacterSheets=false. The viewer's IndexedDB receives a row that
+ * carries id / ownerId / campaignId / public identity bits, plus the
+ * schema-default values for the columns the row still needs to satisfy
+ * `LocalCharacter`. Every private column is set to its safe default so:
  *
- * Owner+ownerId stays so the client-side gate (`shouldUseMinimalView`
- * mirror in CharacterSheetPage) recognises this as someone else's
- * character and renders the minimal view instead of the full sheet.
+ *   - `buildCharacterDetail` (used on the client) produces only the
+ *     10/10/10/10 baseline derived stats if any code path falls through
+ *     to it, never the real numbers that were cached before access was
+ *     downgraded;
+ *   - the orchestrator's `applyServerRow` overwrites the local Dexie row
+ *     with this masked payload, purging the stale `st=15 / hpMod=2 /
+ *     tempEffects=[real buffs]` that were synced while the viewer had
+ *     full access (the previous behaviour only blanked fields when the
+ *     cursor re-emitted the row, which it doesn't do on a share-flag
+ *     flip because the character row's own revision doesn't advance).
+ *
+ * This is the **server half** of the share gate. The client half
+ * (`enforceMinimalViewLocally`) mirrors it by rewriting the cached row
+ * down to the same identity-only set after every cursor pull; both
+ * must stay in lockstep per AGENTS.md's share-gate invariant.
  */
 function projectCharacterRow(row: DbCharacter): DbCharacter {
+  // Drop every private column by replacing the row with a mask that
+  // supplies the schema defaults for NOT NULL numeric / jsonb columns.
   return {
-    ...row,
+    id: row.id,
+    ownerId: row.ownerId,
+    campaignId: row.campaignId,
+    name: row.name,
+    playerName: row.playerName,
+    height: row.height,
+    weight: row.weight,
+    age: row.age,
+    appearance: row.appearance,
+    techLevel: row.techLevel,
     // Stat defaults so the row stays schema-valid (notNull columns).
     // The minimal view never reads these, but if a future code path
     // ever falls through to buildCharacterDetail with this row it
@@ -617,10 +741,14 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     speedQuarterMod: 0,
     moveMod: 0,
     // Share-gate critical: a minimal viewer must never receive another
-    // player's named/manual temp effects, so this collapses to empty
-    // rather than passing `row.tempEffects` through.
+    // player's named/manual temp effects or dismissed warnings, so
+    // these collapse to empty rather than passing the real lists through.
     tempEffects: [],
     dismissedWarnings: [],
+    activeConditionGroups: [],
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    revision: row.revision,
   };
 }
 

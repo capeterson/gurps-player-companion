@@ -50,9 +50,11 @@ export function useLibraryFetcher<T extends LibraryEntry>(
   const enabled = typeof campaignId === 'string' && campaignId.length > 0;
   const query = useQuery({
     enabled,
-    // Single cache entry per campaign — all three kinds share the
-    // aggregate response so picking traits then skills doesn't refetch.
-    queryKey: ['campaignLibrary', campaignId],
+    // Single cache entry per campaign — all kinds share the aggregate
+    // response so picking traits then skills doesn't refetch. The key
+    // matches LibraryPage's query so its CRUD mutations invalidate this
+    // cache too (and useLibraryEffectMaps', which shares it).
+    queryKey: ['campaigns', campaignId, 'library'],
     queryFn: async (): Promise<LibraryPayload> => {
       if (!campaignId) return { traits: [], skills: [], spells: [], items: [] };
       try {

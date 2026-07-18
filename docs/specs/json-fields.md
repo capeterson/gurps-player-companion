@@ -32,7 +32,7 @@ The two deliberate exceptions (`notifications.payload`,
 | `characters.temp_effects` | `tempEffectsField` (character.ts) — `TempEffect[]`, max 40, `{ id, name, mods }` with `mods` a strict per-axis object (`TEMP_STAT_AXES`); `superRefine` enforces unique ids and a per-axis SUM across all effects within [-50, 50]. The `id: 'manual'` sentinel (`MANUAL_TEMP_EFFECT_ID`) is the entry the ✦ modifier popovers write to; other ids are client uuids for named effects. | REST character create/update (`characterCreate` / `characterUpdate`, via `characterAttributesShape`); sync patch `fieldPath: 'tempEffects'` (whole-array replace) via `characterSyncPatch`. Share-gate masked to `[]` for minimal-view characters (`projectCharacterRow` in `routes/sync.ts`). |
 | `character_traits.modifiers` | `traitModifier[]` (trait.ts) | REST trait create/update (`traitCreate` / `traitUpdate`); sync per-field validator |
 | `inventory_items.armor` | `armorData` (inventory.ts), nullable | REST inventory create/update (`inventoryItemCreate` / `inventoryItemUpdate`); sync per-field validator |
-| `inventory_items.weapon_data` | `weaponData` (inventory.ts), nullable | same as `armor` |
+| `inventory_items.weapon_data` | `weaponData` (inventory.ts), nullable; nests `rangedData` (`ranged`, null = melee-only) plus `skill` (governing-skill name) and `db` (shield Defense Bonus, non-null = shield) | same as `armor` |
 | `inventory_items.powerstone_data` | `powerstoneData` (inventory.ts), nullable; refinement: `currentEnergy <= maxEnergy` | same as `armor` |
 | `inventory_items.magic_item_data` | `magicItemData` (inventory.ts), nullable; refinement: `chargesCurrent <= chargesMax` | same as `armor` |
 | `combat_states.conditions` | `combatStateUpdate.conditions` (combat.ts) — `string[]`, each 1–80 chars, max 64 | REST combat patch; sync per-field validator |
@@ -41,7 +41,7 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_traits.tags` | `tagList` (campaignLibrary.ts) — `string[]`, each 1–40 chars | REST library CRUD + YAML import |
 | `campaign_library_skills.situational_modifiers` | `situationalModifier[]` (skill.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
 | `campaign_library_items.armor` | `armorData` (inventory.ts), nullable | REST library CRUD + YAML import (`libraryItemCreate`) |
-| `campaign_library_items.weapon_data` | `weaponData` (inventory.ts), nullable | REST library CRUD + YAML import |
+| `campaign_library_items.weapon_data` | `weaponData` (inventory.ts), nullable — same shape as `inventory_items.weapon_data` incl. `skill`/`db`/`ranged` | REST library CRUD + YAML import |
 | `notifications.payload` | Per-type: `campaignInvitationNotificationPayload` (notification.ts) for `type='campaign_invitation'` | Emit site (`invitations.ts` parses before insert); consume site (`NotificationsBell` `safeParse`s) |
 | `entity_history.old_row` / `new_row` | *Intentionally schemaless* — raw `to_jsonb(OLD/NEW)` row snapshots written by DB triggers | Read-only; exposed as `z.record(z.unknown())` in `historyEventOut` and only with `?detail=1` + full access (see history-tracking.md) |
 

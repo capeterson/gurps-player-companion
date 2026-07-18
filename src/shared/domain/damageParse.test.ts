@@ -4,6 +4,7 @@ import {
   type DamageMode,
   canTargetVitals,
   formatDamageDice,
+  minBasicDamageFor,
   parseDamageSpec,
   resolveDamage,
 } from './damageParse.ts';
@@ -94,6 +95,18 @@ describe('parseDamageSpec', () => {
       expect(() => parseDamageSpec(input)).not.toThrow();
     }
   });
+
+  it('rejects an explicit dice count above the sane cap', () => {
+    // A player-typed or imported absurd die count must not reach the
+    // roll path (allocating/rolling that many dice would freeze the UI).
+    expect(parseDamageSpec('99999999d cr')).toEqual([]);
+    expect(parseDamageSpec('101d cr')).toEqual([]);
+  });
+
+  it('allows an explicit dice count at the cap boundary', () => {
+    const modes = parseDamageSpec('100d cr');
+    expect(modes[0]).toMatchObject({ base: { dice: 100, adds: 0 } });
+  });
 });
 
 describe('resolveDamage + formatDamageDice round trip', () => {
@@ -171,5 +184,28 @@ describe('canTargetVitals', () => {
 
   it('returns false for null (no parseable damage type)', () => {
     expect(canTargetVitals(null)).toBe(false);
+  });
+});
+
+describe('minBasicDamageFor', () => {
+  it('gives cut, imp, and every piercing variant a 1-point floor (B378)', () => {
+    expect(minBasicDamageFor('cut')).toBe(1);
+    expect(minBasicDamageFor('imp')).toBe(1);
+    expect(minBasicDamageFor('pi')).toBe(1);
+    expect(minBasicDamageFor('pi-')).toBe(1);
+    expect(minBasicDamageFor('pi+')).toBe(1);
+    expect(minBasicDamageFor('pi++')).toBe(1);
+  });
+
+  it('leaves crushing, burning, and other non-point types at a 0 floor', () => {
+    expect(minBasicDamageFor('cr')).toBe(0);
+    expect(minBasicDamageFor('burn')).toBe(0);
+    expect(minBasicDamageFor('tox')).toBe(0);
+    expect(minBasicDamageFor('special-homebrew')).toBe(0);
+  });
+
+  it('is case-insensitive and returns 0 for null', () => {
+    expect(minBasicDamageFor('IMP')).toBe(1);
+    expect(minBasicDamageFor(null)).toBe(0);
   });
 });

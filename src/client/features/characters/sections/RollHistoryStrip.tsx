@@ -31,23 +31,36 @@ export function RollHistoryStrip({ characterId }: RollHistoryStripProps) {
             <p className="text-xs text-base-content/60">No rolls yet.</p>
           ) : (
             <ul className="space-y-1">
-              {rolls.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="min-w-0 truncate">{r.label}</span>
-                  <span className="num flex shrink-0 items-center gap-2 text-xs text-base-content/70">
-                    <span>vs {r.target}</span>
-                    <span className="font-semibold text-base-content">{r.total}</span>
-                    <span>{formatSigned(r.margin)}</span>
-                    {r.crit && (
-                      <span
-                        className={`badge badge-xs ${r.crit === 'success' ? 'badge-success' : 'badge-error'}`}
-                      >
-                        {r.crit === 'success' ? 'crit' : 'crit fail'}
-                      </span>
-                    )}
-                  </span>
-                </li>
-              ))}
+              {rolls.map((r) =>
+                r.kind === 'damage' ? (
+                  <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 truncate">{r.label}</span>
+                    <span className="num flex shrink-0 items-center gap-2 text-xs text-base-content/70">
+                      <span>[{r.dice.join(' ')}]</span>
+                      <span className="font-semibold text-base-content">{r.total}</span>
+                      {r.damageType && <span>{r.damageType}</span>}
+                    </span>
+                  </li>
+                ) : (
+                  // Entries stored before damage rolls existed have no `kind`
+                  // and are check rolls with target/margin always present.
+                  <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 truncate">{r.label}</span>
+                    <span className="num flex shrink-0 items-center gap-2 text-xs text-base-content/70">
+                      <span>vs {r.target}</span>
+                      <span className="font-semibold text-base-content">{r.total}</span>
+                      <span>{formatSigned(r.margin ?? 0)}</span>
+                      {r.crit && (
+                        <span
+                          className={`badge badge-xs ${r.crit === 'success' ? 'badge-success' : 'badge-error'}`}
+                        >
+                          {r.crit === 'success' ? 'crit' : 'crit fail'}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </>

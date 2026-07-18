@@ -30,6 +30,7 @@ import {
 // columns and their owning schemas lives in docs/specs/json-fields.md.
 import type { XpAward } from '../../shared/schemas/adventureLog.ts';
 import type { TempEffect } from '../../shared/schemas/character.ts';
+import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type {
   ArmorData,
   MagicItemData,
@@ -37,7 +38,7 @@ import type {
   WeaponData,
 } from '../../shared/schemas/inventory.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
-import type { TraitModifier } from '../../shared/schemas/trait.ts';
+import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
 
 // ---------- enums ----------
 // We let Postgres enforce these at the column level via CHECK / ENUM.
@@ -371,6 +372,14 @@ export const characters = pgTable(
      * `dismissedWarningsField` (src/shared/schemas/character.ts). */
     dismissedWarnings: jsonb('dismissed_warnings').$type<string[]>().notNull().default([]),
 
+    /**
+     * Subset of trait/skill effect `conditionGroup` values that are currently
+     * "on" for this character.  Effects with a conditionGroup are inactive
+     * until the user toggles their group ON via /characters/{id}/conditions.
+     * See src/shared/schemas/effects.ts.
+     */
+    activeConditionGroups: jsonb('active_condition_groups').$type<string[]>().notNull().default([]),
+
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -394,6 +403,8 @@ export const characterTraits = pgTable(
     name: varchar('name', { length: 160 }).notNull(),
     points: integer('points').notNull().default(0),
     level: smallint('level'),
+    /** Selected variant from libraryTrait.variants[].name; null = base form. */
+    variantName: varchar('variant_name', { length: 80 }),
     notes: text('notes'),
     /** Validated by `traitModifier` (src/shared/schemas/trait.ts). */
     modifiers: jsonb('modifiers').$type<TraitModifier[]>().notNull().default([]),
@@ -580,6 +591,17 @@ export const campaignLibraryTraits = pgTable(
     source: varchar('source', { length: 40 }),
     /** Validated by `traitModifier` (src/shared/schemas/trait.ts). */
     availableModifiers: jsonb('available_modifiers').$type<TraitModifier[]>().notNull().default([]),
+    /** Validated by `traitEffect` (src/shared/schemas/effects.ts). */
+    effects: jsonb('effects').$type<TraitEffect[]>().notNull().default([]),
+    /**
+     * Per-level cost.  When non-null, the trait is leveled.
+     * total points = base_points + level * points_per_level.
+     */
+    pointsPerLevel: integer('points_per_level'),
+    /** Optional level cap. */
+    maxLevel: smallint('max_level'),
+    /** Named alternative forms (see traitVariant in shared/schemas/trait.ts). */
+    variants: jsonb('variants').$type<TraitVariant[]>().notNull().default([]),
     /** Validated by the `tagList` element schema (src/shared/schemas/campaignLibrary.ts). */
     tags: jsonb('tags').$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
@@ -611,6 +633,8 @@ export const campaignLibrarySkills = pgTable(
       .$type<SituationalModifier[]>()
       .notNull()
       .default([]),
+    /** Validated by `traitEffect` (src/shared/schemas/effects.ts). */
+    effects: jsonb('effects').$type<TraitEffect[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),

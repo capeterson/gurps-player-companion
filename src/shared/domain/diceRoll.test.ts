@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { evaluateRoll, roll3d6 } from './diceRoll.ts';
+import { evaluateRoll, roll3d6, rollDamageDice } from './diceRoll.ts';
 
 describe('roll3d6', () => {
   it('sums the three dice from an injected rng', () => {
@@ -27,6 +27,35 @@ describe('roll3d6', () => {
     const r = roll3d6();
     expect(r.total).toBeGreaterThanOrEqual(3);
     expect(r.total).toBeLessThanOrEqual(18);
+  });
+});
+
+describe('rollDamageDice', () => {
+  const fixedRng = (values: readonly number[]) => {
+    let i = 0;
+    return () => values[i++] as number;
+  };
+
+  it('rolls N dice and folds in the adds', () => {
+    // floor(rng*6)+1: 0 -> 1, 0.5 -> 4.
+    const r = rollDamageDice({ dice: 2, adds: 1 }, 0, fixedRng([0, 0.5]));
+    expect(r.rolls).toEqual([1, 4]);
+    expect(r.total).toBe(6);
+  });
+
+  it('clamps to the minimum damage (0 for cr, 1 for cut/imp per B378)', () => {
+    // 1d-4 rolling a 1: raw total -3.
+    expect(rollDamageDice({ dice: 1, adds: -4 }, 0, fixedRng([0])).total).toBe(0);
+    expect(rollDamageDice({ dice: 1, adds: -4 }, 1, fixedRng([0])).total).toBe(1);
+  });
+
+  it('stays within N..6N + adds across many samples', () => {
+    for (let i = 0; i < 200; i++) {
+      const r = rollDamageDice({ dice: 3, adds: 2 }, 0, Math.random);
+      expect(r.rolls).toHaveLength(3);
+      expect(r.total).toBeGreaterThanOrEqual(5);
+      expect(r.total).toBeLessThanOrEqual(20);
+    }
   });
 });
 

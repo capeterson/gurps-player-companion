@@ -208,6 +208,8 @@ describe('emitLibraryYaml', () => {
           kind: 'advantage',
           basePoints: 2,
           availableModifiers: [],
+          variants: [],
+          effects: [],
           tags: [],
         },
       ],

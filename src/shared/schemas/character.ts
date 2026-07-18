@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
+import { effectTarget } from './effects.ts';
 import { inventoryItemOut } from './inventory.ts';
 import { skillOut } from './skill.ts';
 import { spellOut } from './spell.ts';
@@ -192,11 +193,40 @@ export const derivedStatsOut = z.object({
   basicSpeed: z.number(),
   basicMove: z.number().int(),
   dodge: z.number().int(),
+  /** Alias of `dodge` (kept for clarity in trait-effect breakdowns). */
+  dodgeBase: z.number().int(),
+  /** Aggregate +N to all parry rolls from active trait effects. */
+  parryMod: z.number().int(),
+  /** Aggregate +N to all block rolls from active trait effects. */
+  blockMod: z.number().int(),
+  /** Aggregate DR contributed by traits (separate from armor DR). */
+  traitDr: z.number().int(),
+  /** Aggregate +N to fright check rolls from active trait effects. */
+  frightCheckMod: z.number().int(),
   basicLift: z.number(),
   /** Basic thrust damage from ST, e.g. "1d-2" (B16). */
   thrust: z.string(),
   /** Basic swing damage from ST, e.g. "1d" (B16). */
   swing: z.string(),
+});
+
+/**
+ * One trait/skill effect resolved against a character — same shape as
+ * domain/traitEffects.ts ResolvedEffect, returned in CharacterDetail
+ * for UI breakdowns.
+ */
+export const resolvedEffectOut = z.object({
+  sourceKind: z.enum(['trait', 'skill']),
+  sourceName: z.string(),
+  sourceId: uuid,
+  target: effectTarget,
+  value: z.number().int(),
+  skillName: z.string().optional(),
+  skillSpecialty: z.string().optional(),
+  hitLocation: z.string().optional(),
+  conditionGroup: z.string().optional(),
+  conditionLabel: z.string().optional(),
+  active: z.boolean(),
 });
 
 export const pointBreakdownOut = z.object({
@@ -248,6 +278,8 @@ export const characterDetail = z.object({
   ...characterIdentityShape,
   ...characterAttributesShape,
   dismissedWarnings: z.array(z.string()),
+  /** Trait/skill effect condition groups currently toggled ON. */
+  activeConditionGroups: z.array(z.string()).default([]),
   ...timestamps,
   revision,
   derived: derivedStatsOut,
@@ -267,6 +299,13 @@ export const characterDetail = z.object({
   spells: z.array(spellOut),
   inventory: z.array(inventoryItemOut),
   combat: combatStateOut.nullable(),
+  /**
+   * Flat list of trait/skill effects resolved against this character's
+   * current condition-group toggles.  The UI groups by `target` to
+   * render per-stat breakdowns.  Inactive (conditional, group OFF)
+   * effects appear here too with `active: false`.
+   */
+  effects: z.array(resolvedEffectOut).default([]),
 });
 
 /**
@@ -308,3 +347,4 @@ export type PointBreakdownOut = z.infer<typeof pointBreakdownOut>;
 export type WarningOut = z.infer<typeof warningOut>;
 export type EncumbranceOut = z.infer<typeof encumbranceOut>;
 export type DismissWarningRequest = z.infer<typeof dismissWarningRequest>;
+export type ResolvedEffectOut = z.infer<typeof resolvedEffectOut>;

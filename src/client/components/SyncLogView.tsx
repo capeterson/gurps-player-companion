@@ -5,6 +5,7 @@ import { getLocalDb } from '../db/dexie.ts';
 import { useDialogState } from '../hooks/useDialogState.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
+import { buildSyncDebugDump } from '../sync/debugDump.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
 
@@ -49,6 +50,23 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
       toasts.push(`Couldn't revert change — ${errorMessage(err)}`, { kind: 'error' });
     } finally {
       setWorking(false);
+    }
+  };
+
+  const downloadDebugLog = async () => {
+    try {
+      const dump = await buildSyncDebugDump();
+      const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sync-debug-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toasts.push(`Couldn't build debug log — ${errorMessage(err)}`, { kind: 'error' });
     }
   };
 
@@ -165,14 +183,23 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
             {storageMessage && (
               <p className="mb-3 text-xs text-base-content/60">{storageMessage}</p>
             )}
-            <button
-              type="button"
-              className="btn btn-error btn-outline btn-sm"
-              disabled={!online}
-              onClick={() => setResyncOpen(true)}
-            >
-              Abandon local changes and re-sync from server
-            </button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <button
+                type="button"
+                className="btn btn-outline btn-sm h-auto whitespace-normal py-2"
+                onClick={() => void downloadDebugLog()}
+              >
+                Download sync debug log
+              </button>
+              <button
+                type="button"
+                className="btn btn-error btn-outline btn-sm h-auto whitespace-normal py-2"
+                disabled={!online}
+                onClick={() => setResyncOpen(true)}
+              >
+                Abandon local changes and re-sync from server
+              </button>
+            </div>
             {!online && (
               <p className="mt-2 text-xs text-warning">
                 Reconnect before abandoning local changes so a fresh server copy can be downloaded.
@@ -262,6 +289,9 @@ function logName(entry: SyncLogEntry): string {
 
 function directionLabel(entry: SyncLogEntry): string {
   if (entry.result === 'reverted') return 'Reverted locally';
+  if (entry.result === 'requeued') return 'Requeued after conflict';
+  if (entry.result === 'rolled_back') return 'Rolled back';
+  if (entry.result === 'retrying') return 'Retrying started';
   return entry.direction === 'push' ? 'Pushed' : 'Pulled';
 }
 

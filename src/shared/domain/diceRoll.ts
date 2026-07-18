@@ -49,6 +49,34 @@ export function roll3d6(rng: () => number = Math.random): DiceRoll {
   return { dice: [d1, d2, d3], total: d1 + d2 + d3 };
 }
 
+/** One damage roll: the individual dice faces plus the clamped total. */
+export interface DamageRollResult {
+  readonly rolls: readonly number[];
+  readonly total: number;
+}
+
+/**
+ * Roll NdM+adds damage dice (B269). `minDamage` clamps the final total:
+ * B378 gives crushing attacks a minimum of 0 and everything that can
+ * wound by edge or point (cut/imp/pi variants) a minimum of 1 — pass
+ * `minBasicDamageFor(type)` from `damageParse.ts`. `dice.dice` is
+ * assumed pre-clamped to a sane count (see AttacksCard/RollSheet,
+ * which cap it before offering the roll) — this function does not
+ * itself guard against an absurd die count.
+ */
+export function rollDamageDice(
+  dice: { readonly dice: number; readonly adds: number },
+  minDamage: number,
+  rng: () => number = Math.random,
+): DamageRollResult {
+  const rolls: number[] = [];
+  for (let i = 0; i < dice.dice; i++) {
+    rolls.push(Math.floor(rng() * 6) + 1);
+  }
+  const raw = rolls.reduce((sum, d) => sum + d, 0) + dice.adds;
+  return { rolls, total: Math.max(minDamage, raw) };
+}
+
 /**
  * Evaluate a 3d6 total against an effective skill per the GURPS 4e
  * success roll rules (B556). See module doc comment for the exact

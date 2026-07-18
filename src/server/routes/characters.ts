@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { desc, eq, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   type CharacterMinimalOut,
@@ -85,11 +85,11 @@ router.openapi(
       .from(characters)
       .where(where)
       .orderBy(desc(characters.updatedAt));
-    // Same share gate as GET /characters/{id} and /sync/cursor: fellow
-    // members of a shareCharacterSheets=false campaign only get the
-    // "readily apparent" identity bits, so core attributes are masked
-    // to the 10/10/10/10 baseline for characters the viewer may only
-    // see in minimal form.
+    // Same share gate as GET /characters/{id} and /sync/cursor. Per
+    // docs/specs/campaign-content-sharing.md the list endpoint EXCLUDES
+    // rows the viewer may only see in minimal form — campaign-shared
+    // minimal characters are browsable from the campaign detail page
+    // instead, never from the player's "your characters" surface.
     const relevantCampaignIds = [
       ...new Set(rows.map((r) => r.campaignId).filter((id): id is string => id !== null)),
     ];
@@ -101,8 +101,17 @@ router.openapi(
               id: campaigns.id,
               ownerId: campaigns.ownerId,
               shareCharacterSheets: campaigns.shareCharacterSheets,
+              allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
+              viewerRole: campaignMemberships.role,
             })
             .from(campaigns)
+            .leftJoin(
+              campaignMemberships,
+              and(
+                eq(campaignMemberships.campaignId, campaigns.id),
+                eq(campaignMemberships.userId, user.id),
+              ),
+            )
             .where(inArray(campaigns.id, relevantCampaignIds));
     const accessModes = decideCharacterAccess({
       viewerId: user.id,
@@ -110,23 +119,22 @@ router.openapi(
       campaigns: campaignRows,
     });
     return c.json(
-      rows.map((r) => {
-        const minimal = accessModes.get(r.id) === 'minimal';
-        return {
+      rows
+        .filter((r) => accessModes.get(r.id) !== 'minimal')
+        .map((r) => ({
           id: r.id,
           ownerId: r.ownerId,
           campaignId: r.campaignId,
           name: r.name,
           playerName: r.playerName,
           techLevel: r.techLevel,
-          st: minimal ? 10 : r.st,
-          dx: minimal ? 10 : r.dx,
-          iq: minimal ? 10 : r.iq,
-          ht: minimal ? 10 : r.ht,
+          st: r.st,
+          dx: r.dx,
+          iq: r.iq,
+          ht: r.ht,
           updatedAt: r.updatedAt.toISOString(),
           revision: Number(r.revision),
-        };
-      }),
+        })),
       200,
     );
   },

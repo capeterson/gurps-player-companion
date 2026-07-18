@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
 
@@ -44,6 +44,34 @@ describe('DrSummaryCard', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByText('Left Arm')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('resolves incoming damage through DR and applies injury to HP', () => {
+    const bumpHp = vi.fn();
+    // Torso DR 4; 12 cut => 8 penetrating × 1.5 = 12 injury.
+    render(
+      <DrSummaryCard
+        character={makeCharacter([{ dr: 4, locations: ['torso'] }])}
+        canWrite
+        hpMax={10}
+        bumpHp={bumpHp}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '12' } });
+    // Type defaults to 'cr'; switch to cut for the ×1.5 multiplier.
+    const [typeSelect] = screen.getAllByRole('combobox');
+    fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
+
+    const apply = screen.getByRole('button', { name: /Apply −12 HP/ });
+    fireEvent.click(apply);
+    expect(bumpHp).toHaveBeenCalledWith(-12);
+  });
+
+  it('offers no incoming-damage button without write access', () => {
+    render(<DrSummaryCard character={makeCharacter([{ dr: 4, locations: ['torso'] }])} />);
+    expect(screen.queryByRole('button', { name: /Incoming damage/ })).not.toBeInTheDocument();
   });
 
   it('skips unequipped armor', () => {

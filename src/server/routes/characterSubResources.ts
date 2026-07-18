@@ -812,4 +812,110 @@ router.openapi(
   },
 );
 
+// ===================== CONDITION TOGGLES =====================
+
+const conditionGroupParam = z
+  .string()
+  .min(1)
+  .max(40)
+  .regex(/^[a-z][a-z0-9_]*$/, 'must be lower_snake_case');
+
+const conditionGroupsResponse = z.object({
+  activeConditionGroups: z.array(z.string()),
+  character: characterDetail,
+});
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/characters/{id}/conditions/{group}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Toggle a trait/skill effect condition group ON for a character',
+    request: {
+      params: z.object({ id: uuid, group: conditionGroupParam }),
+    },
+    responses: {
+      200: {
+        description: 'Updated active group set + refreshed character',
+        content: { 'application/json': { schema: conditionGroupsResponse } },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, group } = c.req.valid('param');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    // Read-modify-write under a row lock INSIDE the audit transaction:
+    // deriving `next` from the permission-check snapshot would let two
+    // concurrent toggles (different groups, two tabs) overwrite each
+    // other — the later write would resurrect the earlier snapshot and
+    // silently drop the other tab's just-activated group.
+    const next = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx
+        .select({ activeConditionGroups: characters.activeConditionGroups })
+        .from(characters)
+        .where(eq(characters.id, id))
+        .for('update');
+      if (!row) throw new HTTPException(404, { message: 'character not found' });
+      const current = new Set(row.activeConditionGroups ?? []);
+      current.add(group);
+      const updated = Array.from(current).sort();
+      await tx
+        .update(characters)
+        .set({ activeConditionGroups: updated, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+      return updated;
+    });
+    return c.json({ activeConditionGroups: next, character: await loadCharacterDetail(id) }, 200);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/characters/{id}/conditions/{group}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Toggle a trait/skill effect condition group OFF (idempotent)',
+    request: {
+      params: z.object({ id: uuid, group: conditionGroupParam }),
+    },
+    responses: {
+      200: {
+        description: 'Updated active group set + refreshed character',
+        content: { 'application/json': { schema: conditionGroupsResponse } },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, group } = c.req.valid('param');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    // Same locked read-modify-write as the POST handler above — see the
+    // comment there for the concurrent-toggle race this prevents.
+    const next = await withAudit(user.id, undefined, async (tx) => {
+      const [row] = await tx
+        .select({ activeConditionGroups: characters.activeConditionGroups })
+        .from(characters)
+        .where(eq(characters.id, id))
+        .for('update');
+      if (!row) throw new HTTPException(404, { message: 'character not found' });
+      const updated = (row.activeConditionGroups ?? []).filter((g) => g !== group);
+      await tx
+        .update(characters)
+        .set({ activeConditionGroups: updated, updatedAt: new Date() })
+        .where(eq(characters.id, id));
+      return updated;
+    });
+    return c.json({ activeConditionGroups: next, character: await loadCharacterDetail(id) }, 200);
+  },
+);
+
 export const characterSubResourcesRouter = router;

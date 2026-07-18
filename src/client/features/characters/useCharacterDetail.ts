@@ -15,7 +15,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { buildCharacterDetail } from '../../../shared/domain/characterDetail.ts';
 import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
+import type { TraitEffect } from '../../../shared/schemas/effects.ts';
 import { getLocalDb } from '../../db/dexie.ts';
+import { readUserIdFromToken } from '../../lib/tokenStore.ts';
+import { characterIdsToMinimize } from '../../sync/minimalViewSweep.ts';
+import { useLibraryEffectMaps } from './useLibraryEffectMaps.ts';
 
 /**
  * `undefined` while the live query is still mounting; `null` for
@@ -25,7 +29,33 @@ import { getLocalDb } from '../../db/dexie.ts';
  */
 export type CharacterDetailResult = CharacterDetail | null | undefined;
 
-export function useCharacterDetail(id: string | undefined): CharacterDetailResult {
+export interface UseCharacterDetailOptions {
+  /**
+   * Library trait id → effects[] map.  When omitted (the default), the
+   * hook fetches the campaign library itself via `useLibraryEffectMaps`
+   * and joins effects automatically.  Pass an explicit map here only if
+   * you need to override the auto-fetch (e.g. in tests).
+   */
+  readonly libraryTraitEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
+  readonly librarySkillEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
+}
+
+export function useCharacterDetail(
+  id: string | undefined,
+  options: UseCharacterDetailOptions = {},
+): CharacterDetailResult {
+  // Pre-fetch the campaignId so the library hook can run with the
+  // correct key.  Two live queries are cheap; the second depends on the
+  // library maps which themselves depend on this campaignId.
+  const campaignId = useLiveQuery(async () => {
+    if (!id) return null;
+    const c = await getLocalDb().characters.get(id);
+    return c?.campaignId ?? null;
+  }, [id]);
+
+  const autoMaps = useLibraryEffectMaps(campaignId ?? null);
+  const traitEffects = options.libraryTraitEffects ?? autoMaps.libraryTraitEffects;
+  const skillEffects = options.librarySkillEffects ?? autoMaps.librarySkillEffects;
   return useLiveQuery(async () => {
     if (!id) return null;
     const db = getLocalDb();
@@ -41,8 +71,20 @@ export function useCharacterDetail(id: string | undefined): CharacterDetailResul
     ]);
     return buildCharacterDetail({
       character,
-      traits,
-      skills,
+      traits: traits.map((t) => ({
+        ...t,
+        libraryEffects:
+          t.libraryTraitId && traitEffects?.has(t.libraryTraitId)
+            ? [...(traitEffects.get(t.libraryTraitId) ?? [])]
+            : [],
+      })),
+      skills: skills.map((s) => ({
+        ...s,
+        libraryEffects:
+          s.librarySkillId && skillEffects?.has(s.librarySkillId)
+            ? [...(skillEffects.get(s.librarySkillId) ?? [])]
+            : [],
+      })),
       spells,
       inventory,
       combat: combat ?? null,
@@ -55,7 +97,11 @@ export function useCharacterDetail(id: string | undefined): CharacterDetailResul
           }
         : null,
     });
-  }, [id]);
+    // The maps are memoized on the library query's data (see
+    // useLibraryEffectMaps), so their identity changes exactly when the
+    // library payload does — including value-only edits a size-based
+    // key would miss.
+  }, [id, traitEffects, skillEffects]);
 }
 
 export type CharacterListResult = CharacterListItem[] | undefined;
@@ -66,7 +112,62 @@ export function useCharactersList(): CharacterListResult {
     // Dexie's orderBy uses the index; we want descending updatedAt so
     // the most recently touched character is at the top, matching the
     // server's GET /characters behaviour.
-    const rows = await db.characters.orderBy('updatedAt').reverse().toArray();
+    const [rows, campaigns] = await Promise.all([
+      db.characters.orderBy('updatedAt').reverse().toArray(),
+      db.campaigns.toArray(),
+    ]);
+    // Per docs/specs/campaign-content-sharing.md: a character the viewer
+    // may only see in minimal form is NOT listed on the "your
+    // characters" page — those rows are discoverable from the campaign
+    // detail page instead. Evaluate the same local access decision as
+    // the privacy sweep so full-share rows and editable manager rows
+    // remain visible.
+    // The token sub is set at login; if it's missing (logged out /
+    // cold boot before the bootstrap gate resolves) we return nothing
+    // so the page doesn't briefly flash rows the viewer can't own.
+    const myId = readUserIdFromToken();
+    if (myId === null) return [];
+    const minimalIds = characterIdsToMinimize({ viewerId: myId, characters: rows, campaigns });
+    return rows
+      .filter((r) => !minimalIds.has(r.id))
+      .map<CharacterListItem>((r) => ({
+        id: r.id,
+        ownerId: r.ownerId,
+        campaignId: r.campaignId,
+        name: r.name,
+        playerName: r.playerName,
+        techLevel: r.techLevel,
+        st: r.st,
+        dx: r.dx,
+        iq: r.iq,
+        ht: r.ht,
+        updatedAt: r.updatedAt,
+        revision: Math.max(0, r.revision),
+      }));
+  }, []);
+}
+
+/**
+ * Campaign roster for `/campaigns/:id`'s browseable "Characters"
+ * section. Returns every character in the campaign Dexie knows about,
+ * regardless of the share gate — minimal viewers deep-link to
+ * `/characters/:id` which renders CharacterMinimalView for them; full
+ * viewers (owner / GM / share=true member) land on the full sheet.
+ *
+ * Reads Dexie (local-first) so the roster stays available offline.
+ * Member-owned characters that the orchestrator hasn't synced down yet
+ * simply don't appear until the next cursor pull — same trade-off as
+ * `useCharactersList`.
+ */
+export function useCampaignCharactersList(campaignId: string | undefined): CharacterListResult {
+  return useLiveQuery(async () => {
+    if (!campaignId) return [];
+    const db = getLocalDb();
+    const rows = await db.characters
+      .where('campaignId')
+      .equals(campaignId)
+      .reverse()
+      .sortBy('updatedAt');
     return rows.map<CharacterListItem>((r) => ({
       id: r.id,
       ownerId: r.ownerId,
@@ -81,5 +182,5 @@ export function useCharactersList(): CharacterListResult {
       updatedAt: r.updatedAt,
       revision: Math.max(0, r.revision),
     }));
-  }, []);
+  }, [campaignId]);
 }

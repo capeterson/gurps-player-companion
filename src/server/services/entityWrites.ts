@@ -87,6 +87,7 @@ export function traitInsertValues(
     name: body.name,
     points: body.points ?? 0,
     level: body.level ?? null,
+    variantName: body.variantName ?? null,
     notes: body.notes ?? null,
     modifiers: body.modifiers ?? [],
     libraryTraitId: body.libraryTraitId ?? null,

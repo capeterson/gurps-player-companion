@@ -57,6 +57,7 @@ async function seedCharacter() {
     moveMod: 0,
     tempEffects: [],
     dismissedWarnings: [],
+    activeConditionGroups: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     revision: 1,
