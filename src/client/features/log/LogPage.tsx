@@ -1,11 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { AdventureLogCreate, AdventureLogOut } from '../../../shared/schemas/adventureLog.ts';
+import type {
+  AdventureLogCreate,
+  AdventureLogOut,
+  AdventureLogUpdate,
+} from '../../../shared/schemas/adventureLog.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
+import { Markdown } from '../../components/markdown/Markdown.tsx';
+import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 
 type FilterKind = 'all' | 'shared' | 'private';
+
+type EditorState = { kind: 'hidden' } | { kind: 'create' } | { kind: 'edit'; entryId: string };
 
 /** Today as 'YYYY-MM-DD' in the user's local calendar. `toISOString()`
  * is UTC, which during local evening hours pushes the default forward
@@ -36,8 +44,28 @@ function formatDate(iso: string): string {
   });
 }
 
+function emptyDraft(): AdventureLogCreate {
+  return {
+    sessionDate: todayIso(),
+    title: '',
+    body: '',
+    visibility: 'campaign',
+    xpAwards: [],
+  };
+}
+
+function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
+  return {
+    sessionDate: entry.sessionDate,
+    title: entry.title,
+    body: entry.body,
+    visibility: entry.visibility,
+    xpAwards: entry.xpAwards,
+  };
+}
+
 /**
- * Top-level adventure-log page.  When `campaignIdProp` is omitted the
+ * Top-level adventure-log page.  When `campaignId` is omitted the
  * page picks a campaign from the `?campaign=` query string (or the
  * first one available) and mirrors the selection back into the URL —
  * the legacy /log behaviour.  When a parent route passes the id
@@ -78,16 +106,30 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     enabled: !!campaignId,
   });
 
-  const [filter, setFilter] = useState<FilterKind>('all');
-  const [showCreate, setShowCreate] = useState(false);
-  const [draft, setDraft] = useState<AdventureLogCreate>({
-    sessionDate: todayIso(),
-    title: '',
-    body: '',
-    visibility: 'campaign',
-    xpAwards: [],
+  // Current user + campaign metadata — used to decide which entries
+  // the viewer may edit/delete (author or campaign owner).
+  const me = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api<{ id: string }>('/auth/me'),
   });
-  const [createError, setCreateError] = useState<string | null>(null);
+  const campaignQuery = useQuery({
+    queryKey: ['campaigns', campaignId],
+    queryFn: () => api<CampaignOut>(`/campaigns/${campaignId}`),
+    enabled: !!campaignId,
+  });
+
+  const [filter, setFilter] = useState<FilterKind>('all');
+  const [editor, setEditor] = useState<EditorState>({ kind: 'hidden' });
+  const [draft, setDraft] = useState<AdventureLogCreate>(emptyDraft());
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Collapse the editor whenever the campaign changes so a stale
+  // draft from another campaign can't be committed by accident.
+  useEffect(() => {
+    setEditor({ kind: 'hidden' });
+    setDraft(emptyDraft());
+    setSaveError(null);
+  }, [campaignId]);
 
   const create = useMutation({
     mutationFn: (snap: AdventureLogCreate) =>
@@ -97,18 +139,37 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
-      setShowCreate(false);
-      setDraft({
-        sessionDate: todayIso(),
-        title: '',
-        body: '',
-        visibility: 'campaign',
-        xpAwards: [],
-      });
-      setCreateError(null);
+      setEditor({ kind: 'hidden' });
+      setDraft(emptyDraft());
+      setSaveError(null);
     },
     onError: (err) => {
-      setCreateError(err instanceof ApiError ? err.message : 'Save failed');
+      setSaveError(err instanceof ApiError ? err.message : 'Save failed');
+    },
+  });
+
+  const update = useMutation({
+    mutationFn: (args: { entryId: string; patch: AdventureLogUpdate }) =>
+      api<AdventureLogOut>(`/campaigns/${campaignId}/log/${args.entryId}`, {
+        method: 'PATCH',
+        body: args.patch,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
+      setEditor({ kind: 'hidden' });
+      setDraft(emptyDraft());
+      setSaveError(null);
+    },
+    onError: (err) => {
+      setSaveError(err instanceof ApiError ? err.message : 'Save failed');
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (entryId: string) =>
+      api<void>(`/campaigns/${campaignId}/log/${entryId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
     },
   });
 
@@ -133,16 +194,61 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     [campaigns.data, campaignId],
   );
 
+  const canModify = (entry: AdventureLogOut): boolean => {
+    const meId = me.data?.id;
+    if (!meId) return false;
+    if (entry.authorId === meId) return true;
+    return campaignQuery.data?.ownerId === meId;
+  };
+
+  const openCreate = () => {
+    setDraft(emptyDraft());
+    setSaveError(null);
+    setEditor({ kind: 'create' });
+  };
+
+  const openEdit = (entry: AdventureLogOut) => {
+    setDraft(draftFromEntry(entry));
+    setSaveError(null);
+    setEditor({ kind: 'edit', entryId: entry.id });
+  };
+
+  const cancelEditor = () => {
+    setEditor({ kind: 'hidden' });
+    setDraft(emptyDraft());
+    setSaveError(null);
+  };
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = draft.title.trim();
+    if (!trimmed) return;
+    if (editor.kind === 'edit') {
+      update.mutate({ entryId: editor.entryId, patch: { ...draft, title: trimmed } });
+    } else {
+      create.mutate({ ...draft, title: trimmed });
+    }
+  };
+
+  const deleting = remove.isPending
+    ? (entries.data?.find((e) => e.id === (remove.variables ?? ''))?.id ?? null)
+    : null;
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <p className="label-eyebrow">
-            Campaign · {currentCampaign?.name ?? 'No campaign selected'}
-          </p>
-          <h1 className="font-display text-4xl font-semibold leading-none">Adventure Log</h1>
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="mx-auto flex max-w-3xl flex-col gap-5">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        {campaignIdProp ? (
+          <h2 className="font-display text-xl font-semibold leading-none">Adventure Log</h2>
+        ) : (
+          <div className="min-w-0">
+            <p className="label-eyebrow">
+              Campaign ·{' '}
+              {currentCampaign?.name ?? campaignQuery.data?.name ?? 'No campaign selected'}
+            </p>
+            <h1 className="font-display text-3xl font-semibold leading-none">Adventure Log</h1>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
           {campaigns.data && campaigns.data.length > 1 && (
             <select
               className="select select-bordered select-sm"
@@ -161,58 +267,58 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
               ))}
             </select>
           )}
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={!campaignId}
-            onClick={() => setShowCreate((v) => !v)}
-          >
-            {showCreate ? 'Cancel' : '+ New entry'}
-          </button>
+          {editor.kind === 'hidden' ? (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={!campaignId}
+              onClick={openCreate}
+            >
+              + New entry
+            </button>
+          ) : (
+            <button type="button" className="btn btn-ghost btn-sm" onClick={cancelEditor}>
+              Cancel
+            </button>
+          )}
         </div>
       </header>
 
-      {!campaigns.isLoading && (campaigns.data?.length ?? 0) === 0 && (
+      {!campaigns.isLoading && (campaigns.data?.length ?? 0) === 0 && !campaignIdProp && (
         <div className="card p-card text-center text-muted">
           You don't belong to any campaigns yet. Create one on the Campaign tab to start a log.
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setFilter('all')}
-          className={`chip ${filter === 'all' ? 'on' : ''}`}
-        >
-          All <span className="num text-dim ml-1">{counts.all}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('shared')}
-          className={`chip ${filter === 'shared' ? 'on' : ''}`}
-        >
-          Shared <span className="num text-dim ml-1">{counts.shared}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('private')}
-          className={`chip ${filter === 'private' ? 'on' : ''}`}
-        >
-          Private <span className="num text-dim ml-1">{counts.private}</span>
-        </button>
-      </div>
+      {campaignId && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className={`chip ${filter === 'all' ? 'on' : ''}`}
+          >
+            All <span className="num text-dim ml-1">{counts.all}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('shared')}
+            className={`chip ${filter === 'shared' ? 'on' : ''}`}
+          >
+            Shared <span className="num text-dim ml-1">{counts.shared}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('private')}
+            className={`chip ${filter === 'private' ? 'on' : ''}`}
+          >
+            Private <span className="num text-dim ml-1">{counts.private}</span>
+          </button>
+        </div>
+      )}
 
-      {showCreate && campaignId && (
-        <form
-          className="card grid gap-3 p-card"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const trimmed = draft.title.trim();
-            if (!trimmed) return;
-            create.mutate({ ...draft, title: trimmed });
-          }}
-        >
-          <div className="grid gap-3 sm:grid-cols-[8rem_1fr_8rem]">
+      {editor.kind !== 'hidden' && campaignId && (
+        <form className="card space-y-4 p-card" onSubmit={submit}>
+          <div className="grid gap-3 sm:grid-cols-[7rem_1fr_7rem]">
             <label className="form-control">
               <span className="label-text">Date</span>
               <input
@@ -251,23 +357,30 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
               </select>
             </label>
           </div>
-          <label className="form-control">
+
+          <div className="form-control">
             <span className="label-text">Body</span>
-            <textarea
-              className="textarea textarea-bordered min-h-[10rem]"
+            <RichTextEditor
               value={draft.body}
-              onChange={(e) => setDraft({ ...draft, body: e.target.value })}
-              placeholder="What happened, who acted, what's left to follow up on…"
+              onChange={(md) => setDraft((d) => ({ ...d, body: md }))}
             />
-          </label>
-          {createError && <p className="alert alert-error text-sm">{createError}</p>}
+          </div>
+
+          {saveError && <p className="alert alert-error text-sm">{saveError}</p>}
+
           <div className="flex justify-end">
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={create.isPending || !draft.title.trim()}
+              disabled={create.isPending || update.isPending || !draft.title.trim()}
             >
-              {create.isPending ? 'Saving…' : 'Save entry'}
+              {editor.kind === 'edit'
+                ? update.isPending
+                  ? 'Saving…'
+                  : 'Save changes'
+                : create.isPending
+                  ? 'Saving…'
+                  : 'Save entry'}
             </button>
           </div>
         </form>
@@ -280,21 +393,56 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       )}
 
       <div className="flex flex-col gap-4">
-        {visible.map((entry) => (
-          <article key={entry.id} className="card p-card">
-            <div className="mb-2 flex items-baseline justify-between">
-              <span className="num text-xs uppercase tracking-widest text-dim">
-                {formatDate(entry.sessionDate)}
-              </span>
-              {entry.visibility === 'private' && <span className="chip text-[10px]">private</span>}
-            </div>
-            <h3 className="font-display text-2xl font-semibold leading-tight">{entry.title}</h3>
-            <div className="mt-1 mb-3 text-xs text-muted">
-              by <span className="text-base-content">{entry.authorDisplayName}</span>
-            </div>
-            <p className="whitespace-pre-line text-sm leading-relaxed">{entry.body}</p>
-          </article>
-        ))}
+        {visible.map((entry) => {
+          const modifiable = canModify(entry);
+          const isEditing = editor.kind === 'edit' && editor.entryId === entry.id;
+          return (
+            <article key={entry.id} className="card p-card">
+              <div className="mb-1 flex items-baseline justify-between gap-3">
+                <span className="num text-xs uppercase tracking-widest text-dim">
+                  {formatDate(entry.sessionDate)}
+                  <span className="ml-2 normal-case tracking-normal text-muted">
+                    by <span className="text-base-content">{entry.authorDisplayName}</span>
+                  </span>
+                </span>
+                <div className="flex items-center gap-2">
+                  {entry.visibility === 'private' && (
+                    <span className="chip text-[10px]">private</span>
+                  )}
+                  {modifiable && !isEditing && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => openEdit(entry)}
+                        aria-label={`Edit ${entry.title}`}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs text-error"
+                        onClick={() => {
+                          if (window.confirm(`Delete "${entry.title}"? This can't be undone.`)) {
+                            remove.mutate(entry.id);
+                          }
+                        }}
+                        aria-label={`Delete ${entry.title}`}
+                        disabled={deleting === entry.id}
+                      >
+                        {deleting === entry.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <h3 className="font-display text-2xl font-semibold leading-tight">{entry.title}</h3>
+              <div className="log-entry-body mt-3">
+                <Markdown source={entry.body} className="text-sm leading-relaxed" />
+              </div>
+            </article>
+          );
+        })}
       </div>
     </div>
   );

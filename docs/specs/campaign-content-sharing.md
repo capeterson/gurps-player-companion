@@ -186,9 +186,26 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
 
 - **Read:** campaign members, **but private entries are hidden from non-authors**
   (`visibility` = campaign-wide vs private GM/player scratch).
-- **Write:** the entry's **author or the campaign owner**.
+- **Write:** the entry's **author or the campaign owner**. The author or owner
+  may also **edit** (`PATCH`) and **delete** (`DELETE`) entries; the client
+  `LogPage` exposes Edit/Delete controls on entries the viewer may modify.
 - Entries carry `sessionDate`, `title`, `body`, `visibility`, and `xpAwards`.
-- Client surface: `LogPage`.
+- **Body is markdown** (CommonMark + GFM), stored verbatim in the `body` text
+  column. Rendering is sanitized at render time only:
+  `src/client/components/markdown/markdownProcessor.ts` runs
+  `remark-parse → remark-gfm → remark-rehype(allowDangerousHtml) →
+  rehypeEscapeRaw → rehype-sanitize → rehype-stringify`. Raw HTML/scripts in
+  the source are **never interpreted** — `<script>` becomes escaped literal
+  text (`&#x3C;script&gt;…`) and `rehype-sanitize` runs as defense-in-depth.
+  There is no server-side HTML stripping; the contract is enforced at the
+  single render site (`<Markdown>`).
+- **Editor:** the create/edit form uses a Tiptap + `tiptap-markdown` WYSIWYG
+  (`src/client/components/markdown/RichTextEditor.tsx`) with a "Rich text" /
+  "Markdown" tab toggle. The stored source of truth is always the markdown
+  string — the editor never produces or persists HTML. Strict CommonMark line
+  breaks (single newlines do not become `<br>`).
+- Client surface: `LogPage` (single-column `max-w-3xl` layout), also embedded
+  in `CampaignDetailPage`.
 
 ## Auditing
 
