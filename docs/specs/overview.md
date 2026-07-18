@@ -246,7 +246,11 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
 - **Adventure log**: session log entries with per-entry visibility
-  (campaign-wide or private).
+  (campaign-wide or private). The body is **markdown** (CommonMark + GFM)
+  rendered through a sanitized pipeline that never interprets raw HTML or
+  scripts. The create/edit form offers a Tiptap **rich text editor** with a
+  raw-markdown toggle; entries can be **edited or deleted** by their author or
+  the campaign owner. See campaign-content-sharing.md.
 - **Campaign history view**: campaign-level audit log (settings, membership,
   library, log), plus an owner/manager roll-up across member characters.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
@@ -322,7 +326,9 @@ src/
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...
-    components/  Shared UI (sync indicator/log, notifications bell, ui/*)
+    components/  Shared UI (sync indicator/log, notifications bell, ui/*,
+                 markdown/ — sanitized markdown renderer + Tiptap WYSIWYG
+                 markdown editor used by the adventure log)
     admin/       Separate admin SPA entry
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol)
