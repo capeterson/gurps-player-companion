@@ -5,6 +5,7 @@ import type {
   AdventureLogCreate,
   AdventureLogOut,
   AdventureLogUpdate,
+  XpAward,
 } from '../../../shared/schemas/adventureLog.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
@@ -12,6 +13,47 @@ import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 
 type FilterKind = 'all' | 'shared' | 'private';
+
+/** Snapshot of the draftable fields at submit time. We compare the
+ * just-settled mutation's `variables` against the CURRENT draft to
+ * decide whether the editor still corresponds to this save (safe to
+ * collapse) or the user has typed further since (kept open, untouched).
+ * Title is trimmed at submit, so we compare against the trimmed value
+ * rather than `draft.title`. */
+interface DraftSnapshot {
+  sessionDate: string;
+  title: string;
+  body: string;
+  visibility: AdventureLogCreate['visibility'];
+  xpAwards: XpAward[];
+}
+
+function snapshotOf(draft: AdventureLogCreate, trimmedTitle: string): DraftSnapshot {
+  return {
+    sessionDate: draft.sessionDate,
+    title: trimmedTitle,
+    body: draft.body,
+    visibility: draft.visibility,
+    xpAwards: draft.xpAwards,
+  };
+}
+
+/** Shallow structural equality on a draft snapshot. Sufficient because
+ * every field is a primitive or short flat array of primitives — the
+ * zod schema forbids nested objects in `xpAwards` beyond
+ * `{ characterId, amount }`, which are themselves primitive
+ * (string + number) */
+function snapshotMatches(a: DraftSnapshot, b: DraftSnapshot): boolean {
+  if (a.sessionDate !== b.sessionDate) return false;
+  if (a.title !== b.title) return false;
+  if (a.body !== b.body) return false;
+  if (a.visibility !== b.visibility) return false;
+  if (a.xpAwards.length !== b.xpAwards.length) return false;
+  return a.xpAwards.every(
+    (award, i) =>
+      award.characterId === b.xpAwards[i]?.characterId && award.amount === b.xpAwards[i]?.amount,
+  );
+}
 
 type EditorState = { kind: 'hidden' } | { kind: 'create' } | { kind: 'edit'; entryId: string };
 
@@ -132,16 +174,25 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   }, [campaignId]);
 
   const create = useMutation({
-    mutationFn: (snap: AdventureLogCreate) =>
+    mutationFn: (args: { snapshot: DraftSnapshot; payload: AdventureLogCreate }) =>
       api<AdventureLogOut>(`/campaigns/${campaignId}/log`, {
         method: 'POST',
-        body: snap,
+        body: args.payload,
       }),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
-      setEditor({ kind: 'hidden' });
-      setDraft(emptyDraft());
-      setSaveError(null);
+      // Only collapse the editor if it still corresponds to this save.
+      // If the user has already opened a follow-up draft while this
+      // request was in flight, leave their newer draft alone — clearing
+      // it would silently throw away what they're typing.
+      if (
+        editor.kind === 'create' &&
+        snapshotMatches(snapshotOf(draft, draft.title.trim()), variables.snapshot)
+      ) {
+        setEditor({ kind: 'hidden' });
+        setDraft(emptyDraft());
+        setSaveError(null);
+      }
     },
     onError: (err) => {
       setSaveError(err instanceof ApiError ? err.message : 'Save failed');
@@ -149,16 +200,30 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   });
 
   const update = useMutation({
-    mutationFn: (args: { entryId: string; patch: AdventureLogUpdate }) =>
+    mutationFn: (args: {
+      entryId: string;
+      snapshot: DraftSnapshot;
+      patch: AdventureLogUpdate;
+    }) =>
       api<AdventureLogOut>(`/campaigns/${campaignId}/log/${args.entryId}`, {
         method: 'PATCH',
         body: args.patch,
       }),
-    onSuccess: () => {
+    onSuccess: (_, { entryId, snapshot }) => {
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
-      setEditor({ kind: 'hidden' });
-      setDraft(emptyDraft());
-      setSaveError(null);
+      // Same guard as create — only clear the editor if no newer draft
+      // is waiting in it. Also verifies we're still editing the entry
+      // this save targeted (the user may have cancelled and started a
+      // different entry's edit in the meantime).
+      if (
+        editor.kind === 'edit' &&
+        editor.entryId === entryId &&
+        snapshotMatches(snapshotOf(draft, draft.title.trim()), snapshot)
+      ) {
+        setEditor({ kind: 'hidden' });
+        setDraft(emptyDraft());
+        setSaveError(null);
+      }
     },
     onError: (err) => {
       setSaveError(err instanceof ApiError ? err.message : 'Save failed');
@@ -223,10 +288,19 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     e.preventDefault();
     const trimmed = draft.title.trim();
     if (!trimmed) return;
+    // Snapshot the draft at submit time so the mutation's `onSuccess`
+    // can tell whether the editor still corresponds to this save or
+    // whether the user has typed further since (in which case we keep
+    // the newer draft rather than silently wiping it).
+    const snapshot = snapshotOf(draft, trimmed);
     if (editor.kind === 'edit') {
-      update.mutate({ entryId: editor.entryId, patch: { ...draft, title: trimmed } });
+      update.mutate({
+        entryId: editor.entryId,
+        snapshot,
+        patch: { ...draft, title: trimmed },
+      });
     } else {
-      create.mutate({ ...draft, title: trimmed });
+      create.mutate({ snapshot, payload: { ...draft, title: trimmed } });
     }
   };
 
@@ -395,7 +469,12 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       <div className="flex flex-col gap-4">
         {visible.map((entry) => {
           const modifiable = canModify(entry);
-          const isEditing = editor.kind === 'edit' && editor.entryId === entry.id;
+          // Row edit/delete controls are only rendered when the editor is
+          // fully hidden. While a create or edit draft is open elsewhere,
+          // clicking Edit here would call `openEdit(entry)` and silently
+          // replace the in-progress draft, so we suppress the controls
+          // entirely rather than confirming on click.
+          const canShowRowActions = modifiable && editor.kind === 'hidden';
           return (
             <article key={entry.id} className="card p-card">
               <div className="mb-1 flex items-baseline justify-between gap-3">
@@ -409,7 +488,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                   {entry.visibility === 'private' && (
                     <span className="chip text-[10px]">private</span>
                   )}
-                  {modifiable && !isEditing && (
+                  {canShowRowActions && (
                     <>
                       <button
                         type="button"

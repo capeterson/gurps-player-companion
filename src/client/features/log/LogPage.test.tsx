@@ -246,4 +246,81 @@ describe('LogPage', () => {
     // The eyebrow "Campaign · ..." should NOT render in embedded mode.
     expect(screen.queryByText(/Campaign ·/)).not.toBeInTheDocument();
   });
+
+  it('hides all row Edit/Delete controls while an editor draft is open', async () => {
+    setupResponses();
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
+
+    // Before opening any editor, the modifiable rows show their actions.
+    expect(screen.getByLabelText('Edit My entry')).toBeInTheDocument();
+    expect(screen.getByLabelText('Delete My entry')).toBeInTheDocument();
+
+    // Opening the create form immediately hides EVERY row's edit/delete
+    // actions — otherwise clicking Edit here would silently replace the
+    // in-progress draft.
+    await user.click(screen.getByRole('button', { name: '+ New entry' }));
+    expect(screen.queryByLabelText('Edit My entry')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Delete My entry')).not.toBeInTheDocument();
+
+    // Cancelling the create form restores them.
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByLabelText('Edit My entry')).toBeInTheDocument();
+    expect(screen.getByLabelText('Delete My entry')).toBeInTheDocument();
+  });
+
+  it('keeps a newer draft when an earlier create save settles later', async () => {
+    setupResponses();
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
+
+    // Defer the POST that follows the create submit; call `releasePost()`
+    // when we want the save to settle, so we can race the user typing into
+    // the still-open form against the in-flight mutation.
+    let releasePost: () => void = () => {};
+    vi.mocked(api).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releasePost = () =>
+            resolve(
+              makeEntry({
+                id: 'e-new',
+                authorId: ME_ID,
+                title: 'First title',
+              }) as unknown as Response,
+            );
+        }) as unknown as ReturnType<typeof api>,
+    );
+
+    await user.click(screen.getByRole('button', { name: '+ New entry' }));
+    const titleInput = screen.getByPlaceholderText(/Session 13/) as HTMLInputElement;
+    await user.type(titleInput, 'First title');
+    await user.type(screen.getByTestId('rich-text-editor'), 'first body');
+    await user.click(screen.getByRole('button', { name: 'Save entry' }));
+
+    // The save is in flight; the editor stayed open. Keep typing into
+    // the same title field — that newer title must NOT be wiped when
+    // the earlier mutation later settles.
+    await user.type(titleInput, ' (rev)');
+
+    // Sanity: the form is still on screen with the newer typed title.
+    expect(titleInput.value).toBe('First title (rev)');
+
+    // Let the slow save resolve. The mutation's onSuccess guard sees
+    // the current draft no longer matches the snapshot it was called
+    // with, so it must leave the editor (and the newer draft) alone.
+    releasePost();
+
+    // The editor must stay mounted with the user's newer draft — if the
+    // guard regressed and wiped the draft, the title input would have
+    // been reset to empty (or the whole form unmounted).
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save entry' })).toBeInTheDocument();
+    });
+    expect((screen.getByPlaceholderText(/Session 13/) as HTMLInputElement).value).toBe(
+      'First title (rev)',
+    );
+  });
 });
