@@ -147,6 +147,17 @@ export function resolveDamage(
  * treats every "burn" mode as NOT vitals-capable rather than guessing.
  * Everything else (cut, cr, tox, homebrew types, ...) is also excluded.
  */
+/**
+ * Minimum basic damage after adds (B378): attacks that wound by edge or
+ * point (cut/imp) always do at least 1 point of basic damage; anything
+ * else (cr, burn, homebrew, untyped) can bottom out at 0.
+ */
+export function minBasicDamageFor(type: string | null): number {
+  if (type == null) return 0;
+  const normalized = type.trim().toLowerCase();
+  return normalized.startsWith('cut') || normalized.startsWith('imp') ? 1 : 0;
+}
+
 export function canTargetVitals(type: string | null): boolean {
   if (type == null) return false;
   const normalized = type.trim().toLowerCase();

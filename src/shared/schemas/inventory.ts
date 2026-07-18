@@ -12,11 +12,45 @@ export const armorData = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
+/**
+ * Ranged stat block (GURPS 4e weapon table columns, B268-271).
+ * Numeric where math consumes the value (`acc` feeds the Aim roll
+ * preset, B364), free text where book notation is irregular
+ * (`range` "100/150" or "x10/x15", `rof` "3~", `shots` "9+1(3)").
+ */
+export const rangedData = z.object({
+  acc: z.number().int().min(0).max(20).nullable().optional(),
+  range: z.string().max(40).nullable().optional(),
+  rof: z.string().max(20).nullable().optional(),
+  shots: z.string().max(20).nullable().optional(),
+  bulk: z.number().int().min(-12).max(0).nullable().optional(),
+  recoil: z.number().int().min(1).max(9).nullable().optional(),
+});
+
 export const weaponData = z.object({
   damage: z.string().max(160).optional(),
   reach: z.string().max(40).nullable().optional(),
   parry: z.string().max(40).nullable().optional(),
   stRequired: z.number().int().min(0).max(99).nullable().optional(),
+  /**
+   * Governing skill, matched by exact case-insensitive name against the
+   * character's skills. A name string (not a skillId) because this same
+   * object lives on campaign_library_items rows shared across
+   * characters. Unset => combat falls back to fuzzy name matching on
+   * the weapon's name (matchSkillForWeapon).
+   */
+  skill: z.string().max(160).trim().nullable().optional(),
+  /**
+   * Shield Defense Bonus (B287). Non-null marks the item as a shield:
+   * when equipped, DB adds to Dodge/Parry/Block and enables the Block
+   * row (a DB 0 shield still blocks, so presence — not magnitude — is
+   * the marker).
+   */
+  db: z.number().int().min(0).max(4).nullable().optional(),
+  /** Ranged stat block; null/absent = melee-only. Melee fields coexist
+   *  (a thrown knife has reach AND ranged). Damage is shared via the
+   *  top-level `damage` field. */
+  ranged: rangedData.nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
 });
 
@@ -131,6 +165,7 @@ export type InventoryItemCreate = z.infer<typeof inventoryItemCreate>;
 export type InventoryItemUpdate = z.infer<typeof inventoryItemUpdate>;
 export type ArmorData = z.infer<typeof armorData>;
 export type WeaponData = z.infer<typeof weaponData>;
+export type RangedData = z.infer<typeof rangedData>;
 export type PowerstoneData = z.infer<typeof powerstoneData>;
 export type MagicItemData = z.infer<typeof magicItemData>;
 export type MagicItemMode = z.infer<typeof magicItemMode>;

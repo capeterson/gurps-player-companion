@@ -5,6 +5,9 @@ import {
   matchSkillForWeapon,
   parryFromSkill,
   parseParryString,
+  pickShield,
+  resolveWeaponSkill,
+  stShortfallPenalty,
 } from './defenseCalc.ts';
 
 describe('effectiveDodge', () => {
@@ -44,37 +47,195 @@ describe('blockFromSkill', () => {
 });
 
 describe('parseParryString', () => {
+  const plain = (mod: number) =>
+    ({ kind: 'parry', mod, fencing: false, unbalanced: false }) as const;
+
   it('parses a bare zero', () => {
-    expect(parseParryString('0')).toEqual({ mod: 0 });
+    expect(parseParryString('0')).toEqual(plain(0));
   });
 
   it('parses signed modifiers', () => {
-    expect(parseParryString('-1')).toEqual({ mod: -1 });
-    expect(parseParryString('+2')).toEqual({ mod: 2 });
+    expect(parseParryString('-1')).toEqual(plain(-1));
+    expect(parseParryString('+2')).toEqual(plain(2));
   });
 
   it('tolerates surrounding whitespace', () => {
-    expect(parseParryString('  3 ')).toEqual({ mod: 3 });
+    expect(parseParryString('  3 ')).toEqual(plain(3));
   });
 
-  it('returns null for "No" (cannot parry)', () => {
-    expect(parseParryString('No')).toBeNull();
-    expect(parseParryString('no')).toBeNull();
+  it('parses "No" as kind:no (cannot parry)', () => {
+    expect(parseParryString('No')).toEqual({ kind: 'no' });
+    expect(parseParryString('no')).toEqual({ kind: 'no' });
   });
 
-  it('returns null for "U" (unbalanced-only notation)', () => {
-    expect(parseParryString('U')).toBeNull();
+  it('parses a bare "U" as an unbalanced parry with mod 0', () => {
+    expect(parseParryString('U')).toEqual({
+      kind: 'parry',
+      mod: 0,
+      fencing: false,
+      unbalanced: true,
+    });
   });
 
-  it('returns null for trailing-letter forms like "0F" / "0U"', () => {
-    expect(parseParryString('0F')).toBeNull();
-    expect(parseParryString('0U')).toBeNull();
+  it('parses fencing forms like "0F" / "-1F"', () => {
+    expect(parseParryString('0F')).toEqual({
+      kind: 'parry',
+      mod: 0,
+      fencing: true,
+      unbalanced: false,
+    });
+    expect(parseParryString('-1F')).toEqual({
+      kind: 'parry',
+      mod: -1,
+      fencing: true,
+      unbalanced: false,
+    });
   });
 
-  it('returns null for empty or missing input', () => {
+  it('parses unbalanced forms like "0U"', () => {
+    expect(parseParryString('0U')).toEqual({
+      kind: 'parry',
+      mod: 0,
+      fencing: false,
+      unbalanced: true,
+    });
+  });
+
+  it('is case-insensitive on the suffix', () => {
+    expect(parseParryString('0f')).toEqual({
+      kind: 'parry',
+      mod: 0,
+      fencing: true,
+      unbalanced: false,
+    });
+    expect(parseParryString('u')).toEqual({
+      kind: 'parry',
+      mod: 0,
+      fencing: false,
+      unbalanced: true,
+    });
+  });
+
+  it('returns null for empty, missing, or unparseable input', () => {
     expect(parseParryString('')).toBeNull();
     expect(parseParryString(null)).toBeNull();
     expect(parseParryString(undefined)).toBeNull();
+    expect(parseParryString('special')).toBeNull();
+    expect(parseParryString('0X')).toBeNull();
+  });
+});
+
+describe('resolveWeaponSkill', () => {
+  const skills = [
+    { name: 'Broadsword', level: 14 },
+    { name: 'Shortsword', level: 12 },
+    { name: 'Katana Drawing', level: 16 },
+  ];
+
+  it('resolves an explicit binding by exact case-insensitive name', () => {
+    expect(resolveWeaponSkill('Excalibur', 'broadsword', skills)).toEqual({
+      kind: 'matched',
+      name: 'Broadsword',
+      level: 14,
+      explicit: true,
+    });
+  });
+
+  it('reports missing for an explicit skill not on the sheet — no fuzzy fallback', () => {
+    // 'Katana' would substring-match 'Katana Drawing' via the fuzzy path;
+    // an explicit binding must NOT take that route.
+    expect(resolveWeaponSkill('Katana', 'Katana', skills)).toEqual({
+      kind: 'missing',
+      skillName: 'Katana',
+    });
+  });
+
+  it('reports missing when the explicitly bound skill has a null level', () => {
+    expect(resolveWeaponSkill('Rapier', 'Rapier', [{ name: 'Rapier', level: null }])).toEqual({
+      kind: 'missing',
+      skillName: 'Rapier',
+    });
+  });
+
+  it('falls back to fuzzy matching when no explicit skill is set', () => {
+    expect(resolveWeaponSkill('Fine Broadsword', null, skills)).toEqual({
+      kind: 'matched',
+      name: 'Broadsword',
+      level: 14,
+      explicit: false,
+    });
+    expect(resolveWeaponSkill('Fine Broadsword', undefined, skills)).toMatchObject({
+      kind: 'matched',
+      explicit: false,
+    });
+  });
+
+  it('treats a whitespace-only explicit skill as unset', () => {
+    expect(resolveWeaponSkill('Fine Broadsword', '   ', skills)).toMatchObject({
+      kind: 'matched',
+      explicit: false,
+    });
+  });
+
+  it('returns none when unset and fuzzy finds nothing', () => {
+    expect(resolveWeaponSkill('Blowpipe', null, skills)).toEqual({ kind: 'none' });
+  });
+
+  it('breaks exact-name duplicates by highest level', () => {
+    const dupes = [
+      { name: 'Brawling', level: 10 },
+      { name: 'Brawling', level: 13 },
+    ];
+    expect(resolveWeaponSkill('Fists', 'Brawling', dupes)).toMatchObject({ level: 13 });
+  });
+});
+
+describe('stShortfallPenalty', () => {
+  it('is 0 when no ST requirement or requirement met', () => {
+    expect(stShortfallPenalty(null, 10)).toBe(0);
+    expect(stShortfallPenalty(undefined, 10)).toBe(0);
+    expect(stShortfallPenalty(10, 10)).toBe(0);
+    expect(stShortfallPenalty(9, 12)).toBe(0);
+  });
+
+  it('is 1 per point of ST shortfall (B270)', () => {
+    expect(stShortfallPenalty(12, 10)).toBe(2);
+    expect(stShortfallPenalty(11, 10)).toBe(1);
+  });
+});
+
+describe('pickShield', () => {
+  const shield = (name: string, db: number | null, equipped = true) => ({
+    equipped,
+    name,
+    weaponData: { db },
+  });
+
+  it('picks the equipped item with a non-null db', () => {
+    const items = [
+      { equipped: true, name: 'Broadsword', weaponData: {} },
+      shield('Medium Shield', 2),
+    ];
+    expect(pickShield(items)).toMatchObject({ name: 'Medium Shield', db: 2 });
+  });
+
+  it('treats db 0 as a shield (presence, not magnitude)', () => {
+    expect(pickShield([shield('Improvised Lid', 0)])).toMatchObject({ db: 0 });
+  });
+
+  it('ignores unequipped shields and non-weapons', () => {
+    expect(pickShield([shield('Large Shield', 3, false)])).toBeNull();
+    expect(pickShield([{ equipped: true, name: 'Rock', weaponData: null }])).toBeNull();
+  });
+
+  it('prefers the highest DB, ties broken by name', () => {
+    expect(pickShield([shield('Buckler', 1), shield('Large Shield', 3)])).toMatchObject({
+      name: 'Large Shield',
+      db: 3,
+    });
+    expect(pickShield([shield('Zeta Shield', 2), shield('Alpha Shield', 2)])).toMatchObject({
+      name: 'Alpha Shield',
+    });
   });
 });
 

@@ -95,7 +95,7 @@ export function App() {
 
   return (
     <div className="arcane-edge min-h-screen bg-base-200 text-base-content">
-      <header className="sticky top-0 z-50 flex w-full items-center justify-between gap-2 border-b border-base-300 bg-base-100/95 px-3 py-2 backdrop-blur sm:gap-6 sm:px-7 sm:py-3">
+      <header className="sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 bg-base-100/95 px-3 py-2 backdrop-blur sm:gap-6 sm:px-7 sm:py-3">
         <div className="flex min-w-0 items-center gap-3 sm:gap-6">
           <Link to="/" className="flex items-center gap-2 no-cap sm:gap-3">
             <span

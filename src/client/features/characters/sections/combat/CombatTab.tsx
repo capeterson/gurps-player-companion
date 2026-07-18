@@ -57,7 +57,12 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
             bumpers={bumpers}
             openRoll={openRoll}
           />
-          <DrSummaryCard character={character} />
+          <DrSummaryCard
+            character={character}
+            canWrite={canWrite}
+            hpMax={bumpers.hpMax}
+            bumpHp={bumpers.bumpHp}
+          />
         </div>
         <div className="space-y-4">
           <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />

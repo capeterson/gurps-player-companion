@@ -4,13 +4,18 @@ import {
   HIT_LOCATION_AIM_PENALTY,
   type HitLocation,
 } from '../../../../../shared/constants/hitLocations.ts';
+import { RANGE_PENALTY_STEPS } from '../../../../../shared/constants/rangePenalty.ts';
 import {
   canTargetVitals,
   parseDamageSpec,
   resolveDamage,
 } from '../../../../../shared/domain/damageParse.ts';
-import { matchSkillForWeapon } from '../../../../../shared/domain/defenseCalc.ts';
+import {
+  resolveWeaponSkill,
+  stShortfallPenalty,
+} from '../../../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type { RangedData } from '../../../../../shared/schemas/inventory.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
 
@@ -49,6 +54,27 @@ const HIT_LOCATION_PRESETS_NO_VITALS: readonly RollPreset[] = HIT_LOCATIONS.filt
   mod: HIT_LOCATION_AIM_PENALTY[loc],
 }));
 
+// Speed/range penalties as presets (B550), same single-select chip model
+// as hit locations. The 0-penalty band is omitted — it changes nothing.
+const RANGE_PRESETS: readonly RollPreset[] = RANGE_PENALTY_STEPS.filter((s) => s.penalty !== 0).map(
+  (s) => ({
+    label: `${s.maxYards} yd (${fmtPenalty(s.penalty)})`,
+    mod: s.penalty,
+  }),
+);
+
+/** "Acc 3 · 100/150 · RoF 1 · Shots 9+1(3) · Bulk −4 · Rcl 2" from present fields only. */
+function rangedStatLine(r: RangedData): string {
+  const parts: string[] = [];
+  if (r.acc != null) parts.push(`Acc ${r.acc}`);
+  if (r.range) parts.push(r.range);
+  if (r.rof) parts.push(`RoF ${r.rof}`);
+  if (r.shots) parts.push(`Shots ${r.shots}`);
+  if (r.bulk != null) parts.push(`Bulk ${r.bulk === 0 ? '0' : `−${Math.abs(r.bulk)}`}`);
+  if (r.recoil != null) parts.push(`Rcl ${r.recoil}`);
+  return parts.join(' · ');
+}
+
 export interface AttacksCardProps {
   character: CharacterDetail;
   openRoll: (req: RollRequest) => void;
@@ -86,52 +112,95 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
           const wd = w.weaponData;
           if (!wd) return null;
           const modes = wd.damage ? parseDamageSpec(wd.damage) : [];
-          const damageDisplay =
-            modes.length > 0
-              ? modes
-                  .map((m) => {
-                    const resolved = resolveDamage(m, thrust, swing);
-                    if (!resolved) return m.raw;
-                    const dice = formatDamageDice(resolved.dice);
-                    const type = resolved.type ? ` ${resolved.type}` : '';
-                    const divisor = resolved.armorDivisor ? ` (${resolved.armorDivisor})` : '';
-                    return `${dice}${type}${divisor}`;
-                  })
-                  .join(' / ')
-              : (wd.damage ?? '—');
-          const stWarn = wd.stRequired != null && wd.stRequired > character.derived.effectiveSt;
-          const matched = matchSkillForWeapon(w.name, skillCandidates);
+          const stPenalty = stShortfallPenalty(wd.stRequired, character.derived.effectiveSt);
+          const resolution = resolveWeaponSkill(w.name, wd.skill, skillCandidates);
           // Only offer the vitals/eye presets when at least one of the
           // weapon's parsed damage modes can target them (B399). A
           // weapon with no parseable modes at all (free-text homebrew
           // damage) keeps the full preset list rather than being
           // punished for not parsing.
           const canHitVitals = modes.length === 0 || modes.some((m) => canTargetVitals(m.type));
-          const hitLocationPresets = canHitVitals
+          const locationPresets = canHitVitals
             ? HIT_LOCATION_PRESETS
             : HIT_LOCATION_PRESETS_NO_VITALS;
+          // Ranged weapons get Aim (+Acc) and the speed/range penalties
+          // ahead of hit locations. Single-select like every preset —
+          // range + location stacking composes via the ± steppers.
+          const ranged = wd.ranged;
+          const presets: readonly RollPreset[] = ranged
+            ? [
+                ...(ranged.acc != null ? [{ label: `Aim (+${ranged.acc})`, mod: ranged.acc }] : []),
+                ...RANGE_PRESETS,
+                ...locationPresets,
+              ]
+            : locationPresets;
 
           return (
             <div key={w.id} className="space-y-1.5 rounded-lg border border-base-300/60 p-3">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium">{w.name}</span>
-                {stWarn && (
+                {stPenalty > 0 && (
                   <span className="badge badge-warning badge-outline text-[10px]">
-                    ST {wd.stRequired}
+                    ST {wd.stRequired} (−{stPenalty})
                   </span>
                 )}
               </div>
-              <p className="num text-xs text-base-content/70">
-                {damageDisplay}
-                {wd.reach ? ` · reach ${wd.reach}` : ''}
-              </p>
-              {matched ? (
+              <div className="num flex flex-wrap items-center gap-1.5 text-xs text-base-content/70">
+                {modes.length > 0 ? (
+                  modes.map((m) => {
+                    const resolved = resolveDamage(m, thrust, swing);
+                    if (!resolved) return <span key={m.raw}>{m.raw}</span>;
+                    const dice = formatDamageDice(resolved.dice);
+                    const type = resolved.type ? ` ${resolved.type}` : '';
+                    const divisor = resolved.armorDivisor ? ` (${resolved.armorDivisor})` : '';
+                    const display = `${dice}${type}${divisor}`;
+                    return (
+                      <button
+                        key={m.raw}
+                        type="button"
+                        className="chip"
+                        onClick={() =>
+                          openRoll({
+                            label: `${w.name} damage`,
+                            baseTarget: 0,
+                            damage: {
+                              dice: resolved.dice,
+                              damageType: resolved.type,
+                              armorDivisor: resolved.armorDivisor,
+                            },
+                          })
+                        }
+                      >
+                        {display}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <span>{wd.damage ?? '—'}</span>
+                )}
+                {wd.reach ? <span>· reach {wd.reach}</span> : null}
+              </div>
+              {ranged && rangedStatLine(ranged) !== '' && (
+                <p className="num text-xs text-base-content/70">{rangedStatLine(ranged)}</p>
+              )}
+              {resolution.kind === 'matched' ? (
                 <RollableRow
-                  label={matched.name}
-                  baseTarget={matched.level}
-                  presets={hitLocationPresets}
+                  label={resolution.name}
+                  baseTarget={resolution.level - stPenalty}
+                  presets={presets}
                   openRoll={openRoll}
+                  sublabel={
+                    stPenalty > 0 ? (
+                      <span className="block text-[11px] text-base-content/60">
+                        {resolution.name} {resolution.level} − {stPenalty} ST
+                      </span>
+                    ) : undefined
+                  }
                 />
+              ) : resolution.kind === 'missing' ? (
+                <p className="text-[11px] text-base-content/50">
+                  Skill '{resolution.skillName}' not on sheet — add it in the Skills tab.
+                </p>
               ) : (
                 <p className="text-[11px] text-base-content/50">No matching skill on sheet.</p>
               )}
