@@ -13225,10 +13225,14 @@
                     "minimum": 0
                   },
                   "linkedCondition": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
                   },
                   "linkedTempEffectId": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
                   },
                   "notes": {
                     "type": "string"
@@ -13559,11 +13563,15 @@
                   },
                   "linkedCondition": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 80
                   },
                   "linkedTempEffectId": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 120
                   },
                   "notes": {
                     "type": "string",

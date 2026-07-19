@@ -112,20 +112,24 @@ export function EncounterPage() {
     const save = async () => {
       const sent = intent.value;
       intent.inFlight = true;
+      let committed = false;
       try {
         await encountersApi.updateCombatant(id, encounterId, combatant.id, { currentHp: sent });
         intent.committedValue = sent;
-        refresh();
+        committed = true;
       } catch (error) {
         toasts.push(problem(error), { kind: 'error' });
-        if (intent.value === sent) intent.value = intent.committedValue;
-      } finally {
-        if (intent.value !== sent) {
-          void save();
-        } else {
-          intent.inFlight = false;
-        }
       }
+      // Only chain another request for a genuinely newer tap made while this one
+      // was in flight. A failure is never retried with the old value — that could
+      // undo damage the server actually committed but failed to acknowledge.
+      if (intent.value !== sent) {
+        void save();
+        return;
+      }
+      intent.inFlight = false;
+      if (committed) refresh();
+      else intent.value = intent.committedValue;
     };
     void save();
   };

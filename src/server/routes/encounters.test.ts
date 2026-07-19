@@ -698,4 +698,144 @@ describe('encounter member projection', () => {
     expect((await patchEffect({ expiryAcknowledgedAtRound: 99 })).status).toBe(422);
     expect((await patchEffect({ lastMaintainedRound: 1 })).status).toBe(200);
   });
+
+  it('rejects setting an inactive combatant as the active turn token', async () => {
+    const gm = await registerUser('inactive-active-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        combatants: [
+          { kind: 'npc', name: 'Sleeper', basicSpeed: 5, dx: 10, maxHp: 10, active: false },
+        ],
+      }),
+    });
+    const encounter = (await created.json()) as { id: string; combatants: { id: string }[] };
+    const combatantId = encounter.combatants[0]?.id;
+    if (!combatantId) throw new Error('missing combatant');
+
+    const response = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ activeCombatantId: combatantId }),
+      },
+    );
+    expect(response.status).toBe(422);
+  });
+
+  it('rejects over-long linked effect fields', async () => {
+    const gm = await registerUser('linked-length-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        combatants: [{ kind: 'npc', name: 'Orc', basicSpeed: 5, dx: 10, maxHp: 10 }],
+      }),
+    });
+    const encounter = (await created.json()) as { id: string; combatants: { id: string }[] };
+    const combatantId = encounter.combatants[0]?.id;
+    if (!combatantId) throw new Error('missing combatant');
+    const createEffect = (body: Record<string, unknown>) =>
+      app.request(`/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/effects`, {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({
+          targetCombatantId: combatantId,
+          name: 'Hex',
+          duration: { unit: 'rounds', amount: 1 },
+          ...body,
+        }),
+      });
+
+    expect((await createEffect({ linkedCondition: 'x'.repeat(81) })).status).toBe(422);
+    expect((await createEffect({ linkedTempEffectId: 'y'.repeat(121) })).status).toBe(422);
+  });
+
+  it('masks linked effect fields for a minimal PC viewer', async () => {
+    const gm = await registerUser('linked-mask-gm');
+    const player = await registerUser('linked-mask-player');
+    const viewer = await registerUser('linked-mask-viewer');
+    const campaign = await createCampaign(gm.accessToken, { shareCharacterSheets: false });
+    await addMember(gm.accessToken, campaign.id, player.email);
+    await addMember(gm.accessToken, campaign.id, viewer.email);
+    const character = await createCharacter(player.accessToken, campaign.id, 'Player PC');
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ combatants: [{ kind: 'pc', characterId: character.id }] }),
+    });
+    const encounter = (await created.json()) as { id: string; combatants: { id: string }[] };
+    const combatantId = encounter.combatants[0]?.id;
+    if (!combatantId) throw new Error('missing combatant');
+    const effect = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/effects`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({
+          targetCombatantId: combatantId,
+          name: 'Hex',
+          duration: { unit: 'rounds', amount: 1 },
+          linkedCondition: 'stunned',
+        }),
+      },
+    );
+    expect(effect.status).toBe(201);
+
+    const projected = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      { headers: { Authorization: `Bearer ${viewer.accessToken}` } },
+    );
+    expect(projected.status).toBe(200);
+    const body = (await projected.json()) as {
+      combatants: { conditions: string[] }[];
+      effects: { linkedCondition: string | null; linkedTempEffectId: string | null }[];
+    };
+    expect(body.combatants[0]?.conditions).toEqual([]);
+    expect(body.effects[0]).toMatchObject({ linkedCondition: null, linkedTempEffectId: null });
+  });
+
+  it('masks PC combat in combatant mutation responses for a manager without GM editing', async () => {
+    const gm = await registerUser('mutation-mask-gm');
+    const player = await registerUser('mutation-mask-player');
+    const manager = await registerUser('mutation-mask-manager');
+    const campaign = await createCampaign(gm.accessToken, {
+      shareCharacterSheets: false,
+      allowGmCharacterEditing: false,
+    });
+    await addMember(gm.accessToken, campaign.id, player.email);
+    await addMember(gm.accessToken, campaign.id, manager.email);
+    await promoteToManager(gm.accessToken, campaign.id, await getUserId(manager.accessToken));
+    const character = await createCharacter(player.accessToken, campaign.id, 'Player PC');
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ combatants: [] }),
+    });
+    const encounter = (await created.json()) as { id: string };
+
+    const added = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/combatants`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(manager.accessToken),
+        body: JSON.stringify({ kind: 'pc', characterId: character.id }),
+      },
+    );
+    expect(added.status).toBe(201);
+    expect((await added.json()) as unknown).toMatchObject({
+      characterId: character.id,
+      basicSpeed: null,
+      dx: null,
+      maxHp: null,
+      currentHp: null,
+      move: null,
+      dodge: null,
+      conditions: [],
+    });
+  });
 });

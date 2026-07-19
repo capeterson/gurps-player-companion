@@ -30,6 +30,7 @@ import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
+  type DbCampaign,
   type DbEncounter,
   type DbEncounterCombatant,
   type DbEncounterEffect,
@@ -54,6 +55,26 @@ function canViewCombatant(row: DbEncounterCombatant, isAdmin: boolean) {
   return true;
 }
 
+/**
+ * Whether a PC combatant's copied combat data must be redacted for this viewer.
+ * Follows the same share gate as `decideCharacterAccess`: a manager without
+ * `allowGmCharacterEditing` gets the minimal view just like the character
+ * detail/list/sync surfaces, even though they are otherwise admins.
+ */
+function shouldMaskCharacterCombat(
+  row: DbEncounterCombatant,
+  canManageCharacters: boolean,
+  shareCharacterSheets: boolean,
+  ownedCharacterIds: ReadonlySet<string>,
+) {
+  return (
+    !canManageCharacters &&
+    !shareCharacterSheets &&
+    row.kind === 'pc' &&
+    !ownedCharacterIds.has(row.characterId ?? '')
+  );
+}
+
 function outCombatant(
   row: DbEncounterCombatant,
   isAdmin: boolean,
@@ -62,14 +83,12 @@ function outCombatant(
   ownedCharacterIds: ReadonlySet<string>,
 ) {
   if (!canViewCombatant(row, isAdmin)) return null;
-  // Masking follows the same share gate as `decideCharacterAccess`: a manager
-  // without `allowGmCharacterEditing` gets the minimal view here just like the
-  // character detail/list/sync surfaces, even though they are otherwise admins.
-  const maskCharacterCombat =
-    !canManageCharacters &&
-    !shareCharacterSheets &&
-    row.kind === 'pc' &&
-    !ownedCharacterIds.has(row.characterId ?? '');
+  const maskCharacterCombat = shouldMaskCharacterCombat(
+    row,
+    canManageCharacters,
+    shareCharacterSheets,
+    ownedCharacterIds,
+  );
   return {
     id: row.id,
     encounterId: row.encounterId,
@@ -178,6 +197,20 @@ export async function projectEncounterForViewer(
     )
     .filter((combatant): combatant is NonNullable<typeof combatant> => combatant !== null);
   const visibleIds = new Set(visible.map((combatant) => combatant.id));
+  // A masked PC still appears in the roster, but effects targeting it must not
+  // leak the sheet condition / temp-effect id its combatant projection redacted.
+  const maskedCombatantIds = new Set(
+    combatants
+      .filter((combatant) =>
+        shouldMaskCharacterCombat(
+          combatant,
+          canManageCharacters,
+          campaign.shareCharacterSheets,
+          ownedCharacterIds,
+        ),
+      )
+      .map((combatant) => combatant.id),
+  );
   return {
     id: row.id,
     campaignId: row.campaignId,
@@ -192,13 +225,19 @@ export async function projectEncounterForViewer(
     combatants: visible,
     effects: effects
       .filter((effect) => visibleIds.has(effect.targetCombatantId))
-      .map((effect) => ({
-        ...outEffect(effect),
-        // Do not reveal a hidden NPC's stable combatant id through an effect.
-        casterCombatantId: visibleIds.has(effect.casterCombatantId ?? '')
-          ? effect.casterCombatantId
-          : null,
-      })),
+      .map((effect) => {
+        const masked = maskedCombatantIds.has(effect.targetCombatantId);
+        return {
+          ...outEffect(effect),
+          // Do not reveal a hidden NPC's stable combatant id through an effect.
+          casterCombatantId: visibleIds.has(effect.casterCombatantId ?? '')
+            ? effect.casterCombatantId
+            : null,
+          // A masked PC's linked sheet condition / temp-effect id are private too.
+          linkedCondition: masked ? null : effect.linkedCondition,
+          linkedTempEffectId: masked ? null : effect.linkedTempEffectId,
+        };
+      }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -249,6 +288,30 @@ function isAdmin(role: string) {
  */
 function canManageCharacters(role: string, allowGmCharacterEditing: boolean) {
   return role === 'owner' || (role === 'manager' && allowGmCharacterEditing);
+}
+
+/**
+ * Project a single mutated combatant back to the acting admin using their real
+ * character access, so a manager without GM editing does not receive copied PC
+ * combat data the read projections mask.  Only queries ownership in the narrow
+ * case where masking could actually apply.
+ */
+async function projectCombatantForActor(
+  row: DbEncounterCombatant,
+  campaign: DbCampaign,
+  role: string,
+  userId: string,
+) {
+  const canManage = canManageCharacters(role, campaign.allowGmCharacterEditing);
+  let ownedCharacterIds: ReadonlySet<string> = new Set();
+  if (row.kind === 'pc' && row.characterId && !canManage && !campaign.shareCharacterSheets) {
+    const owned = await getDb()
+      .select({ id: characters.id })
+      .from(characters)
+      .where(and(eq(characters.ownerId, userId), eq(characters.id, row.characterId)));
+    ownedCharacterIds = new Set(owned.map((character) => character.id));
+  }
+  return outCombatant(row, true, canManage, campaign.shareCharacterSheets, ownedCharacterIds);
 }
 
 async function pcValues(characterId: string, campaignId: string) {
@@ -450,7 +513,7 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await requireCampaignAdmin(id, user.id);
     await loadEncounter(id, encounterId);
-    if (body.activeCombatantId) await assertCombatantsBelong(encounterId, [body.activeCombatantId]);
+    if (body.activeCombatantId) await assertActiveCombatant(encounterId, body.activeCombatantId);
     const endedAt =
       body.status === 'ended' ? new Date() : body.status === 'active' ? null : undefined;
     const updated = await withAudit(user.id, undefined, async (tx) => {
@@ -584,7 +647,7 @@ router.openapi(
     const user = c.get('user');
     const { id, encounterId } = c.req.valid('param');
     const body = c.req.valid('json');
-    await requireCampaignAdmin(id, user.id);
+    const access = await requireCampaignAdmin(id, user.id);
     await loadEncounter(id, encounterId);
     const existing = await getDb()
       .select({
@@ -618,7 +681,7 @@ router.openapi(
       throw error;
     }
     await invalidateEncounter(id, encounterId);
-    const projected = outCombatant(row, true, true, true, new Set());
+    const projected = await projectCombatantForActor(row, access.campaign, access.role, user.id);
     if (!projected) throw new HTTPException(500, { message: 'combatant projection failed' });
     return c.json(projected, 201);
   },
@@ -642,7 +705,7 @@ router.openapi(
     const user = c.get('user');
     const { id, encounterId, combatantId } = c.req.valid('param');
     const body = c.req.valid('json');
-    await requireCampaignAdmin(id, user.id);
+    const access = await requireCampaignAdmin(id, user.id);
     await loadEncounter(id, encounterId);
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
@@ -673,7 +736,7 @@ router.openapi(
       return updated;
     });
     await invalidateEncounter(id, encounterId);
-    const projected = outCombatant(row, true, true, true, new Set());
+    const projected = await projectCombatantForActor(row, access.campaign, access.role, user.id);
     if (!projected) throw new HTTPException(500, { message: 'combatant projection failed' });
     return c.json(projected, 200);
   },
@@ -717,6 +780,29 @@ router.openapi(
     return c.body(null, 204);
   },
 );
+
+/**
+ * The active-turn token must reference a combatant that both belongs to this
+ * encounter and is active in the turn order; an inactive row is filtered out of
+ * advancement, so persisting it as "active" would badge a combatant the tracker
+ * never advances to.
+ */
+async function assertActiveCombatant(encounterId: string, combatantId: string) {
+  const row = (
+    await getDb()
+      .select({ active: encounterCombatants.active })
+      .from(encounterCombatants)
+      .where(
+        and(
+          eq(encounterCombatants.encounterId, encounterId),
+          eq(encounterCombatants.id, combatantId),
+        ),
+      )
+  )[0];
+  if (!row) throw new HTTPException(422, { message: 'active combatant must belong to encounter' });
+  if (!row.active)
+    throw new HTTPException(422, { message: 'active combatant must be active in turn order' });
+}
 
 async function assertCombatantsBelong(encounterId: string, ids: string[]) {
   const rows = await getDb()

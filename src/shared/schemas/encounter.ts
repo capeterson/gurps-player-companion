@@ -90,8 +90,8 @@ export const effectCreate = z.object({
   name: z.string().min(1).max(120),
   duration: effectDuration,
   maintenanceCost: z.number().int().min(0).optional(),
-  linkedCondition: z.string().optional(),
-  linkedTempEffectId: z.string().optional(),
+  linkedCondition: z.string().min(1).max(80).optional(),
+  linkedTempEffectId: z.string().min(1).max(120).optional(),
   notes: z.string().optional(),
 });
 export const effectUpdate = z
@@ -102,8 +102,8 @@ export const effectUpdate = z
     maintenanceCost: z.number().int().min(0).nullable(),
     lastMaintainedRound: z.number().int().min(1).nullable(),
     expiryAcknowledgedAtRound: z.number().int().min(1).nullable(),
-    linkedCondition: z.string().nullable(),
-    linkedTempEffectId: z.string().nullable(),
+    linkedCondition: z.string().min(1).max(80).nullable(),
+    linkedTempEffectId: z.string().min(1).max(120).nullable(),
     notes: z.string().nullable(),
   })
   .partial();

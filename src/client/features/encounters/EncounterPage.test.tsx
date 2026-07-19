@@ -165,6 +165,32 @@ describe('EncounterPage', () => {
     );
   });
 
+  it('rolls back a failed NPC HP save instead of retrying the stale value', async () => {
+    vi.mocked(encountersApi.updateCombatant).mockRejectedValueOnce(new Error('save failed'));
+    renderPage();
+
+    const decrement = await screen.findByRole('button', { name: 'HP -1' });
+    fireEvent.click(decrement);
+    await waitFor(() => expect(encountersApi.updateCombatant).toHaveBeenCalledTimes(1));
+    expect(encountersApi.updateCombatant).toHaveBeenLastCalledWith(
+      'campaign',
+      'encounter',
+      'target',
+      { currentHp: 9 },
+    );
+
+    // A later tap resumes from the last committed value (10 → 9), proving the
+    // failed save rolled back and was never silently retried with a stale number.
+    fireEvent.click(decrement);
+    await waitFor(() => expect(encountersApi.updateCombatant).toHaveBeenCalledTimes(2));
+    expect(encountersApi.updateCombatant).toHaveBeenLastCalledWith(
+      'campaign',
+      'encounter',
+      'target',
+      { currentHp: 9 },
+    );
+  });
+
   it('disables turn-order reslots while a mutation is pending', async () => {
     let resolveMove: (() => void) | undefined;
     vi.mocked(encountersApi.updateCombatant).mockImplementationOnce(
