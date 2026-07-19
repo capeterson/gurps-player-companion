@@ -256,8 +256,31 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.
-  Newly observed changes remain highlighted for 30 seconds. Cards open the full
-  sheet in a new tab; a dense-display toggle fits larger parties.
+   Newly observed changes remain highlighted for 30 seconds. Cards open the full
+   sheet in a new tab; a dense-display toggle fits larger parties.
+- **Encounter tracker foundation**: the online-only REST aggregate under
+  `/campaigns/:id/encounters` stores campaign encounter state, PC/NPC
+   combatants, turn order, and timed effects. Members can read a privacy-aware
+   projection (hidden NPCs and effects targeting them omitted; other players'
+   copied PC combat fields masked when character sheets are not shared; hidden
+   casters' effect ids masked), while
+   owners/managers control the tracker. Encounter updates use optimistic turn
+   concurrency and `encounter_invalidate` WebSocket nudges.
+    - **Encounter tracker**: campaign pages list active and ended encounters;
+     owners/managers can select PCs from the campaign roster, create and fully
+     edit NPC combatants, reorder combatants (including Wait reslots), end
+      combat, advance turns while combat is active, and maintain or
+    acknowledge timed effects. Effect add/edit supports templates, manual
+    round/minute/hour/indefinite durations, known-spell prefills, maintenance
+    costs, and optional PC-sheet links; expiry acknowledgement/removal confirms
+     and, after the REST acknowledgement succeeds, clears linked sheet values through the character outbox. Members receive the server's privacy-safe
+   projection; a player can use local-first HP/FP and condition quick actions
+    only for their own PC. Each character's Combat tab also has its own
+    device-only initiative scratchpad in Dexie, with local combatants and
+    timed effects. Effects can use shared templates or manual round/minute/
+    hour/indefinite durations, show expiry and maintenance prompts, and can
+    be acknowledged or removed locally. The scratchpad is cleared at logout
+    and never sent to the server.
 - **Optional GM character editing**: an owner-controlled, default-off campaign
   setting lets owners and managers edit player-owned sheets through the normal
   local-first outbox. REST and sync use the same central write decision.
@@ -289,7 +312,7 @@ src/
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,
-                 health). campaignLibrary.ts is now a thin factory wiring:
+                 health, encounters). campaignLibrary.ts is now a thin factory wiring:
                  campaignLibraryEntities.ts (per-entity-kind config: schemas,
                  DTO/insert/update mappers, natural key) and
                  campaignLibraryCrud.ts (generic POST/PATCH/DELETE route
@@ -310,7 +333,7 @@ src/
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
-                 campaigns, library, log, settings, history, home)
+                 campaigns, encounters, library, log, settings, history, home)
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Inventory: useAddEntityForm (the add
                  form), useEntityRowPatch (per-row field patch dispatch),
@@ -322,7 +345,8 @@ src/
                   (CombatTab + Pools/Maneuver/Defenses/Attacks/DrSummary cards)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
-    db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth)
+    db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth),
+                  plus per-character device-only solo tracker scratchpads
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...

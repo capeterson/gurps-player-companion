@@ -191,6 +191,28 @@ payload and no WebSocket row streaming. The activity rail polls the existing
 campaign character-history endpoint every five seconds and visually fades newly
 observed events over 30 seconds.
 
+## Encounter tracker
+
+The online-only encounter REST aggregate lives in
+`src/server/routes/encounters.ts` at `/campaigns/{id}/encounters`. Campaign
+members may read it; owners and managers may create, update, advance, and
+delete encounters, combatants, and effects. Every mutation uses `withAudit`
+and fans out an `encounter_invalidate` WebSocket nudge without row data.
+
+The member projection omits NPC combatants marked `hiddenFromPlayers` and
+returns `basicSpeed` and `dx` as null for PCs not owned by that member. Effects
+whose target is hidden are omitted; an effect from a hidden caster keeps its
+visible target but masks `casterCombatantId`. The active-combatant id remains
+an opaque turn-state token even when its combatant is hidden, without including
+the hidden combatant or its targeted effects. Owners and managers receive the
+full projection. Turn advance requires an expected round and active combatant,
+returning 409 rather than overwriting stale state.
+
+The encounter page lets campaign admins add PCs from the locally mirrored
+campaign roster, fully edit NPC combat data, and patch `orderKey` for
+move-up/down and Wait reslots. Ended encounters remain available in the
+campaign's past-encounter list with an on-page final-round summary.
+
 ## The campaign library
 
 A per-campaign catalog of reusable content, backed by four tables:

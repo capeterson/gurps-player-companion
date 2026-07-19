@@ -194,6 +194,24 @@ export interface LocalCampaign {
   revision: number;
 }
 
+/** Device-only, unsynced initiative tracker for one character. */
+export interface LocalSoloEncounter {
+  characterId: string;
+  round: number;
+  activeCombatantId: string | null;
+  combatants: Array<{ id: string; name: string; orderKey: number; active: boolean }>;
+  effects: Array<{
+    id: string;
+    name: string;
+    duration: import('../../shared/schemas/encounter.ts').EffectDuration;
+    startedAtRound: number;
+    maintenanceCost?: number;
+    lastMaintainedRound?: number;
+    expiryAcknowledgedAtRound?: number;
+  }>;
+  updatedAt: string;
+}
+
 /**
  * One row per pending mutation.  Lifecycle:
  *   pending → in_flight → applied (row deleted; revision stamped)
@@ -385,6 +403,7 @@ class LocalDb extends Dexie {
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
   campaigns!: Table<LocalCampaign, string>;
+  soloEncounters!: Table<LocalSoloEncounter, string>;
   outbox!: Table<OutboxEntry, string>;
   syncCursors!: Table<SyncCursor, string>;
   syncMeta!: Table<SyncMetaRow, string>;
@@ -443,6 +462,10 @@ class LocalDb extends Dexie {
     this.version(5).stores({
       syncLog: 'id, occurredAt, direction, result, [direction+occurredAt]',
     });
+    this.version(6).stores({
+      // One private scratchpad per character, never synced to the server.
+      soloEncounters: 'characterId, updatedAt',
+    });
   }
 }
 
@@ -478,6 +501,7 @@ export const ALL_STORE_NAMES = [
   'characterInventory',
   'characterCombat',
   'campaigns',
+  'soloEncounters',
   'outbox',
   'syncCursors',
   'syncMeta',

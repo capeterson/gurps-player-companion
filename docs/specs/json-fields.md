@@ -45,6 +45,8 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_skills.effects` | `traitEffect[]` (effects.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
 | `campaign_library_items.armor` | `armorData` (inventory.ts), nullable | REST library CRUD + YAML import (`libraryItemCreate`) |
 | `campaign_library_items.weapon_data` | `weaponData` (inventory.ts), nullable — same shape as `inventory_items.weapon_data` incl. `skill`/`db`/`ranged` | REST library CRUD + YAML import |
+| `encounter_combatants.conditions` | `combatantConditionsField` (encounter.ts) — `string[]`, each 1–80 chars, max 64 | Encounter combatant create defaults to `[]`; REST combatant patch (`combatantUpdate`) |
+| `encounter_effects.duration` | `effectDuration` (encounter.ts) — discriminated `{ unit, amount? }` round/minute/hour/indefinite duration | Encounter effect create/update (`effectCreate` / `effectUpdate`) |
 | `campaign_library_items.powerstone_data` | `powerstoneData` (inventory.ts), nullable; refinement: `currentEnergy <= maxEnergy` — same shape as `inventory_items.powerstone_data` | REST library CRUD + YAML import |
 | `campaign_library_items.magic_item_data` | `magicItemData` (inventory.ts), nullable; refinement: `chargesCurrent <= chargesMax` — same shape as `inventory_items.magic_item_data` | REST library CRUD + YAML import |
 | `notifications.payload` | Per-type: `campaignInvitationNotificationPayload` (notification.ts) for `type='campaign_invitation'` | Emit site (`invitations.ts` parses before insert); consume site (`NotificationsBell` `safeParse`s) |

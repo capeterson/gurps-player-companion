@@ -194,3 +194,12 @@ export function computeEncumbrance(playerWeightLbs: number, basicLift: number): 
   /* c8 ignore next */
   throw new Error('encumbrance: no tier matched');
 }
+
+/** Move after encumbrance (B17). A legal load preserves one yard of Move. */
+export function effectiveMove(
+  basicMove: number,
+  encumbrance: Pick<EncumbranceResult, 'ratio' | 'moveMultiplier'>,
+): number {
+  if (encumbrance.ratio > 10) return 0;
+  return Math.max(basicMove > 0 ? 1 : 0, Math.floor(basicMove * encumbrance.moveMultiplier));
+}

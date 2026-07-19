@@ -3,7 +3,7 @@
  * registered user can reach the authenticated home page.
  *
  * Requires the dev stack to be running (Postgres + the Bun server on
- * :3000).  Skipped automatically in CI until we wire docker-compose
+ * :3001).  Skipped automatically in CI until we wire docker-compose
  * into the workflow.
  */
 

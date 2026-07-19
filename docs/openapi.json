@@ -10478,6 +10478,3322 @@
         }
       }
     },
+    "/api/v1/campaigns/{id}/encounters": {
+      "get": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Encounter aggregates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "campaignId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "active",
+                          "ended"
+                        ]
+                      },
+                      "round": {
+                        "type": "integer"
+                      },
+                      "activeCombatantId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "endedAt": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date-time"
+                      },
+                      "combatants": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "encounterId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "pc",
+                                "npc"
+                              ]
+                            },
+                            "characterId": {
+                              "type": "string",
+                              "nullable": true,
+                              "format": "uuid"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "basicSpeed": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "dx": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "orderKey": {
+                              "type": "number"
+                            },
+                            "active": {
+                              "type": "boolean"
+                            },
+                            "maxHp": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "currentHp": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "move": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "dodge": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "dr": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "maneuver": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 64
+                            },
+                            "hiddenFromPlayers": {
+                              "type": "boolean"
+                            },
+                            "notes": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "encounterId",
+                            "kind",
+                            "characterId",
+                            "name",
+                            "basicSpeed",
+                            "dx",
+                            "orderKey",
+                            "active",
+                            "maxHp",
+                            "currentHp",
+                            "move",
+                            "dodge",
+                            "dr",
+                            "maneuver",
+                            "conditions",
+                            "hiddenFromPlayers",
+                            "notes",
+                            "createdAt",
+                            "updatedAt"
+                          ]
+                        }
+                      },
+                      "effects": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "encounterId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "targetCombatantId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "casterCombatantId": {
+                              "type": "string",
+                              "nullable": true,
+                              "format": "uuid"
+                            },
+                            "createdById": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "duration": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "unit": {
+                                      "type": "string",
+                                      "enum": [
+                                        "rounds"
+                                      ]
+                                    },
+                                    "amount": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "unit",
+                                    "amount"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "unit": {
+                                      "type": "string",
+                                      "enum": [
+                                        "minutes"
+                                      ]
+                                    },
+                                    "amount": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "unit",
+                                    "amount"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "unit": {
+                                      "type": "string",
+                                      "enum": [
+                                        "hours"
+                                      ]
+                                    },
+                                    "amount": {
+                                      "type": "integer",
+                                      "minimum": 1
+                                    }
+                                  },
+                                  "required": [
+                                    "unit",
+                                    "amount"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "unit": {
+                                      "type": "string",
+                                      "enum": [
+                                        "indefinite"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "unit"
+                                  ]
+                                }
+                              ]
+                            },
+                            "startedAtRound": {
+                              "type": "integer"
+                            },
+                            "maintenanceCost": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "lastMaintainedRound": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "expiryAcknowledgedAtRound": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "linkedCondition": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "linkedTempEffectId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "notes": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "encounterId",
+                            "targetCombatantId",
+                            "casterCombatantId",
+                            "createdById",
+                            "name",
+                            "duration",
+                            "startedAtRound",
+                            "maintenanceCost",
+                            "lastMaintainedRound",
+                            "expiryAcknowledgedAtRound",
+                            "linkedCondition",
+                            "linkedTempEffectId",
+                            "notes",
+                            "createdAt",
+                            "updatedAt"
+                          ]
+                        }
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "campaignId",
+                      "name",
+                      "status",
+                      "round",
+                      "activeCombatantId",
+                      "version",
+                      "endedAt",
+                      "combatants",
+                      "effects",
+                      "createdAt",
+                      "updatedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "combatants": {
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "pc"
+                              ]
+                            },
+                            "characterId": {
+                              "type": "string",
+                              "format": "uuid"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "characterId"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "npc"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 120
+                            },
+                            "basicSpeed": {
+                              "type": "number"
+                            },
+                            "dx": {
+                              "type": "integer"
+                            },
+                            "maxHp": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "currentHp": {
+                              "type": "integer"
+                            },
+                            "move": {
+                              "type": "integer"
+                            },
+                            "dodge": {
+                              "type": "integer"
+                            },
+                            "dr": {
+                              "type": "integer"
+                            },
+                            "maneuver": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "conditions": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                              },
+                              "maxItems": 64
+                            },
+                            "active": {
+                              "type": "boolean"
+                            },
+                            "hiddenFromPlayers": {
+                              "type": "boolean"
+                            },
+                            "notes": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "basicSpeed",
+                            "dx",
+                            "maxHp"
+                          ]
+                        }
+                      ]
+                    },
+                    "maxItems": 200,
+                    "default": []
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "ended"
+                      ]
+                    },
+                    "round": {
+                      "type": "integer"
+                    },
+                    "activeCombatantId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "endedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "combatants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "pc",
+                              "npc"
+                            ]
+                          },
+                          "characterId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "basicSpeed": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "dx": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "orderKey": {
+                            "type": "number"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "maxHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "currentHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "move": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dodge": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dr": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "maneuver": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "conditions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "maxItems": 64
+                          },
+                          "hiddenFromPlayers": {
+                            "type": "boolean"
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "kind",
+                          "characterId",
+                          "name",
+                          "basicSpeed",
+                          "dx",
+                          "orderKey",
+                          "active",
+                          "maxHp",
+                          "currentHp",
+                          "move",
+                          "dodge",
+                          "dr",
+                          "maneuver",
+                          "conditions",
+                          "hiddenFromPlayers",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "effects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "targetCombatantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "casterCombatantId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "createdById": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "duration": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "rounds"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "minutes"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hours"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "indefinite"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "unit"
+                                ]
+                              }
+                            ]
+                          },
+                          "startedAtRound": {
+                            "type": "integer"
+                          },
+                          "maintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "lastMaintainedRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "expiryAcknowledgedAtRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "linkedCondition": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "linkedTempEffectId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "targetCombatantId",
+                          "casterCombatantId",
+                          "createdById",
+                          "name",
+                          "duration",
+                          "startedAtRound",
+                          "maintenanceCost",
+                          "lastMaintainedRound",
+                          "expiryAcknowledgedAtRound",
+                          "linkedCondition",
+                          "linkedTempEffectId",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "status",
+                    "round",
+                    "activeCombatantId",
+                    "version",
+                    "endedAt",
+                    "combatants",
+                    "effects",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/encounters/{encounterId}": {
+      "get": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Encounter aggregate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "ended"
+                      ]
+                    },
+                    "round": {
+                      "type": "integer"
+                    },
+                    "activeCombatantId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "endedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "combatants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "pc",
+                              "npc"
+                            ]
+                          },
+                          "characterId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "basicSpeed": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "dx": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "orderKey": {
+                            "type": "number"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "maxHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "currentHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "move": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dodge": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dr": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "maneuver": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "conditions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "maxItems": 64
+                          },
+                          "hiddenFromPlayers": {
+                            "type": "boolean"
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "kind",
+                          "characterId",
+                          "name",
+                          "basicSpeed",
+                          "dx",
+                          "orderKey",
+                          "active",
+                          "maxHp",
+                          "currentHp",
+                          "move",
+                          "dodge",
+                          "dr",
+                          "maneuver",
+                          "conditions",
+                          "hiddenFromPlayers",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "effects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "targetCombatantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "casterCombatantId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "createdById": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "duration": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "rounds"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "minutes"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hours"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "indefinite"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "unit"
+                                ]
+                              }
+                            ]
+                          },
+                          "startedAtRound": {
+                            "type": "integer"
+                          },
+                          "maintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "lastMaintainedRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "expiryAcknowledgedAtRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "linkedCondition": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "linkedTempEffectId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "targetCombatantId",
+                          "casterCombatantId",
+                          "createdById",
+                          "name",
+                          "duration",
+                          "startedAtRound",
+                          "maintenanceCost",
+                          "lastMaintainedRound",
+                          "expiryAcknowledgedAtRound",
+                          "linkedCondition",
+                          "linkedTempEffectId",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "status",
+                    "round",
+                    "activeCombatantId",
+                    "version",
+                    "endedAt",
+                    "combatants",
+                    "effects",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "ended"
+                    ]
+                  },
+                  "round": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "activeCombatantId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "ended"
+                      ]
+                    },
+                    "round": {
+                      "type": "integer"
+                    },
+                    "activeCombatantId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "endedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "combatants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "pc",
+                              "npc"
+                            ]
+                          },
+                          "characterId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "basicSpeed": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "dx": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "orderKey": {
+                            "type": "number"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "maxHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "currentHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "move": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dodge": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dr": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "maneuver": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "conditions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "maxItems": 64
+                          },
+                          "hiddenFromPlayers": {
+                            "type": "boolean"
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "kind",
+                          "characterId",
+                          "name",
+                          "basicSpeed",
+                          "dx",
+                          "orderKey",
+                          "active",
+                          "maxHp",
+                          "currentHp",
+                          "move",
+                          "dodge",
+                          "dr",
+                          "maneuver",
+                          "conditions",
+                          "hiddenFromPlayers",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "effects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "targetCombatantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "casterCombatantId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "createdById": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "duration": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "rounds"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "minutes"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hours"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "indefinite"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "unit"
+                                ]
+                              }
+                            ]
+                          },
+                          "startedAtRound": {
+                            "type": "integer"
+                          },
+                          "maintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "lastMaintainedRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "expiryAcknowledgedAtRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "linkedCondition": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "linkedTempEffectId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "targetCombatantId",
+                          "casterCombatantId",
+                          "createdById",
+                          "name",
+                          "duration",
+                          "startedAtRound",
+                          "maintenanceCost",
+                          "lastMaintainedRound",
+                          "expiryAcknowledgedAtRound",
+                          "linkedCondition",
+                          "linkedTempEffectId",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "status",
+                    "round",
+                    "activeCombatantId",
+                    "version",
+                    "endedAt",
+                    "combatants",
+                    "effects",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/encounters/{encounterId}/advance": {
+      "post": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "direction": {
+                    "type": "string",
+                    "enum": [
+                      "next",
+                      "previous"
+                    ]
+                  },
+                  "expectedRound": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "expectedActiveCombatantId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "direction",
+                  "expectedRound",
+                  "expectedActiveCombatantId",
+                  "expectedVersion"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Advanced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "ended"
+                      ]
+                    },
+                    "round": {
+                      "type": "integer"
+                    },
+                    "activeCombatantId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "endedAt": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "date-time"
+                    },
+                    "combatants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "pc",
+                              "npc"
+                            ]
+                          },
+                          "characterId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "basicSpeed": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "dx": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "orderKey": {
+                            "type": "number"
+                          },
+                          "active": {
+                            "type": "boolean"
+                          },
+                          "maxHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "currentHp": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "move": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dodge": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "dr": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "maneuver": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "conditions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 80
+                            },
+                            "maxItems": 64
+                          },
+                          "hiddenFromPlayers": {
+                            "type": "boolean"
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "kind",
+                          "characterId",
+                          "name",
+                          "basicSpeed",
+                          "dx",
+                          "orderKey",
+                          "active",
+                          "maxHp",
+                          "currentHp",
+                          "move",
+                          "dodge",
+                          "dr",
+                          "maneuver",
+                          "conditions",
+                          "hiddenFromPlayers",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "effects": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "encounterId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "targetCombatantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "casterCombatantId": {
+                            "type": "string",
+                            "nullable": true,
+                            "format": "uuid"
+                          },
+                          "createdById": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "duration": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "rounds"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "minutes"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "hours"
+                                    ]
+                                  },
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  }
+                                },
+                                "required": [
+                                  "unit",
+                                  "amount"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "unit": {
+                                    "type": "string",
+                                    "enum": [
+                                      "indefinite"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "unit"
+                                ]
+                              }
+                            ]
+                          },
+                          "startedAtRound": {
+                            "type": "integer"
+                          },
+                          "maintenanceCost": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "lastMaintainedRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "expiryAcknowledgedAtRound": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "linkedCondition": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "linkedTempEffectId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "encounterId",
+                          "targetCombatantId",
+                          "casterCombatantId",
+                          "createdById",
+                          "name",
+                          "duration",
+                          "startedAtRound",
+                          "maintenanceCost",
+                          "lastMaintainedRound",
+                          "expiryAcknowledgedAtRound",
+                          "linkedCondition",
+                          "linkedTempEffectId",
+                          "notes",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "campaignId",
+                    "name",
+                    "status",
+                    "round",
+                    "activeCombatantId",
+                    "version",
+                    "endedAt",
+                    "combatants",
+                    "effects",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Turn state changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/encounters/{encounterId}/combatants": {
+      "post": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "pc"
+                        ]
+                      },
+                      "characterId": {
+                        "type": "string",
+                        "format": "uuid"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "characterId"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "npc"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "basicSpeed": {
+                        "type": "number"
+                      },
+                      "dx": {
+                        "type": "integer"
+                      },
+                      "maxHp": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "currentHp": {
+                        "type": "integer"
+                      },
+                      "move": {
+                        "type": "integer"
+                      },
+                      "dodge": {
+                        "type": "integer"
+                      },
+                      "dr": {
+                        "type": "integer"
+                      },
+                      "maneuver": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "conditions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "maxItems": 64
+                      },
+                      "active": {
+                        "type": "boolean"
+                      },
+                      "hiddenFromPlayers": {
+                        "type": "boolean"
+                      },
+                      "notes": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "name",
+                      "basicSpeed",
+                      "dx",
+                      "maxHp"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "encounterId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "pc",
+                        "npc"
+                      ]
+                    },
+                    "characterId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "basicSpeed": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "dx": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "orderKey": {
+                      "type": "number"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "maxHp": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currentHp": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "move": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "dodge": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "dr": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "maneuver": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "maxItems": 64
+                    },
+                    "hiddenFromPlayers": {
+                      "type": "boolean"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "encounterId",
+                    "kind",
+                    "characterId",
+                    "name",
+                    "basicSpeed",
+                    "dx",
+                    "orderKey",
+                    "active",
+                    "maxHp",
+                    "currentHp",
+                    "move",
+                    "dodge",
+                    "dr",
+                    "maneuver",
+                    "conditions",
+                    "hiddenFromPlayers",
+                    "notes",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/encounters/{encounterId}/combatants/{combatantId}": {
+      "patch": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "combatantId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "basicSpeed": {
+                    "type": "number"
+                  },
+                  "dx": {
+                    "type": "integer"
+                  },
+                  "orderKey": {
+                    "type": "number"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "maxHp": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "currentHp": {
+                    "type": "integer"
+                  },
+                  "move": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "dodge": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "dr": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "maneuver": {
+                    "type": "string",
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "conditions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "maxItems": 64
+                  },
+                  "hiddenFromPlayers": {
+                    "type": "boolean"
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "encounterId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "pc",
+                        "npc"
+                      ]
+                    },
+                    "characterId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "basicSpeed": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "dx": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "orderKey": {
+                      "type": "number"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "maxHp": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "currentHp": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "move": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "dodge": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "dr": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "maneuver": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "conditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80
+                      },
+                      "maxItems": 64
+                    },
+                    "hiddenFromPlayers": {
+                      "type": "boolean"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "encounterId",
+                    "kind",
+                    "characterId",
+                    "name",
+                    "basicSpeed",
+                    "dx",
+                    "orderKey",
+                    "active",
+                    "maxHp",
+                    "currentHp",
+                    "move",
+                    "dodge",
+                    "dr",
+                    "maneuver",
+                    "conditions",
+                    "hiddenFromPlayers",
+                    "notes",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "combatantId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/encounters/{encounterId}/effects": {
+      "post": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targetCombatantId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "casterCombatantId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "duration": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "rounds"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "minutes"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "hours"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "indefinite"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "unit"
+                        ]
+                      }
+                    ]
+                  },
+                  "maintenanceCost": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "linkedCondition": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "linkedTempEffectId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "targetCombatantId",
+                  "name",
+                  "duration"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "encounterId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "targetCombatantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "casterCombatantId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "createdById": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "duration": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "rounds"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "minutes"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "hours"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "indefinite"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "unit"
+                          ]
+                        }
+                      ]
+                    },
+                    "startedAtRound": {
+                      "type": "integer"
+                    },
+                    "maintenanceCost": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "lastMaintainedRound": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "expiryAcknowledgedAtRound": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "linkedCondition": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "linkedTempEffectId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "encounterId",
+                    "targetCombatantId",
+                    "casterCombatantId",
+                    "createdById",
+                    "name",
+                    "duration",
+                    "startedAtRound",
+                    "maintenanceCost",
+                    "lastMaintainedRound",
+                    "expiryAcknowledgedAtRound",
+                    "linkedCondition",
+                    "linkedTempEffectId",
+                    "notes",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/encounters/{encounterId}/effects/{effectId}": {
+      "patch": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "effectId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "duration": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "rounds"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "minutes"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "hours"
+                            ]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": [
+                          "unit",
+                          "amount"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "unit": {
+                            "type": "string",
+                            "enum": [
+                              "indefinite"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "unit"
+                        ]
+                      }
+                    ]
+                  },
+                  "casterCombatantId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
+                  },
+                  "maintenanceCost": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "lastMaintainedRound": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 1
+                  },
+                  "expiryAcknowledgedAtRound": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 1
+                  },
+                  "linkedCondition": {
+                    "type": "string",
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "linkedTempEffectId": {
+                    "type": "string",
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "notes": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "encounterId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "targetCombatantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "casterCombatantId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
+                    "createdById": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "duration": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "rounds"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "minutes"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "hours"
+                              ]
+                            },
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "amount"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "unit": {
+                              "type": "string",
+                              "enum": [
+                                "indefinite"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "unit"
+                          ]
+                        }
+                      ]
+                    },
+                    "startedAtRound": {
+                      "type": "integer"
+                    },
+                    "maintenanceCost": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "lastMaintainedRound": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "expiryAcknowledgedAtRound": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "linkedCondition": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "linkedTempEffectId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "encounterId",
+                    "targetCombatantId",
+                    "casterCombatantId",
+                    "createdById",
+                    "name",
+                    "duration",
+                    "startedAtRound",
+                    "maintenanceCost",
+                    "lastMaintainedRound",
+                    "expiryAcknowledgedAtRound",
+                    "linkedCondition",
+                    "linkedTempEffectId",
+                    "notes",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "encounters"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "encounterId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "effectId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
     "/api/v1/characters": {
       "get": {
         "tags": [

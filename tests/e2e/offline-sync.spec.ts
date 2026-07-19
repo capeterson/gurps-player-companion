@@ -18,7 +18,7 @@
  *         5 seconds.  Fix: triggerCursorPull is called immediately after
  *         applyOutcomes.
  *
- * Requirements: dev stack running at http://localhost:3000.
+ * Requirements: dev stack running at http://localhost:3001.
  */
 
 import { expect, test } from '@playwright/test';

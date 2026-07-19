@@ -14,29 +14,11 @@
 
 import { describe, expect, it } from 'bun:test';
 import { createApp } from '../app.ts';
-import { type AppConfig, resetConfigCache } from '../config.ts';
+import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
-const testConfig: AppConfig = {
-  environment: 'test',
-  port: 0,
-  host: '127.0.0.1',
-  databaseUrl: 'postgres://gurps:gurps@localhost:5432/gurps',
-  jwtSecret: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
-  jwtAccessTtlMinutes: 15,
-  jwtRefreshTtlDays: 14,
-  apiKeyPepper: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
-  corsOrigins: [],
-  resendApiKey: undefined,
-  resendFromEmail: undefined,
-  appBaseUrl: undefined,
-};
+configureIntegrationTestEnvironment();
 
-process.env.DATABASE_URL = testConfig.databaseUrl;
-process.env.JWT_SECRET = testConfig.jwtSecret;
-process.env.ENVIRONMENT = testConfig.environment;
-resetConfigCache();
-
-const app = createApp(testConfig);
+const app = createApp(integrationTestConfig);
 
 function bearer(token: string) {
   return { Authorization: `Bearer ${token}` };
