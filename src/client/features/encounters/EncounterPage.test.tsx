@@ -154,13 +154,14 @@ describe('EncounterPage', () => {
     vi.mocked(encountersApi.deleteEffect).mockRejectedValue(new Error('Delete failed'));
     vi.mocked(encountersApi.updateEffect).mockRejectedValue(new Error('Acknowledge failed'));
     renderPage();
-    await screen.findByRole('button', { name: 'Remove' });
-    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    const effectCard = (await screen.findByText('Haste')).closest('article');
+    if (!effectCard) throw new Error('effect card is missing');
+    fireEvent.click(within(effectCard).getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(encountersApi.deleteEffect).toHaveBeenCalled());
     expect(cleanupLinkedSheetEffect).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge expiry' }));
+    fireEvent.click(within(effectCard).getByRole('button', { name: 'Acknowledge expiry' }));
     await waitFor(() => expect(encountersApi.updateEffect).toHaveBeenCalled());
     expect(cleanupLinkedSheetEffect).not.toHaveBeenCalled();
   });

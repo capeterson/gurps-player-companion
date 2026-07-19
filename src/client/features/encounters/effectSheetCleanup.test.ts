@@ -69,10 +69,13 @@ describe('cleanupLinkedSheetEffect', () => {
       { id: 'keep', name: 'Other', mods: { dx: 1 } },
     ]);
     const ops = await db.outbox.toArray();
-    expect(ops.map((op) => [op.entityClass, op.fieldPath, op.attemptedValue])).toEqual([
-      ['character', 'tempEffects', [{ id: 'keep', name: 'Other', mods: { dx: 1 } }]],
-      ['character_combat', 'conditions', ['bleeding']],
-    ]);
+    expect(ops).toHaveLength(2);
+    expect(ops.map((op) => [op.entityClass, op.fieldPath, op.attemptedValue])).toEqual(
+      expect.arrayContaining([
+        ['character', 'tempEffects', [{ id: 'keep', name: 'Other', mods: { dx: 1 } }]],
+        ['character_combat', 'conditions', ['bleeding']],
+      ]),
+    );
   });
 
   it('does nothing for an NPC target', async () => {

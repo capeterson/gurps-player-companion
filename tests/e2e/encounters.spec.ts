@@ -94,6 +94,10 @@ test('GM runs an NPC encounter through expiry acknowledgement and ending', async
   const createdEffect = (await effect.json()) as { id: string; startedAtRound: number };
   expect(createdEffect.startedAtRound).toBe(1);
 
+  // The direct API setup changed the encounter version, so refresh before
+  // submitting the UI's optimistic-concurrency turn advance.
+  await page.reload();
+  await expect(page.getByText('Stun', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Next turn' }).click();
   await expect(page.getByText(/Round 2 · Orc scout/)).toBeVisible();
   const acknowledgement = await api(
