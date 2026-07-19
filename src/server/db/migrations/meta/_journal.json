@@ -162,6 +162,13 @@
       "when": 1784500000000,
       "tag": "0022_encounters",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784500100000,
+      "tag": "0023_encounter_pc_character_set_null",
+      "breakpoints": true
     }
   ]
 }

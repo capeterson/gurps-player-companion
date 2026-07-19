@@ -114,8 +114,8 @@ export function EncounterPage() {
   const removeEffect = (effect: Effect, label = 'Remove') => {
     if (!window.confirm(`${label} ${effect.name}? Linked sheet effects will be cleared.`)) return;
     mutation.mutate(async () => {
+      await encountersApi.deleteEffect(id, encounterId, effect.id);
       await cleanup(effect);
-      return encountersApi.deleteEffect(id, encounterId, effect.id);
     });
   };
   return (
@@ -132,38 +132,44 @@ export function EncounterPage() {
         </div>
         {canManage ? (
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={mutation.isPending}
-              onClick={() =>
-                mutation.mutate(() =>
-                  encountersApi.advance(id, encounterId, {
-                    direction: 'previous',
-                    expectedRound: data.round,
-                    expectedActiveCombatantId: data.activeCombatantId,
-                  }),
-                )
-              }
-            >
-              Previous
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={mutation.isPending}
-              onClick={() =>
-                mutation.mutate(() =>
-                  encountersApi.advance(id, encounterId, {
-                    direction: 'next',
-                    expectedRound: data.round,
-                    expectedActiveCombatantId: data.activeCombatantId,
-                  }),
-                )
-              }
-            >
-              Next turn
-            </button>
+            {data.status === 'active' && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={mutation.isPending}
+                  onClick={() =>
+                    mutation.mutate(() =>
+                      encountersApi.advance(id, encounterId, {
+                        direction: 'previous',
+                        expectedRound: data.round,
+                        expectedActiveCombatantId: data.activeCombatantId,
+                        expectedVersion: data.version,
+                      }),
+                    )
+                  }
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={mutation.isPending}
+                  onClick={() =>
+                    mutation.mutate(() =>
+                      encountersApi.advance(id, encounterId, {
+                        direction: 'next',
+                        expectedRound: data.round,
+                        expectedActiveCombatantId: data.activeCombatantId,
+                        expectedVersion: data.version,
+                      }),
+                    )
+                  }
+                >
+                  Next turn
+                </button>
+              </>
+            )}
             {data.status === 'active' && (
               <button
                 type="button"
@@ -419,10 +425,10 @@ export function EncounterPage() {
               )
                 return;
               mutation.mutate(async () => {
-                await cleanup(effect);
-                return encountersApi.updateEffect(id, encounterId, effect.id, {
+                await encountersApi.updateEffect(id, encounterId, effect.id, {
                   expiryAcknowledgedAtRound: data.round,
                 });
+                await cleanup(effect);
               });
             }}
             onRemove={() => removeEffect(effect)}
@@ -752,7 +758,7 @@ function EffectDialog({
     const duration: EffectDuration = unit === 'indefinite' ? { unit } : { unit, amount: n };
     const upkeep = maintenance.trim() === '' ? null : Number(maintenance);
     if (upkeep !== null && (!Number.isInteger(upkeep) || upkeep < 0)) return;
-    const body = {
+    const body: EffectUpdate = {
       name: name.trim(),
       duration,
       casterCombatantId: casterCombatantId || null,
@@ -761,7 +767,17 @@ function EffectDialog({
       linkedTempEffectId: linkedTempEffectId || null,
       notes: notes.trim() || null,
     };
-    onSave(effect ? body : { ...body, targetCombatantId });
+    const createBody: EffectCreate = {
+      targetCombatantId,
+      name: name.trim(),
+      duration,
+      ...(casterCombatantId && { casterCombatantId }),
+      ...(upkeep !== null && { maintenanceCost: upkeep }),
+      ...(linkedCondition && { linkedCondition }),
+      ...(linkedTempEffectId && { linkedTempEffectId }),
+      ...(notes.trim() && { notes: notes.trim() }),
+    };
+    onSave(effect ? body : createBody);
   };
   return (
     <dialog open className="modal">

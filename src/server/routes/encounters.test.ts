@@ -2,32 +2,11 @@
 
 import { describe, expect, it } from 'bun:test';
 import { createApp } from '../app.ts';
-import { type AppConfig, resetConfigCache } from '../config.ts';
+import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
-const testDatabaseUrl =
-  process.env.TEST_DATABASE_URL ?? 'postgres://gurps:gurps@localhost:5432/gurps';
+configureIntegrationTestEnvironment();
 
-const testConfig: AppConfig = {
-  environment: 'test',
-  port: 0,
-  host: '127.0.0.1',
-  databaseUrl: testDatabaseUrl,
-  jwtSecret: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
-  jwtAccessTtlMinutes: 15,
-  jwtRefreshTtlDays: 14,
-  apiKeyPepper: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
-  corsOrigins: [],
-  resendApiKey: undefined,
-  resendFromEmail: undefined,
-  appBaseUrl: undefined,
-};
-
-process.env.DATABASE_URL = testConfig.databaseUrl;
-process.env.JWT_SECRET = testConfig.jwtSecret;
-process.env.ENVIRONMENT = testConfig.environment;
-resetConfigCache();
-
-const app = createApp(testConfig);
+const app = createApp(integrationTestConfig);
 
 function jsonHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
@@ -44,11 +23,11 @@ async function registerUser(suffix: string) {
   return { email, accessToken: ((await response.json()) as { accessToken: string }).accessToken };
 }
 
-async function createCampaign(accessToken: string) {
+async function createCampaign(accessToken: string, overrides: Record<string, unknown> = {}) {
   const response = await app.request('/api/v1/campaigns', {
     method: 'POST',
     headers: jsonHeaders(accessToken),
-    body: JSON.stringify({ name: `Encounter campaign ${Date.now()}-${Math.random()}` }),
+    body: JSON.stringify({ name: `Encounter campaign ${Date.now()}-${Math.random()}`, ...overrides }),
   });
   expect(response.status).toBe(201);
   return (await response.json()) as { id: string };
@@ -157,7 +136,7 @@ describe('encounter member projection', () => {
     const gm = await registerUser('gm');
     const otherPlayer = await registerUser('other-player');
     const viewer = await registerUser('viewer');
-    const campaign = await createCampaign(gm.accessToken);
+    const campaign = await createCampaign(gm.accessToken, { shareCharacterSheets: false });
     await addMember(gm.accessToken, campaign.id, otherPlayer.email);
     await addMember(gm.accessToken, campaign.id, viewer.email);
     const otherCharacter = await createCharacter(otherPlayer.accessToken, campaign.id, 'Other PC');
@@ -242,6 +221,12 @@ describe('encounter member projection', () => {
         name: string;
         basicSpeed: number | null;
         dx: number | null;
+        maxHp: number | null;
+        currentHp: number | null;
+        move: number | null;
+        dodge: number | null;
+        maneuver: string | null;
+        conditions: string[];
       }[];
       effects: { targetCombatantId: string; casterCombatantId: string | null; name: string }[];
     };
@@ -254,11 +239,160 @@ describe('encounter member projection', () => {
     expect(ownPc?.dx).toBe(10);
     expect(foreignPc?.basicSpeed).toBeNull();
     expect(foreignPc?.dx).toBeNull();
+    expect(foreignPc).toMatchObject({
+      maxHp: null,
+      currentHp: null,
+      move: null,
+      dodge: null,
+      maneuver: null,
+      conditions: [],
+    });
     expect(projected.effects).toHaveLength(1);
     expect(projected.effects[0]).toMatchObject({
       targetCombatantId: visibleGuardId,
       casterCombatantId: null,
       name: 'Concealed hex',
+    });
+  });
+
+  it('does not mask another PC initiative when sheets are shared', async () => {
+    const gm = await registerUser('shared-gm');
+    const player = await registerUser('shared-player');
+    const viewer = await registerUser('shared-viewer');
+    const campaign = await createCampaign(gm.accessToken, { shareCharacterSheets: true });
+    await addMember(gm.accessToken, campaign.id, player.email);
+    await addMember(gm.accessToken, campaign.id, viewer.email);
+    const character = await createCharacter(player.accessToken, campaign.id, 'Shared PC');
+    const response = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ combatants: [{ kind: 'pc', characterId: character.id }] }),
+    });
+    expect(response.status).toBe(201);
+    const encounter = (await response.json()) as { id: string };
+
+    const projected = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      { headers: { Authorization: `Bearer ${viewer.accessToken}` } },
+    );
+    expect(projected.status).toBe(200);
+    expect(await projected.json()).toMatchObject({
+      combatants: [
+        expect.objectContaining({
+          characterId: character.id,
+          basicSpeed: 5,
+          dx: 10,
+          maxHp: 10,
+          currentHp: 10,
+          move: 5,
+          dodge: 8,
+          conditions: [],
+        }),
+      ],
+    });
+  });
+
+  it('validates encounter active combatants and applies versioned active turn advances', async () => {
+    const gm = await registerUser('advance-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const create = (name: string) =>
+      app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({
+          name,
+          combatants: [{ kind: 'npc', name: 'Orc', basicSpeed: 5, dx: 10, maxHp: 10 }],
+        }),
+      });
+    const secondResponse = await create('Second');
+    const second = (await secondResponse.json()) as { id: string; combatants: { id: string }[] };
+    const endedSecond = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${second.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ status: 'ended' }),
+    });
+    expect(endedSecond.status).toBe(200);
+    const firstResponse = await create('First');
+    const first = (await firstResponse.json()) as {
+      id: string;
+      version: number;
+      combatants: { id: string }[];
+    };
+    const foreignCombatantId = second.combatants[0]?.id;
+    if (!foreignCombatantId) throw new Error('missing foreign combatant');
+
+    const invalidActive = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${first.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ activeCombatantId: foreignCombatantId }),
+    });
+    expect(invalidActive.status).toBe(422);
+
+    const invalidHp = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${first.id}/combatants/${first.combatants[0]?.id}`,
+      { method: 'PATCH', headers: jsonHeaders(gm.accessToken), body: JSON.stringify({ maxHp: 0 }) },
+    );
+    expect(invalidHp.status).toBe(422);
+
+    const advanceBody = {
+      direction: 'next',
+      expectedRound: 1,
+      expectedActiveCombatantId: null,
+      expectedVersion: first.version,
+    };
+    const advanced = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${first.id}/advance`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify(advanceBody),
+    });
+    expect(advanced.status).toBe(200);
+    expect((await advanced.json()) as { version: number }).toMatchObject({ version: first.version + 1 });
+
+    const staleAdvance = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${first.id}/advance`,
+      { method: 'POST', headers: jsonHeaders(gm.accessToken), body: JSON.stringify(advanceBody) },
+    );
+    expect(staleAdvance.status).toBe(409);
+
+    const end = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${first.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ status: 'ended' }),
+    });
+    const ended = (await end.json()) as { version: number };
+    const endedAdvance = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${first.id}/advance`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ ...advanceBody, expectedVersion: ended.version }),
+      },
+    );
+    expect(endedAdvance.status).toBe(409);
+  });
+
+  it('retains a PC combatant when its character is deleted', async () => {
+    const gm = await registerUser('deleted-pc-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const character = await createCharacter(gm.accessToken, campaign.id, 'Departed PC');
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ combatants: [{ kind: 'pc', characterId: character.id }] }),
+    });
+    const encounter = (await created.json()) as { id: string };
+
+    const deleted = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'DELETE',
+      headers: jsonHeaders(gm.accessToken),
+    });
+    expect(deleted.status).toBe(204);
+
+    const projected = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`, {
+      headers: { Authorization: `Bearer ${gm.accessToken}` },
+    });
+    expect(await projected.json()).toMatchObject({
+      combatants: [expect.objectContaining({ kind: 'pc', characterId: null, name: 'Departed PC' })],
     });
   });
 });

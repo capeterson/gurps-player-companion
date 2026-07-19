@@ -12195,12 +12195,17 @@
                     "type": "string",
                     "nullable": true,
                     "format": "uuid"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 },
                 "required": [
                   "direction",
                   "expectedRound",
-                  "expectedActiveCombatantId"
+                  "expectedActiveCombatantId",
+                  "expectedVersion"
                 ]
               }
             }
@@ -12878,7 +12883,8 @@
                     "type": "boolean"
                   },
                   "maxHp": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 1
                   },
                   "currentHp": {
                     "type": "integer"

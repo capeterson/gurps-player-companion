@@ -56,7 +56,7 @@ export const combatantUpdate = z
     dx: z.number().int(),
     orderKey: z.number(),
     active: z.boolean(),
-    maxHp: z.number().int(),
+    maxHp: z.number().int().min(1),
     currentHp: z.number().int(),
     move: z.number().int().nullable(),
     dodge: z.number().int().nullable(),
@@ -123,6 +123,7 @@ export const advanceRequest = z.object({
   direction: z.enum(['next', 'previous']),
   expectedRound: z.number().int().min(1),
   expectedActiveCombatantId: uuid.nullable(),
+  expectedVersion: z.number().int().min(0),
 });
 export const encounterOut = z.object({
   id: uuid,

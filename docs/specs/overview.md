@@ -260,19 +260,20 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
    sheet in a new tab; a dense-display toggle fits larger parties.
 - **Encounter tracker foundation**: the online-only REST aggregate under
   `/campaigns/:id/encounters` stores campaign encounter state, PC/NPC
-  combatants, turn order, and timed effects. Members can read a privacy-aware
-  projection (hidden NPCs and effects targeting them omitted; other players'
-  Basic Speed/DX masked; hidden casters' effect ids masked), while
+   combatants, turn order, and timed effects. Members can read a privacy-aware
+   projection (hidden NPCs and effects targeting them omitted; other players'
+   copied PC combat fields masked when character sheets are not shared; hidden
+   casters' effect ids masked), while
    owners/managers control the tracker. Encounter updates use optimistic turn
    concurrency and `encounter_invalidate` WebSocket nudges.
     - **Encounter tracker**: campaign pages list active and ended encounters;
      owners/managers can select PCs from the campaign roster, create and fully
      edit NPC combatants, reorder combatants (including Wait reslots), end
-     combat, advance turns, and maintain or
+      combat, advance turns while combat is active, and maintain or
     acknowledge timed effects. Effect add/edit supports templates, manual
     round/minute/hour/indefinite durations, known-spell prefills, maintenance
     costs, and optional PC-sheet links; expiry acknowledgement/removal confirms
-    and clears linked sheet values through the character outbox. Members receive the server's privacy-safe
+     and, after the REST acknowledgement succeeds, clears linked sheet values through the character outbox. Members receive the server's privacy-safe
    projection; a player can use local-first HP/FP and condition quick actions
     only for their own PC. Each character's Combat tab also has its own
     device-only initiative scratchpad in Dexie, with local combatants and

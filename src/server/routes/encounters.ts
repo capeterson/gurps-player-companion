@@ -54,28 +54,32 @@ function canViewCombatant(row: DbEncounterCombatant, isAdmin: boolean) {
 function outCombatant(
   row: DbEncounterCombatant,
   isAdmin: boolean,
+  shareCharacterSheets: boolean,
   ownedCharacterIds: ReadonlySet<string>,
 ) {
   if (!canViewCombatant(row, isAdmin)) return null;
-  const maskInitiative =
-    !isAdmin && row.kind === 'pc' && !ownedCharacterIds.has(row.characterId ?? '');
+  const maskCharacterCombat =
+    !isAdmin &&
+    !shareCharacterSheets &&
+    row.kind === 'pc' &&
+    !ownedCharacterIds.has(row.characterId ?? '');
   return {
     id: row.id,
     encounterId: row.encounterId,
     kind: row.kind,
     characterId: row.characterId,
     name: row.name,
-    basicSpeed: maskInitiative ? null : row.basicSpeed === null ? null : Number(row.basicSpeed),
-    dx: maskInitiative ? null : row.dx,
+    basicSpeed: maskCharacterCombat ? null : row.basicSpeed === null ? null : Number(row.basicSpeed),
+    dx: maskCharacterCombat ? null : row.dx,
     orderKey: Number(row.orderKey),
     active: row.active,
-    maxHp: row.maxHp,
-    currentHp: row.currentHp,
-    move: row.move,
-    dodge: row.dodge,
-    dr: row.dr,
-    maneuver: row.maneuver,
-    conditions: row.conditions,
+    maxHp: maskCharacterCombat ? null : row.maxHp,
+    currentHp: maskCharacterCombat ? null : row.currentHp,
+    move: maskCharacterCombat ? null : row.move,
+    dodge: maskCharacterCombat ? null : row.dodge,
+    dr: maskCharacterCombat ? null : row.dr,
+    maneuver: maskCharacterCombat ? null : row.maneuver,
+    conditions: maskCharacterCombat ? [] : row.conditions,
     hiddenFromPlayers: isAdmin ? row.hiddenFromPlayers : false,
     notes: isAdmin ? row.notes : null,
     createdAt: row.createdAt.toISOString(),
@@ -121,7 +125,11 @@ export async function projectEncounterForViewer(
   isAdmin: boolean,
 ) {
   const db = getDb();
-  const [combatants, effects] = await Promise.all([
+  const [[campaign], combatants, effects] = await Promise.all([
+    db
+      .select({ shareCharacterSheets: campaigns.shareCharacterSheets })
+      .from(campaigns)
+      .where(eq(campaigns.id, row.campaignId)),
     db
       .select()
       .from(encounterCombatants)
@@ -129,6 +137,7 @@ export async function projectEncounterForViewer(
       .orderBy(asc(encounterCombatants.orderKey), asc(encounterCombatants.createdAt)),
     db.select().from(encounterEffects).where(eq(encounterEffects.encounterId, row.id)),
   ]);
+  if (!campaign) throw new HTTPException(404, { message: 'campaign not found' });
   const pcCharacterIds = combatants.flatMap((combatant) =>
     combatant.kind === 'pc' && combatant.characterId ? [combatant.characterId] : [],
   );
@@ -144,7 +153,9 @@ export async function projectEncounterForViewer(
         ).map((character) => character.id),
       );
   const visible = combatants
-    .map((combatant) => outCombatant(combatant, isAdmin, ownedCharacterIds))
+    .map((combatant) =>
+      outCombatant(combatant, isAdmin, campaign.shareCharacterSheets, ownedCharacterIds),
+    )
     .filter((combatant): combatant is NonNullable<typeof combatant> => combatant !== null);
   const visibleIds = new Set(visible.map((combatant) => combatant.id));
   return {
@@ -384,6 +395,7 @@ router.openapi(
     const body = c.req.valid('json');
     await requireCampaignAdmin(id, user.id);
     await loadEncounter(id, encounterId);
+    if (body.activeCombatantId) await assertCombatantsBelong(encounterId, [body.activeCombatantId]);
     const endedAt =
       body.status === 'ended' ? new Date() : body.status === 'active' ? null : undefined;
     const updated = await withAudit(user.id, undefined, async (tx) => {
@@ -426,6 +438,8 @@ router.openapi(
     const body = c.req.valid('json');
     await requireCampaignAdmin(id, user.id);
     const encounter = await loadEncounter(id, encounterId);
+    if (encounter.status === 'ended')
+      throw new HTTPException(409, { message: 'encounter has ended; refresh encounter' });
     const combatants = await getDb()
       .select()
       .from(encounterCombatants)
@@ -465,8 +479,10 @@ router.openapi(
             .where(
               and(
                 eq(encounters.id, encounter.id),
+                eq(encounters.status, 'active'),
                 eq(encounters.round, body.expectedRound),
                 activeMatch,
+                eq(encounters.version, body.expectedVersion),
               ),
             )
             .returning()
@@ -516,7 +532,7 @@ router.openapi(
       return created;
     });
     await invalidateEncounter(id, encounterId);
-    const projected = outCombatant(row, true, new Set());
+    const projected = outCombatant(row, true, true, new Set());
     if (!projected) throw new HTTPException(500, { message: 'combatant projection failed' });
     return c.json(projected, 201);
   },
@@ -558,7 +574,7 @@ router.openapi(
       return updated;
     });
     await invalidateEncounter(id, encounterId);
-    const projected = outCombatant(row, true, new Set());
+    const projected = outCombatant(row, true, true, new Set());
     if (!projected) throw new HTTPException(500, { message: 'combatant projection failed' });
     return c.json(projected, 200);
   },

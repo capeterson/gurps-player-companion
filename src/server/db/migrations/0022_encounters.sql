@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS "encounter_combatants" (
   "created_at" timestamptz NOT NULL DEFAULT now(),
   "updated_at" timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT "encounter_combatants_kind_character_check"
-    CHECK ((kind = 'pc' AND character_id IS NOT NULL) OR (kind = 'npc' AND character_id IS NULL))
+    CHECK ((kind = 'pc') OR (kind = 'npc' AND character_id IS NULL))
 );
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "encounter_effects" (
