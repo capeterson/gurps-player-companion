@@ -58,6 +58,81 @@ library:
       cost: 60
 `;
 
+// v3: a fully-loaded item (weapon w/ skill/db/ranged, container fields,
+// powerstone, magic item), a leveled trait with variants + effects, and a
+// campaign block with manaLevel.
+const SAMPLE_V3 = `version: 3
+campaign:
+  name: Sample
+  description: A sample campaign for tests.
+  pointTarget: 150
+  disadvantageCap: 50
+  quirkCap: 5
+  manaLevel: high
+library:
+  traits:
+    - name: Magery
+      kind: advantage
+      basePoints: 5
+      pointsPerLevel: 10
+      maxLevel: 6
+      variants:
+        - name: Ritual Magic Only
+          pointCostMultiplier: 0.5
+      effects:
+        - target: skill
+          skillName: Thaumatology
+          value: 1
+          scaling: per_level
+  skills: []
+  spells: []
+  items:
+    - name: Boarding Cutlass
+      category: weapon
+      weightLbs: 3
+      cost: 300
+      isArmor: false
+      weaponData:
+        damage: sw+1 cut
+        reach: '1'
+        parry: '0'
+        stRequired: 9
+        skill: Shortsword
+        db: 1
+        ranged:
+          acc: 0
+          range: 10/15
+          rof: '1'
+          shots: '1'
+          bulk: -2
+          recoil: 1
+    - name: Explorer's Pack
+      category: general
+      weightLbs: 4
+      cost: 80
+      isContainer: true
+      hideawayCapacityLbs: 30
+      weightReductionPercent: 25
+    - name: Charged Powerstone
+      category: magic
+      weightLbs: 1
+      cost: 500
+      powerstoneData:
+        maxEnergy: 20
+        currentEnergy: 15
+        notes: Attuned to fire.
+    - name: Wand of Light
+      category: magic
+      weightLbs: 1
+      cost: 400
+      magicItemData:
+        spellName: Light
+        spellSkillLevel: 18
+        mode: charged
+        chargesMax: 20
+        chargesCurrent: 20
+`;
+
 describe('parseLibraryYaml', () => {
   it('parses a valid sample document', () => {
     const doc = parseLibraryYaml(SAMPLE);
@@ -158,6 +233,75 @@ library:
     expect(() => parseLibraryYaml(bad)).toThrow(LibraryYamlError);
     expect(() => parseLibraryYaml(bad)).toThrow(/schema validation/);
   });
+
+  it('parses a v3 document with the full item/trait/campaign shape', () => {
+    const doc = parseLibraryYaml(SAMPLE_V3);
+    expect(doc.version).toBe(3);
+    expect(doc.campaign?.manaLevel).toBe('high');
+
+    const magery = doc.library.traits.find((t) => t.name === 'Magery');
+    expect(magery?.pointsPerLevel).toBe(10);
+    expect(magery?.maxLevel).toBe(6);
+    expect(magery?.variants).toEqual([{ name: 'Ritual Magic Only', pointCostMultiplier: 0.5 }]);
+    expect(magery?.effects).toEqual([
+      { target: 'skill', skillName: 'Thaumatology', value: 1, scaling: 'per_level' },
+    ]);
+
+    const cutlass = doc.library.items.find((i) => i.name === 'Boarding Cutlass');
+    expect(cutlass?.weaponData?.skill).toBe('Shortsword');
+    expect(cutlass?.weaponData?.db).toBe(1);
+    expect(cutlass?.weaponData?.ranged).toEqual({
+      acc: 0,
+      range: '10/15',
+      rof: '1',
+      shots: '1',
+      bulk: -2,
+      recoil: 1,
+    });
+
+    const pack = doc.library.items.find((i) => i.name === "Explorer's Pack");
+    expect(pack?.isContainer).toBe(true);
+    expect(pack?.hideawayCapacityLbs).toBe(30);
+    expect(pack?.weightReductionPercent).toBe(25);
+
+    const stone = doc.library.items.find((i) => i.name === 'Charged Powerstone');
+    expect(stone?.powerstoneData).toEqual({
+      maxEnergy: 20,
+      currentEnergy: 15,
+      notes: 'Attuned to fire.',
+    });
+
+    const wand = doc.library.items.find((i) => i.name === 'Wand of Light');
+    expect(wand?.magicItemData).toEqual({
+      spellName: 'Light',
+      spellSkillLevel: 18,
+      mode: 'charged',
+      chargesMax: 20,
+      chargesCurrent: 20,
+    });
+  });
+
+  it('still parses v1 and v2 documents (new v3 fields default/absent)', () => {
+    const v1 = parseLibraryYaml(SAMPLE);
+    expect(v1.version).toBe(1);
+    expect(v1.library.items[0]?.isContainer).toBe(false);
+    expect(v1.library.items[0]?.powerstoneData).toBeUndefined();
+    expect(v1.campaign?.manaLevel).toBeUndefined();
+
+    const v2 = `version: 2
+library:
+  traits:
+    - name: Fearlessness
+      kind: advantage
+      basePoints: 2
+      effects: []
+  skills: []
+  items: []
+`;
+    const doc = parseLibraryYaml(v2);
+    expect(doc.version).toBe(2);
+    expect(doc.library.traits[0]?.pointsPerLevel).toBeUndefined();
+  });
 });
 
 describe('emitLibraryYaml', () => {
@@ -198,6 +342,34 @@ describe('emitLibraryYaml', () => {
       items: docB.library.items,
     });
     expect(second).toBe(first);
+  });
+
+  it('round-trips a v3 document (full item/trait/campaign shape) byte-stably', () => {
+    const doc = parseLibraryYaml(SAMPLE_V3);
+    const first = emitLibraryYaml({
+      campaign: doc.campaign,
+      traits: doc.library.traits,
+      skills: doc.library.skills,
+      spells: doc.library.spells ?? [],
+      items: doc.library.items,
+    });
+    expect(first).toContain('version: 3');
+    expect(first).toContain('manaLevel: high');
+
+    const docB = parseLibraryYaml(first);
+    const second = emitLibraryYaml({
+      campaign: docB.campaign,
+      traits: docB.library.traits,
+      skills: docB.library.skills,
+      spells: docB.library.spells ?? [],
+      items: docB.library.items,
+    });
+    expect(second).toBe(first);
+
+    const cutlass = docB.library.items.find((i) => i.name === 'Boarding Cutlass');
+    expect(cutlass?.weaponData?.ranged?.range).toBe('10/15');
+    const stone = docB.library.items.find((i) => i.name === 'Charged Powerstone');
+    expect(stone?.powerstoneData?.currentEnergy).toBe(15);
   });
 
   it('drops empty arrays and null fields from compact output', () => {
