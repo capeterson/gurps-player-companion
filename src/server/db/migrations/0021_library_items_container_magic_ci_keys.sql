@@ -18,6 +18,74 @@
 --    case-sensitive unique index with a functional one on `lower(name)`
 --    (+ `kind` for traits).
 
+-- ---------- remap character references off doomed duplicates ----------
+--
+-- Character rows soft-reference library rows (plain uuid columns, no
+-- FK: character_traits.library_trait_id etc.), and those ids drive
+-- library-effect joins -- a dangling id silently reads as "no library
+-- entry / no effects".  So before deleting a shadowed duplicate, point
+-- every character reference at the row its natural-key group keeps
+-- (the max by (updated_at, id), matching the dedupe below).  The
+-- LATERAL picks the group survivor explicitly so groups larger than
+-- two can't remap onto another row that is itself about to be deleted.
+
+UPDATE "character_traits" ct
+SET "library_trait_id" = keep."id"
+FROM "campaign_library_traits" dup
+CROSS JOIN LATERAL (
+  SELECT k."id" FROM "campaign_library_traits" k
+  WHERE k."campaign_id" = dup."campaign_id"
+    AND k."kind" = dup."kind"
+    AND lower(k."name") = lower(dup."name")
+  ORDER BY k."updated_at" DESC, k."id" DESC
+  LIMIT 1
+) keep
+WHERE ct."library_trait_id" = dup."id"
+  AND dup."id" <> keep."id";
+--> statement-breakpoint
+
+UPDATE "character_skills" cs
+SET "library_skill_id" = keep."id"
+FROM "campaign_library_skills" dup
+CROSS JOIN LATERAL (
+  SELECT k."id" FROM "campaign_library_skills" k
+  WHERE k."campaign_id" = dup."campaign_id"
+    AND lower(k."name") = lower(dup."name")
+  ORDER BY k."updated_at" DESC, k."id" DESC
+  LIMIT 1
+) keep
+WHERE cs."library_skill_id" = dup."id"
+  AND dup."id" <> keep."id";
+--> statement-breakpoint
+
+UPDATE "character_spells" csp
+SET "library_spell_id" = keep."id"
+FROM "campaign_library_spells" dup
+CROSS JOIN LATERAL (
+  SELECT k."id" FROM "campaign_library_spells" k
+  WHERE k."campaign_id" = dup."campaign_id"
+    AND lower(k."name") = lower(dup."name")
+  ORDER BY k."updated_at" DESC, k."id" DESC
+  LIMIT 1
+) keep
+WHERE csp."library_spell_id" = dup."id"
+  AND dup."id" <> keep."id";
+--> statement-breakpoint
+
+UPDATE "inventory_items" ii
+SET "library_item_id" = keep."id"
+FROM "campaign_library_items" dup
+CROSS JOIN LATERAL (
+  SELECT k."id" FROM "campaign_library_items" k
+  WHERE k."campaign_id" = dup."campaign_id"
+    AND lower(k."name") = lower(dup."name")
+  ORDER BY k."updated_at" DESC, k."id" DESC
+  LIMIT 1
+) keep
+WHERE ii."library_item_id" = dup."id"
+  AND dup."id" <> keep."id";
+--> statement-breakpoint
+
 -- ---------- dedupe case-insensitive collisions ----------
 --
 -- Standard self-join dedupe: for every row `a`, delete it if some row

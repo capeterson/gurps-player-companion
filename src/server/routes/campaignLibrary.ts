@@ -24,6 +24,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, type sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { campaignUpdate } from '../../shared/schemas/campaign.ts';
 import {
   importMode,
   importResult,
@@ -220,6 +221,34 @@ router.openapi(
       throw err;
     }
 
+    // Re-validate the campaign block against the campaign settings
+    // schema before touching anything: the YAML doc schema only checks
+    // types (any int), while `campaignUpdate` carries the real bounds
+    // (pointTarget/disadvantageCap 0..10000, quirkCap 0..50) that the
+    // campaign PATCH route enforces -- an import must not be a side
+    // door around them.  Failing here (before the transaction) rejects
+    // the whole import, matching the "invalid document" contract.
+    let campaignSettings: Record<string, unknown> | null = null;
+    if (applyCampaignSettings && doc.campaign) {
+      const { description, pointTarget, disadvantageCap, quirkCap, manaLevel } = doc.campaign;
+      const checked = campaignUpdate.safeParse({
+        description,
+        pointTarget,
+        disadvantageCap,
+        quirkCap,
+        manaLevel,
+      });
+      if (!checked.success) {
+        throw new HTTPException(400, {
+          message: `campaign settings failed validation: ${checked.error.issues
+            .slice(0, 5)
+            .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
+            .join('; ')}`,
+        });
+      }
+      campaignSettings = checked.data;
+    }
+
     const result = await withAudit(user.id, undefined, async (tx) => {
       const traits = await upsertByKey(tx, traitEntity, id, doc.library.traits, mode);
       const skills = await upsertByKey(tx, skillEntity, id, doc.library.skills, mode);
@@ -232,21 +261,14 @@ router.openapi(
       const spells = await upsertByKey(tx, spellEntity, id, doc.library.spells, mode);
       const items = await upsertByKey(tx, itemEntity, id, doc.library.items, mode);
 
-      // Opt-in campaign-settings apply: only fields actually present in
-      // the doc get copied (undefined = leave alone); `name` is never
-      // touched.  `campaignSettingsApplied` reports whether anything
-      // actually changed (flag on, `campaign` block present, and at
-      // least one recognized field in it).
+      // Opt-in campaign-settings apply (validated above): only fields
+      // actually present in the doc get copied (undefined = leave
+      // alone); `name` is never touched.  `campaignSettingsApplied`
+      // reports whether anything actually changed (flag on, `campaign`
+      // block present, and at least one recognized field in it).
       let campaignSettingsApplied = false;
-      if (applyCampaignSettings && doc.campaign) {
-        const { description, pointTarget, disadvantageCap, quirkCap, manaLevel } = doc.campaign;
-        const patch = buildPatchSet({
-          description,
-          pointTarget,
-          disadvantageCap,
-          quirkCap,
-          manaLevel,
-        });
+      if (campaignSettings) {
+        const patch = buildPatchSet(campaignSettings);
         if (Object.keys(patch).length > 1) {
           // more than just the always-present `updatedAt`
           await tx.update(campaigns).set(patch).where(eq(campaigns.id, id));

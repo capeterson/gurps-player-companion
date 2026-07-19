@@ -116,9 +116,12 @@ export function InventoryPanel({
     if (opt.weightLbs != null) setWeight(String(opt.weightLbs));
     if (opt.cost != null) setCost(String(opt.cost));
     if (opt.defaultQuantity != null) setQty(String(opt.defaultQuantity));
-    if (opt.isArmor) setNewIsArmor(true);
-    if (opt.weaponData != null) setNewIsWeapon(true);
-    if (opt.isContainer) setNewIsContainer(true);
+    // Set (not merely enable) each facet from the pick: a second pick of
+    // a plain item must clear facets left over from an earlier pick, or
+    // the add would create e.g. an empty container/armor row.
+    setNewIsArmor(opt.isArmor);
+    setNewIsWeapon(opt.weaponData != null);
+    setNewIsContainer(opt.isContainer);
   }
 
   async function patchField(
@@ -252,8 +255,14 @@ export function InventoryPanel({
         worn: parent === null && newWorn,
         equipped: newEquipped,
         isContainer: newIsContainer,
-        hideawayCapacityLbs: containerFromLibrary?.hideawayCapacityLbs ?? 0,
-        weightReductionPercent: containerFromLibrary?.weightReductionPercent ?? 0,
+        // Gated on the facet, not just the pick: encumbrance applies
+        // these to worn root items regardless of isContainer, so a pick
+        // whose Container chip was toggled off must not smuggle in an
+        // invisible weight reduction.
+        hideawayCapacityLbs: newIsContainer ? (containerFromLibrary?.hideawayCapacityLbs ?? 0) : 0,
+        weightReductionPercent: newIsContainer
+          ? (containerFromLibrary?.weightReductionPercent ?? 0)
+          : 0,
         isArmor: newIsArmor,
         armor: newIsArmor
           ? (armorFromLibrary ?? {

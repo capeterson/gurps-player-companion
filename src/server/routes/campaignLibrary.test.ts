@@ -638,6 +638,51 @@ library:
     expect(result.campaignSettingsApplied).toBe(false);
   });
 
+  it('applyCampaignSettings=true rejects out-of-bounds settings with 400 and imports nothing', async () => {
+    // The YAML doc schema only type-checks the campaign block; the
+    // campaignUpdate bounds (quirkCap 0..50 etc.) must still hold so
+    // import isn't a side door around the campaign PATCH validation.
+    const owner = await registerUser('apply-settings-bounds');
+    const campaign = await createCampaign(owner.accessToken, { quirkCap: 5 });
+    const yaml = `version: 3
+campaign:
+  quirkCap: 100
+  pointTarget: -5
+library:
+  traits: []
+  skills: []
+  items:
+    - name: Should Not Land
+`;
+    const res = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml, applyCampaignSettings: true }),
+    });
+    expect(res.status).toBe(400);
+
+    const after = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}`, { headers: bearer(owner.accessToken) })
+    ).json()) as Record<string, unknown>;
+    expect(after.quirkCap).toBe(5);
+
+    // Rejected before the transaction: the library content must not
+    // have been imported either.
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const list = (await listRes.json()) as { items: { name: string }[] };
+    expect(list.items.length).toBe(0);
+
+    // Without the flag the same doc imports fine (block stays inert).
+    const okRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml }),
+    });
+    expect(okRes.status).toBe(200);
+  });
+
   it('new item fields (container/powerstone/magic-item) survive export -> import -> export through the DB', async () => {
     const owner = await registerUser('item-fields-roundtrip');
     const campaign = await createCampaign(owner.accessToken);
