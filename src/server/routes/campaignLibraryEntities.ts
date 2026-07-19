@@ -343,6 +343,11 @@ function itemEditableFields(body: LibraryItemCreate) {
     isArmor: body.isArmor ?? false,
     armor: body.armor ?? null,
     weaponData: body.weaponData ?? null,
+    isContainer: body.isContainer ?? false,
+    hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
+    weightReductionPercent: body.weightReductionPercent ?? 0,
+    powerstoneData: body.powerstoneData ?? null,
+    magicItemData: body.magicItemData ?? null,
   };
 }
 
@@ -362,7 +367,7 @@ export const itemEntity: LibraryEntityConfig<
   createSchema: libraryItemCreate,
   updateSchema: libraryItemUpdate,
   outSchema: libraryItemOut,
-  stringifyKeys: ['weightLbs', 'cost'],
+  stringifyKeys: ['weightLbs', 'cost', 'hideawayCapacityLbs'],
   summaries: {
     post: 'Add a library item (owner only)',
     patch: 'Update a library item (owner only)',
@@ -382,6 +387,11 @@ export const itemEntity: LibraryEntityConfig<
       isArmor: row.isArmor,
       armor: row.armor ?? null,
       weaponData: row.weaponData ?? null,
+      isContainer: row.isContainer,
+      hideawayCapacityLbs: Number(row.hideawayCapacityLbs),
+      weightReductionPercent: row.weightReductionPercent,
+      powerstoneData: row.powerstoneData ?? null,
+      magicItemData: row.magicItemData ?? null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
@@ -404,6 +414,11 @@ export const itemEntity: LibraryEntityConfig<
       isArmor: row.isArmor,
       armor: row.armor ?? undefined,
       weaponData: row.weaponData ?? undefined,
+      isContainer: row.isContainer,
+      hideawayCapacityLbs: Number(row.hideawayCapacityLbs),
+      weightReductionPercent: row.weightReductionPercent,
+      powerstoneData: row.powerstoneData ?? undefined,
+      magicItemData: row.magicItemData ?? undefined,
     }),
 };
 

@@ -241,7 +241,21 @@ mechanism for sharing content between campaigns or seeding a new one.
   validates against the `campaignLibrary` Zod schemas and rejects duplicate
   keys; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 1`; max payload 20 MB.
+  the same bytes. `LIBRARY_YAML_VERSION = 3`; max payload 20 MB. v1 (pre-effects)
+  and v2 (effects on traits/skills) documents still parse — the parser unions
+  on the literal `version` field and newer fields default/absent on older docs.
+- **Item fields (v3):** library items carry the same container/powerstone/
+  magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):
+  `isContainer`, `hideawayCapacityLbs`, `weightReductionPercent`,
+  `powerstoneData` (nullable; `maxEnergy`/`currentEnergy`/`notes`), and
+  `magicItemData` (nullable; `spellName`/`spellSkillLevel`/`mode`/`chargesMax`/
+  `chargesCurrent`/`energyCost`/`notes`). These pass through the library →
+  character copy path (`InventoryPanel.onPickLibraryItem`/`onCreate`) verbatim,
+  the same way `armor`/`weaponData` already did — a picked powerstone or magic
+  item arrives on the character's inventory row with its template charge state.
+- **Campaign block `manaLevel` (v3):** export always includes the campaign's
+  ambient `manaLevel` (Basic Set p. 235) alongside `description`/`pointTarget`/
+  `disadvantageCap`/`quirkCap`.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. Two modes:
@@ -252,11 +266,25 @@ mechanism for sharing content between campaigns or seeding a new one.
     pre-spell-library export (which omits it) doesn't wipe the current spell
     library. An explicit `spells: []` still deletes.
   - Returns per-section `{ created, updated, deleted }` counts.
+  - **`applyCampaignSettings`** (boolean, default `false`): opt-in. When
+    true and the document carries a `campaign` block, `description`,
+    `pointTarget`, `disadvantageCap`, `quirkCap`, and `manaLevel` are copied
+    onto the campaigns row — only the fields actually present in the
+    document (an omitted field leaves the current value alone); `name` is
+    never touched by import. The response's `campaignSettingsApplied`
+    reports whether anything was actually written (false when the flag was
+    off, the document had no `campaign` block, or the block had no
+    recognized fields).
 - **Seed:** `bootstrap/sample_library.yaml` is imported into the "Sample"
   campaign by `db:seed`.
 
 Keys used for upsert matching: traits by `kind::lower(name)`; skills, spells,
-and items by `lower(name)`.
+and items by `lower(name)`. The natural-key unique indexes on all four
+`campaign_library_*` tables are **case-insensitive** (`UNIQUE (campaign_id,
+lower(name))`, traits additionally scoped by `kind`; see migration 0021), so
+`POST`/`PATCH` reject a case-insensitive duplicate with `409` and an import's
+name match can never be shadowed by a differently-cased row created through
+the CRUD editor.
 
 ## Adventure log
 

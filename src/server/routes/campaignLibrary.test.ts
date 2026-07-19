@@ -317,11 +317,18 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 2');
+    expect(yaml).toContain('version: 3');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
     expect(yaml).toContain('Rope');
+  });
+
+  it('export includes the campaign manaLevel', async () => {
+    const owner = await registerUser('export-mana');
+    const campaign = await createCampaign(owner.accessToken, { manaLevel: 'high' });
+    const yaml = await exportYaml(owner.accessToken, campaign.id as string);
+    expect(yaml).toContain('manaLevel: high');
   });
 
   it('re-importing the same export into the same campaign (mode=merge, the default) updates existing rows in place and does not duplicate them', async () => {
@@ -539,5 +546,256 @@ describe('YAML export/import round trip', () => {
       body: JSON.stringify({ yaml: 'not: [valid, library, yaml' }),
     });
     expect(res.status).toBe(400);
+  });
+
+  it('applyCampaignSettings=false (default) leaves the campaign row untouched; true applies description/pointTarget/disadvantageCap/quirkCap/manaLevel but never name', async () => {
+    const owner = await registerUser('apply-settings');
+    const campaign = await createCampaign(owner.accessToken, {
+      description: 'Original description',
+      pointTarget: 100,
+      disadvantageCap: 40,
+      quirkCap: 5,
+      manaLevel: 'normal',
+    });
+    const yaml = `version: 3
+campaign:
+  name: Should Not Change
+  description: Updated description
+  pointTarget: 200
+  disadvantageCap: 60
+  quirkCap: 10
+  manaLevel: high
+library:
+  traits: []
+  skills: []
+  items: []
+`;
+
+    const noApplyRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml }),
+    });
+    expect(noApplyRes.status).toBe(200);
+    const noApplyResult = (await noApplyRes.json()) as { campaignSettingsApplied: boolean };
+    expect(noApplyResult.campaignSettingsApplied).toBe(false);
+
+    const afterNoApply = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}`, { headers: bearer(owner.accessToken) })
+    ).json()) as Record<string, unknown>;
+    expect(afterNoApply.description).toBe('Original description');
+    expect(afterNoApply.manaLevel).toBe('normal');
+
+    const applyRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml, applyCampaignSettings: true }),
+    });
+    expect(applyRes.status).toBe(200);
+    const applyResult = (await applyRes.json()) as { campaignSettingsApplied: boolean };
+    expect(applyResult.campaignSettingsApplied).toBe(true);
+
+    const afterApply = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}`, { headers: bearer(owner.accessToken) })
+    ).json()) as Record<string, unknown>;
+    expect(afterApply.description).toBe('Updated description');
+    expect(afterApply.pointTarget).toBe(200);
+    expect(afterApply.disadvantageCap).toBe(60);
+    expect(afterApply.quirkCap).toBe(10);
+    expect(afterApply.manaLevel).toBe('high');
+    expect(afterApply.name).toBe(campaign.name); // `name` is never touched by import
+  });
+
+  it('applyCampaignSettings=true with no campaign block in the doc reports campaignSettingsApplied=false', async () => {
+    const owner = await registerUser('apply-settings-no-block');
+    const campaign = await createCampaign(owner.accessToken);
+    const yaml = 'version: 3\nlibrary:\n  traits: []\n  skills: []\n  items: []\n';
+    const res = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml, applyCampaignSettings: true }),
+    });
+    expect(res.status).toBe(200);
+    const result = (await res.json()) as { campaignSettingsApplied: boolean };
+    expect(result.campaignSettingsApplied).toBe(false);
+  });
+
+  it('applyCampaignSettings=true rejects out-of-bounds settings with 400 and imports nothing', async () => {
+    // The YAML doc schema only type-checks the campaign block; the
+    // campaignUpdate bounds (quirkCap 0..50 etc.) must still hold so
+    // import isn't a side door around the campaign PATCH validation.
+    const owner = await registerUser('apply-settings-bounds');
+    const campaign = await createCampaign(owner.accessToken, { quirkCap: 5 });
+    const yaml = `version: 3
+campaign:
+  quirkCap: 100
+  pointTarget: -5
+library:
+  traits: []
+  skills: []
+  items:
+    - name: Should Not Land
+`;
+    const res = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml, applyCampaignSettings: true }),
+    });
+    expect(res.status).toBe(400);
+
+    const after = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}`, { headers: bearer(owner.accessToken) })
+    ).json()) as Record<string, unknown>;
+    expect(after.quirkCap).toBe(5);
+
+    // Rejected before the transaction: the library content must not
+    // have been imported either.
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const list = (await listRes.json()) as { items: { name: string }[] };
+    expect(list.items.length).toBe(0);
+
+    // Without the flag the same doc imports fine (block stays inert).
+    const okRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml }),
+    });
+    expect(okRes.status).toBe(200);
+  });
+
+  it('new item fields (container/powerstone/magic-item) survive export -> import -> export through the DB', async () => {
+    const owner = await registerUser('item-fields-roundtrip');
+    const campaign = await createCampaign(owner.accessToken);
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Adventurer’s Pack',
+        isContainer: true,
+        hideawayCapacityLbs: 15,
+        weightReductionPercent: 25,
+      }),
+    });
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Storage Crystal',
+        powerstoneData: { maxEnergy: 10, currentEnergy: 4 },
+      }),
+    });
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Rod of Sparks',
+        magicItemData: {
+          spellName: 'Shocking Touch',
+          spellSkillLevel: 16,
+          mode: 'charged',
+          chargesMax: 5,
+          chargesCurrent: 5,
+        },
+      }),
+    });
+
+    const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
+    expect(firstYaml).toContain('isContainer: true');
+    expect(firstYaml).toContain('powerstoneData:');
+    expect(firstYaml).toContain('magicItemData:');
+
+    const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: firstYaml }),
+    });
+    expect(importRes.status).toBe(200);
+
+    const secondYaml = await exportYaml(owner.accessToken, campaign.id as string);
+    expect(secondYaml).toBe(firstYaml);
+  });
+});
+
+describe('case-insensitive natural keys (migration 0021)', () => {
+  it('POST "Sword" then "sword" conflicts with 409', async () => {
+    const owner = await registerUser('ci-key-conflict');
+    const campaign = await createCampaign(owner.accessToken);
+    const firstRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Sword' }),
+    });
+    expect(firstRes.status).toBe(201);
+    const secondRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'sword' }),
+    });
+    expect(secondRes.status).toBe(409);
+  });
+
+  it('PATCH to a case-insensitive duplicate name conflicts with 409', async () => {
+    const owner = await registerUser('ci-key-patch-conflict');
+    const campaign = await createCampaign(owner.accessToken);
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/skills`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Stealth', attribute: 'DX', difficulty: 'A' }),
+    });
+    const otherRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/skills`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Fencing', attribute: 'DX', difficulty: 'A' }),
+    });
+    const other = (await otherRes.json()) as { id: string };
+    const patchRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/skills/${other.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ name: 'STEALTH' }),
+      },
+    );
+    expect(patchRes.status).toBe(409);
+  });
+
+  it('importing a doc with a differently-cased name updates the existing row rather than creating a shadow duplicate', async () => {
+    const owner = await registerUser('ci-key-import');
+    const campaign = await createCampaign(owner.accessToken);
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Sword', cost: 50 }),
+    });
+    expect(created.status).toBe(201);
+
+    const yaml = `version: 3
+library:
+  traits: []
+  skills: []
+  items:
+    - name: SWORD
+      cost: 75
+`;
+    const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml }),
+    });
+    expect(importRes.status).toBe(200);
+    const result = (await importRes.json()) as {
+      items: { created: number; updated: number; deleted: number };
+    };
+    expect(result.items).toEqual({ created: 0, updated: 1, deleted: 0 });
+
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const list = (await listRes.json()) as { items: { name: string; cost: number }[] };
+    expect(list.items.length).toBe(1);
+    expect(list.items[0]?.name).toBe('Sword'); // existing row's name kept, not renamed
+    expect(list.items[0]?.cost).toBe(75); // fields still updated in place
   });
 });

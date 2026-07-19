@@ -92,6 +92,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
   const [section, setSection] = useState<SectionKey>('traits');
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
+  const [applyCampaignSettings, setApplyCampaignSettings] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
 
@@ -226,7 +227,11 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   });
 
   const importMutation = useMutation({
-    mutationFn: (snap: { yaml: string; mode: 'merge' | 'replace' }) =>
+    mutationFn: (snap: {
+      yaml: string;
+      mode: 'merge' | 'replace';
+      applyCampaignSettings: boolean;
+    }) =>
       api<ImportResult>(`/campaigns/${campaignId}/library/import`, {
         method: 'POST',
         body: snap,
@@ -235,6 +240,12 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       setImportError(null);
       setImportMessage(formatImportResult(result));
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+      // Campaign settings live in the top-level campaigns list query, not
+      // the library query — refresh it too so a manaLevel/pointTarget
+      // change from an applied import shows up without a manual reload.
+      if (result.campaignSettingsApplied) {
+        qc.invalidateQueries({ queryKey: ['campaigns'] });
+      }
     },
     onError: (err) => {
       setImportMessage(null);
@@ -263,7 +274,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       return;
     }
     const text = await file.text();
-    importMutation.mutate({ yaml: text, mode: importMode });
+    importMutation.mutate({ yaml: text, mode: importMode, applyCampaignSettings });
   }
 
   function downloadExport() {
@@ -366,6 +377,18 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                 <option value="merge">Merge (additive)</option>
                 <option value="replace">Replace (sync exact)</option>
               </select>
+            </label>
+            <label className="flex items-center gap-2 self-end pb-1.5">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={applyCampaignSettings}
+                onChange={(e) => setApplyCampaignSettings(e.target.checked)}
+              />
+              <span className="label-text">
+                Apply campaign settings from the file (description, point target, caps, mana level —
+                never the name)
+              </span>
             </label>
             <label className="form-control">
               <span className="label-text">YAML file</span>
@@ -1483,6 +1506,11 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
   const [cost, setCost] = useState(initial?.cost ?? 0);
   const [description, setDescription] = useState(initial?.description ?? '');
   const [source, setSource] = useState(initial?.source ?? '');
+  const [isContainer, setIsContainer] = useState(initial?.isContainer ?? false);
+  const [hideawayCapacityLbs, setHideawayCapacityLbs] = useState(initial?.hideawayCapacityLbs ?? 0);
+  const [weightReductionPercent, setWeightReductionPercent] = useState(
+    initial?.weightReductionPercent ?? 0,
+  );
 
   function handleSubmit() {
     if (!name.trim()) return;
@@ -1497,6 +1525,14 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
       isArmor: initial?.isArmor ?? false,
       armor: initial?.armor ?? null,
       weaponData: initial?.weaponData ?? null,
+      isContainer,
+      hideawayCapacityLbs: isContainer ? hideawayCapacityLbs : 0,
+      weightReductionPercent: isContainer ? weightReductionPercent : 0,
+      // Full powerstone / magic-item editors stay YAML-authored for now
+      // (same as armor/weapon); pass through so editing name/cost etc.
+      // doesn't wipe YAML-authored data.
+      powerstoneData: initial?.powerstoneData ?? null,
+      magicItemData: initial?.magicItemData ?? null,
     });
   }
 
@@ -1580,6 +1616,53 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
           onChange={(e) => setDescription(e.target.value)}
         />
       </label>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-sm"
+            checked={isContainer}
+            onChange={(e) => setIsContainer(e.target.checked)}
+          />
+          <span>Container</span>
+        </label>
+        {isContainer && (
+          <>
+            <label className="form-control w-32">
+              <span className="label-text">Hideaway capacity (lb)</span>
+              <input
+                type="number"
+                className="input input-bordered input-sm"
+                value={hideawayCapacityLbs}
+                onChange={(e) => setHideawayCapacityLbs(Number.parseFloat(e.target.value) || 0)}
+                min={0}
+                step={0.1}
+              />
+            </label>
+            <label className="form-control w-28">
+              <span className="label-text">Weight reduction %</span>
+              <input
+                type="number"
+                className="input input-bordered input-sm"
+                value={weightReductionPercent}
+                onChange={(e) => {
+                  const v = Number.parseInt(e.target.value, 10);
+                  setWeightReductionPercent(Number.isNaN(v) ? 0 : Math.max(0, Math.min(100, v)));
+                }}
+                min={0}
+                max={100}
+              />
+            </label>
+          </>
+        )}
+      </div>
+      {(initial?.powerstoneData || initial?.magicItemData) && (
+        <p className="text-xs text-dim">
+          {initial?.powerstoneData && 'This item carries powerstone data. '}
+          {initial?.magicItemData && 'This item carries magic-item data. '}
+          Edit those fields via YAML import/export for now.
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -1610,7 +1693,8 @@ function formatImportResult(r: ImportResult): string {
     const s = r[label];
     return `${label}: +${s.created} · ~${s.updated} · −${s.deleted}`;
   };
-  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}`;
+  const settingsNote = r.campaignSettingsApplied ? '; campaign settings applied' : '';
+  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}${settingsNote}`;
 }
 
 function slugify(name: string): string {

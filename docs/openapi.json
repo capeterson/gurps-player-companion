@@ -5664,6 +5664,96 @@
                               }
                             }
                           },
+                          "isContainer": {
+                            "type": "boolean"
+                          },
+                          "hideawayCapacityLbs": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1000000
+                          },
+                          "weightReductionPercent": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "powerstoneData": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "maxEnergy": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 100
+                              },
+                              "currentEnergy": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            },
+                            "required": [
+                              "maxEnergy",
+                              "currentEnergy"
+                            ]
+                          },
+                          "magicItemData": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "spellName": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "spellSkillLevel": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 40
+                              },
+                              "mode": {
+                                "type": "string",
+                                "enum": [
+                                  "charged",
+                                  "powered",
+                                  "continuous"
+                                ]
+                              },
+                              "chargesMax": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 1000
+                              },
+                              "chargesCurrent": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 1000
+                              },
+                              "energyCost": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 99
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            },
+                            "required": [
+                              "spellName",
+                              "spellSkillLevel",
+                              "mode"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -5686,6 +5776,11 @@
                           "isArmor",
                           "armor",
                           "weaponData",
+                          "isContainer",
+                          "hideawayCapacityLbs",
+                          "weightReductionPercent",
+                          "powerstoneData",
+                          "magicItemData",
                           "createdAt",
                           "updatedAt"
                         ]
@@ -6223,6 +6318,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -6740,6 +6845,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       },
@@ -7199,6 +7314,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -7616,6 +7741,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       },
@@ -7875,6 +8010,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -8087,6 +8232,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate name",
             "content": {
               "application/json": {
                 "schema": {
@@ -8349,6 +8504,99 @@
                         "maxLength": 2000
                       }
                     }
+                  },
+                  "isContainer": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "hideawayCapacityLbs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0
+                  },
+                  "weightReductionPercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 0
+                  },
+                  "powerstoneData": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "maxEnergy": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "currentEnergy": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    },
+                    "required": [
+                      "maxEnergy",
+                      "currentEnergy"
+                    ]
+                  },
+                  "magicItemData": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "spellName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "spellSkillLevel": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 40
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "charged",
+                          "powered",
+                          "continuous"
+                        ]
+                      },
+                      "chargesMax": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "chargesCurrent": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "energyCost": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 99
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    },
+                    "required": [
+                      "spellName",
+                      "spellSkillLevel",
+                      "mode"
+                    ]
                   }
                 },
                 "required": [
@@ -8536,6 +8784,96 @@
                         }
                       }
                     },
+                    "isContainer": {
+                      "type": "boolean"
+                    },
+                    "hideawayCapacityLbs": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    "weightReductionPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "powerstoneData": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "maxEnergy": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "currentEnergy": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "maxEnergy",
+                        "currentEnergy"
+                      ]
+                    },
+                    "magicItemData": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "spellName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "spellSkillLevel": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 40
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "charged",
+                            "powered",
+                            "continuous"
+                          ]
+                        },
+                        "chargesMax": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "chargesCurrent": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "energyCost": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 99
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "spellName",
+                        "spellSkillLevel",
+                        "mode"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -8558,6 +8896,11 @@
                     "isArmor",
                     "armor",
                     "weaponData",
+                    "isContainer",
+                    "hideawayCapacityLbs",
+                    "weightReductionPercent",
+                    "powerstoneData",
+                    "magicItemData",
                     "createdAt",
                     "updatedAt"
                   ]
@@ -8567,6 +8910,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate name",
             "content": {
               "application/json": {
                 "schema": {
@@ -8782,6 +9135,99 @@
                         "maxLength": 2000
                       }
                     }
+                  },
+                  "isContainer": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "hideawayCapacityLbs": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "default": 0
+                  },
+                  "weightReductionPercent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 0
+                  },
+                  "powerstoneData": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "maxEnergy": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "currentEnergy": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    },
+                    "required": [
+                      "maxEnergy",
+                      "currentEnergy"
+                    ]
+                  },
+                  "magicItemData": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "spellName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "spellSkillLevel": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 40
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "charged",
+                          "powered",
+                          "continuous"
+                        ]
+                      },
+                      "chargesMax": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "chargesCurrent": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "energyCost": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 99
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 2000
+                      }
+                    },
+                    "required": [
+                      "spellName",
+                      "spellSkillLevel",
+                      "mode"
+                    ]
                   }
                 }
               }
@@ -8966,6 +9412,96 @@
                         }
                       }
                     },
+                    "isContainer": {
+                      "type": "boolean"
+                    },
+                    "hideawayCapacityLbs": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    },
+                    "weightReductionPercent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "powerstoneData": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "maxEnergy": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        },
+                        "currentEnergy": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "maxEnergy",
+                        "currentEnergy"
+                      ]
+                    },
+                    "magicItemData": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "spellName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "spellSkillLevel": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 40
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "charged",
+                            "powered",
+                            "continuous"
+                          ]
+                        },
+                        "chargesMax": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "chargesCurrent": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        "energyCost": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 99
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "spellName",
+                        "spellSkillLevel",
+                        "mode"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
@@ -8988,6 +9524,11 @@
                     "isArmor",
                     "armor",
                     "weaponData",
+                    "isContainer",
+                    "hideawayCapacityLbs",
+                    "weightReductionPercent",
+                    "powerstoneData",
+                    "magicItemData",
                     "createdAt",
                     "updatedAt"
                   ]
@@ -9007,6 +9548,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate name",
             "content": {
               "application/json": {
                 "schema": {
@@ -9176,6 +9727,10 @@
                       "replace"
                     ],
                     "default": "merge"
+                  },
+                  "applyCampaignSettings": {
+                    "type": "boolean",
+                    "default": false
                   }
                 },
                 "required": [
@@ -9287,6 +9842,9 @@
                         "updated",
                         "deleted"
                       ]
+                    },
+                    "campaignSettingsApplied": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -9294,7 +9852,8 @@
                     "traits",
                     "skills",
                     "spells",
-                    "items"
+                    "items",
+                    "campaignSettingsApplied"
                   ]
                 }
               }

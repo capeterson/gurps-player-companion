@@ -115,8 +115,13 @@ export function InventoryPanel({
     setName(opt.name);
     if (opt.weightLbs != null) setWeight(String(opt.weightLbs));
     if (opt.cost != null) setCost(String(opt.cost));
-    if (opt.isArmor) setNewIsArmor(true);
-    if (opt.weaponData != null) setNewIsWeapon(true);
+    if (opt.defaultQuantity != null) setQty(String(opt.defaultQuantity));
+    // Set (not merely enable) each facet from the pick: a second pick of
+    // a plain item must clear facets left over from an earlier pick, or
+    // the add would create e.g. an empty container/armor row.
+    setNewIsArmor(opt.isArmor);
+    setNewIsWeapon(opt.weaponData != null);
+    setNewIsContainer(opt.isContainer);
   }
 
   async function patchField(
@@ -208,6 +213,17 @@ export function InventoryPanel({
         : null;
     const weaponFromLibrary =
       linkedLibraryId && pickedLibraryItem?.weaponData ? pickedLibraryItem.weaponData : null;
+    // Powerstone/magic-item charge state is part of the library template
+    // (authors set currentEnergy/chargesCurrent to full); copied verbatim,
+    // same as armor/weapon.
+    const powerstoneFromLibrary =
+      linkedLibraryId && pickedLibraryItem?.powerstoneData
+        ? pickedLibraryItem.powerstoneData
+        : null;
+    const magicItemFromLibrary =
+      linkedLibraryId && pickedLibraryItem?.magicItemData ? pickedLibraryItem.magicItemData : null;
+    const containerFromLibrary =
+      linkedLibraryId && pickedLibraryItem?.isContainer ? pickedLibraryItem : null;
     //  Mirrors the armor-from-library / default-armor fallback: checking
     //  "Weapon" without a library pick still creates a real (empty) weapon
     //  so AttacksCard recognises the row immediately — otherwise the user
@@ -239,8 +255,14 @@ export function InventoryPanel({
         worn: parent === null && newWorn,
         equipped: newEquipped,
         isContainer: newIsContainer,
-        hideawayCapacityLbs: 0,
-        weightReductionPercent: 0,
+        // Gated on the facet, not just the pick: encumbrance applies
+        // these to worn root items regardless of isContainer, so a pick
+        // whose Container chip was toggled off must not smuggle in an
+        // invisible weight reduction.
+        hideawayCapacityLbs: newIsContainer ? (containerFromLibrary?.hideawayCapacityLbs ?? 0) : 0,
+        weightReductionPercent: newIsContainer
+          ? (containerFromLibrary?.weightReductionPercent ?? 0)
+          : 0,
         isArmor: newIsArmor,
         armor: newIsArmor
           ? (armorFromLibrary ?? {
@@ -254,6 +276,8 @@ export function InventoryPanel({
             })
           : null,
         weaponData: newIsWeapon ? (weaponFromLibrary ?? weaponDefault) : null,
+        powerstoneData: powerstoneFromLibrary,
+        magicItemData: magicItemFromLibrary,
         libraryItemId: linkedLibraryId,
       },
       () => {
@@ -868,8 +892,12 @@ export function InventoryPanel({
                   container: newIsContainer,
                   armor: newIsArmor,
                   weapon: newIsWeapon,
-                  powerstone: false,
-                  magicItem: false,
+                  // Not independently toggleable here (no manual "add a
+                  // powerstone" control in the quick-add form); reflects
+                  // whether the linked library pick carries that data,
+                  // the same data onCreate copies onto the new row.
+                  powerstone: pickedLibraryItem?.powerstoneData != null,
+                  magicItem: pickedLibraryItem?.magicItemData != null,
                 }}
                 onToggle={(facet, next) => {
                   if (facet === 'container') setNewIsContainer(next);

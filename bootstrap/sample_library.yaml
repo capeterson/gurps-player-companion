@@ -1,14 +1,16 @@
-version: 1
+version: 3
 campaign:
   name: Sample
   description: |
     A small starter library that demonstrates every shape: traits with
-    modifiers, skills with situational modifiers, items with armor and
-    weapon data.  Suitable as a smoke-test fixture and a starting point
-    for new campaigns.
+    modifiers, levels, variants, and effects; skills with situational
+    modifiers; items with armor, weapon, container, powerstone, and
+    magic-item data.  Suitable as a smoke-test fixture and a starting
+    point for new campaigns.
   pointTarget: 150
   disadvantageCap: 50
   quirkCap: 5
+  manaLevel: normal
 library:
   traits:
     - name: Combat Reflexes
@@ -20,6 +22,13 @@ library:
         on a critical failure.
       source: B-43
       tags: [combat]
+      effects:
+        - target: dodge
+          value: 1
+        - target: parry
+          value: 1
+        - target: block
+          value: 1
     - name: Bad Temper
       kind: disadvantage
       basePoints: -10
@@ -67,6 +76,8 @@ library:
     - name: Magery
       kind: advantage
       basePoints: 5
+      pointsPerLevel: 10
+      maxLevel: 6
       description: |
         The base supernatural prerequisite for spellcasting.  Magery 0
         unlocks the ability to cast at all in a normal-mana zone (5
@@ -75,6 +86,29 @@ library:
         require a minimum Magery level as a prerequisite.
       source: B-66
       tags: [magic]
+      effects:
+        - target: skill
+          skillName: Thaumatology
+          value: 1
+          scaling: per_level
+    - name: Damage Resistance
+      kind: advantage
+      basePoints: 0
+      pointsPerLevel: 5
+      maxLevel: 5
+      description: |
+        Your skin or hide is naturally tough.  Adds DR to your whole
+        body, stacking with worn armor.  A variant may narrow or
+        enhance the protection.
+      source: B-46
+      tags: [combat]
+      variants:
+        - name: Tough Skin
+          description: DR only protects against cutting and impaling/piercing damage.
+          pointCostMultiplier: 0.5
+        - name: Hardened
+          description: Ignores up to two levels of an attack's armor divisor.
+          pointCostDelta: 5
   skills:
     - name: Stealth
       attribute: DX
@@ -176,6 +210,8 @@ library:
       cost: 60
       description: Sturdy backpack worn on the shoulders.  20 lb capacity.
       source: B-288
+      isContainer: true
+      hideawayCapacityLbs: 20
     - name: Broadsword
       category: weapon
       weightLbs: 3
@@ -198,3 +234,21 @@ library:
         and burn down energy when casting.  Recharges at 1 point per
         day in a normal-mana area.
       source: M-69
+      powerstoneData:
+        maxEnergy: 5
+        currentEnergy: 0
+    - name: Wand of Fireball
+      category: magic
+      weightLbs: 1
+      cost: 3000
+      description: |
+        A carved wand that casts Fireball on command.  Recharges only
+        by returning it to an enchanter; track remaining charges in the
+        item's magic-item metadata.
+      source: M-16
+      magicItemData:
+        spellName: Fireball
+        spellSkillLevel: 20
+        mode: charged
+        chargesMax: 10
+        chargesCurrent: 10

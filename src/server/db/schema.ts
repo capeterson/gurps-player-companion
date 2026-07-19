@@ -705,7 +705,13 @@ export const campaignLibraryTraits = pgTable(
     revision: revision(),
   },
   (t) => ({
-    naturalKey: uniqueIndex('campaign_library_traits_key').on(t.campaignId, t.name, t.kind),
+    // Case-insensitive natural key -- matches the YAML import loop's
+    // `keyOf` (kind::lower(name)); see migration 0021.
+    naturalKey: uniqueIndex('campaign_library_traits_key').on(
+      t.campaignId,
+      t.kind,
+      sql`lower(${t.name})`,
+    ),
   }),
 );
 
@@ -736,7 +742,8 @@ export const campaignLibrarySkills = pgTable(
     revision: revision(),
   },
   (t) => ({
-    naturalKey: uniqueIndex('campaign_library_skills_key').on(t.campaignId, t.name),
+    // Case-insensitive natural key -- see migration 0021.
+    naturalKey: uniqueIndex('campaign_library_skills_key').on(t.campaignId, sql`lower(${t.name})`),
   }),
 );
 
@@ -769,7 +776,8 @@ export const campaignLibrarySpells = pgTable(
     revision: revision(),
   },
   (t) => ({
-    naturalKey: uniqueIndex('campaign_library_spells_key').on(t.campaignId, t.name),
+    // Case-insensitive natural key -- see migration 0021.
+    naturalKey: uniqueIndex('campaign_library_spells_key').on(t.campaignId, sql`lower(${t.name})`),
   }),
 );
 
@@ -792,12 +800,22 @@ export const campaignLibraryItems = pgTable(
     armor: jsonb('armor').$type<ArmorData>(),
     /** Validated by `weaponData` (src/shared/schemas/inventory.ts).  Null = not a weapon. */
     weaponData: jsonb('weapon_data').$type<WeaponData>(),
+    isContainer: boolean('is_container').notNull().default(false),
+    hideawayCapacityLbs: numeric('hideaway_capacity_lbs', { precision: 10, scale: 2 })
+      .notNull()
+      .default('0'),
+    weightReductionPercent: smallint('weight_reduction_percent').notNull().default(0),
+    /** Validated by `powerstoneData` (src/shared/schemas/inventory.ts).  Null = not a powerstone. */
+    powerstoneData: jsonb('powerstone_data').$type<PowerstoneData>(),
+    /** Validated by `magicItemData` (src/shared/schemas/inventory.ts).  Null = not a magic item. */
+    magicItemData: jsonb('magic_item_data').$type<MagicItemData>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
   },
   (t) => ({
-    naturalKey: uniqueIndex('campaign_library_items_key').on(t.campaignId, t.name),
+    // Case-insensitive natural key -- see migration 0021.
+    naturalKey: uniqueIndex('campaign_library_items_key').on(t.campaignId, sql`lower(${t.name})`),
   }),
 );
 
