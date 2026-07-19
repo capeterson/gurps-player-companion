@@ -27,7 +27,10 @@ async function createCampaign(accessToken: string, overrides: Record<string, unk
   const response = await app.request('/api/v1/campaigns', {
     method: 'POST',
     headers: jsonHeaders(accessToken),
-    body: JSON.stringify({ name: `Encounter campaign ${Date.now()}-${Math.random()}`, ...overrides }),
+    body: JSON.stringify({
+      name: `Encounter campaign ${Date.now()}-${Math.random()}`,
+      ...overrides,
+    }),
   });
   expect(response.status).toBe(201);
   return (await response.json()) as { id: string };
@@ -306,11 +309,14 @@ describe('encounter member projection', () => {
       });
     const secondResponse = await create('Second');
     const second = (await secondResponse.json()) as { id: string; combatants: { id: string }[] };
-    const endedSecond = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${second.id}`, {
-      method: 'PATCH',
-      headers: jsonHeaders(gm.accessToken),
-      body: JSON.stringify({ status: 'ended' }),
-    });
+    const endedSecond = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${second.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ status: 'ended' }),
+      },
+    );
     expect(endedSecond.status).toBe(200);
     const firstResponse = await create('First');
     const first = (await firstResponse.json()) as {
@@ -321,11 +327,14 @@ describe('encounter member projection', () => {
     const foreignCombatantId = second.combatants[0]?.id;
     if (!foreignCombatantId) throw new Error('missing foreign combatant');
 
-    const invalidActive = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${first.id}`, {
-      method: 'PATCH',
-      headers: jsonHeaders(gm.accessToken),
-      body: JSON.stringify({ activeCombatantId: foreignCombatantId }),
-    });
+    const invalidActive = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${first.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ activeCombatantId: foreignCombatantId }),
+      },
+    );
     expect(invalidActive.status).toBe(422);
 
     const invalidHp = await app.request(
@@ -340,13 +349,18 @@ describe('encounter member projection', () => {
       expectedActiveCombatantId: null,
       expectedVersion: first.version,
     };
-    const advanced = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${first.id}/advance`, {
-      method: 'POST',
-      headers: jsonHeaders(gm.accessToken),
-      body: JSON.stringify(advanceBody),
-    });
+    const advanced = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${first.id}/advance`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify(advanceBody),
+      },
+    );
     expect(advanced.status).toBe(200);
-    expect((await advanced.json()) as { version: number }).toMatchObject({ version: first.version + 1 });
+    expect((await advanced.json()) as { version: number }).toMatchObject({
+      version: first.version + 1,
+    });
 
     const staleAdvance = await app.request(
       `/api/v1/campaigns/${campaign.id}/encounters/${first.id}/advance`,
@@ -388,9 +402,12 @@ describe('encounter member projection', () => {
     });
     expect(deleted.status).toBe(204);
 
-    const projected = await app.request(`/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`, {
-      headers: { Authorization: `Bearer ${gm.accessToken}` },
-    });
+    const projected = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      {
+        headers: { Authorization: `Bearer ${gm.accessToken}` },
+      },
+    );
     expect(await projected.json()).toMatchObject({
       combatants: [expect.objectContaining({ kind: 'pc', characterId: null, name: 'Departed PC' })],
     });

@@ -18,7 +18,10 @@ vi.mock('./useEncounters.ts', () => ({
 }));
 vi.mock('./effectSheetCleanup.ts', () => ({ cleanupLinkedSheetEffect: vi.fn() }));
 vi.mock('./encountersApi.ts', () => ({
-  encounterKeys: { detail: (id: string, encounterId: string) => ['encounters', id, encounterId], list: (id: string) => ['encounters', id] },
+  encounterKeys: {
+    detail: (id: string, encounterId: string) => ['encounters', id, encounterId],
+    list: (id: string) => ['encounters', id],
+  },
   encountersApi: {
     advance: vi.fn(),
     createCombatant: vi.fn(),
@@ -110,8 +113,11 @@ describe('EncounterPage', () => {
     await screen.findByRole('button', { name: 'Add effect' });
     fireEvent.click(screen.getByRole('button', { name: 'Add effect' }));
     const dialog = screen.getByRole('dialog');
-    fireEvent.change(within(dialog).getAllByRole('textbox')[0]!, { target: { value: 'Haste' } });
-    fireEvent.change(within(dialog).getAllByRole('combobox')[2]!, { target: { value: 'target' } });
+    const [nameInput] = within(dialog).getAllByRole('textbox');
+    const [, , targetSelect] = within(dialog).getAllByRole('combobox');
+    if (!nameInput || !targetSelect) throw new Error('effect dialog fields are missing');
+    fireEvent.change(nameInput, { target: { value: 'Haste' } });
+    fireEvent.change(targetSelect, { target: { value: 'target' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add effect' }));
 
     await waitFor(() => expect(encountersApi.createEffect).toHaveBeenCalled());

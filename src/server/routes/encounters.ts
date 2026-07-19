@@ -69,7 +69,11 @@ function outCombatant(
     kind: row.kind,
     characterId: row.characterId,
     name: row.name,
-    basicSpeed: maskCharacterCombat ? null : row.basicSpeed === null ? null : Number(row.basicSpeed),
+    basicSpeed: maskCharacterCombat
+      ? null
+      : row.basicSpeed === null
+        ? null
+        : Number(row.basicSpeed),
     dx: maskCharacterCombat ? null : row.dx,
     orderKey: Number(row.orderKey),
     active: row.active,
