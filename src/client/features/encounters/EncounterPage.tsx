@@ -104,9 +104,9 @@ export function EncounterPage() {
     const hp = combatant.currentHp ?? 0;
     const intent = existingIntent ?? { value: hp, committedValue: hp, inFlight: false };
     if (!existingIntent) npcHpIntents.current.set(combatant.id, intent);
-    const next = Math.max(0, intent.value - 1);
-    if (next === intent.value) return;
-    intent.value = next;
+    // GURPS tracks HP below zero for knockdown/death checks, so damage is not
+    // clamped at zero here; the schema and detailed editor already allow it.
+    intent.value = intent.value - 1;
     if (intent.inFlight) return;
 
     const save = async () => {
@@ -165,6 +165,11 @@ export function EncounterPage() {
     cleanupLinkedSheetEffect(
       effect,
       data.combatants.find((row) => row.id === effect.targetCombatantId),
+      {
+        viewerId: me.data?.id,
+        isStaff: canManage,
+        allowGmCharacterEditing: campaign.data?.allowGmCharacterEditing ?? false,
+      },
     );
   const removeEffect = (effect: Effect, label = 'Remove') => {
     if (!window.confirm(`${label} ${effect.name}? Linked sheet effects will be cleared.`)) return;
@@ -306,7 +311,7 @@ export function EncounterPage() {
                   <button
                     type="button"
                     className="btn btn-xs"
-                    disabled={index === 0}
+                    disabled={index === 0 || mutation.isPending}
                     onClick={() => {
                       const orderKey = orderKeyForMove(data.combatants, index, -1);
                       if (orderKey != null)
@@ -322,7 +327,7 @@ export function EncounterPage() {
                   <button
                     type="button"
                     className="btn btn-xs"
-                    disabled={index === data.combatants.length - 1}
+                    disabled={index === data.combatants.length - 1 || mutation.isPending}
                     onClick={() => {
                       const orderKey = orderKeyForMove(data.combatants, index, 1);
                       if (orderKey != null)
@@ -338,7 +343,7 @@ export function EncounterPage() {
                   <button
                     type="button"
                     className="btn btn-xs"
-                    disabled={index === data.combatants.length - 1}
+                    disabled={index === data.combatants.length - 1 || mutation.isPending}
                     onClick={() =>
                       mutation.mutate(() =>
                         encountersApi.updateCombatant(id, encounterId, combatant.id, {

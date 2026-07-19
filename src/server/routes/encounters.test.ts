@@ -45,6 +45,36 @@ async function addMember(accessToken: string, campaignId: string, email: string)
   expect(response.status).toBe(200);
 }
 
+async function getUserId(accessToken: string) {
+  const response = await app.request('/api/v1/auth/me', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { id: string }).id;
+}
+
+async function promoteToManager(ownerToken: string, campaignId: string, userId: string) {
+  const response = await app.request(`/api/v1/campaigns/${campaignId}/members/${userId}`, {
+    method: 'PATCH',
+    headers: jsonHeaders(ownerToken),
+    body: JSON.stringify({ role: 'manager' }),
+  });
+  expect(response.status).toBe(200);
+}
+
+async function updateCampaign(
+  ownerToken: string,
+  campaignId: string,
+  body: Record<string, unknown>,
+) {
+  const response = await app.request(`/api/v1/campaigns/${campaignId}`, {
+    method: 'PATCH',
+    headers: jsonHeaders(ownerToken),
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(200);
+}
+
 async function createCharacter(accessToken: string, campaignId: string, name: string) {
   const response = await app.request('/api/v1/characters', {
     method: 'POST',
@@ -519,5 +549,153 @@ describe('encounter member projection', () => {
     expect(await projected.json()).toMatchObject({
       combatants: [expect.objectContaining({ kind: 'pc', characterId: null, name: 'Departed PC' })],
     });
+  });
+
+  it('masks foreign PC combat from a manager unless GM character editing is enabled', async () => {
+    const gm = await registerUser('mask-gm');
+    const player = await registerUser('mask-player');
+    const manager = await registerUser('mask-manager');
+    const campaign = await createCampaign(gm.accessToken, {
+      shareCharacterSheets: false,
+      allowGmCharacterEditing: false,
+    });
+    await addMember(gm.accessToken, campaign.id, player.email);
+    await addMember(gm.accessToken, campaign.id, manager.email);
+    await promoteToManager(gm.accessToken, campaign.id, await getUserId(manager.accessToken));
+    const character = await createCharacter(player.accessToken, campaign.id, 'Player PC');
+
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ combatants: [{ kind: 'pc', characterId: character.id }] }),
+    });
+    expect(created.status).toBe(201);
+    const encounter = (await created.json()) as { id: string };
+
+    const masked = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      { headers: { Authorization: `Bearer ${manager.accessToken}` } },
+    );
+    expect(masked.status).toBe(200);
+    expect((await masked.json()) as unknown).toMatchObject({
+      combatants: [
+        expect.objectContaining({
+          characterId: character.id,
+          basicSpeed: null,
+          dx: null,
+          maxHp: null,
+          currentHp: null,
+          move: null,
+          dodge: null,
+          conditions: [],
+        }),
+      ],
+    });
+
+    await updateCampaign(gm.accessToken, campaign.id, { allowGmCharacterEditing: true });
+    const visible = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      { headers: { Authorization: `Bearer ${manager.accessToken}` } },
+    );
+    expect(visible.status).toBe(200);
+    expect((await visible.json()) as unknown).toMatchObject({
+      combatants: [
+        expect.objectContaining({ characterId: character.id, basicSpeed: 5, dx: 10, maxHp: 10 }),
+      ],
+    });
+  });
+
+  it('clears active turn state when the acting combatant is deactivated', async () => {
+    const gm = await registerUser('deactivate-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        combatants: [{ kind: 'npc', name: 'Orc', basicSpeed: 5, dx: 10, maxHp: 10 }],
+      }),
+    });
+    const encounter = (await created.json()) as { id: string; combatants: { id: string }[] };
+    const combatantId = encounter.combatants[0]?.id;
+    if (!combatantId) throw new Error('missing combatant');
+
+    const activated = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ activeCombatantId: combatantId }),
+      },
+    );
+    const active = (await activated.json()) as { version: number };
+
+    const deactivated = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/combatants/${combatantId}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ active: false }),
+      },
+    );
+    expect(deactivated.status).toBe(200);
+
+    const current = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      { headers: { Authorization: `Bearer ${gm.accessToken}` } },
+    );
+    expect(await current.json()).toMatchObject({
+      activeCombatantId: null,
+      version: active.version + 1,
+    });
+  });
+
+  it('rejects over-long maneuver edits and out-of-range effect round markers', async () => {
+    const gm = await registerUser('validation-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        combatants: [{ kind: 'npc', name: 'Orc', basicSpeed: 5, dx: 10, maxHp: 10 }],
+      }),
+    });
+    const encounter = (await created.json()) as { id: string; combatants: { id: string }[] };
+    const combatantId = encounter.combatants[0]?.id;
+    if (!combatantId) throw new Error('missing combatant');
+
+    const longManeuver = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/combatants/${combatantId}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ maneuver: 'x'.repeat(81) }),
+      },
+    );
+    expect(longManeuver.status).toBe(422);
+
+    const effectResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/effects`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({
+          targetCombatantId: combatantId,
+          name: 'Bless',
+          duration: { unit: 'rounds', amount: 5 },
+        }),
+      },
+    );
+    expect(effectResponse.status).toBe(201);
+    const effect = (await effectResponse.json()) as { id: string };
+    const patchEffect = (body: Record<string, unknown>) =>
+      app.request(
+        `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/effects/${effect.id}`,
+        { method: 'PATCH', headers: jsonHeaders(gm.accessToken), body: JSON.stringify(body) },
+      );
+
+    expect((await patchEffect({ lastMaintainedRound: 0 })).status).toBe(422);
+    expect((await patchEffect({ lastMaintainedRound: 5 })).status).toBe(422);
+    expect((await patchEffect({ expiryAcknowledgedAtRound: 99 })).status).toBe(422);
+    expect((await patchEffect({ lastMaintainedRound: 1 })).status).toBe(200);
   });
 });

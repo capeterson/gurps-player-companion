@@ -147,6 +147,56 @@ describe('EncounterPage', () => {
     );
   });
 
+  it('lets NPC HP damage drop below zero', async () => {
+    const [firstCombatant] = makeEncounter().combatants;
+    if (!firstCombatant) throw new Error('missing combatant');
+    encounter.data = makeEncounter({ combatants: [{ ...firstCombatant, currentHp: 0 }] });
+    renderPage();
+
+    const decrement = await screen.findByRole('button', { name: 'HP -1' });
+    fireEvent.click(decrement);
+
+    await waitFor(() => expect(encountersApi.updateCombatant).toHaveBeenCalled());
+    expect(encountersApi.updateCombatant).toHaveBeenLastCalledWith(
+      'campaign',
+      'encounter',
+      'target',
+      { currentHp: -1 },
+    );
+  });
+
+  it('disables turn-order reslots while a mutation is pending', async () => {
+    let resolveMove: (() => void) | undefined;
+    vi.mocked(encountersApi.updateCombatant).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveMove = () => resolve({});
+        }),
+    );
+    const [firstCombatant] = makeEncounter().combatants;
+    if (!firstCombatant) throw new Error('missing combatant');
+    encounter.data = makeEncounter({
+      combatants: [
+        firstCombatant,
+        { ...firstCombatant, id: 'second', name: 'Second', orderKey: 20 },
+      ],
+    });
+    renderPage();
+
+    const [moveDown] = await screen.findAllByRole('button', { name: 'Move down' });
+    if (!moveDown) throw new Error('missing move down button');
+    fireEvent.click(moveDown);
+    await waitFor(() => expect(encountersApi.updateCombatant).toHaveBeenCalledTimes(1));
+    // While that reslot is pending the button is disabled, so a second tap cannot
+    // recompute from the stale snapshot and re-send the same order key.
+    await waitFor(() => expect(moveDown).toBeDisabled());
+    fireEvent.click(moveDown);
+    expect(encountersApi.updateCombatant).toHaveBeenCalledTimes(1);
+
+    resolveMove?.();
+    await waitFor(() => expect(moveDown).not.toBeDisabled());
+  });
+
   it('omits blank optional fields when creating an effect', async () => {
     renderPage();
     await screen.findByRole('button', { name: 'Add effect' });

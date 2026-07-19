@@ -57,12 +57,16 @@ function canViewCombatant(row: DbEncounterCombatant, isAdmin: boolean) {
 function outCombatant(
   row: DbEncounterCombatant,
   isAdmin: boolean,
+  canManageCharacters: boolean,
   shareCharacterSheets: boolean,
   ownedCharacterIds: ReadonlySet<string>,
 ) {
   if (!canViewCombatant(row, isAdmin)) return null;
+  // Masking follows the same share gate as `decideCharacterAccess`: a manager
+  // without `allowGmCharacterEditing` gets the minimal view here just like the
+  // character detail/list/sync surfaces, even though they are otherwise admins.
   const maskCharacterCombat =
-    !isAdmin &&
+    !canManageCharacters &&
     !shareCharacterSheets &&
     row.kind === 'pc' &&
     !ownedCharacterIds.has(row.characterId ?? '');
@@ -130,6 +134,7 @@ export async function projectEncounterForViewer(
   row: DbEncounter,
   userId: string,
   isAdmin: boolean,
+  canManageCharacters: boolean,
 ) {
   const db = getDb();
   const [[campaign], combatants, effects] = await Promise.all([
@@ -148,20 +153,28 @@ export async function projectEncounterForViewer(
   const pcCharacterIds = combatants.flatMap((combatant) =>
     combatant.kind === 'pc' && combatant.characterId ? [combatant.characterId] : [],
   );
-  const ownedCharacterIds = isAdmin
-    ? new Set(pcCharacterIds)
-    : new Set(
-        (pcCharacterIds.length
-          ? await db
+  // Managers/owners with character access never mask, so the ownership lookup
+  // only matters for viewers subject to the share gate.
+  const ownedCharacterIds =
+    canManageCharacters || campaign.shareCharacterSheets || pcCharacterIds.length === 0
+      ? new Set<string>()
+      : new Set(
+          (
+            await db
               .select({ id: characters.id })
               .from(characters)
               .where(and(eq(characters.ownerId, userId), inArray(characters.id, pcCharacterIds)))
-          : []
-        ).map((character) => character.id),
-      );
+          ).map((character) => character.id),
+        );
   const visible = combatants
     .map((combatant) =>
-      outCombatant(combatant, isAdmin, campaign.shareCharacterSheets, ownedCharacterIds),
+      outCombatant(
+        combatant,
+        isAdmin,
+        canManageCharacters,
+        campaign.shareCharacterSheets,
+        ownedCharacterIds,
+      ),
     )
     .filter((combatant): combatant is NonNullable<typeof combatant> => combatant !== null);
   const visibleIds = new Set(visible.map((combatant) => combatant.id));
@@ -226,6 +239,16 @@ async function touchEncounter(
 
 function isAdmin(role: string) {
   return role === 'owner' || role === 'manager';
+}
+
+/**
+ * Whether the viewer may see other players' copied combat stats.  Mirrors
+ * `decideCharacterAccess`: owners always can; managers only when the campaign
+ * enables GM character editing.  Members fall back to the share gate / ownership
+ * checks in `outCombatant`.
+ */
+function canManageCharacters(role: string, allowGmCharacterEditing: boolean) {
+  return role === 'owner' || (role === 'manager' && allowGmCharacterEditing);
 }
 
 async function pcValues(characterId: string, campaignId: string) {
@@ -308,7 +331,14 @@ router.openapi(
       .orderBy(asc(encounters.createdAt));
     return c.json(
       await Promise.all(
-        rows.map((row) => projectEncounterForViewer(row, user.id, isAdmin(access.role))),
+        rows.map((row) =>
+          projectEncounterForViewer(
+            row,
+            user.id,
+            isAdmin(access.role),
+            canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
+          ),
+        ),
       ),
       200,
     );
@@ -339,6 +369,7 @@ router.openapi(
         await loadEncounter(id, encounterId),
         user.id,
         isAdmin(access.role),
+        canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
       ),
       200,
     );
@@ -364,7 +395,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    await requireCampaignAdmin(id, user.id);
+    const access = await requireCampaignAdmin(id, user.id);
     assertUniquePcCombatants(body.combatants);
     const rows = await Promise.all(
       body.combatants.map(async (combatant, index) => {
@@ -387,7 +418,15 @@ router.openapi(
       return encounter;
     });
     await invalidateEncounter(id, created.id);
-    return c.json(await projectEncounterForViewer(created, user.id, true), 201);
+    return c.json(
+      await projectEncounterForViewer(
+        created,
+        user.id,
+        true,
+        canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
+      ),
+      201,
+    );
   },
 );
 
@@ -409,7 +448,7 @@ router.openapi(
     const user = c.get('user');
     const { id, encounterId } = c.req.valid('param');
     const body = c.req.valid('json');
-    await requireCampaignAdmin(id, user.id);
+    const access = await requireCampaignAdmin(id, user.id);
     await loadEncounter(id, encounterId);
     if (body.activeCombatantId) await assertCombatantsBelong(encounterId, [body.activeCombatantId]);
     const endedAt =
@@ -429,7 +468,15 @@ router.openapi(
       return row;
     });
     await invalidateEncounter(id, encounterId);
-    return c.json(await projectEncounterForViewer(updated, user.id, true), 200);
+    return c.json(
+      await projectEncounterForViewer(
+        updated,
+        user.id,
+        true,
+        canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
+      ),
+      200,
+    );
   },
 );
 
@@ -452,7 +499,7 @@ router.openapi(
     const user = c.get('user');
     const { id, encounterId } = c.req.valid('param');
     const body = c.req.valid('json');
-    await requireCampaignAdmin(id, user.id);
+    const access = await requireCampaignAdmin(id, user.id);
     const encounter = await loadEncounter(id, encounterId);
     if (encounter.status === 'ended')
       throw new HTTPException(409, { message: 'encounter has ended; refresh encounter' });
@@ -507,7 +554,15 @@ router.openapi(
     if (!updated)
       throw new HTTPException(409, { message: 'turn state changed; refresh encounter' });
     await invalidateEncounter(id, encounterId);
-    return c.json(await projectEncounterForViewer(updated, user.id, true), 200);
+    return c.json(
+      await projectEncounterForViewer(
+        updated,
+        user.id,
+        true,
+        canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
+      ),
+      200,
+    );
   },
 );
 
@@ -563,7 +618,7 @@ router.openapi(
       throw error;
     }
     await invalidateEncounter(id, encounterId);
-    const projected = outCombatant(row, true, true, new Set());
+    const projected = outCombatant(row, true, true, true, new Set());
     if (!projected) throw new HTTPException(500, { message: 'combatant projection failed' });
     return c.json(projected, 201);
   },
@@ -601,11 +656,24 @@ router.openapi(
         )
         .returning();
       if (!updated) throw new HTTPException(404, { message: 'combatant not found' });
-      await touchEncounter(tx, encounterId);
+      // Deactivating the acting combatant must also drop the stale active-turn
+      // token so the tracker never renders an inactive combatant as "Acting".
+      if (body.active === false) {
+        await tx
+          .update(encounters)
+          .set({
+            activeCombatantId: sql`case when ${encounters.activeCombatantId} = ${combatantId} then null else ${encounters.activeCombatantId} end`,
+            version: sql`${encounters.version} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(eq(encounters.id, encounterId));
+      } else {
+        await touchEncounter(tx, encounterId);
+      }
       return updated;
     });
     await invalidateEncounter(id, encounterId);
-    const projected = outCombatant(row, true, true, new Set());
+    const projected = outCombatant(row, true, true, true, new Set());
     if (!projected) throw new HTTPException(500, { message: 'combatant projection failed' });
     return c.json(projected, 200);
   },
@@ -728,8 +796,17 @@ router.openapi(
     const { id, encounterId, effectId } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignAdmin(id, user.id);
-    await loadEncounter(id, encounterId);
+    const encounter = await loadEncounter(id, encounterId);
     if (body.casterCombatantId) await assertCombatantsBelong(encounterId, [body.casterCombatantId]);
+    // Round markers are written from the live encounter round; a value past the
+    // current round would hide maintenance/expiry prompts for state that has not
+    // happened yet, so reject it rather than persist an out-of-range marker.
+    for (const marker of [body.lastMaintainedRound, body.expiryAcknowledgedAtRound]) {
+      if (marker != null && marker > encounter.round)
+        throw new HTTPException(422, {
+          message: 'effect round marker cannot exceed current round',
+        });
+    }
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
         .update(encounterEffects)

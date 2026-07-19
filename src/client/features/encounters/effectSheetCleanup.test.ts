@@ -3,6 +3,8 @@ import { getLocalDb, resetLocalDb } from '../../db/dexie.ts';
 import { cleanupLinkedSheetEffect } from './effectSheetCleanup.ts';
 
 const CHARACTER_ID = '0193b3c0-f1f0-7000-8000-00000000e001';
+const OWNER_ID = '0193b3c0-f1f0-7000-8000-00000000e002';
+const ownerAccess = { viewerId: OWNER_ID, isStaff: false, allowGmCharacterEditing: false };
 
 afterEach(async () => {
   await resetLocalDb();
@@ -11,7 +13,7 @@ afterEach(async () => {
 async function seedCharacter() {
   await getLocalDb().characters.put({
     id: CHARACTER_ID,
-    ownerId: '0193b3c0-f1f0-7000-8000-00000000e002',
+    ownerId: OWNER_ID,
     campaignId: null,
     name: 'Target',
     playerName: null,
@@ -61,6 +63,7 @@ describe('cleanupLinkedSheetEffect', () => {
     await cleanupLinkedSheetEffect(
       { linkedCondition: 'stunned', linkedTempEffectId: 'spell-effect' },
       { characterId: CHARACTER_ID },
+      ownerAccess,
     );
 
     const db = getLocalDb();
@@ -87,6 +90,7 @@ describe('cleanupLinkedSheetEffect', () => {
     await cleanupLinkedSheetEffect(
       { linkedCondition: 'stunned', linkedTempEffectId: null },
       { characterId: CHARACTER_ID },
+      ownerAccess,
     );
 
     expect((await getLocalDb().characterCombat.get(CHARACTER_ID))?.conditions).toEqual([
@@ -104,6 +108,7 @@ describe('cleanupLinkedSheetEffect', () => {
     await cleanupLinkedSheetEffect(
       { linkedCondition: 'stunned', linkedTempEffectId: 'spell-effect' },
       { characterId: CHARACTER_ID },
+      ownerAccess,
     );
 
     const db = getLocalDb();
@@ -122,7 +127,46 @@ describe('cleanupLinkedSheetEffect', () => {
     await cleanupLinkedSheetEffect(
       { linkedCondition: 'stunned', linkedTempEffectId: 'spell-effect' },
       { characterId: null },
+      ownerAccess,
     );
     expect(await getLocalDb().outbox.count()).toBe(0);
+  });
+
+  it('skips cleanup when the viewer cannot write the target sheet', async () => {
+    await seedCharacter();
+
+    // A GM acting on another player's PC without GM editing enabled: the sync
+    // write guard would reject these patches, so no outbox op should be queued
+    // and the sheet values must remain untouched.
+    await cleanupLinkedSheetEffect(
+      { linkedCondition: 'stunned', linkedTempEffectId: 'spell-effect' },
+      { characterId: CHARACTER_ID },
+      { viewerId: 'a-different-user', isStaff: true, allowGmCharacterEditing: false },
+    );
+
+    const db = getLocalDb();
+    expect(await db.outbox.count()).toBe(0);
+    expect((await db.characterCombat.get(CHARACTER_ID))?.conditions).toEqual([
+      'stunned',
+      'bleeding',
+    ]);
+    expect((await db.characters.get(CHARACTER_ID))?.tempEffects).toEqual([
+      { id: 'spell-effect', name: 'Might', mods: { st: 2 } },
+      { id: 'keep', name: 'Other', mods: { dx: 1 } },
+    ]);
+  });
+
+  it('clears the sheet for staff when GM character editing is enabled', async () => {
+    await seedCharacter();
+
+    await cleanupLinkedSheetEffect(
+      { linkedCondition: 'stunned', linkedTempEffectId: null },
+      { characterId: CHARACTER_ID },
+      { viewerId: 'a-different-user', isStaff: true, allowGmCharacterEditing: true },
+    );
+
+    expect((await getLocalDb().characterCombat.get(CHARACTER_ID))?.conditions).toEqual([
+      'bleeding',
+    ]);
   });
 });
