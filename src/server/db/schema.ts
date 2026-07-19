@@ -31,6 +31,7 @@ import {
 import type { XpAward } from '../../shared/schemas/adventureLog.ts';
 import type { TempEffect } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
+import type { CombatantConditionsField, EffectDuration } from '../../shared/schemas/encounter.ts';
 import type {
   ArmorData,
   MagicItemData,
@@ -86,6 +87,9 @@ export const campaignInvitationStatusEnum = pgEnum('campaign_invitation_status',
   'rejected',
   'cancelled',
 ]);
+
+export const encounterStatusEnum = pgEnum('encounter_status', ['active', 'ended']);
+export const encounterCombatantKindEnum = pgEnum('encounter_combatant_kind', ['pc', 'npc']);
 
 // ---------- columns helpers ----------
 
@@ -547,6 +551,98 @@ export const combatStates = pgTable(
   }),
 );
 
+// ---------- campaign encounters ----------
+
+/** Online-only live-session combat trackers.  Their JSONB fields are typed
+ * against the encounter schemas; see docs/specs/json-fields.md. */
+export const encounters = pgTable(
+  'encounters',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 120 }).notNull().default('Encounter'),
+    status: encounterStatusEnum('status').notNull().default('active'),
+    round: integer('round').notNull().default(1),
+    activeCombatantId: uuid('active_combatant_id'),
+    /** Incremented on every state mutation; turn advancement uses it with OCC. */
+    version: integer('version').notNull().default(1),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({ campaignIdx: index('encounters_campaign_idx').on(t.campaignId) }),
+);
+
+export const encounterCombatants = pgTable(
+  'encounter_combatants',
+  {
+    id: id(),
+    encounterId: uuid('encounter_id')
+      .notNull()
+      .references(() => encounters.id, { onDelete: 'cascade' }),
+    kind: encounterCombatantKindEnum('kind').notNull(),
+    characterId: uuid('character_id').references(() => characters.id, { onDelete: 'set null' }),
+    name: varchar('name', { length: 120 }).notNull(),
+    basicSpeed: numeric('basic_speed', { precision: 6, scale: 2 }),
+    dx: integer('dx'),
+    orderKey: numeric('order_key', { precision: 14, scale: 4 }).notNull().default('10'),
+    active: boolean('active').notNull().default(true),
+    maxHp: integer('max_hp'),
+    currentHp: integer('current_hp'),
+    move: integer('move'),
+    dodge: integer('dodge'),
+    dr: integer('dr'),
+    maneuver: varchar('maneuver', { length: 80 }),
+    /** Validated by `combatantConditionsField` (schemas/encounter.ts). */
+    conditions: jsonb('conditions').$type<CombatantConditionsField>().notNull().default([]),
+    hiddenFromPlayers: boolean('hidden_from_players').notNull().default(false),
+    notes: text('notes'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    encounterIdx: index('encounter_combatants_encounter_idx').on(t.encounterId),
+    characterIdx: index('encounter_combatants_character_idx').on(t.characterId),
+  }),
+);
+
+export const encounterEffects = pgTable(
+  'encounter_effects',
+  {
+    id: id(),
+    encounterId: uuid('encounter_id')
+      .notNull()
+      .references(() => encounters.id, { onDelete: 'cascade' }),
+    targetCombatantId: uuid('target_combatant_id')
+      .notNull()
+      .references(() => encounterCombatants.id, { onDelete: 'cascade' }),
+    casterCombatantId: uuid('caster_combatant_id').references(() => encounterCombatants.id, {
+      onDelete: 'set null',
+    }),
+    createdById: uuid('created_by_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    name: varchar('name', { length: 120 }).notNull(),
+    /** Validated by `effectDuration` (schemas/encounter.ts). */
+    duration: jsonb('duration').$type<EffectDuration>().notNull(),
+    startedAtRound: integer('started_at_round').notNull(),
+    maintenanceCost: integer('maintenance_cost'),
+    lastMaintainedRound: integer('last_maintained_round'),
+    expiryAcknowledgedAtRound: integer('expiry_acknowledged_at_round'),
+    linkedCondition: varchar('linked_condition', { length: 80 }),
+    linkedTempEffectId: varchar('linked_temp_effect_id', { length: 120 }),
+    notes: text('notes'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    encounterIdx: index('encounter_effects_encounter_idx').on(t.encounterId),
+    targetIdx: index('encounter_effects_target_idx').on(t.targetCombatantId),
+  }),
+);
+
 // ---------- adventure log ----------
 
 export const adventureLogEntries = pgTable(
@@ -713,6 +809,9 @@ export type DbCharacterSkill = typeof characterSkills.$inferSelect;
 export type DbCharacterSpell = typeof characterSpells.$inferSelect;
 export type DbInventoryItem = typeof inventoryItems.$inferSelect;
 export type DbCombatState = typeof combatStates.$inferSelect;
+export type DbEncounter = typeof encounters.$inferSelect;
+export type DbEncounterCombatant = typeof encounterCombatants.$inferSelect;
+export type DbEncounterEffect = typeof encounterEffects.$inferSelect;
 export type DbCampaign = typeof campaigns.$inferSelect;
 export type DbCampaignMembership = typeof campaignMemberships.$inferSelect;
 export type DbCampaignInvitation = typeof campaignInvitations.$inferSelect;

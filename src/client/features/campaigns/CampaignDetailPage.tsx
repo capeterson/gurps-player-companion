@@ -16,6 +16,7 @@ import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { api } from '../../lib/api.ts';
 import { useCampaignCharactersList } from '../characters/useCharacterDetail.ts';
+import { CampaignEncounterPanel } from '../encounters/CampaignEncounterPanel.tsx';
 import { LogPage } from '../log/LogPage.tsx';
 import { CampaignHistoryPanel } from './CampaignHistoryPanel.tsx';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
@@ -132,6 +133,8 @@ export function CampaignDetailPage() {
           </ul>
         )}
       </section>
+
+      <CampaignEncounterPanel campaignId={c.id} canManage={canManage} />
 
       {/* Embedded adventure log scoped to this campaign. */}
       <LogPage campaignId={c.id} />

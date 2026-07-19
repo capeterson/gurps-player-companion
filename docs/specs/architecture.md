@@ -38,7 +38,7 @@ Hono API on the same port — see `dev-entry.ts` and `vite.config.ts`.
 | Validation | Zod — shared across server, client, and service worker |
 | Database | PostgreSQL 18 + Drizzle ORM |
 | Client | React 19, React Router 7, TanStack Query 5 |
-| Local store | Dexie 4 (IndexedDB) |
+| Local store | Dexie 6 (IndexedDB) |
 | PWA | vite-plugin-pwa + Workbox |
 | Styling | Tailwind 4 + DaisyUI 5 ("Arcane" theme) |
 | Auth | JWT (`jose`) + refresh tokens; WebAuthn passkeys; API keys |
@@ -123,7 +123,8 @@ Tables (grouped):
   `character_spells`, `combat_states` (1:1 by `character_id`).
 - **Campaign content**: `adventure_log_entries`, `campaign_library_traits`,
   `campaign_library_skills`, `campaign_library_spells`,
-  `campaign_library_items`.
+  `campaign_library_items`, plus online-only live-session `encounters`,
+  `encounter_combatants`, and `encounter_effects`.
 - **Sync/audit infra**: `entity_tombstones` (deletes for cursor backfill),
   `entity_history` (append-only audit log).
 
@@ -147,8 +148,12 @@ Key PG18 / trigger machinery, layered by migration:
   writes through the outbox; the sync orchestrator is a long-lived singleton.
   This is the heart of the app — see [offline-sync.md](offline-sync.md).
 - **Online-only surfaces** (campaign library, adventure log, invitations,
-  notifications, settings, admin) use TanStack Query directly against the HTTP
+  notifications, settings, admin, and campaign encounters) use TanStack Query directly against the HTTP
   API. Default query options: `staleTime: 30s`, no refetch-on-focus, one retry.
+- **Encounters** use query keys scoped by campaign/encounter. The existing WS
+  subscriber dispatches `encounter_invalidate` frames to that query cache; the
+   frame contains no combat data. A Dexie v6 `soloEncounters` store, keyed by
+   `characterId`, is explicitly device-only and is included in the logout purge.
 - **Draft inputs**: `useDraftField.ts` is the canonical draft-on-blur hook (do
   not fork it). It queues same-field edits, per-field syncs from the server only
   when clean, and fires toast+flash on rollback.
@@ -161,7 +166,10 @@ Key PG18 / trigger machinery, layered by migration:
 
 - `bun test src/server src/shared` — server + shared unit/integration
   (`sync.test.ts`, `syncDispatch.test.ts`, `historyTriggers.test.ts`, and the
-  domain math suites). Server tests hit a real Postgres.
+  domain math suites). Server tests hit a real Postgres. Live-Postgres suites
+  share `src/server/testConfig.ts`: they use `DATABASE_URL` when provided
+  (Compose app container: `db:5432`) and otherwise default to the CI/host URL
+  at `localhost:5432`.
 - `vitest run` — client component/hook tests (happy-dom DOM environment;
   `fake-indexeddb` for Dexie).
 - `playwright test` — end-to-end.

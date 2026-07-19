@@ -8,5 +8,6 @@ export * from './skill.ts';
 export * from './inventory.ts';
 export * from './combat.ts';
 export * from './adventureLog.ts';
+export * from './encounter.ts';
 export * from './campaignLibrary.ts';
 export * from './sync.ts';

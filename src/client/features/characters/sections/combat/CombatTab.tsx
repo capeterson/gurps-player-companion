@@ -28,6 +28,7 @@ import { DefensesCard } from './DefensesCard.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
 import { ManeuverCard } from './ManeuverCard.tsx';
 import { PoolsCard } from './PoolsCard.tsx';
+import { SoloTrackerCard } from './SoloTrackerCard.tsx';
 
 export interface CombatTabProps {
   character: CharacterDetail;
@@ -63,6 +64,7 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
             hpMax={bumpers.hpMax}
             bumpHp={bumpers.bumpHp}
           />
+          <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
         </div>
         <div className="space-y-4">
           <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />

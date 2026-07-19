@@ -27,6 +27,7 @@ const MUTATING_ROUTE_FILES = [
   'src/server/routes/invitations.ts',
   'src/server/routes/characters.ts',
   'src/server/routes/characterSubResources.ts',
+  'src/server/routes/encounters.ts',
 ];
 
 /**

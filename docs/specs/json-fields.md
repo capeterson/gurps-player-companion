@@ -42,6 +42,8 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_skills.situational_modifiers` | `situationalModifier[]` (skill.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
 | `campaign_library_items.armor` | `armorData` (inventory.ts), nullable | REST library CRUD + YAML import (`libraryItemCreate`) |
 | `campaign_library_items.weapon_data` | `weaponData` (inventory.ts), nullable — same shape as `inventory_items.weapon_data` incl. `skill`/`db`/`ranged` | REST library CRUD + YAML import |
+| `encounter_combatants.conditions` | `combatantConditionsField` (encounter.ts) — `string[]`, each 1–80 chars, max 64 | Encounter combatant create defaults to `[]`; REST combatant patch (`combatantUpdate`) |
+| `encounter_effects.duration` | `effectDuration` (encounter.ts) — discriminated `{ unit, amount? }` round/minute/hour/indefinite duration | Encounter effect create/update (`effectCreate` / `effectUpdate`) |
 | `notifications.payload` | Per-type: `campaignInvitationNotificationPayload` (notification.ts) for `type='campaign_invitation'` | Emit site (`invitations.ts` parses before insert); consume site (`NotificationsBell` `safeParse`s) |
 | `entity_history.old_row` / `new_row` | *Intentionally schemaless* — raw `to_jsonb(OLD/NEW)` row snapshots written by DB triggers | Read-only; exposed as `z.record(z.unknown())` in `historyEventOut` and only with `?detail=1` + full access (see history-tracking.md) |
 

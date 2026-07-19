@@ -1,38 +1,18 @@
 /**
  * Integration tests for the /auth/api-keys endpoints.
  *
- * Requires a running Postgres test DB at the URL in testConfig below.
+ * Requires a running Postgres test DB configured by ../testConfig.ts.
  * Start it with: bun run db:up (docker-compose.dev.yml)
  * Apply migrations first: bun run db:migrate
  */
 
 import { describe, expect, it } from 'bun:test';
 import { createApp } from '../app.ts';
-import { type AppConfig, resetConfigCache } from '../config.ts';
+import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
-const testConfig: AppConfig = {
-  environment: 'test',
-  port: 0,
-  host: '127.0.0.1',
-  databaseUrl: 'postgres://gurps:gurps@localhost:5432/gurps',
-  jwtSecret: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
-  jwtAccessTtlMinutes: 15,
-  jwtRefreshTtlDays: 14,
-  apiKeyPepper: 'test-secret-which-is-deliberately-very-long-and-not-a-placeholder',
-  corsOrigins: [],
-  resendApiKey: undefined,
-  resendFromEmail: undefined,
-  appBaseUrl: undefined,
-};
+configureIntegrationTestEnvironment();
 
-// Seed process.env so getDb() → loadConfig() finds the right database URL
-// and JWT secret when running outside CI without those variables exported.
-process.env.DATABASE_URL = testConfig.databaseUrl;
-process.env.JWT_SECRET = testConfig.jwtSecret;
-process.env.ENVIRONMENT = testConfig.environment;
-resetConfigCache();
-
-const app = createApp(testConfig);
+const app = createApp(integrationTestConfig);
 
 async function register(suffix = '') {
   const email = `apikey-test-${suffix}-${Date.now()}@example.com`;

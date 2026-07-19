@@ -16,13 +16,16 @@
  * This module is page-only — never imported by the server.
  */
 
+import { invalidateEncounter } from '../features/encounters/encounterInvalidation.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator } from './orchestrator.ts';
 
 interface WsMessage {
-  kind: 'hello' | 'sync_invalidate';
+  kind: 'hello' | 'sync_invalidate' | 'encounter_invalidate';
   emittedAt?: string;
   entityClasses?: string[];
+  campaignId?: string;
+  encounterId?: string;
 }
 
 const RECONNECT_BASE_MS = 1000;
@@ -125,6 +128,9 @@ class SyncWsSubscriber {
       if (!parsed) return;
       if (parsed.kind === 'sync_invalidate') {
         getSyncOrchestrator().triggerDrain();
+      }
+      if (parsed.kind === 'encounter_invalidate' && parsed.campaignId && parsed.encounterId) {
+        invalidateEncounter(parsed.campaignId, parsed.encounterId);
       }
     });
 

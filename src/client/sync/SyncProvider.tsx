@@ -7,14 +7,18 @@
  *     knows about the toast context.
  */
 
+import { useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useEffect } from 'react';
 import { getLocalDb } from '../db/dexie.ts';
+import { mountEncounterInvalidations } from '../features/encounters/encounterInvalidation.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { getSyncOrchestrator, setRejectionNotifier } from './orchestrator.ts';
 import { getSyncWsSubscriber } from './wsSubscriber.ts';
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const toasts = useToasts();
+  const queryClient = useQueryClient();
+  useEffect(() => mountEncounterInvalidations(queryClient), [queryClient]);
   useEffect(() => {
     const orch = getSyncOrchestrator();
     orch.start();
