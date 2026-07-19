@@ -1,3 +1,4 @@
+import { normalizeCondition } from '../../../shared/domain/conditions.ts';
 import { getLocalDb } from '../../db/dexie.ts';
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
@@ -24,30 +25,17 @@ export async function cleanupLinkedSheetEffect(
   const db = getLocalDb();
 
   if (effect.linkedCondition) {
-    const character = await db.characters.get(characterId);
-    await db.transaction('rw', db.characterCombat, async () => {
-      if (await db.characterCombat.get(characterId)) return;
-      await db.characterCombat.add({
-        id: characterId,
-        characterId,
-        currentHp: (character?.st ?? 10) + (character?.hpMod ?? 0),
-        currentFp: (character?.ht ?? 10) + (character?.fpMod ?? 0),
-        conditions: [],
-        maneuver: null,
-        posture: 'standing',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        revision: -1,
-      });
-    });
-    const conditions = (await db.characterCombat.get(characterId))?.conditions ?? [];
-    if (conditions.includes(effect.linkedCondition)) {
+    const conditions = (await db.characterCombat.get(characterId))?.conditions;
+    const linkedCondition = normalizeCondition(effect.linkedCondition);
+    if (conditions?.some((condition) => normalizeCondition(condition) === linkedCondition)) {
       await enqueueFieldPatch({
         entityClass: 'character_combat',
         entityId: characterId,
         characterId,
         fieldPath: 'conditions',
-        attemptedValue: conditions.filter((condition) => condition !== effect.linkedCondition),
+        attemptedValue: conditions
+          .map(normalizeCondition)
+          .filter((condition) => condition !== linkedCondition),
         humanName: 'conditions',
         flashKey: makeFlashKey('character_combat', characterId, 'conditions'),
       });

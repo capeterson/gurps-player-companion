@@ -13219,7 +13219,8 @@
                     ]
                   },
                   "maintenanceCost": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0
                   },
                   "linkedCondition": {
                     "type": "string"
@@ -13455,7 +13456,9 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
                   },
                   "duration": {
                     "oneOf": [
@@ -13539,7 +13542,8 @@
                   },
                   "maintenanceCost": {
                     "type": "integer",
-                    "nullable": true
+                    "nullable": true,
+                    "minimum": 0
                   },
                   "lastMaintainedRound": {
                     "type": "integer",

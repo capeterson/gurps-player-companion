@@ -106,6 +106,45 @@ describe('EncounterPage', () => {
     vi.mocked(encountersApi.createEffect).mockResolvedValue({});
     vi.mocked(encountersApi.deleteEffect).mockResolvedValue(undefined);
     vi.mocked(encountersApi.updateEffect).mockResolvedValue({});
+    vi.mocked(encountersApi.updateCombatant).mockResolvedValue({});
+  });
+
+  it('serializes rapid NPC HP decrements against the latest intended value', async () => {
+    let resolveFirst: (() => void) | undefined;
+    vi.mocked(encountersApi.updateCombatant)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = () => resolve({});
+          }),
+      )
+      .mockResolvedValueOnce({});
+    renderPage();
+
+    const decrement = await screen.findByRole('button', { name: 'HP -1' });
+    fireEvent.click(decrement);
+    fireEvent.click(decrement);
+
+    expect(encountersApi.updateCombatant).toHaveBeenCalledTimes(1);
+    expect(encountersApi.updateCombatant).toHaveBeenLastCalledWith(
+      'campaign',
+      'encounter',
+      'target',
+      {
+        currentHp: 9,
+      },
+    );
+
+    resolveFirst?.();
+    await waitFor(() => expect(encountersApi.updateCombatant).toHaveBeenCalledTimes(2));
+    expect(encountersApi.updateCombatant).toHaveBeenLastCalledWith(
+      'campaign',
+      'encounter',
+      'target',
+      {
+        currentHp: 8,
+      },
+    );
   });
 
   it('omits blank optional fields when creating an effect', async () => {

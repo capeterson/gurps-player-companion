@@ -55,6 +55,15 @@ async function createCharacter(accessToken: string, campaignId: string, name: st
   return (await response.json()) as { id: string };
 }
 
+async function addInventory(accessToken: string, characterId: string, weightLbs: number) {
+  const response = await app.request(`/api/v1/characters/${characterId}/inventory`, {
+    method: 'POST',
+    headers: jsonHeaders(accessToken),
+    body: JSON.stringify({ name: 'Load', weightLbs, worn: true }),
+  });
+  expect(response.status).toBe(201);
+}
+
 describe('encounter member projection', () => {
   it('persists full NPC edits, order-key reslots, and ended encounter state', async () => {
     const gm = await registerUser('edit-gm');
@@ -383,6 +392,105 @@ describe('encounter member projection', () => {
       },
     );
     expect(endedAdvance.status).toBe(409);
+  });
+
+  it('captures PC Move and Dodge after encumbrance', async () => {
+    const gm = await registerUser('encumbered-pc-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const character = await createCharacter(gm.accessToken, campaign.id, 'Loaded PC');
+    // Default ST 10 has BL 20; just above 10x BL leaves the PC unable to move.
+    await addInventory(gm.accessToken, character.id, 201);
+
+    const response = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ combatants: [{ kind: 'pc', characterId: character.id }] }),
+    });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      combatants: [expect.objectContaining({ move: 0, dodge: 4 })],
+    });
+  });
+
+  it('rejects duplicate PCs in encounter creation and combatant additions', async () => {
+    const gm = await registerUser('duplicate-pc-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const character = await createCharacter(gm.accessToken, campaign.id, 'Duplicate PC');
+    const duplicateCreate = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        combatants: [
+          { kind: 'pc', characterId: character.id },
+          { kind: 'pc', characterId: character.id },
+        ],
+      }),
+    });
+    expect(duplicateCreate.status).toBe(422);
+
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ combatants: [{ kind: 'pc', characterId: character.id }] }),
+    });
+    expect(created.status).toBe(201);
+    const encounter = (await created.json()) as { id: string };
+    const duplicateAdd = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/combatants`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ kind: 'pc', characterId: character.id }),
+      },
+    );
+    expect(duplicateAdd.status).toBe(422);
+  });
+
+  it('clears the active combatant and increments the version when it is deleted', async () => {
+    const gm = await registerUser('delete-active-gm');
+    const campaign = await createCampaign(gm.accessToken);
+    const created = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        combatants: [{ kind: 'npc', name: 'Orc', basicSpeed: 5, dx: 10, maxHp: 10 }],
+      }),
+    });
+    const encounter = (await created.json()) as {
+      id: string;
+      version: number;
+      combatants: { id: string }[];
+    };
+    const combatantId = encounter.combatants[0]?.id;
+    if (!combatantId) throw new Error('missing combatant');
+
+    const activated = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ activeCombatantId: combatantId }),
+      },
+    );
+    expect(activated.status).toBe(200);
+    const active = (await activated.json()) as { version: number };
+
+    const deleted = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}/combatants/${combatantId}`,
+      { method: 'DELETE', headers: jsonHeaders(gm.accessToken) },
+    );
+    expect(deleted.status).toBe(204);
+    const current = await app.request(
+      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
+      {
+        headers: { Authorization: `Bearer ${gm.accessToken}` },
+      },
+    );
+    expect(await current.json()).toMatchObject({
+      activeCombatantId: null,
+      version: active.version + 1,
+      combatants: [],
+    });
   });
 
   it('retains a PC combatant when its character is deleted', async () => {

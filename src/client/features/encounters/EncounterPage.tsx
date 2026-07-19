@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { COMMON_CONDITIONS } from '../../../shared/constants/combat.ts';
 import { EFFECT_TEMPLATES } from '../../../shared/constants/effectTemplates.ts';
@@ -35,6 +35,12 @@ function problem(error: unknown) {
 type Effect = EncounterOut['effects'][number];
 type Combatant = EncounterOut['combatants'][number];
 
+interface NpcHpIntent {
+  value: number;
+  committedValue: number;
+  inFlight: boolean;
+}
+
 function orderKeyForMove(combatants: readonly Combatant[], index: number, direction: -1 | 1) {
   const current = combatants[index];
   const neighbor = combatants[index + direction];
@@ -54,6 +60,7 @@ export function EncounterPage() {
   const [editingNpc, setEditingNpc] = useState<Combatant | null | undefined>(undefined);
   const [editingEffect, setEditingEffect] = useState<Effect | null | undefined>(undefined);
   const encounter = useEncounter(id, encounterId);
+  const npcHpIntents = useRef(new Map<string, NpcHpIntent>());
   const campaign = useQuery({
     queryKey: ['campaigns', id],
     queryFn: () => api<CampaignOut>(`/campaigns/${id}`),
@@ -74,6 +81,54 @@ export function EncounterPage() {
     onSuccess: refresh,
     onError: (error) => toasts.push(problem(error), { kind: 'error' }),
   });
+
+  // Encounter mutations are online-only. Keep the latest intended HP per NPC
+  // until its serialized requests settle so a refetch cannot lose a rapid tap.
+  useEffect(() => {
+    for (const combatant of encounter.data?.combatants ?? []) {
+      if (combatant.kind !== 'npc') continue;
+      const hp = combatant.currentHp ?? 0;
+      const intent = npcHpIntents.current.get(combatant.id);
+      if (!intent || !intent.inFlight)
+        npcHpIntents.current.set(combatant.id, {
+          value: hp,
+          committedValue: hp,
+          inFlight: false,
+        });
+    }
+  }, [encounter.data?.combatants]);
+
+  const decrementNpcHp = (combatant: Combatant) => {
+    if (combatant.kind !== 'npc') return;
+    const existingIntent = npcHpIntents.current.get(combatant.id);
+    const hp = combatant.currentHp ?? 0;
+    const intent = existingIntent ?? { value: hp, committedValue: hp, inFlight: false };
+    if (!existingIntent) npcHpIntents.current.set(combatant.id, intent);
+    const next = Math.max(0, intent.value - 1);
+    if (next === intent.value) return;
+    intent.value = next;
+    if (intent.inFlight) return;
+
+    const save = async () => {
+      const sent = intent.value;
+      intent.inFlight = true;
+      try {
+        await encountersApi.updateCombatant(id, encounterId, combatant.id, { currentHp: sent });
+        intent.committedValue = sent;
+        refresh();
+      } catch (error) {
+        toasts.push(problem(error), { kind: 'error' });
+        if (intent.value === sent) intent.value = intent.committedValue;
+      } finally {
+        if (intent.value !== sent) {
+          void save();
+        } else {
+          intent.inFlight = false;
+        }
+      }
+    };
+    void save();
+  };
   if (!id || !encounterId) return <p className="alert alert-error">Missing encounter.</p>;
   if (encounter.isLoading || campaign.isLoading)
     return <p className="text-sm text-base-content/60">Loading encounter...</p>;
@@ -222,13 +277,7 @@ export function EncounterPage() {
                   <button
                     type="button"
                     className="btn btn-xs"
-                    onClick={() =>
-                      mutation.mutate(() =>
-                        encountersApi.updateCombatant(id, encounterId, combatant.id, {
-                          currentHp: Math.max(0, (combatant.currentHp ?? 0) - 1),
-                        }),
-                      )
-                    }
+                    onClick={() => decrementNpcHp(combatant)}
                   >
                     HP -1
                   </button>

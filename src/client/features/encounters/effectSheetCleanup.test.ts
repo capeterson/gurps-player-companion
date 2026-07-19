@@ -78,6 +78,46 @@ describe('cleanupLinkedSheetEffect', () => {
     );
   });
 
+  it('clears legacy condition spellings and normalizes the conditions it retains', async () => {
+    await seedCharacter();
+    await getLocalDb().characterCombat.update(CHARACTER_ID, {
+      conditions: [' StUnNeD ', 'BLEEDING'],
+    });
+
+    await cleanupLinkedSheetEffect(
+      { linkedCondition: 'stunned', linkedTempEffectId: null },
+      { characterId: CHARACTER_ID },
+    );
+
+    expect((await getLocalDb().characterCombat.get(CHARACTER_ID))?.conditions).toEqual([
+      'bleeding',
+    ]);
+    expect((await getLocalDb().outbox.toArray()).map((op) => op.attemptedValue)).toContainEqual([
+      'bleeding',
+    ]);
+  });
+
+  it('does not create combat state when no linked condition exists, while still clearing temp effects', async () => {
+    await seedCharacter();
+    await getLocalDb().characterCombat.delete(CHARACTER_ID);
+
+    await cleanupLinkedSheetEffect(
+      { linkedCondition: 'stunned', linkedTempEffectId: 'spell-effect' },
+      { characterId: CHARACTER_ID },
+    );
+
+    const db = getLocalDb();
+    expect(await db.characterCombat.get(CHARACTER_ID)).toBeUndefined();
+    expect((await db.characters.get(CHARACTER_ID))?.tempEffects).toEqual([
+      { id: 'keep', name: 'Other', mods: { dx: 1 } },
+    ]);
+    expect(await db.outbox.toArray()).toHaveLength(1);
+    expect((await db.outbox.toArray())[0]).toMatchObject({
+      entityClass: 'character',
+      fieldPath: 'tempEffects',
+    });
+  });
+
   it('does nothing for an NPC target', async () => {
     await cleanupLinkedSheetEffect(
       { linkedCondition: 'stunned', linkedTempEffectId: 'spell-effect' },

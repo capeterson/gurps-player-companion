@@ -89,17 +89,17 @@ export const effectCreate = z.object({
   casterCombatantId: uuid.optional(),
   name: z.string().min(1).max(120),
   duration: effectDuration,
-  maintenanceCost: z.number().int().optional(),
+  maintenanceCost: z.number().int().min(0).optional(),
   linkedCondition: z.string().optional(),
   linkedTempEffectId: z.string().optional(),
   notes: z.string().optional(),
 });
 export const effectUpdate = z
   .object({
-    name: z.string(),
+    name: z.string().min(1).max(120),
     duration: effectDuration,
     casterCombatantId: uuid.nullable(),
-    maintenanceCost: z.number().int().nullable(),
+    maintenanceCost: z.number().int().min(0).nullable(),
     lastMaintainedRound: z.number().int().nullable(),
     expiryAcknowledgedAtRound: z.number().int().nullable(),
     linkedCondition: z.string().nullable(),

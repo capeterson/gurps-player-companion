@@ -605,6 +605,9 @@ export const encounterCombatants = pgTable(
   (t) => ({
     encounterIdx: index('encounter_combatants_encounter_idx').on(t.encounterId),
     characterIdx: index('encounter_combatants_character_idx').on(t.characterId),
+    pcCharacterKey: uniqueIndex('encounter_combatants_pc_character_key')
+      .on(t.encounterId, t.characterId)
+      .where(sql`${t.characterId} is not null`),
   }),
 );
 

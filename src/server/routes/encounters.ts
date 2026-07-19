@@ -7,7 +7,9 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { effectiveDodge } from '../../shared/domain/defenseCalc.ts';
 import { advanceTurn, previousTurn } from '../../shared/domain/encounterTurns.ts';
+import { effectiveMove } from '../../shared/domain/encumbrance.ts';
 import { uuid } from '../../shared/schemas/common.ts';
 import {
   advanceRequest,
@@ -26,6 +28,7 @@ import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin, requireCampaignMember } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
+import { isUniqueViolation } from '../db/errors.ts';
 import {
   type DbEncounter,
   type DbEncounterCombatant,
@@ -238,11 +241,19 @@ async function pcValues(characterId: string, campaignId: string) {
     dx: detail.derived.effectiveDx,
     maxHp: detail.derived.hp,
     currentHp: detail.combat?.currentHp ?? detail.derived.hp,
-    move: detail.derived.basicMove,
-    dodge: detail.derived.dodge,
+    move: effectiveMove(detail.derived.basicMove, detail.encumbrance),
+    dodge: effectiveDodge(detail.derived.dodge, detail.encumbrance.dodgePenalty),
     conditions: detail.combat?.conditions ?? [],
     maneuver: detail.combat?.maneuver ?? null,
   };
+}
+
+function assertUniquePcCombatants(combatants: readonly CombatantCreate[]) {
+  const characterIds = combatants.flatMap((combatant) =>
+    combatant.kind === 'pc' ? [combatant.characterId] : [],
+  );
+  if (new Set(characterIds).size !== characterIds.length)
+    throw new HTTPException(422, { message: 'PC is already a combatant in this encounter' });
 }
 
 function npcValues(
@@ -354,6 +365,7 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignAdmin(id, user.id);
+    assertUniquePcCombatants(body.combatants);
     const rows = await Promise.all(
       body.combatants.map(async (combatant, index) => {
         const orderKey = String((index + 1) * 10);
@@ -520,21 +532,36 @@ router.openapi(
     await requireCampaignAdmin(id, user.id);
     await loadEncounter(id, encounterId);
     const existing = await getDb()
-      .select({ orderKey: encounterCombatants.orderKey })
+      .select({
+        orderKey: encounterCombatants.orderKey,
+        characterId: encounterCombatants.characterId,
+      })
       .from(encounterCombatants)
       .where(eq(encounterCombatants.encounterId, encounterId))
       .orderBy(asc(encounterCombatants.orderKey));
     const orderKey = String((Number(existing.at(-1)?.orderKey ?? 0) || 0) + 10);
+    if (
+      body.kind === 'pc' &&
+      existing.some((combatant) => combatant.characterId === body.characterId)
+    )
+      throw new HTTPException(422, { message: 'PC is already a combatant in this encounter' });
     const values =
       body.kind === 'pc'
         ? { ...(await pcValues(body.characterId, id)), encounterId, orderKey }
         : npcValues(body, encounterId, orderKey);
-    const row = await withAudit(user.id, undefined, async (tx) => {
-      const [created] = await tx.insert(encounterCombatants).values(values).returning();
-      if (!created) throw new HTTPException(500, { message: 'insert failed' });
-      await touchEncounter(tx, encounterId);
-      return created;
-    });
+    let row: DbEncounterCombatant;
+    try {
+      row = await withAudit(user.id, undefined, async (tx) => {
+        const [created] = await tx.insert(encounterCombatants).values(values).returning();
+        if (!created) throw new HTTPException(500, { message: 'insert failed' });
+        await touchEncounter(tx, encounterId);
+        return created;
+      });
+    } catch (error) {
+      if (isUniqueViolation(error, 'encounter_combatants_pc_character_key'))
+        throw new HTTPException(409, { message: 'PC is already a combatant in this encounter' });
+      throw error;
+    }
     await invalidateEncounter(id, encounterId);
     const projected = outCombatant(row, true, true, new Set());
     if (!projected) throw new HTTPException(500, { message: 'combatant projection failed' });
@@ -609,7 +636,14 @@ router.openapi(
         )
         .returning();
       if (!deleted[0]) throw new HTTPException(404, { message: 'combatant not found' });
-      await touchEncounter(tx, encounterId);
+      await tx
+        .update(encounters)
+        .set({
+          activeCombatantId: sql`case when ${encounters.activeCombatantId} = ${combatantId} then null else ${encounters.activeCombatantId} end`,
+          version: sql`${encounters.version} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(encounters.id, encounterId));
     });
     await invalidateEncounter(id, encounterId);
     return c.body(null, 204);

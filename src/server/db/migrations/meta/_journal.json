@@ -169,6 +169,13 @@
       "when": 1784500100000,
       "tag": "0023_encounter_pc_character_set_null",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784500200000,
+      "tag": "0024_encounter_unique_pc_combatant",
+      "breakpoints": true
     }
   ]
 }
