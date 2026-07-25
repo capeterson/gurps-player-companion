@@ -6,7 +6,14 @@ import { useDialogState } from '../hooks/useDialogState.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { buildSyncDebugDump } from '../sync/debugDump.ts';
+import {
+  characterAccessFrom,
+  isOutboxAccessRestricted,
+  isRecordAccessRestricted,
+} from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
+import { readRevokedCharacters } from '../sync/syncLog.ts';
+import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
 
 interface SyncLogViewProps {
@@ -19,6 +26,7 @@ interface SyncLogViewProps {
 export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogViewProps) {
   const ref = useDialogState(open);
   const toasts = useToasts();
+  const status = useSyncStatus();
   const outbox = useLiveQuery(
     () => getLocalDb().outbox.orderBy('enqueuedAt').reverse().toArray(),
     [],
@@ -26,6 +34,17 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   const log = useLiveQuery(
     () => getLocalDb().syncLog.orderBy('occurredAt').reverse().limit(1_000).toArray(),
     [],
+  );
+  // The outbox is deliberately NOT swept when access is downgraded --
+  // a queued op is the user's own unsent intent and still has to be
+  // delivered. But its `prevValue` can hold another player's private
+  // value, so this view has to apply the share gate itself rather than
+  // print whatever the row happens to carry.
+  const access = useLiveQuery(
+    async () =>
+      characterAccessFrom(await getLocalDb().characters.toArray(), await readRevokedCharacters()),
+    [],
+    { known: new Set<string>(), masked: new Set<string>(), revoked: new Set<string>() },
   );
   const [revertTarget, setRevertTarget] = useState<OutboxEntry | null>(null);
   const [resyncOpen, setResyncOpen] = useState(false);
@@ -118,6 +137,27 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           </header>
 
           <div className="min-h-0 space-y-6 overflow-y-auto px-5 py-4">
+            {status.state === 'error' && status.error && (
+              // The badge that opens this dialog says something is
+              // wrong; this is where it says *what*.  Cycle-level
+              // failures (server down, connection dropped, session
+              // lost) produce no toast and no outbox row, so without
+              // this the dialog looked completely healthy.
+              <section
+                aria-labelledby="sync-current-error-title"
+                className="rounded-box border border-warning/50 bg-warning/10 p-3"
+              >
+                <h3 id="sync-current-error-title" className="font-semibold text-warning">
+                  Sync isn't currently working
+                </h3>
+                <p className="mt-1 text-sm">{status.error.reason}</p>
+                <p className="mt-1 text-xs text-base-content/60">
+                  Last attempt {formatTime(status.error.at)}. Local changes are safe and will upload
+                  once this clears.
+                </p>
+              </section>
+            )}
+
             {failures.length > 0 && (
               <section aria-labelledby="sync-failures-title">
                 <h3 id="sync-failures-title" className="mb-2 font-semibold text-error">
@@ -131,7 +171,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-error">{changeName(op)}</p>
+                          <p className="font-semibold text-error">
+                            {changeName(op, isOutboxAccessRestricted(op, access))}
+                          </p>
                           <p className="text-base-content/70">
                             Failed {op.attemptCount} times ·{' '}
                             {formatTime(op.lastAttemptAt ?? op.enqueuedAt)}
@@ -149,7 +191,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                       <details className="mt-3 rounded-field bg-base-100/70 p-2">
                         <summary className="cursor-pointer font-medium">Debug information</summary>
                         <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">
-                          {debugText(op)}
+                          {debugText(op, isOutboxAccessRestricted(op, access))}
                         </pre>
                       </details>
                     </article>
@@ -162,8 +204,11 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
               {pending.map((op) => (
                 <ChangeRow
                   key={op.clientOpId}
-                  title={changeName(op)}
+                  title={changeName(op, isOutboxAccessRestricted(op, access))}
                   meta={`${statusLabel(op)} · ${formatTime(op.enqueuedAt)}`}
+                  details={
+                    <PendingDetails op={op} hideValues={isOutboxAccessRestricted(op, access)} />
+                  }
                 />
               ))}
             </SyncSection>
@@ -172,8 +217,17 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
               {(log ?? []).map((entry) => (
                 <ChangeRow
                   key={entry.id}
-                  title={logName(entry)}
+                  title={logName(entry, isRecordAccessRestricted(entry, access))}
                   meta={`${directionLabel(entry)} · ${formatTime(entry.occurredAt)}`}
+                  tone={
+                    entry.result === 'failed' || entry.result === 'rolled_back' ? 'bad' : undefined
+                  }
+                  details={
+                    <LogDetails
+                      entry={entry}
+                      restricted={isRecordAccessRestricted(entry, access)}
+                    />
+                  }
                 />
               ))}
             </SyncSection>
@@ -267,24 +321,196 @@ function SyncSection({
   );
 }
 
-function ChangeRow({ title, meta }: { title: string; meta: string }) {
+/**
+ * One log line, expandable.  `"character inventory patch"` on its own
+ * doesn't tell the user anything about what changed, but the full
+ * before/after doesn't belong inline either -- so the summary stays a
+ * one-liner and the specifics live behind a disclosure that is closed
+ * by default.
+ */
+function ChangeRow({
+  title,
+  meta,
+  details,
+  tone,
+}: { title: string; meta: string; details?: React.ReactNode; tone?: 'bad' | undefined }) {
+  if (!details) {
+    return (
+      <div className="flex flex-wrap justify-between gap-2 p-3 text-sm">
+        <span className="font-medium">{title}</span>
+        <span className="text-base-content/60">{meta}</span>
+      </div>
+    );
+  }
   return (
-    <div className="flex flex-wrap justify-between gap-2 p-3 text-sm">
-      <span className="font-medium">{title}</span>
-      <span className="text-base-content/60">{meta}</span>
-    </div>
+    <details className="group text-sm">
+      <summary className="flex cursor-pointer flex-wrap items-baseline gap-2 p-3 hover:bg-base-200">
+        <span
+          aria-hidden="true"
+          className="inline-block text-base-content/40 transition-transform group-open:rotate-90"
+        >
+          ›
+        </span>
+        <span className="font-medium">{title}</span>
+        <span className={`ml-auto ${tone === 'bad' ? 'text-error' : 'text-base-content/60'}`}>
+          {meta}
+        </span>
+      </summary>
+      <div className="border-base-300 border-t bg-base-200/40 px-3 py-2">{details}</div>
+    </details>
   );
 }
 
-function changeName(op: OutboxEntry): string {
+/**
+ * A detail row is plain data, never pre-rendered JSX, so `DetailList`
+ * owns every styling decision in one place.  `kind: 'value'` defers to
+ * `ValueText`, which knows how to print a bare field value, a whole
+ * entity row, or a truncation marker.
+ */
+type DetailRow =
+  | { label: string; kind: 'text'; text: string; tone?: 'error' }
+  | { label: string; kind: 'value'; value: unknown };
+
+function textRow(label: string, text: string, tone?: 'error'): DetailRow {
+  return tone ? { label, kind: 'text', text, tone } : { label, kind: 'text', text };
+}
+
+function valueRow(label: string, value: unknown): DetailRow {
+  return { label, kind: 'value', value };
+}
+
+/** Label / value grid used inside an expanded row. */
+function DetailList({ rows }: { rows: DetailRow[] }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      {rows.map((row) => (
+        <div key={row.label} className="contents">
+          <dt className="text-base-content/60">{row.label}</dt>
+          <dd className="min-w-0 break-words font-mono">
+            {row.kind === 'text' ? (
+              <span className={row.tone === 'error' ? 'text-error' : undefined}>{row.text}</span>
+            ) : (
+              <ValueText value={row.value} />
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function LogDetails({ entry, restricted }: { entry: SyncLogEntry; restricted: boolean }) {
+  const rows: DetailRow[] = [];
+  if (entry.reason) rows.push(textRow('Reason', entry.reason, 'error'));
+  if (entry.fieldPath) rows.push(textRow('Field', entry.fieldPath));
+  if (restricted) {
+    // Either scrubbed at rest by the sweep, or still holding values for
+    // a character the viewer can no longer see -- an offline revert can
+    // write a fresh snapshot after the last sweep ran, with no later
+    // pull to clean it up.
+    rows.push(textRow('Values', 'removed — you no longer have access to this character'));
+  } else if (hasValueSnapshot(entry)) {
+    rows.push(valueRow('Before', entry.previousValue));
+    rows.push(valueRow('After', entry.newValue));
+  } else if (entry.direction === 'pull') {
+    // Deliberate: pull entries never store row payloads, so a later
+    // access downgrade can't leave another player's sheet data sitting
+    // in this journal. See docs/specs/offline-sync.md.
+    rows.push(textRow('Values', 'not recorded for downloads'));
+  }
+  if (entry.entityClass) rows.push(textRow('Entity', entry.entityClass.replaceAll('_', ' ')));
+  if (entry.entityId) rows.push(textRow('Entity id', entry.entityId));
+  if (entry.command) rows.push(textRow('Operation', entry.command));
+  rows.push(textRow('When', formatTime(entry.occurredAt)));
+
+  return (
+    <>
+      <DetailList rows={rows} />
+      {/* `details` can carry a whole `latestEntity` row on a conflict,
+          so it is gated by the same check as the value snapshots. */}
+      {!restricted && entry.details !== undefined && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs text-base-content/60">Raw</summary>
+          <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all text-xs">
+            {JSON.stringify(entry.details, null, 2)}
+          </pre>
+        </details>
+      )}
+    </>
+  );
+}
+
+function PendingDetails({ op, hideValues }: { op: OutboxEntry; hideValues: boolean }) {
+  const rows: DetailRow[] = [];
+  if (op.fieldPath) rows.push(textRow('Field', op.fieldPath));
+  if (hideValues) {
+    rows.push(textRow('Values', 'hidden — you no longer have access to this character'));
+  } else {
+    rows.push(valueRow('Before', op.prevValue));
+    rows.push(valueRow('After', op.attemptedValue));
+  }
+  rows.push(textRow('Entity', op.entityClass.replaceAll('_', ' ')));
+  rows.push(textRow('Entity id', op.entityId));
+  rows.push(textRow('Operation', op.command));
+  rows.push(textRow('Queued', formatTime(op.enqueuedAt)));
+  if (op.attemptCount > 0) rows.push(textRow('Attempts', String(op.attemptCount)));
+  if (op.serverReason) rows.push(textRow('Last error', op.serverReason, 'error'));
+  return <DetailList rows={rows} />;
+}
+
+/**
+ * A create/delete op's value is a whole row and a patch's is a bare
+ * field value, so render whatever we got rather than assuming a scalar.
+ */
+function ValueText({ value }: { value: unknown }) {
+  if (value === undefined) return <span className="text-base-content/50">(not recorded)</span>;
+  if (value === null) return <span className="text-base-content/50">(empty)</span>;
+  if (typeof value === 'string') {
+    return value.length === 0 ? (
+      <span className="text-base-content/50">(blank)</span>
+    ) : (
+      <>{value}</>
+    );
+  }
+  if (typeof value !== 'object') return <>{String(value)}</>;
+  if (isTruncated(value)) {
+    return (
+      <span className="text-base-content/60">
+        (too large to record in full — {String(value.length ?? '?')} characters)
+      </span>
+    );
+  }
+  return (
+    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all">
+      {JSON.stringify(value, null, 2)}
+    </pre>
+  );
+}
+
+function isTruncated(value: object): value is { truncated: true; length?: number } {
+  return 'truncated' in value && (value as { truncated?: unknown }).truncated === true;
+}
+
+/** Only push/local entries carry value snapshots; pull entries never do. */
+function hasValueSnapshot(entry: SyncLogEntry): boolean {
+  return entry.previousValue !== undefined || entry.newValue !== undefined;
+}
+
+/**
+ * `humanName` embeds private content on a child op (`skill "Stealth"`,
+ * `item "Hidden Blade"`), and it is the row's visible title -- so a
+ * restricted op falls back to the generic class label.
+ */
+function changeName(op: OutboxEntry, restricted = false): string {
+  if (restricted) return `${op.entityClass.replaceAll('_', ' ')} ${op.command}`;
   return op.humanName ?? `${op.entityClass.replaceAll('_', ' ')} ${op.fieldPath ?? op.command}`;
 }
 
-function logName(entry: SyncLogEntry): string {
-  return (
-    entry.humanName ??
-    `${entry.entityClass.replaceAll('_', ' ')} ${entry.fieldPath ?? entry.command}`
-  );
+function logName(entry: SyncLogEntry, restricted = false): string {
+  if (entry.humanName && !restricted) return entry.humanName;
+  // Cycle-level failures aren't about one entity.
+  if (!entry.entityClass) return entry.reason ?? 'Sync cycle failed';
+  return `${entry.entityClass.replaceAll('_', ' ')} ${entry.fieldPath ?? entry.command ?? ''}`.trim();
 }
 
 function directionLabel(entry: SyncLogEntry): string {
@@ -292,6 +518,13 @@ function directionLabel(entry: SyncLogEntry): string {
   if (entry.result === 'requeued') return 'Requeued after conflict';
   if (entry.result === 'rolled_back') return 'Rolled back';
   if (entry.result === 'retrying') return 'Retrying started';
+  if (entry.result === 'failed') {
+    // `local` covers a lost session and anything thrown outside the
+    // HTTP calls; calling those "Download failed" would point the user
+    // at the wrong thing entirely.
+    if (entry.direction === 'local') return 'Sync failed';
+    return entry.direction === 'push' ? 'Upload failed' : 'Download failed';
+  }
   return entry.direction === 'push' ? 'Pushed' : 'Pulled';
 }
 
@@ -307,7 +540,7 @@ function formatTime(value: string): string {
   );
 }
 
-function debugText(op: OutboxEntry): string {
+function debugText(op: OutboxEntry, hideValues = false): string {
   return JSON.stringify(
     {
       clientOpId: op.clientOpId,
@@ -315,8 +548,8 @@ function debugText(op: OutboxEntry): string {
       entityId: op.entityId,
       command: op.command,
       fieldPath: op.fieldPath,
-      attemptedValue: op.attemptedValue,
-      previousValue: op.prevValue,
+      attemptedValue: hideValues ? '[hidden — no access to this character]' : op.attemptedValue,
+      previousValue: hideValues ? '[hidden — no access to this character]' : op.prevValue,
       attemptCount: op.attemptCount,
       lastAttemptAt: op.lastAttemptAt,
       nextAttemptAt: op.nextEarliestAttemptAt,

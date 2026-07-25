@@ -71,6 +71,15 @@ export interface LocalCharacter {
   revision: number;
   /** Local-only marker used to rehydrate a row when minimal access returns to full. */
   minimalViewMasked?: boolean;
+  /**
+   * Local-only marker: the cursor's authoritative `accessible` set says
+   * this character is gone, but `pruneInaccessibleLocally` kept the row
+   * because an unsettled outbox op still references it. Without the
+   * marker the row simply looks present-and-unmasked, and the share
+   * gate would treat the character as fully accessible. Cleared when
+   * access returns.
+   */
+  accessRevoked?: boolean;
 }
 
 export interface LocalCharacterTrait {
@@ -295,15 +304,51 @@ export interface SyncLogEntry {
    * respectively (`retrying` only on the transition INTO transient_retry,
    * so a forever-retrying op can't flush the journal). They're not
    * terminal outcomes like `synced`/`reverted`/`rolled_back`.
+   *
+   * `failed` is a whole-cycle failure -- the drain POST or the cursor
+   * pull itself errored (network drop, 5xx, proxy/tunnel error), so no
+   * individual operation has an outcome to report. These used to be
+   * logged nowhere at all, which left the red sync badge with nothing
+   * to point at.
    */
-  result: 'synced' | 'reverted' | 'requeued' | 'rolled_back' | 'retrying';
-  entityClass: EntityClass;
-  entityId: string;
-  command: OperationCommand;
+  result: 'synced' | 'reverted' | 'requeued' | 'rolled_back' | 'retrying' | 'failed';
+  /**
+   * Absent on `failed` cycle-level entries, which aren't about one
+   * entity.  Present on everything else.
+   */
+  entityClass?: EntityClass | undefined;
+  entityId?: string | undefined;
+  /**
+   * Parent character id for child classes, mirroring `OutboxEntry`.
+   * Carried so the share-gate sweeps can find every journal row
+   * belonging to a character whose access was downgraded — matching on
+   * `entityId` alone would miss trait/skill/inventory rows.
+   */
+  parentId?: string | undefined;
+  command?: OperationCommand | undefined;
   fieldPath?: string | undefined;
   humanName?: string | undefined;
   occurredAt: string;
+  /** One-line human-readable summary of a failure/rollback. */
+  reason?: string | undefined;
+  /**
+   * The value this event moved `fieldPath` away from / to, so the sync
+   * log can show what actually changed instead of just "character
+   * inventory patch".  Recorded for `push` and `local` entries only:
+   * those are always this user's OWN outgoing edits, the same values
+   * the outbox already holds.  Pull entries deliberately carry no row
+   * payload (see `appendSyncLog`).  Large values are truncated by
+   * `snapshotValue` so the bounded journal stays bounded.
+   */
+  previousValue?: unknown;
+  newValue?: unknown;
   details?: unknown;
+  /**
+   * Set by `redactSyncLogForCharacters` when the viewer lost access to
+   * this entity's character: payload fields are cleared, metadata
+   * stays. The UI says so rather than rendering a blank.
+   */
+  redacted?: boolean | undefined;
 }
 
 export interface SyncCursor {
@@ -332,14 +377,32 @@ export interface TombstoneRow {
 export interface RejectionRecord {
   id: string;
   clientOpId: string;
+  /**
+   * Who this rejection belongs to.  Logout purges the table, but a
+   * session can also end *without* a purge — a refresh-token rejection
+   * just clears the tokens — so signing in as someone else would
+   * otherwise replay the previous account's toasts, private labels and
+   * all. Replay only emits records matching the current user; rows
+   * without an id predate this field and are never replayed.
+   */
+  userId?: string | undefined;
   entityClass: EntityClass;
   entityId: string;
+  /**
+   * Parent character id for child classes, mirroring `OutboxEntry` and
+   * `SyncLogEntry`.  `humanName` on a child rejection embeds private
+   * content (`skill "Stealth"`, `item "..."`), so the share gate needs
+   * a way to tie the record back to a character.
+   */
+  parentId?: string | undefined;
   fieldPath?: string | undefined;
   humanName?: string | undefined;
   reason: string;
   status: 'rejected' | 'unauthorized' | 'failed_permanent' | 'conflict';
   createdAt: string;
   dismissedAt?: string | undefined;
+  /** Set when the share gate scrubbed `humanName`; see `redactSyncLogForCharacters`. */
+  redacted?: boolean | undefined;
 }
 
 /**

@@ -5,17 +5,30 @@
  *
  * Deliberately excludes entity stores (characters, traits, skills,
  * etc.): a dump attached to a bug report must not carry other players'
- * cached character sheets. The outbox/rejection/log rows already
- * contain everything needed to diagnose a sync issue -- and they only
- * ever hold this user's own attempted edits. Access tokens are never
- * included; only the derived userId (see `readUserIdFromToken`).
+ * cached character sheets. Access tokens are never included; only the
+ * derived userId (see `readUserIdFromToken`).
+ *
+ * Outbox values get the same share-gate treatment the sync dialog
+ * applies: a GM or manager can queue an edit against a player's sheet,
+ * so "this user's own attempted edits" is not the same as "values this
+ * user is still allowed to see". Ops whose character has been masked
+ * or pruned have their values replaced with a marker -- this file is
+ * meant to be handed to someone else, which makes it the surface where
+ * that matters most.
  */
 
 import type { OutboxEntry, RejectionRecord, SyncCursor, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
+import {
+  type LocalCharacterAccess,
+  characterAccessFrom,
+  isOutboxAccessRestricted,
+  isRecordAccessRestricted,
+} from './minimalViewSweep.ts';
 import type { SyncIndicatorState } from './state.ts';
 import { syncStateStore } from './state.ts';
+import { readRevokedCharacters } from './syncLog.ts';
 
 export interface SyncDebugDump {
   meta: {
@@ -38,53 +51,112 @@ export interface SyncDebugDump {
   syncLog: SyncLogEntry[];
 }
 
+const HIDDEN = '[hidden — no access to this character]';
+
+/**
+ * Apply the share gate to queued ops, using the same decision the sync
+ * dialog renders with (`isOutboxAccessRestricted`) so the two can't
+ * drift.  This is the surface where it matters most: the dump is a file
+ * the user hands to someone else.
+ */
+function maskRestrictedOps(outbox: OutboxEntry[], access: LocalCharacterAccess): OutboxEntry[] {
+  return outbox.map((op) =>
+    isOutboxAccessRestricted(op, access)
+      ? // `humanName` is private content too on a child op -- it reads
+        // `skill "Stealth"` / `item "Hidden Blade"`. Hiding the values
+        // while exporting the label defeats the point.
+        { ...op, attemptedValue: HIDDEN, prevValue: HIDDEN, humanName: undefined }
+      : op,
+  );
+}
+
+/**
+ * Journal entries are scrubbed at rest by `redactSyncLogForCharacters`,
+ * but only when a sweep runs -- and a revert performed offline writes a
+ * fresh snapshot after the last sweep, with no later pull to clean it.
+ * Re-check at export time.
+ */
+function maskRestrictedLog(entries: SyncLogEntry[], access: LocalCharacterAccess): SyncLogEntry[] {
+  return entries.map((entry) =>
+    isRecordAccessRestricted(entry, access)
+      ? {
+          ...entry,
+          previousValue: undefined,
+          newValue: undefined,
+          details: undefined,
+          humanName: undefined,
+          fieldPath: undefined,
+          redacted: true,
+        }
+      : entry,
+  );
+}
+
+/** `humanName` embeds private content (`skill "Stealth"`, `item "..."`). */
+function maskRestrictedRejections(
+  records: RejectionRecord[],
+  access: LocalCharacterAccess,
+): RejectionRecord[] {
+  return records.map((rec) =>
+    isRecordAccessRestricted(rec, access)
+      ? { ...rec, humanName: undefined, fieldPath: undefined, redacted: true }
+      : rec,
+  );
+}
+
 export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
   const db = getLocalDb();
-  const [outbox, rejectionToasts, syncLog, syncCursors, storeCounts] = await Promise.all([
-    db.outbox.toArray(),
-    db.rejectionToasts.toArray(),
-    db.syncLog.orderBy('occurredAt').toArray(),
-    db.syncCursors.toArray(),
-    Promise.all([
-      db.characters.count(),
-      db.characterTraits.count(),
-      db.characterSkills.count(),
-      db.characterSpells.count(),
-      db.characterInventory.count(),
-      db.characterCombat.count(),
-      db.campaigns.count(),
-      db.tombstones.count(),
-      db.outbox.count(),
-      db.rejectionToasts.count(),
-      db.syncLog.count(),
-    ]).then(
-      ([
-        characters,
-        characterTraits,
-        characterSkills,
-        characterSpells,
-        characterInventory,
-        characterCombat,
-        campaigns,
-        tombstones,
-        outboxCount,
-        rejectionToastsCount,
-        syncLogCount,
-      ]) => ({
-        characters,
-        characterTraits,
-        characterSkills,
-        characterSpells,
-        characterInventory,
-        characterCombat,
-        campaigns,
-        tombstones,
-        outbox: outboxCount,
-        rejectionToasts: rejectionToastsCount,
-        syncLog: syncLogCount,
-      }),
-    ),
-  ]);
+  const [rawOutbox, characterRows, rawRejections, rawSyncLog, syncCursors, storeCounts] =
+    await Promise.all([
+      db.outbox.toArray(),
+      db.characters.toArray(),
+      db.rejectionToasts.toArray(),
+      db.syncLog.orderBy('occurredAt').toArray(),
+      db.syncCursors.toArray(),
+      Promise.all([
+        db.characters.count(),
+        db.characterTraits.count(),
+        db.characterSkills.count(),
+        db.characterSpells.count(),
+        db.characterInventory.count(),
+        db.characterCombat.count(),
+        db.campaigns.count(),
+        db.tombstones.count(),
+        db.outbox.count(),
+        db.rejectionToasts.count(),
+        db.syncLog.count(),
+      ]).then(
+        ([
+          characters,
+          characterTraits,
+          characterSkills,
+          characterSpells,
+          characterInventory,
+          characterCombat,
+          campaigns,
+          tombstones,
+          outboxCount,
+          rejectionToastsCount,
+          syncLogCount,
+        ]) => ({
+          characters,
+          characterTraits,
+          characterSkills,
+          characterSpells,
+          characterInventory,
+          characterCombat,
+          campaigns,
+          tombstones,
+          outbox: outboxCount,
+          rejectionToasts: rejectionToastsCount,
+          syncLog: syncLogCount,
+        }),
+      ),
+    ]);
+  const access = characterAccessFrom(characterRows, await readRevokedCharacters());
+  const outbox = maskRestrictedOps(rawOutbox, access);
+  const syncLog = maskRestrictedLog(rawSyncLog, access);
+  const rejectionToasts = maskRestrictedRejections(rawRejections, access);
 
   return {
     meta: {

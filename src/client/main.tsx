@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
+import { SwUpdatePrompt } from './components/SwUpdatePrompt.tsx';
 import { AboutPage } from './features/about/AboutPage.tsx';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
@@ -92,6 +93,10 @@ createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
+        {/* Inside ToastProvider: it announces SW updates through the
+            toast API. Outside the router so the prompt survives
+            navigation. */}
+        <SwUpdatePrompt />
         <RouterProvider router={router} />
       </ToastProvider>
     </QueryClientProvider>

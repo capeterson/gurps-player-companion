@@ -74,6 +74,46 @@ lives in the **page** orchestrator, not the service worker — see below.)
   read-only GET caches (library, `/auth/me`) so a fresh device has a fallback
   when Dexie is empty. It **never** caches mutations or replays sync ops —
   outbox replay is page-orchestrator territory (`src/sw/registerSW.ts`).
+  It also owns **update discovery** — see below.
+
+### Stale-build discovery
+
+`registerType: 'autoUpdate'` only means a newly installed worker skips waiting;
+it does **not** reload the page, and the browser only looks for a new worker on
+a navigation. This app is a SPA whose router never navigates, so a tab left
+open for days would keep running the JS it booted with — against freshly
+precached assets — and never say so.
+
+`registerSwLifecycle()` therefore polls `registration.update()` every
+`SW_UPDATE_POLL_MS` (1h) and on focus / visibility / `online`, throttled to one
+check per 5 minutes. It resolves its registration via `getRegistration()` and
+falls back to `navigator.serviceWorker.ready`: on a **first visit** there is no
+registration when this module runs (vite-plugin-pwa registers the worker on the
+window `load` event), so keying off `getRegistration()` alone would leave that
+tab with no timer and no listeners for the rest of its life. `ready` simply
+stays pending when the app runs without a service worker (dev), which is the
+correct no-op. When a new worker reaches `installed` **and the page is
+already controlled** (so a first-ever install isn't mistaken for an update), or
+when a worker installed by another tab is found parked in `registration.waiting`
+at startup, or when one is found **already installing** at startup (a
+navigation-triggered update can begin before the async registration lookup
+resolves, firing `updatefound` with no listener attached and leaving `waiting`
+still null — once autoUpdate activates it, no later `update()` call can recreate
+the lost event), it dispatches `gpc:sw-update-ready` with a `reload()` callback
+and latches it in `getPendingSwUpdate()` — the latch matters because
+`registerSwLifecycle()` runs at module load in `main.tsx`, before React mounts.
+
+`SwUpdatePrompt` (mounted inside `<ToastProvider>`, outside the router so it
+survives navigation) turns that into a **persistent toast with a Reload
+action**. The reload is always the user's call: never automatic, since swapping
+the running bundle mid-edit is worse than being one build behind.
+
+Dismissing the prompt calls `dismissPendingSwUpdate()`, which drops the
+outstanding announcement so polling resumes — `checkForUpdate` short-circuits
+while one is pending, so without this a single dismissal would latch the tab
+closed against every future release. The *announced worker* is remembered
+separately, so polling won't re-nag about the same build while a genuinely
+newer one still gets through.
 
 ## Request lifecycle
 

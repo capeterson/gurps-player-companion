@@ -18,22 +18,84 @@
  * caches mutations, never replays POSTs, and never replays sync ops —
  * that is page-orchestrator territory.
  *
- * `vite-plugin-pwa` auto-injects registration when `registerType` is
- * `'autoUpdate'`, so this module's only job is to surface lifecycle
- * events to the rest of the app: it logs to the console and dispatches
- * a `gpc:sw-update-ready` CustomEvent for any UI that wants to prompt
- * a refresh.  It is safe to import in tests / non-browser contexts —
+ * # Update discovery
+ *
+ * `registerType: 'autoUpdate'` only means the new worker takes over
+ * without waiting; it does NOT reload the page, and the browser only
+ * re-checks for a new worker on navigation.  This app is a SPA whose
+ * router never navigates, so a tab left open for days would run stale
+ * JS against fresh precached assets forever and never say so.  We
+ * therefore poll `registration.update()` on an interval and whenever
+ * the tab regains focus or the network returns, then surface the
+ * result: a `gpc:sw-update-ready` CustomEvent carrying a `reload()`,
+ * plus `getPendingSwUpdate()` for subscribers that mount after the
+ * event fired.  It is safe to import in tests / non-browser contexts —
  * all DOM access is feature-detected.
  */
 
 const UPDATE_READY_EVENT = 'gpc:sw-update-ready';
 const CONTROLLER_CHANGED_EVENT = 'gpc:sw-controller-changed';
 
+/** How often a foreground tab re-checks for a new build. */
+export const SW_UPDATE_POLL_MS = 60 * 60 * 1000;
+/** Floor between checks, so focus/online churn can't hammer the server. */
+const MIN_CHECK_GAP_MS = 5 * 60 * 1000;
+
 export interface SwLifecycleEvents {
   /** A new SW has installed and is waiting to take over. */
   onUpdateReady?(reload: () => void): void;
   /** The active SW changed (i.e. the new one took over). */
   onControllerChanged?(): void;
+}
+
+/**
+ * Latched so a subscriber that mounts *after* the update was found
+ * still learns about it.  `registerSwLifecycle()` runs at module load,
+ * before React renders, so the toast component would otherwise miss an
+ * update discovered during startup.
+ */
+let pendingUpdate: (() => void) | null = null;
+
+/**
+ * The worker we've already told the user about.  Kept separately from
+ * `pendingUpdate` so dismissing the prompt re-enables polling (see
+ * `dismissPendingSwUpdate`) without immediately re-announcing the same
+ * build on the next tick.
+ */
+let announcedWorker: ServiceWorker | null = null;
+
+/** The reload callback for an already-discovered update, if any. */
+export function getPendingSwUpdate(): (() => void) | null {
+  return pendingUpdate;
+}
+
+/**
+ * The user dismissed the prompt instead of reloading.  Drops the
+ * outstanding announcement so update checks resume — otherwise
+ * `checkForUpdate`'s `if (pendingUpdate) return` guard would latch
+ * closed and this tab would never look for a release again. The
+ * *announced worker* is remembered, so polling won't nag about the
+ * same build; a genuinely newer one still gets through.
+ */
+export function dismissPendingSwUpdate(): void {
+  pendingUpdate = null;
+}
+
+/** Test seam: forget both the announcement and the acknowledgement. */
+export function clearPendingSwUpdate(): void {
+  pendingUpdate = null;
+  announcedWorker = null;
+}
+
+function makeReload(worker: ServiceWorker | null): () => void {
+  return () => {
+    // Harmless when the SW already skipped waiting (autoUpdate does),
+    // and necessary when it hasn't.
+    worker?.postMessage({ type: 'SKIP_WAITING' });
+    // Give the SW a tick to take over, then reload.  A reload is what
+    // actually swaps the running JS; activation alone does not.
+    setTimeout(() => window.location.reload(), 250);
+  };
 }
 
 /**
@@ -48,6 +110,17 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
   if (!('serviceWorker' in navigator)) {
     return () => {};
   }
+
+  const announceUpdate = (worker: ServiceWorker | null) => {
+    // Already told the user about this exact build and they dismissed
+    // it -- don't re-nag on the next poll.
+    if (worker !== null && worker === announcedWorker) return;
+    const reload = makeReload(worker);
+    pendingUpdate = reload;
+    announcedWorker = worker;
+    window.dispatchEvent(new CustomEvent(UPDATE_READY_EVENT, { detail: { reload } }));
+    events.onUpdateReady?.(reload);
+  };
 
   const onMessage = (e: MessageEvent) => {
     if (e?.data?.type === 'SKIP_WAITING_DONE') {
@@ -64,43 +137,115 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
   navigator.serviceWorker.addEventListener('message', onMessage);
   navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
-  // The vite-plugin-pwa runtime calls `registration.update()` and
-  // raises `updatefound`. We watch the active registration (if any)
-  // and emit our update-ready signal once a waiting worker is in
-  // place.  Pure observer — we don't trigger SKIP_WAITING here; the
-  // app gets a `reload()` callback to do that on user request.
   let registration: ServiceWorkerRegistration | null = null;
+  let lastCheckAt = 0;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Announce `worker` once it finishes installing (or right away if it
+   * already has).  Extracted so the startup path can adopt a worker
+   * that was **already installing** before our async registration
+   * lookup resolved: `updatefound` would have fired with no listener
+   * attached, `waiting` is still null so the startup check below misses
+   * it too, and once autoUpdate activates it no later
+   * `registration.update()` can recreate the lost event — that release
+   * would never prompt at all.
+   */
+  const watchInstalling = (worker: ServiceWorker) => {
+    const check = () => {
+      if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        announceUpdate(worker);
+      }
+    };
+    worker.addEventListener('statechange', check);
+    check();
+  };
+
   const onUpdateFound = () => {
     if (!registration) return;
     const installing = registration.installing;
     if (!installing) return;
-    installing.addEventListener('statechange', () => {
-      if (
-        installing.state === 'installed' &&
-        navigator.serviceWorker.controller // page already controlled → genuine update
-      ) {
-        const reload = () => {
-          installing.postMessage({ type: 'SKIP_WAITING' });
-          // Give the SW a tick to take over, then reload.  If
-          // controllerchange fires first this is a no-op (handler above
-          // would already have fired).
-          setTimeout(() => window.location.reload(), 250);
-        };
-        window.dispatchEvent(new CustomEvent(UPDATE_READY_EVENT, { detail: { reload } }));
-        events.onUpdateReady?.(reload);
-      }
+    watchInstalling(installing);
+  };
+
+  const checkForUpdate = (force = false) => {
+    if (!registration) return;
+    // An announcement the user hasn't acted on yet -- nothing to learn
+    // until they reload or dismiss it.
+    if (pendingUpdate) return;
+    const now = Date.now();
+    if (!force && now - lastCheckAt < MIN_CHECK_GAP_MS) return;
+    if (navigator.onLine === false) return;
+    lastCheckAt = now;
+    // A worker that installed while the prompt was dismissed is parked
+    // in `waiting` and won't fire `updatefound` again; announceUpdate
+    // no-ops if it's the build we already showed.
+    if (registration.waiting && navigator.serviceWorker.controller) {
+      announceUpdate(registration.waiting);
+    }
+    void registration.update().catch(() => {
+      // Offline or the server is down -- the next tick tries again.
     });
   };
 
-  navigator.serviceWorker.getRegistration().then((reg) => {
-    if (!reg) return;
+  const onFocus = () => checkForUpdate();
+  const onOnline = () => checkForUpdate();
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') checkForUpdate();
+  };
+
+  let disposed = false;
+
+  // On a first visit there is no registration yet: vite-plugin-pwa's
+  // injected script registers the worker on the window `load` event,
+  // well after this module runs. `getRegistration()` resolves to null
+  // there, so bailing out would leave that tab with no polling and no
+  // listeners for the rest of its life -- it would never offer an
+  // update until someone reloaded it by hand. `ready` resolves once a
+  // registration becomes active; it simply stays pending when the app
+  // runs without a service worker (dev), which is the correct no-op.
+  const resolveRegistration = async (): Promise<ServiceWorkerRegistration | null> => {
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing) return existing;
+    return await navigator.serviceWorker.ready;
+  };
+
+  void resolveRegistration().then((reg) => {
+    if (!reg || disposed) return;
     registration = reg;
     reg.addEventListener('updatefound', onUpdateFound);
+
+    // An update installed by another tab (or a previous session) is
+    // already parked in `waiting` and will never fire `updatefound`
+    // here -- without this branch that update stays invisible.
+    //
+    // Announce it but keep going: returning early here would skip the
+    // polling setup below, so a tab that started with a waiting worker
+    // would never check for anything again once the user dismissed it.
+    if (reg.waiting && navigator.serviceWorker.controller) {
+      announceUpdate(reg.waiting);
+    } else if (reg.installing) {
+      // A navigation-triggered update that began before this lookup
+      // resolved: `updatefound` already fired with nobody listening.
+      watchInstalling(reg.installing);
+    }
+
+    lastCheckAt = Date.now();
+    pollTimer = setInterval(() => checkForUpdate(), SW_UPDATE_POLL_MS);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
   });
 
   return () => {
+    disposed = true;
     navigator.serviceWorker.removeEventListener('message', onMessage);
     navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+    window.removeEventListener('focus', onFocus);
+    window.removeEventListener('online', onOnline);
+    document.removeEventListener('visibilitychange', onVisibility);
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
     if (registration) {
       registration.removeEventListener('updatefound', onUpdateFound);
     }

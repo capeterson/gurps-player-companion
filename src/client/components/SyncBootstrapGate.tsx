@@ -14,6 +14,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { getLocalDb } from '../db/dexie.ts';
 import { api } from '../lib/api.ts';
 import { readUserIdFromToken, tokenStore } from '../lib/tokenStore.ts';
+import { isAccountMismatch, writeActiveUser } from '../sync/activeUser.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 
 interface MeResponse {
@@ -59,11 +60,45 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
     undefined as boolean | undefined,
   );
 
+  // Local Dexie belongs to a different account. Sign-out purges, but a
+  // session can also end WITHOUT one -- a refresh-token rejection just
+  // clears the tokens -- and if that other account was itself
+  // bootstrapped, the flag below is already true and the gate would
+  // render their characters, outbox and journal as this user's own.
+  // Seeded synchronously so nothing paints before the purge.
+  const [switching, setSwitching] = useState(() => (userId ? isAccountMismatch(userId) : false));
+
+  // Tell the orchestrator who's signed in as soon as we know, on EVERY
+  // mount. `bootstrap()` below runs only when the bootstrap flag is
+  // absent, so on an ordinary reload it never fires -- and the
+  // orchestrator would spend the whole session without a user id,
+  // silently skipping the minimal-view share sweep and the lost-session
+  // report.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    void (async () => {
+      if (isAccountMismatch(userId)) {
+        setSwitching(true);
+        // Wipes every store, so the bootstrap flag goes with it and the
+        // block below keeps the gate closed until a fresh pull lands.
+        await getSyncOrchestrator().purge();
+      }
+      if (cancelled) return;
+      writeActiveUser(userId);
+      setSwitching(false);
+      getSyncOrchestrator().setCurrentUser(userId);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   // Trigger the bootstrap once we know the user and it hasn't run yet.
   useEffect(() => {
-    if (!userId || bootstrapped !== false) return;
+    if (!userId || switching || bootstrapped !== false) return;
     void getSyncOrchestrator().bootstrap(userId);
-  }, [userId, bootstrapped]);
+  }, [userId, bootstrapped, switching]);
 
   // Block children until bootstrap is confirmed. Three sub-states:
   //   bootstrapped === undefined  liveQuery hasn't resolved yet (Dexie opening)
@@ -73,7 +108,7 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
   // Without the `undefined` case the gate would briefly render children
   // with an empty Dexie on first login, between the liveQuery settling
   // on `false` and the setBootstrapping(true) state update landing.
-  if (userId && bootstrapped !== true) {
+  if (userId && (switching || bootstrapped !== true)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">

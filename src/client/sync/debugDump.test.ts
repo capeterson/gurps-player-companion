@@ -129,4 +129,228 @@ describe('buildSyncDebugDump', () => {
     const dump = await buildSyncDebugDump();
     expect(dump.meta.userId).toBeNull();
   });
+
+  it('masks queued values for a character the viewer lost access to', async () => {
+    // A GM/manager can queue an edit against a player's sheet, so "the
+    // user's own attempted edits" is not the same as "values the user
+    // may still see" -- and this file gets handed to someone else.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-masked',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.outbox.add({
+      clientOpId: 'op-masked',
+      entityClass: 'character_inventory',
+      entityId: 'inv-1',
+      parentId: 'char-masked',
+      command: 'patch',
+      coalesceKey: 'inv-1|notes',
+      fieldPath: 'notes',
+      attemptedValue: 'PRIVATE-AFTER-VALUE',
+      prevValue: 'PRIVATE-BEFORE-VALUE',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('PRIVATE-AFTER-VALUE');
+    expect(serialized).not.toContain('PRIVATE-BEFORE-VALUE');
+    // The op itself is still reported -- only its payload is masked.
+    expect(serialized).toContain('op-masked');
+  });
+
+  it('masks a patch whose character was pruned entirely', async () => {
+    const db = getLocalDb();
+    await db.outbox.add({
+      clientOpId: 'op-orphan',
+      entityClass: 'character',
+      entityId: 'char-gone',
+      command: 'patch',
+      coalesceKey: 'char-gone|st',
+      fieldPath: 'st',
+      attemptedValue: 'ORPHAN-VALUE',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('ORPHAN-VALUE');
+  });
+
+  it('masks a queued child delete whose parent character was pruned', async () => {
+    // enqueueDelete stores the entire removed row in prevValue, so a GM
+    // deleting another player's trait leaves that whole row queued.
+    const db = getLocalDb();
+    await db.outbox.add({
+      clientOpId: 'op-del',
+      entityClass: 'character_trait',
+      entityId: 'trait-1',
+      parentId: 'char-gone',
+      command: 'delete',
+      coalesceKey: 'trait-1|',
+      prevValue: { id: 'trait-1', name: 'DELETED-TRAIT-SECRET', notes: 'PRIVATE-NOTE' },
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('DELETED-TRAIT-SECRET');
+    expect(serialized).not.toContain('PRIVATE-NOTE');
+    expect(serialized).toContain('op-del');
+  });
+
+  it('masks rejection records for a masked character', async () => {
+    // humanName on a child rejection reads `skill "Stealth"` / `item
+    // "..."` -- private content, and this file gets handed to someone
+    // else.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-masked',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.rejectionToasts.add({
+      id: 'rej-1',
+      clientOpId: 'rej-1',
+      entityClass: 'character_skill',
+      entityId: 'skill-1',
+      parentId: 'char-masked',
+      humanName: 'skill "SECRET-SKILL-NAME"',
+      reason: 'newer server revision',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('SECRET-SKILL-NAME');
+    expect(serialized).toContain('rej-1');
+  });
+
+  it('masks a journal snapshot written after the last sweep ran', async () => {
+    // The offline-revert window: redactSyncLogForCharacters only runs
+    // after a successful pull, so the export re-checks at read time.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-masked-2',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.syncLog.add({
+      id: 'log-fresh',
+      direction: 'local',
+      result: 'reverted',
+      entityClass: 'character_trait',
+      entityId: 'trait-1',
+      parentId: 'char-masked-2',
+      command: 'patch',
+      previousValue: 'FRESH-SECRET-BEFORE',
+      newValue: 'FRESH-SECRET-AFTER',
+      occurredAt: new Date().toISOString(),
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('FRESH-SECRET-BEFORE');
+    expect(serialized).not.toContain('FRESH-SECRET-AFTER');
+  });
+
+  it('scrubs the private label, not just the values', async () => {
+    // humanName is the row title and reads `item "Hidden Blade"` --
+    // hiding before/after while exporting the label defeats the point.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-label',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.outbox.add({
+      clientOpId: 'op-label',
+      entityClass: 'character_inventory',
+      entityId: 'inv-9',
+      parentId: 'char-label',
+      command: 'patch',
+      coalesceKey: 'inv-9|notes',
+      fieldPath: 'notes',
+      attemptedValue: 'x',
+      humanName: 'item "HIDDEN-BLADE-NAME"',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('HIDDEN-BLADE-NAME');
+  });
+
+  it('masks a character kept only because its op is unsettled', async () => {
+    // pruneInaccessibleLocally retains it, so the row is present and
+    // minimalViewMasked is false -- accessRevoked is the only signal.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-revoked',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Revoked',
+      accessRevoked: true,
+    } as never);
+    await db.outbox.add({
+      clientOpId: 'op-revoked',
+      entityClass: 'character',
+      entityId: 'char-revoked',
+      command: 'patch',
+      coalesceKey: 'char-revoked|st',
+      fieldPath: 'st',
+      attemptedValue: 'REVOKED-SECRET-VALUE',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('REVOKED-SECRET-VALUE');
+  });
+
+  it('leaves a speculative create alone — its row is absent by design', async () => {
+    const db = getLocalDb();
+    await db.outbox.add({
+      clientOpId: 'op-create',
+      entityClass: 'character',
+      entityId: 'char-new',
+      command: 'create',
+      coalesceKey: 'char-new|',
+      attemptedValue: { name: 'BRAND-NEW-CHARACTER' },
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).toContain('BRAND-NEW-CHARACTER');
+  });
 });

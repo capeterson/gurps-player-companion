@@ -7,7 +7,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { characterIdsToMinimize } from './minimalViewSweep.ts';
+import {
+  characterAccessFrom,
+  characterIdsToMinimize,
+  isOutboxAccessRestricted,
+  isRecordAccessRestricted,
+} from './minimalViewSweep.ts';
 
 const ME = 'me';
 const THEM = 'them';
@@ -123,5 +128,166 @@ describe('characterIdsToMinimize', () => {
       campaigns: [],
     });
     expect([...out]).toEqual([]);
+  });
+});
+
+describe('isOutboxAccessRestricted', () => {
+  // Build via the shared helper -- hand-rolled snapshots are exactly
+  // the drift it exists to prevent.
+  const access = (known: string[], masked: string[] = []) =>
+    characterAccessFrom(known.map((id) => ({ id, minimalViewMasked: masked.includes(id) })));
+
+  it('hides values for a masked character', () => {
+    const op = { entityClass: 'character', entityId: 'c1', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access(['c1'], ['c1']))).toBe(true);
+  });
+
+  it('allows values for a character the viewer still sees', () => {
+    const op = { entityClass: 'character', entityId: 'c1', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access(['c1']))).toBe(false);
+  });
+
+  it('hides a child delete whose parent character was pruned', () => {
+    // enqueueDelete stores the ENTIRE removed row in prevValue, so a GM
+    // deleting another player's trait leaves that whole row queued. The
+    // parent going away is access loss, not an expected local delete.
+    const op = {
+      entityClass: 'character_trait',
+      entityId: 't1',
+      parentId: 'c-gone',
+      command: 'delete',
+    };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(true);
+  });
+
+  it('hides any child op whose parent character was pruned', () => {
+    for (const command of ['patch', 'create', 'delete']) {
+      const op = {
+        entityClass: 'character_inventory',
+        entityId: 'i1',
+        parentId: 'c-gone',
+        command,
+      };
+      expect(isOutboxAccessRestricted(op, access([]))).toBe(true);
+    }
+  });
+
+  it('allows a root delete whose row is absent by design', () => {
+    // The user deleted their own character; the missing row is the
+    // expected consequence, not evidence of lost access.
+    const op = { entityClass: 'character', entityId: 'c-mine', command: 'delete' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(false);
+  });
+
+  it('allows a speculative root create that has not landed', () => {
+    const op = { entityClass: 'character', entityId: 'c-new', command: 'create' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(false);
+  });
+
+  it('hides a root patch whose character vanished', () => {
+    const op = { entityClass: 'character', entityId: 'c-gone', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(true);
+  });
+
+  it('ignores ops with no character at all', () => {
+    const op = { entityClass: 'campaign', entityId: 'camp-1', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(false);
+  });
+});
+
+describe('isRecordAccessRestricted', () => {
+  // Build via the shared helper -- hand-rolled snapshots are exactly
+  // the drift it exists to prevent.
+  const access = (known: string[], masked: string[] = []) =>
+    characterAccessFrom(known.map((id) => ({ id, minimalViewMasked: masked.includes(id) })));
+
+  it('honours the at-rest redacted flag', () => {
+    expect(isRecordAccessRestricted({ redacted: true }, access([]))).toBe(true);
+  });
+
+  it('hides a fresh snapshot written for a masked character', () => {
+    // A revert performed OFFLINE writes a new journal entry after the
+    // last sweep ran, and offline means no later pull to scrub it.
+    const entry = { entityClass: 'character_skill', entityId: 's1', parentId: 'c1' };
+    expect(isRecordAccessRestricted(entry, access(['c1'], ['c1']))).toBe(true);
+  });
+
+  it('shows records for a character the viewer still sees', () => {
+    const entry = { entityClass: 'character', entityId: 'c1', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access(['c1']))).toBe(false);
+  });
+
+  it('does not treat a long-deleted entity as restricted', () => {
+    // Unlike a queued op, a written record's entity may legitimately be
+    // gone; only an active mask restricts.
+    const entry = { entityClass: 'character', entityId: 'c-old', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access([]))).toBe(false);
+  });
+
+  it('ignores cycle-failure entries that carry no entity', () => {
+    expect(isRecordAccessRestricted({}, access([]))).toBe(false);
+  });
+});
+
+describe('characterAccessFrom', () => {
+  it('treats a retained-but-revoked character as masked', () => {
+    // pruneInaccessibleLocally keeps a character whose op is still
+    // unsettled, so the row is present and minimalViewMasked is false.
+    // Without accessRevoked it would look fully accessible.
+    const access = characterAccessFrom([{ id: 'c1', accessRevoked: true }]);
+    expect(access.known.has('c1')).toBe(true);
+    expect(access.masked.has('c1')).toBe(true);
+    expect(isOutboxAccessRestricted({ entityClass: 'character', entityId: 'c1' }, access)).toBe(
+      true,
+    );
+  });
+
+  it('includes share-gate masking too', () => {
+    const access = characterAccessFrom([{ id: 'c1', minimalViewMasked: true }]);
+    expect(access.masked.has('c1')).toBe(true);
+  });
+
+  it('leaves an ordinary character unmasked', () => {
+    const access = characterAccessFrom([{ id: 'c1' }]);
+    expect(access.masked.has('c1')).toBe(false);
+  });
+});
+
+describe('isRecordAccessRestricted fail-closed ledger', () => {
+  it('restricts a root record whose character is in the revoked ledger', () => {
+    // The row is already deleted and the best-effort redaction may have
+    // failed; without the ledger this would read as an ordinary
+    // long-deleted entity and fail open.
+    const access = characterAccessFrom([], ['c-revoked']);
+    const entry = { entityClass: 'character', entityId: 'c-revoked', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(true);
+  });
+
+  it('restricts a child record whose parent is in the ledger', () => {
+    const access = characterAccessFrom([], ['c-revoked']);
+    const entry = { entityClass: 'character_skill', entityId: 's1', parentId: 'c-revoked' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(true);
+  });
+
+  it('still shows a record for a character the user simply deleted', () => {
+    const access = characterAccessFrom([], []);
+    const entry = { entityClass: 'character', entityId: 'c-mine', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(false);
+  });
+});
+
+describe('isRecordAccessRestricted with a missing parent', () => {
+  it('hides a child record whose parent character is gone', () => {
+    // pruneInaccessibleLocally matches dirty ops by entityId only, so a
+    // queued CHILD op does not protect its parent row from the prune.
+    const access = characterAccessFrom([]);
+    const entry = { entityClass: 'character_trait', entityId: 't1', parentId: 'c-gone' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(true);
+  });
+
+  it('still shows a child record whose parent is present', () => {
+    const access = characterAccessFrom([{ id: 'c1' }]);
+    const entry = { entityClass: 'character_trait', entityId: 't1', parentId: 'c1' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(false);
   });
 });

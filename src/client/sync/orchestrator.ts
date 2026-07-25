@@ -41,6 +41,7 @@ import {
 } from '../db/dexie.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
+import { clearActiveUser } from './activeUser.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
 import { characterIdsToMinimize } from './minimalViewSweep.ts';
 import {
@@ -52,7 +53,13 @@ import {
   setOutboxStatus,
 } from './outbox.ts';
 import { syncStateStore } from './state.ts';
-import { appendSyncLog } from './syncLog.ts';
+import {
+  appendSyncLog,
+  pruneRejectionToasts,
+  redactSyncLogForCharacters,
+  rememberRevokedCharacters,
+  snapshotValue,
+} from './syncLog.ts';
 
 const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character',
@@ -151,13 +158,27 @@ class SyncOrchestrator {
   private recoveryInProgress = false;
   private bootstrapRetryTimer: ReturnType<typeof setTimeout> | null = null;
   /**
-   * The viewer's user id, captured at bootstrap. Used by
-   * `enforceMinimalViewLocally` to figure out which campaign-shared
-   * characters the viewer is allowed to see in detail. Null until
-   * bootstrap runs (the orchestrator is a singleton; periodic pulls
-   * before bootstrap are no-ops anyway).
+   * The viewer's user id. Used by `enforceMinimalViewLocally` to figure
+   * out which campaign-shared characters the viewer may see in detail,
+   * and by `reportSessionLost` to tell "never signed in" apart from
+   * "session vanished underneath us".
+   *
+   * Seeded by `setCurrentUser` on every authenticated mount, NOT only
+   * at bootstrap: `SyncBootstrapGate` calls `bootstrap()` only when the
+   * `bootstrap:<userId>` flag is absent, so on an ordinary reload — the
+   * common path — this would otherwise stay null for the whole session,
+   * silently disabling both of those.
    */
   private currentUserId: string | null = null;
+  /** Latches `reportSessionLost` so a lost session logs once, not every cycle. */
+  private sessionLostReported = false;
+  /** Latches rejection prune+replay to once per signed-in session. */
+  private rejectionHousekeepingDone = false;
+  /**
+   * False while a cycle failure is outstanding. Cleared only by a
+   * cycle that actually succeeds -- see `refreshIndicator`.
+   */
+  private syncHealthy = true;
 
   /** Idempotent.  Wires online/offline + outbox liveQuery + drain loop. */
   start(): void {
@@ -214,6 +235,50 @@ class SyncOrchestrator {
   }
 
   /**
+   * Record who is signed in.  Called on every authenticated mount, not
+   * just at bootstrap -- see `currentUserId`.  Switching users re-arms
+   * the session-loss latch so the new session can report its own loss.
+   */
+  setCurrentUser(userId: string): void {
+    if (this.currentUserId === userId) {
+      // Same user, but the notifier may only now be wired up.
+      void this.maybeRunRejectionHousekeeping();
+      return;
+    }
+    this.currentUserId = userId;
+    this.sessionLostReported = false;
+    this.rejectionHousekeepingDone = false;
+    void this.maybeRunRejectionHousekeeping();
+  }
+
+  /**
+   * Prune + replay open rejection toasts, once per signed-in session.
+   *
+   * This used to happen only inside `bootstrap()`, which the gate skips
+   * whenever `bootstrap:<userId>` already exists — i.e. on every
+   * ordinary reload. The consequences were that an undismissed rollback
+   * toast did NOT survive a reload (the whole point of persisting it),
+   * and that `pruneRejectionToasts` never ran for a long-lived account,
+   * so the pile-up it exists to prevent came back.
+   *
+   * Waits for the notifier: `SyncProvider` registers it in a mount
+   * effect that can land after the gate sets the user, and replaying
+   * into a null notifier would silently drop every toast.
+   */
+  /** Called when a rejection notifier registers; see `setRejectionNotifier`. */
+  async flushPendingRejectionReplay(): Promise<void> {
+    await this.maybeRunRejectionHousekeeping();
+  }
+
+  private async maybeRunRejectionHousekeeping(): Promise<void> {
+    if (this.rejectionHousekeepingDone) return;
+    if (this.currentUserId === null) return;
+    if (!hasRejectionNotifier()) return;
+    this.rejectionHousekeepingDone = true;
+    await this.replayRejectionToasts();
+  }
+
+  /**
    * Pull /sync/cursor for every known entity class and apply the
    * results into Dexie.  Safe to call repeatedly; each class's cursor
    * is the high-water mark seen so far.
@@ -237,7 +302,17 @@ class SyncOrchestrator {
    */
   private async pullInner(force: boolean): Promise<boolean> {
     if (this.recoveryInProgress && !force) return false;
-    if (!tokenStore.read()) return false;
+    if (!tokenStore.read()) {
+      // A session that vanished *after* bootstrap wasn't a sign-out --
+      // something invalidated it underneath the user (see the refresh
+      // handling in lib/api.ts).  Say so: every later cycle bails right
+      // here without touching the indicator, so staying quiet freezes
+      // the badge on its last value with nothing to explain it.
+      if (this.currentUserId !== null) {
+        this.reportSessionLost();
+      }
+      return false;
+    }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
     // Don't flip the indicator to 'syncing' just to *check* for changes —
     // the periodic loop polls every 5s and would otherwise leave the
@@ -288,13 +363,35 @@ class SyncOrchestrator {
       // page is the only signal. Absent on old servers -> no-op.
       await this.pruneInaccessibleLocally(lastAccessible);
       this.fireCycleDone();
+      // A pull that completed is the one thing that clears an
+      // outstanding failure.
+      this.syncHealthy = true;
       const pending = await countPending();
       this.refreshIndicator(pending);
       return true;
-    } catch (_err) {
-      syncStateStore.set('error');
-      throw _err;
+    } catch (err) {
+      // Leave a trace.  A failing pull produces no outbox row, no
+      // rejection record and no toast, so before this the only symptom
+      // was a red badge telling the user to go read a toast that never
+      // existed.
+      this.markCycleFailed();
+      await reportCycleFailure(err, 'Downloading server changes failed', 'pull');
+      throw err;
     }
+  }
+
+  /**
+   * The session disappeared mid-run.  Surfaces it once (not on every
+   * 5s cycle) as a red badge with an actionable reason plus a journal
+   * entry, instead of silently going quiet.
+   */
+  private reportSessionLost(): void {
+    if (this.sessionLostReported) return;
+    this.sessionLostReported = true;
+    const reason = 'Signed out — sign in again to resume syncing';
+    this.markCycleFailed();
+    void appendSyncLog({ direction: 'local', result: 'failed', reason });
+    syncStateStore.setError(reason);
   }
 
   /**
@@ -344,6 +441,7 @@ class SyncOrchestrator {
     if (!completed) return false;
     // Re-emit any persistent rejection toasts that survived the
     // reload so the user doesn't lose an open error.
+    this.rejectionHousekeepingDone = true;
     await this.replayRejectionToasts();
     return true;
   }
@@ -418,6 +516,10 @@ class SyncOrchestrator {
         throw new Error('This change is not eligible to be reverted');
       }
       let preservedNewerEdit = false;
+      // What the local field actually ends up holding, for the journal.
+      // Usually `prevValue`, but a superseding edit deliberately keeps
+      // the user's newer value instead.
+      let restoredValue: unknown = op.prevValue;
       if (op.command === 'patch' && op.fieldPath !== undefined) {
         const superseding = await db.outbox
           .where('coalesceKey')
@@ -433,6 +535,7 @@ class SyncOrchestrator {
         const latest = superseding.sort((a, b) => b.enqueuedAt.localeCompare(a.enqueuedAt))[0];
         if (latest) {
           preservedNewerEdit = true;
+          restoredValue = latest.attemptedValue;
           await this.revertField(op.entityClass, op.entityId, op.fieldPath, latest.attemptedValue);
           await db.outbox.update(latest.clientOpId, {
             prevValue: op.prevValue,
@@ -452,9 +555,24 @@ class SyncOrchestrator {
         result: 'reverted',
         entityClass: op.entityClass,
         entityId: op.entityId,
+        parentId: op.parentId,
         command: op.command,
         fieldPath: op.fieldPath,
         humanName: op.humanName,
+        reason: preservedNewerEdit
+          ? `Failed attempt discarded by user after ${op.attemptCount} attempts; a newer local edit was kept${
+              op.serverReason ? ` — ${op.serverReason}` : ''
+            }`
+          : op.serverReason
+            ? `Discarded by user after ${op.attemptCount} failed attempts — ${op.serverReason}`
+            : `Discarded by user after ${op.attemptCount} failed attempts`,
+        // Direction of travel is inverted here: the local row moved away
+        // from `attemptedValue`.  It lands on `prevValue` normally, but
+        // on the superseding-edit path it keeps the user's newer value
+        // instead -- claiming it went back to the old server value would
+        // contradict what the field visibly shows.
+        previousValue: snapshotValue(op.attemptedValue),
+        newValue: snapshotValue(restoredValue),
       });
       if (op.fieldPath) {
         flashBus.emit({
@@ -473,6 +591,9 @@ class SyncOrchestrator {
   /** Wipe Dexie and reset state -- called on logout. */
   async purge(): Promise<void> {
     this.currentUserId = null;
+    this.rejectionHousekeepingDone = false;
+    // The wiped Dexie no longer belongs to anyone.
+    clearActiveUser();
     if (this.bootstrapRetryTimer) clearTimeout(this.bootstrapRetryTimer);
     this.bootstrapRetryTimer = null;
     await this.clearAllLocalStores();
@@ -532,8 +653,13 @@ class SyncOrchestrator {
     while (this.running) {
       try {
         await this.maybeDrainOnce();
-      } catch (_err) {
-        syncStateStore.set('error');
+      } catch (err) {
+        // Anything the inner handlers didn't already account for --
+        // recoverStaleInFlight, readDrainableOps, applyOutcomes, a
+        // Dexie failure. A bare set('error') here would restore exactly
+        // the unexplained red badge this whole change exists to remove.
+        this.markCycleFailed();
+        await reportCycleFailure(err, 'Sync failed');
       }
       // Wait for an outbox change, an online event, or 5s, whichever
       // comes first.
@@ -543,7 +669,13 @@ class SyncOrchestrator {
 
   private async maybeDrainOnce(): Promise<void> {
     if (this.recoveryInProgress) return;
-    if (!tokenStore.read()) return;
+    if (!tokenStore.read()) {
+      if (this.currentUserId !== null) this.reportSessionLost();
+      return;
+    }
+    // A session is back (re-login, or a refresh that finally succeeded)
+    // -- re-arm the latch so a future loss is reported again.
+    this.sessionLostReported = false;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       // Can't drain while offline -- leave the indicator showing
       // 'syncing' if anything is pending so the user knows their
@@ -596,7 +728,10 @@ class SyncOrchestrator {
             lastError: errorDetails(err),
           });
         }
-        syncStateStore.set('error');
+        this.markCycleFailed();
+        await reportCycleFailure(err, 'Uploading changes failed', 'push', {
+          operationCount: ops.length,
+        });
         return;
       }
       await this.applyOutcomes(ops, outcomes);
@@ -605,8 +740,17 @@ class SyncOrchestrator {
       // for the next loop iteration.  triggerCursorPull handles its own
       // fireCycleDone + refreshIndicator; the calls below are fallbacks for
       // the early-return paths (offline / no token) where it returns silently.
-      await this.triggerCursorPull().catch(() => {});
+      let pullFailed = false;
+      await this.triggerCursorPull().catch(() => {
+        pullFailed = true;
+      });
       this.fireCycleDone();
+      // Only the *skipped* pull needs the fallback. A pull that FAILED
+      // already reported a reason; refreshing the indicator here would
+      // flip the badge straight back to 'synced' (the upload emptied the
+      // outbox) and drop the banner explaining that downloads are still
+      // broken.
+      if (pullFailed) return;
       const pending = await countPending();
       this.refreshIndicator(pending);
     });
@@ -641,10 +785,13 @@ class SyncOrchestrator {
             result: 'synced',
             entityClass: op.entityClass,
             entityId: op.entityId,
+            parentId: op.parentId,
             command: op.command,
             fieldPath: op.fieldPath,
             humanName: op.humanName,
-            details: outcome,
+            previousValue: snapshotValue(op.prevValue),
+            newValue: snapshotValue(op.attemptedValue),
+            details: snapshotValue(outcome),
           });
           await db.outbox.delete(op.clientOpId);
           break;
@@ -695,6 +842,7 @@ class SyncOrchestrator {
                 result: 'requeued',
                 entityClass: op.entityClass,
                 entityId: op.entityId,
+                parentId: op.parentId,
                 command: op.command,
                 fieldPath: op.fieldPath,
                 humanName: op.humanName,
@@ -757,6 +905,7 @@ class SyncOrchestrator {
               result: 'retrying',
               entityClass: op.entityClass,
               entityId: op.entityId,
+              parentId: op.parentId,
               command: op.command,
               fieldPath: op.fieldPath,
               humanName: op.humanName,
@@ -806,7 +955,9 @@ class SyncOrchestrator {
     await this.revertLocal(op, outcome);
     // Persistent toast + flash event so the input animates.
     await this.recordRejection(op, outcome);
-    syncStateStore.set('error');
+    syncStateStore.setError(
+      `Couldn't sync ${op.humanName ?? op.entityClass} — ${outcome.reason ?? 'sync rejected'}`,
+    );
     if (op.fieldPath) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
@@ -818,10 +969,18 @@ class SyncOrchestrator {
       result: 'rolled_back',
       entityClass: op.entityClass,
       entityId: op.entityId,
+      parentId: op.parentId,
       command: op.command,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
-      details: outcome,
+      reason: outcome.reason ?? 'sync rejected',
+      // Before/after describe the LOCAL ROW's movement, and a rollback
+      // moves it the other way: away from the value the server refused,
+      // back to whatever was restored. Recording the refused value as
+      // "After" would show the user the rejected edit as their final
+      // state and the restored one as discarded -- backwards.
+      ...rollbackSnapshot(op, outcome),
+      details: snapshotValue(outcome),
     });
     await db.outbox.delete(op.clientOpId);
   }
@@ -842,8 +1001,10 @@ class SyncOrchestrator {
     const rec: RejectionRecord = {
       id: op.clientOpId,
       clientOpId: op.clientOpId,
+      userId: this.currentUserId ?? undefined,
       entityClass: op.entityClass,
       entityId: op.entityId,
+      parentId: op.parentId,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
       reason: outcome.reason ?? 'sync failed',
@@ -852,7 +1013,7 @@ class SyncOrchestrator {
     };
     await db.rejectionToasts.put(rec);
     notifyRejection(rec);
-    syncStateStore.set('error');
+    syncStateStore.setError(`Couldn't sync ${rec.humanName ?? op.entityClass} — ${rec.reason}`);
     if (op.fieldPath) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
@@ -866,8 +1027,11 @@ class SyncOrchestrator {
       entityId: op.entityId,
       command: op.command,
       fieldPath: op.fieldPath,
+      parentId: op.parentId,
       humanName: op.humanName,
-      details: outcome,
+      reason: rec.reason,
+      ...rollbackSnapshot(op, outcome),
+      details: snapshotValue(outcome),
     });
     await db.outbox.delete(op.clientOpId);
   }
@@ -883,8 +1047,10 @@ class SyncOrchestrator {
     const rec: RejectionRecord = {
       id: op.clientOpId,
       clientOpId: op.clientOpId,
+      userId: this.currentUserId ?? undefined,
       entityClass: op.entityClass,
       entityId: op.entityId,
+      parentId: op.parentId,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
       reason: outcome.reason ?? 'sync failed',
@@ -1225,16 +1391,29 @@ class SyncOrchestrator {
 
   private async replayRejectionToasts(): Promise<void> {
     const db = getLocalDb();
+    // Auto-dismiss anything too old to be news and trim the table
+    // before replaying, so bootstrap can't bury the user under months
+    // of accumulated toasts.
+    await pruneRejectionToasts();
     // Dexie's `.equals(undefined)` throws ("Keys must be of type string,
     // number, Date or Array"), so a where()/or() chain on `dismissedAt`
     // can't catch both the unset and explicit-empty-string states. Fall
     // back to a full-table filter — `rejectionToasts` is a small,
     // user-scoped set, so the cost is negligible.
+    const viewerId = this.currentUserId;
     const open = await db.rejectionToasts
       .filter((r) => !r.dismissedAt)
       .toArray()
       .catch(() => [] as RejectionRecord[]);
-    for (const r of open) notifyRejection(r);
+    for (const r of open) {
+      // Only this account's rejections. A session can end without a
+      // purge (a refresh-token rejection just clears the tokens), so
+      // signing in as someone else would otherwise surface the previous
+      // account's toasts -- private skill/item labels included. Rows
+      // with no userId predate the field and can't be attributed.
+      if (r.userId === undefined || r.userId !== viewerId) continue;
+      notifyRejection(r);
+    }
   }
 
   /**
@@ -1338,6 +1517,12 @@ class SyncOrchestrator {
         }
       },
     );
+    // Same reasoning as the row rewrite above: the sync journal is
+    // another surface carrying character data, so a share=false flip
+    // has to reach it too or the masked character's real values stay
+    // readable in the sync dialog and the debug dump.
+    await rememberRevokedCharacters(idArray);
+    await redactSyncLogForCharacters(idArray);
     return restored.length > 0;
   }
 
@@ -1373,6 +1558,18 @@ class SyncOrchestrator {
 
     const [chars, camps] = await Promise.all([db.characters.toArray(), db.campaigns.toArray()]);
 
+    // Clear the revoked mark first, and unconditionally: a character
+    // whose access came back must recover even when nothing else is
+    // stale (the early return below would otherwise skip it forever).
+    const regained = chars.filter((c) => c.accessRevoked && accessibleCharacterIds.has(c.id));
+    if (regained.length > 0) {
+      // Marker only -- never rewrite the whole row from a snapshot that
+      // may already be stale.
+      await db.characters.bulkUpdate(
+        regained.map((c) => ({ key: c.id, changes: { accessRevoked: false } })),
+      );
+    }
+
     const staleCharacterIds = chars
       .filter((c) => !accessibleCharacterIds.has(c.id) && c.revision >= 0)
       .map((c) => c.id);
@@ -1397,6 +1594,25 @@ class SyncOrchestrator {
 
     const charIdsToDelete = staleCharacterIds.filter((id) => !dirtyEntityIds.has(id));
     const campaignIdsToDelete = staleCampaignIds.filter((id) => !dirtyEntityIds.has(id));
+
+    // A character we deliberately KEEP (its op still has to be
+    // delivered) would otherwise look present-and-unmasked, i.e. fully
+    // accessible, to the share gate. Mark it so the dialog and the
+    // debug dump can tell the difference; clear the mark for any
+    // character whose access came back.
+    //
+    // Update ONLY the marker: `chars` was read before the awaited
+    // outbox query above, so a full-row bulkPut would write that stale
+    // snapshot back over any field another tab committed in between --
+    // a silent, visible rollback of a value whose op is still pending.
+    const retained = new Set(staleCharacterIds.filter((id) => dirtyEntityIds.has(id)));
+    const newlyRevoked = chars.filter((c) => retained.has(c.id) && !c.accessRevoked);
+    if (newlyRevoked.length > 0) {
+      await db.characters.bulkUpdate(
+        newlyRevoked.map((c) => ({ key: c.id, changes: { accessRevoked: true } })),
+      );
+    }
+
     if (charIdsToDelete.length === 0 && campaignIdsToDelete.length === 0) return;
 
     // Single transaction across every affected store so observers see
@@ -1428,6 +1644,14 @@ class SyncOrchestrator {
         }
       },
     );
+    // Record the revocation BEFORE the best-effort redaction: the rows
+    // are already gone, so if that redaction fails this ledger is the
+    // only thing left that can keep those records closed.
+    await rememberRevokedCharacters(charIdsToDelete);
+    // The journal holds before/after character values too; deleting the
+    // rows while leaving those readable in the sync dialog and the
+    // debug dump would defeat the purge.
+    await redactSyncLogForCharacters(charIdsToDelete);
   }
 
   private fireCycleDone(): void {
@@ -1435,11 +1659,19 @@ class SyncOrchestrator {
   }
 
   private refreshIndicator(pending: number): void {
-    if (pending > 0) {
-      syncStateStore.set('syncing');
-    } else {
-      syncStateStore.set('synced');
-    }
+    // An outstanding cycle failure outlives ANY outbox state. This runs
+    // from the outbox liveQuery, so without the guard the delete that
+    // settles a successful upload would flip the badge to 'synced', and
+    // a fresh edit made *during* the outage would flip it to 'syncing'
+    // -- either way dropping the reason and its banner without a single
+    // successful cycle.
+    if (!this.syncHealthy) return;
+    syncStateStore.set(pending > 0 ? 'syncing' : 'synced');
+  }
+
+  /** A cycle failed; the badge must not go green until one succeeds. */
+  private markCycleFailed(): void {
+    this.syncHealthy = false;
   }
 }
 
@@ -1458,6 +1690,78 @@ function toEnvelope(op: OutboxEntry): OperationEnvelope {
     batchId: op.batchId,
     createdAt: op.enqueuedAt,
   };
+}
+
+/**
+ * Before/after for a rollback, in the direction the local row actually
+ * moved: from the refused `attemptedValue` back to whatever
+ * `revertLocal` restored.  That is `prevValue` normally, but the
+ * server's `latestEntity` when it returned one (conflict / stale_base),
+ * since `revertLocal` prefers it as the more recent truth.
+ */
+function rollbackSnapshot(
+  op: OutboxEntry,
+  outcome: OperationOutcome,
+): { previousValue: unknown; newValue: unknown } {
+  let restored = op.prevValue;
+  if (outcome.latestEntity && typeof outcome.latestEntity === 'object' && op.fieldPath) {
+    restored = (outcome.latestEntity as Record<string, unknown>)[op.fieldPath];
+  }
+  return {
+    previousValue: snapshotValue(op.attemptedValue),
+    newValue: snapshotValue(restored),
+  };
+}
+
+/**
+ * Errors already turned into a journal entry + indicator reason.  The
+ * cursor-pull path reports and then rethrows, so `runLoop`'s catch sees
+ * the same object again; without this it would log the failure twice.
+ */
+const reportedFailures = new WeakSet<object>();
+
+/**
+ * The single way a whole-cycle failure becomes visible: one journal
+ * entry plus a named indicator error.  Every `catch` that ends a sync
+ * cycle must go through here — a bare `syncStateStore.set('error')`
+ * produces a red badge with nothing behind it.
+ */
+async function reportCycleFailure(
+  err: unknown,
+  prefix: string,
+  direction: 'push' | 'pull' | 'local' = 'local',
+  extraDetails?: Record<string, unknown>,
+): Promise<void> {
+  if (typeof err === 'object' && err !== null) {
+    if (reportedFailures.has(err)) return;
+    reportedFailures.add(err);
+  }
+  const reason = failureReason(err, prefix);
+  await appendSyncLog({
+    direction,
+    result: 'failed',
+    reason,
+    // Capped like every other payload: `errorDetails` embeds the whole
+    // `ApiError.body`, and a server returning a large non-2xx body on
+    // every retry would otherwise fill the journal with copies of it.
+    details: snapshotValue({ ...extraDetails, error: errorDetails(err) }),
+  });
+  syncStateStore.setError(reason);
+}
+
+/**
+ * A short, user-facing sentence for a whole-cycle failure.  HTTP status
+ * is included because "HTTP 530" is the difference between "my server
+ * is down" and "my edit was rejected" -- and the user is the one who
+ * has to tell those apart when the badge goes red.
+ */
+function failureReason(err: unknown, prefix: string): string {
+  if (err instanceof ApiError) {
+    const detail = err.message === `HTTP ${err.status}` ? '' : ` — ${err.message}`;
+    return `${prefix} (HTTP ${err.status})${detail}`;
+  }
+  if (err instanceof Error) return `${prefix} — ${err.message}`;
+  return prefix;
 }
 
 function errorDetails(err: unknown): unknown {
@@ -1512,6 +1816,13 @@ let activeNotifier: RejectionNotifier | null = null;
 
 export function setRejectionNotifier(notifier: RejectionNotifier | null): void {
   activeNotifier = notifier;
+  // The gate may have set the user before this landed; flush any
+  // replay that was waiting for somewhere to send toasts.
+  if (notifier) void getSyncOrchestrator().flushPendingRejectionReplay();
+}
+
+function hasRejectionNotifier(): boolean {
+  return activeNotifier !== null;
 }
 
 function notifyRejection(rec: RejectionRecord): void {

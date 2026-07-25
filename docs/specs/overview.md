@@ -287,11 +287,19 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
 
 ### Cross-cutting UI
 - **Sync status indicator and log** (header): honest pending/syncing/offline/error
-  state. Clicking it opens the local sync log, with current unsynced changes,
-  the latest 1,000 pushed/pulled changes and timestamps, repeatedly failing
-  changes with diagnostics and an explicit revert action, plus a confirmed
-  emergency action to abandon local changes and pull a fresh server copy.
+  state, and an `error` badge always names its reason (in the tooltip and in a
+  banner at the top of the log) rather than pointing at a toast that may never
+  have existed. Clicking it opens the local sync log, with current unsynced
+  changes, the latest 1,000 pushed/pulled changes and timestamps, repeatedly
+  failing changes with diagnostics and an explicit revert action, plus a
+  confirmed emergency action to abandon local changes and pull a fresh server
+  copy. Every queued and journalled event **expands** (collapsed by default) to
+  show what actually changed — field, before/after values, entity, operation,
+  and the failure reason where there is one.
 - **Notifications bell**: invitations and other events.
+- **New-version prompt**: a long-lived tab polls for a new build and offers a
+  persistent "A new version of the app is available" toast with a Reload
+  button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
 - **Themeable** (light/dark; "Arcane" DaisyUI theme), installable PWA, works
   offline for the character surface.
 - **Settings** page: profile, password, passkeys, API keys.
@@ -350,9 +358,10 @@ src/
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...
-    components/  Shared UI (sync indicator/log, notifications bell, ui/*,
-                 markdown/ — sanitized markdown renderer + Tiptap WYSIWYG
-                 markdown editor used by the adventure log)
+    components/  Shared UI (sync indicator/log, notifications bell,
+                 SwUpdatePrompt (new-build toast), ui/*, markdown/ —
+                 sanitized markdown renderer + Tiptap WYSIWYG markdown
+                 editor used by the adventure log)
     admin/       Separate admin SPA entry
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol)

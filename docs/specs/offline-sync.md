@@ -43,7 +43,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
-| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, each expandable (collapsed by default) to its before/after values and metadata. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -134,14 +134,64 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 | `stale_base` | Same as conflict — `baseRevision` was behind the server. If `latestEntity` shows the field unchanged, the client re-enqueues the op with the fresh revision instead of rolling back (the self-heal below); the server's batch-local fast-forward means a same-client burst now settles in one round trip rather than needing this self-heal per op. |
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
-| network error | Whole batch reverts to `transient_retry`; loop retries. |
+| network error | Whole batch reverts to `transient_retry`; loop retries, and a `failed` journal entry + a named indicator error record why. |
+
+## The session must survive a server outage
+
+`refreshTokens()` in `src/client/lib/api.ts` clears the token store **only** on
+a `401`/`403` from `/auth/refresh` — a definitive rejection of the refresh
+token. A `5xx`, a reverse-proxy/tunnel error (Cloudflare `52x`/`530`), or a
+transport failure leaves the session intact and reports
+`{ kind: 'unavailable' }` so the caller retries later.
+
+It returns a typed `RefreshResult` rather than a boolean so `apiFetch` can
+**surface the outage instead of the 401 that triggered the refresh**: for the
+`unavailable` case it reconstructs the refresh's own response (or rethrows its
+transport error). Collapsing both to the original 401 would have the
+orchestrator journal "HTTP 401 — token expired" during a total origin outage,
+pointing the user at their account rather than at the server — defeating the
+diagnostics above.
+
+The failure is captured as **plain data** (`status` / `bodyText` /
+`contentType`), not as the `Response` object. Concurrent 401s all await the one
+`refreshInFlight` promise and so share one result; handing them a single
+`Response` would let the first `parse()` drain its body and leave every other
+caller throwing "body already read" instead of the real status. Each caller
+builds its own `Response` from that data.
+
+This is load-bearing, not a nicety. Clearing on any non-OK response means one
+badly-timed outage signs the user out permanently, and it does so **invisibly**:
+the local-first UI keeps rendering Dexie data, so nothing looks wrong, while
+every orchestrator cycle bails at its `!tokenStore.read()` guard without
+touching the indicator — freezing the badge on whatever it last showed, with no
+toast. (Observed in production during an HTTP 530 origin outage.) The
+orchestrator now also reports a session that disappears *after* bootstrap
+(`reportSessionLost`, latched so it fires once per loss) as a named indicator
+error plus a journal entry.
+
+That report keys off `currentUserId`, which `SyncBootstrapGate` seeds via
+`orchestrator.setCurrentUser()` on **every** authenticated mount — not only at
+bootstrap. The gate calls `bootstrap()` only when the `bootstrap:<userId>` flag
+is absent, so on an ordinary reload (the common path) `currentUserId` would
+otherwise stay null for the whole session, silently disabling both the
+lost-session report **and** the minimal-view share sweep, which has the same
+guard.
+
+`setCurrentUser` also drives **rejection housekeeping** (prune + replay), once
+per signed-in session, for the same reason: it used to live only inside
+`bootstrap()`, so on an ordinary reload an undismissed rollback toast did not
+survive — the exact thing persisting it was for — and `pruneRejectionToasts`
+never ran, letting the pile-up it prevents come back. It waits for a notifier:
+`SyncProvider` registers one in a mount effect that can land *after* the gate
+sets the user, so `setRejectionNotifier` flushes any replay that was waiting
+(replaying into a null notifier would silently drop every toast).
 
 ## Local sync log and recovery
 
 The `syncLog` Dexie store is a device-local operational journal, separate from
 the server-side entity history. Successful outbox outcomes are recorded as
 `push` with `result: 'synced'`, cursor changes as `pull`, and explicit user
-rollbacks as `local` with `result: 'reverted'`. Three more `result` values are
+rollbacks as `local` with `result: 'reverted'`. Four more `result` values are
 diagnostics-only, logged by `applyOutcomes` in the orchestrator:
 
 - `requeued` — the `stale_base` self-heal deleted a stale op and re-enqueued it
@@ -154,14 +204,164 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   retry attempt) so a stubbornly-failing op can't flush the 1,000-row journal;
   the live retry state (attempt count, backoff timing) is always visible via
   the outbox rows themselves.
+- `failed` — a **whole-cycle** failure: the drain POST or the cursor pull
+  itself errored (dropped connection, 5xx, reverse-proxy/tunnel error), so no
+  individual operation has an outcome to report. These carry no `entityClass` /
+  `entityId` / `command`; `reason` names the failure including its HTTP status
+  and `details` carries the raw error. **This class of failure previously
+  logged nothing anywhere** — no outbox row, no rejection record, no toast —
+  which left the red badge with nothing to point at during a server outage.
 
 It is pruned to the newest 1,000 records. Pull entries retain metadata and
-revision only, never cursor row payloads, so later access downgrades cannot
-leave private sheet data in the journal. Journal writes are best-effort: quota
-or IndexedDB failures never block outbox settlement. Pending state is never
-copied into the log; the sync view reads the authoritative outbox directly,
-including attempt count, backoff timing, and the raw operation outcome or
-HTTP/network error.
+revision only, never cursor row payloads. `push` and `local` entries
+additionally carry `previousValue` / `newValue` snapshots (via `snapshotValue`,
+which caps **strings as well as objects** at `SYNC_LOG_VALUE_MAX_CHARS` — `notes`
+/ `appearance` / trait descriptions accept 20,000 characters, so exempting
+strings would let a few edits retain tens of MB) so the log UI can show *what
+changed* instead of just "character inventory patch".
+
+**Rollback entries record the direction the local row actually moved.** A
+rejected patch moves the row *away* from the refused `attemptedValue` and back
+to what `revertLocal` restored — `prevValue`, or the server's `latestEntity`
+field when one came back. `rollbackSnapshot()` is the single place that decides
+this; recording it the other way round would show the user their rejected edit
+as the final value and the restored one as discarded. The user-initiated
+`revertFailedOperation` follows the same rule, including its superseding-edit
+branch: when a newer same-field op is preserved the row lands on *that* value,
+not `prevValue`, and the journal has to say so or it contradicts what the sheet
+visibly shows.
+
+**The share gate reaches this journal too.** A GM or manager editing a player's
+sheet records that player's values here, and a `conflict`/`stale_base` outcome
+can carry a whole `latestEntity` row in `details` — so the journal is one of the
+surfaces `AGENTS.md`'s share-gate invariant covers.
+`redactSyncLogForCharacters()` clears `previousValue` / `newValue` / `details`
+and sets `redacted: true` on every entry whose `entityId` **or `parentId`**
+matches a character being minimized or pruned; both
+`enforceMinimalViewLocally` and `pruneInaccessibleLocally` call it. `parentId`
+is stored on child-class entries precisely so this match can find them. The row
+survives with its metadata, and the UI says the values were removed.
+
+**The outbox needs the same gate applied at read time.** Queued ops are
+deliberately *not* swept on a downgrade — the op is the user's own unsent intent
+and still has to be delivered, and `pruneInaccessibleLocally` explicitly refuses
+to prune an entity with unsettled local ops. So every surface that *prints*
+outbox values applies the decision itself, through the single shared predicate
+`isOutboxAccessRestricted()` in `minimalViewSweep.ts` (it lives beside the sweep
+it mirrors because it was briefly duplicated in the dialog and the dump, and
+those must not drift). `SyncLogView` and `maskRestrictedOps()` in `debugDump.ts`
+both call it.
+
+Build the access snapshot with **`characterAccessFrom()`** — never by hand
+(it takes the character rows *and* the revoked ledger below).
+A character stops being fully visible two ways, and both must be in `masked`:
+`minimalViewMasked` (share gate flipped off) and **`accessRevoked`**. The second
+covers a character the cursor's authoritative `accessible` set says is gone but
+that `pruneInaccessibleLocally` deliberately *kept*, because an unsettled outbox
+op still references it: that row is present and unmasked, so without the marker
+the share gate would read it as fully accessible. It is cleared as soon as
+access returns (unconditionally, before the prune's early return, or a character
+could never recover).
+
+A masked character always restricts. A **missing** character row means different
+things depending on the op:
+
+- **child op** (`parentId` set) — the parent going away is access loss, whatever
+  the command. `delete` matters most: `enqueueDelete` stores the *entire*
+  removed row in `prevValue`, so a GM deleting another player's trait leaves
+  that whole row queued.
+- **root `character` op** — the row is *expected* to be gone after a local
+  delete, and a speculative create may not have landed, so only a `patch`
+  implies lost access.
+
+The debug dump matters most here: it is a file the user hands to someone else.
+
+**Written records get a read-time check too**, via `isRecordAccessRestricted()`.
+`redactSyncLogForCharacters` only scrubs at rest when a sweep runs, and a sweep
+only runs after a successful cursor pull — so a revert performed **offline**
+writes a fresh snapshot after the last sweep, with no later pull to clean it up.
+Both `SyncLogView` and the debug dump re-check journal entries and rejection
+records against the live masked set (the `Raw` details block is gated the same
+way; a `conflict` outcome can carry a whole `latestEntity` row). A **child**
+record whose parent character is missing is restricted: `pruneInaccessible-
+Locally` matches dirty ops by `entityId` only, so a queued *child* op does not
+protect its parent row from being pruned, and reverting that child offline then
+writes a fresh snapshot naming a character the viewer can no longer see. A root
+record's own entity may legitimately be long deleted, so there only an active
+mask restricts — *unless* the id is in the revoked ledger.
+
+**The revoked ledger makes the deleted-row case fail closed.**
+`rememberRevokedCharacters()` records revoked ids in `syncMeta`
+(`REVOKED_CHARACTERS_KEY`, capped at `REVOKED_CHARACTERS_RETENTION`), written
+**before** the best-effort redaction at both revocation points. The prune
+deletes the character row first, and `redactSyncLogForCharacters` is
+deliberately best-effort — diagnostic housekeeping must never break a sync
+cycle — so if it fails on quota or an aborted transaction, the row is gone,
+nothing is marked, and a read-time check would see "unknown character" and fail
+**open**. The ledger outlives the row and closes that path.
+
+**`humanName` is private content too**, on every surface — it reads
+`skill "Stealth"` / `item "Hidden Blade"` and it is the row's visible *title*.
+Hiding the before/after values while still printing the label defeats the point,
+so a restricted outbox op or journal entry falls back to its generic class label
+in the dialog and has `humanName` stripped in the export. Rejection records get
+`parentId` and the same treatment on both sides: scrubbed at rest by the sweep,
+re-checked at export time.
+
+**Rejection replay is account-scoped.** Records carry `userId`, and replay emits
+only the current user's. Rows with no `userId` predate the field and are never
+replayed.
+
+**And the local database itself is claimed by one account.**
+`src/client/sync/activeUser.ts` records which user Dexie belongs to, in
+localStorage so `SyncBootstrapGate` can read it **synchronously on first render**
+and block before anything paints. On a mismatch the gate purges and re-bootstraps
+from zero. Sign-out already purges, so the UI path was safe; the gap is a session
+that ends *without* one — a refresh-token rejection just clears the tokens — after
+which signing in as a different, **already bootstrapped** account would find its
+`bootstrap:<userId>` flag set, render immediately, and show the previous user's
+characters, outbox and journal as the new user's own. Worse, the share-gate
+snapshot is derived from those same stale character rows, so they read as present
+and unmasked, i.e. fully accessible. `purge()` clears the claim.
+
+Journal writes are best-effort:
+quota or IndexedDB failures never block outbox settlement. Pending state is
+never copied into the log; the sync view reads the authoritative outbox
+directly, including attempt count, backoff timing, and the raw operation
+outcome or HTTP/network error.
+
+**Every event in the dialog expands.** Queued outbox rows and journal entries
+both render as a `<details>` disclosure, **collapsed by default**, holding
+field, before/after values, entity class + id, operation, timing, attempt
+count, and the failure reason. The summary line stays a scannable one-liner.
+
+**The indicator's `error` state always carries a reason.** `syncStateStore`
+holds a `SyncErrorDetail { reason, at }` alongside the state; use
+`setError(reason)` rather than `set('error')`. The reason drives the badge
+tooltip and a banner at the top of the sync-log dialog, and is cleared
+automatically when the store leaves `error` (a successful cycle). The old
+tooltip — "see toast for details" — was a lie for every failure that produces
+no toast. `setError` refreshes `at` even when the reason repeats, so the
+dialog's "Last attempt" time stays true through a sustained outage.
+
+**An outstanding failure outlives an empty outbox.** `refreshIndicator` runs
+from the outbox `liveQuery` as well as from the cycle paths, so with no guard
+*any* Dexie outbox change — including the delete that settles a successful
+upload — would flip the badge to `synced` and drop the banner. The orchestrator
+tracks `syncHealthy`, cleared by `markCycleFailed()` and set only by a cursor
+pull that completes; `refreshIndicator` returns early while it is false, so
+neither an emptied outbox (`synced`) **nor a fresh edit made during the outage**
+(`syncing`) can drop the reason without a successful cycle.
+(Per-operation rejections deliberately don't set it: those have their own
+persistent toast, and the badge should follow the queue.)
+
+**Every cycle-ending `catch` goes through `reportCycleFailure()`** — the cursor
+pull, the drain POST, *and* `runLoop`'s outer catch (which covers
+`recoverStaleInFlight`, `readDrainableOps`, `applyOutcomes` and Dexie faults).
+It writes the journal entry and sets the named error together, and de-dupes via
+a `WeakSet` so an error reported by the pull path and rethrown into `runLoop`
+isn't logged twice. A bare `syncStateStore.set('error')` anywhere reintroduces
+the unexplained red badge this design exists to remove.
 
 **Download sync debug log.** The sync-log dialog's footer has a "Download sync
 debug log" button (`buildSyncDebugDump()` in `src/client/sync/debugDump.ts`)
@@ -173,6 +373,18 @@ excludes every entity store (characters, traits, skills, inventory, etc.) and
 the access/refresh tokens — a dump attached to a support request must not leak
 other players' cached sheets or session credentials. Assembly is pure Dexie
 reads with no network calls, so it works offline.
+
+**Rejection records have a lifecycle.** `rejectionToasts` rows back the
+persistent rollback toasts and are replayed on bootstrap so a failure survives a
+reload. Dismissing the toast now writes `dismissedAt` through the toast API's
+`onDismiss` hook (`markRejectionDismissed`) — previously "dismissed" meant only
+"removed from React state", so every bootstrap replayed every rejection the user
+had ever seen, and the table grew without bound for the life of the install
+(observed: 38 open records spanning two months, none dismissed).
+`pruneRejectionToasts` runs before each replay: it auto-dismisses records older
+than `REJECTION_REPLAY_MAX_AGE_MS` (7 days — a months-old rollback is noise, not
+news) and trims the table to `REJECTION_RETENTION`. Auto-dismissed rows are
+kept, not deleted; they remain the audit trail and stay in the debug dump.
 
 After four consecutive attempts, a pending operation is promoted as a repeated
 failure. The user may explicitly revert it under the same cross-tab drain lock:

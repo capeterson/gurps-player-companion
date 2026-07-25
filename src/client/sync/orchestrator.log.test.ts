@@ -11,8 +11,13 @@ import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
-import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
+import {
+  getSyncOrchestrator,
+  resetSyncOrchestratorForTests,
+  setRejectionNotifier,
+} from './orchestrator.ts';
 import { enqueueFieldPatch } from './outbox.ts';
+import { syncStateStore } from './state.ts';
 
 function jwtForUser(userId: string): string {
   const enc = (value: unknown) =>
@@ -75,6 +80,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   tokenStore.clear();
   resetSyncOrchestratorForTests();
+  syncStateStore.reset('synced');
   await resetLocalDb();
 });
 
@@ -136,6 +142,105 @@ describe('applyOutcomes sync-log diagnostics', () => {
         const row = await getLocalDb().characters.get(CHAR_ID);
         expect(row?.st).toBe(13);
       });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('records a rollback in the direction the local row actually moved', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 999,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'rejected' as const,
+          reason: 'ST must be <= 20',
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) return cursorResponse();
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const row = await getLocalDb().characters.get(CHAR_ID);
+        expect(row?.st).toBe(10);
+      });
+      const log = await getLocalDb().syncLog.toArray();
+      const rolled = log.find((entry) => entry.result === 'rolled_back');
+      // The row moved 999 -> 10. Recording it the other way round would
+      // show the user the refused edit as their final value and the
+      // restored one as discarded.
+      expect(rolled).toMatchObject({ previousValue: 999, newValue: 10 });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('uses the server value as the restored side when one comes back', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 13,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'conflict' as const,
+          reason: 'someone else edited this',
+          // revertLocal prefers this over prevValue, so the journal has
+          // to agree with it.
+          latestEntity: { id: CHAR_ID, st: 16, revision: 9 },
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) return cursorResponse();
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const log = await getLocalDb().syncLog.toArray();
+        expect(log.some((entry) => entry.result === 'rolled_back')).toBe(true);
+      });
+      const rolled = (await getLocalDb().syncLog.toArray()).find(
+        (entry) => entry.result === 'rolled_back',
+      );
+      expect(rolled).toMatchObject({ previousValue: 13, newValue: 16 });
     } finally {
       getSyncOrchestrator().stop();
     }
@@ -259,6 +364,311 @@ describe('applyOutcomes sync-log diagnostics', () => {
       });
     } finally {
       orchestrator.stop();
+    }
+  });
+
+  it('records the before/after values on a successful push', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'applied' as const,
+          newRevision: 2,
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) return cursorResponse();
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const log = await getLocalDb().syncLog.toArray();
+        expect(log.some((entry) => entry.result === 'synced')).toBe(true);
+      });
+      const log = await getLocalDb().syncLog.toArray();
+      const synced = log.find((entry) => entry.result === 'synced' && entry.direction === 'push');
+      // Without these the log could only say "character patch", which
+      // tells the user nothing about what actually changed.
+      expect(synced).toMatchObject({ fieldPath: 'st', previousValue: 10, newValue: 12 });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+});
+
+describe('whole-cycle failures', () => {
+  it('journals a failed pull with its HTTP status and names the reason on the indicator', async () => {
+    await seedCharacter();
+    login();
+
+    // No outbox rows: the drain loop goes straight to the cursor pull,
+    // which is the path that produced a red badge and no toast during
+    // the origin outage.
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/sync/cursor')) {
+        return new Response('error code: 530', { status: 530 });
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const log = await getLocalDb().syncLog.toArray();
+        expect(log.some((entry) => entry.result === 'failed')).toBe(true);
+      });
+      const failed = (await getLocalDb().syncLog.toArray()).find((e) => e.result === 'failed');
+      expect(failed).toMatchObject({ direction: 'pull' });
+      expect(failed?.reason).toContain('530');
+      expect(syncStateStore.status.state).toBe('error');
+      expect(syncStateStore.status.error?.reason).toContain('530');
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('reports a session that vanishes after an ordinary reload', async () => {
+    // The common path: `bootstrap:<userId>` already exists, so
+    // SyncBootstrapGate never calls bootstrap() and only setCurrentUser
+    // seeds the identity. Without that seeding this failure is silent.
+    await seedCharacter();
+    login();
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser(USER_ID);
+
+    const fetchMock = vi.fn().mockImplementation(async () => cursorResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    orchestrator.start();
+    try {
+      await waitFor(() => expect(syncStateStore.status.state).toBe('synced'));
+
+      // Something cleared the session underneath us (e.g. a refresh
+      // that a proxy error turned into a logout).
+      tokenStore.clear();
+      orchestrator.triggerDrain();
+
+      // triggerDrain's wake() is dropped when the loop isn't parked in
+      // waitForSignal, so the report can be up to one 5s tick away.
+      await waitFor(() => expect(syncStateStore.status.state).toBe('error'), { timeout: 8_000 });
+      expect(syncStateStore.status.error?.reason).toMatch(/signed out/i);
+      const failed = (await getLocalDb().syncLog.toArray()).find((e) => e.result === 'failed');
+      expect(failed?.reason).toMatch(/signed out/i);
+    } finally {
+      orchestrator.stop();
+    }
+    // Room for the 5s loop tick above.
+  }, 20_000);
+
+  it('keeps the download failure visible when the upload succeeded', async () => {
+    // The upload empties the outbox, so the fallback refreshIndicator
+    // would flip the badge to 'synced' and drop the banner explaining
+    // that downloads are still broken.
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        return new Response(
+          JSON.stringify({
+            outcomes: body.operations.map((op) => ({
+              clientOpId: op.clientOpId,
+              status: 'applied' as const,
+              newRevision: 2,
+            })),
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (url.includes('/sync/cursor')) return new Response('error code: 530', { status: 530 });
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(() => expect(syncStateStore.status.state).toBe('error'));
+      // Give the post-drain fallback every chance to clobber it.
+      await new Promise((r) => setTimeout(r, 1_500));
+      expect(syncStateStore.status.state).toBe('error');
+      expect(syncStateStore.status.error?.reason).toContain('530');
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  }, 20_000);
+
+  it('clears the error reason once a cycle succeeds again', async () => {
+    await seedCharacter();
+    login();
+
+    let down = true;
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/sync/cursor')) {
+        if (down) return new Response('error code: 530', { status: 530 });
+        return cursorResponse();
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.start();
+    try {
+      await waitFor(() => expect(syncStateStore.status.state).toBe('error'));
+      down = false;
+      orchestrator.triggerDrain();
+      // Generous: the store holds every state for a minimum dwell of 1s
+      // so transitions stay perceptible, so recovery can't be instant.
+      await waitFor(() => expect(syncStateStore.status.state).toBe('synced'), { timeout: 5_000 });
+      // A stale reason on a healthy badge would be its own lie.
+      expect(syncStateStore.status.error).toBeNull();
+    } finally {
+      orchestrator.stop();
+    }
+  });
+});
+
+describe('rejection housekeeping without a fresh bootstrap', () => {
+  it('replays open rejections on an ordinary authenticated reload', async () => {
+    // SyncBootstrapGate skips bootstrap() whenever the bootstrap flag
+    // exists -- the common path -- so replay used to never run there,
+    // and a persistent rollback toast did not survive the reload it was
+    // designed to survive.
+    login();
+    const db = getLocalDb();
+    await db.rejectionToasts.put({
+      id: 'rej-open',
+      clientOpId: 'rej-open',
+      userId: USER_ID,
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      humanName: 'ST',
+      reason: 'ST must be <= 20',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    });
+
+    const seen: string[] = [];
+    setRejectionNotifier((rec) => seen.push(rec.id));
+    try {
+      getSyncOrchestrator().setCurrentUser(USER_ID);
+      await waitFor(() => expect(seen).toContain('rej-open'));
+    } finally {
+      setRejectionNotifier(null);
+    }
+  });
+
+  it('replays when the notifier registers after the user is known', async () => {
+    // SyncProvider wires the notifier in a mount effect that can land
+    // after the gate sets the user; replaying into a null notifier
+    // would silently drop every toast.
+    login();
+    await getLocalDb().rejectionToasts.put({
+      id: 'rej-late',
+      clientOpId: 'rej-late',
+      userId: USER_ID,
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      humanName: 'DX',
+      reason: 'rejected',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    });
+
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+
+    const seen: string[] = [];
+    setRejectionNotifier((rec) => seen.push(rec.id));
+    try {
+      await waitFor(() => expect(seen).toContain('rej-late'));
+    } finally {
+      setRejectionNotifier(null);
+    }
+  });
+
+  it('prunes stale rejection records on that same pass', async () => {
+    login();
+    const db = getLocalDb();
+    await db.rejectionToasts.put({
+      id: 'rej-ancient',
+      clientOpId: 'rej-ancient',
+      userId: USER_ID,
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      humanName: 'ST',
+      reason: 'newer server revision',
+      status: 'rejected',
+      createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    setRejectionNotifier(() => {});
+    try {
+      getSyncOrchestrator().setCurrentUser(USER_ID);
+      await waitFor(async () => {
+        expect((await db.rejectionToasts.get('rej-ancient'))?.dismissedAt).toBeTruthy();
+      });
+    } finally {
+      setRejectionNotifier(null);
+    }
+  });
+
+  it("never replays another account's rejections", async () => {
+    // A session can end without a purge (a refresh-token rejection just
+    // clears the tokens), so signing in as someone else must not
+    // surface the previous account's toasts and their private labels.
+    login();
+    await getLocalDb().rejectionToasts.put({
+      id: 'rej-other',
+      clientOpId: 'rej-other',
+      userId: '0193b3c0-f1f0-7000-8000-00000000bbbb',
+      entityClass: 'character_skill',
+      entityId: 'skill-9',
+      humanName: 'skill "Another Account Secret"',
+      reason: 'rejected',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    });
+
+    const seen: string[] = [];
+    setRejectionNotifier((rec) => seen.push(rec.id));
+    try {
+      getSyncOrchestrator().setCurrentUser(USER_ID);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(seen).not.toContain('rej-other');
+    } finally {
+      setRejectionNotifier(null);
     }
   });
 });

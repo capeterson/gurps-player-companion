@@ -25,22 +25,86 @@ export class ApiError extends Error {
  * one-time-use rotation rejects it) and blow away the freshly-issued
  * tokens, logging the user out.
  */
-let refreshInFlight: Promise<boolean> | null = null;
+let refreshInFlight: Promise<RefreshResult> | null = null;
 
-async function refreshTokens(): Promise<boolean> {
+/**
+ * Why a refresh didn't produce a fresh token.
+ *
+ * `rejected` — the server judged the refresh token and said no; the
+ * session is over.
+ * `unavailable` — the server never got to judge it (5xx, proxy/tunnel
+ * error, transport failure). The session stands, and the caller needs
+ * the underlying failure rather than the 401 that started this: the
+ * whole point of the diagnostics in this change is that "HTTP 530"
+ * and "HTTP 401" send the user looking in completely different places.
+ */
+type RefreshResult =
+  | { ok: true }
+  | { ok: false; kind: 'rejected' }
+  | {
+      ok: false;
+      kind: 'unavailable';
+      /**
+       * The refresh response captured as plain, re-usable data.  Every
+       * caller that piled onto the same `refreshInFlight` promise gets
+       * this same result object, so handing them all one `Response`
+       * would let the first `parse()` consume the body and leave the
+       * rest throwing "body already read" — replacing the HTTP 530
+       * diagnostic with a misleading local TypeError. Each caller
+       * reconstructs its own Response from these instead.
+       */
+      failure?: { status: number; bodyText: string; contentType: string | null };
+      cause?: unknown;
+    };
+
+async function refreshTokens(): Promise<RefreshResult> {
   if (refreshInFlight) return refreshInFlight;
-  const promise = (async () => {
+  const promise = (async (): Promise<RefreshResult> => {
     try {
       const tokens = tokenStore.read();
-      if (!tokens) return false;
-      const res = await fetch(`${API_ROOT}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-      });
+      if (!tokens) return { ok: false, kind: 'rejected' };
+      let res: Response;
+      try {
+        res = await fetch(`${API_ROOT}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+        });
+      } catch (cause) {
+        // Transport failure (offline, DNS, dropped connection).  The
+        // refresh token is almost certainly still valid -- keep it and
+        // let the caller retry.  See the comment below for why clearing
+        // here is so damaging.
+        return { ok: false, kind: 'unavailable', cause };
+      }
       if (!res.ok) {
-        tokenStore.clear();
-        return false;
+        // ONLY a definitive rejection invalidates the session.  A 5xx,
+        // or a reverse-proxy/tunnel error (502/503/504, Cloudflare
+        // 52x/530), means the server never got to judge the token --
+        // clearing on those silently signs the user out for the rest of
+        // the session.  Nothing prompts a re-login, because the app is
+        // local-first and keeps rendering Dexie data; meanwhile every
+        // orchestrator cycle bails at its `!tokenStore.read()` guard, so
+        // the sync badge freezes on whatever it last showed (typically
+        // 'error', from the request that triggered this refresh) with no
+        // toast and no way for the user to find out why.
+        if (res.status === 401 || res.status === 403) {
+          tokenStore.clear();
+          return { ok: false, kind: 'rejected' };
+        }
+        // Drain the body here, once, into plain data. Every caller
+        // awaiting this same promise reconstructs its own Response
+        // below rather than sharing a single consumable one.
+        const bodyText = await res.text().catch(() => '');
+        return {
+          ok: false,
+          kind: 'unavailable',
+          failure: {
+            status: res.status,
+            bodyText,
+            contentType: res.headers.get('content-type'),
+          },
+        };
       }
       const fresh = (await res.json()) as {
         accessToken: string;
@@ -48,7 +112,7 @@ async function refreshTokens(): Promise<boolean> {
         accessTokenExpiresIn: number;
       };
       tokenStore.write(fresh);
-      return true;
+      return { ok: true };
     } finally {
       refreshInFlight = null;
     }
@@ -77,7 +141,10 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
  * the access token expires.
  *
  * Non-2xx responses are NOT thrown — the caller decides how to handle
- * them (e.g. show a download error vs. a parse error).
+ * them (e.g. show a download error vs. a parse error).  The one
+ * exception is a refresh that couldn't reach the server at all: that
+ * transport error propagates, because there is no Response to hand
+ * back and the original 401 would misdescribe what happened.
  */
 export async function apiFetch(path: string, options: ApiOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
@@ -94,7 +161,27 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   const res = await fetch(`${API_ROOT}${path}`, init);
   if (res.status === 401 && options.authenticated !== false) {
     const refreshed = await refreshTokens();
-    if (refreshed) {
+    if (!refreshed.ok && refreshed.kind === 'unavailable') {
+      // Report the failure that actually blocked us. Returning the
+      // original 401 would have the caller record "HTTP 401 — token
+      // expired" during a total origin outage, sending the user to look
+      // at their account instead of at the server.
+      // A fresh Response per caller: concurrent 401s all await the one
+      // refresh promise, so sharing a single Response would let the
+      // first parse() drain the body and leave the rest throwing
+      // "body already read" instead of the real status.
+      if (refreshed.failure) {
+        const { status, bodyText, contentType } = refreshed.failure;
+        return new Response(bodyText, {
+          status,
+          headers: contentType ? { 'content-type': contentType } : {},
+        });
+      }
+      throw refreshed.cause instanceof Error
+        ? refreshed.cause
+        : new Error('Token refresh could not reach the server');
+    }
+    if (refreshed.ok) {
       const next = tokenStore.read();
       if (next) {
         const retryInit: RequestInit = {
