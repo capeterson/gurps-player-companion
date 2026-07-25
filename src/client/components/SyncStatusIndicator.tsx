@@ -16,11 +16,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { formatBytes, readLocalDbStatus } from '../lib/localDbStatus.ts';
-import { useSyncIndicatorState } from '../sync/useSyncIndicatorState.ts';
+import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 
 export function SyncStatusIndicator() {
-  const state = useSyncIndicatorState();
+  const { state, error } = useSyncStatus();
   const meta = STATE_META[state];
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [logOpen, setLogOpen] = useState(false);
@@ -43,7 +43,11 @@ export function SyncStatusIndicator() {
   });
 
   // Build a single-line tooltip: state message · storage info
-  const statusMsg = !online ? '⚠ Offline — changes will sync when reconnected' : meta.tooltip;
+  const statusMsg = !online
+    ? '⚠ Offline — changes will sync when reconnected'
+    : error
+      ? `⚠ ${error.reason} — click for details`
+      : meta.tooltip;
 
   let storageMsg = '';
   if (storage.data) {
@@ -98,7 +102,10 @@ const STATE_META = {
   error: {
     badgeClass: 'badge-warning',
     ariaLabel: 'Some changes failed to sync',
-    tooltip: "⚠ Some changes couldn't sync — see toast for details",
+    // Fallback only.  The live reason replaces this below -- and the
+    // dialog this badge opens is the durable record, which a toast the
+    // user already dismissed (or never saw) is not.
+    tooltip: "⚠ Sync isn't working — click for details",
     icon: <WarningIcon />,
   },
   synced: {

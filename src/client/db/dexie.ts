@@ -295,14 +295,37 @@ export interface SyncLogEntry {
    * respectively (`retrying` only on the transition INTO transient_retry,
    * so a forever-retrying op can't flush the journal). They're not
    * terminal outcomes like `synced`/`reverted`/`rolled_back`.
+   *
+   * `failed` is a whole-cycle failure -- the drain POST or the cursor
+   * pull itself errored (network drop, 5xx, proxy/tunnel error), so no
+   * individual operation has an outcome to report. These used to be
+   * logged nowhere at all, which left the red sync badge with nothing
+   * to point at.
    */
-  result: 'synced' | 'reverted' | 'requeued' | 'rolled_back' | 'retrying';
-  entityClass: EntityClass;
-  entityId: string;
-  command: OperationCommand;
+  result: 'synced' | 'reverted' | 'requeued' | 'rolled_back' | 'retrying' | 'failed';
+  /**
+   * Absent on `failed` cycle-level entries, which aren't about one
+   * entity.  Present on everything else.
+   */
+  entityClass?: EntityClass | undefined;
+  entityId?: string | undefined;
+  command?: OperationCommand | undefined;
   fieldPath?: string | undefined;
   humanName?: string | undefined;
   occurredAt: string;
+  /** One-line human-readable summary of a failure/rollback. */
+  reason?: string | undefined;
+  /**
+   * The value this event moved `fieldPath` away from / to, so the sync
+   * log can show what actually changed instead of just "character
+   * inventory patch".  Recorded for `push` and `local` entries only:
+   * those are always this user's OWN outgoing edits, the same values
+   * the outbox already holds.  Pull entries deliberately carry no row
+   * payload (see `appendSyncLog`).  Large values are truncated by
+   * `snapshotValue` so the bounded journal stays bounded.
+   */
+  previousValue?: unknown;
+  newValue?: unknown;
   details?: unknown;
 }
 

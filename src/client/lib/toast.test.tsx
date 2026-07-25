@@ -75,4 +75,63 @@ describe('ToastProvider persistent option', () => {
     });
     expect(screen.queryByText('persistent')).toBeNull();
   });
+
+  it('reports the dismissal so the caller can persist it', () => {
+    // Sync rejections need this: without it "dismissed" only ever meant
+    // "gone from React state", so every reload replayed rejections the
+    // user had already read.
+    const onDismiss = vi.fn();
+    render(
+      <ToastProvider>
+        <Capture />
+      </ToastProvider>,
+    );
+    act(() => {
+      captured?.push('rejection', { kind: 'error', persistent: true, id: 'op-1', onDismiss });
+    });
+    act(() => {
+      fireEvent.click(screen.getByLabelText('Dismiss notification'));
+    });
+    expect(onDismiss).toHaveBeenCalledWith('op-1');
+  });
+
+  it('runs an action button and clears the toast that offered it', () => {
+    const onClick = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <ToastProvider>
+        <Capture />
+      </ToastProvider>,
+    );
+    act(() => {
+      captured?.push('update ready', {
+        kind: 'info',
+        persistent: true,
+        id: 'sw-1',
+        onDismiss,
+        action: { label: 'Reload', onClick },
+      });
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    });
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(onDismiss).toHaveBeenCalledWith('sw-1');
+    expect(screen.queryByText('update ready')).toBeNull();
+  });
+
+  it('does not fire the dismissal callback while the toast is still open', () => {
+    const onDismiss = vi.fn();
+    render(
+      <ToastProvider>
+        <Capture />
+      </ToastProvider>,
+    );
+    act(() => {
+      captured?.push('rejection', { kind: 'error', persistent: true, id: 'op-1', onDismiss });
+      // Re-emitting the same record (bootstrap replay) updates in place.
+      captured?.push('rejection again', { kind: 'error', persistent: true, id: 'op-1', onDismiss });
+    });
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });

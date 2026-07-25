@@ -43,7 +43,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
-| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, each expandable (collapsed by default) to its before/after values and metadata. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -134,14 +134,32 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 | `stale_base` | Same as conflict — `baseRevision` was behind the server. If `latestEntity` shows the field unchanged, the client re-enqueues the op with the fresh revision instead of rolling back (the self-heal below); the server's batch-local fast-forward means a same-client burst now settles in one round trip rather than needing this self-heal per op. |
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
-| network error | Whole batch reverts to `transient_retry`; loop retries. |
+| network error | Whole batch reverts to `transient_retry`; loop retries, and a `failed` journal entry + a named indicator error record why. |
+
+## The session must survive a server outage
+
+`refreshTokens()` in `src/client/lib/api.ts` clears the token store **only** on
+a `401`/`403` from `/auth/refresh` — a definitive rejection of the refresh
+token. A `5xx`, a reverse-proxy/tunnel error (Cloudflare `52x`/`530`), or a
+transport failure leaves the session intact and returns `false` so the caller
+retries later.
+
+This is load-bearing, not a nicety. Clearing on any non-OK response means one
+badly-timed outage signs the user out permanently, and it does so **invisibly**:
+the local-first UI keeps rendering Dexie data, so nothing looks wrong, while
+every orchestrator cycle bails at its `!tokenStore.read()` guard without
+touching the indicator — freezing the badge on whatever it last showed, with no
+toast. (Observed in production during an HTTP 530 origin outage.) The
+orchestrator now also reports a session that disappears *after* bootstrap
+(`reportSessionLost`, latched so it fires once per loss) as a named indicator
+error plus a journal entry.
 
 ## Local sync log and recovery
 
 The `syncLog` Dexie store is a device-local operational journal, separate from
 the server-side entity history. Successful outbox outcomes are recorded as
 `push` with `result: 'synced'`, cursor changes as `pull`, and explicit user
-rollbacks as `local` with `result: 'reverted'`. Three more `result` values are
+rollbacks as `local` with `result: 'reverted'`. Four more `result` values are
 diagnostics-only, logged by `applyOutcomes` in the orchestrator:
 
 - `requeued` — the `stale_base` self-heal deleted a stale op and re-enqueued it
@@ -154,14 +172,39 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   retry attempt) so a stubbornly-failing op can't flush the 1,000-row journal;
   the live retry state (attempt count, backoff timing) is always visible via
   the outbox rows themselves.
+- `failed` — a **whole-cycle** failure: the drain POST or the cursor pull
+  itself errored (dropped connection, 5xx, reverse-proxy/tunnel error), so no
+  individual operation has an outcome to report. These carry no `entityClass` /
+  `entityId` / `command`; `reason` names the failure including its HTTP status
+  and `details` carries the raw error. **This class of failure previously
+  logged nothing anywhere** — no outbox row, no rejection record, no toast —
+  which left the red badge with nothing to point at during a server outage.
 
 It is pruned to the newest 1,000 records. Pull entries retain metadata and
 revision only, never cursor row payloads, so later access downgrades cannot
-leave private sheet data in the journal. Journal writes are best-effort: quota
-or IndexedDB failures never block outbox settlement. Pending state is never
-copied into the log; the sync view reads the authoritative outbox directly,
-including attempt count, backoff timing, and the raw operation outcome or
-HTTP/network error.
+leave private sheet data in the journal. `push` and `local` entries additionally
+carry `previousValue` / `newValue` snapshots (via `snapshotValue`, which caps
+each at `SYNC_LOG_VALUE_MAX_CHARS`) so the log UI can show *what changed*
+instead of just "character inventory patch"; those are always this user's own
+outgoing edits — the same values the outbox already holds — which is why the
+pull-side prohibition doesn't apply to them. Journal writes are best-effort:
+quota or IndexedDB failures never block outbox settlement. Pending state is
+never copied into the log; the sync view reads the authoritative outbox
+directly, including attempt count, backoff timing, and the raw operation
+outcome or HTTP/network error.
+
+**Every event in the dialog expands.** Queued outbox rows and journal entries
+both render as a `<details>` disclosure, **collapsed by default**, holding
+field, before/after values, entity class + id, operation, timing, attempt
+count, and the failure reason. The summary line stays a scannable one-liner.
+
+**The indicator's `error` state always carries a reason.** `syncStateStore`
+holds a `SyncErrorDetail { reason, at }` alongside the state; use
+`setError(reason)` rather than `set('error')`. The reason drives the badge
+tooltip and a banner at the top of the sync-log dialog, and is cleared
+automatically when the store leaves `error` (a successful cycle). The old
+tooltip — "see toast for details" — was a lie for every failure that produces
+no toast.
 
 **Download sync debug log.** The sync-log dialog's footer has a "Download sync
 debug log" button (`buildSyncDebugDump()` in `src/client/sync/debugDump.ts`)
@@ -173,6 +216,18 @@ excludes every entity store (characters, traits, skills, inventory, etc.) and
 the access/refresh tokens — a dump attached to a support request must not leak
 other players' cached sheets or session credentials. Assembly is pure Dexie
 reads with no network calls, so it works offline.
+
+**Rejection records have a lifecycle.** `rejectionToasts` rows back the
+persistent rollback toasts and are replayed on bootstrap so a failure survives a
+reload. Dismissing the toast now writes `dismissedAt` through the toast API's
+`onDismiss` hook (`markRejectionDismissed`) — previously "dismissed" meant only
+"removed from React state", so every bootstrap replayed every rejection the user
+had ever seen, and the table grew without bound for the life of the install
+(observed: 38 open records spanning two months, none dismissed).
+`pruneRejectionToasts` runs before each replay: it auto-dismisses records older
+than `REJECTION_REPLAY_MAX_AGE_MS` (7 days — a months-old rollback is noise, not
+news) and trims the table to `REJECTION_RETENTION`. Auto-dismissed rows are
+kept, not deleted; they remain the audit trail and stay in the debug dump.
 
 After four consecutive attempts, a pending operation is promoted as a repeated
 failure. The user may explicitly revert it under the same cross-tab drain lock:

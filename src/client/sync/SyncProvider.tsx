@@ -13,6 +13,7 @@ import { getLocalDb } from '../db/dexie.ts';
 import { mountEncounterInvalidations } from '../features/encounters/encounterInvalidation.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { getSyncOrchestrator, setRejectionNotifier } from './orchestrator.ts';
+import { markRejectionDismissed } from './syncLog.ts';
 import { getSyncWsSubscriber } from './wsSubscriber.ts';
 
 export function SyncProvider({ children }: { children: ReactNode }) {
@@ -32,6 +33,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         kind: 'error',
         persistent: true,
         id: rec.id,
+        // Acknowledgement has to reach Dexie, or the next bootstrap
+        // replays this rejection forever (and the pile grows without
+        // bound).  The record is kept, just marked read.
+        onDismiss: (id) => void markRejectionDismissed(id),
       });
     });
     return () => {
@@ -40,21 +45,6 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       setRejectionNotifier(null);
     };
   }, [toasts]);
-
-  // Wire user dismissal of a sync error toast back to the
-  // rejectionToasts row -- so a refresh doesn't re-surface a toast the
-  // user has already acknowledged.  We can't intercept dismiss() here
-  // cleanly; instead, the orchestrator just re-emits open records on
-  // bootstrap, and the user can clear them through the same ✕ button
-  // (which removes from the in-memory toast list).  Persistence across
-  // reload is best-effort.
-  useEffect(() => {
-    // Mark dismissed records non-persistent on next bootstrap by
-    // running a tiny sweep that deletes any rejectionToasts row that
-    // isn't currently visible in the toast list.  Skipped here for
-    // simplicity -- the orchestrator's replay only runs on bootstrap.
-    return undefined;
-  }, []);
 
   // Note: getLocalDb() is referenced to ensure Dexie is opened
   // eagerly so liveQueries elsewhere don't lazily-open later.

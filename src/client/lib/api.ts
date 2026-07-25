@@ -33,13 +33,32 @@ async function refreshTokens(): Promise<boolean> {
     try {
       const tokens = tokenStore.read();
       if (!tokens) return false;
-      const res = await fetch(`${API_ROOT}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${API_ROOT}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+        });
+      } catch {
+        // Transport failure (offline, DNS, dropped connection).  The
+        // refresh token is almost certainly still valid -- keep it and
+        // let the caller retry.  See the comment below for why clearing
+        // here is so damaging.
+        return false;
+      }
       if (!res.ok) {
-        tokenStore.clear();
+        // ONLY a definitive rejection invalidates the session.  A 5xx,
+        // or a reverse-proxy/tunnel error (502/503/504, Cloudflare
+        // 52x/530), means the server never got to judge the token --
+        // clearing on those silently signs the user out for the rest of
+        // the session.  Nothing prompts a re-login, because the app is
+        // local-first and keeps rendering Dexie data; meanwhile every
+        // orchestrator cycle bails at its `!tokenStore.read()` guard, so
+        // the sync badge freezes on whatever it last showed (typically
+        // 'error', from the request that triggered this refresh) with no
+        // toast and no way for the user to find out why.
+        if (res.status === 401 || res.status === 403) tokenStore.clear();
         return false;
       }
       const fresh = (await res.json()) as {

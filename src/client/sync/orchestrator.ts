@@ -52,7 +52,7 @@ import {
   setOutboxStatus,
 } from './outbox.ts';
 import { syncStateStore } from './state.ts';
-import { appendSyncLog } from './syncLog.ts';
+import { appendSyncLog, pruneRejectionToasts, snapshotValue } from './syncLog.ts';
 
 const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character',
@@ -158,6 +158,8 @@ class SyncOrchestrator {
    * before bootstrap are no-ops anyway).
    */
   private currentUserId: string | null = null;
+  /** Latches `reportSessionLost` so a lost session logs once, not every cycle. */
+  private sessionLostReported = false;
 
   /** Idempotent.  Wires online/offline + outbox liveQuery + drain loop. */
   start(): void {
@@ -237,7 +239,17 @@ class SyncOrchestrator {
    */
   private async pullInner(force: boolean): Promise<boolean> {
     if (this.recoveryInProgress && !force) return false;
-    if (!tokenStore.read()) return false;
+    if (!tokenStore.read()) {
+      // A session that vanished *after* bootstrap wasn't a sign-out --
+      // something invalidated it underneath the user (see the refresh
+      // handling in lib/api.ts).  Say so: every later cycle bails right
+      // here without touching the indicator, so staying quiet freezes
+      // the badge on its last value with nothing to explain it.
+      if (this.currentUserId !== null) {
+        this.reportSessionLost();
+      }
+      return false;
+    }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
     // Don't flip the indicator to 'syncing' just to *check* for changes —
     // the periodic loop polls every 5s and would otherwise leave the
@@ -291,10 +303,34 @@ class SyncOrchestrator {
       const pending = await countPending();
       this.refreshIndicator(pending);
       return true;
-    } catch (_err) {
-      syncStateStore.set('error');
-      throw _err;
+    } catch (err) {
+      // Leave a trace.  A failing pull produces no outbox row, no
+      // rejection record and no toast, so before this the only symptom
+      // was a red badge telling the user to go read a toast that never
+      // existed.
+      const reason = failureReason(err, 'Downloading server changes failed');
+      await appendSyncLog({
+        direction: 'pull',
+        result: 'failed',
+        reason,
+        details: { error: errorDetails(err) },
+      });
+      syncStateStore.setError(reason);
+      throw err;
     }
+  }
+
+  /**
+   * The session disappeared mid-run.  Surfaces it once (not on every
+   * 5s cycle) as a red badge with an actionable reason plus a journal
+   * entry, instead of silently going quiet.
+   */
+  private reportSessionLost(): void {
+    if (this.sessionLostReported) return;
+    this.sessionLostReported = true;
+    const reason = 'Signed out — sign in again to resume syncing';
+    void appendSyncLog({ direction: 'local', result: 'failed', reason });
+    syncStateStore.setError(reason);
   }
 
   /**
@@ -455,6 +491,13 @@ class SyncOrchestrator {
         command: op.command,
         fieldPath: op.fieldPath,
         humanName: op.humanName,
+        reason: op.serverReason
+          ? `Discarded by user after ${op.attemptCount} failed attempts — ${op.serverReason}`
+          : `Discarded by user after ${op.attemptCount} failed attempts`,
+        // Direction of travel is inverted here: the local row went back
+        // to `prevValue`, discarding `attemptedValue`.
+        previousValue: snapshotValue(op.attemptedValue),
+        newValue: snapshotValue(op.prevValue),
       });
       if (op.fieldPath) {
         flashBus.emit({
@@ -543,7 +586,13 @@ class SyncOrchestrator {
 
   private async maybeDrainOnce(): Promise<void> {
     if (this.recoveryInProgress) return;
-    if (!tokenStore.read()) return;
+    if (!tokenStore.read()) {
+      if (this.currentUserId !== null) this.reportSessionLost();
+      return;
+    }
+    // A session is back (re-login, or a refresh that finally succeeded)
+    // -- re-arm the latch so a future loss is reported again.
+    this.sessionLostReported = false;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       // Can't drain while offline -- leave the indicator showing
       // 'syncing' if anything is pending so the user knows their
@@ -596,7 +645,14 @@ class SyncOrchestrator {
             lastError: errorDetails(err),
           });
         }
-        syncStateStore.set('error');
+        const reason = failureReason(err, 'Uploading changes failed');
+        await appendSyncLog({
+          direction: 'push',
+          result: 'failed',
+          reason,
+          details: { operationCount: ops.length, error: errorDetails(err) },
+        });
+        syncStateStore.setError(reason);
         return;
       }
       await this.applyOutcomes(ops, outcomes);
@@ -644,6 +700,8 @@ class SyncOrchestrator {
             command: op.command,
             fieldPath: op.fieldPath,
             humanName: op.humanName,
+            previousValue: snapshotValue(op.prevValue),
+            newValue: snapshotValue(op.attemptedValue),
             details: outcome,
           });
           await db.outbox.delete(op.clientOpId);
@@ -806,7 +864,9 @@ class SyncOrchestrator {
     await this.revertLocal(op, outcome);
     // Persistent toast + flash event so the input animates.
     await this.recordRejection(op, outcome);
-    syncStateStore.set('error');
+    syncStateStore.setError(
+      `Couldn't sync ${op.humanName ?? op.entityClass} — ${outcome.reason ?? 'sync rejected'}`,
+    );
     if (op.fieldPath) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
@@ -821,6 +881,12 @@ class SyncOrchestrator {
       command: op.command,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
+      reason: outcome.reason ?? 'sync rejected',
+      // The value the server refused, and the one the local row was put
+      // back to -- the two things a user actually wants to know when
+      // they find a rolled-back edit in the log.
+      previousValue: snapshotValue(op.prevValue),
+      newValue: snapshotValue(op.attemptedValue),
       details: outcome,
     });
     await db.outbox.delete(op.clientOpId);
@@ -852,7 +918,7 @@ class SyncOrchestrator {
     };
     await db.rejectionToasts.put(rec);
     notifyRejection(rec);
-    syncStateStore.set('error');
+    syncStateStore.setError(`Couldn't sync ${rec.humanName ?? op.entityClass} — ${rec.reason}`);
     if (op.fieldPath) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
@@ -867,6 +933,9 @@ class SyncOrchestrator {
       command: op.command,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
+      reason: rec.reason,
+      previousValue: snapshotValue(op.prevValue),
+      newValue: snapshotValue(op.attemptedValue),
       details: outcome,
     });
     await db.outbox.delete(op.clientOpId);
@@ -1225,6 +1294,10 @@ class SyncOrchestrator {
 
   private async replayRejectionToasts(): Promise<void> {
     const db = getLocalDb();
+    // Auto-dismiss anything too old to be news and trim the table
+    // before replaying, so bootstrap can't bury the user under months
+    // of accumulated toasts.
+    await pruneRejectionToasts();
     // Dexie's `.equals(undefined)` throws ("Keys must be of type string,
     // number, Date or Array"), so a where()/or() chain on `dismissedAt`
     // can't catch both the unset and explicit-empty-string states. Fall
@@ -1458,6 +1531,21 @@ function toEnvelope(op: OutboxEntry): OperationEnvelope {
     batchId: op.batchId,
     createdAt: op.enqueuedAt,
   };
+}
+
+/**
+ * A short, user-facing sentence for a whole-cycle failure.  HTTP status
+ * is included because "HTTP 530" is the difference between "my server
+ * is down" and "my edit was rejected" -- and the user is the one who
+ * has to tell those apart when the badge goes red.
+ */
+function failureReason(err: unknown, prefix: string): string {
+  if (err instanceof ApiError) {
+    const detail = err.message === `HTTP ${err.status}` ? '' : ` — ${err.message}`;
+    return `${prefix} (HTTP ${err.status})${detail}`;
+  }
+  if (err instanceof Error) return `${prefix} — ${err.message}`;
+  return prefix;
 }
 
 function errorDetails(err: unknown): unknown {

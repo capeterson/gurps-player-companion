@@ -21,10 +21,23 @@ import { createPortal } from 'react-dom';
 
 export type ToastKind = 'error' | 'info' | 'success';
 
+/**
+ * An inline button on the toast.  A toast that tells the user something
+ * is available ("a new version is ready") needs to let them act on it
+ * without hunting for the equivalent control elsewhere.
+ */
+export interface ToastAction {
+  label: string;
+  onClick(): void;
+  /** Default true -- most actions replace the toast that offered them. */
+  dismissOnClick?: boolean;
+}
+
 export interface Toast {
   id: string;
   kind: ToastKind;
   message: string;
+  action?: ToastAction | undefined;
 }
 
 export interface ToastPushOpts {
@@ -40,6 +53,16 @@ export interface ToastPushOpts {
   persistent?: boolean;
   /** Caller-provided id; if omitted a fresh one is generated. */
   id?: string;
+  /**
+   * Called when the toast leaves the screen (✕ or an explicit
+   * `dismiss(id)`).  Persistent sync-rejection toasts use it to record
+   * the acknowledgement in Dexie -- without it, "dismissed" only ever
+   * meant "removed from React state", so every reload replayed every
+   * rejection the user had already read.
+   */
+  onDismiss?(id: string): void;
+  /** Inline button rendered before the ✕. */
+  action?: ToastAction | undefined;
 }
 
 export interface ToastApi {
@@ -58,6 +81,7 @@ export function useToasts(): ToastApi {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const dismissHandlers = useRef(new Map<string, (id: string) => void>());
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -66,20 +90,27 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       clearTimeout(t);
       timers.current.delete(id);
     }
+    const onDismiss = dismissHandlers.current.get(id);
+    if (onDismiss) {
+      dismissHandlers.current.delete(id);
+      onDismiss(id);
+    }
   }, []);
 
   const push = useCallback<ToastApi['push']>(
     (message, opts) => {
       const kind = opts?.kind ?? 'info';
       const id = opts?.id ?? `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      if (opts?.onDismiss) dismissHandlers.current.set(id, opts.onDismiss);
       setToasts((prev) => {
         // Dedup: if a toast with this id is already on screen (re-emit
         // from bootstrap, repeated rejection of the same op) replace
         // the existing entry rather than stacking.
+        const next: Toast = { id, kind, message, action: opts?.action };
         if (prev.some((t) => t.id === id)) {
-          return prev.map((t) => (t.id === id ? { id, kind, message } : t));
+          return prev.map((t) => (t.id === id ? next : t));
         }
-        return [...prev, { id, kind, message }];
+        return [...prev, next];
       });
       if (opts?.persistent) {
         // Caller will call dismiss() (e.g. when the user clicks ✕ or
@@ -124,9 +155,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           }
         >
           <span>{t.message}</span>
+          {t.action && (
+            <button
+              type="button"
+              className="btn btn-sm ml-auto shrink-0"
+              onClick={() => {
+                const { onClick, dismissOnClick } = t.action as ToastAction;
+                if (dismissOnClick !== false) dismiss(t.id);
+                onClick();
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             type="button"
-            className="btn btn-ghost btn-xs ml-auto shrink-0"
+            className={`btn btn-ghost btn-xs shrink-0 ${t.action ? '' : 'ml-auto'}`}
             onClick={() => dismiss(t.id)}
             aria-label="Dismiss notification"
           >

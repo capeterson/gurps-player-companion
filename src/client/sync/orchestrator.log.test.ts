@@ -13,6 +13,7 @@ import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
 import { enqueueFieldPatch } from './outbox.ts';
+import { syncStateStore } from './state.ts';
 
 function jwtForUser(userId: string): string {
   const enc = (value: unknown) =>
@@ -75,6 +76,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   tokenStore.clear();
   resetSyncOrchestratorForTests();
+  syncStateStore.reset('synced');
   await resetLocalDb();
 });
 
@@ -257,6 +259,117 @@ describe('applyOutcomes sync-log diagnostics', () => {
         entityId: CHAR_ID,
         fieldPath: 'st',
       });
+    } finally {
+      orchestrator.stop();
+    }
+  });
+
+  it('records the before/after values on a successful push', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'applied' as const,
+          newRevision: 2,
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) return cursorResponse();
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const log = await getLocalDb().syncLog.toArray();
+        expect(log.some((entry) => entry.result === 'synced')).toBe(true);
+      });
+      const log = await getLocalDb().syncLog.toArray();
+      const synced = log.find((entry) => entry.result === 'synced' && entry.direction === 'push');
+      // Without these the log could only say "character patch", which
+      // tells the user nothing about what actually changed.
+      expect(synced).toMatchObject({ fieldPath: 'st', previousValue: 10, newValue: 12 });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+});
+
+describe('whole-cycle failures', () => {
+  it('journals a failed pull with its HTTP status and names the reason on the indicator', async () => {
+    await seedCharacter();
+    login();
+
+    // No outbox rows: the drain loop goes straight to the cursor pull,
+    // which is the path that produced a red badge and no toast during
+    // the origin outage.
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/sync/cursor')) {
+        return new Response('error code: 530', { status: 530 });
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const log = await getLocalDb().syncLog.toArray();
+        expect(log.some((entry) => entry.result === 'failed')).toBe(true);
+      });
+      const failed = (await getLocalDb().syncLog.toArray()).find((e) => e.result === 'failed');
+      expect(failed).toMatchObject({ direction: 'pull' });
+      expect(failed?.reason).toContain('530');
+      expect(syncStateStore.status.state).toBe('error');
+      expect(syncStateStore.status.error?.reason).toContain('530');
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('clears the error reason once a cycle succeeds again', async () => {
+    await seedCharacter();
+    login();
+
+    let down = true;
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/sync/cursor')) {
+        if (down) return new Response('error code: 530', { status: 530 });
+        return cursorResponse();
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.start();
+    try {
+      await waitFor(() => expect(syncStateStore.status.state).toBe('error'));
+      down = false;
+      orchestrator.triggerDrain();
+      // Generous: the store holds every state for a minimum dwell of 1s
+      // so transitions stay perceptible, so recovery can't be instant.
+      await waitFor(() => expect(syncStateStore.status.state).toBe('synced'), { timeout: 5_000 });
+      // A stale reason on a healthy badge would be its own lie.
+      expect(syncStateStore.status.error).toBeNull();
     } finally {
       orchestrator.stop();
     }
