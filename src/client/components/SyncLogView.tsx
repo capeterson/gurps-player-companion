@@ -6,7 +6,11 @@ import { useDialogState } from '../hooks/useDialogState.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { buildSyncDebugDump } from '../sync/debugDump.ts';
-import { isOutboxAccessRestricted, isRecordAccessRestricted } from '../sync/minimalViewSweep.ts';
+import {
+  characterAccessFrom,
+  isOutboxAccessRestricted,
+  isRecordAccessRestricted,
+} from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
@@ -36,13 +40,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   // value, so this view has to apply the share gate itself rather than
   // print whatever the row happens to carry.
   const access = useLiveQuery(
-    async () => {
-      const chars = await getLocalDb().characters.toArray();
-      return {
-        known: new Set(chars.map((c) => c.id)),
-        masked: new Set(chars.filter((c) => c.minimalViewMasked).map((c) => c.id)),
-      };
-    },
+    async () => characterAccessFrom(await getLocalDb().characters.toArray()),
     [],
     { known: new Set<string>(), masked: new Set<string>() },
   );
@@ -171,7 +169,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-error">{changeName(op)}</p>
+                          <p className="font-semibold text-error">
+                            {changeName(op, isOutboxAccessRestricted(op, access))}
+                          </p>
                           <p className="text-base-content/70">
                             Failed {op.attemptCount} times ·{' '}
                             {formatTime(op.lastAttemptAt ?? op.enqueuedAt)}
@@ -202,7 +202,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
               {pending.map((op) => (
                 <ChangeRow
                   key={op.clientOpId}
-                  title={changeName(op)}
+                  title={changeName(op, isOutboxAccessRestricted(op, access))}
                   meta={`${statusLabel(op)} · ${formatTime(op.enqueuedAt)}`}
                   details={
                     <PendingDetails op={op} hideValues={isOutboxAccessRestricted(op, access)} />
@@ -215,7 +215,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
               {(log ?? []).map((entry) => (
                 <ChangeRow
                   key={entry.id}
-                  title={logName(entry)}
+                  title={logName(entry, isRecordAccessRestricted(entry, access))}
                   meta={`${directionLabel(entry)} · ${formatTime(entry.occurredAt)}`}
                   tone={
                     entry.result === 'failed' || entry.result === 'rolled_back' ? 'bad' : undefined
@@ -494,12 +494,18 @@ function hasValueSnapshot(entry: SyncLogEntry): boolean {
   return entry.previousValue !== undefined || entry.newValue !== undefined;
 }
 
-function changeName(op: OutboxEntry): string {
+/**
+ * `humanName` embeds private content on a child op (`skill "Stealth"`,
+ * `item "Hidden Blade"`), and it is the row's visible title -- so a
+ * restricted op falls back to the generic class label.
+ */
+function changeName(op: OutboxEntry, restricted = false): string {
+  if (restricted) return `${op.entityClass.replaceAll('_', ' ')} ${op.command}`;
   return op.humanName ?? `${op.entityClass.replaceAll('_', ' ')} ${op.fieldPath ?? op.command}`;
 }
 
-function logName(entry: SyncLogEntry): string {
-  if (entry.humanName) return entry.humanName;
+function logName(entry: SyncLogEntry, restricted = false): string {
+  if (entry.humanName && !restricted) return entry.humanName;
   // Cycle-level failures aren't about one entity.
   if (!entry.entityClass) return entry.reason ?? 'Sync cycle failed';
   return `${entry.entityClass.replaceAll('_', ' ')} ${entry.fieldPath ?? entry.command ?? ''}`.trim();

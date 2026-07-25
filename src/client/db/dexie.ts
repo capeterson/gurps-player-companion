@@ -71,6 +71,15 @@ export interface LocalCharacter {
   revision: number;
   /** Local-only marker used to rehydrate a row when minimal access returns to full. */
   minimalViewMasked?: boolean;
+  /**
+   * Local-only marker: the cursor's authoritative `accessible` set says
+   * this character is gone, but `pruneInaccessibleLocally` kept the row
+   * because an unsettled outbox op still references it. Without the
+   * marker the row simply looks present-and-unmasked, and the share
+   * gate would treat the character as fully accessible. Cleared when
+   * access returns.
+   */
+  accessRevoked?: boolean;
 }
 
 export interface LocalCharacterTrait {
@@ -368,6 +377,15 @@ export interface TombstoneRow {
 export interface RejectionRecord {
   id: string;
   clientOpId: string;
+  /**
+   * Who this rejection belongs to.  Logout purges the table, but a
+   * session can also end *without* a purge — a refresh-token rejection
+   * just clears the tokens — so signing in as someone else would
+   * otherwise replay the previous account's toasts, private labels and
+   * all. Replay only emits records matching the current user; rows
+   * without an id predate this field and are never replayed.
+   */
+  userId?: string | undefined;
   entityClass: EntityClass;
   entityId: string;
   /**

@@ -571,6 +571,7 @@ describe('rejection housekeeping without a fresh bootstrap', () => {
     await db.rejectionToasts.put({
       id: 'rej-open',
       clientOpId: 'rej-open',
+      userId: USER_ID,
       entityClass: 'character',
       entityId: CHAR_ID,
       humanName: 'ST',
@@ -597,6 +598,7 @@ describe('rejection housekeeping without a fresh bootstrap', () => {
     await getLocalDb().rejectionToasts.put({
       id: 'rej-late',
       clientOpId: 'rej-late',
+      userId: USER_ID,
       entityClass: 'character',
       entityId: CHAR_ID,
       humanName: 'DX',
@@ -622,6 +624,7 @@ describe('rejection housekeeping without a fresh bootstrap', () => {
     await db.rejectionToasts.put({
       id: 'rej-ancient',
       clientOpId: 'rej-ancient',
+      userId: USER_ID,
       entityClass: 'character',
       entityId: CHAR_ID,
       humanName: 'ST',
@@ -636,6 +639,34 @@ describe('rejection housekeeping without a fresh bootstrap', () => {
       await waitFor(async () => {
         expect((await db.rejectionToasts.get('rej-ancient'))?.dismissedAt).toBeTruthy();
       });
+    } finally {
+      setRejectionNotifier(null);
+    }
+  });
+
+  it("never replays another account's rejections", async () => {
+    // A session can end without a purge (a refresh-token rejection just
+    // clears the tokens), so signing in as someone else must not
+    // surface the previous account's toasts and their private labels.
+    login();
+    await getLocalDb().rejectionToasts.put({
+      id: 'rej-other',
+      clientOpId: 'rej-other',
+      userId: '0193b3c0-f1f0-7000-8000-00000000bbbb',
+      entityClass: 'character_skill',
+      entityId: 'skill-9',
+      humanName: 'skill "Another Account Secret"',
+      reason: 'rejected',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    });
+
+    const seen: string[] = [];
+    setRejectionNotifier((rec) => seen.push(rec.id));
+    try {
+      getSyncOrchestrator().setCurrentUser(USER_ID);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(seen).not.toContain('rej-other');
     } finally {
       setRejectionNotifier(null);
     }

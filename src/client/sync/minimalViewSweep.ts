@@ -71,8 +71,36 @@ export function characterIdsToMinimize(args: {
 export interface LocalCharacterAccess {
   /** Ids of character rows present in Dexie. */
   readonly known: ReadonlySet<string>;
-  /** Ids whose private fields were masked by the sweep above. */
+  /**
+   * Ids the viewer may not see in full: masked by the share-gate sweep,
+   * or retained-but-revoked (`accessRevoked`) because an unsettled op
+   * blocked the prune. Build it with `characterAccessFrom` so both
+   * sources are always included.
+   */
   readonly masked: ReadonlySet<string>;
+}
+
+/** The character-row fields the access snapshot needs. */
+export interface AccessInputCharacter {
+  readonly id: string;
+  readonly minimalViewMasked?: boolean | undefined;
+  readonly accessRevoked?: boolean | undefined;
+}
+
+/**
+ * Build the access snapshot every share-gate read uses.  Single helper
+ * so no caller can forget one of the two ways a character stops being
+ * fully visible.
+ */
+export function characterAccessFrom(
+  characters: readonly AccessInputCharacter[],
+): LocalCharacterAccess {
+  return {
+    known: new Set(characters.map((c) => c.id)),
+    masked: new Set(
+      characters.filter((c) => c.minimalViewMasked || c.accessRevoked).map((c) => c.id),
+    ),
+  };
 }
 
 /**
@@ -138,8 +166,13 @@ export function isRecordAccessRestricted(
     record.parentId ?? (record.entityClass === 'character' ? record.entityId : undefined);
   if (!characterId) return false;
   if (access.masked.has(characterId)) return true;
-  // Unlike a queued op, a written record's entity may legitimately be
-  // gone (deleted long ago), so a missing row is not on its own
-  // evidence of lost access -- only an active mask is.
+  // A child record whose parent character is gone: `pruneInaccessible-
+  // Locally` matches dirty ops by entityId only, so a queued CHILD op
+  // does not protect its parent row from being pruned. Reverting that
+  // child offline then writes a fresh snapshot naming a character the
+  // viewer can no longer see, with no later pull to redact it.
+  if (record.parentId !== undefined) return !access.known.has(record.parentId);
+  // A root record's own entity may legitimately be long deleted, so a
+  // missing row there is not on its own evidence of lost access.
   return false;
 }

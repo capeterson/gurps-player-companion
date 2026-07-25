@@ -157,7 +157,11 @@ describe('SyncLogView event details', () => {
 
     renderView();
 
-    const title = await screen.findByText('Masked item notes');
+    // The title falls back to the generic class label: `humanName` is
+    // private content too on a child op (`item "..."`), and it is the
+    // visible row title.
+    const title = await screen.findByText('character inventory patch');
+    expect(screen.queryByText('Masked item notes')).toBeNull();
     const detail = within(title.closest('details') as HTMLDetailsElement);
     expect(
       detail.getByText('hidden — you no longer have access to this character'),

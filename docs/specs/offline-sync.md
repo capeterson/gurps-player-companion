@@ -252,6 +252,16 @@ it mirrors because it was briefly duplicated in the dialog and the dump, and
 those must not drift). `SyncLogView` and `maskRestrictedOps()` in `debugDump.ts`
 both call it.
 
+Build the access snapshot with **`characterAccessFrom()`** — never by hand.
+A character stops being fully visible two ways, and both must be in `masked`:
+`minimalViewMasked` (share gate flipped off) and **`accessRevoked`**. The second
+covers a character the cursor's authoritative `accessible` set says is gone but
+that `pruneInaccessibleLocally` deliberately *kept*, because an unsettled outbox
+op still references it: that row is present and unmasked, so without the marker
+the share gate would read it as fully accessible. It is cleared as soon as
+access returns (unconditionally, before the prune's early return, or a character
+could never recover).
+
 A masked character always restricts. A **missing** character row means different
 things depending on the op:
 
@@ -271,14 +281,28 @@ only runs after a successful cursor pull — so a revert performed **offline**
 writes a fresh snapshot after the last sweep, with no later pull to clean it up.
 Both `SyncLogView` and the debug dump re-check journal entries and rejection
 records against the live masked set (the `Raw` details block is gated the same
-way; a `conflict` outcome can carry a whole `latestEntity` row). A written
-record's entity may legitimately be long deleted, so unlike a queued op only an
-*active mask* restricts it — a pruned character can't reach this path, because
-`pruneInaccessibleLocally` won't prune an entity that still has a queued op.
+way; a `conflict` outcome can carry a whole `latestEntity` row). A **child**
+record whose parent character is missing is restricted: `pruneInaccessible-
+Locally` matches dirty ops by `entityId` only, so a queued *child* op does not
+protect its parent row from being pruned, and reverting that child offline then
+writes a fresh snapshot naming a character the viewer can no longer see. A root
+record's own entity may legitimately be long deleted, so there only an active
+mask restricts.
 
-**Rejection records carry private content in `humanName`** (`skill "Stealth"`,
-`item "..."`), so they get `parentId` and the same treatment on both sides:
-scrubbed at rest by the sweep, re-checked at export time.
+**`humanName` is private content too**, on every surface — it reads
+`skill "Stealth"` / `item "Hidden Blade"` and it is the row's visible *title*.
+Hiding the before/after values while still printing the label defeats the point,
+so a restricted outbox op or journal entry falls back to its generic class label
+in the dialog and has `humanName` stripped in the export. Rejection records get
+`parentId` and the same treatment on both sides: scrubbed at rest by the sweep,
+re-checked at export time.
+
+**Rejection replay is account-scoped.** Records carry `userId`, and replay emits
+only the current user's. Logout purges the table, but a session can also end
+*without* a purge — a refresh-token rejection just clears the tokens — so
+signing in as someone else would otherwise replay the previous account's toasts,
+private labels and all. Rows with no `userId` predate the field and are never
+replayed.
 
 Journal writes are best-effort:
 quota or IndexedDB failures never block outbox settlement. Pending state is
@@ -305,7 +329,9 @@ from the outbox `liveQuery` as well as from the cycle paths, so with no guard
 *any* Dexie outbox change — including the delete that settles a successful
 upload — would flip the badge to `synced` and drop the banner. The orchestrator
 tracks `syncHealthy`, cleared by `markCycleFailed()` and set only by a cursor
-pull that completes; `refreshIndicator` refuses to go green while it is false.
+pull that completes; `refreshIndicator` returns early while it is false, so
+neither an emptied outbox (`synced`) **nor a fresh edit made during the outage**
+(`syncing`) can drop the reason without a successful cycle.
 (Per-operation rejections deliberately don't set it: those have their own
 persistent toast, and the badge should follow the queue.)
 

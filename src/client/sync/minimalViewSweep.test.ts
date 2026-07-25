@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  characterAccessFrom,
   characterIdsToMinimize,
   isOutboxAccessRestricted,
   isRecordAccessRestricted,
@@ -225,5 +226,45 @@ describe('isRecordAccessRestricted', () => {
 
   it('ignores cycle-failure entries that carry no entity', () => {
     expect(isRecordAccessRestricted({}, access([]))).toBe(false);
+  });
+});
+
+describe('characterAccessFrom', () => {
+  it('treats a retained-but-revoked character as masked', () => {
+    // pruneInaccessibleLocally keeps a character whose op is still
+    // unsettled, so the row is present and minimalViewMasked is false.
+    // Without accessRevoked it would look fully accessible.
+    const access = characterAccessFrom([{ id: 'c1', accessRevoked: true }]);
+    expect(access.known.has('c1')).toBe(true);
+    expect(access.masked.has('c1')).toBe(true);
+    expect(isOutboxAccessRestricted({ entityClass: 'character', entityId: 'c1' }, access)).toBe(
+      true,
+    );
+  });
+
+  it('includes share-gate masking too', () => {
+    const access = characterAccessFrom([{ id: 'c1', minimalViewMasked: true }]);
+    expect(access.masked.has('c1')).toBe(true);
+  });
+
+  it('leaves an ordinary character unmasked', () => {
+    const access = characterAccessFrom([{ id: 'c1' }]);
+    expect(access.masked.has('c1')).toBe(false);
+  });
+});
+
+describe('isRecordAccessRestricted with a missing parent', () => {
+  it('hides a child record whose parent character is gone', () => {
+    // pruneInaccessibleLocally matches dirty ops by entityId only, so a
+    // queued CHILD op does not protect its parent row from the prune.
+    const access = characterAccessFrom([]);
+    const entry = { entityClass: 'character_trait', entityId: 't1', parentId: 'c-gone' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(true);
+  });
+
+  it('still shows a child record whose parent is present', () => {
+    const access = characterAccessFrom([{ id: 'c1' }]);
+    const entry = { entityClass: 'character_trait', entityId: 't1', parentId: 'c1' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(false);
   });
 });

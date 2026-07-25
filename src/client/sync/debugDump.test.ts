@@ -272,6 +272,68 @@ describe('buildSyncDebugDump', () => {
     expect(serialized).not.toContain('FRESH-SECRET-AFTER');
   });
 
+  it('scrubs the private label, not just the values', async () => {
+    // humanName is the row title and reads `item "Hidden Blade"` --
+    // hiding before/after while exporting the label defeats the point.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-label',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.outbox.add({
+      clientOpId: 'op-label',
+      entityClass: 'character_inventory',
+      entityId: 'inv-9',
+      parentId: 'char-label',
+      command: 'patch',
+      coalesceKey: 'inv-9|notes',
+      fieldPath: 'notes',
+      attemptedValue: 'x',
+      humanName: 'item "HIDDEN-BLADE-NAME"',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('HIDDEN-BLADE-NAME');
+  });
+
+  it('masks a character kept only because its op is unsettled', async () => {
+    // pruneInaccessibleLocally retains it, so the row is present and
+    // minimalViewMasked is false -- accessRevoked is the only signal.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-revoked',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Revoked',
+      accessRevoked: true,
+    } as never);
+    await db.outbox.add({
+      clientOpId: 'op-revoked',
+      entityClass: 'character',
+      entityId: 'char-revoked',
+      command: 'patch',
+      coalesceKey: 'char-revoked|st',
+      fieldPath: 'st',
+      attemptedValue: 'REVOKED-SECRET-VALUE',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('REVOKED-SECRET-VALUE');
+  });
+
   it('leaves a speculative create alone — its row is absent by design', async () => {
     const db = getLocalDb();
     await db.outbox.add({

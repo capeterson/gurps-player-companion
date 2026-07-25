@@ -30,6 +30,10 @@ export type NewSyncLogEntry = Omit<SyncLogEntry, 'id' | 'occurredAt'> & {
  * accept up to 20,000 characters, so exempting strings would let a
  * handful of edits to those fields retain tens of MB across the 1,000
  * before/after pairs this journal keeps.
+ *
+ * The same applies to a raw server outcome: a `conflict`/`stale_base`
+ * response carries a whole `latestEntity` row, so `details` is capped
+ * through here too rather than stored verbatim.
  */
 export function snapshotValue(value: unknown): unknown {
   if (value === undefined || value === null) return value;

@@ -786,7 +786,7 @@ class SyncOrchestrator {
             humanName: op.humanName,
             previousValue: snapshotValue(op.prevValue),
             newValue: snapshotValue(op.attemptedValue),
-            details: outcome,
+            details: snapshotValue(outcome),
           });
           await db.outbox.delete(op.clientOpId);
           break;
@@ -975,7 +975,7 @@ class SyncOrchestrator {
       // "After" would show the user the rejected edit as their final
       // state and the restored one as discarded -- backwards.
       ...rollbackSnapshot(op, outcome),
-      details: outcome,
+      details: snapshotValue(outcome),
     });
     await db.outbox.delete(op.clientOpId);
   }
@@ -996,6 +996,7 @@ class SyncOrchestrator {
     const rec: RejectionRecord = {
       id: op.clientOpId,
       clientOpId: op.clientOpId,
+      userId: this.currentUserId ?? undefined,
       entityClass: op.entityClass,
       entityId: op.entityId,
       parentId: op.parentId,
@@ -1025,7 +1026,7 @@ class SyncOrchestrator {
       humanName: op.humanName,
       reason: rec.reason,
       ...rollbackSnapshot(op, outcome),
-      details: outcome,
+      details: snapshotValue(outcome),
     });
     await db.outbox.delete(op.clientOpId);
   }
@@ -1041,6 +1042,7 @@ class SyncOrchestrator {
     const rec: RejectionRecord = {
       id: op.clientOpId,
       clientOpId: op.clientOpId,
+      userId: this.currentUserId ?? undefined,
       entityClass: op.entityClass,
       entityId: op.entityId,
       parentId: op.parentId,
@@ -1393,11 +1395,20 @@ class SyncOrchestrator {
     // can't catch both the unset and explicit-empty-string states. Fall
     // back to a full-table filter — `rejectionToasts` is a small,
     // user-scoped set, so the cost is negligible.
+    const viewerId = this.currentUserId;
     const open = await db.rejectionToasts
       .filter((r) => !r.dismissedAt)
       .toArray()
       .catch(() => [] as RejectionRecord[]);
-    for (const r of open) notifyRejection(r);
+    for (const r of open) {
+      // Only this account's rejections. A session can end without a
+      // purge (a refresh-token rejection just clears the tokens), so
+      // signing in as someone else would otherwise surface the previous
+      // account's toasts -- private skill/item labels included. Rows
+      // with no userId predate the field and can't be attributed.
+      if (r.userId === undefined || r.userId !== viewerId) continue;
+      notifyRejection(r);
+    }
   }
 
   /**
@@ -1541,6 +1552,14 @@ class SyncOrchestrator {
 
     const [chars, camps] = await Promise.all([db.characters.toArray(), db.campaigns.toArray()]);
 
+    // Clear the revoked mark first, and unconditionally: a character
+    // whose access came back must recover even when nothing else is
+    // stale (the early return below would otherwise skip it forever).
+    const regained = chars.filter((c) => c.accessRevoked && accessibleCharacterIds.has(c.id));
+    if (regained.length > 0) {
+      await db.characters.bulkPut(regained.map((c) => ({ ...c, accessRevoked: false })));
+    }
+
     const staleCharacterIds = chars
       .filter((c) => !accessibleCharacterIds.has(c.id) && c.revision >= 0)
       .map((c) => c.id);
@@ -1565,6 +1584,18 @@ class SyncOrchestrator {
 
     const charIdsToDelete = staleCharacterIds.filter((id) => !dirtyEntityIds.has(id));
     const campaignIdsToDelete = staleCampaignIds.filter((id) => !dirtyEntityIds.has(id));
+
+    // A character we deliberately KEEP (its op still has to be
+    // delivered) would otherwise look present-and-unmasked, i.e. fully
+    // accessible, to the share gate. Mark it so the dialog and the
+    // debug dump can tell the difference; clear the mark for any
+    // character whose access came back.
+    const retained = new Set(staleCharacterIds.filter((id) => dirtyEntityIds.has(id)));
+    const newlyRevoked = chars.filter((c) => retained.has(c.id) && !c.accessRevoked);
+    if (newlyRevoked.length > 0) {
+      await db.characters.bulkPut(newlyRevoked.map((c) => ({ ...c, accessRevoked: true })));
+    }
+
     if (charIdsToDelete.length === 0 && campaignIdsToDelete.length === 0) return;
 
     // Single transaction across every affected store so observers see
@@ -1607,17 +1638,14 @@ class SyncOrchestrator {
   }
 
   private refreshIndicator(pending: number): void {
-    if (pending > 0) {
-      syncStateStore.set('syncing');
-      return;
-    }
-    // An outstanding cycle failure outlives an empty outbox. This runs
-    // from the outbox liveQuery too, so without the guard *any* Dexie
-    // outbox change -- including the delete that settles a successful
-    // upload -- would flip the badge to 'synced' and drop the banner
-    // explaining that downloads are still failing.
+    // An outstanding cycle failure outlives ANY outbox state. This runs
+    // from the outbox liveQuery, so without the guard the delete that
+    // settles a successful upload would flip the badge to 'synced', and
+    // a fresh edit made *during* the outage would flip it to 'syncing'
+    // -- either way dropping the reason and its banner without a single
+    // successful cycle.
     if (!this.syncHealthy) return;
-    syncStateStore.set('synced');
+    syncStateStore.set(pending > 0 ? 'syncing' : 'synced');
   }
 
   /** A cycle failed; the badge must not go green until one succeeds. */

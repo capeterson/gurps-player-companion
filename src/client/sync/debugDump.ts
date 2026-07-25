@@ -22,6 +22,7 @@ import { getLocalDb } from '../db/dexie.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import {
   type LocalCharacterAccess,
+  characterAccessFrom,
   isOutboxAccessRestricted,
   isRecordAccessRestricted,
 } from './minimalViewSweep.ts';
@@ -57,19 +58,13 @@ const HIDDEN = '[hidden — no access to this character]';
  * drift.  This is the surface where it matters most: the dump is a file
  * the user hands to someone else.
  */
-function accessFrom(
-  characters: Array<{ id: string; minimalViewMasked?: boolean | undefined }>,
-): LocalCharacterAccess {
-  return {
-    known: new Set(characters.map((c) => c.id)),
-    masked: new Set(characters.filter((c) => c.minimalViewMasked).map((c) => c.id)),
-  };
-}
-
 function maskRestrictedOps(outbox: OutboxEntry[], access: LocalCharacterAccess): OutboxEntry[] {
   return outbox.map((op) =>
     isOutboxAccessRestricted(op, access)
-      ? { ...op, attemptedValue: HIDDEN, prevValue: HIDDEN }
+      ? // `humanName` is private content too on a child op -- it reads
+        // `skill "Stealth"` / `item "Hidden Blade"`. Hiding the values
+        // while exporting the label defeats the point.
+        { ...op, attemptedValue: HIDDEN, prevValue: HIDDEN, humanName: undefined }
       : op,
   );
 }
@@ -88,6 +83,8 @@ function maskRestrictedLog(entries: SyncLogEntry[], access: LocalCharacterAccess
           previousValue: undefined,
           newValue: undefined,
           details: undefined,
+          humanName: undefined,
+          fieldPath: undefined,
           redacted: true,
         }
       : entry,
@@ -155,7 +152,7 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
         }),
       ),
     ]);
-  const access = accessFrom(characterRows);
+  const access = characterAccessFrom(characterRows);
   const outbox = maskRestrictedOps(rawOutbox, access);
   const syncLog = maskRestrictedLog(rawSyncLog, access);
   const rejectionToasts = maskRestrictedRejections(rawRejections, access);
