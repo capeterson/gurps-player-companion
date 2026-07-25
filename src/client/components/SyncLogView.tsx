@@ -12,6 +12,7 @@ import {
   isRecordAccessRestricted,
 } from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
+import { readRevokedCharacters } from '../sync/syncLog.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
 
@@ -40,9 +41,10 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   // value, so this view has to apply the share gate itself rather than
   // print whatever the row happens to carry.
   const access = useLiveQuery(
-    async () => characterAccessFrom(await getLocalDb().characters.toArray()),
+    async () =>
+      characterAccessFrom(await getLocalDb().characters.toArray(), await readRevokedCharacters()),
     [],
-    { known: new Set<string>(), masked: new Set<string>() },
+    { known: new Set<string>(), masked: new Set<string>(), revoked: new Set<string>() },
   );
   const [revertTarget, setRevertTarget] = useState<OutboxEntry | null>(null);
   const [resyncOpen, setResyncOpen] = useState(false);

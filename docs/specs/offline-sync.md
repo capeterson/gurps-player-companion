@@ -252,7 +252,8 @@ it mirrors because it was briefly duplicated in the dialog and the dump, and
 those must not drift). `SyncLogView` and `maskRestrictedOps()` in `debugDump.ts`
 both call it.
 
-Build the access snapshot with **`characterAccessFrom()`** — never by hand.
+Build the access snapshot with **`characterAccessFrom()`** — never by hand
+(it takes the character rows *and* the revoked ledger below).
 A character stops being fully visible two ways, and both must be in `masked`:
 `minimalViewMasked` (share gate flipped off) and **`accessRevoked`**. The second
 covers a character the cursor's authoritative `accessible` set says is gone but
@@ -287,7 +288,17 @@ Locally` matches dirty ops by `entityId` only, so a queued *child* op does not
 protect its parent row from being pruned, and reverting that child offline then
 writes a fresh snapshot naming a character the viewer can no longer see. A root
 record's own entity may legitimately be long deleted, so there only an active
-mask restricts.
+mask restricts — *unless* the id is in the revoked ledger.
+
+**The revoked ledger makes the deleted-row case fail closed.**
+`rememberRevokedCharacters()` records revoked ids in `syncMeta`
+(`REVOKED_CHARACTERS_KEY`, capped at `REVOKED_CHARACTERS_RETENTION`), written
+**before** the best-effort redaction at both revocation points. The prune
+deletes the character row first, and `redactSyncLogForCharacters` is
+deliberately best-effort — diagnostic housekeeping must never break a sync
+cycle — so if it fails on quota or an aborted transaction, the row is gone,
+nothing is marked, and a read-time check would see "unknown character" and fail
+**open**. The ledger outlives the row and closes that path.
 
 **`humanName` is private content too**, on every surface — it reads
 `skill "Stealth"` / `item "Hidden Blade"` and it is the row's visible *title*.
@@ -298,11 +309,20 @@ in the dialog and has `humanName` stripped in the export. Rejection records get
 re-checked at export time.
 
 **Rejection replay is account-scoped.** Records carry `userId`, and replay emits
-only the current user's. Logout purges the table, but a session can also end
-*without* a purge — a refresh-token rejection just clears the tokens — so
-signing in as someone else would otherwise replay the previous account's toasts,
-private labels and all. Rows with no `userId` predate the field and are never
+only the current user's. Rows with no `userId` predate the field and are never
 replayed.
+
+**And the local database itself is claimed by one account.**
+`src/client/sync/activeUser.ts` records which user Dexie belongs to, in
+localStorage so `SyncBootstrapGate` can read it **synchronously on first render**
+and block before anything paints. On a mismatch the gate purges and re-bootstraps
+from zero. Sign-out already purges, so the UI path was safe; the gap is a session
+that ends *without* one — a refresh-token rejection just clears the tokens — after
+which signing in as a different, **already bootstrapped** account would find its
+`bootstrap:<userId>` flag set, render immediately, and show the previous user's
+characters, outbox and journal as the new user's own. Worse, the share-gate
+snapshot is derived from those same stale character rows, so they read as present
+and unmasked, i.e. fully accessible. `purge()` clears the claim.
 
 Journal writes are best-effort:
 quota or IndexedDB failures never block outbox settlement. Pending state is

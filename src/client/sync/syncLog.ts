@@ -147,6 +147,47 @@ export async function redactSyncLogForCharacters(characterIds: Iterable<string>)
   }
 }
 
+/** `syncMeta` key holding the ids whose access has been revoked locally. */
+export const REVOKED_CHARACTERS_KEY = 'revokedCharacters';
+/** Bound on that ledger; ids only, so this is generous. */
+export const REVOKED_CHARACTERS_RETENTION = 1_000;
+
+/**
+ * Remember that a character's access was revoked, independently of its
+ * row.
+ *
+ * `redactSyncLogForCharacters` is best-effort by design (diagnostic
+ * housekeeping must never break a sync cycle), and the prune deletes
+ * the character row *before* calling it. If the redaction then fails --
+ * quota, aborted transaction -- the row is gone, nothing is marked, and
+ * a read-time check on a root record would see "unknown character" and
+ * fail **open**. This ledger outlives the row so that path fails closed.
+ */
+export async function rememberRevokedCharacters(ids: Iterable<string>): Promise<void> {
+  const incoming = [...ids];
+  if (incoming.length === 0) return;
+  try {
+    const db = getLocalDb();
+    const existing = await readRevokedCharacters();
+    const merged = [...existing, ...incoming.filter((id) => !existing.includes(id))];
+    await db.syncMeta.put({
+      key: REVOKED_CHARACTERS_KEY,
+      value: merged.slice(-REVOKED_CHARACTERS_RETENTION),
+    });
+  } catch {
+    // Best-effort; the row-level markers still cover the common path.
+  }
+}
+
+export async function readRevokedCharacters(): Promise<string[]> {
+  try {
+    const row = await getLocalDb().syncMeta.get(REVOKED_CHARACTERS_KEY);
+    return Array.isArray(row?.value) ? (row.value as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Hard cap on stored rejection records. */
 export const REJECTION_RETENTION = 200;
 /**

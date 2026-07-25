@@ -78,6 +78,13 @@ export interface LocalCharacterAccess {
    * sources are always included.
    */
   readonly masked: ReadonlySet<string>;
+  /**
+   * Ids recorded as revoked in the durable ledger, which outlives the
+   * character row. Lets a read-time check on a root record whose row is
+   * already deleted fail **closed** even if the best-effort redaction
+   * that should have scrubbed it never ran.
+   */
+  readonly revoked: ReadonlySet<string>;
 }
 
 /** The character-row fields the access snapshot needs. */
@@ -89,17 +96,19 @@ export interface AccessInputCharacter {
 
 /**
  * Build the access snapshot every share-gate read uses.  Single helper
- * so no caller can forget one of the two ways a character stops being
+ * so no caller can forget one of the ways a character stops being
  * fully visible.
  */
 export function characterAccessFrom(
   characters: readonly AccessInputCharacter[],
+  revokedIds: Iterable<string> = [],
 ): LocalCharacterAccess {
   return {
     known: new Set(characters.map((c) => c.id)),
     masked: new Set(
       characters.filter((c) => c.minimalViewMasked || c.accessRevoked).map((c) => c.id),
     ),
+    revoked: new Set(revokedIds),
   };
 }
 
@@ -166,13 +175,17 @@ export function isRecordAccessRestricted(
     record.parentId ?? (record.entityClass === 'character' ? record.entityId : undefined);
   if (!characterId) return false;
   if (access.masked.has(characterId)) return true;
+  // The durable ledger outlives the deleted row, so a redaction that
+  // silently failed can't leave this fully open.
+  if (access.revoked.has(characterId)) return true;
   // A child record whose parent character is gone: `pruneInaccessible-
   // Locally` matches dirty ops by entityId only, so a queued CHILD op
   // does not protect its parent row from being pruned. Reverting that
   // child offline then writes a fresh snapshot naming a character the
   // viewer can no longer see, with no later pull to redact it.
   if (record.parentId !== undefined) return !access.known.has(record.parentId);
-  // A root record's own entity may legitimately be long deleted, so a
-  // missing row there is not on its own evidence of lost access.
+  // A root record's own entity may legitimately be long deleted (the
+  // user deleted their own character), so absence alone isn't evidence
+  // of lost access -- the ledger above is.
   return false;
 }

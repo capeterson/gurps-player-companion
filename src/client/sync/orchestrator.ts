@@ -41,6 +41,7 @@ import {
 } from '../db/dexie.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
+import { clearActiveUser } from './activeUser.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
 import { characterIdsToMinimize } from './minimalViewSweep.ts';
 import {
@@ -56,6 +57,7 @@ import {
   appendSyncLog,
   pruneRejectionToasts,
   redactSyncLogForCharacters,
+  rememberRevokedCharacters,
   snapshotValue,
 } from './syncLog.ts';
 
@@ -589,6 +591,9 @@ class SyncOrchestrator {
   /** Wipe Dexie and reset state -- called on logout. */
   async purge(): Promise<void> {
     this.currentUserId = null;
+    this.rejectionHousekeepingDone = false;
+    // The wiped Dexie no longer belongs to anyone.
+    clearActiveUser();
     if (this.bootstrapRetryTimer) clearTimeout(this.bootstrapRetryTimer);
     this.bootstrapRetryTimer = null;
     await this.clearAllLocalStores();
@@ -1516,6 +1521,7 @@ class SyncOrchestrator {
     // another surface carrying character data, so a share=false flip
     // has to reach it too or the masked character's real values stay
     // readable in the sync dialog and the debug dump.
+    await rememberRevokedCharacters(idArray);
     await redactSyncLogForCharacters(idArray);
     return restored.length > 0;
   }
@@ -1557,7 +1563,11 @@ class SyncOrchestrator {
     // stale (the early return below would otherwise skip it forever).
     const regained = chars.filter((c) => c.accessRevoked && accessibleCharacterIds.has(c.id));
     if (regained.length > 0) {
-      await db.characters.bulkPut(regained.map((c) => ({ ...c, accessRevoked: false })));
+      // Marker only -- never rewrite the whole row from a snapshot that
+      // may already be stale.
+      await db.characters.bulkUpdate(
+        regained.map((c) => ({ key: c.id, changes: { accessRevoked: false } })),
+      );
     }
 
     const staleCharacterIds = chars
@@ -1590,10 +1600,17 @@ class SyncOrchestrator {
     // accessible, to the share gate. Mark it so the dialog and the
     // debug dump can tell the difference; clear the mark for any
     // character whose access came back.
+    //
+    // Update ONLY the marker: `chars` was read before the awaited
+    // outbox query above, so a full-row bulkPut would write that stale
+    // snapshot back over any field another tab committed in between --
+    // a silent, visible rollback of a value whose op is still pending.
     const retained = new Set(staleCharacterIds.filter((id) => dirtyEntityIds.has(id)));
     const newlyRevoked = chars.filter((c) => retained.has(c.id) && !c.accessRevoked);
     if (newlyRevoked.length > 0) {
-      await db.characters.bulkPut(newlyRevoked.map((c) => ({ ...c, accessRevoked: true })));
+      await db.characters.bulkUpdate(
+        newlyRevoked.map((c) => ({ key: c.id, changes: { accessRevoked: true } })),
+      );
     }
 
     if (charIdsToDelete.length === 0 && campaignIdsToDelete.length === 0) return;
@@ -1627,6 +1644,10 @@ class SyncOrchestrator {
         }
       },
     );
+    // Record the revocation BEFORE the best-effort redaction: the rows
+    // are already gone, so if that redaction fails this ledger is the
+    // only thing left that can keep those records closed.
+    await rememberRevokedCharacters(charIdsToDelete);
     // The journal holds before/after character values too; deleting the
     // rows while leaving those readable in the sync dialog and the
     // debug dump would defeat the purge.
@@ -1720,7 +1741,10 @@ async function reportCycleFailure(
     direction,
     result: 'failed',
     reason,
-    details: { ...extraDetails, error: errorDetails(err) },
+    // Capped like every other payload: `errorDetails` embeds the whole
+    // `ApiError.body`, and a server returning a large non-2xx body on
+    // every retry would otherwise fill the journal with copies of it.
+    details: snapshotValue({ ...extraDetails, error: errorDetails(err) }),
   });
   syncStateStore.setError(reason);
 }

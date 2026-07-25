@@ -4,12 +4,15 @@ import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import {
   REJECTION_REPLAY_MAX_AGE_MS,
   REJECTION_RETENTION,
+  REVOKED_CHARACTERS_RETENTION,
   SYNC_LOG_RETENTION,
   SYNC_LOG_VALUE_MAX_CHARS,
   appendSyncLog,
   markRejectionDismissed,
   pruneRejectionToasts,
+  readRevokedCharacters,
   redactSyncLogForCharacters,
+  rememberRevokedCharacters,
   snapshotValue,
 } from './syncLog.ts';
 
@@ -159,6 +162,37 @@ describe('redactSyncLogForCharacters', () => {
     await seedEntry({ id: 'd', entityClass: 'character', entityId: 'char-1' });
     expect(await redactSyncLogForCharacters([])).toBe(0);
     expect((await getLocalDb().syncLog.get('d'))?.previousValue).toBe('secret-before');
+  });
+});
+
+describe('revoked-character ledger', () => {
+  it('outlives the character row so a failed redaction fails closed', async () => {
+    // pruneInaccessibleLocally deletes the row BEFORE calling the
+    // best-effort redaction. If that redaction throws, the ledger is
+    // the only thing left that can keep those records restricted.
+    await rememberRevokedCharacters(['char-gone']);
+    expect(await readRevokedCharacters()).toContain('char-gone');
+  });
+
+  it('merges without duplicating', async () => {
+    await rememberRevokedCharacters(['a', 'b']);
+    await rememberRevokedCharacters(['b', 'c']);
+    expect(await readRevokedCharacters()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('stays bounded', async () => {
+    await rememberRevokedCharacters(
+      Array.from({ length: REVOKED_CHARACTERS_RETENTION + 50 }, (_, i) => `c${i}`),
+    );
+    const ids = await readRevokedCharacters();
+    expect(ids).toHaveLength(REVOKED_CHARACTERS_RETENTION);
+    // Newest kept, oldest dropped.
+    expect(ids).toContain(`c${REVOKED_CHARACTERS_RETENTION + 49}`);
+    expect(ids).not.toContain('c0');
+  });
+
+  it('reads as empty when nothing was recorded', async () => {
+    expect(await readRevokedCharacters()).toEqual([]);
   });
 });
 

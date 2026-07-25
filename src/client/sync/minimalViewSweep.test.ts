@@ -132,10 +132,10 @@ describe('characterIdsToMinimize', () => {
 });
 
 describe('isOutboxAccessRestricted', () => {
-  const access = (known: string[], masked: string[] = []) => ({
-    known: new Set(known),
-    masked: new Set(masked),
-  });
+  // Build via the shared helper -- hand-rolled snapshots are exactly
+  // the drift it exists to prevent.
+  const access = (known: string[], masked: string[] = []) =>
+    characterAccessFrom(known.map((id) => ({ id, minimalViewMasked: masked.includes(id) })));
 
   it('hides values for a masked character', () => {
     const op = { entityClass: 'character', entityId: 'c1', command: 'patch' };
@@ -196,10 +196,10 @@ describe('isOutboxAccessRestricted', () => {
 });
 
 describe('isRecordAccessRestricted', () => {
-  const access = (known: string[], masked: string[] = []) => ({
-    known: new Set(known),
-    masked: new Set(masked),
-  });
+  // Build via the shared helper -- hand-rolled snapshots are exactly
+  // the drift it exists to prevent.
+  const access = (known: string[], masked: string[] = []) =>
+    characterAccessFrom(known.map((id) => ({ id, minimalViewMasked: masked.includes(id) })));
 
   it('honours the at-rest redacted flag', () => {
     expect(isRecordAccessRestricted({ redacted: true }, access([]))).toBe(true);
@@ -250,6 +250,29 @@ describe('characterAccessFrom', () => {
   it('leaves an ordinary character unmasked', () => {
     const access = characterAccessFrom([{ id: 'c1' }]);
     expect(access.masked.has('c1')).toBe(false);
+  });
+});
+
+describe('isRecordAccessRestricted fail-closed ledger', () => {
+  it('restricts a root record whose character is in the revoked ledger', () => {
+    // The row is already deleted and the best-effort redaction may have
+    // failed; without the ledger this would read as an ordinary
+    // long-deleted entity and fail open.
+    const access = characterAccessFrom([], ['c-revoked']);
+    const entry = { entityClass: 'character', entityId: 'c-revoked', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(true);
+  });
+
+  it('restricts a child record whose parent is in the ledger', () => {
+    const access = characterAccessFrom([], ['c-revoked']);
+    const entry = { entityClass: 'character_skill', entityId: 's1', parentId: 'c-revoked' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(true);
+  });
+
+  it('still shows a record for a character the user simply deleted', () => {
+    const access = characterAccessFrom([], []);
+    const entry = { entityClass: 'character', entityId: 'c-mine', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access)).toBe(false);
   });
 });
 
