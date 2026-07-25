@@ -86,7 +86,13 @@ precached assets — and never say so.
 
 `registerSwLifecycle()` therefore polls `registration.update()` every
 `SW_UPDATE_POLL_MS` (1h) and on focus / visibility / `online`, throttled to one
-check per 5 minutes. When a new worker reaches `installed` **and the page is
+check per 5 minutes. It resolves its registration via `getRegistration()` and
+falls back to `navigator.serviceWorker.ready`: on a **first visit** there is no
+registration when this module runs (vite-plugin-pwa registers the worker on the
+window `load` event), so keying off `getRegistration()` alone would leave that
+tab with no timer and no listeners for the rest of its life. `ready` simply
+stays pending when the app runs without a service worker (dev), which is the
+correct no-op. When a new worker reaches `installed` **and the page is
 already controlled** (so a first-ever install isn't mistaken for an update), or
 when a worker installed by another tab is found parked in `registration.waiting`
 at startup, it dispatches `gpc:sw-update-ready` with a `reload()` callback and

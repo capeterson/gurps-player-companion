@@ -141,8 +141,16 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 `refreshTokens()` in `src/client/lib/api.ts` clears the token store **only** on
 a `401`/`403` from `/auth/refresh` — a definitive rejection of the refresh
 token. A `5xx`, a reverse-proxy/tunnel error (Cloudflare `52x`/`530`), or a
-transport failure leaves the session intact and returns `false` so the caller
-retries later.
+transport failure leaves the session intact and reports
+`{ kind: 'unavailable' }` so the caller retries later.
+
+It returns a typed `RefreshResult` rather than a boolean so `apiFetch` can
+**surface the outage instead of the 401 that triggered the refresh**: it returns
+the refresh's own response (or rethrows its transport error) in the
+`unavailable` case. Collapsing both to the original 401 would have the
+orchestrator journal "HTTP 401 — token expired" during a total origin outage,
+pointing the user at their account rather than at the server — defeating the
+diagnostics above.
 
 This is load-bearing, not a nicety. Clearing on any non-OK response means one
 badly-timed outage signs the user out permanently, and it does so **invisibly**:
@@ -201,7 +209,11 @@ rejected patch moves the row *away* from the refused `attemptedValue` and back
 to what `revertLocal` restored — `prevValue`, or the server's `latestEntity`
 field when one came back. `rollbackSnapshot()` is the single place that decides
 this; recording it the other way round would show the user their rejected edit
-as the final value and the restored one as discarded.
+as the final value and the restored one as discarded. The user-initiated
+`revertFailedOperation` follows the same rule, including its superseding-edit
+branch: when a newer same-field op is preserved the row lands on *that* value,
+not `prevValue`, and the journal has to say so or it contradicts what the sheet
+visibly shows.
 
 **The share gate reaches this journal too.** A GM or manager editing a player's
 sheet records that player's values here, and a `conflict`/`stale_base` outcome
@@ -212,8 +224,21 @@ and sets `redacted: true` on every entry whose `entityId` **or `parentId`**
 matches a character being minimized or pruned; both
 `enforceMinimalViewLocally` and `pruneInaccessibleLocally` call it. `parentId`
 is stored on child-class entries precisely so this match can find them. The row
-survives with its metadata, and the UI says the values were removed. Journal
-writes are best-effort:
+survives with its metadata, and the UI says the values were removed.
+
+**The outbox needs the same gate applied at read time.** Queued ops are
+deliberately *not* swept on a downgrade — the op is the user's own unsent intent
+and still has to be delivered, and `pruneInaccessibleLocally` explicitly refuses
+to prune an entity with unsettled local ops. So the two surfaces that *print*
+outbox values apply the decision themselves: `isAccessRestricted()` in
+`SyncLogView` and `maskRestrictedOps()` in `debugDump.ts` hide `prevValue` /
+`attemptedValue` when the op's character is `minimalViewMasked`, or when a
+`patch`'s character row has vanished entirely. `create`/`delete` are exempt from
+the missing-row test — the row is meant to be absent there, and the values are
+the user's own new or just-deleted content. The debug dump matters most here: it
+is a file the user hands to someone else.
+
+Journal writes are best-effort:
 quota or IndexedDB failures never block outbox settlement. Pending state is
 never copied into the log; the sync view reads the authoritative outbox
 directly, including attempt count, backoff timing, and the raw operation

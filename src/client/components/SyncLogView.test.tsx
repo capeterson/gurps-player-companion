@@ -126,6 +126,95 @@ describe('SyncLogView event details', () => {
     expect(detail.getByText('not recorded for downloads')).toBeInTheDocument();
   });
 
+  it('hides queued values for a character the viewer can no longer see', async () => {
+    // The outbox is deliberately not swept on downgrade -- the op still
+    // has to be delivered -- so this view has to apply the gate itself.
+    const db = getLocalDb();
+    await db.characters.put({
+      id: 'char-masked',
+      ownerId: 'someone-else',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+      revision: 3,
+    } as never);
+    await db.outbox.put({
+      clientOpId: 'op-masked',
+      entityClass: 'character_inventory',
+      entityId: 'inv-1',
+      parentId: 'char-masked',
+      command: 'patch',
+      coalesceKey: 'inv-1|notes',
+      fieldPath: 'notes',
+      attemptedValue: 'private-after',
+      prevValue: 'private-before',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+      humanName: 'Masked item notes',
+    } as never);
+
+    renderView();
+
+    const title = await screen.findByText('Masked item notes');
+    const detail = within(title.closest('details') as HTMLDetailsElement);
+    expect(
+      detail.getByText('hidden — you no longer have access to this character'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('private-before')).toBeNull();
+    expect(screen.queryByText('private-after')).toBeNull();
+  });
+
+  it('still shows queued values for a character the viewer owns', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      id: 'char-mine',
+      ownerId: 'me',
+      campaignId: null,
+      name: 'Mine',
+      revision: 1,
+    } as never);
+    await db.outbox.put({
+      clientOpId: 'op-mine',
+      entityClass: 'character',
+      entityId: 'char-mine',
+      command: 'patch',
+      coalesceKey: 'char-mine|st',
+      fieldPath: 'st',
+      attemptedValue: 14,
+      prevValue: 10,
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+      humanName: 'ST base',
+    } as never);
+
+    renderView();
+
+    const title = await screen.findByText('ST base');
+    const detail = within(title.closest('details') as HTMLDetailsElement);
+    expect(detail.getByText('Before')).toBeInTheDocument();
+    expect(detail.getByText('10')).toBeInTheDocument();
+    expect(detail.getByText('14')).toBeInTheDocument();
+  });
+
+  it('labels a local cycle failure as a sync failure, not a download', async () => {
+    await getLocalDb().syncLog.put({
+      id: 'log-local',
+      direction: 'local',
+      result: 'failed',
+      reason: 'Signed out — sign in again to resume syncing',
+      occurredAt: new Date().toISOString(),
+    });
+
+    renderView();
+
+    expect(await screen.findByText(/Sync failed/)).toBeInTheDocument();
+    expect(screen.queryByText(/Download failed/)).toBeNull();
+  });
+
   it('explains a failed cycle instead of showing a healthy log', async () => {
     syncStateStore.reset('synced');
     syncStateStore.setError('Downloading server changes failed (HTTP 530)');

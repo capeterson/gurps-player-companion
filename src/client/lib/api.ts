@@ -25,14 +25,30 @@ export class ApiError extends Error {
  * one-time-use rotation rejects it) and blow away the freshly-issued
  * tokens, logging the user out.
  */
-let refreshInFlight: Promise<boolean> | null = null;
+let refreshInFlight: Promise<RefreshResult> | null = null;
 
-async function refreshTokens(): Promise<boolean> {
+/**
+ * Why a refresh didn't produce a fresh token.
+ *
+ * `rejected` — the server judged the refresh token and said no; the
+ * session is over.
+ * `unavailable` — the server never got to judge it (5xx, proxy/tunnel
+ * error, transport failure). The session stands, and the caller needs
+ * the underlying failure rather than the 401 that started this: the
+ * whole point of the diagnostics in this change is that "HTTP 530"
+ * and "HTTP 401" send the user looking in completely different places.
+ */
+type RefreshResult =
+  | { ok: true }
+  | { ok: false; kind: 'rejected' }
+  | { ok: false; kind: 'unavailable'; response?: Response; cause?: unknown };
+
+async function refreshTokens(): Promise<RefreshResult> {
   if (refreshInFlight) return refreshInFlight;
-  const promise = (async () => {
+  const promise = (async (): Promise<RefreshResult> => {
     try {
       const tokens = tokenStore.read();
-      if (!tokens) return false;
+      if (!tokens) return { ok: false, kind: 'rejected' };
       let res: Response;
       try {
         res = await fetch(`${API_ROOT}/auth/refresh`, {
@@ -40,12 +56,12 @@ async function refreshTokens(): Promise<boolean> {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ refreshToken: tokens.refreshToken }),
         });
-      } catch {
+      } catch (cause) {
         // Transport failure (offline, DNS, dropped connection).  The
         // refresh token is almost certainly still valid -- keep it and
         // let the caller retry.  See the comment below for why clearing
         // here is so damaging.
-        return false;
+        return { ok: false, kind: 'unavailable', cause };
       }
       if (!res.ok) {
         // ONLY a definitive rejection invalidates the session.  A 5xx,
@@ -58,8 +74,11 @@ async function refreshTokens(): Promise<boolean> {
         // the sync badge freezes on whatever it last showed (typically
         // 'error', from the request that triggered this refresh) with no
         // toast and no way for the user to find out why.
-        if (res.status === 401 || res.status === 403) tokenStore.clear();
-        return false;
+        if (res.status === 401 || res.status === 403) {
+          tokenStore.clear();
+          return { ok: false, kind: 'rejected' };
+        }
+        return { ok: false, kind: 'unavailable', response: res };
       }
       const fresh = (await res.json()) as {
         accessToken: string;
@@ -67,7 +86,7 @@ async function refreshTokens(): Promise<boolean> {
         accessTokenExpiresIn: number;
       };
       tokenStore.write(fresh);
-      return true;
+      return { ok: true };
     } finally {
       refreshInFlight = null;
     }
@@ -96,7 +115,10 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
  * the access token expires.
  *
  * Non-2xx responses are NOT thrown — the caller decides how to handle
- * them (e.g. show a download error vs. a parse error).
+ * them (e.g. show a download error vs. a parse error).  The one
+ * exception is a refresh that couldn't reach the server at all: that
+ * transport error propagates, because there is no Response to hand
+ * back and the original 401 would misdescribe what happened.
  */
 export async function apiFetch(path: string, options: ApiOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
@@ -113,7 +135,17 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   const res = await fetch(`${API_ROOT}${path}`, init);
   if (res.status === 401 && options.authenticated !== false) {
     const refreshed = await refreshTokens();
-    if (refreshed) {
+    if (!refreshed.ok && refreshed.kind === 'unavailable') {
+      // Report the failure that actually blocked us. Returning the
+      // original 401 would have the caller record "HTTP 401 — token
+      // expired" during a total origin outage, sending the user to look
+      // at their account instead of at the server.
+      if (refreshed.response) return refreshed.response;
+      throw refreshed.cause instanceof Error
+        ? refreshed.cause
+        : new Error('Token refresh could not reach the server');
+    }
+    if (refreshed.ok) {
       const next = tokenStore.read();
       if (next) {
         const retryInit: RequestInit = {

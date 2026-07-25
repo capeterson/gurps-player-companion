@@ -29,6 +29,22 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
     () => getLocalDb().syncLog.orderBy('occurredAt').reverse().limit(1_000).toArray(),
     [],
   );
+  // The outbox is deliberately NOT swept when access is downgraded --
+  // a queued op is the user's own unsent intent and still has to be
+  // delivered. But its `prevValue` can hold another player's private
+  // value, so this view has to apply the share gate itself rather than
+  // print whatever the row happens to carry.
+  const access = useLiveQuery(
+    async () => {
+      const chars = await getLocalDb().characters.toArray();
+      return {
+        known: new Set(chars.map((c) => c.id)),
+        masked: new Set(chars.filter((c) => c.minimalViewMasked).map((c) => c.id)),
+      };
+    },
+    [],
+    { known: new Set<string>(), masked: new Set<string>() },
+  );
   const [revertTarget, setRevertTarget] = useState<OutboxEntry | null>(null);
   const [resyncOpen, setResyncOpen] = useState(false);
   const [working, setWorking] = useState(false);
@@ -172,7 +188,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                       <details className="mt-3 rounded-field bg-base-100/70 p-2">
                         <summary className="cursor-pointer font-medium">Debug information</summary>
                         <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">
-                          {debugText(op)}
+                          {debugText(op, isAccessRestricted(op, access))}
                         </pre>
                       </details>
                     </article>
@@ -187,7 +203,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                   key={op.clientOpId}
                   title={changeName(op)}
                   meta={`${statusLabel(op)} · ${formatTime(op.enqueuedAt)}`}
-                  details={<PendingDetails op={op} />}
+                  details={<PendingDetails op={op} hideValues={isAccessRestricted(op, access)} />}
                 />
               ))}
             </SyncSection>
@@ -410,11 +426,15 @@ function LogDetails({ entry }: { entry: SyncLogEntry }) {
   );
 }
 
-function PendingDetails({ op }: { op: OutboxEntry }) {
+function PendingDetails({ op, hideValues }: { op: OutboxEntry; hideValues: boolean }) {
   const rows: DetailRow[] = [];
   if (op.fieldPath) rows.push(textRow('Field', op.fieldPath));
-  rows.push(valueRow('Before', op.prevValue));
-  rows.push(valueRow('After', op.attemptedValue));
+  if (hideValues) {
+    rows.push(textRow('Values', 'hidden — you no longer have access to this character'));
+  } else {
+    rows.push(valueRow('Before', op.prevValue));
+    rows.push(valueRow('After', op.attemptedValue));
+  }
   rows.push(textRow('Entity', op.entityClass.replaceAll('_', ' ')));
   rows.push(textRow('Entity id', op.entityId));
   rows.push(textRow('Operation', op.command));
@@ -479,6 +499,10 @@ function directionLabel(entry: SyncLogEntry): string {
   if (entry.result === 'rolled_back') return 'Rolled back';
   if (entry.result === 'retrying') return 'Retrying started';
   if (entry.result === 'failed') {
+    // `local` covers a lost session and anything thrown outside the
+    // HTTP calls; calling those "Download failed" would point the user
+    // at the wrong thing entirely.
+    if (entry.direction === 'local') return 'Sync failed';
     return entry.direction === 'push' ? 'Upload failed' : 'Download failed';
   }
   return entry.direction === 'push' ? 'Pushed' : 'Pulled';
@@ -496,7 +520,27 @@ function formatTime(value: string): string {
   );
 }
 
-function debugText(op: OutboxEntry): string {
+/**
+ * Does the share gate apply to this queued op's values?
+ *
+ * A masked character means sharing was turned off; a `patch` whose
+ * character row has vanished means the viewer was removed from the
+ * campaign entirely (`pruneInaccessibleLocally` deletes the row but
+ * deliberately keeps the op). `create`/`delete` are exempt from the
+ * missing-row test — for those the row is *expected* to be absent, and
+ * the values are the user's own brand-new or just-deleted content.
+ */
+function isAccessRestricted(
+  op: OutboxEntry,
+  access: { known: Set<string>; masked: Set<string> },
+): boolean {
+  const characterId = op.parentId ?? (op.entityClass === 'character' ? op.entityId : undefined);
+  if (!characterId) return false;
+  if (access.masked.has(characterId)) return true;
+  return op.command === 'patch' && !access.known.has(characterId);
+}
+
+function debugText(op: OutboxEntry, hideValues = false): string {
   return JSON.stringify(
     {
       clientOpId: op.clientOpId,
@@ -504,8 +548,8 @@ function debugText(op: OutboxEntry): string {
       entityId: op.entityId,
       command: op.command,
       fieldPath: op.fieldPath,
-      attemptedValue: op.attemptedValue,
-      previousValue: op.prevValue,
+      attemptedValue: hideValues ? '[hidden — no access to this character]' : op.attemptedValue,
+      previousValue: hideValues ? '[hidden — no access to this character]' : op.prevValue,
       attemptCount: op.attemptCount,
       lastAttemptAt: op.lastAttemptAt,
       nextAttemptAt: op.nextEarliestAttemptAt,

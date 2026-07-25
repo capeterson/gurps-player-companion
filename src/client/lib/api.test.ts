@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe('api refresh-on-401', () => {
-  it('keeps the session when the refresh endpoint is unreachable (HTTP 530)', async () => {
+  it('keeps the session and reports the outage when refresh returns HTTP 530', async () => {
     seedTokens();
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       if (String(url).includes('/auth/refresh'))
@@ -45,22 +45,24 @@ describe('api refresh-on-401', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(api('/characters')).rejects.toMatchObject({ status: 401 });
+    // The failure that actually blocked us is the 530, not the 401 that
+    // triggered the refresh -- surfacing 401 would send the user to
+    // look at their account during a total origin outage.
+    await expect(api('/characters')).rejects.toMatchObject({ status: 530 });
 
-    // The whole point: the user is still signed in and the next attempt
-    // (once the origin is back) can succeed.
+    // And the user is still signed in, so the next attempt can succeed.
     expect(tokenStore.read()).toMatchObject({ refreshToken: 'refresh-1' });
   });
 
-  it('keeps the session when the refresh request throws', async () => {
+  it('keeps the session and propagates the transport error', async () => {
     seedTokens();
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if (String(url).includes('/auth/refresh')) throw new TypeError('network error');
+      if (String(url).includes('/auth/refresh')) throw new TypeError('network down');
       return jsonResponse(401, { error: 'token expired' });
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(api('/characters')).rejects.toMatchObject({ status: 401 });
+    await expect(api('/characters')).rejects.toThrow('network down');
     expect(tokenStore.read()).toMatchObject({ refreshToken: 'refresh-1' });
   });
 

@@ -299,6 +299,16 @@ describe('SyncOrchestrator.revertFailedOperation', () => {
       attemptedValue: 'Newest local',
       prevValue: 'Server',
     });
+
+    // The journal has to agree with what the field visibly shows. The
+    // row kept the newer edit, so claiming it went back to the old
+    // server value would contradict the sheet.
+    const reverted = (await db.syncLog.toArray()).find((e) => e.result === 'reverted');
+    expect(reverted).toMatchObject({
+      previousValue: 'Older local',
+      newValue: 'Newest local',
+    });
+    expect(reverted?.reason).toMatch(/newer local edit was kept/i);
   });
 
   it('removes nested inventory rows and operations with a reverted container create', async () => {

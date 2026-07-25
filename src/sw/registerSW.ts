@@ -181,8 +181,24 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
     if (document.visibilityState === 'visible') checkForUpdate();
   };
 
-  navigator.serviceWorker.getRegistration().then((reg) => {
-    if (!reg) return;
+  let disposed = false;
+
+  // On a first visit there is no registration yet: vite-plugin-pwa's
+  // injected script registers the worker on the window `load` event,
+  // well after this module runs. `getRegistration()` resolves to null
+  // there, so bailing out would leave that tab with no polling and no
+  // listeners for the rest of its life -- it would never offer an
+  // update until someone reloaded it by hand. `ready` resolves once a
+  // registration becomes active; it simply stays pending when the app
+  // runs without a service worker (dev), which is the correct no-op.
+  const resolveRegistration = async (): Promise<ServiceWorkerRegistration | null> => {
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing) return existing;
+    return await navigator.serviceWorker.ready;
+  };
+
+  void resolveRegistration().then((reg) => {
+    if (!reg || disposed) return;
     registration = reg;
     reg.addEventListener('updatefound', onUpdateFound);
 
@@ -205,6 +221,7 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
   });
 
   return () => {
+    disposed = true;
     navigator.serviceWorker.removeEventListener('message', onMessage);
     navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
     window.removeEventListener('focus', onFocus);

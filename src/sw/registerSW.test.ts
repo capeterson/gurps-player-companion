@@ -34,14 +34,19 @@ class FakeRegistration extends EventTarget {
 let registration: FakeRegistration;
 let container: EventTarget & { controller: unknown; getRegistration(): Promise<unknown> };
 
-function installFakeServiceWorker(controller: unknown = {}) {
+function installFakeServiceWorker(controller: unknown = {}, options: { ready?: boolean } = {}) {
   registration = new FakeRegistration();
   const target = new EventTarget() as EventTarget & {
     controller: unknown;
     getRegistration(): Promise<unknown>;
+    ready: Promise<unknown>;
   };
   target.controller = controller;
-  target.getRegistration = () => Promise.resolve(registration);
+  // `options.ready` models a first visit: vite-plugin-pwa registers the
+  // worker on window `load`, long after this module runs, so
+  // getRegistration() resolves null and only `ready` ever produces one.
+  target.getRegistration = () => Promise.resolve(options.ready ? null : registration);
+  target.ready = Promise.resolve(registration);
   container = target;
   Object.defineProperty(navigator, 'serviceWorker', {
     value: container,
@@ -192,6 +197,38 @@ describe('registerSwLifecycle update discovery', () => {
     await vi.advanceTimersByTimeAsync(SW_UPDATE_POLL_MS + 10);
     expect(onUpdateReady).toHaveBeenCalledTimes(2);
 
+    teardown();
+  });
+
+  it('starts polling on a first visit, where no registration exists yet', async () => {
+    // The regression: getRegistration() resolves null before the worker
+    // is registered on window `load`, so bailing out left that tab with
+    // no timer and no listeners for the rest of its life.
+    vi.useFakeTimers();
+    installFakeServiceWorker({}, { ready: true });
+
+    const teardown = registerSwLifecycle();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(SW_UPDATE_POLL_MS + 10);
+
+    expect(registration.update).toHaveBeenCalled();
+    teardown();
+  });
+
+  it('detects an update found after a first-visit registration', async () => {
+    vi.useFakeTimers();
+    installFakeServiceWorker({}, { ready: true });
+    const onUpdateReady = vi.fn();
+
+    const teardown = registerSwLifecycle({ onUpdateReady });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const worker = new FakeWorker();
+    registration.installing = worker;
+    registration.dispatchEvent(new Event('updatefound'));
+    worker.setState('installed');
+
+    expect(onUpdateReady).toHaveBeenCalledOnce();
     teardown();
   });
 

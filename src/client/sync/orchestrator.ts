@@ -468,6 +468,10 @@ class SyncOrchestrator {
         throw new Error('This change is not eligible to be reverted');
       }
       let preservedNewerEdit = false;
+      // What the local field actually ends up holding, for the journal.
+      // Usually `prevValue`, but a superseding edit deliberately keeps
+      // the user's newer value instead.
+      let restoredValue: unknown = op.prevValue;
       if (op.command === 'patch' && op.fieldPath !== undefined) {
         const superseding = await db.outbox
           .where('coalesceKey')
@@ -483,6 +487,7 @@ class SyncOrchestrator {
         const latest = superseding.sort((a, b) => b.enqueuedAt.localeCompare(a.enqueuedAt))[0];
         if (latest) {
           preservedNewerEdit = true;
+          restoredValue = latest.attemptedValue;
           await this.revertField(op.entityClass, op.entityId, op.fieldPath, latest.attemptedValue);
           await db.outbox.update(latest.clientOpId, {
             prevValue: op.prevValue,
@@ -506,13 +511,20 @@ class SyncOrchestrator {
         command: op.command,
         fieldPath: op.fieldPath,
         humanName: op.humanName,
-        reason: op.serverReason
-          ? `Discarded by user after ${op.attemptCount} failed attempts — ${op.serverReason}`
-          : `Discarded by user after ${op.attemptCount} failed attempts`,
-        // Direction of travel is inverted here: the local row went back
-        // to `prevValue`, discarding `attemptedValue`.
+        reason: preservedNewerEdit
+          ? `Failed attempt discarded by user after ${op.attemptCount} attempts; a newer local edit was kept${
+              op.serverReason ? ` — ${op.serverReason}` : ''
+            }`
+          : op.serverReason
+            ? `Discarded by user after ${op.attemptCount} failed attempts — ${op.serverReason}`
+            : `Discarded by user after ${op.attemptCount} failed attempts`,
+        // Direction of travel is inverted here: the local row moved away
+        // from `attemptedValue`.  It lands on `prevValue` normally, but
+        // on the superseding-edit path it keeps the user's newer value
+        // instead -- claiming it went back to the old server value would
+        // contradict what the field visibly shows.
         previousValue: snapshotValue(op.attemptedValue),
-        newValue: snapshotValue(op.prevValue),
+        newValue: snapshotValue(restoredValue),
       });
       if (op.fieldPath) {
         flashBus.emit({

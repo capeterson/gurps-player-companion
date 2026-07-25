@@ -129,4 +129,81 @@ describe('buildSyncDebugDump', () => {
     const dump = await buildSyncDebugDump();
     expect(dump.meta.userId).toBeNull();
   });
+
+  it('masks queued values for a character the viewer lost access to', async () => {
+    // A GM/manager can queue an edit against a player's sheet, so "the
+    // user's own attempted edits" is not the same as "values the user
+    // may still see" -- and this file gets handed to someone else.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-masked',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.outbox.add({
+      clientOpId: 'op-masked',
+      entityClass: 'character_inventory',
+      entityId: 'inv-1',
+      parentId: 'char-masked',
+      command: 'patch',
+      coalesceKey: 'inv-1|notes',
+      fieldPath: 'notes',
+      attemptedValue: 'PRIVATE-AFTER-VALUE',
+      prevValue: 'PRIVATE-BEFORE-VALUE',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('PRIVATE-AFTER-VALUE');
+    expect(serialized).not.toContain('PRIVATE-BEFORE-VALUE');
+    // The op itself is still reported -- only its payload is masked.
+    expect(serialized).toContain('op-masked');
+  });
+
+  it('masks a patch whose character was pruned entirely', async () => {
+    const db = getLocalDb();
+    await db.outbox.add({
+      clientOpId: 'op-orphan',
+      entityClass: 'character',
+      entityId: 'char-gone',
+      command: 'patch',
+      coalesceKey: 'char-gone|st',
+      fieldPath: 'st',
+      attemptedValue: 'ORPHAN-VALUE',
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('ORPHAN-VALUE');
+  });
+
+  it('leaves a speculative create alone — its row is absent by design', async () => {
+    const db = getLocalDb();
+    await db.outbox.add({
+      clientOpId: 'op-create',
+      entityClass: 'character',
+      entityId: 'char-new',
+      command: 'create',
+      coalesceKey: 'char-new|',
+      attemptedValue: { name: 'BRAND-NEW-CHARACTER' },
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).toContain('BRAND-NEW-CHARACTER');
+  });
 });
