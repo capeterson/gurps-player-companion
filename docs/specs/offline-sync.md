@@ -154,6 +154,14 @@ orchestrator now also reports a session that disappears *after* bootstrap
 (`reportSessionLost`, latched so it fires once per loss) as a named indicator
 error plus a journal entry.
 
+That report keys off `currentUserId`, which `SyncBootstrapGate` seeds via
+`orchestrator.setCurrentUser()` on **every** authenticated mount — not only at
+bootstrap. The gate calls `bootstrap()` only when the `bootstrap:<userId>` flag
+is absent, so on an ordinary reload (the common path) `currentUserId` would
+otherwise stay null for the whole session, silently disabling both the
+lost-session report **and** the minimal-view share sweep, which has the same
+guard.
+
 ## Local sync log and recovery
 
 The `syncLog` Dexie store is a device-local operational journal, separate from
@@ -181,13 +189,31 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   which left the red badge with nothing to point at during a server outage.
 
 It is pruned to the newest 1,000 records. Pull entries retain metadata and
-revision only, never cursor row payloads, so later access downgrades cannot
-leave private sheet data in the journal. `push` and `local` entries additionally
-carry `previousValue` / `newValue` snapshots (via `snapshotValue`, which caps
-each at `SYNC_LOG_VALUE_MAX_CHARS`) so the log UI can show *what changed*
-instead of just "character inventory patch"; those are always this user's own
-outgoing edits — the same values the outbox already holds — which is why the
-pull-side prohibition doesn't apply to them. Journal writes are best-effort:
+revision only, never cursor row payloads. `push` and `local` entries
+additionally carry `previousValue` / `newValue` snapshots (via `snapshotValue`,
+which caps **strings as well as objects** at `SYNC_LOG_VALUE_MAX_CHARS` — `notes`
+/ `appearance` / trait descriptions accept 20,000 characters, so exempting
+strings would let a few edits retain tens of MB) so the log UI can show *what
+changed* instead of just "character inventory patch".
+
+**Rollback entries record the direction the local row actually moved.** A
+rejected patch moves the row *away* from the refused `attemptedValue` and back
+to what `revertLocal` restored — `prevValue`, or the server's `latestEntity`
+field when one came back. `rollbackSnapshot()` is the single place that decides
+this; recording it the other way round would show the user their rejected edit
+as the final value and the restored one as discarded.
+
+**The share gate reaches this journal too.** A GM or manager editing a player's
+sheet records that player's values here, and a `conflict`/`stale_base` outcome
+can carry a whole `latestEntity` row in `details` — so the journal is one of the
+surfaces `AGENTS.md`'s share-gate invariant covers.
+`redactSyncLogForCharacters()` clears `previousValue` / `newValue` / `details`
+and sets `redacted: true` on every entry whose `entityId` **or `parentId`**
+matches a character being minimized or pruned; both
+`enforceMinimalViewLocally` and `pruneInaccessibleLocally` call it. `parentId`
+is stored on child-class entries precisely so this match can find them. The row
+survives with its metadata, and the UI says the values were removed. Journal
+writes are best-effort:
 quota or IndexedDB failures never block outbox settlement. Pending state is
 never copied into the log; the sync view reads the authoritative outbox
 directly, including attempt count, backoff timing, and the raw operation
@@ -204,7 +230,16 @@ holds a `SyncErrorDetail { reason, at }` alongside the state; use
 tooltip and a banner at the top of the sync-log dialog, and is cleared
 automatically when the store leaves `error` (a successful cycle). The old
 tooltip — "see toast for details" — was a lie for every failure that produces
-no toast.
+no toast. `setError` refreshes `at` even when the reason repeats, so the
+dialog's "Last attempt" time stays true through a sustained outage.
+
+**Every cycle-ending `catch` goes through `reportCycleFailure()`** — the cursor
+pull, the drain POST, *and* `runLoop`'s outer catch (which covers
+`recoverStaleInFlight`, `readDrainableOps`, `applyOutcomes` and Dexie faults).
+It writes the journal entry and sets the named error together, and de-dupes via
+a `WeakSet` so an error reported by the pull path and rethrown into `runLoop`
+isn't logged twice. A bare `syncStateStore.set('error')` anywhere reintroduces
+the unexplained red badge this design exists to remove.
 
 **Download sync debug log.** The sync-log dialog's footer has a "Download sync
 debug log" button (`buildSyncDebugDump()` in `src/client/sync/debugDump.ts`)

@@ -309,6 +309,13 @@ export interface SyncLogEntry {
    */
   entityClass?: EntityClass | undefined;
   entityId?: string | undefined;
+  /**
+   * Parent character id for child classes, mirroring `OutboxEntry`.
+   * Carried so the share-gate sweeps can find every journal row
+   * belonging to a character whose access was downgraded — matching on
+   * `entityId` alone would miss trait/skill/inventory rows.
+   */
+  parentId?: string | undefined;
   command?: OperationCommand | undefined;
   fieldPath?: string | undefined;
   humanName?: string | undefined;
@@ -327,6 +334,12 @@ export interface SyncLogEntry {
   previousValue?: unknown;
   newValue?: unknown;
   details?: unknown;
+  /**
+   * Set by `redactSyncLogForCharacters` when the viewer lost access to
+   * this entity's character: payload fields are cleared, metadata
+   * stays. The UI says so rather than rendering a blank.
+   */
+  redacted?: boolean | undefined;
 }
 
 export interface SyncCursor {

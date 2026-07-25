@@ -59,6 +59,17 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
     undefined as boolean | undefined,
   );
 
+  // Tell the orchestrator who's signed in as soon as we know, on EVERY
+  // mount. `bootstrap()` below runs only when the bootstrap flag is
+  // absent, so on an ordinary reload it never fires -- and the
+  // orchestrator would spend the whole session without a user id,
+  // silently skipping the minimal-view share sweep and the lost-session
+  // report.
+  useEffect(() => {
+    if (!userId) return;
+    getSyncOrchestrator().setCurrentUser(userId);
+  }, [userId]);
+
   // Trigger the bootstrap once we know the user and it hasn't run yet.
   useEffect(() => {
     if (!userId || bootstrapped !== false) return;

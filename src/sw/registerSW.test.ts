@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SW_UPDATE_POLL_MS,
   clearPendingSwUpdate,
+  dismissPendingSwUpdate,
   getPendingSwUpdate,
   registerSwLifecycle,
   swEvents,
@@ -143,6 +144,53 @@ describe('registerSwLifecycle update discovery', () => {
 
     window.dispatchEvent(new Event('focus'));
     expect(registration.update).toHaveBeenCalledOnce();
+
+    teardown();
+  });
+
+  it('resumes checking after the user dismisses the prompt', async () => {
+    vi.useFakeTimers();
+    const teardown = registerSwLifecycle();
+    await vi.advanceTimersByTimeAsync(0);
+
+    const worker = new FakeWorker();
+    registration.installing = worker;
+    registration.dispatchEvent(new Event('updatefound'));
+    worker.setState('installed');
+    expect(getPendingSwUpdate()).toBeTypeOf('function');
+
+    // While an announcement is outstanding, checks are pointless.
+    await vi.advanceTimersByTimeAsync(SW_UPDATE_POLL_MS + 10);
+    expect(registration.update).not.toHaveBeenCalled();
+
+    // Dismissing means "not now", not "stop looking" -- without this
+    // the latch stays closed and the tab never learns about any future
+    // release either.
+    dismissPendingSwUpdate();
+    await vi.advanceTimersByTimeAsync(SW_UPDATE_POLL_MS + 10);
+    expect(registration.update).toHaveBeenCalled();
+
+    teardown();
+  });
+
+  it('does not re-nag about a build the user already dismissed', async () => {
+    vi.useFakeTimers();
+    const onUpdateReady = vi.fn();
+    const waiting = new FakeWorker();
+    registration.waiting = waiting;
+    const teardown = registerSwLifecycle({ onUpdateReady });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onUpdateReady).toHaveBeenCalledOnce();
+
+    dismissPendingSwUpdate();
+    // The same worker is still parked in `waiting` on every later poll.
+    await vi.advanceTimersByTimeAsync(SW_UPDATE_POLL_MS * 3);
+    expect(onUpdateReady).toHaveBeenCalledOnce();
+
+    // A genuinely newer build still gets through.
+    registration.waiting = new FakeWorker();
+    await vi.advanceTimersByTimeAsync(SW_UPDATE_POLL_MS + 10);
+    expect(onUpdateReady).toHaveBeenCalledTimes(2);
 
     teardown();
   });

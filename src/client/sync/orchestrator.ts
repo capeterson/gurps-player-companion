@@ -52,7 +52,12 @@ import {
   setOutboxStatus,
 } from './outbox.ts';
 import { syncStateStore } from './state.ts';
-import { appendSyncLog, pruneRejectionToasts, snapshotValue } from './syncLog.ts';
+import {
+  appendSyncLog,
+  pruneRejectionToasts,
+  redactSyncLogForCharacters,
+  snapshotValue,
+} from './syncLog.ts';
 
 const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character',
@@ -151,11 +156,16 @@ class SyncOrchestrator {
   private recoveryInProgress = false;
   private bootstrapRetryTimer: ReturnType<typeof setTimeout> | null = null;
   /**
-   * The viewer's user id, captured at bootstrap. Used by
-   * `enforceMinimalViewLocally` to figure out which campaign-shared
-   * characters the viewer is allowed to see in detail. Null until
-   * bootstrap runs (the orchestrator is a singleton; periodic pulls
-   * before bootstrap are no-ops anyway).
+   * The viewer's user id. Used by `enforceMinimalViewLocally` to figure
+   * out which campaign-shared characters the viewer may see in detail,
+   * and by `reportSessionLost` to tell "never signed in" apart from
+   * "session vanished underneath us".
+   *
+   * Seeded by `setCurrentUser` on every authenticated mount, NOT only
+   * at bootstrap: `SyncBootstrapGate` calls `bootstrap()` only when the
+   * `bootstrap:<userId>` flag is absent, so on an ordinary reload — the
+   * common path — this would otherwise stay null for the whole session,
+   * silently disabling both of those.
    */
   private currentUserId: string | null = null;
   /** Latches `reportSessionLost` so a lost session logs once, not every cycle. */
@@ -213,6 +223,17 @@ class SyncOrchestrator {
   /** Force the drain loop to re-evaluate immediately. */
   triggerDrain(): void {
     this.wake();
+  }
+
+  /**
+   * Record who is signed in.  Called on every authenticated mount, not
+   * just at bootstrap -- see `currentUserId`.  Switching users re-arms
+   * the session-loss latch so the new session can report its own loss.
+   */
+  setCurrentUser(userId: string): void {
+    if (this.currentUserId === userId) return;
+    this.currentUserId = userId;
+    this.sessionLostReported = false;
   }
 
   /**
@@ -308,14 +329,7 @@ class SyncOrchestrator {
       // rejection record and no toast, so before this the only symptom
       // was a red badge telling the user to go read a toast that never
       // existed.
-      const reason = failureReason(err, 'Downloading server changes failed');
-      await appendSyncLog({
-        direction: 'pull',
-        result: 'failed',
-        reason,
-        details: { error: errorDetails(err) },
-      });
-      syncStateStore.setError(reason);
+      await reportCycleFailure(err, 'Downloading server changes failed', 'pull');
       throw err;
     }
   }
@@ -488,6 +502,7 @@ class SyncOrchestrator {
         result: 'reverted',
         entityClass: op.entityClass,
         entityId: op.entityId,
+        parentId: op.parentId,
         command: op.command,
         fieldPath: op.fieldPath,
         humanName: op.humanName,
@@ -575,8 +590,12 @@ class SyncOrchestrator {
     while (this.running) {
       try {
         await this.maybeDrainOnce();
-      } catch (_err) {
-        syncStateStore.set('error');
+      } catch (err) {
+        // Anything the inner handlers didn't already account for --
+        // recoverStaleInFlight, readDrainableOps, applyOutcomes, a
+        // Dexie failure. A bare set('error') here would restore exactly
+        // the unexplained red badge this whole change exists to remove.
+        await reportCycleFailure(err, 'Sync failed');
       }
       // Wait for an outbox change, an online event, or 5s, whichever
       // comes first.
@@ -645,14 +664,9 @@ class SyncOrchestrator {
             lastError: errorDetails(err),
           });
         }
-        const reason = failureReason(err, 'Uploading changes failed');
-        await appendSyncLog({
-          direction: 'push',
-          result: 'failed',
-          reason,
-          details: { operationCount: ops.length, error: errorDetails(err) },
+        await reportCycleFailure(err, 'Uploading changes failed', 'push', {
+          operationCount: ops.length,
         });
-        syncStateStore.setError(reason);
         return;
       }
       await this.applyOutcomes(ops, outcomes);
@@ -697,6 +711,7 @@ class SyncOrchestrator {
             result: 'synced',
             entityClass: op.entityClass,
             entityId: op.entityId,
+            parentId: op.parentId,
             command: op.command,
             fieldPath: op.fieldPath,
             humanName: op.humanName,
@@ -753,6 +768,7 @@ class SyncOrchestrator {
                 result: 'requeued',
                 entityClass: op.entityClass,
                 entityId: op.entityId,
+                parentId: op.parentId,
                 command: op.command,
                 fieldPath: op.fieldPath,
                 humanName: op.humanName,
@@ -815,6 +831,7 @@ class SyncOrchestrator {
               result: 'retrying',
               entityClass: op.entityClass,
               entityId: op.entityId,
+              parentId: op.parentId,
               command: op.command,
               fieldPath: op.fieldPath,
               humanName: op.humanName,
@@ -878,15 +895,17 @@ class SyncOrchestrator {
       result: 'rolled_back',
       entityClass: op.entityClass,
       entityId: op.entityId,
+      parentId: op.parentId,
       command: op.command,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
       reason: outcome.reason ?? 'sync rejected',
-      // The value the server refused, and the one the local row was put
-      // back to -- the two things a user actually wants to know when
-      // they find a rolled-back edit in the log.
-      previousValue: snapshotValue(op.prevValue),
-      newValue: snapshotValue(op.attemptedValue),
+      // Before/after describe the LOCAL ROW's movement, and a rollback
+      // moves it the other way: away from the value the server refused,
+      // back to whatever was restored. Recording the refused value as
+      // "After" would show the user the rejected edit as their final
+      // state and the restored one as discarded -- backwards.
+      ...rollbackSnapshot(op, outcome),
       details: outcome,
     });
     await db.outbox.delete(op.clientOpId);
@@ -932,10 +951,10 @@ class SyncOrchestrator {
       entityId: op.entityId,
       command: op.command,
       fieldPath: op.fieldPath,
+      parentId: op.parentId,
       humanName: op.humanName,
       reason: rec.reason,
-      previousValue: snapshotValue(op.prevValue),
-      newValue: snapshotValue(op.attemptedValue),
+      ...rollbackSnapshot(op, outcome),
       details: outcome,
     });
     await db.outbox.delete(op.clientOpId);
@@ -1411,6 +1430,11 @@ class SyncOrchestrator {
         }
       },
     );
+    // Same reasoning as the row rewrite above: the sync journal is
+    // another surface carrying character data, so a share=false flip
+    // has to reach it too or the masked character's real values stay
+    // readable in the sync dialog and the debug dump.
+    await redactSyncLogForCharacters(idArray);
     return restored.length > 0;
   }
 
@@ -1501,6 +1525,10 @@ class SyncOrchestrator {
         }
       },
     );
+    // The journal holds before/after character values too; deleting the
+    // rows while leaving those readable in the sync dialog and the
+    // debug dump would defeat the purge.
+    await redactSyncLogForCharacters(charIdsToDelete);
   }
 
   private fireCycleDone(): void {
@@ -1531,6 +1559,60 @@ function toEnvelope(op: OutboxEntry): OperationEnvelope {
     batchId: op.batchId,
     createdAt: op.enqueuedAt,
   };
+}
+
+/**
+ * Before/after for a rollback, in the direction the local row actually
+ * moved: from the refused `attemptedValue` back to whatever
+ * `revertLocal` restored.  That is `prevValue` normally, but the
+ * server's `latestEntity` when it returned one (conflict / stale_base),
+ * since `revertLocal` prefers it as the more recent truth.
+ */
+function rollbackSnapshot(
+  op: OutboxEntry,
+  outcome: OperationOutcome,
+): { previousValue: unknown; newValue: unknown } {
+  let restored = op.prevValue;
+  if (outcome.latestEntity && typeof outcome.latestEntity === 'object' && op.fieldPath) {
+    restored = (outcome.latestEntity as Record<string, unknown>)[op.fieldPath];
+  }
+  return {
+    previousValue: snapshotValue(op.attemptedValue),
+    newValue: snapshotValue(restored),
+  };
+}
+
+/**
+ * Errors already turned into a journal entry + indicator reason.  The
+ * cursor-pull path reports and then rethrows, so `runLoop`'s catch sees
+ * the same object again; without this it would log the failure twice.
+ */
+const reportedFailures = new WeakSet<object>();
+
+/**
+ * The single way a whole-cycle failure becomes visible: one journal
+ * entry plus a named indicator error.  Every `catch` that ends a sync
+ * cycle must go through here — a bare `syncStateStore.set('error')`
+ * produces a red badge with nothing behind it.
+ */
+async function reportCycleFailure(
+  err: unknown,
+  prefix: string,
+  direction: 'push' | 'pull' | 'local' = 'local',
+  extraDetails?: Record<string, unknown>,
+): Promise<void> {
+  if (typeof err === 'object' && err !== null) {
+    if (reportedFailures.has(err)) return;
+    reportedFailures.add(err);
+  }
+  const reason = failureReason(err, prefix);
+  await appendSyncLog({
+    direction,
+    result: 'failed',
+    reason,
+    details: { ...extraDetails, error: errorDetails(err) },
+  });
+  syncStateStore.setError(reason);
 }
 
 /**

@@ -56,14 +56,35 @@ export interface SwLifecycleEvents {
  */
 let pendingUpdate: (() => void) | null = null;
 
+/**
+ * The worker we've already told the user about.  Kept separately from
+ * `pendingUpdate` so dismissing the prompt re-enables polling (see
+ * `dismissPendingSwUpdate`) without immediately re-announcing the same
+ * build on the next tick.
+ */
+let announcedWorker: ServiceWorker | null = null;
+
 /** The reload callback for an already-discovered update, if any. */
 export function getPendingSwUpdate(): (() => void) | null {
   return pendingUpdate;
 }
 
-/** Test seam. */
+/**
+ * The user dismissed the prompt instead of reloading.  Drops the
+ * outstanding announcement so update checks resume — otherwise
+ * `checkForUpdate`'s `if (pendingUpdate) return` guard would latch
+ * closed and this tab would never look for a release again. The
+ * *announced worker* is remembered, so polling won't nag about the
+ * same build; a genuinely newer one still gets through.
+ */
+export function dismissPendingSwUpdate(): void {
+  pendingUpdate = null;
+}
+
+/** Test seam: forget both the announcement and the acknowledgement. */
 export function clearPendingSwUpdate(): void {
   pendingUpdate = null;
+  announcedWorker = null;
 }
 
 function makeReload(worker: ServiceWorker | null): () => void {
@@ -91,8 +112,12 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
   }
 
   const announceUpdate = (worker: ServiceWorker | null) => {
+    // Already told the user about this exact build and they dismissed
+    // it -- don't re-nag on the next poll.
+    if (worker !== null && worker === announcedWorker) return;
     const reload = makeReload(worker);
     pendingUpdate = reload;
+    announcedWorker = worker;
     window.dispatchEvent(new CustomEvent(UPDATE_READY_EVENT, { detail: { reload } }));
     events.onUpdateReady?.(reload);
   };
@@ -132,11 +157,19 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
 
   const checkForUpdate = (force = false) => {
     if (!registration) return;
-    if (pendingUpdate) return; // already found one; nothing to learn
+    // An announcement the user hasn't acted on yet -- nothing to learn
+    // until they reload or dismiss it.
+    if (pendingUpdate) return;
     const now = Date.now();
     if (!force && now - lastCheckAt < MIN_CHECK_GAP_MS) return;
     if (navigator.onLine === false) return;
     lastCheckAt = now;
+    // A worker that installed while the prompt was dismissed is parked
+    // in `waiting` and won't fire `updatefound` again; announceUpdate
+    // no-ops if it's the build we already showed.
+    if (registration.waiting && navigator.serviceWorker.controller) {
+      announceUpdate(registration.waiting);
+    }
     void registration.update().catch(() => {
       // Offline or the server is down -- the next tick tries again.
     });
@@ -156,9 +189,12 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
     // An update installed by another tab (or a previous session) is
     // already parked in `waiting` and will never fire `updatefound`
     // here -- without this branch that update stays invisible.
+    //
+    // Announce it but keep going: returning early here would skip the
+    // polling setup below, so a tab that started with a waiting worker
+    // would never check for anything again once the user dismissed it.
     if (reg.waiting && navigator.serviceWorker.controller) {
       announceUpdate(reg.waiting);
-      return;
     }
 
     lastCheckAt = Date.now();

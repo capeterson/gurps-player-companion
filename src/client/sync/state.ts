@@ -77,13 +77,17 @@ export class SyncStateStore {
    * a red badge with no reason is the bug this exists to prevent.
    */
   setError(reason: string): void {
-    const changed = this.errorDetail?.reason !== reason;
+    // Always refresh, even when the reason repeats. During a sustained
+    // outage every retry reports the same sentence, but `at` is what
+    // the dialog renders as "Last attempt" -- pinning it to the first
+    // failure would leave that timestamp frozen and wrong for as long
+    // as the outage lasts.
     this.errorDetail = { reason, at: new Date(this.now()).toISOString() };
-    if (changed) this.refreshSnapshot();
+    this.refreshSnapshot();
     this.set('error');
-    // `set` skips notifying when the state was already 'error'; a new
-    // reason still has to reach subscribers.
-    if (changed && this.current === 'error') {
+    // `set` skips notifying when the state was already 'error'; the
+    // updated detail still has to reach subscribers.
+    if (this.current === 'error') {
       for (const cb of this.subs) cb(this.current);
     }
   }

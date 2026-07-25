@@ -377,7 +377,11 @@ function LogDetails({ entry }: { entry: SyncLogEntry }) {
   const rows: DetailRow[] = [];
   if (entry.reason) rows.push(textRow('Reason', entry.reason, 'error'));
   if (entry.fieldPath) rows.push(textRow('Field', entry.fieldPath));
-  if (hasValueSnapshot(entry)) {
+  if (entry.redacted) {
+    // Payload cleared because the viewer lost access to this
+    // character; the metadata row is kept as operational history.
+    rows.push(textRow('Values', 'removed — you no longer have access to this character'));
+  } else if (hasValueSnapshot(entry)) {
     rows.push(valueRow('Before', entry.previousValue));
     rows.push(valueRow('After', entry.newValue));
   } else if (entry.direction === 'pull') {

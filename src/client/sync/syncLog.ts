@@ -20,13 +20,28 @@ export type NewSyncLogEntry = Omit<SyncLogEntry, 'id' | 'occurredAt'> & {
 };
 
 /**
- * Bound a value before it goes into the journal.  Scalars pass through
- * unchanged (the common case: one field of one character). Anything
- * whose JSON exceeds the cap is replaced by a marker object so the UI
- * can say "too large to record" rather than silently showing nothing.
+ * Bound a value before it goes into the journal.  Small scalars pass
+ * through unchanged (the common case: one field of one character);
+ * anything over the cap becomes a marker object so the UI can say "too
+ * large to record" rather than silently showing nothing.
+ *
+ * Strings get the same ceiling as objects -- they are NOT small by
+ * assumption. `notes` / `appearance` / trait + skill descriptions all
+ * accept up to 20,000 characters, so exempting strings would let a
+ * handful of edits to those fields retain tens of MB across the 1,000
+ * before/after pairs this journal keeps.
  */
 export function snapshotValue(value: unknown): unknown {
   if (value === undefined || value === null) return value;
+  if (typeof value === 'string') {
+    return value.length <= SYNC_LOG_VALUE_MAX_CHARS
+      ? value
+      : {
+          truncated: true,
+          preview: value.slice(0, SYNC_LOG_VALUE_MAX_CHARS),
+          length: value.length,
+        };
+  }
   if (typeof value !== 'object') return value;
   let json: string;
   try {
@@ -59,6 +74,52 @@ export async function pruneSyncLog(): Promise<void> {
   if (excess <= 0) return;
   const oldestIds = await db.syncLog.orderBy('occurredAt').limit(excess).primaryKeys();
   await db.syncLog.bulkDelete(oldestIds);
+}
+
+/**
+ * Strip the character payloads from journal entries for characters the
+ * viewer may no longer see.
+ *
+ * The share gate applies to **every** surface carrying character data
+ * (`AGENTS.md`), and this journal is one: a GM/manager editing a
+ * player's sheet records that player's before/after values here, and a
+ * `conflict`/`stale_base` outcome can carry a whole `latestEntity` row
+ * in `details`. The entity stores get purged when access is downgraded
+ * (`enforceMinimalViewLocally` / `pruneInaccessibleLocally`) — without
+ * this the same values stayed readable in the sync dialog and in the
+ * downloadable debug dump.
+ *
+ * The row itself survives with its metadata (class, timing, outcome),
+ * which is the same shape a `pull` entry has always kept, so the
+ * operational history stays intact.
+ */
+export async function redactSyncLogForCharacters(characterIds: Iterable<string>): Promise<number> {
+  const ids = new Set(characterIds);
+  if (ids.size === 0) return 0;
+  try {
+    const db = getLocalDb();
+    const affected = await db.syncLog
+      .filter(
+        (entry) =>
+          !entry.redacted &&
+          ((entry.entityId !== undefined && ids.has(entry.entityId)) ||
+            (entry.parentId !== undefined && ids.has(entry.parentId))),
+      )
+      .toArray();
+    if (affected.length === 0) return 0;
+    await db.syncLog.bulkPut(
+      affected.map((entry) => ({
+        ...entry,
+        previousValue: undefined,
+        newValue: undefined,
+        details: undefined,
+        redacted: true,
+      })),
+    );
+    return affected.length;
+  } catch {
+    return 0;
+  }
 }
 
 /** Hard cap on stored rejection records. */

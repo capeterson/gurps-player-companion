@@ -143,6 +143,105 @@ describe('applyOutcomes sync-log diagnostics', () => {
     }
   });
 
+  it('records a rollback in the direction the local row actually moved', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 999,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'rejected' as const,
+          reason: 'ST must be <= 20',
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) return cursorResponse();
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const row = await getLocalDb().characters.get(CHAR_ID);
+        expect(row?.st).toBe(10);
+      });
+      const log = await getLocalDb().syncLog.toArray();
+      const rolled = log.find((entry) => entry.result === 'rolled_back');
+      // The row moved 999 -> 10. Recording it the other way round would
+      // show the user the refused edit as their final value and the
+      // restored one as discarded.
+      expect(rolled).toMatchObject({ previousValue: 999, newValue: 10 });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('uses the server value as the restored side when one comes back', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 13,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'conflict' as const,
+          reason: 'someone else edited this',
+          // revertLocal prefers this over prevValue, so the journal has
+          // to agree with it.
+          latestEntity: { id: CHAR_ID, st: 16, revision: 9 },
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) return cursorResponse();
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const log = await getLocalDb().syncLog.toArray();
+        expect(log.some((entry) => entry.result === 'rolled_back')).toBe(true);
+      });
+      const rolled = (await getLocalDb().syncLog.toArray()).find(
+        (entry) => entry.result === 'rolled_back',
+      );
+      expect(rolled).toMatchObject({ previousValue: 13, newValue: 16 });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
   it('logs a "rolled_back" entry when the server rejects an op', async () => {
     await seedCharacter();
     login();
@@ -344,6 +443,39 @@ describe('whole-cycle failures', () => {
       getSyncOrchestrator().stop();
     }
   });
+
+  it('reports a session that vanishes after an ordinary reload', async () => {
+    // The common path: `bootstrap:<userId>` already exists, so
+    // SyncBootstrapGate never calls bootstrap() and only setCurrentUser
+    // seeds the identity. Without that seeding this failure is silent.
+    await seedCharacter();
+    login();
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser(USER_ID);
+
+    const fetchMock = vi.fn().mockImplementation(async () => cursorResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    orchestrator.start();
+    try {
+      await waitFor(() => expect(syncStateStore.status.state).toBe('synced'));
+
+      // Something cleared the session underneath us (e.g. a refresh
+      // that a proxy error turned into a logout).
+      tokenStore.clear();
+      orchestrator.triggerDrain();
+
+      // triggerDrain's wake() is dropped when the loop isn't parked in
+      // waitForSignal, so the report can be up to one 5s tick away.
+      await waitFor(() => expect(syncStateStore.status.state).toBe('error'), { timeout: 8_000 });
+      expect(syncStateStore.status.error?.reason).toMatch(/signed out/i);
+      const failed = (await getLocalDb().syncLog.toArray()).find((e) => e.result === 'failed');
+      expect(failed?.reason).toMatch(/signed out/i);
+    } finally {
+      orchestrator.stop();
+    }
+    // Room for the 5s loop tick above.
+  }, 20_000);
 
   it('clears the error reason once a cycle succeeds again', async () => {
     await seedCharacter();

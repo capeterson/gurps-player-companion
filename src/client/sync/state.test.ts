@@ -64,3 +64,61 @@ describe('SyncStateStore', () => {
     vi.useRealTimers();
   });
 });
+
+describe('SyncStateStore error detail', () => {
+  it('exposes the reason for an error', () => {
+    const store = new SyncStateStore();
+    store.setError('Downloading server changes failed (HTTP 530)');
+    expect(store.status.state).toBe('error');
+    expect(store.status.error?.reason).toBe('Downloading server changes failed (HTTP 530)');
+  });
+
+  it('refreshes the timestamp when the same failure repeats', () => {
+    // A sustained outage reports the same sentence every retry. The
+    // dialog renders `at` as "Last attempt", so pinning it to the first
+    // failure would leave it stale for the whole outage.
+    let t = 1_000;
+    const store = new SyncStateStore('synced', () => t);
+    store.setError('server down');
+    const first = store.status.error?.at;
+
+    t = 60_000;
+    store.setError('server down');
+
+    expect(store.status.error?.at).not.toBe(first);
+    expect(store.status.error?.at).toBe(new Date(60_000).toISOString());
+  });
+
+  it('notifies subscribers when a repeated failure updates', () => {
+    let t = 1_000;
+    const store = new SyncStateStore('synced', () => t);
+    store.setError('server down');
+    const seen: string[] = [];
+    store.subscribe((s) => seen.push(s));
+
+    t = 60_000;
+    store.setError('server down');
+
+    expect(seen).toEqual(['error']);
+  });
+
+  it('clears the reason once a cycle succeeds', async () => {
+    vi.useFakeTimers();
+    let t = 0;
+    const store = new SyncStateStore('synced', () => t);
+    store.setError('server down');
+    t = 5_000;
+    store.set('synced');
+    expect(store.status.state).toBe('synced');
+    // A healthy badge must not keep quoting a resolved failure.
+    expect(store.status.error).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('keeps a stable snapshot identity between changes', () => {
+    // useSyncExternalStore re-renders forever if getSnapshot() returns
+    // a fresh object each call.
+    const store = new SyncStateStore();
+    expect(store.status).toBe(store.status);
+  });
+});

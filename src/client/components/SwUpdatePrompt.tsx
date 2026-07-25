@@ -14,7 +14,7 @@
  */
 
 import { useEffect } from 'react';
-import { getPendingSwUpdate, swEvents } from '../../sw/registerSW.ts';
+import { dismissPendingSwUpdate, getPendingSwUpdate, swEvents } from '../../sw/registerSW.ts';
 import { useToasts } from '../lib/toast.tsx';
 
 /** Stable id so a repeated announcement updates in place, never stacks. */
@@ -33,6 +33,11 @@ export function SwUpdatePrompt() {
         persistent: true,
         id: TOAST_ID,
         action: { label: 'Reload', onClick: reload },
+        // Dismissing means "not now", not "stop looking". Without
+        // this the module-level latch stays set and every later
+        // poll/focus/online check short-circuits, so the tab would
+        // never learn about any future release either.
+        onDismiss: () => dismissPendingSwUpdate(),
       });
     };
 

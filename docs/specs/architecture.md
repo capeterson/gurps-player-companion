@@ -98,6 +98,13 @@ survives navigation) turns that into a **persistent toast with a Reload
 action**. The reload is always the user's call: never automatic, since swapping
 the running bundle mid-edit is worse than being one build behind.
 
+Dismissing the prompt calls `dismissPendingSwUpdate()`, which drops the
+outstanding announcement so polling resumes — `checkForUpdate` short-circuits
+while one is pending, so without this a single dismissal would latch the tab
+closed against every future release. The *announced worker* is remembered
+separately, so polling won't re-nag about the same build while a genuinely
+newer one still gets through.
+
 ## Request lifecycle
 
 1. **Routing/validation.** Every route is declared with `createRoute` from
