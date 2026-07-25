@@ -6,7 +6,7 @@ import { useDialogState } from '../hooks/useDialogState.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { buildSyncDebugDump } from '../sync/debugDump.ts';
-import { isOutboxAccessRestricted } from '../sync/minimalViewSweep.ts';
+import { isOutboxAccessRestricted, isRecordAccessRestricted } from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
@@ -220,7 +220,12 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                   tone={
                     entry.result === 'failed' || entry.result === 'rolled_back' ? 'bad' : undefined
                   }
-                  details={<LogDetails entry={entry} />}
+                  details={
+                    <LogDetails
+                      entry={entry}
+                      restricted={isRecordAccessRestricted(entry, access)}
+                    />
+                  }
                 />
               ))}
             </SyncSection>
@@ -392,13 +397,15 @@ function DetailList({ rows }: { rows: DetailRow[] }) {
   );
 }
 
-function LogDetails({ entry }: { entry: SyncLogEntry }) {
+function LogDetails({ entry, restricted }: { entry: SyncLogEntry; restricted: boolean }) {
   const rows: DetailRow[] = [];
   if (entry.reason) rows.push(textRow('Reason', entry.reason, 'error'));
   if (entry.fieldPath) rows.push(textRow('Field', entry.fieldPath));
-  if (entry.redacted) {
-    // Payload cleared because the viewer lost access to this
-    // character; the metadata row is kept as operational history.
+  if (restricted) {
+    // Either scrubbed at rest by the sweep, or still holding values for
+    // a character the viewer can no longer see -- an offline revert can
+    // write a fresh snapshot after the last sweep ran, with no later
+    // pull to clean it up.
     rows.push(textRow('Values', 'removed — you no longer have access to this character'));
   } else if (hasValueSnapshot(entry)) {
     rows.push(valueRow('Before', entry.previousValue));
@@ -417,7 +424,9 @@ function LogDetails({ entry }: { entry: SyncLogEntry }) {
   return (
     <>
       <DetailList rows={rows} />
-      {entry.details !== undefined && (
+      {/* `details` can carry a whole `latestEntity` row on a conflict,
+          so it is gated by the same check as the value snapshots. */}
+      {!restricted && entry.details !== undefined && (
         <details className="mt-2">
           <summary className="cursor-pointer text-xs text-base-content/60">Raw</summary>
           <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all text-xs">

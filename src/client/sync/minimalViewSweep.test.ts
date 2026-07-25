@@ -7,7 +7,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { characterIdsToMinimize, isOutboxAccessRestricted } from './minimalViewSweep.ts';
+import {
+  characterIdsToMinimize,
+  isOutboxAccessRestricted,
+  isRecordAccessRestricted,
+} from './minimalViewSweep.ts';
 
 const ME = 'me';
 const THEM = 'them';
@@ -187,5 +191,39 @@ describe('isOutboxAccessRestricted', () => {
   it('ignores ops with no character at all', () => {
     const op = { entityClass: 'campaign', entityId: 'camp-1', command: 'patch' };
     expect(isOutboxAccessRestricted(op, access([]))).toBe(false);
+  });
+});
+
+describe('isRecordAccessRestricted', () => {
+  const access = (known: string[], masked: string[] = []) => ({
+    known: new Set(known),
+    masked: new Set(masked),
+  });
+
+  it('honours the at-rest redacted flag', () => {
+    expect(isRecordAccessRestricted({ redacted: true }, access([]))).toBe(true);
+  });
+
+  it('hides a fresh snapshot written for a masked character', () => {
+    // A revert performed OFFLINE writes a new journal entry after the
+    // last sweep ran, and offline means no later pull to scrub it.
+    const entry = { entityClass: 'character_skill', entityId: 's1', parentId: 'c1' };
+    expect(isRecordAccessRestricted(entry, access(['c1'], ['c1']))).toBe(true);
+  });
+
+  it('shows records for a character the viewer still sees', () => {
+    const entry = { entityClass: 'character', entityId: 'c1', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access(['c1']))).toBe(false);
+  });
+
+  it('does not treat a long-deleted entity as restricted', () => {
+    // Unlike a queued op, a written record's entity may legitimately be
+    // gone; only an active mask restricts.
+    const entry = { entityClass: 'character', entityId: 'c-old', command: 'patch' };
+    expect(isRecordAccessRestricted(entry, access([]))).toBe(false);
+  });
+
+  it('ignores cycle-failure entries that carry no entity', () => {
+    expect(isRecordAccessRestricted({}, access([]))).toBe(false);
   });
 });

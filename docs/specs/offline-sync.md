@@ -177,6 +177,15 @@ otherwise stay null for the whole session, silently disabling both the
 lost-session report **and** the minimal-view share sweep, which has the same
 guard.
 
+`setCurrentUser` also drives **rejection housekeeping** (prune + replay), once
+per signed-in session, for the same reason: it used to live only inside
+`bootstrap()`, so on an ordinary reload an undismissed rollback toast did not
+survive — the exact thing persisting it was for — and `pruneRejectionToasts`
+never ran, letting the pile-up it prevents come back. It waits for a notifier:
+`SyncProvider` registers one in a mount effect that can land *after* the gate
+sets the user, so `setRejectionNotifier` flushes any replay that was waiting
+(replaying into a null notifier would silently drop every toast).
+
 ## Local sync log and recovery
 
 The `syncLog` Dexie store is a device-local operational journal, separate from
@@ -256,6 +265,21 @@ things depending on the op:
 
 The debug dump matters most here: it is a file the user hands to someone else.
 
+**Written records get a read-time check too**, via `isRecordAccessRestricted()`.
+`redactSyncLogForCharacters` only scrubs at rest when a sweep runs, and a sweep
+only runs after a successful cursor pull — so a revert performed **offline**
+writes a fresh snapshot after the last sweep, with no later pull to clean it up.
+Both `SyncLogView` and the debug dump re-check journal entries and rejection
+records against the live masked set (the `Raw` details block is gated the same
+way; a `conflict` outcome can carry a whole `latestEntity` row). A written
+record's entity may legitimately be long deleted, so unlike a queued op only an
+*active mask* restricts it — a pruned character can't reach this path, because
+`pruneInaccessibleLocally` won't prune an entity that still has a queued op.
+
+**Rejection records carry private content in `humanName`** (`skill "Stealth"`,
+`item "..."`), so they get `parentId` and the same treatment on both sides:
+scrubbed at rest by the sweep, re-checked at export time.
+
 Journal writes are best-effort:
 quota or IndexedDB failures never block outbox settlement. Pending state is
 never copied into the log; the sync view reads the authoritative outbox
@@ -275,6 +299,15 @@ automatically when the store leaves `error` (a successful cycle). The old
 tooltip — "see toast for details" — was a lie for every failure that produces
 no toast. `setError` refreshes `at` even when the reason repeats, so the
 dialog's "Last attempt" time stays true through a sustained outage.
+
+**An outstanding failure outlives an empty outbox.** `refreshIndicator` runs
+from the outbox `liveQuery` as well as from the cycle paths, so with no guard
+*any* Dexie outbox change — including the delete that settles a successful
+upload — would flip the badge to `synced` and drop the banner. The orchestrator
+tracks `syncHealthy`, cleared by `markCycleFailed()` and set only by a cursor
+pull that completes; `refreshIndicator` refuses to go green while it is false.
+(Per-operation rejections deliberately don't set it: those have their own
+persistent toast, and the badge should follow the queue.)
 
 **Every cycle-ending `catch` goes through `reportCycleFailure()`** — the cursor
 pull, the drain POST, *and* `runLoop`'s outer catch (which covers

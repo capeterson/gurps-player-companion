@@ -20,7 +20,11 @@
 import type { OutboxEntry, RejectionRecord, SyncCursor, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
-import { isOutboxAccessRestricted } from './minimalViewSweep.ts';
+import {
+  type LocalCharacterAccess,
+  isOutboxAccessRestricted,
+  isRecordAccessRestricted,
+} from './minimalViewSweep.ts';
 import type { SyncIndicatorState } from './state.ts';
 import { syncStateStore } from './state.ts';
 
@@ -53,14 +57,16 @@ const HIDDEN = '[hidden — no access to this character]';
  * drift.  This is the surface where it matters most: the dump is a file
  * the user hands to someone else.
  */
-function maskRestrictedOps(
-  outbox: OutboxEntry[],
+function accessFrom(
   characters: Array<{ id: string; minimalViewMasked?: boolean | undefined }>,
-): OutboxEntry[] {
-  const access = {
+): LocalCharacterAccess {
+  return {
     known: new Set(characters.map((c) => c.id)),
     masked: new Set(characters.filter((c) => c.minimalViewMasked).map((c) => c.id)),
   };
+}
+
+function maskRestrictedOps(outbox: OutboxEntry[], access: LocalCharacterAccess): OutboxEntry[] {
   return outbox.map((op) =>
     isOutboxAccessRestricted(op, access)
       ? { ...op, attemptedValue: HIDDEN, prevValue: HIDDEN }
@@ -68,9 +74,41 @@ function maskRestrictedOps(
   );
 }
 
+/**
+ * Journal entries are scrubbed at rest by `redactSyncLogForCharacters`,
+ * but only when a sweep runs -- and a revert performed offline writes a
+ * fresh snapshot after the last sweep, with no later pull to clean it.
+ * Re-check at export time.
+ */
+function maskRestrictedLog(entries: SyncLogEntry[], access: LocalCharacterAccess): SyncLogEntry[] {
+  return entries.map((entry) =>
+    isRecordAccessRestricted(entry, access)
+      ? {
+          ...entry,
+          previousValue: undefined,
+          newValue: undefined,
+          details: undefined,
+          redacted: true,
+        }
+      : entry,
+  );
+}
+
+/** `humanName` embeds private content (`skill "Stealth"`, `item "..."`). */
+function maskRestrictedRejections(
+  records: RejectionRecord[],
+  access: LocalCharacterAccess,
+): RejectionRecord[] {
+  return records.map((rec) =>
+    isRecordAccessRestricted(rec, access)
+      ? { ...rec, humanName: undefined, fieldPath: undefined, redacted: true }
+      : rec,
+  );
+}
+
 export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
   const db = getLocalDb();
-  const [rawOutbox, characterRows, rejectionToasts, syncLog, syncCursors, storeCounts] =
+  const [rawOutbox, characterRows, rawRejections, rawSyncLog, syncCursors, storeCounts] =
     await Promise.all([
       db.outbox.toArray(),
       db.characters.toArray(),
@@ -117,7 +155,10 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
         }),
       ),
     ]);
-  const outbox = maskRestrictedOps(rawOutbox, characterRows);
+  const access = accessFrom(characterRows);
+  const outbox = maskRestrictedOps(rawOutbox, access);
+  const syncLog = maskRestrictedLog(rawSyncLog, access);
+  const rejectionToasts = maskRestrictedRejections(rawRejections, access);
 
   return {
     meta: {

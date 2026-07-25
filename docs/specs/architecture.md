@@ -95,8 +95,12 @@ stays pending when the app runs without a service worker (dev), which is the
 correct no-op. When a new worker reaches `installed` **and the page is
 already controlled** (so a first-ever install isn't mistaken for an update), or
 when a worker installed by another tab is found parked in `registration.waiting`
-at startup, it dispatches `gpc:sw-update-ready` with a `reload()` callback and
-latches it in `getPendingSwUpdate()` — the latch matters because
+at startup, or when one is found **already installing** at startup (a
+navigation-triggered update can begin before the async registration lookup
+resolves, firing `updatefound` with no listener attached and leaving `waiting`
+still null — once autoUpdate activates it, no later `update()` call can recreate
+the lost event), it dispatches `gpc:sw-update-ready` with a `reload()` callback
+and latches it in `getPendingSwUpdate()` — the latch matters because
 `registerSwLifecycle()` runs at module load in `main.tsx`, before React mounts.
 
 `SwUpdatePrompt` (mounted inside `<ToastProvider>`, outside the router so it

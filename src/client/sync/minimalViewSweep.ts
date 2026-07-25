@@ -75,12 +75,15 @@ export interface LocalCharacterAccess {
   readonly masked: ReadonlySet<string>;
 }
 
-/** The parts of an outbox row this decision needs. */
+/**
+ * The parts of a row this decision needs.  Fields are optional because
+ * journal entries for whole-cycle failures carry no entity at all.
+ */
 export interface OutboxAccessSubject {
-  readonly entityClass: string;
-  readonly entityId: string;
+  readonly entityClass?: string | undefined;
+  readonly entityId?: string | undefined;
   readonly parentId?: string | undefined;
-  readonly command: string;
+  readonly command?: string | undefined;
 }
 
 /**
@@ -113,4 +116,30 @@ export function isOutboxAccessRestricted(
   if (access.known.has(characterId)) return false;
   if (op.parentId !== undefined) return true;
   return op.command === 'patch';
+}
+
+/**
+ * The same decision applied at **read time** to anything that has
+ * already been written down — journal entries, rejection records.
+ *
+ * `redactSyncLogForCharacters` scrubs those at rest when a sweep runs,
+ * but a sweep only runs after a successful cursor pull. A user-triggered
+ * revert performed **offline** writes a fresh snapshot after the sweep
+ * has already been and gone, and offline means no later pull to scrub
+ * it. Checking at read time closes that window and covers every future
+ * write path for free.
+ */
+export function isRecordAccessRestricted(
+  record: OutboxAccessSubject & { readonly redacted?: boolean | undefined },
+  access: LocalCharacterAccess,
+): boolean {
+  if (record.redacted) return true;
+  const characterId =
+    record.parentId ?? (record.entityClass === 'character' ? record.entityId : undefined);
+  if (!characterId) return false;
+  if (access.masked.has(characterId)) return true;
+  // Unlike a queued op, a written record's entity may legitimately be
+  // gone (deleted long ago), so a missing row is not on its own
+  // evidence of lost access -- only an active mask is.
+  return false;
 }

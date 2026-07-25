@@ -11,7 +11,11 @@ import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
-import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
+import {
+  getSyncOrchestrator,
+  resetSyncOrchestratorForTests,
+  setRejectionNotifier,
+} from './orchestrator.ts';
 import { enqueueFieldPatch } from './outbox.ts';
 import { syncStateStore } from './state.ts';
 
@@ -477,6 +481,54 @@ describe('whole-cycle failures', () => {
     // Room for the 5s loop tick above.
   }, 20_000);
 
+  it('keeps the download failure visible when the upload succeeded', async () => {
+    // The upload empties the outbox, so the fallback refreshIndicator
+    // would flip the badge to 'synced' and drop the banner explaining
+    // that downloads are still broken.
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+      humanName: 'ST',
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        return new Response(
+          JSON.stringify({
+            outcomes: body.operations.map((op) => ({
+              clientOpId: op.clientOpId,
+              status: 'applied' as const,
+              newRevision: 2,
+            })),
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (url.includes('/sync/cursor')) return new Response('error code: 530', { status: 530 });
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(() => expect(syncStateStore.status.state).toBe('error'));
+      // Give the post-drain fallback every chance to clobber it.
+      await new Promise((r) => setTimeout(r, 1_500));
+      expect(syncStateStore.status.state).toBe('error');
+      expect(syncStateStore.status.error?.reason).toContain('530');
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  }, 20_000);
+
   it('clears the error reason once a cycle succeeds again', async () => {
     await seedCharacter();
     login();
@@ -504,6 +556,88 @@ describe('whole-cycle failures', () => {
       expect(syncStateStore.status.error).toBeNull();
     } finally {
       orchestrator.stop();
+    }
+  });
+});
+
+describe('rejection housekeeping without a fresh bootstrap', () => {
+  it('replays open rejections on an ordinary authenticated reload', async () => {
+    // SyncBootstrapGate skips bootstrap() whenever the bootstrap flag
+    // exists -- the common path -- so replay used to never run there,
+    // and a persistent rollback toast did not survive the reload it was
+    // designed to survive.
+    login();
+    const db = getLocalDb();
+    await db.rejectionToasts.put({
+      id: 'rej-open',
+      clientOpId: 'rej-open',
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      humanName: 'ST',
+      reason: 'ST must be <= 20',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    });
+
+    const seen: string[] = [];
+    setRejectionNotifier((rec) => seen.push(rec.id));
+    try {
+      getSyncOrchestrator().setCurrentUser(USER_ID);
+      await waitFor(() => expect(seen).toContain('rej-open'));
+    } finally {
+      setRejectionNotifier(null);
+    }
+  });
+
+  it('replays when the notifier registers after the user is known', async () => {
+    // SyncProvider wires the notifier in a mount effect that can land
+    // after the gate sets the user; replaying into a null notifier
+    // would silently drop every toast.
+    login();
+    await getLocalDb().rejectionToasts.put({
+      id: 'rej-late',
+      clientOpId: 'rej-late',
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      humanName: 'DX',
+      reason: 'rejected',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    });
+
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+
+    const seen: string[] = [];
+    setRejectionNotifier((rec) => seen.push(rec.id));
+    try {
+      await waitFor(() => expect(seen).toContain('rej-late'));
+    } finally {
+      setRejectionNotifier(null);
+    }
+  });
+
+  it('prunes stale rejection records on that same pass', async () => {
+    login();
+    const db = getLocalDb();
+    await db.rejectionToasts.put({
+      id: 'rej-ancient',
+      clientOpId: 'rej-ancient',
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      humanName: 'ST',
+      reason: 'newer server revision',
+      status: 'rejected',
+      createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+    });
+
+    setRejectionNotifier(() => {});
+    try {
+      getSyncOrchestrator().setCurrentUser(USER_ID);
+      await waitFor(async () => {
+        expect((await db.rejectionToasts.get('rej-ancient'))?.dismissedAt).toBeTruthy();
+      });
+    } finally {
+      setRejectionNotifier(null);
     }
   });
 });

@@ -106,17 +106,38 @@ export async function redactSyncLogForCharacters(characterIds: Iterable<string>)
             (entry.parentId !== undefined && ids.has(entry.parentId))),
       )
       .toArray();
-    if (affected.length === 0) return 0;
-    await db.syncLog.bulkPut(
-      affected.map((entry) => ({
-        ...entry,
-        previousValue: undefined,
-        newValue: undefined,
-        details: undefined,
-        redacted: true,
-      })),
-    );
-    return affected.length;
+    if (affected.length > 0) {
+      await db.syncLog.bulkPut(
+        affected.map((entry) => ({
+          ...entry,
+          previousValue: undefined,
+          newValue: undefined,
+          details: undefined,
+          redacted: true,
+        })),
+      );
+    }
+    // Rejection records carry private content too: `humanName` on a
+    // child rejection reads `skill "Stealth"` / `item "..."`, and the
+    // debug dump exports these rows verbatim.
+    const rejections = await db.rejectionToasts
+      .filter(
+        (rec) =>
+          !rec.redacted &&
+          (ids.has(rec.entityId) || (rec.parentId !== undefined && ids.has(rec.parentId))),
+      )
+      .toArray();
+    if (rejections.length > 0) {
+      await db.rejectionToasts.bulkPut(
+        rejections.map((rec) => ({
+          ...rec,
+          humanName: undefined,
+          fieldPath: undefined,
+          redacted: true,
+        })),
+      );
+    }
+    return affected.length + rejections.length;
   } catch {
     return 0;
   }

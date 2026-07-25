@@ -141,18 +141,31 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
   let lastCheckAt = 0;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Announce `worker` once it finishes installing (or right away if it
+   * already has).  Extracted so the startup path can adopt a worker
+   * that was **already installing** before our async registration
+   * lookup resolved: `updatefound` would have fired with no listener
+   * attached, `waiting` is still null so the startup check below misses
+   * it too, and once autoUpdate activates it no later
+   * `registration.update()` can recreate the lost event — that release
+   * would never prompt at all.
+   */
+  const watchInstalling = (worker: ServiceWorker) => {
+    const check = () => {
+      if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+        announceUpdate(worker);
+      }
+    };
+    worker.addEventListener('statechange', check);
+    check();
+  };
+
   const onUpdateFound = () => {
     if (!registration) return;
     const installing = registration.installing;
     if (!installing) return;
-    installing.addEventListener('statechange', () => {
-      if (
-        installing.state === 'installed' &&
-        navigator.serviceWorker.controller // page already controlled → genuine update
-      ) {
-        announceUpdate(installing);
-      }
-    });
+    watchInstalling(installing);
   };
 
   const checkForUpdate = (force = false) => {
@@ -211,6 +224,10 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
     // would never check for anything again once the user dismissed it.
     if (reg.waiting && navigator.serviceWorker.controller) {
       announceUpdate(reg.waiting);
+    } else if (reg.installing) {
+      // A navigation-triggered update that began before this lookup
+      // resolved: `updatefound` already fired with nobody listening.
+      watchInstalling(reg.installing);
     }
 
     lastCheckAt = Date.now();

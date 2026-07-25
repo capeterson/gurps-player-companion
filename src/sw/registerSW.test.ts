@@ -232,6 +232,38 @@ describe('registerSwLifecycle update discovery', () => {
     teardown();
   });
 
+  it('adopts a worker that was already installing when we attached', async () => {
+    // A navigation-triggered update can start before the async
+    // registration lookup resolves: `updatefound` fires with nobody
+    // listening, `waiting` is still null, and once autoUpdate activates
+    // that worker no later update() call can recreate the lost event --
+    // the release would never prompt at all.
+    const installing = new FakeWorker();
+    registration.installing = installing;
+    const onUpdateReady = vi.fn();
+
+    const teardown = registerSwLifecycle({ onUpdateReady });
+    await flush();
+
+    installing.setState('installed');
+
+    expect(onUpdateReady).toHaveBeenCalledOnce();
+    teardown();
+  });
+
+  it('adopts an already-installed worker that never fired an event here', async () => {
+    const installing = new FakeWorker();
+    installing.state = 'installed';
+    registration.installing = installing;
+    const onUpdateReady = vi.fn();
+
+    const teardown = registerSwLifecycle({ onUpdateReady });
+    await flush();
+
+    expect(onUpdateReady).toHaveBeenCalledOnce();
+    teardown();
+  });
+
   it('stops polling after teardown', async () => {
     vi.useFakeTimers();
     const teardown = registerSwLifecycle();

@@ -212,6 +212,66 @@ describe('buildSyncDebugDump', () => {
     expect(serialized).toContain('op-del');
   });
 
+  it('masks rejection records for a masked character', async () => {
+    // humanName on a child rejection reads `skill "Stealth"` / `item
+    // "..."` -- private content, and this file gets handed to someone
+    // else.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-masked',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.rejectionToasts.add({
+      id: 'rej-1',
+      clientOpId: 'rej-1',
+      entityClass: 'character_skill',
+      entityId: 'skill-1',
+      parentId: 'char-masked',
+      humanName: 'skill "SECRET-SKILL-NAME"',
+      reason: 'newer server revision',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('SECRET-SKILL-NAME');
+    expect(serialized).toContain('rej-1');
+  });
+
+  it('masks a journal snapshot written after the last sweep ran', async () => {
+    // The offline-revert window: redactSyncLogForCharacters only runs
+    // after a successful pull, so the export re-checks at read time.
+    const db = getLocalDb();
+    await db.characters.add({
+      id: 'char-masked-2',
+      ownerId: 'another-player',
+      campaignId: 'camp-1',
+      name: 'Masked',
+      minimalViewMasked: true,
+    } as never);
+    await db.syncLog.add({
+      id: 'log-fresh',
+      direction: 'local',
+      result: 'reverted',
+      entityClass: 'character_trait',
+      entityId: 'trait-1',
+      parentId: 'char-masked-2',
+      command: 'patch',
+      previousValue: 'FRESH-SECRET-BEFORE',
+      newValue: 'FRESH-SECRET-AFTER',
+      occurredAt: new Date().toISOString(),
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('FRESH-SECRET-BEFORE');
+    expect(serialized).not.toContain('FRESH-SECRET-AFTER');
+  });
+
   it('leaves a speculative create alone — its row is absent by design', async () => {
     const db = getLocalDb();
     await db.outbox.add({

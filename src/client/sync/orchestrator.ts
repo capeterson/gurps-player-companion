@@ -170,6 +170,13 @@ class SyncOrchestrator {
   private currentUserId: string | null = null;
   /** Latches `reportSessionLost` so a lost session logs once, not every cycle. */
   private sessionLostReported = false;
+  /** Latches rejection prune+replay to once per signed-in session. */
+  private rejectionHousekeepingDone = false;
+  /**
+   * False while a cycle failure is outstanding. Cleared only by a
+   * cycle that actually succeeds -- see `refreshIndicator`.
+   */
+  private syncHealthy = true;
 
   /** Idempotent.  Wires online/offline + outbox liveQuery + drain loop. */
   start(): void {
@@ -231,9 +238,42 @@ class SyncOrchestrator {
    * the session-loss latch so the new session can report its own loss.
    */
   setCurrentUser(userId: string): void {
-    if (this.currentUserId === userId) return;
+    if (this.currentUserId === userId) {
+      // Same user, but the notifier may only now be wired up.
+      void this.maybeRunRejectionHousekeeping();
+      return;
+    }
     this.currentUserId = userId;
     this.sessionLostReported = false;
+    this.rejectionHousekeepingDone = false;
+    void this.maybeRunRejectionHousekeeping();
+  }
+
+  /**
+   * Prune + replay open rejection toasts, once per signed-in session.
+   *
+   * This used to happen only inside `bootstrap()`, which the gate skips
+   * whenever `bootstrap:<userId>` already exists — i.e. on every
+   * ordinary reload. The consequences were that an undismissed rollback
+   * toast did NOT survive a reload (the whole point of persisting it),
+   * and that `pruneRejectionToasts` never ran for a long-lived account,
+   * so the pile-up it exists to prevent came back.
+   *
+   * Waits for the notifier: `SyncProvider` registers it in a mount
+   * effect that can land after the gate sets the user, and replaying
+   * into a null notifier would silently drop every toast.
+   */
+  /** Called when a rejection notifier registers; see `setRejectionNotifier`. */
+  async flushPendingRejectionReplay(): Promise<void> {
+    await this.maybeRunRejectionHousekeeping();
+  }
+
+  private async maybeRunRejectionHousekeeping(): Promise<void> {
+    if (this.rejectionHousekeepingDone) return;
+    if (this.currentUserId === null) return;
+    if (!hasRejectionNotifier()) return;
+    this.rejectionHousekeepingDone = true;
+    await this.replayRejectionToasts();
   }
 
   /**
@@ -321,6 +361,9 @@ class SyncOrchestrator {
       // page is the only signal. Absent on old servers -> no-op.
       await this.pruneInaccessibleLocally(lastAccessible);
       this.fireCycleDone();
+      // A pull that completed is the one thing that clears an
+      // outstanding failure.
+      this.syncHealthy = true;
       const pending = await countPending();
       this.refreshIndicator(pending);
       return true;
@@ -329,6 +372,7 @@ class SyncOrchestrator {
       // rejection record and no toast, so before this the only symptom
       // was a red badge telling the user to go read a toast that never
       // existed.
+      this.markCycleFailed();
       await reportCycleFailure(err, 'Downloading server changes failed', 'pull');
       throw err;
     }
@@ -343,6 +387,7 @@ class SyncOrchestrator {
     if (this.sessionLostReported) return;
     this.sessionLostReported = true;
     const reason = 'Signed out — sign in again to resume syncing';
+    this.markCycleFailed();
     void appendSyncLog({ direction: 'local', result: 'failed', reason });
     syncStateStore.setError(reason);
   }
@@ -394,6 +439,7 @@ class SyncOrchestrator {
     if (!completed) return false;
     // Re-emit any persistent rejection toasts that survived the
     // reload so the user doesn't lose an open error.
+    this.rejectionHousekeepingDone = true;
     await this.replayRejectionToasts();
     return true;
   }
@@ -607,6 +653,7 @@ class SyncOrchestrator {
         // recoverStaleInFlight, readDrainableOps, applyOutcomes, a
         // Dexie failure. A bare set('error') here would restore exactly
         // the unexplained red badge this whole change exists to remove.
+        this.markCycleFailed();
         await reportCycleFailure(err, 'Sync failed');
       }
       // Wait for an outbox change, an online event, or 5s, whichever
@@ -676,6 +723,7 @@ class SyncOrchestrator {
             lastError: errorDetails(err),
           });
         }
+        this.markCycleFailed();
         await reportCycleFailure(err, 'Uploading changes failed', 'push', {
           operationCount: ops.length,
         });
@@ -687,8 +735,17 @@ class SyncOrchestrator {
       // for the next loop iteration.  triggerCursorPull handles its own
       // fireCycleDone + refreshIndicator; the calls below are fallbacks for
       // the early-return paths (offline / no token) where it returns silently.
-      await this.triggerCursorPull().catch(() => {});
+      let pullFailed = false;
+      await this.triggerCursorPull().catch(() => {
+        pullFailed = true;
+      });
       this.fireCycleDone();
+      // Only the *skipped* pull needs the fallback. A pull that FAILED
+      // already reported a reason; refreshing the indicator here would
+      // flip the badge straight back to 'synced' (the upload emptied the
+      // outbox) and drop the banner explaining that downloads are still
+      // broken.
+      if (pullFailed) return;
       const pending = await countPending();
       this.refreshIndicator(pending);
     });
@@ -941,6 +998,7 @@ class SyncOrchestrator {
       clientOpId: op.clientOpId,
       entityClass: op.entityClass,
       entityId: op.entityId,
+      parentId: op.parentId,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
       reason: outcome.reason ?? 'sync failed',
@@ -985,6 +1043,7 @@ class SyncOrchestrator {
       clientOpId: op.clientOpId,
       entityClass: op.entityClass,
       entityId: op.entityId,
+      parentId: op.parentId,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
       reason: outcome.reason ?? 'sync failed',
@@ -1550,9 +1609,20 @@ class SyncOrchestrator {
   private refreshIndicator(pending: number): void {
     if (pending > 0) {
       syncStateStore.set('syncing');
-    } else {
-      syncStateStore.set('synced');
+      return;
     }
+    // An outstanding cycle failure outlives an empty outbox. This runs
+    // from the outbox liveQuery too, so without the guard *any* Dexie
+    // outbox change -- including the delete that settles a successful
+    // upload -- would flip the badge to 'synced' and drop the banner
+    // explaining that downloads are still failing.
+    if (!this.syncHealthy) return;
+    syncStateStore.set('synced');
+  }
+
+  /** A cycle failed; the badge must not go green until one succeeds. */
+  private markCycleFailed(): void {
+    this.syncHealthy = false;
   }
 }
 
@@ -1694,6 +1764,13 @@ let activeNotifier: RejectionNotifier | null = null;
 
 export function setRejectionNotifier(notifier: RejectionNotifier | null): void {
   activeNotifier = notifier;
+  // The gate may have set the user before this landed; flush any
+  // replay that was waiting for somewhere to send toasts.
+  if (notifier) void getSyncOrchestrator().flushPendingRejectionReplay();
+}
+
+function hasRejectionNotifier(): boolean {
+  return activeNotifier !== null;
 }
 
 function notifyRejection(rec: RejectionRecord): void {

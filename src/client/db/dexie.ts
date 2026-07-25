@@ -370,12 +370,21 @@ export interface RejectionRecord {
   clientOpId: string;
   entityClass: EntityClass;
   entityId: string;
+  /**
+   * Parent character id for child classes, mirroring `OutboxEntry` and
+   * `SyncLogEntry`.  `humanName` on a child rejection embeds private
+   * content (`skill "Stealth"`, `item "..."`), so the share gate needs
+   * a way to tie the record back to a character.
+   */
+  parentId?: string | undefined;
   fieldPath?: string | undefined;
   humanName?: string | undefined;
   reason: string;
   status: 'rejected' | 'unauthorized' | 'failed_permanent' | 'conflict';
   createdAt: string;
   dismissedAt?: string | undefined;
+  /** Set when the share gate scrubbed `humanName`; see `redactSyncLogForCharacters`. */
+  redacted?: boolean | undefined;
 }
 
 /**
