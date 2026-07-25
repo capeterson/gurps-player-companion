@@ -66,3 +66,51 @@ export function characterIdsToMinimize(args: {
   }
   return out;
 }
+
+/** The local character rows a viewer can still see, and which are masked. */
+export interface LocalCharacterAccess {
+  /** Ids of character rows present in Dexie. */
+  readonly known: ReadonlySet<string>;
+  /** Ids whose private fields were masked by the sweep above. */
+  readonly masked: ReadonlySet<string>;
+}
+
+/** The parts of an outbox row this decision needs. */
+export interface OutboxAccessSubject {
+  readonly entityClass: string;
+  readonly entityId: string;
+  readonly parentId?: string | undefined;
+  readonly command: string;
+}
+
+/**
+ * Should the share gate hide a queued op's `prevValue` / `attemptedValue`?
+ *
+ * The outbox is deliberately never swept — a queued op is the user's own
+ * unsent intent and still has to be delivered, and
+ * `pruneInaccessibleLocally` refuses to prune an entity with unsettled
+ * ops. So every surface that *prints* those values applies this instead.
+ * It lives here, next to the sweep it mirrors, because it was duplicated
+ * in the sync dialog and the debug dump and those must not drift.
+ *
+ * A masked character always restricts. A **missing** character row means
+ * something different depending on the op:
+ *   - child op (`parentId` set): the parent going away is access loss,
+ *     whatever the command. A `delete` matters most here — `enqueueDelete`
+ *     stores the entire removed row in `prevValue`, so a GM deleting
+ *     another player's trait leaves that whole row queued.
+ *   - root `character` op: the row is *expected* to be gone after a local
+ *     delete, and a speculative create may not have landed, so only a
+ *     `patch` implies lost access.
+ */
+export function isOutboxAccessRestricted(
+  op: OutboxAccessSubject,
+  access: LocalCharacterAccess,
+): boolean {
+  const characterId = op.parentId ?? (op.entityClass === 'character' ? op.entityId : undefined);
+  if (!characterId) return false;
+  if (access.masked.has(characterId)) return true;
+  if (access.known.has(characterId)) return false;
+  if (op.parentId !== undefined) return true;
+  return op.command === 'patch';
+}

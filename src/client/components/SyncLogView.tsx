@@ -6,6 +6,7 @@ import { useDialogState } from '../hooks/useDialogState.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { buildSyncDebugDump } from '../sync/debugDump.ts';
+import { isOutboxAccessRestricted } from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
@@ -188,7 +189,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                       <details className="mt-3 rounded-field bg-base-100/70 p-2">
                         <summary className="cursor-pointer font-medium">Debug information</summary>
                         <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">
-                          {debugText(op, isAccessRestricted(op, access))}
+                          {debugText(op, isOutboxAccessRestricted(op, access))}
                         </pre>
                       </details>
                     </article>
@@ -203,7 +204,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                   key={op.clientOpId}
                   title={changeName(op)}
                   meta={`${statusLabel(op)} · ${formatTime(op.enqueuedAt)}`}
-                  details={<PendingDetails op={op} hideValues={isAccessRestricted(op, access)} />}
+                  details={
+                    <PendingDetails op={op} hideValues={isOutboxAccessRestricted(op, access)} />
+                  }
                 />
               ))}
             </SyncSection>
@@ -518,26 +521,6 @@ function formatTime(value: string): string {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
     new Date(value),
   );
-}
-
-/**
- * Does the share gate apply to this queued op's values?
- *
- * A masked character means sharing was turned off; a `patch` whose
- * character row has vanished means the viewer was removed from the
- * campaign entirely (`pruneInaccessibleLocally` deletes the row but
- * deliberately keeps the op). `create`/`delete` are exempt from the
- * missing-row test — for those the row is *expected* to be absent, and
- * the values are the user's own brand-new or just-deleted content.
- */
-function isAccessRestricted(
-  op: OutboxEntry,
-  access: { known: Set<string>; masked: Set<string> },
-): boolean {
-  const characterId = op.parentId ?? (op.entityClass === 'character' ? op.entityId : undefined);
-  if (!characterId) return false;
-  if (access.masked.has(characterId)) return true;
-  return op.command === 'patch' && !access.known.has(characterId);
 }
 
 function debugText(op: OutboxEntry, hideValues = false): string {

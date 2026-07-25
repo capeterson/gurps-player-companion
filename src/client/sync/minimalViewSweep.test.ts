@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { characterIdsToMinimize } from './minimalViewSweep.ts';
+import { characterIdsToMinimize, isOutboxAccessRestricted } from './minimalViewSweep.ts';
 
 const ME = 'me';
 const THEM = 'them';
@@ -123,5 +123,69 @@ describe('characterIdsToMinimize', () => {
       campaigns: [],
     });
     expect([...out]).toEqual([]);
+  });
+});
+
+describe('isOutboxAccessRestricted', () => {
+  const access = (known: string[], masked: string[] = []) => ({
+    known: new Set(known),
+    masked: new Set(masked),
+  });
+
+  it('hides values for a masked character', () => {
+    const op = { entityClass: 'character', entityId: 'c1', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access(['c1'], ['c1']))).toBe(true);
+  });
+
+  it('allows values for a character the viewer still sees', () => {
+    const op = { entityClass: 'character', entityId: 'c1', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access(['c1']))).toBe(false);
+  });
+
+  it('hides a child delete whose parent character was pruned', () => {
+    // enqueueDelete stores the ENTIRE removed row in prevValue, so a GM
+    // deleting another player's trait leaves that whole row queued. The
+    // parent going away is access loss, not an expected local delete.
+    const op = {
+      entityClass: 'character_trait',
+      entityId: 't1',
+      parentId: 'c-gone',
+      command: 'delete',
+    };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(true);
+  });
+
+  it('hides any child op whose parent character was pruned', () => {
+    for (const command of ['patch', 'create', 'delete']) {
+      const op = {
+        entityClass: 'character_inventory',
+        entityId: 'i1',
+        parentId: 'c-gone',
+        command,
+      };
+      expect(isOutboxAccessRestricted(op, access([]))).toBe(true);
+    }
+  });
+
+  it('allows a root delete whose row is absent by design', () => {
+    // The user deleted their own character; the missing row is the
+    // expected consequence, not evidence of lost access.
+    const op = { entityClass: 'character', entityId: 'c-mine', command: 'delete' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(false);
+  });
+
+  it('allows a speculative root create that has not landed', () => {
+    const op = { entityClass: 'character', entityId: 'c-new', command: 'create' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(false);
+  });
+
+  it('hides a root patch whose character vanished', () => {
+    const op = { entityClass: 'character', entityId: 'c-gone', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(true);
+  });
+
+  it('ignores ops with no character at all', () => {
+    const op = { entityClass: 'campaign', entityId: 'camp-1', command: 'patch' };
+    expect(isOutboxAccessRestricted(op, access([]))).toBe(false);
   });
 });

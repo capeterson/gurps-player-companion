@@ -20,6 +20,7 @@
 import type { OutboxEntry, RejectionRecord, SyncCursor, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
+import { isOutboxAccessRestricted } from './minimalViewSweep.ts';
 import type { SyncIndicatorState } from './state.ts';
 import { syncStateStore } from './state.ts';
 
@@ -47,26 +48,24 @@ export interface SyncDebugDump {
 const HIDDEN = '[hidden — no access to this character]';
 
 /**
- * Mirrors `isAccessRestricted` in `SyncLogView`: a masked character
- * means sharing was revoked, and a missing one means the viewer lost
- * campaign access entirely (the op survives the prune by design).
- * `create`/`delete` are exempt from the missing-row test — the row is
- * meant to be absent there.
+ * Apply the share gate to queued ops, using the same decision the sync
+ * dialog renders with (`isOutboxAccessRestricted`) so the two can't
+ * drift.  This is the surface where it matters most: the dump is a file
+ * the user hands to someone else.
  */
 function maskRestrictedOps(
   outbox: OutboxEntry[],
   characters: Array<{ id: string; minimalViewMasked?: boolean | undefined }>,
 ): OutboxEntry[] {
-  const known = new Set(characters.map((c) => c.id));
-  const masked = new Set(characters.filter((c) => c.minimalViewMasked).map((c) => c.id));
-  return outbox.map((op) => {
-    const characterId = op.parentId ?? (op.entityClass === 'character' ? op.entityId : undefined);
-    if (!characterId) return op;
-    const restricted =
-      masked.has(characterId) || (op.command === 'patch' && !known.has(characterId));
-    if (!restricted) return op;
-    return { ...op, attemptedValue: HIDDEN, prevValue: HIDDEN };
-  });
+  const access = {
+    known: new Set(characters.map((c) => c.id)),
+    masked: new Set(characters.filter((c) => c.minimalViewMasked).map((c) => c.id)),
+  };
+  return outbox.map((op) =>
+    isOutboxAccessRestricted(op, access)
+      ? { ...op, attemptedValue: HIDDEN, prevValue: HIDDEN }
+      : op,
+  );
 }
 
 export async function buildSyncDebugDump(): Promise<SyncDebugDump> {

@@ -54,6 +54,40 @@ describe('api refresh-on-401', () => {
     expect(tokenStore.read()).toMatchObject({ refreshToken: 'refresh-1' });
   });
 
+  it('gives every concurrent caller the real status, not a drained body', async () => {
+    // All parallel 401s await the same refresh promise. Sharing one
+    // Response would let the first parse() consume the body and leave
+    // the rest throwing "body already read" -- replacing the outage
+    // diagnostic with a misleading local TypeError.
+    seedTokens();
+    let refreshCalls = 0;
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (String(url).includes('/auth/refresh')) {
+        refreshCalls += 1;
+        return new Response(JSON.stringify({ error: 'origin unreachable' }), {
+          status: 530,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return jsonResponse(401, { error: 'token expired' });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const results = await Promise.allSettled([
+      api('/characters'),
+      api('/campaigns'),
+      api('/auth/me'),
+    ]);
+
+    expect(refreshCalls).toBe(1);
+    for (const result of results) {
+      expect(result.status).toBe('rejected');
+      const reason = (result as PromiseRejectedResult).reason;
+      expect(reason).toMatchObject({ status: 530, message: 'origin unreachable' });
+    }
+    expect(tokenStore.read()).toMatchObject({ refreshToken: 'refresh-1' });
+  });
+
   it('keeps the session and propagates the transport error', async () => {
     seedTokens();
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {

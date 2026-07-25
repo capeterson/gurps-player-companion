@@ -187,6 +187,31 @@ describe('buildSyncDebugDump', () => {
     expect(serialized).not.toContain('ORPHAN-VALUE');
   });
 
+  it('masks a queued child delete whose parent character was pruned', async () => {
+    // enqueueDelete stores the entire removed row in prevValue, so a GM
+    // deleting another player's trait leaves that whole row queued.
+    const db = getLocalDb();
+    await db.outbox.add({
+      clientOpId: 'op-del',
+      entityClass: 'character_trait',
+      entityId: 'trait-1',
+      parentId: 'char-gone',
+      command: 'delete',
+      coalesceKey: 'trait-1|',
+      prevValue: { id: 'trait-1', name: 'DELETED-TRAIT-SECRET', notes: 'PRIVATE-NOTE' },
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    } as never);
+
+    const serialized = JSON.stringify(await buildSyncDebugDump());
+
+    expect(serialized).not.toContain('DELETED-TRAIT-SECRET');
+    expect(serialized).not.toContain('PRIVATE-NOTE');
+    expect(serialized).toContain('op-del');
+  });
+
   it('leaves a speculative create alone — its row is absent by design', async () => {
     const db = getLocalDb();
     await db.outbox.add({

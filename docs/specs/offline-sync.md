@@ -145,12 +145,19 @@ transport failure leaves the session intact and reports
 `{ kind: 'unavailable' }` so the caller retries later.
 
 It returns a typed `RefreshResult` rather than a boolean so `apiFetch` can
-**surface the outage instead of the 401 that triggered the refresh**: it returns
-the refresh's own response (or rethrows its transport error) in the
-`unavailable` case. Collapsing both to the original 401 would have the
+**surface the outage instead of the 401 that triggered the refresh**: for the
+`unavailable` case it reconstructs the refresh's own response (or rethrows its
+transport error). Collapsing both to the original 401 would have the
 orchestrator journal "HTTP 401 — token expired" during a total origin outage,
 pointing the user at their account rather than at the server — defeating the
 diagnostics above.
+
+The failure is captured as **plain data** (`status` / `bodyText` /
+`contentType`), not as the `Response` object. Concurrent 401s all await the one
+`refreshInFlight` promise and so share one result; handing them a single
+`Response` would let the first `parse()` drain its body and leave every other
+caller throwing "body already read" instead of the real status. Each caller
+builds its own `Response` from that data.
 
 This is load-bearing, not a nicety. Clearing on any non-OK response means one
 badly-timed outage signs the user out permanently, and it does so **invisibly**:
@@ -229,14 +236,25 @@ survives with its metadata, and the UI says the values were removed.
 **The outbox needs the same gate applied at read time.** Queued ops are
 deliberately *not* swept on a downgrade — the op is the user's own unsent intent
 and still has to be delivered, and `pruneInaccessibleLocally` explicitly refuses
-to prune an entity with unsettled local ops. So the two surfaces that *print*
-outbox values apply the decision themselves: `isAccessRestricted()` in
-`SyncLogView` and `maskRestrictedOps()` in `debugDump.ts` hide `prevValue` /
-`attemptedValue` when the op's character is `minimalViewMasked`, or when a
-`patch`'s character row has vanished entirely. `create`/`delete` are exempt from
-the missing-row test — the row is meant to be absent there, and the values are
-the user's own new or just-deleted content. The debug dump matters most here: it
-is a file the user hands to someone else.
+to prune an entity with unsettled local ops. So every surface that *prints*
+outbox values applies the decision itself, through the single shared predicate
+`isOutboxAccessRestricted()` in `minimalViewSweep.ts` (it lives beside the sweep
+it mirrors because it was briefly duplicated in the dialog and the dump, and
+those must not drift). `SyncLogView` and `maskRestrictedOps()` in `debugDump.ts`
+both call it.
+
+A masked character always restricts. A **missing** character row means different
+things depending on the op:
+
+- **child op** (`parentId` set) — the parent going away is access loss, whatever
+  the command. `delete` matters most: `enqueueDelete` stores the *entire*
+  removed row in `prevValue`, so a GM deleting another player's trait leaves
+  that whole row queued.
+- **root `character` op** — the row is *expected* to be gone after a local
+  delete, and a speculative create may not have landed, so only a `patch`
+  implies lost access.
+
+The debug dump matters most here: it is a file the user hands to someone else.
 
 Journal writes are best-effort:
 quota or IndexedDB failures never block outbox settlement. Pending state is

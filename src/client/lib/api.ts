@@ -41,7 +41,21 @@ let refreshInFlight: Promise<RefreshResult> | null = null;
 type RefreshResult =
   | { ok: true }
   | { ok: false; kind: 'rejected' }
-  | { ok: false; kind: 'unavailable'; response?: Response; cause?: unknown };
+  | {
+      ok: false;
+      kind: 'unavailable';
+      /**
+       * The refresh response captured as plain, re-usable data.  Every
+       * caller that piled onto the same `refreshInFlight` promise gets
+       * this same result object, so handing them all one `Response`
+       * would let the first `parse()` consume the body and leave the
+       * rest throwing "body already read" — replacing the HTTP 530
+       * diagnostic with a misleading local TypeError. Each caller
+       * reconstructs its own Response from these instead.
+       */
+      failure?: { status: number; bodyText: string; contentType: string | null };
+      cause?: unknown;
+    };
 
 async function refreshTokens(): Promise<RefreshResult> {
   if (refreshInFlight) return refreshInFlight;
@@ -78,7 +92,19 @@ async function refreshTokens(): Promise<RefreshResult> {
           tokenStore.clear();
           return { ok: false, kind: 'rejected' };
         }
-        return { ok: false, kind: 'unavailable', response: res };
+        // Drain the body here, once, into plain data. Every caller
+        // awaiting this same promise reconstructs its own Response
+        // below rather than sharing a single consumable one.
+        const bodyText = await res.text().catch(() => '');
+        return {
+          ok: false,
+          kind: 'unavailable',
+          failure: {
+            status: res.status,
+            bodyText,
+            contentType: res.headers.get('content-type'),
+          },
+        };
       }
       const fresh = (await res.json()) as {
         accessToken: string;
@@ -140,7 +166,17 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
       // original 401 would have the caller record "HTTP 401 — token
       // expired" during a total origin outage, sending the user to look
       // at their account instead of at the server.
-      if (refreshed.response) return refreshed.response;
+      // A fresh Response per caller: concurrent 401s all await the one
+      // refresh promise, so sharing a single Response would let the
+      // first parse() drain the body and leave the rest throwing
+      // "body already read" instead of the real status.
+      if (refreshed.failure) {
+        const { status, bodyText, contentType } = refreshed.failure;
+        return new Response(bodyText, {
+          status,
+          headers: contentType ? { 'content-type': contentType } : {},
+        });
+      }
       throw refreshed.cause instanceof Error
         ? refreshed.cause
         : new Error('Token refresh could not reach the server');
