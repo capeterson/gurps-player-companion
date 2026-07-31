@@ -38,10 +38,13 @@ Endpoints (`src/server/routes/campaigns.ts`):
 
 Campaign settings that shape shared play: `pointTarget`, `disadvantageCap`,
 `quirkCap`, `manaLevel` (the campaign's ambient mana, which shapes
-spellcasting for member characters), `shareCharacterSheets`, and the default-off
-`allowGmCharacterEditing` switch. The latter grants owners/managers normal sheet
-editing through the character outbox and server `assertWrite` path; it does not
-create a dashboard-specific mutation path.
+spellcasting for member characters), `techLevel` (the campaign's tech
+level, resolved onto every member character's `CharacterDetail.techLevel`
+the same way `manaLevel` is — characters no longer set their own),
+`shareCharacterSheets`, and the default-off `allowGmCharacterEditing`
+switch. The latter grants owners/managers normal sheet editing through
+the character outbox and server `assertWrite` path; it does not create a
+dashboard-specific mutation path.
 
 ### Invitations
 
@@ -253,9 +256,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   character copy path (`InventoryPanel.onPickLibraryItem`/`onCreate`) verbatim,
   the same way `armor`/`weaponData` already did — a picked powerstone or magic
   item arrives on the character's inventory row with its template charge state.
-- **Campaign block `manaLevel` (v3):** export always includes the campaign's
-  ambient `manaLevel` (Basic Set p. 235) alongside `description`/`pointTarget`/
-  `disadvantageCap`/`quirkCap`.
+- **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
+  campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set
+  p. 513) alongside `description`/`pointTarget`/`disadvantageCap`/`quirkCap`.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. Two modes:
@@ -268,8 +271,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   - Returns per-section `{ created, updated, deleted }` counts.
   - **`applyCampaignSettings`** (boolean, default `false`): opt-in. When
     true and the document carries a `campaign` block, `description`,
-    `pointTarget`, `disadvantageCap`, `quirkCap`, and `manaLevel` are copied
-    onto the campaigns row — only the fields actually present in the
+    `pointTarget`, `disadvantageCap`, `quirkCap`, `manaLevel`, and
+    `techLevel` are copied onto the campaigns row — only the fields
+    actually present in the
     document (an omitted field leaves the current value alone); `name` is
     never touched by import. The response's `campaignSettingsApplied`
     reports whether anything was actually written (false when the flag was

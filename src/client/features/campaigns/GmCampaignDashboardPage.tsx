@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { MANA_LEVEL_LABELS } from '../../../shared/constants/magic.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { api } from '../../lib/api.ts';
+import { useMirrorCampaigns } from '../characters/useMirrorCampaigns.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 import { GmChangeFeed } from './GmChangeFeed.tsx';
 import { GmCharacterCard } from './GmCharacterCard.tsx';
@@ -23,6 +24,13 @@ export function GmCampaignDashboardPage() {
     enabled: id.length > 0,
   });
   const characters = useCampaignCharacterDetails(id);
+  // Mirror the fetched campaign into Dexie so a settings save (e.g. tech
+  // level) is reflected on the GM cards immediately, without waiting on
+  // whatever last synced it there — this page is otherwise not one of the
+  // routes that keeps the local campaign mirror fresh (see
+  // useMirrorCampaigns.ts: campaigns have no outbox/cursor sync path, this
+  // REST fetch is the only route campaign rows have into Dexie).
+  useMirrorCampaigns(campaign.data ? [campaign.data] : undefined);
 
   if (!id) return <p className="alert alert-error">Missing campaign id.</p>;
   if (campaign.isLoading) return <p className="text-sm text-base-content/60">Loading campaign…</p>;
