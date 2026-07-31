@@ -294,6 +294,48 @@ describe('summarizeEvent character_inventory', () => {
     });
     expect(summary.toLowerCase()).toContain('sword');
   });
+
+  it('isArmor set: "Shortsword: set as armor" (not raw field name)', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', isArmor: false },
+      newRow: { name: 'Shortsword', isArmor: true },
+    });
+    expect(summary).toBe('Shortsword: set as armor');
+  });
+
+  it('isArmor unset: "Shortsword: unset as armor"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', isArmor: true },
+      newRow: { name: 'Shortsword', isArmor: false },
+    });
+    expect(summary).toBe('Shortsword: unset as armor');
+  });
+
+  it('handles snake_case is_armor column name', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', is_armor: false },
+      newRow: { name: 'Shortsword', is_armor: true },
+    });
+    expect(summary).toBe('Shortsword: set as armor');
+  });
+
+  it('generic multi-field fallback names the changed fields, not raw keys', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Torch', weightLbs: 1, cost: 1 },
+      newRow: { name: 'Torch', weightLbs: 2, cost: 3 },
+    });
+    expect(summary).toContain('Torch');
+    expect(summary).not.toContain('weightLbs');
+    expect(summary).toContain('Weight Lbs');
+  });
 });
 
 // ---------- summarizeEvent — campaign ----------
@@ -398,5 +440,66 @@ describe('groupIntoBatches', () => {
     ];
     const groups = groupIntoBatches(events);
     expect(groups).toHaveLength(3);
+  });
+
+  it('un-batched updates to the same item within 60s fold into one collapsed group', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: t0.toISOString(),
+        summary: 'Shortsword: set as armor',
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: new Date(t0.getTime() + 10_000).toISOString(),
+        summary: 'Shortsword qty 1 → 2',
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: new Date(t0.getTime() + 59_000).toISOString(),
+        summary: 'Wearing Shortsword',
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.foldable).toBe(true);
+    expect(groups[0]?.events).toHaveLength(3);
+  });
+
+  it('same-item updates more than 60s apart stay separate', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: t0.toISOString(),
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: new Date(t0.getTime() + 61_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('same-window updates to different items stay separate', () => {
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: crypto.randomUUID(), createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: crypto.randomUUID(),
+        createdAt: new Date(t0.getTime() + 1_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
   });
 });

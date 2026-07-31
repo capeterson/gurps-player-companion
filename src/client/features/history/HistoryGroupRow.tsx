@@ -14,10 +14,21 @@ function formatRelative(iso: string): string {
   return `${d}d ago`;
 }
 
+/** Full localized timestamp down to the second, for the hover tooltip. */
+function formatAbsolute(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  });
+}
+
 function SingleRow({ event }: { event: HistoryEventOut }) {
   return (
     <div className="flex items-start gap-2 py-2 px-3 border-b border-base-200 last:border-0 hover:bg-base-200/40 transition-colors text-sm">
-      <span className="text-base-content/40 text-xs tabular-nums w-16 shrink-0 pt-0.5">
+      <span
+        className="text-base-content/40 text-xs tabular-nums w-16 shrink-0 pt-0.5"
+        title={formatAbsolute(event.createdAt)}
+      >
         {formatRelative(event.createdAt)}
       </span>
       <span className="flex-1 min-w-0">
@@ -52,7 +63,10 @@ export function HistoryGroupRow({ group }: GroupRowProps) {
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-start gap-2 py-2 px-3 hover:bg-base-200/40 transition-colors text-sm text-left"
       >
-        <span className="text-base-content/40 text-xs tabular-nums w-16 shrink-0 pt-0.5">
+        <span
+          className="text-base-content/40 text-xs tabular-nums w-16 shrink-0 pt-0.5"
+          title={first ? formatAbsolute(first.createdAt) : undefined}
+        >
           {first ? formatRelative(first.createdAt) : ''}
         </span>
         <span className="flex-1 min-w-0 text-base-content">{group.groupSummary}</span>
