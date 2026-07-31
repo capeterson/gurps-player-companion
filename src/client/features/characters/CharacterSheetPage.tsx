@@ -17,6 +17,8 @@ import {
   TEMP_STAT_AXES,
   type TempStatAxis,
 } from '../../../shared/schemas/character.ts';
+import { Markdown } from '../../components/markdown/Markdown.tsx';
+import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { EffectSourcesList } from '../../components/ui/EffectSourcesList.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
@@ -546,12 +548,6 @@ function IdentityPanel({
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
     ...buildSave('name', { humanName: 'name' }),
   });
-  const playerField = useDraftField<string | null>({
-    name: 'player name',
-    serverValue: character.playerName ?? '',
-    parse: nullableTextParser,
-    ...buildSave('playerName', { humanName: 'player name' }),
-  });
   const heightField = useDraftField<string | null>({
     name: 'height',
     serverValue: character.height ?? '',
@@ -570,13 +566,6 @@ function IdentityPanel({
     format: (v) => (v === null ? '' : String(v)),
     parse: nullableIntParser(0, 10000),
     ...buildSave('age', { humanName: 'age' }),
-  });
-  const tlField = useDraftField<number | null>({
-    name: 'tech level',
-    serverValue: character.techLevel ?? null,
-    format: (v) => (v === null ? '' : String(v)),
-    parse: nullableIntParser(0, 12),
-    ...buildSave('techLevel', { humanName: 'tech level' }),
   });
   const appearanceField = useDraftField<string | null>({
     name: 'appearance',
@@ -601,28 +590,8 @@ function IdentityPanel({
       )}
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="form-control">
-          <span className="label-text-alt label-eyebrow">Player</span>
-          {canWrite ? (
-            <input
-              aria-label="player name"
-              className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm`}
-              {...playerField.inputProps}
-            />
-          ) : (
-            <span>{character.playerName ?? '—'}</span>
-          )}
-        </div>
-        <div className="form-control">
           <span className="label-text-alt label-eyebrow">Tech level</span>
-          {canWrite ? (
-            <input
-              aria-label="tech level"
-              className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num`}
-              {...tlField.inputProps}
-            />
-          ) : (
-            <span>TL {character.techLevel ?? '—'}</span>
-          )}
+          <span>TL {character.techLevel ?? '—'}</span>
         </div>
         <div className="form-control">
           <span className="label-text-alt label-eyebrow">Age</span>
@@ -696,18 +665,18 @@ function IdentityPanel({
       <div className="form-control">
         <span className="label-text-alt label-eyebrow">Appearance / notes</span>
         {canWrite ? (
-          <textarea
-            aria-label="appearance"
-            rows={2}
-            className={`${DRAFT_FIELD_CLASS} textarea textarea-bordered textarea-sm`}
+          <RichTextEditor
+            id="character-appearance-editor"
             value={appearanceField.value}
-            onChange={(e) => appearanceField.setValue(e.target.value)}
+            onChange={appearanceField.setValue}
             onBlur={appearanceField.inputProps.onBlur}
+            className={DRAFT_FIELD_CLASS}
+            placeholder="Appearance, mannerisms, notes…"
             data-flashing={appearanceField.inputProps['data-flashing']}
             data-flash-parity={appearanceField.inputProps['data-flash-parity']}
           />
         ) : (
-          <p className="text-sm whitespace-pre-line">{character.appearance ?? '—'}</p>
+          <Markdown source={character.appearance ?? ''} />
         )}
       </div>
     </section>
@@ -1384,7 +1353,6 @@ function IdentityHero({
   });
 
   const chips: Array<[string, string]> = [
-    ['Player', character.playerName ?? '—'],
     ['TL', character.techLevel != null ? String(character.techLevel) : '—'],
     ['Age', character.age != null ? String(character.age) : '—'],
     ['Height', character.height ?? '—'],
@@ -1522,7 +1490,6 @@ export function CharacterSheetPage() {
           // allow string|null).  Same coercion applies to the rest.
           campaignId: character.campaignId ?? null,
           name: character.name,
-          playerName: character.playerName ?? null,
           height: character.height ?? null,
           weight: character.weight ?? null,
           age: character.age ?? null,
@@ -1645,21 +1612,18 @@ function NotesPanel({
     <section className="card p-card">
       <p className="label-eyebrow mb-2">Notes</p>
       {canWrite ? (
-        <textarea
-          aria-label="notes"
-          rows={10}
-          className={`${DRAFT_FIELD_CLASS} w-full resize-y bg-transparent text-base leading-relaxed focus:outline-none`}
+        <RichTextEditor
+          id="character-notes-editor"
           value={notesField.value}
-          onChange={(e) => notesField.setValue(e.target.value)}
+          onChange={notesField.setValue}
           onBlur={notesField.inputProps.onBlur}
+          className={DRAFT_FIELD_CLASS}
+          placeholder="Session notes, NPC names, things to remember…"
           data-flashing={notesField.inputProps['data-flashing']}
           data-flash-parity={notesField.inputProps['data-flash-parity']}
-          placeholder="Session notes, NPC names, things to remember…"
         />
       ) : (
-        <p className="whitespace-pre-line text-base leading-relaxed">
-          {character.appearance ?? '—'}
-        </p>
+        <Markdown source={character.appearance ?? ''} />
       )}
     </section>
   );

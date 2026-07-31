@@ -94,6 +94,7 @@ export function useCharacterDetail(
             disadvantageCap: campaign.disadvantageCap,
             quirkCap: campaign.quirkCap,
             manaLevel: campaign.manaLevel ?? 'normal',
+            techLevel: campaign.techLevel ?? null,
           }
         : null,
     });
@@ -135,8 +136,6 @@ export function useCharactersList(): CharacterListResult {
         ownerId: r.ownerId,
         campaignId: r.campaignId,
         name: r.name,
-        playerName: r.playerName,
-        techLevel: r.techLevel,
         st: r.st,
         dx: r.dx,
         iq: r.iq,
@@ -173,8 +172,6 @@ export function useCampaignCharactersList(campaignId: string | undefined): Chara
       ownerId: r.ownerId,
       campaignId: r.campaignId,
       name: r.name,
-      playerName: r.playerName,
-      techLevel: r.techLevel,
       st: r.st,
       dx: r.dx,
       iq: r.iq,

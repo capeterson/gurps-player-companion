@@ -1469,6 +1469,12 @@
                         ],
                         "default": "normal"
                       },
+                      "techLevel": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 12
+                      },
                       "shareCharacterSheets": {
                         "type": "boolean"
                       },
@@ -1530,6 +1536,7 @@
                       "pointTarget",
                       "disadvantageCap",
                       "quirkCap",
+                      "techLevel",
                       "shareCharacterSheets",
                       "allowGmCharacterEditing",
                       "members",
@@ -1609,6 +1616,12 @@
                       "very_high"
                     ]
                   },
+                  "techLevel": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 12
+                  },
                   "shareCharacterSheets": {
                     "type": "boolean"
                   },
@@ -1672,6 +1685,12 @@
                       ],
                       "default": "normal"
                     },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -1733,6 +1752,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "techLevel",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -1838,6 +1858,12 @@
                       ],
                       "default": "normal"
                     },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -1899,6 +1925,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "techLevel",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -1998,6 +2025,12 @@
                       "very_high"
                     ]
                   },
+                  "techLevel": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 12
+                  },
                   "shareCharacterSheets": {
                     "type": "boolean"
                   },
@@ -2057,6 +2090,12 @@
                         "very_high"
                       ],
                       "default": "normal"
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
                     },
                     "shareCharacterSheets": {
                       "type": "boolean"
@@ -2119,6 +2158,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "techLevel",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -2291,6 +2331,12 @@
                       ],
                       "default": "normal"
                     },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2352,6 +2398,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "techLevel",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -2498,6 +2545,12 @@
                       ],
                       "default": "normal"
                     },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2559,6 +2612,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "techLevel",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -2759,6 +2813,12 @@
                       ],
                       "default": "normal"
                     },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 12
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2820,6 +2880,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "techLevel",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -13831,14 +13892,6 @@
                       "name": {
                         "type": "string"
                       },
-                      "playerName": {
-                        "type": "string",
-                        "nullable": true
-                      },
-                      "techLevel": {
-                        "type": "integer",
-                        "nullable": true
-                      },
                       "st": {
                         "type": "integer"
                       },
@@ -13865,8 +13918,6 @@
                       "ownerId",
                       "campaignId",
                       "name",
-                      "playerName",
-                      "techLevel",
                       "st",
                       "dx",
                       "iq",
@@ -13913,11 +13964,6 @@
                     "minLength": 1,
                     "maxLength": 120
                   },
-                  "playerName": {
-                    "type": "string",
-                    "nullable": true,
-                    "maxLength": 120
-                  },
                   "height": {
                     "type": "string",
                     "nullable": true,
@@ -13938,12 +13984,6 @@
                     "type": "string",
                     "nullable": true,
                     "maxLength": 20000
-                  },
-                  "techLevel": {
-                    "type": "integer",
-                    "nullable": true,
-                    "minimum": 0,
-                    "maximum": 12
                   },
                   "campaignId": {
                     "type": "string",
@@ -14127,11 +14167,6 @@
                       "minLength": 1,
                       "maxLength": 120
                     },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
                     "height": {
                       "type": "string",
                       "nullable": true,
@@ -14152,12 +14187,6 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
                     },
                     "campaignId": {
                       "type": "string",
@@ -14536,6 +14565,11 @@
                     "manaLevelKnown": {
                       "type": "boolean",
                       "default": true
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "default": null
                     },
                     "traits": {
                       "type": "array",
@@ -15429,11 +15463,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -15454,12 +15483,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -15838,6 +15861,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -16680,10 +16708,6 @@
                           "type": "string",
                           "minLength": 1
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true
@@ -16715,7 +16739,6 @@
                         "ownerId",
                         "campaignId",
                         "name",
-                        "playerName",
                         "height",
                         "weight",
                         "age",
@@ -16784,11 +16807,6 @@
                     "minLength": 1,
                     "maxLength": 120
                   },
-                  "playerName": {
-                    "type": "string",
-                    "nullable": true,
-                    "maxLength": 120
-                  },
                   "height": {
                     "type": "string",
                     "nullable": true,
@@ -16809,12 +16827,6 @@
                     "type": "string",
                     "nullable": true,
                     "maxLength": 20000
-                  },
-                  "techLevel": {
-                    "type": "integer",
-                    "nullable": true,
-                    "minimum": 0,
-                    "maximum": 12
                   },
                   "campaignId": {
                     "type": "string",
@@ -16995,11 +17007,6 @@
                       "minLength": 1,
                       "maxLength": 120
                     },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
                     "height": {
                       "type": "string",
                       "nullable": true,
@@ -17020,12 +17027,6 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
                     },
                     "campaignId": {
                       "type": "string",
@@ -17404,6 +17405,11 @@
                     "manaLevelKnown": {
                       "type": "boolean",
                       "default": true
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "default": null
                     },
                     "traits": {
                       "type": "array",
@@ -18366,11 +18372,6 @@
                       "minLength": 1,
                       "maxLength": 120
                     },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
                     "height": {
                       "type": "string",
                       "nullable": true,
@@ -18391,12 +18392,6 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
                     },
                     "campaignId": {
                       "type": "string",
@@ -18775,6 +18770,11 @@
                     "manaLevelKnown": {
                       "type": "boolean",
                       "default": true
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "default": null
                     },
                     "traits": {
                       "type": "array",
@@ -19901,11 +19901,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -19926,12 +19921,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -20310,6 +20299,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -21447,11 +21441,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -21472,12 +21461,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -21856,6 +21839,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -22761,11 +22749,6 @@
                       "minLength": 1,
                       "maxLength": 120
                     },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
                     "height": {
                       "type": "string",
                       "nullable": true,
@@ -22786,12 +22769,6 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
                     },
                     "campaignId": {
                       "type": "string",
@@ -23170,6 +23147,11 @@
                     "manaLevelKnown": {
                       "type": "boolean",
                       "default": true
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "default": null
                     },
                     "traits": {
                       "type": "array",
@@ -24232,11 +24214,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -24257,12 +24234,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -24641,6 +24612,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -25713,11 +25689,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -25738,12 +25709,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -26122,6 +26087,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -27027,11 +26997,6 @@
                       "minLength": 1,
                       "maxLength": 120
                     },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
                     "height": {
                       "type": "string",
                       "nullable": true,
@@ -27052,12 +27017,6 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
                     },
                     "campaignId": {
                       "type": "string",
@@ -27436,6 +27395,11 @@
                     "manaLevelKnown": {
                       "type": "boolean",
                       "default": true
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "default": null
                     },
                     "traits": {
                       "type": "array",
@@ -28517,11 +28481,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -28542,12 +28501,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -28926,6 +28879,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -30019,11 +29977,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -30044,12 +29997,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -30428,6 +30375,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -31333,11 +31285,6 @@
                       "minLength": 1,
                       "maxLength": 120
                     },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
                     "height": {
                       "type": "string",
                       "nullable": true,
@@ -31358,12 +31305,6 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
                     },
                     "campaignId": {
                       "type": "string",
@@ -31742,6 +31683,11 @@
                     "manaLevelKnown": {
                       "type": "boolean",
                       "default": true
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "default": null
                     },
                     "traits": {
                       "type": "array",
@@ -33238,11 +33184,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -33263,12 +33204,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -33647,6 +33582,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -35155,11 +35095,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -35180,12 +35115,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -35564,6 +35493,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -36469,11 +36403,6 @@
                       "minLength": 1,
                       "maxLength": 120
                     },
-                    "playerName": {
-                      "type": "string",
-                      "nullable": true,
-                      "maxLength": 120
-                    },
                     "height": {
                       "type": "string",
                       "nullable": true,
@@ -36494,12 +36423,6 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 20000
-                    },
-                    "techLevel": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 12
                     },
                     "campaignId": {
                       "type": "string",
@@ -36878,6 +36801,11 @@
                     "manaLevelKnown": {
                       "type": "boolean",
                       "default": true
+                    },
+                    "techLevel": {
+                      "type": "integer",
+                      "nullable": true,
+                      "default": null
                     },
                     "traits": {
                       "type": "array",
@@ -37884,11 +37812,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -37909,12 +37832,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -38293,6 +38210,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -39211,11 +39133,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -39236,12 +39153,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -39620,6 +39531,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",
@@ -40536,11 +40452,6 @@
                           "minLength": 1,
                           "maxLength": 120
                         },
-                        "playerName": {
-                          "type": "string",
-                          "nullable": true,
-                          "maxLength": 120
-                        },
                         "height": {
                           "type": "string",
                           "nullable": true,
@@ -40561,12 +40472,6 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 20000
-                        },
-                        "techLevel": {
-                          "type": "integer",
-                          "nullable": true,
-                          "minimum": 0,
-                          "maximum": 12
                         },
                         "campaignId": {
                           "type": "string",
@@ -40945,6 +40850,11 @@
                         "manaLevelKnown": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "techLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "default": null
                         },
                         "traits": {
                           "type": "array",

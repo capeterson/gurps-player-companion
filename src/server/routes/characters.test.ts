@@ -381,13 +381,12 @@ describe('PATCH /api/v1/characters/{id}', () => {
     const res = await app.request(`/api/v1/characters/${character.id}`, {
       method: 'PATCH',
       headers: jsonHeaders(accessToken),
-      body: JSON.stringify({ name: 'After', st: 13, playerName: 'Alice' }),
+      body: JSON.stringify({ name: 'After', st: 13 }),
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.name).toBe('After');
     expect(body.st).toBe(13);
-    expect(body.playerName).toBe('Alice');
   });
 
   it('a non-owner campaign member cannot patch (403 "owner only")', async () => {

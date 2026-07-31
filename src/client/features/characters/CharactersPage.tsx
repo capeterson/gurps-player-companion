@@ -97,10 +97,7 @@ export function CharactersPage() {
               to={`/characters/${c.id}`}
               className="card block p-4 transition hover:border-border-strong"
             >
-              <div className="flex items-baseline justify-between">
-                <p className="font-display text-xl">{c.name}</p>
-                <span className="label-eyebrow">TL {c.techLevel ?? '—'}</span>
-              </div>
+              <p className="font-display text-xl">{c.name}</p>
               <p className="text-sm text-base-content/70">
                 <span className="num">ST {c.st}</span> · <span className="num">DX {c.dx}</span> ·{' '}
                 <span className="num">IQ {c.iq}</span> · <span className="num">HT {c.ht}</span>

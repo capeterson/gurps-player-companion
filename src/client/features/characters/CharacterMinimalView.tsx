@@ -12,10 +12,10 @@
 
 import { Link } from 'react-router-dom';
 import type { CharacterMinimalOut } from '../../../shared/schemas/character.ts';
+import { Markdown } from '../../components/markdown/Markdown.tsx';
 
 export function CharacterMinimalView({ data }: { data: CharacterMinimalOut }) {
   const fields: Array<{ label: string; value: string | number | null }> = [
-    { label: 'Player', value: data.playerName },
     { label: 'Height', value: data.height },
     { label: 'Weight', value: data.weight },
     { label: 'Age', value: data.age },
@@ -60,7 +60,7 @@ export function CharacterMinimalView({ data }: { data: CharacterMinimalOut }) {
           {data.appearance && (
             <div>
               <header className="label-eyebrow mb-2">Description</header>
-              <p className="whitespace-pre-wrap text-base-content/90">{data.appearance}</p>
+              <Markdown source={data.appearance} />
             </div>
           )}
         </div>

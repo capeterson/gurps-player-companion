@@ -141,12 +141,10 @@ export const characterAttributesShape = {
 
 export const characterIdentityShape = {
   name: z.string().min(1).max(120).trim(),
-  playerName: z.string().max(120).trim().nullable().optional(),
   height: z.string().max(40).nullable().optional(),
   weight: z.string().max(40).nullable().optional(),
   age: z.number().int().min(0).max(10_000).nullable().optional(),
   appearance: z.string().max(20_000).nullable().optional(),
-  techLevel: z.number().int().min(0).max(12).nullable().optional(),
   campaignId: uuid.nullable().optional(),
 } as const;
 
@@ -260,8 +258,6 @@ export const characterListItem = z.object({
   ownerId: uuid,
   campaignId: uuid.nullable(),
   name: z.string(),
-  playerName: z.string().nullable(),
-  techLevel: z.number().int().nullable(),
   st: z.number().int(),
   dx: z.number().int(),
   iq: z.number().int(),
@@ -294,6 +290,9 @@ export const characterDetail = z.object({
    * fallback and casting should be held rather than trusted. Always
    * true on server-built details (the server joins the campaign). */
   manaLevelKnown: z.boolean().default(true),
+  /** Campaign's tech level (Basic Set p. 513); null when campaignless or
+   * unset. Sourced from the campaign, not the character. */
+  techLevel: z.number().int().nullable().default(null),
   traits: z.array(traitOut),
   skills: z.array(skillOut),
   spells: z.array(spellOut),
@@ -320,7 +319,6 @@ export const characterMinimalOut = z.object({
   ownerId: uuid,
   campaignId: uuid.nullable(),
   name: z.string().min(1),
-  playerName: z.string().nullable(),
   height: z.string().nullable(),
   weight: z.string().nullable(),
   age: z.number().int().nullable(),

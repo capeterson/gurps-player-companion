@@ -58,6 +58,9 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     campaign.quirkCap == null ? '' : String(campaign.quirkCap),
   );
   const [manaLevel, setManaLevel] = useState<ManaLevel>(campaign.manaLevel);
+  const [techLevel, setTechLevel] = useState(
+    campaign.techLevel == null ? '' : String(campaign.techLevel),
+  );
   const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets);
   const [allowGmEditing, setAllowGmEditing] = useState(campaign.allowGmCharacterEditing);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +76,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     setDisadCap(campaign.disadvantageCap == null ? '' : String(campaign.disadvantageCap));
     setQuirkCap(campaign.quirkCap == null ? '' : String(campaign.quirkCap));
     setManaLevel(campaign.manaLevel);
+    setTechLevel(campaign.techLevel == null ? '' : String(campaign.techLevel));
     setShareSheets(campaign.shareCharacterSheets);
     setAllowGmEditing(campaign.allowGmCharacterEditing);
     setError(null);
@@ -130,8 +134,9 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     const pt = nullableIntFromInput(pointTarget);
     const dc = nullableIntFromInput(disadCap);
     const qcVal = nullableIntFromInput(quirkCap);
-    if (pt === 'invalid' || dc === 'invalid' || qcVal === 'invalid') {
-      setError('Caps and point target must be non-negative integers (or blank).');
+    const tl = nullableIntFromInput(techLevel);
+    if (pt === 'invalid' || dc === 'invalid' || qcVal === 'invalid' || tl === 'invalid') {
+      setError('Caps, point target, and tech level must be non-negative integers (or blank).');
       return;
     }
     update.mutate({
@@ -139,6 +144,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       disadvantageCap: dc,
       quirkCap: qcVal,
       manaLevel,
+      techLevel: tl,
       shareCharacterSheets: shareSheets,
       allowGmCharacterEditing: allowGmEditing,
     });
@@ -202,6 +208,15 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
                   className="input input-bordered input-sm num"
                   value={quirkCap}
                   onChange={(e) => setQuirkCap(e.target.value)}
+                  placeholder="—"
+                />
+              </label>
+              <label className="form-control">
+                <span className="label-text text-xs">Tech level</span>
+                <input
+                  className="input input-bordered input-sm num"
+                  value={techLevel}
+                  onChange={(e) => setTechLevel(e.target.value)}
                   placeholder="—"
                 />
               </label>

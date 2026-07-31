@@ -30,6 +30,7 @@ export interface CampaignSummary {
   disadvantageCap: number | null;
   quirkCap: number | null;
   manaLevel: 'none' | 'low' | 'normal' | 'high' | 'very_high';
+  techLevel: number | null;
   shareCharacterSheets: boolean;
   allowGmCharacterEditing: boolean;
   viewerRole?: 'owner' | 'manager' | 'member';
@@ -95,6 +96,7 @@ function toCampaignSummary(row: LocalCampaign): CampaignSummary {
     // safe defaults mirror the ones this file already applies when the
     // field is missing (see `sharesSheets`/mana-level fallbacks above).
     manaLevel: row.manaLevel ?? 'normal',
+    techLevel: row.techLevel ?? null,
     shareCharacterSheets: row.shareCharacterSheets ?? true,
     allowGmCharacterEditing: row.allowGmCharacterEditing ?? false,
     ...(row.viewerRole !== undefined ? { viewerRole: row.viewerRole } : {}),

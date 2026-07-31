@@ -75,6 +75,7 @@ export function CampaignDetailPage() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {c.techLevel != null && <span className="chip">TL{c.techLevel}</span>}
           <AvatarStack names={c.members.map((m) => m.displayName)} max={6} />
           <span
             className={`chip ${viewerRole === 'owner' ? 'on' : ''}`}
@@ -120,13 +121,7 @@ export function CampaignDetailPage() {
                   to={`/characters/${ch.id}`}
                   className="card block p-4 transition hover:border-border-strong"
                 >
-                  <div className="flex items-baseline justify-between">
-                    <p className="font-display text-xl">{ch.name}</p>
-                    <span className="label-eyebrow">TL {ch.techLevel ?? '—'}</span>
-                  </div>
-                  <p className="text-sm text-base-content/70">
-                    {ch.playerName ?? 'Player not specified'}
-                  </p>
+                  <p className="font-display text-xl">{ch.name}</p>
                 </Link>
               </li>
             ))}

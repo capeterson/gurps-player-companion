@@ -43,12 +43,10 @@ export interface LocalCharacter {
   ownerId: string;
   campaignId: string | null;
   name: string;
-  playerName: string | null;
   height: string | null;
   weight: string | null;
   age: number | null;
   appearance: string | null;
-  techLevel: number | null;
   st: number;
   dx: number;
   iq: number;
@@ -186,6 +184,9 @@ export interface LocalCampaign {
   /** Optional: rows synced before the mana column existed lack it;
    * readers default missing values to 'normal'. */
   manaLevel?: 'none' | 'low' | 'normal' | 'high' | 'very_high';
+  /** Optional: rows synced before the tech-level column existed lack it;
+   * readers default missing values to `null`. */
+  techLevel?: number | null;
   /**
    * When false, non-owner members see the minimal "readily apparent"
    * view of other players' character sheets instead of the full

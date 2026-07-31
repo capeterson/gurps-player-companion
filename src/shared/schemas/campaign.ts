@@ -29,6 +29,8 @@ export const campaignOut = z.object({
   quirkCap: z.number().int().nullable(),
   /** Ambient mana level for the whole campaign (Basic Set p. 235). */
   manaLevel: z.enum(MANA_LEVELS).default('normal'),
+  /** Tech level for the whole campaign (Basic Set p. 513). */
+  techLevel: z.number().int().min(0).max(12).nullable(),
   /**
    * When false, non-owner members get the minimal "readily apparent"
    * view of other players' character sheets instead of the full
@@ -50,6 +52,7 @@ export const campaignCreate = z.object({
   disadvantageCap: z.number().int().min(0).max(10_000).nullable().optional(),
   quirkCap: z.number().int().min(0).max(50).nullable().optional(),
   manaLevel: z.enum(MANA_LEVELS).optional(),
+  techLevel: z.number().int().min(0).max(12).nullable().optional(),
   shareCharacterSheets: z.boolean().optional(),
   allowGmCharacterEditing: z.boolean().optional(),
 });

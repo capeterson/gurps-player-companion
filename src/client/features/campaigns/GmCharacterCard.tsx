@@ -22,10 +22,9 @@ export function GmCharacterCard({ character, dense, lookup }: Props) {
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-display text-xl font-semibold truncate">{character.name}</h2>
-          <p className="text-xs text-base-content/60 truncate">
-            {character.playerName || 'Unassigned player'}
-            {character.techLevel != null ? ` · TL${character.techLevel}` : ''}
-          </p>
+          {character.techLevel != null && (
+            <p className="text-xs text-base-content/60 truncate">TL{character.techLevel}</p>
+          )}
         </div>
         <a
           href={`/characters/${character.id}`}
