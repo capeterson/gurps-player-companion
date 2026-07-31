@@ -75,12 +75,10 @@ function realCharacterRow() {
     ownerId: OWNER_ID,
     campaignId: CAMPAIGN_ID,
     name: 'Secretly Buffed',
-    playerName: 'Alice',
     height: null,
     weight: null,
     age: null,
     appearance: null,
-    techLevel: null,
     st: 17,
     dx: 14,
     iq: 13,
@@ -147,7 +145,6 @@ describe('enforceMinimalViewLocally — character row rewrite', () => {
     expect(row?.ownerId).toBe(OWNER_ID);
     expect(row?.campaignId).toBe(CAMPAIGN_ID);
     expect(row?.name).toBe('Secretly Buffed');
-    expect(row?.playerName).toBe('Alice');
     // Private fields blanked to safe schema defaults — NOT the real
     // values cached before the share flip.
     expect(row?.st).toBe(10);

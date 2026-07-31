@@ -37,18 +37,25 @@ async function loadMinimalCharacter(id: string): Promise<CharacterMinimalOut> {
   const db = getDb();
   const [c] = await db.select().from(characters).where(eq(characters.id, id));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
+  let techLevel: number | null = null;
+  if (c.campaignId) {
+    const [campaign] = await db
+      .select({ techLevel: campaigns.techLevel })
+      .from(campaigns)
+      .where(eq(campaigns.id, c.campaignId));
+    techLevel = campaign?.techLevel ?? null;
+  }
   return {
     view: 'minimal',
     id: c.id,
     ownerId: c.ownerId,
     campaignId: c.campaignId,
     name: c.name,
-    playerName: c.playerName,
     height: c.height,
     weight: c.weight,
     age: c.age,
     appearance: c.appearance,
-    techLevel: c.techLevel,
+    techLevel,
     updatedAt: c.updatedAt.toISOString(),
   };
 }
@@ -126,8 +133,6 @@ router.openapi(
           ownerId: r.ownerId,
           campaignId: r.campaignId,
           name: r.name,
-          playerName: r.playerName,
-          techLevel: r.techLevel,
           st: r.st,
           dx: r.dx,
           iq: r.iq,

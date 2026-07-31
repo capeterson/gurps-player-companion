@@ -59,6 +59,7 @@ export function useCampaignCharacterDetails(campaignId: string): CharacterDetail
                 disadvantageCap: campaign.disadvantageCap,
                 quirkCap: campaign.quirkCap,
                 manaLevel: campaign.manaLevel ?? 'normal',
+                techLevel: campaign.techLevel ?? null,
               }
             : null,
         }),

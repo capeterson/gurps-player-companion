@@ -54,12 +54,10 @@ export interface CharacterDetailInputCharacter {
   ownerId: string;
   campaignId: string | null;
   name: string;
-  playerName: string | null;
   height: string | null;
   weight: string | null;
   age: number | null;
   appearance: string | null;
-  techLevel: number | null;
   st: number;
   dx: number;
   iq: number;
@@ -183,6 +181,8 @@ export interface CharacterDetailInputCampaign {
   quirkCap: number | null;
   /** Optional: rows from before the mana column default to 'normal'. */
   manaLevel?: ManaLevel | null;
+  /** Optional: rows from before the campaign tech-level column exist. */
+  techLevel?: number | null;
 }
 
 export interface CharacterDetailInput {
@@ -420,6 +420,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   );
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
+  const techLevel: number | null = campaign?.techLevel ?? null;
   // A character in a campaign whose row we don't have yet (client-side,
   // before the campaign mirror lands in Dexie) gets the 'normal'
   // fallback above -- flag it so the UI can hold cast actions instead
@@ -473,12 +474,10 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     ownerId: character.ownerId,
     campaignId: character.campaignId,
     name: character.name,
-    playerName: character.playerName,
     height: character.height,
     weight: character.weight,
     age: character.age,
     appearance: character.appearance,
-    techLevel: character.techLevel,
     st: character.st,
     dx: character.dx,
     iq: character.iq,
@@ -501,6 +500,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     warnings,
     manaLevel,
     manaLevelKnown,
+    techLevel,
     traits: traitsOut,
     skills: skillsOut,
     spells: spellsOut,

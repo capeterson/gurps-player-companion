@@ -24,7 +24,7 @@
 import { Link as TiptapLink } from '@tiptap/extension-link';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Markdown as TiptapMarkdown } from 'tiptap-markdown';
 import { Markdown } from './Markdown.tsx';
 
@@ -33,23 +33,48 @@ export type EditorMode = 'rich' | 'source';
 export interface RichTextEditorProps {
   value: string;
   onChange: (markdown: string) => void;
+  /** Fired when the editing surface (either mode) loses focus. Optional —
+   * callers that autosave on blur (e.g. `useDraftField`) wire this up;
+   * callers that save on explicit submit (e.g. the adventure log form)
+   * can omit it. */
+  onBlur?: () => void;
   placeholder?: string;
   id?: string;
   className?: string;
+  /** Accessible name applied to both the Tiptap surface (rich mode) and
+   * the raw-markdown textarea (source mode) — neither has a `<label>`
+   * association since the caller's visible label is typically a
+   * non-associated `<span>`. */
+  'aria-label'?: string;
+  /** Drives the `field-rollback-flash` keyframe (theme.css) on the
+   * outer wrapper — pass through `useDraftField`'s `inputProps` flash
+   * attributes for callers that autosave on blur. */
+  'data-flashing'?: 'true' | 'false';
+  'data-flash-parity'?: '0' | '1';
 }
 
 export function RichTextEditor({
   value,
   onChange,
+  onBlur,
   placeholder = "What happened, who acted, what's left to follow up on…",
   id,
   className,
+  'data-flashing': dataFlashing,
+  'data-flash-parity': dataFlashParity,
+  'aria-label': ariaLabel,
 }: RichTextEditorProps) {
   const [mode, setMode] = useState<EditorMode>('rich');
   // Raw-markdown buffer shown in source mode. Kept in state so the
   // <textarea> re-renders as the user types; mirrored into the editor
   // when switching back to rich mode.
   const [sourceText, setSourceText] = useState<string>(value);
+
+  // Ref so the editor (created once by useEditor) always calls the
+  // latest onBlur without needing to be recreated when the caller's
+  // callback identity changes across renders.
+  const onBlurRef = useRef(onBlur);
+  onBlurRef.current = onBlur;
 
   const editor = useEditor({
     extensions: [
@@ -80,6 +105,13 @@ export function RichTextEditor({
       attributes: {
         class: 'rich-text-surface',
         'data-placeholder': placeholder,
+        ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
+      },
+      handleDOMEvents: {
+        blur: () => {
+          onBlurRef.current?.();
+          return false;
+        },
       },
     },
     onUpdate: ({ editor: e }) => {
@@ -104,12 +136,20 @@ export function RichTextEditor({
     }
   }, [value]);
 
+  // Both directions swap out the focused DOM surface (contenteditable
+  // <-> textarea) via the toolbar button, whose onMouseDown prevents the
+  // click from ever blurring the old surface first — so neither
+  // Tiptap's own blur handler nor the textarea's onBlur fires. Call
+  // onBlur explicitly here so a caller autosaving on blur (useDraftField)
+  // still commits the surface's latest value instead of leaving the
+  // draft dirty until an unrelated blur happens to fire later.
   const switchToSource = () => {
     if (editor) {
       const md = (editor.storage as { markdown?: MarkdownStore }).markdown;
       setSourceText(md ? md.getMarkdown() : '');
     }
     setMode('source');
+    onBlurRef.current?.();
   };
 
   const switchToRich = () => {
@@ -119,10 +159,15 @@ export function RichTextEditor({
       onChange(md);
     }
     setMode('rich');
+    onBlurRef.current?.();
   };
 
   return (
-    <div className={`rich-text-editor ${className ?? ''}`}>
+    <div
+      className={`rich-text-editor ${className ?? ''}`}
+      data-flashing={dataFlashing}
+      data-flash-parity={dataFlashParity}
+    >
       <div className="rich-text-toolbar">
         <ToolbarButton
           label="Bold"
@@ -213,12 +258,14 @@ export function RichTextEditor({
         <div className="rich-text-surface-wrap rich-text-source-wrap">
           <textarea
             id={id}
+            aria-label={ariaLabel}
             className="rich-text-source-input"
             value={sourceText}
             onChange={(e) => {
               setSourceText(e.target.value);
               onChange(e.target.value);
             }}
+            onBlur={() => onBlur?.()}
             placeholder={placeholder}
           />
           <details className="rich-text-preview">

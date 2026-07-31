@@ -60,6 +60,16 @@ touches mid-session, front-loaded so one tap lands there; on a
 read-only view of a non-magical character the Magic tab is hidden, and
 on any sheet the viewer can edit — their own — it always shows).
 
+- **Identity tab.** Name, height, weight, age, campaign assignment, and
+  an **appearance/notes** field. No per-character "player" field is
+  tracked — the character's owner (the authenticated user who created
+  it) is the player. **Tech level** is likewise not set per character:
+  it's read-only here, sourced from the parent campaign (or an em dash
+  when campaignless). Appearance/notes is edited with the same
+  WYSIWYG **markdown editor** (`RichTextEditor`/`Markdown`,
+  `src/client/components/markdown/`) used by the adventure log, with a
+  raw-markdown/source toggle and sanitized rendering; the Notes tab is
+  a thin second surface over the same `appearance` column.
 - **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
   Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary** card
@@ -225,7 +235,9 @@ there, regardless of the share gate; rows a viewer only sees minimally deep-link
 to `/characters/:id`, which renders `CharacterMinimalView`.
 
 - Create/edit campaigns with **point target, disadvantage cap, quirk cap,
-  mana level**, and the **share-character-sheets** toggle.
+  mana level, tech level**, and the **share-character-sheets** toggle. Tech
+  level is campaign-wide (not per character); every character in the
+  campaign displays it read-only, resolved the same way `manaLevel` is.
 - **Roles**: `owner` (GM), `manager`, `member`.
 - **Membership management**: add/remove members, change roles, **transfer
   ownership**, delete campaign.

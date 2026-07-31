@@ -37,6 +37,7 @@ export function useMirrorCampaigns(campaigns: CampaignSummary[] | undefined): vo
           disadvantageCap: c.disadvantageCap,
           quirkCap: c.quirkCap,
           manaLevel: c.manaLevel,
+          techLevel: c.techLevel,
           shareCharacterSheets: c.shareCharacterSheets,
           allowGmCharacterEditing: c.allowGmCharacterEditing,
           ...(c.ownerId === viewerId

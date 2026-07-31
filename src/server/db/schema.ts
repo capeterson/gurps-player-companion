@@ -244,6 +244,8 @@ export const campaigns = pgTable('campaigns', {
   })
     .notNull()
     .default('normal'),
+  /** Campaign-wide tech level (Basic Set p. 513); characters no longer set their own. */
+  techLevel: smallint('tech_level'),
   /**
    * When false, non-owner members fetching `/characters/{id}` get the
    * minimal "readily apparent" view (race / height / weight / age /
@@ -347,12 +349,10 @@ export const characters = pgTable(
     campaignId: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'set null' }),
 
     name: varchar('name', { length: 120 }).notNull(),
-    playerName: varchar('player_name', { length: 120 }),
     height: varchar('height', { length: 40 }),
     weight: varchar('weight', { length: 40 }),
     age: integer('age'),
     appearance: text('appearance'),
-    techLevel: smallint('tech_level'),
 
     st: smallint('st').notNull().default(10),
     dx: smallint('dx').notNull().default(10),
