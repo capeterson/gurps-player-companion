@@ -157,6 +157,7 @@ router.openapi(
         disadvantageCap: campaign.disadvantageCap ?? undefined,
         quirkCap: campaign.quirkCap ?? undefined,
         manaLevel: campaign.manaLevel,
+        techLevel: campaign.techLevel ?? undefined,
       },
       traits: traits.map(traitEntity.rowToCreate),
       skills: skills.map(skillEntity.rowToCreate),
@@ -179,7 +180,7 @@ const importBody = z.object({
     .max(20 * 1024 * 1024),
   mode: importMode.default('merge'),
   /** Opt-in: apply the doc's `campaign` block (description/pointTarget/
-   * disadvantageCap/quirkCap/manaLevel) to the campaigns row.  Never
+   * disadvantageCap/quirkCap/manaLevel/techLevel) to the campaigns row.  Never
    * touches `name`.  Default off so a routine content import can't
    * silently rewrite campaign settings. */
   applyCampaignSettings: z.boolean().default(false),
@@ -230,13 +231,15 @@ router.openapi(
     // the whole import, matching the "invalid document" contract.
     let campaignSettings: Record<string, unknown> | null = null;
     if (applyCampaignSettings && doc.campaign) {
-      const { description, pointTarget, disadvantageCap, quirkCap, manaLevel } = doc.campaign;
+      const { description, pointTarget, disadvantageCap, quirkCap, manaLevel, techLevel } =
+        doc.campaign;
       const checked = campaignUpdate.safeParse({
         description,
         pointTarget,
         disadvantageCap,
         quirkCap,
         manaLevel,
+        techLevel,
       });
       if (!checked.success) {
         throw new HTTPException(400, {

@@ -41,6 +41,11 @@ export interface RichTextEditorProps {
   placeholder?: string;
   id?: string;
   className?: string;
+  /** Accessible name applied to both the Tiptap surface (rich mode) and
+   * the raw-markdown textarea (source mode) — neither has a `<label>`
+   * association since the caller's visible label is typically a
+   * non-associated `<span>`. */
+  'aria-label'?: string;
   /** Drives the `field-rollback-flash` keyframe (theme.css) on the
    * outer wrapper — pass through `useDraftField`'s `inputProps` flash
    * attributes for callers that autosave on blur. */
@@ -57,6 +62,7 @@ export function RichTextEditor({
   className,
   'data-flashing': dataFlashing,
   'data-flash-parity': dataFlashParity,
+  'aria-label': ariaLabel,
 }: RichTextEditorProps) {
   const [mode, setMode] = useState<EditorMode>('rich');
   // Raw-markdown buffer shown in source mode. Kept in state so the
@@ -99,6 +105,7 @@ export function RichTextEditor({
       attributes: {
         class: 'rich-text-surface',
         'data-placeholder': placeholder,
+        ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
       },
       handleDOMEvents: {
         blur: () => {
@@ -129,12 +136,20 @@ export function RichTextEditor({
     }
   }, [value]);
 
+  // Both directions swap out the focused DOM surface (contenteditable
+  // <-> textarea) via the toolbar button, whose onMouseDown prevents the
+  // click from ever blurring the old surface first — so neither
+  // Tiptap's own blur handler nor the textarea's onBlur fires. Call
+  // onBlur explicitly here so a caller autosaving on blur (useDraftField)
+  // still commits the surface's latest value instead of leaving the
+  // draft dirty until an unrelated blur happens to fire later.
   const switchToSource = () => {
     if (editor) {
       const md = (editor.storage as { markdown?: MarkdownStore }).markdown;
       setSourceText(md ? md.getMarkdown() : '');
     }
     setMode('source');
+    onBlurRef.current?.();
   };
 
   const switchToRich = () => {
@@ -144,6 +159,7 @@ export function RichTextEditor({
       onChange(md);
     }
     setMode('rich');
+    onBlurRef.current?.();
   };
 
   return (
@@ -242,6 +258,7 @@ export function RichTextEditor({
         <div className="rich-text-surface-wrap rich-text-source-wrap">
           <textarea
             id={id}
+            aria-label={ariaLabel}
             className="rich-text-source-input"
             value={sourceText}
             onChange={(e) => {

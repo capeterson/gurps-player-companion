@@ -667,6 +667,7 @@ function IdentityPanel({
         {canWrite ? (
           <RichTextEditor
             id="character-appearance-editor"
+            aria-label="appearance"
             value={appearanceField.value}
             onChange={appearanceField.setValue}
             onBlur={appearanceField.inputProps.onBlur}
@@ -1614,6 +1615,7 @@ function NotesPanel({
       {canWrite ? (
         <RichTextEditor
           id="character-notes-editor"
+          aria-label="notes"
           value={notesField.value}
           onChange={notesField.setValue}
           onBlur={notesField.inputProps.onBlur}

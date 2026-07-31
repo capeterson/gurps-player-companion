@@ -214,6 +214,8 @@ export const libraryYamlDoc = z.object({
       quirkCap: z.number().int().nullable().optional(),
       /** Ambient mana level (Basic Set p. 235); reuses the campaign schema's enum. */
       manaLevel: z.enum(MANA_LEVELS).optional(),
+      /** Campaign-wide tech level (Basic Set p. 513). */
+      techLevel: z.number().int().min(0).max(12).nullable().optional(),
     })
     .optional(),
   library: z.object({
