@@ -1079,7 +1079,7 @@ function PointsPanel({
             className="num font-medium"
             style={{ color: unspent < 0 ? 'var(--color-error)' : 'var(--color-primary)' }}
           >
-            {unspent}
+            {Math.abs(unspent)}
           </span>
         </p>
       )}

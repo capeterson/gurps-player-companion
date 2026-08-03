@@ -130,7 +130,7 @@ Diff helpers live alongside (`diffRows(old, new, ignoreKeys)` ignoring `revision
 - Add `'History'` to `SHEET_TABS` in `src/client/features/characters/CharacterSheetPage.tsx` and render a new `sections/HistoryPanel.tsx`.
 - `HistoryPanel` (props `{ characterId, canRead }`):
   - `useInfiniteQuery` → `GET /characters/:id/history`; runs `groupIntoBatches(summarizeEvent(...))`.
-  - Renders a vertical list reusing the row styling from `sections/SkillsPanel.tsx` (grid rows, border-b). Each group is **one line**: timestamp (relative), summary, actor name.
+  - Renders a vertical list reusing the row styling from `sections/SkillsPanel.tsx` (grid rows, border-b). Each group is **one line**: timestamp (relative), summary, actor name. The timestamp carries a `title` tooltip with the full localized date/time down to the second (`HistoryGroupRow.tsx`'s `formatAbsolute`), for when the relative label ("3h ago") isn't precise enough.
   - **Foldable batches:** groups with >1 child render a disclosure arrow, reusing existing expand patterns already in this file — the `▸`/`▾` toggle in PointsPanel (CharacterSheetPage.tsx:1062) and the `<details>` pattern in WarningsPanel (~:1303); expanding fetches `?detail=1` for that `batchId` and shows each child's `old → new` per field.
   - **Local filter & search:** a search box + filter chips (by entity type: Attributes/Skills/Spells/Inventory/Combat; by op: added/changed/removed; optional date range) that filter the already-loaded list **in memory** (no server round-trip), matching against the summary line and field names. "Load older" button triggers the next page.
 
