@@ -542,34 +542,64 @@ export interface HistoryGroup {
 }
 
 /**
- * Consecutive events on the same item spaced no more than this far apart
- * get folded together even without a shared batchId (e.g. someone
- * fiddling with a single item's fields one field-patch at a time).
+ * Consecutive events on the same item (same actor, same field-patch op)
+ * spaced no more than this far apart get folded together even without an
+ * explicit shared batchId (e.g. someone fiddling with a single item's
+ * fields one field-patch at a time).
  */
 const SAME_ITEM_BURST_WINDOW_MS = 60_000;
 
 /**
+ * `batchId` is non-null for effectively every sync-backed write:
+ * `dispatchOperation` fills it in from `op.clientOpId` when the client
+ * didn't set one (see syncDispatch.ts), so a single un-batched field
+ * patch still gets its own distinct, non-null batch_id in entity_history.
+ * That id has no sibling — no other event shares it — so it isn't a real
+ * "one user gesture" batch the way a multi-item bulk move's shared
+ * batchId is. Treat a batchId as a real batch only when >1 event in the
+ * loaded page actually carries it; a singleton batchId is eligible for
+ * the same-item time-window burst heuristic below, same as a null one.
+ */
+function countBatchMembers(events: HistoryEventOut[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const ev of events) {
+    if (!ev.batchId) continue;
+    counts.set(ev.batchId, (counts.get(ev.batchId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
  * Fold consecutive events into one group when either:
- *   - they share a non-null batchId (one user gesture), or
- *   - they touch the same entity and land within
- *     SAME_ITEM_BURST_WINDOW_MS of the previous event in the run (a burst
+ *   - they share a batchId that >1 loaded event carries (one explicit
+ *     user gesture, e.g. a bulk inventory move), or
+ *   - they're both plain field-patch updates to the same entity by the
+ *     same actor, neither carries a "real" (multi-member) batchId, and
+ *     they land within SAME_ITEM_BURST_WINDOW_MS of each other (a burst
  *     of quick edits to one item that weren't explicitly batched).
  * Standalone events become single-item groups without a fold arrow.
  */
 export function groupIntoBatches(events: HistoryEventOut[]): HistoryGroup[] {
+  const batchMembers = countBatchMembers(events);
+  const isRealBatch = (ev: HistoryEventOut) =>
+    Boolean(ev.batchId) && (batchMembers.get(ev.batchId as string) ?? 0) > 1;
+
   const groups: HistoryGroup[] = [];
   for (const ev of events) {
     const last = groups[groups.length - 1];
     const lastEvent = last?.events[last.events.length - 1];
-    const sharesBatch = Boolean(ev.batchId) && last?.batchId === ev.batchId;
+    const sharesBatch = isRealBatch(ev) && last?.batchId === ev.batchId;
     const sameItemBurst =
       !sharesBatch &&
-      !ev.batchId &&
-      !last?.batchId &&
+      !isRealBatch(ev) &&
       last &&
       lastEvent &&
+      !isRealBatch(lastEvent) &&
+      ev.op === 'update' &&
+      lastEvent.op === 'update' &&
       lastEvent.entityId === ev.entityId &&
       lastEvent.entityClass === ev.entityClass &&
+      lastEvent.actorUserId === ev.actorUserId &&
       Math.abs(new Date(ev.createdAt).getTime() - new Date(lastEvent.createdAt).getTime()) <=
         SAME_ITEM_BURST_WINDOW_MS;
     if (sharesBatch || sameItemBurst) {

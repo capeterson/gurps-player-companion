@@ -502,4 +502,81 @@ describe('groupIntoBatches', () => {
     const groups = groupIntoBatches(events);
     expect(groups).toHaveLength(2);
   });
+
+  // dispatchOperation falls back to op.clientOpId when a write has no
+  // explicit batchId, so un-batched sync writes still carry a distinct,
+  // non-null batchId each. That per-event id has no sibling in the
+  // loaded page, so it must not be treated as a "real" (multi-member)
+  // batch — otherwise the same-item burst heuristic above would never
+  // fire for any sync-backed entity class.
+  it('same-item updates each carrying a distinct singleton batchId still fold', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        batchId: crypto.randomUUID(),
+        createdAt: t0.toISOString(),
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        batchId: crypto.randomUUID(),
+        createdAt: new Date(t0.getTime() + 10_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.foldable).toBe(true);
+  });
+
+  it('a real multi-member batch is not swept into an adjacent same-item burst', () => {
+    const itemId = crypto.randomUUID();
+    const bid = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, batchId: bid, createdAt: t0.toISOString() }),
+      makeEvent({ entityId: itemId, batchId: bid, createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        batchId: null,
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.events).toHaveLength(2);
+    expect(groups[1]?.events).toHaveLength(1);
+  });
+
+  it('insert followed by update on the same item within the window does not fold', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, op: 'insert', createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        op: 'update',
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('same-item updates by different actors within the window stay separate', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, actorUserId: 'user-a', createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        actorUserId: 'user-b',
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
 });
