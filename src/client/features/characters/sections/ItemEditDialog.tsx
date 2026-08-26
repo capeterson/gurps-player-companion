@@ -332,8 +332,13 @@ export function ItemEditDialog({
 
   return (
     <>
-      <dialog ref={ref} className="modal" onClose={onCancel} onCancel={onCancel}>
-        <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-2xl">
+      <dialog
+        ref={ref}
+        className="modal-back h-[100dvh] w-[100dvw] max-h-none max-w-none border-0 bg-transparent"
+        onClose={onCancel}
+        onCancel={onCancel}
+      >
+        <div className="card relative max-h-[calc(100vh-3rem)] w-[42rem] max-w-[calc(100vw-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl p-5">
           <h3 className="font-display text-xl font-semibold">Edit item</h3>
           <form onSubmit={handleSubmit} className="mt-3 space-y-4 text-sm">
             <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
@@ -923,7 +928,7 @@ export function ItemEditDialog({
               </fieldset>
             )}
 
-            <div className="modal-action">
+            <div className="modal-action sticky bottom-0 z-10 -mx-5 border-t border-base-300/60 bg-base-100 px-5 py-3">
               <button type="button" onClick={onCancel} className="btn btn-ghost">
                 Cancel
               </button>

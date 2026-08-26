@@ -121,3 +121,37 @@ test('campaign settings dialog keeps its close control reachable on a short mobi
     })
     .toBe(true);
 });
+
+test('item edit dialog keeps its cancel control reachable on a short mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-item-dialog-${suffix()}@example.com`;
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Responsive QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill('Narrow Item Sheet');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
+  await page.locator('.panel-tab').filter({ hasText: /^Inventory/ }).click();
+  await page.getByLabel('Item name').fill('Reachable item');
+  await page.getByRole('button', { name: /^add$/i }).click();
+  await expect(page.getByText('Reachable item', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Reachable item' }).click();
+
+  const itemDialog = page.locator('dialog[open]').filter({ hasText: 'Edit item' });
+  const cancel = itemDialog.getByRole('button', { name: 'Cancel' });
+  await expect(cancel).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await cancel.boundingBox();
+      return box ? box.y >= 0 && box.y + box.height <= 568 : false;
+    })
+    .toBe(true);
+});
