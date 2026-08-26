@@ -288,4 +288,11 @@ describe('EncounterPage', () => {
     expect(screen.queryByRole('button', { name: 'Previous' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Next turn' })).not.toBeInTheDocument();
   });
+
+  it('wraps encounter turn controls instead of making a phone viewport scroll horizontally', async () => {
+    renderPage();
+
+    const controls = (await screen.findByRole('button', { name: 'Next turn' })).parentElement;
+    expect(controls).toHaveClass('flex-wrap');
+  });
 });
