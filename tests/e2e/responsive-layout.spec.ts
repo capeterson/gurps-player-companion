@@ -92,3 +92,32 @@ test('spell rows do not create page-level horizontal overflow on a 320px viewpor
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(320);
 });
+
+test('campaign settings dialog keeps its close control reachable on a short mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-campaign-settings-${suffix()}@example.com`;
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Responsive QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/campaigns');
+  await page.getByRole('button', { name: /new campaign/i }).click();
+  await page.getByLabel(/campaign name/i).fill('Responsive campaign settings');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await page.getByLabel('Settings for Responsive campaign settings').click();
+
+  const close = page.getByRole('dialog', { name: 'Responsive campaign settings' }).getByLabel('Close');
+  await expect(close).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await close.boundingBox();
+      return box ? box.y >= 0 && box.y + box.height <= 568 : false;
+    })
+    .toBe(true);
+});

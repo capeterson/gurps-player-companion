@@ -162,7 +162,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       >
         <form
           method="dialog"
-          className="card relative w-[28rem] max-w-[calc(100vw-3rem)] p-5 gap-3"
+          className="card relative max-h-[calc(100vh-3rem)] w-[28rem] max-w-[calc(100vw-3rem)] overflow-y-auto p-5 gap-3"
           onSubmit={onSubmit}
         >
           <header className="flex items-baseline justify-between">
