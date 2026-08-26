@@ -142,7 +142,7 @@ export function App() {
               >
                 Campaign
               </NavLink>
-              <details ref={campaignMenuRef} className="dropdown relative z-50">
+              <details ref={campaignMenuRef} className="dropdown dropdown-end relative z-50">
                 <summary
                   className={`flex cursor-pointer list-none items-center rounded-r-field px-2 py-2 text-sm transition ${
                     campaignActive
