@@ -354,3 +354,34 @@ test('long recent-character cards do not create page-level horizontal overflow a
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(320);
 });
+
+test('attribute modifier popovers keep their actions reachable on a short mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-modifier-popover-${suffix()}@example.com`;
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Responsive QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill('Narrow modifier sheet');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Edit IQ modifiers' }).click();
+
+  const apply = page.getByRole('dialog', { name: 'Modifiers for IQ' }).getByRole('button', {
+    name: 'Apply',
+  });
+  await expect(apply).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await apply.boundingBox();
+      return box ? box.y >= 0 && box.y + box.height <= 568 : false;
+    })
+    .toBe(true);
+});

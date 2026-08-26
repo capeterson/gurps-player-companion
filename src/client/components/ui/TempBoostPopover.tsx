@@ -106,6 +106,16 @@ export function TempBoostPopover({
     } else if (rect.right > vw - margin) {
       el.style.marginLeft = `-${rect.right - (vw - margin)}px`;
     }
+
+    // Attribute chips near the bottom of a short phone viewport used to
+    // anchor this popover entirely below its trigger, hiding its actions.
+    // Keep the familiar below-trigger placement when it fits, but lift it
+    // just enough to leave the full popover usable when it does not.
+    const vh = window.innerHeight;
+    if (rect.bottom > vh - margin) {
+      const currentMarginTop = Number.parseFloat(window.getComputedStyle(el).marginTop) || 0;
+      el.style.marginTop = `${currentMarginTop + (vh - margin - rect.bottom)}px`;
+    }
   }, []);
 
   useEffect(() => {
