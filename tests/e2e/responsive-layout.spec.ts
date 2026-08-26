@@ -30,6 +30,36 @@ test('long campaign cards do not create page-level horizontal overflow at 320px'
     .toBeLessThanOrEqual(320);
 });
 
+test('long campaign-library trait names do not create page-level horizontal overflow at 320px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-library-trait-${suffix()}@example.com`;
+  const traitName = 'PneumonoultramicroscopicsilicovolcanoconiosisUnbreakableResponsiveLibraryTrait';
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Responsive QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/campaigns');
+  await page.getByRole('button', { name: /new campaign/i }).click();
+  await page.getByLabel(/campaign name/i).fill('Responsive library trait');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await page.getByRole('link', { name: 'Responsive library trait' }).click();
+  await page.getByRole('link', { name: /^library$/i }).click();
+  await page.getByRole('button', { name: /add trait/i }).click();
+  await page.getByLabel(/name \*/i).fill(traitName);
+  await page.getByRole('button', { name: /^add trait$/i }).click();
+  await expect(page.getByText(traitName, { exact: true })).toHaveCount(1);
+
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(320);
+});
+
 test('skill rows do not create page-level horizontal overflow on a 320px viewport', async ({
   page,
 }) => {
