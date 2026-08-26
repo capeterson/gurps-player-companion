@@ -237,7 +237,7 @@ export function CastSpellDialog({
 
   return (
     <dialog ref={ref} className="modal" onClose={onClose} onCancel={onClose}>
-      <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
+      <div className="modal-box max-h-[calc(100dvh-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
         <h3 className="font-display text-2xl">
           {maintaining ? `Maintain ${spell.name}` : spell.name}
         </h3>
@@ -348,7 +348,7 @@ export function CastSpellDialog({
           )}
         </div>
 
-        <div className="modal-action">
+        <div className="modal-action sticky bottom-0 z-10 -mx-5 border-t border-base-300/60 bg-base-100 px-5 py-3">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>

@@ -221,3 +221,47 @@ test('effect dialog keeps its actions reachable on a short mobile viewport', asy
     })
     .toBe(true);
 });
+
+test('cast spell dialog keeps its actions reachable on a short mobile viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-cast-dialog-${suffix()}@example.com`;
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Responsive QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill('Narrow Caster Sheet');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
+
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Traits/ })
+    .click();
+  await page.getByLabel('Trait name').fill('Magery');
+  await page.getByRole('button', { name: /^add$/i }).click();
+
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Magic/ })
+    .click();
+  await page.getByLabel(/^spell$/i).fill('Reachable spell');
+  await page.getByRole('button', { name: /^add$/i }).click();
+  await page.getByRole('button', { name: 'Cast Reachable spell' }).click();
+
+  const castDialog = page.locator('dialog[open]').filter({ hasText: 'Reachable spell' });
+  const cancel = castDialog.getByRole('button', { name: 'Cancel' });
+  await expect(cancel).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await cancel.boundingBox();
+      return box ? box.y >= 0 && box.y + box.height <= 568 : false;
+    })
+    .toBe(true);
+});
