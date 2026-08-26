@@ -132,7 +132,7 @@ export function CampaignsPage() {
             <Link
               key={c.id}
               to={`/campaigns/${c.id}`}
-              className={`card relative flex items-center gap-4 px-5 py-4 transition hover:border-border-strong ${
+              className={`card relative flex flex-row min-w-0 items-center gap-4 px-5 py-4 transition hover:border-border-strong ${
                 isOwner ? 'border-l-[3px] border-l-primary' : ''
               }`}
             >
