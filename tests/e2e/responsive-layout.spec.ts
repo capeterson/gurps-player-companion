@@ -298,3 +298,29 @@ test('long powerstone rows do not create page-level horizontal overflow on a 320
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(320);
 });
+
+test('long recent-character cards do not create page-level horizontal overflow at 320px', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-recent-character-${suffix()}@example.com`;
+  const name = 'Sir Responsiveness Longname the Unbreakably Extensive Tester';
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Responsive QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill(name);
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
+  await page.goto('/');
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(320);
+});
