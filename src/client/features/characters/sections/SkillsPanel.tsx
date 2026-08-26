@@ -215,11 +215,11 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   };
 
   return (
-    <li className="grid grid-cols-[1fr_4rem_4rem_4rem_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
+    <li className="grid grid-cols-[minmax(0,1fr)_3.5rem_3rem_3rem_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 items-center py-2 border-b border-base-300 last:border-0">
       {canWrite ? (
         <input
           aria-label={`${skill.name} name`}
-          className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm font-medium`}
+          className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 font-medium`}
           {...nameField.inputProps}
         />
       ) : (
@@ -310,7 +310,7 @@ export function SkillsPanel({
         <p className="text-sm text-base-content/60">No skills yet.</p>
       ) : (
         <>
-          <div className="grid grid-cols-[1fr_4rem_4rem_4rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_3rem_3rem_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 label-eyebrow border-b border-base-300 pb-1">
             <span>Skill</span>
             <span className="text-center">Attr/Dif</span>
             <span className="text-right">Pts</span>
