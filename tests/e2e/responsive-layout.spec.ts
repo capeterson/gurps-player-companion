@@ -265,3 +265,36 @@ test('cast spell dialog keeps its actions reachable on a short mobile viewport',
     })
     .toBe(true);
 });
+
+test('long powerstone rows do not create page-level horizontal overflow on a 320px viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-powerstone-${suffix()}@example.com`;
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Responsive QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill('Narrow Powerstone Sheet');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
+  await page.locator('.panel-tab').filter({ hasText: /^Inventory/ }).click();
+  await page
+    .getByLabel('Item name')
+    .fill('Extremely Long Powerstone Name For Horizontal Overflow Testing');
+  await page.getByRole('button', { name: /^add$/i }).click();
+  await page.getByRole('button', { name: /edit extremely long powerstone/i }).click();
+  await page.getByRole('button', { name: '+ Powerstone' }).click();
+  await page.getByRole('button', { name: /^save$/i }).click();
+  await page.locator('.panel-tab').filter({ hasText: /^Magic/ }).click();
+  await expect(page.getByText('Stored energy')).toBeVisible();
+
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(320);
+});
