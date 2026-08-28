@@ -35,7 +35,8 @@ test('long campaign-library trait names do not create page-level horizontal over
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   const email = `responsive-library-trait-${suffix()}@example.com`;
-  const traitName = 'PneumonoultramicroscopicsilicovolcanoconiosisUnbreakableResponsiveLibraryTrait';
+  const traitName =
+    'PneumonoultramicroscopicsilicovolcanoconiosisUnbreakableResponsiveLibraryTrait';
 
   await page.goto('/register');
   await page.getByLabel(/email/i).fill(email);
@@ -111,7 +112,10 @@ test('spell rows do not create page-level horizontal overflow on a 320px viewpor
   await page.getByLabel(/new character name/i).fill('Narrow Spell Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
-  await page.locator('.panel-tab').filter({ hasText: /^Magic/ }).click();
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Magic/ })
+    .click();
   await page.getByLabel(/^spell$/i).fill('Extremely Long Spell Name For Horizontal Testing');
   await page.getByRole('button', { name: /^add$/i }).click();
   await expect(
@@ -142,7 +146,9 @@ test('campaign settings dialog keeps its close control reachable on a short mobi
   await page.getByRole('button', { name: /^create$/i }).click();
   await page.getByLabel('Settings for Responsive campaign settings').click();
 
-  const close = page.getByRole('dialog', { name: 'Responsive campaign settings' }).getByLabel('Close');
+  const close = page
+    .getByRole('dialog', { name: 'Responsive campaign settings' })
+    .getByLabel('Close');
   await expect(close).toBeVisible();
   await expect
     .poll(async () => {
@@ -169,7 +175,10 @@ test('item edit dialog keeps its cancel control reachable on a short mobile view
   await page.getByLabel(/new character name/i).fill('Narrow Item Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
-  await page.locator('.panel-tab').filter({ hasText: /^Inventory/ }).click();
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Inventory/ })
+    .click();
   await page.getByLabel('Item name').fill('Reachable item');
   await page.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Reachable item', { exact: true })).toBeVisible();
@@ -186,7 +195,9 @@ test('item edit dialog keeps its cancel control reachable on a short mobile view
     .toBe(true);
 });
 
-test('detailed NPC dialog keeps its actions reachable on a short mobile viewport', async ({ page }) => {
+test('detailed NPC dialog keeps its actions reachable on a short mobile viewport', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 320, height: 568 });
   const email = `responsive-npc-dialog-${suffix()}@example.com`;
 
@@ -313,7 +324,10 @@ test('long powerstone rows do not create page-level horizontal overflow on a 320
   await page.getByLabel(/new character name/i).fill('Narrow Powerstone Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
-  await page.locator('.panel-tab').filter({ hasText: /^Inventory/ }).click();
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Inventory/ })
+    .click();
   await page
     .getByLabel('Item name')
     .fill('Extremely Long Powerstone Name For Horizontal Overflow Testing');
@@ -321,7 +335,10 @@ test('long powerstone rows do not create page-level horizontal overflow on a 320
   await page.getByRole('button', { name: /edit extremely long powerstone/i }).click();
   await page.getByRole('button', { name: '+ Powerstone' }).click();
   await page.getByRole('button', { name: /^save$/i }).click();
-  await page.locator('.panel-tab').filter({ hasText: /^Magic/ }).click();
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Magic/ })
+    .click();
   await expect(page.getByText('Stored energy')).toBeVisible();
 
   await expect
