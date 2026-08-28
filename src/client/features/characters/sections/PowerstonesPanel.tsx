@@ -42,7 +42,9 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
     <li className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
       <span className="flex min-w-0 flex-col">
         <span className="break-words font-medium">{item.name}</span>
-        {data.notes ? <span className="break-words text-xs text-base-content/60">{data.notes}</span> : null}
+        {data.notes ? (
+          <span className="break-words text-xs text-base-content/60">{data.notes}</span>
+        ) : null}
       </span>
       <div
         className="w-24 h-2 rounded-full bg-base-300/60 overflow-hidden"
