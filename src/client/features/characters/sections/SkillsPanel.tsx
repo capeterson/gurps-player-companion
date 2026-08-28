@@ -223,7 +223,7 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
           {...nameField.inputProps}
         />
       ) : (
-        <span className="font-medium">{skill.name}</span>
+        <span className="min-w-0 break-words font-medium">{skill.name}</span>
       )}
       <span className="text-xs text-base-content/70 num text-center">
         {skill.attribute}/{skill.difficulty}
