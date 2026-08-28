@@ -330,7 +330,7 @@ test('long powerstone rows do not create page-level horizontal overflow on a 320
     .click();
   await page
     .getByLabel('Item name')
-    .fill('Extremely Long Powerstone Name For Horizontal Overflow Testing');
+    .fill('PneumonoultramicroscopicsilicovolcanoconiosisUnbreakablePowerstone');
   await page.getByRole('button', { name: /^add$/i }).click();
   await page.getByRole('button', { name: /edit extremely long powerstone/i }).click();
   await page.getByRole('button', { name: '+ Powerstone' }).click();
