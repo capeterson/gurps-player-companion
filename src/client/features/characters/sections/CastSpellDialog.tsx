@@ -348,7 +348,7 @@ export function CastSpellDialog({
           )}
         </div>
 
-        <div className="modal-action sticky bottom-0 z-10 -mx-5 border-t border-base-300/60 bg-base-100 px-5 py-3">
+        <div className="modal-action sticky bottom-0 z-10 -mx-6 border-t border-base-300/60 bg-base-100 px-6 py-3">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
