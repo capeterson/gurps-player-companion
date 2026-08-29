@@ -9,7 +9,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { type SQL, and, desc, eq, lt, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { summarizeEvent } from '../../shared/history/summarize.ts';
 import { uuid } from '../../shared/schemas/common.ts';
@@ -48,9 +48,9 @@ const historyEventColumns = {
 };
 
 /** Base select+join shared by both endpoints; callers add `.where()`, `.orderBy()`, `.limit()`. */
-function baseHistorySelect() {
+function baseHistorySelect(batchSize: SQL<number> | SQL.Aliased<number>) {
   return getDb()
-    .select(historyEventColumns)
+    .select({ ...historyEventColumns, batchSize })
     .from(entityHistory)
     .leftJoin(users, eq(users.id, entityHistory.actorUserId));
 }
@@ -82,6 +82,7 @@ function toHistoryEvent(row: HistoryEventRow, detail: boolean): z.infer<typeof h
     actorUserId: row.actorUserId,
     actorDisplayName: row.actorDisplayName ?? null,
     batchId: row.batchId,
+    batchSize: Number(row.batchSize ?? 0),
     summary,
     createdAt: row.createdAt.toISOString(),
   };
@@ -152,7 +153,16 @@ router.openapi(
       ? and(eq(entityHistory.characterId, characterId), lt(entityHistory.revision, before))
       : eq(entityHistory.characterId, characterId);
 
-    const rows = await baseHistorySelect()
+    // Compute batch cardinality independently of the page cursor. A later
+    // page may contain only an older suffix of an explicit batch, but the UI
+    // still needs to know that the batch has siblings and must not treat it
+    // as a synthetic singleton eligible for burst folding.
+    const batchSize = sql<number>`CASE WHEN ${entityHistory.batchId} IS NULL THEN 0 ELSE (
+      SELECT count(*) FROM entity_history AS batch_members
+      WHERE batch_members.batch_id = ${entityHistory.batchId}
+        AND batch_members.character_id = ${characterId}
+    ) END`.as('batch_size');
+    const rows = await baseHistorySelect(batchSize)
       .where(whereClause)
       .orderBy(desc(entityHistory.revision))
       .limit(limit);
@@ -200,8 +210,14 @@ router.openapi(
     // Determine scope filter: default to campaign-scope rows only.
     const scopeFilter = scope ?? 'campaign';
 
+    const batchSize = sql<number>`CASE WHEN ${entityHistory.batchId} IS NULL THEN 0 ELSE (
+      SELECT count(*) FROM entity_history AS batch_members
+      WHERE batch_members.batch_id = ${entityHistory.batchId}
+        AND batch_members.campaign_id = ${campaignId}
+        AND batch_members.scope = ${scopeFilter}
+    ) END`.as('batch_size');
     const selectBatch = (beforeRev: number | undefined) =>
-      baseHistorySelect()
+      baseHistorySelect(batchSize)
         .where(
           beforeRev
             ? and(

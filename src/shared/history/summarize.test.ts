@@ -294,6 +294,48 @@ describe('summarizeEvent character_inventory', () => {
     });
     expect(summary.toLowerCase()).toContain('sword');
   });
+
+  it('isArmor set: "Shortsword: set as armor" (not raw field name)', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', isArmor: false },
+      newRow: { name: 'Shortsword', isArmor: true },
+    });
+    expect(summary).toBe('Shortsword: set as armor');
+  });
+
+  it('isArmor unset: "Shortsword: unset as armor"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', isArmor: true },
+      newRow: { name: 'Shortsword', isArmor: false },
+    });
+    expect(summary).toBe('Shortsword: unset as armor');
+  });
+
+  it('handles snake_case is_armor column name', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', is_armor: false },
+      newRow: { name: 'Shortsword', is_armor: true },
+    });
+    expect(summary).toBe('Shortsword: set as armor');
+  });
+
+  it('generic multi-field fallback names the changed fields, not raw keys', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Torch', weightLbs: 1, cost: 1 },
+      newRow: { name: 'Torch', weightLbs: 2, cost: 3 },
+    });
+    expect(summary).toContain('Torch');
+    expect(summary).not.toContain('weightLbs');
+    expect(summary).toContain('Weight Lbs');
+  });
 });
 
 // ---------- summarizeEvent — campaign ----------
@@ -318,6 +360,19 @@ describe('summarizeEvent campaign', () => {
     });
     expect(summary).toContain('100');
     expect(summary).toContain('125');
+  });
+});
+
+describe('summarizeEvent campaign_library_trait', () => {
+  it('uses humanized changed fields for library updates and ignores revision noise', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'campaign_library_trait',
+      op: 'update',
+      oldRow: { name: 'Combat Training', basePoints: 5, revision: 1 },
+      newRow: { name: 'Combat Training', basePoints: 10, revision: 2 },
+    });
+    expect(summary).toBe('Library trait Combat Training: Base Points updated');
+    expect(summary).not.toContain('Revision');
   });
 });
 
@@ -347,7 +402,7 @@ function makeEvent(overrides: Partial<HistoryEventOut> = {}): HistoryEventOut {
     op: 'update',
     characterId: null,
     campaignId: null,
-    actorUserId: null,
+    actorUserId: 'user-1',
     actorDisplayName: null,
     batchId: null,
     summary: 'ST 10 → 12',
@@ -398,5 +453,181 @@ describe('groupIntoBatches', () => {
     ];
     const groups = groupIntoBatches(events);
     expect(groups).toHaveLength(3);
+  });
+
+  it('un-batched updates to the same item within 60s fold into one collapsed group', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: t0.toISOString(),
+        summary: 'Shortsword: set as armor',
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: new Date(t0.getTime() + 10_000).toISOString(),
+        summary: 'Shortsword qty 1 → 2',
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: new Date(t0.getTime() + 59_000).toISOString(),
+        summary: 'Wearing Shortsword',
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.foldable).toBe(true);
+    expect(groups[0]?.events).toHaveLength(3);
+  });
+
+  it('same-item updates more than 60s apart stay separate', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: t0.toISOString(),
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        createdAt: new Date(t0.getTime() + 61_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('same-window updates to different items stay separate', () => {
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: crypto.randomUUID(), createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: crypto.randomUUID(),
+        createdAt: new Date(t0.getTime() + 1_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  // dispatchOperation falls back to op.clientOpId when a write has no
+  // explicit batchId, so un-batched sync writes still carry a distinct,
+  // non-null batchId each. That per-event id has no sibling in the
+  // loaded page, so it must not be treated as a "real" (multi-member)
+  // batch — otherwise the same-item burst heuristic above would never
+  // fire for any sync-backed entity class.
+  it('same-item updates each carrying a distinct singleton batchId still fold', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        batchId: crypto.randomUUID(),
+        createdAt: t0.toISOString(),
+      }),
+      makeEvent({
+        entityId: itemId,
+        entityClass: 'character_inventory',
+        batchId: crypto.randomUUID(),
+        createdAt: new Date(t0.getTime() + 10_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.foldable).toBe(true);
+  });
+
+  it('a real multi-member batch is not swept into an adjacent same-item burst', () => {
+    const itemId = crypto.randomUUID();
+    const bid = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, batchId: bid, createdAt: t0.toISOString() }),
+      makeEvent({ entityId: itemId, batchId: bid, createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        batchId: null,
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.events).toHaveLength(2);
+    expect(groups[1]?.events).toHaveLength(1);
+  });
+
+  it('insert followed by update on the same item within the window does not fold', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, op: 'insert', createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        op: 'update',
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('same-item updates by different actors within the window stay separate', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, actorUserId: 'user-a', createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        actorUserId: 'user-b',
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('same-item updates without actors stay separate because they cannot be attributed to one actor', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, actorUserId: null, createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        actorUserId: null,
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('keeps a real batch separate from a same-item burst across a page boundary', () => {
+    const itemId = crypto.randomUUID();
+    const batchId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        actorUserId: 'user-1',
+        batchId,
+        batchSize: 2,
+        createdAt: t0.toISOString(),
+      }),
+      makeEvent({
+        entityId: itemId,
+        actorUserId: 'user-1',
+        batchId: null,
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
   });
 });

@@ -23,6 +23,10 @@ export const historyEventOut = z.object({
   actorUserId: uuid.nullable(),
   actorDisplayName: z.string().nullable(),
   batchId: uuid.nullable(),
+  // Total number of rows sharing this batchId in the requested history-feed
+  // scope, including rows outside the current pagination page. This lets
+  // clients preserve explicit batches across page boundaries.
+  batchSize: z.number().int().nonnegative().optional(),
   summary: z.string(),
   createdAt: isoTimestamp,
   oldRow: z.record(z.unknown()).nullable().optional(),

@@ -41844,6 +41844,10 @@
                         "nullable": true,
                         "format": "uuid"
                       },
+                      "batchSize": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
                       "summary": {
                         "type": "string"
                       },
@@ -42059,6 +42063,10 @@
                         "type": "string",
                         "nullable": true,
                         "format": "uuid"
+                      },
+                      "batchSize": {
+                        "type": "integer",
+                        "minimum": 0
                       },
                       "summary": {
                         "type": "string"

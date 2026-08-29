@@ -1043,9 +1043,16 @@ function StatusPanel({
   );
 }
 
-function PointsPanel({ character }: { character: CharacterDetail }) {
+function PointsPanel({
+  character,
+  pointTarget,
+}: {
+  character: CharacterDetail;
+  pointTarget: number | null;
+}) {
   const p = character.points;
   const [open, setOpen] = useState(false);
+  const unspent = pointTarget != null ? pointTarget - p.total : null;
   return (
     <StatCard
       title="Point ledger"
@@ -1062,6 +1069,20 @@ function PointsPanel({ character }: { character: CharacterDetail }) {
         </button>
       }
     >
+      {/* Shown whether the breakdown is folded or not — see the header's
+          ▸/▾ toggle above; the campaign point target line stays visible
+          either way. */}
+      {unspent != null && unspent !== 0 && (
+        <p className="flex justify-between text-sm mb-1">
+          <span className="text-base-content/60">{unspent < 0 ? 'Over' : 'Unspent'}</span>
+          <span
+            className="num font-medium"
+            style={{ color: unspent < 0 ? 'var(--color-error)' : 'var(--color-primary)' }}
+          >
+            {Math.abs(unspent)}
+          </span>
+        </p>
+      )}
       {open && (
         <ul className="text-sm space-y-1">
           <li className="flex justify-between">
@@ -1542,7 +1563,7 @@ export function CharacterSheetPage() {
         <SecondaryModsPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
         <StatusPanel character={character} canWrite={canWrite} />
         <div className="grid grid-cols-1 gap-4">
-          <PointsPanel character={character} />
+          <PointsPanel character={character} pointTarget={pointTarget} />
           <EncumbrancePanel character={character} />
           <ActiveConditionsPanel character={character} canWrite={canWrite} />
         </div>
