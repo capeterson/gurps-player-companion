@@ -73,8 +73,12 @@ export function HistoryGroupRow({ group }: GroupRowProps) {
           {first ? formatRelative(first.createdAt) : ''}
         </span>
         <span className="flex-1 min-w-0 text-base-content">{group.groupSummary}</span>
+        {actor && (
+          <span className="text-base-content/40 text-xs truncate max-w-24 shrink-0 pt-0.5">
+            {actor}
+          </span>
+        )}
         <span className="text-base-content/40 text-xs shrink-0 pt-0.5 select-none">
-          {actor ? `${actor} · ` : ''}
           {open ? '▾' : '▸'} {group.events.length}
         </span>
       </button>
