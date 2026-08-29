@@ -363,6 +363,19 @@ describe('summarizeEvent campaign', () => {
   });
 });
 
+describe('summarizeEvent campaign_library_trait', () => {
+  it('uses humanized changed fields for library updates and ignores revision noise', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'campaign_library_trait',
+      op: 'update',
+      oldRow: { name: 'Combat Training', basePoints: 5, revision: 1 },
+      newRow: { name: 'Combat Training', basePoints: 10, revision: 2 },
+    });
+    expect(summary).toBe('Library trait Combat Training: Base Points updated');
+    expect(summary).not.toContain('Revision');
+  });
+});
+
 // ---------- summarizeEvent — adventure_log ----------
 
 describe('summarizeEvent adventure_log', () => {
@@ -389,7 +402,7 @@ function makeEvent(overrides: Partial<HistoryEventOut> = {}): HistoryEventOut {
     op: 'update',
     characterId: null,
     campaignId: null,
-    actorUserId: null,
+    actorUserId: 'user-1',
     actorDisplayName: null,
     batchId: null,
     summary: 'ST 10 → 12',
@@ -573,6 +586,21 @@ describe('groupIntoBatches', () => {
       makeEvent({
         entityId: itemId,
         actorUserId: 'user-b',
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
+
+  it('same-item updates without actors stay separate because they cannot be attributed to one actor', () => {
+    const itemId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({ entityId: itemId, actorUserId: null, createdAt: t0.toISOString() }),
+      makeEvent({
+        entityId: itemId,
+        actorUserId: null,
         createdAt: new Date(t0.getTime() + 5_000).toISOString(),
       }),
     ];

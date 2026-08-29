@@ -599,6 +599,8 @@ export function groupIntoBatches(events: HistoryEventOut[]): HistoryGroup[] {
       lastEvent.op === 'update' &&
       lastEvent.entityId === ev.entityId &&
       lastEvent.entityClass === ev.entityClass &&
+      lastEvent.actorUserId != null &&
+      ev.actorUserId != null &&
       lastEvent.actorUserId === ev.actorUserId &&
       Math.abs(new Date(ev.createdAt).getTime() - new Date(lastEvent.createdAt).getTime()) <=
         SAME_ITEM_BURST_WINDOW_MS;
