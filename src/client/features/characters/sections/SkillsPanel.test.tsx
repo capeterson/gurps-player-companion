@@ -86,6 +86,13 @@ describe('SkillsPanel', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
+  it('contains long read-only skill names within the skill column', () => {
+    const longName = 'PneumonoultramicroscopicsilicovolcanoconiosisUnbreakableSkill';
+    renderPanel(makeCharacter([makeSkill({ name: longName })]), false);
+
+    expect(screen.getByText(longName)).toHaveClass('min-w-0', 'break-words');
+  });
+
   it('works for read-only viewers too, since a roll mutates nothing', () => {
     const skill = makeSkill({ name: 'Stealth', level: 12 });
     renderPanel(makeCharacter([skill]), false);

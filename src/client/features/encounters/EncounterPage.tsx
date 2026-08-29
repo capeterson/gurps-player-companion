@@ -195,7 +195,7 @@ export function EncounterPage() {
           </p>
         </div>
         {canManage ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {data.status === 'active' && (
               <>
                 <button
@@ -601,7 +601,7 @@ function NpcDialog({
   );
   return (
     <dialog open className="modal">
-      <div className="modal-box max-w-2xl">
+      <div className="modal-box max-h-[calc(100dvh-3rem)] max-w-2xl overflow-y-auto">
         <h3 className="font-display text-2xl">{combatant ? 'Edit NPC' : 'Add NPC'}</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <label className="form-control sm:col-span-3">
@@ -839,7 +839,7 @@ function EffectDialog({
   };
   return (
     <dialog open className="modal">
-      <div className="modal-box max-w-xl">
+      <div className="modal-box max-h-[calc(100dvh-3rem)] max-w-xl overflow-y-auto">
         <h3 className="font-display text-2xl">{effect ? 'Edit effect' : 'Add effect'}</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="form-control">

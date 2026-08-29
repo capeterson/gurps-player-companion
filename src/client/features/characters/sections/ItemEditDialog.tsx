@@ -333,7 +333,7 @@ export function ItemEditDialog({
   return (
     <>
       <dialog ref={ref} className="modal" onClose={onCancel} onCancel={onCancel}>
-        <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-2xl">
+        <div className="modal-box max-h-[calc(100dvh-3rem)] max-w-2xl overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl">
           <h3 className="font-display text-xl font-semibold">Edit item</h3>
           <form onSubmit={handleSubmit} className="mt-3 space-y-4 text-sm">
             <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
@@ -923,7 +923,7 @@ export function ItemEditDialog({
               </fieldset>
             )}
 
-            <div className="modal-action">
+            <div className="modal-action sticky bottom-0 z-10 -mx-6 border-t border-base-300/60 bg-base-100 px-6 py-3">
               <button type="button" onClick={onCancel} className="btn btn-ghost">
                 Cancel
               </button>

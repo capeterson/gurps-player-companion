@@ -106,6 +106,18 @@ export function TempBoostPopover({
     } else if (rect.right > vw - margin) {
       el.style.marginLeft = `-${rect.right - (vw - margin)}px`;
     }
+
+    // Attribute chips near the bottom of a short phone viewport used to
+    // anchor this popover entirely below its trigger, hiding its actions.
+    // Keep the familiar below-trigger placement when it fits, but lift it
+    // just enough to leave the full popover usable when it does not.
+    const vh = window.innerHeight;
+    if (rect.bottom > vh - margin) {
+      const currentMarginTop = Number.parseFloat(window.getComputedStyle(el).marginTop) || 0;
+      const shiftedMarginTop = currentMarginTop + (vh - margin - rect.bottom);
+      const minMarginTop = margin - rect.top;
+      el.style.marginTop = `${Math.max(shiftedMarginTop, minMarginTop)}px`;
+    }
   }, []);
 
   useEffect(() => {
@@ -148,7 +160,7 @@ export function TempBoostPopover({
       // to the trigger chip, which role="dialog" describes correctly.
       role="dialog"
       aria-label={`Modifiers for ${label}`}
-      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 w-64 rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
+      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 max-h-[calc(100dvh-1rem)] w-64 overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
     >
       <div className="label-eyebrow mb-2">{label} modifiers</div>
       {perm && (
