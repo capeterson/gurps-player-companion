@@ -607,4 +607,27 @@ describe('groupIntoBatches', () => {
     const groups = groupIntoBatches(events);
     expect(groups).toHaveLength(2);
   });
+
+  it('keeps a real batch separate from a same-item burst across a page boundary', () => {
+    const itemId = crypto.randomUUID();
+    const batchId = crypto.randomUUID();
+    const t0 = new Date('2026-01-01T00:00:00Z');
+    const events = [
+      makeEvent({
+        entityId: itemId,
+        actorUserId: 'user-1',
+        batchId,
+        batchSize: 2,
+        createdAt: t0.toISOString(),
+      }),
+      makeEvent({
+        entityId: itemId,
+        actorUserId: 'user-1',
+        batchId: null,
+        createdAt: new Date(t0.getTime() + 5_000).toISOString(),
+      }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(2);
+  });
 });

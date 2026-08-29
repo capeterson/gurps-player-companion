@@ -582,7 +582,8 @@ function countBatchMembers(events: HistoryEventOut[]): Map<string, number> {
 export function groupIntoBatches(events: HistoryEventOut[]): HistoryGroup[] {
   const batchMembers = countBatchMembers(events);
   const isRealBatch = (ev: HistoryEventOut) =>
-    Boolean(ev.batchId) && (batchMembers.get(ev.batchId as string) ?? 0) > 1;
+    Boolean(ev.batchId) &&
+    Math.max(ev.batchSize ?? 0, batchMembers.get(ev.batchId as string) ?? 0) > 1;
 
   const groups: HistoryGroup[] = [];
   for (const ev of events) {

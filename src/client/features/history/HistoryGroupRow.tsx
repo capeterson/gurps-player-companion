@@ -55,6 +55,9 @@ export function HistoryGroupRow({ group }: GroupRowProps) {
   }
 
   const first = group.events[0];
+  const actor = group.events.every((event) => event.actorDisplayName === first?.actorDisplayName)
+    ? first?.actorDisplayName
+    : null;
 
   return (
     <div className="border-b border-base-200 last:border-0">
@@ -71,6 +74,7 @@ export function HistoryGroupRow({ group }: GroupRowProps) {
         </span>
         <span className="flex-1 min-w-0 text-base-content">{group.groupSummary}</span>
         <span className="text-base-content/40 text-xs shrink-0 pt-0.5 select-none">
+          {actor ? `${actor} · ` : ''}
           {open ? '▾' : '▸'} {group.events.length}
         </span>
       </button>

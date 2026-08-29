@@ -23,6 +23,9 @@ export const historyEventOut = z.object({
   actorUserId: uuid.nullable(),
   actorDisplayName: z.string().nullable(),
   batchId: uuid.nullable(),
+  // Total number of rows sharing this batchId across the server dataset.
+  // This lets clients preserve explicit batches across page boundaries.
+  batchSize: z.number().int().nonnegative().optional(),
   summary: z.string(),
   createdAt: isoTimestamp,
   oldRow: z.record(z.unknown()).nullable().optional(),

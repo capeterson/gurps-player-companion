@@ -9,7 +9,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, lt } from 'drizzle-orm';
+import { and, desc, eq, lt, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { summarizeEvent } from '../../shared/history/summarize.ts';
 import { uuid } from '../../shared/schemas/common.ts';
@@ -45,6 +45,10 @@ const historyEventColumns = {
   newRow: entityHistory.newRow,
   createdAt: entityHistory.createdAt,
   actorDisplayName: users.displayName,
+  batchSize:
+    sql<number>`CASE WHEN ${entityHistory.batchId} IS NULL THEN 0 ELSE count(*) OVER (PARTITION BY ${entityHistory.batchId}) END`.as(
+      'batch_size',
+    ),
 };
 
 /** Base select+join shared by both endpoints; callers add `.where()`, `.orderBy()`, `.limit()`. */
@@ -82,6 +86,7 @@ function toHistoryEvent(row: HistoryEventRow, detail: boolean): z.infer<typeof h
     actorUserId: row.actorUserId,
     actorDisplayName: row.actorDisplayName ?? null,
     batchId: row.batchId,
+    batchSize: Number(row.batchSize ?? 0),
     summary,
     createdAt: row.createdAt.toISOString(),
   };
