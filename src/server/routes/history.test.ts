@@ -9,7 +9,10 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { sql } from 'drizzle-orm';
 import { createApp } from '../app.ts';
+import { getDb } from '../db/client.ts';
+import { entityHistory } from '../db/schema.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
 configureIntegrationTestEnvironment();
@@ -77,6 +80,8 @@ type HistoryEvent = {
   op: string;
   actorUserId: string | null;
   actorDisplayName: string | null;
+  batchId: string | null;
+  batchSize?: number;
   summary: string;
   oldRow?: Record<string, unknown> | null;
   newRow?: Record<string, unknown> | null;
@@ -135,6 +140,63 @@ describe('GET /characters/{id}/history', () => {
       expect(curr).toBeDefined();
       expect(prev?.revision).toBeGreaterThan(curr?.revision ?? Number.NaN);
     }
+  });
+
+  it('reports an explicit batch total on a later pagination page', async () => {
+    const owner = await registerUser('char-hist-batch-page');
+    const character = await createCharacter(owner.accessToken, { name: 'Batch Page Test' });
+    const batchId = crypto.randomUUID();
+    const ownerId = character.ownerId as string;
+
+    await getDb()
+      .insert(entityHistory)
+      .values([
+        {
+          revision: sql<number>`nextval('revisions_seq')`,
+          scope: 'character',
+          entityClass: 'character',
+          entityId: character.id as string,
+          op: 'update',
+          characterId: character.id as string,
+          campaignId: null,
+          ownerUserId: ownerId,
+          actorUserId: ownerId,
+          batchId,
+          oldRow: { name: 'Batch Page Test' },
+          newRow: { name: 'Batch Page Test 1' },
+        },
+        {
+          revision: sql<number>`nextval('revisions_seq')`,
+          scope: 'character',
+          entityClass: 'character',
+          entityId: character.id as string,
+          op: 'update',
+          characterId: character.id as string,
+          campaignId: null,
+          ownerUserId: ownerId,
+          actorUserId: ownerId,
+          batchId,
+          oldRow: { name: 'Batch Page Test 1' },
+          newRow: { name: 'Batch Page Test 2' },
+        },
+      ]);
+
+    const firstPage = await app.request(`/api/v1/characters/${character.id}/history?limit=1`, {
+      headers: bearer(owner.accessToken),
+    });
+    const firstEvents = (await firstPage.json()) as HistoryEvent[];
+    expect(firstPage.status).toBe(200);
+    expect(firstEvents).toHaveLength(1);
+
+    const secondPage = await app.request(
+      `/api/v1/characters/${character.id}/history?limit=1&before=${firstEvents[0]?.revision}`,
+      { headers: bearer(owner.accessToken) },
+    );
+    const secondEvents = (await secondPage.json()) as HistoryEvent[];
+    expect(secondPage.status).toBe(200);
+    expect(secondEvents).toHaveLength(1);
+    expect(secondEvents[0]?.batchId).toBe(batchId);
+    expect(secondEvents[0]?.batchSize).toBe(2);
   });
 
   it('a member with minimal access (shareCharacterSheets=false) is denied (403)', async () => {
