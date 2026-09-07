@@ -731,7 +731,11 @@ export const adventureLogEntries = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     sessionDate: date('session_date').notNull(),
+    /** Optional session ordinal for cross-referencing ("session 13"). */
+    sessionNumber: integer('session_number'),
     title: varchar('title', { length: 200 }).notNull(),
+    /** Free-form where-the-session-took-place text. */
+    location: varchar('location', { length: 200 }),
     body: text('body').notNull().default(''),
     visibility: visibilityEnum('visibility').notNull().default('campaign'),
     /** Validated by `xpAward` (src/shared/schemas/adventureLog.ts). */

@@ -304,11 +304,14 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
 - **Adventure log**: session log entries with per-entry visibility
-  (campaign-wide or private). The body is **markdown** (CommonMark + GFM)
-  rendered through a sanitized pipeline that never interprets raw HTML or
-  scripts. The create/edit form offers a Tiptap **rich text editor** with a
-  raw-markdown toggle; entries can be **edited or deleted** by their author or
-  the campaign owner. See campaign-content-sharing.md.
+  (campaign-wide or private), an optional **session number** (running
+  session ordinal, e.g. 13) and **location** (free-form text, e.g. "The
+  Hollow Beneath Greymoor"), and an optional **XP award** list per entry.
+  The body is **markdown** (CommonMark + GFM) rendered through a sanitized
+  pipeline that never interprets raw HTML or scripts. The create/edit form
+  offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
+  can be **edited or deleted** by their author or the campaign owner. See
+  campaign-content-sharing.md.
 - **Campaign history view**: campaign-level audit log (settings, membership,
   library, log), plus an owner/manager roll-up across member characters.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
