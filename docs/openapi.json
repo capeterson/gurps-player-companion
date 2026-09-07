@@ -5924,6 +5924,40 @@
                               "mode"
                             ]
                           },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
+                          },
                           "createdAt": {
                             "type": "string",
                             "format": "date-time"
@@ -9112,6 +9146,40 @@
                       "spellSkillLevel",
                       "mode"
                     ]
+                  },
+                  "enchantments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "spellName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "spellLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 40
+                        },
+                        "category": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 80
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "spellName"
+                      ]
+                    },
+                    "maxItems": 50,
+                    "default": []
                   }
                 },
                 "required": [
@@ -9497,6 +9565,40 @@
                         "spellSkillLevel",
                         "mode"
                       ]
+                    },
+                    "enchantments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "spellName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "spellLevel": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 40
+                          },
+                          "category": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 80
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 2000
+                          }
+                        },
+                        "required": [
+                          "spellName"
+                        ]
+                      },
+                      "maxItems": 50,
+                      "default": []
                     },
                     "createdAt": {
                       "type": "string",
@@ -9961,6 +10063,40 @@
                       "spellSkillLevel",
                       "mode"
                     ]
+                  },
+                  "enchantments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "spellName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "spellLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 40
+                        },
+                        "category": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 80
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "spellName"
+                      ]
+                    },
+                    "maxItems": 50,
+                    "default": []
                   }
                 }
               }
@@ -10343,6 +10479,40 @@
                         "spellSkillLevel",
                         "mode"
                       ]
+                    },
+                    "enchantments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "spellName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "spellLevel": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 40
+                          },
+                          "category": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 80
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 2000
+                          }
+                        },
+                        "required": [
+                          "spellName"
+                        ]
+                      },
+                      "maxItems": 50,
+                      "default": []
                     },
                     "createdAt": {
                       "type": "string",
@@ -17720,6 +17890,40 @@
                               "mode"
                             ]
                           },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
+                          },
                           "libraryItemId": {
                             "type": "string",
                             "nullable": true,
@@ -19308,6 +19512,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -21156,6 +21394,40 @@
                               "mode"
                             ]
                           },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
+                          },
                           "libraryItemId": {
                             "type": "string",
                             "nullable": true,
@@ -22813,6 +23085,40 @@
                               "spellSkillLevel",
                               "mode"
                             ]
+                          },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
                           },
                           "libraryItemId": {
                             "type": "string",
@@ -24635,6 +24941,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -26469,6 +26809,40 @@
                                   "mode"
                                 ]
                               },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
+                              },
                               "libraryItemId": {
                                 "type": "string",
                                 "nullable": true,
@@ -28069,6 +28443,40 @@
                               "spellSkillLevel",
                               "mode"
                             ]
+                          },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
                           },
                           "libraryItemId": {
                             "type": "string",
@@ -29827,6 +30235,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -31596,6 +32038,40 @@
                                   "mode"
                                 ]
                               },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
+                              },
                               "libraryItemId": {
                                 "type": "string",
                                 "nullable": true,
@@ -33196,6 +33672,40 @@
                               "spellSkillLevel",
                               "mode"
                             ]
+                          },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
                           },
                           "libraryItemId": {
                             "type": "string",
@@ -34973,6 +35483,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -36763,6 +37307,40 @@
                                   "mode"
                                 ]
                               },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
+                              },
                               "libraryItemId": {
                                 "type": "string",
                                 "nullable": true,
@@ -38363,6 +38941,40 @@
                               "spellSkillLevel",
                               "mode"
                             ]
+                          },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
                           },
                           "libraryItemId": {
                             "type": "string",
@@ -40085,6 +40697,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -41820,6 +42466,40 @@
                                   "mode"
                                 ]
                               },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
+                              },
                               "libraryItemId": {
                                 "type": "string",
                                 "nullable": true,
@@ -43420,6 +44100,40 @@
                               "spellSkillLevel",
                               "mode"
                             ]
+                          },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
                           },
                           "libraryItemId": {
                             "type": "string",
@@ -45149,6 +45863,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -46890,6 +47638,40 @@
                                   "mode"
                                 ]
                               },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
+                              },
                               "libraryItemId": {
                                 "type": "string",
                                 "nullable": true,
@@ -48491,6 +49273,40 @@
                               "mode"
                             ]
                           },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
+                          },
                           "libraryItemId": {
                             "type": "string",
                             "nullable": true,
@@ -49128,6 +49944,40 @@
                       "mode"
                     ]
                   },
+                  "enchantments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "spellName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "spellLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 40
+                        },
+                        "category": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 80
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "spellName"
+                      ]
+                    },
+                    "maxItems": 50,
+                    "default": []
+                  },
                   "libraryItemId": {
                     "type": "string",
                     "nullable": true,
@@ -49527,6 +50377,40 @@
                             "spellSkillLevel",
                             "mode"
                           ]
+                        },
+                        "enchantments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "spellName": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "spellLevel": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 40
+                              },
+                              "category": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 80
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            },
+                            "required": [
+                              "spellName"
+                            ]
+                          },
+                          "maxItems": 50,
+                          "default": []
                         },
                         "libraryItemId": {
                           "type": "string",
@@ -50900,6 +51784,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -51553,6 +52471,40 @@
                       "mode"
                     ]
                   },
+                  "enchantments": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "spellName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "spellLevel": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 40
+                        },
+                        "category": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 80
+                        },
+                        "notes": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 2000
+                        }
+                      },
+                      "required": [
+                        "spellName"
+                      ]
+                    },
+                    "maxItems": 50,
+                    "default": []
+                  },
                   "libraryItemId": {
                     "type": "string",
                     "nullable": true,
@@ -51949,6 +52901,40 @@
                             "spellSkillLevel",
                             "mode"
                           ]
+                        },
+                        "enchantments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "spellName": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "spellLevel": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 40
+                              },
+                              "category": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 80
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            },
+                            "required": [
+                              "spellName"
+                            ]
+                          },
+                          "maxItems": 50,
+                          "default": []
                         },
                         "libraryItemId": {
                           "type": "string",
@@ -53322,6 +54308,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",
@@ -54923,6 +55943,40 @@
                               "spellSkillLevel",
                               "mode"
                             ]
+                          },
+                          "enchantments": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "spellName": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "spellLevel": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 40
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 80
+                                },
+                                "notes": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "maxLength": 2000
+                                }
+                              },
+                              "required": [
+                                "spellName"
+                              ]
+                            },
+                            "maxItems": 50,
+                            "default": []
                           },
                           "libraryItemId": {
                             "type": "string",
@@ -56626,6 +57680,40 @@
                                   "mode"
                                 ]
                               },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
+                              },
                               "libraryItemId": {
                                 "type": "string",
                                 "nullable": true,
@@ -58240,6 +59328,40 @@
                                   "mode"
                                 ]
                               },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
+                              },
                               "libraryItemId": {
                                 "type": "string",
                                 "nullable": true,
@@ -59851,6 +60973,40 @@
                                   "spellSkillLevel",
                                   "mode"
                                 ]
+                              },
+                              "enchantments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "spellName": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "spellLevel": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0,
+                                      "maximum": 40
+                                    },
+                                    "category": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 80
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "spellName"
+                                  ]
+                                },
+                                "maxItems": 50,
+                                "default": []
                               },
                               "libraryItemId": {
                                 "type": "string",

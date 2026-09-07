@@ -337,7 +337,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 4');
+    expect(yaml).toContain('version: 5');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
@@ -727,6 +727,46 @@ library:
     expect(firstYaml).toContain('isContainer: true');
     expect(firstYaml).toContain('powerstoneData:');
     expect(firstYaml).toContain('magicItemData:');
+
+    const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: firstYaml }),
+    });
+    expect(importRes.status).toBe(200);
+
+    const secondYaml = await exportYaml(owner.accessToken, campaign.id as string);
+    expect(secondYaml).toBe(firstYaml);
+  });
+
+  it('enchantments survive POST -> GET list -> export -> import -> export (v5 doc)', async () => {
+    const owner = await registerUser('item-enchant-roundtrip');
+    const campaign = await createCampaign(owner.accessToken);
+    const enchantments = [
+      { spellName: 'Fortify', spellLevel: 18, category: 'Fortify +3' },
+      { spellName: 'Deflect', category: 'Deflect +2' },
+    ];
+    const postRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Phoenix Cloak', enchantments }),
+    });
+    expect(postRes.status).toBe(201);
+    const created = (await postRes.json()) as { enchantments: unknown[] };
+    expect(created.enchantments).toEqual(enchantments);
+
+    // The aggregate library GET projects them too.
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const list = (await listRes.json()) as {
+      items: Array<{ name: string; enchantments: unknown[] }>;
+    };
+    expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
+
+    const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
+    expect(firstYaml).toContain('version: 5');
+    expect(firstYaml).toContain('enchantments:');
 
     const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
       method: 'POST',

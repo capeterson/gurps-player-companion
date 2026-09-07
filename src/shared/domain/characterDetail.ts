@@ -145,6 +145,7 @@ export interface CharacterDetailInputInventory {
   weaponData: unknown | null;
   powerstoneData: unknown | null;
   magicItemData: unknown | null;
+  enchantments: unknown | null;
   libraryItemId: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -399,6 +400,7 @@ export function buildInventoryItemOut(
     weaponData: (item.weaponData as InventoryItemOut['weaponData']) ?? null,
     powerstoneData: (item.powerstoneData as InventoryItemOut['powerstoneData']) ?? null,
     magicItemData: (item.magicItemData as InventoryItemOut['magicItemData']) ?? null,
+    enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
     libraryItemId: item.libraryItemId,
     effectiveWeightLbs: perItemEffective.get(item.id) ?? Number(item.weightLbs) * item.quantity,
     createdAt: toIso(item.createdAt),

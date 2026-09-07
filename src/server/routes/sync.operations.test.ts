@@ -1124,3 +1124,95 @@ describe('POST /api/v1/sync/operations -- character_technique', () => {
     expect(second.changes.find((c) => c.entityId === techniqueId)?.command).toBe('delete');
   });
 });
+
+describe('POST /api/v1/sync/operations -- inventory enchantments', () => {
+  it('creates an item with enchantments and patches the list through fieldPath', async () => {
+    const { accessToken } = await registerUser('sync-enchant');
+    const character = await createCharacter(accessToken);
+
+    const itemId = crypto.randomUUID();
+    const created = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: itemId,
+        command: 'create' as const,
+        attemptedValue: {
+          name: 'Phoenix Cloak',
+          enchantments: [{ spellName: 'Deflect', category: 'Deflect +2' }],
+        },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(created.outcomes[0]?.status).toBe('applied');
+    const revision = created.outcomes[0]?.newRevision as number;
+
+    // A whole-list patch replaces the column (S2/S3 semantics: the bare
+    // array is the value, same as any other field).
+    const patched = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: itemId,
+        command: 'patch' as const,
+        fieldPath: 'enchantments',
+        attemptedValue: [
+          { spellName: 'Deflect', category: 'Deflect +2' },
+          { spellName: 'Fortify', spellLevel: 18, category: 'Fortify +3' },
+        ],
+        baseRevision: revision,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(patched.outcomes[0]?.status).toBe('applied');
+
+    const detail = (await getCharacter(accessToken, character.id)) as unknown as {
+      inventory: Array<{ id: string; enchantments: unknown[] }>;
+    };
+    const item = detail.inventory.find((i) => i.id === itemId);
+    expect(item?.enchantments).toEqual([
+      { spellName: 'Deflect', category: 'Deflect +2' },
+      { spellName: 'Fortify', spellLevel: 18, category: 'Fortify +3' },
+    ]);
+  });
+
+  it('rejects an enchantments patch carrying a blank spell name', async () => {
+    const { accessToken } = await registerUser('sync-enchant-bad');
+    const character = await createCharacter(accessToken);
+
+    const itemId = crypto.randomUUID();
+    const created = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: itemId,
+        command: 'create' as const,
+        attemptedValue: { name: 'Cloak' },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    const revision = created.outcomes[0]?.newRevision as number;
+
+    const rejected = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: itemId,
+        command: 'patch' as const,
+        fieldPath: 'enchantments',
+        attemptedValue: [{ spellName: '' }],
+        baseRevision: revision,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(rejected.outcomes[0]?.status).toBe('rejected');
+  });
+});

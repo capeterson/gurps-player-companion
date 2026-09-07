@@ -222,6 +222,12 @@ export function InventoryPanel({
         : null;
     const magicItemFromLibrary =
       linkedLibraryId && pickedLibraryItem?.magicItemData ? pickedLibraryItem.magicItemData : null;
+    // Enchantments ride along with the library template like the other
+    // magic metadata; an unlinked (hand-typed) item starts unenchanted.
+    const enchantmentsFromLibrary =
+      linkedLibraryId && pickedLibraryItem && (pickedLibraryItem.enchantments?.length ?? 0) > 0
+        ? pickedLibraryItem.enchantments
+        : [];
     const containerFromLibrary =
       linkedLibraryId && pickedLibraryItem?.isContainer ? pickedLibraryItem : null;
     //  Mirrors the armor-from-library / default-armor fallback: checking
@@ -280,6 +286,7 @@ export function InventoryPanel({
         weaponData: newIsWeapon ? (weaponFromLibrary ?? weaponDefault) : null,
         powerstoneData: powerstoneFromLibrary,
         magicItemData: magicItemFromLibrary,
+        enchantments: enchantmentsFromLibrary,
         libraryItemId: linkedLibraryId,
       },
       () => {

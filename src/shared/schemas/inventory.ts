@@ -146,6 +146,25 @@ export const powerstoneData = z
  */
 export const magicItemMode = z.enum(['charged', 'powered', 'continuous']);
 
+/**
+ * One enchantment on an inventory item (B262 enchantment economy, the
+ * veteran sheet's "Fortify +3" / "Deflect +2" / "Cornucopia" rows).
+ * Multiple enchantments stack on one item, so this is a list on the
+ * item row rather than a separate magicItemData block (which models a
+ * single *castable* spell). Non-mechanical metadata: nothing consumes
+ * it in combat math yet; it records what the enchantments are.
+ */
+export const enchantmentRef = z.object({
+  /** The enchantment's spell name, e.g. "Fortify". */
+  spellName: z.string().min(1).max(160),
+  /** Enchanter's skill when the item was made (GURPS item spells are
+   * cast at a fixed level); null = unknown/unrecorded. */
+  spellLevel: z.number().int().min(0).max(40).nullable().optional(),
+  /** Free-text category label, e.g. "Fortify +3" or "Deflect +2". */
+  category: z.string().max(80).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
 export const magicItemData = z
   .object({
     spellName: z.string().min(1).max(160),
@@ -187,6 +206,7 @@ export const inventoryItemOut = z.object({
   weaponData: weaponData.nullable(),
   powerstoneData: powerstoneData.nullable(),
   magicItemData: magicItemData.nullable(),
+  enchantments: z.array(enchantmentRef).max(50).default([]),
   libraryItemId: uuid.nullable(),
   /** Server-computed convenience field. */
   effectiveWeightLbs: z.number(),
@@ -211,6 +231,7 @@ export const inventoryItemCreate = z.object({
   weaponData: weaponData.nullable().optional(),
   powerstoneData: powerstoneData.nullable().optional(),
   magicItemData: magicItemData.nullable().optional(),
+  enchantments: z.array(enchantmentRef).max(50).default([]),
   libraryItemId: uuid.nullable().optional(),
 });
 
@@ -227,3 +248,4 @@ export type RangedData = z.infer<typeof rangedData>;
 export type PowerstoneData = z.infer<typeof powerstoneData>;
 export type MagicItemData = z.infer<typeof magicItemData>;
 export type MagicItemMode = z.infer<typeof magicItemMode>;
+export type EnchantmentRef = z.infer<typeof enchantmentRef>;

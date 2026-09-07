@@ -186,6 +186,7 @@ export interface LocalCharacterInventory {
   weaponData: unknown | null;
   powerstoneData: unknown | null;
   magicItemData: unknown | null;
+  enchantments: unknown | null;
   libraryItemId: string | null;
   createdAt: string;
   updatedAt: string;

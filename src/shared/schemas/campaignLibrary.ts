@@ -2,7 +2,13 @@ import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { timestamps, uuid } from './common.ts';
 import { traitEffect } from './effects.ts';
-import { armorData, magicItemData, powerstoneData, weaponData } from './inventory.ts';
+import {
+  armorData,
+  enchantmentRef,
+  magicItemData,
+  powerstoneData,
+  weaponData,
+} from './inventory.ts';
 import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
 import { spellDifficulty } from './spell.ts';
 import { techniqueDifficulty } from './technique.ts';
@@ -255,6 +261,8 @@ export const libraryItemOut = z.object({
   weightReductionPercent: z.number().int().min(0).max(100),
   powerstoneData: powerstoneData.nullable(),
   magicItemData: magicItemData.nullable(),
+  /** Non-mechanical enchantment list carried onto inventory copies. */
+  enchantments: z.array(enchantmentRef).max(50).default([]),
   ...timestamps,
 });
 
@@ -274,6 +282,7 @@ export const libraryItemCreate = z.object({
   weightReductionPercent: z.number().int().min(0).max(100).default(0),
   powerstoneData: powerstoneData.nullable().optional(),
   magicItemData: magicItemData.nullable().optional(),
+  enchantments: z.array(enchantmentRef).max(50).default([]),
 });
 
 export const libraryItemUpdate = libraryItemCreate.partial();
@@ -307,14 +316,20 @@ export const importResult = z.object({
 
 /**
  * v1 docs (pre-effects), v2 docs (effects on traits/skills), v3 docs
- * (container/powerstone/magic-item item fields + campaign.manaLevel), and
- * v4 docs (languages + techniques + styles sections) all parse.  Schema
- * unions on a literal version field so older library files keep
- * round-tripping without mutation.  Older docs that omit the newer fields
- * get their defaults (empty array / false / null) via the library*Create
- * schemas.
+ * (container/powerstone/magic-item item fields + campaign.manaLevel), v4
+ * docs (languages + techniques + styles sections), and v5 docs
+ * (enchantments on items) all parse.  Schema unions on a literal version
+ * field so older library files keep round-tripping without mutation.
+ * Older docs that omit the newer fields get their defaults (empty
+ * array / false / null) via the library*Create schemas.
  */
-export const libraryYamlVersion = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
+export const libraryYamlVersion = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(5),
+]);
 
 export const libraryYamlDoc = z.object({
   version: libraryYamlVersion,

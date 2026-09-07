@@ -1,7 +1,8 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { HIT_LOCATIONS, type HitLocation } from '../../../../shared/constants/hitLocations.ts';
 import type {
   ArmorData,
+  EnchantmentRef,
   InventoryItemOut,
   InventoryItemUpdate,
   MagicItemData,
@@ -17,6 +18,7 @@ import { FACET_LABELS, type Facet, FacetChipRow } from './FacetChips.tsx';
 
 const REDUCTIONS = [0, 25, 50] as const;
 const MAGIC_ITEM_MODES: readonly MagicItemMode[] = ['charged', 'powered', 'continuous'];
+const MAX_ENCHANTMENTS = 50;
 
 function defaultArmor(): ArmorData {
   return {
@@ -120,6 +122,19 @@ export function ItemEditDialog({
   const [weapon, setWeapon] = useState<WeaponData>(defaultWeapon());
   const [stRequiredRaw, setStRequiredRaw] = useState('');
 
+  // Enchantments are item-level metadata, independent of the magic-item
+  // facet (an enchanted cloak has no castable spell, so no magicItemData).
+  // Rows carry a stable local key so removing one doesn't remount the rest.
+  const [enchantments, setEnchantments] = useState<Array<{ key: number; data: EnchantmentRef }>>(
+    [],
+  );
+  const enchantKeyRef = useRef(0);
+
+  function nextEnchantKey(): number {
+    enchantKeyRef.current += 1;
+    return enchantKeyRef.current;
+  }
+
   // A facet whose removal would clear data waits on a confirm.
   const [pendingRemoval, setPendingRemoval] = useState<Facet | null>(null);
   const [dbRaw, setDbRaw] = useState('');
@@ -166,6 +181,12 @@ export function ItemEditDialog({
     setIsWeapon(wd != null);
     setWeapon(wd ?? defaultWeapon());
     setStRequiredRaw(wd?.stRequired == null ? '' : String(wd.stRequired));
+    setEnchantments(
+      (item.enchantments ?? []).map((data) => {
+        enchantKeyRef.current += 1;
+        return { key: enchantKeyRef.current, data };
+      }),
+    );
     setDbRaw(wd?.db == null ? '' : String(wd.db));
     const rg = wd?.ranged ?? null;
     setIsRanged(rg != null);
@@ -231,6 +252,30 @@ export function ItemEditDialog({
       return;
     }
     facetSetters[facet](next);
+  }
+
+  function updateEnchantment(index: number, patch: Partial<EnchantmentRef>) {
+    setEnchantments((list) =>
+      list.map((row, i) => (i === index ? { ...row, data: { ...row.data, ...patch } } : row)),
+    );
+  }
+
+  function removeEnchantment(index: number) {
+    setEnchantments((list) => list.filter((_, i) => i !== index));
+  }
+
+  function addEnchantment() {
+    setEnchantments((list) =>
+      list.length >= MAX_ENCHANTMENTS
+        ? list
+        : [
+            ...list,
+            {
+              key: nextEnchantKey(),
+              data: { spellName: '', spellLevel: null, category: null, notes: null },
+            },
+          ],
+    );
   }
 
   function handleSubmit(e: FormEvent) {
@@ -312,6 +357,23 @@ export function ItemEditDialog({
         alternateModes: weapon.alternateModes ?? [],
       };
     }
+    const enchantmentPatch: EnchantmentRef[] = [];
+    for (const [i, row] of enchantments.entries()) {
+      const en = row.data;
+      const spellName = en.spellName.trim();
+      if (!spellName) {
+        toasts.push(`Enchantment ${i + 1} needs a spell name`, { kind: 'error' });
+        return;
+      }
+      enchantmentPatch.push({
+        spellName,
+        ...(en.spellLevel != null ? { spellLevel: en.spellLevel } : {}),
+        ...(en.category != null && en.category.trim() !== ''
+          ? { category: en.category.trim() }
+          : {}),
+        ...(en.notes != null && en.notes.trim() !== '' ? { notes: en.notes.trim() } : {}),
+      });
+    }
     const patch: InventoryItemUpdate = {
       name: name.trim(),
       quantity: parsedQty,
@@ -330,6 +392,7 @@ export function ItemEditDialog({
       weaponData: weaponPatch,
       powerstoneData: powerstonePatch,
       magicItemData: magicItemPatch,
+      enchantments: enchantmentPatch,
     };
     onSubmit(patch);
   }
@@ -926,6 +989,105 @@ export function ItemEditDialog({
                 </div>
               </fieldset>
             )}
+
+            <div className="space-y-1.5 border-t border-base-300/60 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="label-eyebrow">Enchantments</span>
+                <button
+                  type="button"
+                  className="btn btn-xs"
+                  onClick={addEnchantment}
+                  disabled={enchantments.length >= MAX_ENCHANTMENTS}
+                >
+                  + Add enchantment
+                </button>
+              </div>
+              {enchantments.length === 0 ? (
+                <p className="text-xs text-base-content/50">
+                  Stacked enchantments on this item, e.g. “Fortify +3” and “Deflect +2” (B262).
+                  Metadata only — no combat math consumes them yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {enchantments.map(({ key, data: en }, i) => (
+                    <div
+                      key={key}
+                      className="grid grid-cols-1 sm:grid-cols-[1fr_4rem_8rem_1fr_auto] gap-2"
+                    >
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Spell</span>
+                        <input
+                          value={en.spellName}
+                          onChange={(e) => updateEnchantment(i, { spellName: e.target.value })}
+                          className="input input-xs input-bordered"
+                          placeholder="e.g. Fortify"
+                          aria-label={`Enchantment ${i + 1} spell`}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Level</span>
+                        <input
+                          value={en.spellLevel == null ? '' : String(en.spellLevel)}
+                          inputMode="numeric"
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const v = Number(raw);
+                            updateEnchantment(i, {
+                              spellLevel:
+                                raw === ''
+                                  ? null
+                                  : Number.isFinite(v)
+                                    ? Math.max(0, Math.min(40, Math.floor(v)))
+                                    : null,
+                            });
+                          }}
+                          className="num input input-xs input-bordered text-right"
+                          placeholder="—"
+                          aria-label={`Enchantment ${i + 1} level`}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Category</span>
+                        <input
+                          value={en.category ?? ''}
+                          onChange={(e) =>
+                            updateEnchantment(i, {
+                              category: e.target.value === '' ? null : e.target.value,
+                            })
+                          }
+                          className="input input-xs input-bordered"
+                          placeholder="e.g. Fortify +3"
+                          aria-label={`Enchantment ${i + 1} category`}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Notes</span>
+                        <input
+                          value={en.notes ?? ''}
+                          onChange={(e) =>
+                            updateEnchantment(i, {
+                              notes: e.target.value === '' ? null : e.target.value,
+                            })
+                          }
+                          className="input input-xs input-bordered"
+                          aria-label={`Enchantment ${i + 1} notes`}
+                        />
+                      </label>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-ghost text-error"
+                          onClick={() => removeEnchantment(i)}
+                          aria-label={`Remove enchantment ${i + 1}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="modal-action">
               <button type="button" onClick={onCancel} className="btn btn-ghost">

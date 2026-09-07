@@ -35,6 +35,7 @@ The two deliberate exceptions (`notifications.payload`,
 | `inventory_items.weapon_data` | `weaponData` (inventory.ts), nullable; nests `rangedData` (`ranged`, null = melee-only) plus `skill` (governing-skill name), `db` (shield Defense Bonus, non-null = shield), and `alternateModes` (`weaponMode[]`, max 10, defaults to `[]` — extra attack rows beyond the primary `damage`/`reach`/`parry`, e.g. swing + thrust + thrown) | same as `armor` |
 | `inventory_items.powerstone_data` | `powerstoneData` (inventory.ts), nullable; refinement: `currentEnergy <= maxEnergy` | same as `armor` |
 | `inventory_items.magic_item_data` | `magicItemData` (inventory.ts), nullable; refinement: `chargesCurrent <= chargesMax` | same as `armor` |
+| `inventory_items.enchantments` | `enchantmentRef[]` (inventory.ts), max 50, defaults to `[]` — `{ spellName (1–160), spellLevel? (0–40), category? (1–80), notes? (≤2000) }`. Multi-enchantment metadata ("Fortify +3" + "Deflect +2"); non-mechanical, nothing consumes it in combat math yet | REST inventory create/update (`inventoryItemCreate` / `inventoryItemUpdate`); sync per-field validator (whitelist derived from `inventoryItemUpdate`) |
 | `combat_states.conditions` | `combatStateUpdate.conditions` (combat.ts) — `string[]`, each 1–80 chars, max 64 | REST combat patch; sync per-field validator |
 | `adventure_log_entries.xp_awards` | `xpAward[]` (adventureLog.ts) — `{ characterId, amount }`, max 50 | REST log create/update (`adventureLogCreate` / `adventureLogUpdate`) |
 | `campaign_library_traits.available_modifiers` | `traitModifier[]` (trait.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
@@ -51,6 +52,7 @@ The two deliberate exceptions (`notifications.payload`,
 | `encounter_effects.duration` | `effectDuration` (encounter.ts) — discriminated `{ unit, amount? }` round/minute/hour/indefinite duration | Encounter effect create/update (`effectCreate` / `effectUpdate`) |
 | `campaign_library_items.powerstone_data` | `powerstoneData` (inventory.ts), nullable; refinement: `currentEnergy <= maxEnergy` — same shape as `inventory_items.powerstone_data` | REST library CRUD + YAML import |
 | `campaign_library_items.magic_item_data` | `magicItemData` (inventory.ts), nullable; refinement: `chargesCurrent <= chargesMax` — same shape as `inventory_items.magic_item_data` | REST library CRUD + YAML import |
+| `campaign_library_items.enchantments` | `enchantmentRef[]` (inventory.ts), max 50, defaults to `[]` — same shape as `inventory_items.enchantments`; carried onto inventory copies via the InventoryPanel library pick | REST library CRUD + YAML import (`libraryItemCreate`) |
 | `notifications.payload` | Per-type: `campaignInvitationNotificationPayload` (notification.ts) for `type='campaign_invitation'` | Emit site (`invitations.ts` parses before insert); consume site (`NotificationsBell` `safeParse`s) |
 | `entity_history.old_row` / `new_row` | *Intentionally schemaless* — raw `to_jsonb(OLD/NEW)` row snapshots written by DB triggers | Read-only; exposed as `z.record(z.unknown())` in `historyEventOut` and only with `?detail=1` + full access (see history-tracking.md) |
 

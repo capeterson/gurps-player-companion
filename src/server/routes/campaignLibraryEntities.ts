@@ -376,6 +376,7 @@ function itemEditableFields(body: LibraryItemCreate) {
     weightReductionPercent: body.weightReductionPercent ?? 0,
     powerstoneData: body.powerstoneData ?? null,
     magicItemData: body.magicItemData ?? null,
+    enchantments: body.enchantments ?? [],
   };
 }
 
@@ -420,6 +421,7 @@ export const itemEntity: LibraryEntityConfig<
       weightReductionPercent: row.weightReductionPercent,
       powerstoneData: row.powerstoneData ?? null,
       magicItemData: row.magicItemData ?? null,
+      enchantments: row.enchantments ?? [],
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
@@ -447,6 +449,7 @@ export const itemEntity: LibraryEntityConfig<
       weightReductionPercent: row.weightReductionPercent,
       powerstoneData: row.powerstoneData ?? undefined,
       magicItemData: row.magicItemData ?? undefined,
+      enchantments: row.enchantments ?? [],
     }),
 };
 

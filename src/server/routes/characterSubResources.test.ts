@@ -302,6 +302,52 @@ describe('inventory sub-resource CRUD', () => {
     expect(body.item.cost).toBe(99.99);
   });
 
+  it('POST/PATCH round-trip the enchantments list; explicit [] clears it', async () => {
+    const { accessToken } = await registerUser('inv-enchant');
+    const character = await createCharacter(accessToken);
+    const enchantments = [
+      { spellName: 'Fortify', spellLevel: 18, category: 'Fortify +3' },
+      { spellName: 'Deflect', category: 'Deflect +2' },
+    ];
+    const createRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Phoenix Cloak', enchantments }),
+    });
+    expect(createRes.status).toBe(201);
+    const { item } = (await createRes.json()) as { item: Record<string, unknown> };
+    expect(item.enchantments).toEqual(enchantments);
+
+    // A patch that omits the field preserves the list.
+    const touchRes = await app.request(`/api/v1/characters/${character.id}/inventory/${item.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ notes: 'woven phoenix feathers' }),
+    });
+    expect(touchRes.status).toBe(200);
+    const touched = (await touchRes.json()) as { item: Record<string, unknown> };
+    expect(touched.item.enchantments).toEqual(enchantments);
+    expect(touched.item.notes).toBe('woven phoenix feathers');
+
+    // An explicit empty array clears it.
+    const clearRes = await app.request(`/api/v1/characters/${character.id}/inventory/${item.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ enchantments: [] }),
+    });
+    expect(clearRes.status).toBe(200);
+    const cleared = (await clearRes.json()) as { item: Record<string, unknown> };
+    expect(cleared.item.enchantments).toEqual([]);
+
+    // Over-length / blank-name entries are rejected (422).
+    const badRes = await app.request(`/api/v1/characters/${character.id}/inventory/${item.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ enchantments: [{ spellName: '' }] }),
+    });
+    expect(badRes.status).toBe(422);
+  });
+
   it('parentId must belong to the same character — rejects a foreign parent (400)', async () => {
     const a = await registerUser('inv-parent-a');
     const b = await registerUser('inv-parent-b');

@@ -35,6 +35,7 @@ import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { CombatantConditionsField, EffectDuration } from '../../shared/schemas/encounter.ts';
 import type {
   ArmorData,
+  EnchantmentRef,
   MagicItemData,
   PowerstoneData,
   WeaponData,
@@ -551,6 +552,9 @@ export const inventoryItems = pgTable(
     /** Magic-item metadata (linked spell, charges, mode), validated by
      * `magicItemData` (src/shared/schemas/inventory.ts).  Null = mundane item. */
     magicItemData: jsonb('magic_item_data').$type<MagicItemData>(),
+    /** Enchantment list (multi-enchant items), validated by `enchantmentRef`
+     * (src/shared/schemas/inventory.ts).  Empty = unenchanted. */
+    enchantments: jsonb('enchantments').$type<EnchantmentRef[]>().notNull().default([]),
     libraryItemId: uuid('library_item_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -984,6 +988,9 @@ export const campaignLibraryItems = pgTable(
     powerstoneData: jsonb('powerstone_data').$type<PowerstoneData>(),
     /** Validated by `magicItemData` (src/shared/schemas/inventory.ts).  Null = not a magic item. */
     magicItemData: jsonb('magic_item_data').$type<MagicItemData>(),
+    /** Enchantment list carried onto inventory copies, validated by
+     * `enchantmentRef` (src/shared/schemas/inventory.ts).  Empty = unenchanted. */
+    enchantments: jsonb('enchantments').$type<EnchantmentRef[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),

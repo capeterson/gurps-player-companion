@@ -39,6 +39,7 @@ function makeItem(overrides: Partial<InventoryItemOut> = {}): InventoryItemOut {
     weaponData: null,
     powerstoneData: null,
     magicItemData: null,
+    enchantments: [],
     libraryItemId: null,
     effectiveWeightLbs: 3,
     createdAt: '2026-01-01T00:00:00Z',
@@ -128,5 +129,80 @@ describe('ItemEditDialog facet chips', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     const patch = onSubmit.mock.calls[0]?.[0];
     expect(patch.weaponData).toMatchObject({ skill: 'Broadsword' });
+  });
+});
+
+describe('ItemEditDialog enchantments', () => {
+  it('adds an enchantment and includes it in the submitted patch', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog
+        open
+        item={makeItem({ name: 'Phoenix Cloak' })}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add enchantment' }));
+    fireEvent.change(screen.getByLabelText('Enchantment 1 spell'), {
+      target: { value: 'Fortify' },
+    });
+    fireEvent.change(screen.getByLabelText('Enchantment 1 category'), {
+      target: { value: 'Fortify +3' },
+    });
+    fireEvent.change(screen.getByLabelText('Enchantment 1 level'), {
+      target: { value: '18' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const patch = onSubmit.mock.calls[0]?.[0];
+    expect(patch.enchantments).toEqual([
+      { spellName: 'Fortify', spellLevel: 18, category: 'Fortify +3' },
+    ]);
+  });
+
+  it('prefills enchantments from the loaded item and lets the user remove one', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog
+        open
+        item={makeItem({
+          enchantments: [
+            { spellName: 'Fortify', spellLevel: 18, category: 'Fortify +3' },
+            { spellName: 'Deflect', category: 'Deflect +2' },
+          ],
+        })}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText('Enchantment 1 spell')).toHaveValue('Fortify');
+    expect(screen.getByLabelText('Enchantment 2 spell')).toHaveValue('Deflect');
+
+    fireEvent.click(screen.getByLabelText('Remove enchantment 1'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    const patch = onSubmit.mock.calls[0]?.[0];
+    expect(patch.enchantments).toEqual([{ spellName: 'Deflect', category: 'Deflect +2' }]);
+  });
+
+  it('blocks submit when an enchantment row is missing its spell name', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog open item={makeItem()} onSubmit={onSubmit} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add enchantment' }));
+    // Leave the spell blank; only the category is filled.
+    fireEvent.change(screen.getByLabelText('Enchantment 1 category'), {
+      target: { value: 'Fortify +3' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('Enchantment 1 needs a spell name')).toBeInTheDocument();
   });
 });

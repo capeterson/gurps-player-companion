@@ -365,7 +365,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 4');
+    expect(first).toContain('version: 5');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

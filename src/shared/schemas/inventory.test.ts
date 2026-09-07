@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { magicItemData, powerstoneData, weaponData } from './inventory.ts';
+import {
+  enchantmentRef,
+  inventoryItemCreate,
+  magicItemData,
+  powerstoneData,
+  weaponData,
+} from './inventory.ts';
 
 describe('powerstoneData', () => {
   it('accepts a valid stone', () => {
@@ -105,5 +111,52 @@ describe('weaponData', () => {
 
   it('rejects an alternate mode missing its name', () => {
     expect(() => weaponData.parse({ alternateModes: [{ damage: '1d' }] })).toThrow();
+  });
+});
+
+describe('enchantmentRef', () => {
+  it('accepts a bare enchantment (spell name only)', () => {
+    expect(enchantmentRef.parse({ spellName: 'Cornucopia' })).toEqual({ spellName: 'Cornucopia' });
+  });
+
+  it('round-trips a fully-populated enchantment', () => {
+    const parsed = enchantmentRef.parse({
+      spellName: 'Fortify',
+      spellLevel: 18,
+      category: 'Fortify +3',
+      notes: 'Stacks with the shield Deflect +2',
+    });
+    expect(parsed).toEqual({
+      spellName: 'Fortify',
+      spellLevel: 18,
+      category: 'Fortify +3',
+      notes: 'Stacks with the shield Deflect +2',
+    });
+  });
+
+  it('rejects a blank spell name, a 41-level, and a non-integer level', () => {
+    expect(() => enchantmentRef.parse({ spellName: '' })).toThrow();
+    expect(() => enchantmentRef.parse({ spellName: 'X', spellLevel: 41 })).toThrow();
+    expect(() => enchantmentRef.parse({ spellName: 'X', spellLevel: 1.5 })).toThrow();
+  });
+});
+
+describe('inventoryItemCreate.enchantments', () => {
+  it('defaults to [] so pre-existing creates parse unchanged', () => {
+    const parsed = inventoryItemCreate.parse({ name: 'Cloak' });
+    expect(parsed.enchantments).toEqual([]);
+  });
+
+  it('carries multiple enchantments and enforces the 50 cap', () => {
+    const enchantments = Array.from({ length: 50 }, (_, i) => ({ spellName: `E${i}` }));
+    expect(inventoryItemCreate.parse({ name: 'Cloak', enchantments }).enchantments).toHaveLength(
+      50,
+    );
+    expect(() =>
+      inventoryItemCreate.parse({
+        name: 'Cloak',
+        enchantments: [...enchantments, { spellName: 'One too many' }],
+      }),
+    ).toThrow();
   });
 });

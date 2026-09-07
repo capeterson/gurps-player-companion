@@ -158,7 +158,12 @@ on any sheet the viewer can edit — their own — it always shows).
   Recoil — and **alternate attack modes**: extra damage/reach/parry
   rows beyond the primary line, e.g. swing + thrust + thrown) is
   editable from the item edit dialog, and copied from
-  campaign library items on the inventory add form. Encumbered Move
+  campaign library items on the inventory add form. Items can also
+  carry an **enchantments** list (B262 multi-enchant economy — e.g.
+  "Fortify +3" plus "Deflect +2" on one item), edited from the item
+  edit dialog and copied from library templates; it is non-mechanical
+  display metadata (nothing consumes it in combat math yet).
+  Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
 - **Combat tab (live-gameplay surface)**. The first tab on the sheet

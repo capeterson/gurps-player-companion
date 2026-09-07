@@ -24,10 +24,10 @@ import {
  * `effects` arrays to traits/skills (see schemas/effects.ts).  v3 added
  * container/powerstone/magic-item fields on items and `manaLevel` in the
  * campaign block.  v4 added the `languages`, `techniques`, and `styles`
- * library sections.  The parser still accepts v1-v3 docs (new fields
- * default/absent).
+ * library sections.  v5 added the `enchantments` list on items.  The
+ * parser still accepts v1-v4 docs (new fields default/absent).
  */
-export const LIBRARY_YAML_VERSION = 4 as const;
+export const LIBRARY_YAML_VERSION = 5 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {

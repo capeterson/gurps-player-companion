@@ -203,6 +203,7 @@ export function inventoryInsertValues(
     weaponData: body.weaponData ?? null,
     powerstoneData: body.powerstoneData ?? null,
     magicItemData: body.magicItemData ?? null,
+    enchantments: body.enchantments ?? [],
     libraryItemId: body.libraryItemId ?? null,
   };
 }
