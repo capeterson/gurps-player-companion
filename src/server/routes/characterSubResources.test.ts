@@ -956,3 +956,133 @@ describe('technique sub-resource CRUD', () => {
     expect(techEvents.some((e) => e.summary === 'Feint 1 → 3 pts')).toBe(true);
   });
 });
+
+// ===================== POINT LEDGER =====================
+
+describe('point ledger completeness', () => {
+  it('spells get their own bucket instead of inflating skills', async () => {
+    const { accessToken } = await registerUser('ledger-spells');
+    const character = await createCharacter(accessToken);
+    await addSkill(accessToken, character.id as string, {
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 4,
+    });
+    const spellRes = await app.request(`/api/v1/characters/${character.id}/spells`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Ignite Fire', points: 6 }),
+    });
+    expect(spellRes.status).toBe(201);
+    const body = (await spellRes.json()) as { character: { points: Record<string, number> } };
+    expect(body.character.points.skills).toBe(4);
+    expect(body.character.points.spells).toBe(6);
+    expect(body.character.points.total).toBe(10);
+  });
+
+  it('a legacy kind="language" trait bills to the languages bucket, not advantages', async () => {
+    const { accessToken } = await registerUser('ledger-lang-trait');
+    const character = await createCharacter(accessToken);
+    const res = await app.request(`/api/v1/characters/${character.id}/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ kind: 'language', name: 'Latin', points: 3 }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { character: { points: Record<string, number> } };
+    expect(body.character.points.languages).toBe(3);
+    expect(body.character.points.advantages).toBe(0);
+    expect(body.character.points.total).toBe(3);
+  });
+
+  it('cultural_familiarity stays an advantage (no first-class entity yet)', async () => {
+    const { accessToken } = await registerUser('ledger-cultfam');
+    const character = await createCharacter(accessToken);
+    const res = await app.request(`/api/v1/characters/${character.id}/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ kind: 'cultural_familiarity', name: 'Roman', points: 1 }),
+    });
+    const body = (await res.json()) as { character: { points: Record<string, number> } };
+    expect(body.character.points.advantages).toBe(1);
+    expect(body.character.points.languages).toBe(0);
+    expect(body.character.points.total).toBe(1);
+  });
+
+  it('unspent is the campaign point target minus every bucket', async () => {
+    const owner = await registerUser('ledger-unspent');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: `Camp ${Date.now()}-${Math.random()}`, pointTarget: 200 }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    // ST 12 = 20 pts of attributes.
+    const character = await createCharacter(owner.accessToken, {
+      campaignId: campaign.id,
+      st: 12,
+    });
+    const post = (path: string, body: Record<string, unknown>) =>
+      app.request(`/api/v1/characters/${character.id}/${path}`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify(body),
+      });
+    await post('traits', { kind: 'advantage', name: 'Combat Reflexes', points: 15 });
+    await post('traits', { kind: 'disadvantage', name: 'Bad Temper', points: -10 });
+    await post('skills', { name: 'Broadsword', attribute: 'DX', difficulty: 'A', points: 8 });
+    await post('spells', { name: 'Ignite Fire', points: 4 });
+    await post('languages', { name: 'Latin', spokenFluency: 'accented', points: 2 });
+    await post('techniques', { name: 'Feint', defaultSkillName: 'Broadsword', points: 3 });
+
+    const detailRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(owner.accessToken),
+    });
+    const detail = (await detailRes.json()) as { points: Record<string, number> };
+    expect(detail.points).toMatchObject({
+      attributes: 20,
+      secondary: 0,
+      advantages: 15,
+      disadvantages: -10,
+      quirks: 0,
+      languages: 2,
+      skills: 8,
+      spells: 4,
+      techniques: 3,
+    });
+    expect(detail.points.total).toBe(42);
+    expect(detail.points.unspent).toBe(158);
+  });
+
+  it('unspent goes negative when the character is over the campaign target', async () => {
+    const owner = await registerUser('ledger-over');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: `Camp ${Date.now()}-${Math.random()}`, pointTarget: 10 }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    const character = await createCharacter(owner.accessToken, {
+      campaignId: campaign.id,
+      st: 12,
+    });
+    const detailRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(owner.accessToken),
+    });
+    const detail = (await detailRes.json()) as { points: Record<string, number> };
+    expect(detail.points.total).toBe(20);
+    expect(detail.points.unspent).toBe(-10);
+  });
+
+  it('unspent is 0 for a campaignless character (nothing to be unspent against)', async () => {
+    const { accessToken } = await registerUser('ledger-nocampaign');
+    const character = await createCharacter(accessToken, { st: 12 });
+    const detailRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    const detail = (await detailRes.json()) as { points: Record<string, number> };
+    expect(detail.points.total).toBe(20);
+    expect(detail.points.unspent).toBe(0);
+  });
+});

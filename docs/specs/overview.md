@@ -106,6 +106,16 @@ on any sheet the viewer can edit — their own — it always shows).
   tappable roll target: it opens the same roll sheet used everywhere
   else on the character (dispatch only, so read-only viewers can roll
   too); null-level rows stay plain text.
+- **Point ledger** with one bucket per source: attributes, secondary
+  characteristics, advantages, disadvantages, quirks, languages, skills,
+  spells, and techniques, plus a derived `unspent`
+  (`campaign.pointTarget - total`; 0 when the campaign sets no target).
+  Spells used to be folded into the skills bucket and languages into
+  advantages; both now total the way a printed sheet does. Legacy
+  `kind='language'` trait rows still bill to the languages bucket
+  (migration 0028 moved the existing ones into `character_languages`);
+  `cultural_familiarity` stays an advantage until it gets an entity of
+  its own.
 - **Techniques** (`character_techniques`, sync-backed): Martial Arts
   p. 87 techniques bought up from a named default skill. Difficulty is
   Average (+1 per point) or Hard (the first point buys nothing, then +1

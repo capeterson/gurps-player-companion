@@ -250,12 +250,62 @@ describe('computePointBreakdown', () => {
     );
     expect(result.attributes).toBe(20);
     expect(result.secondary).toBe(2);
-    expect(result.advantages).toBe(29); // 25 + 1 + 3
+    // 25 + 1 (perk). The kind='language' trait is billed to `languages`,
+    // NOT to advantages -- see LANGUAGE_TRAIT_KINDS.
+    expect(result.advantages).toBe(26);
     expect(result.disadvantages).toBe(-15);
     expect(result.quirks).toBe(-2);
     expect(result.skills).toBe(7);
-    expect(result.languages).toBe(0);
-    expect(result.total).toBe(20 + 2 + 29 - 15 - 2 + 7);
+    expect(result.languages).toBe(3);
+    expect(result.total).toBe(20 + 2 + 26 - 15 - 2 + 3 + 7);
+  });
+
+  it('a legacy kind="language" trait bills to the languages bucket alongside real language rows', () => {
+    const result = computePointBreakdown(
+      baseAttrs,
+      [
+        { kind: 'language', points: 3 },
+        { kind: 'cultural_familiarity', points: 1 },
+      ],
+      [],
+      [{ points: 2 }],
+    );
+    expect(result.languages).toBe(5);
+    // cultural_familiarity has no first-class entity yet, so it stays an
+    // advantage rather than vanishing from the ledger.
+    expect(result.advantages).toBe(1);
+    expect(result.total).toBe(6);
+  });
+
+  it('spells get their own bucket instead of being folded into skills', () => {
+    const result = computePointBreakdown(baseAttrs, [], [{ points: 4 }], [], [], [{ points: 6 }]);
+    expect(result.skills).toBe(4);
+    expect(result.spells).toBe(6);
+    expect(result.total).toBe(10);
+  });
+
+  it('unspent is the campaign point target minus the total', () => {
+    const result = computePointBreakdown(
+      baseAttrs,
+      [],
+      [{ points: 40 }],
+      [{ points: 5 }],
+      [{ points: 2 }],
+      [{ points: 2 }],
+      100,
+    );
+    expect(result.total).toBe(49);
+    expect(result.unspent).toBe(51);
+  });
+
+  it('unspent goes negative when the character is over budget', () => {
+    const result = computePointBreakdown(baseAttrs, [], [{ points: 120 }], [], [], [], 100);
+    expect(result.unspent).toBe(-20);
+  });
+
+  it('unspent is 0 when the campaign sets no point target', () => {
+    const result = computePointBreakdown(baseAttrs, [], [{ points: 40 }]);
+    expect(result.unspent).toBe(0);
   });
 
   it('sums character_languages rows into their own bucket', () => {

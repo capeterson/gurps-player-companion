@@ -16110,10 +16110,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -16125,8 +16131,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -17577,10 +17585,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -17592,8 +17606,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -19292,10 +19308,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -19307,8 +19329,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -20828,10 +20852,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -20843,8 +20873,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -22528,10 +22560,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -22543,8 +22581,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -24239,10 +24279,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -24254,8 +24300,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -25718,10 +25766,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -25733,8 +25787,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -27354,10 +27410,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -27369,8 +27431,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -29000,10 +29064,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -29015,8 +29085,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -30479,10 +30551,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -30494,8 +30572,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -32134,10 +32214,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -32149,8 +32235,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -33801,10 +33889,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -33816,8 +33910,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -35280,10 +35376,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -35295,8 +35397,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -36880,10 +36984,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -36895,8 +37005,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -38492,10 +38604,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -38507,8 +38625,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -39971,10 +40091,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -39986,8 +40112,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -41578,10 +41706,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -41593,8 +41727,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -43196,10 +43332,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -43211,8 +43353,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -44675,10 +44819,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -44690,8 +44840,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -46745,10 +46897,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -46760,8 +46918,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -48827,10 +48987,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -48842,8 +49008,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -50306,10 +50474,16 @@
                         "skills": {
                           "type": "integer"
                         },
+                        "spells": {
+                          "type": "integer"
+                        },
                         "techniques": {
                           "type": "integer"
                         },
                         "total": {
+                          "type": "integer"
+                        },
+                        "unspent": {
                           "type": "integer"
                         }
                       },
@@ -50321,8 +50495,10 @@
                         "quirks",
                         "languages",
                         "skills",
+                        "spells",
                         "techniques",
-                        "total"
+                        "total",
+                        "unspent"
                       ]
                     },
                     "encumbrance": {
@@ -51886,10 +52062,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -51901,8 +52083,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -53378,10 +53562,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -53393,8 +53583,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {
@@ -54868,10 +55060,16 @@
                             "skills": {
                               "type": "integer"
                             },
+                            "spells": {
+                              "type": "integer"
+                            },
                             "techniques": {
                               "type": "integer"
                             },
                             "total": {
+                              "type": "integer"
+                            },
+                            "unspent": {
                               "type": "integer"
                             }
                           },
@@ -54883,8 +55081,10 @@
                             "quirks",
                             "languages",
                             "skills",
+                            "spells",
                             "techniques",
-                            "total"
+                            "total",
+                            "unspent"
                           ]
                         },
                         "encumbrance": {

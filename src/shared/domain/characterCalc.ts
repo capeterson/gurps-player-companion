@@ -21,6 +21,7 @@ import { damageForSt, formatDamageDice } from '../constants/damage.ts';
 import {
   ADVANTAGE_KINDS,
   DISADVANTAGE_KINDS,
+  LANGUAGE_TRAIT_KINDS,
   QUIRK_KINDS,
   type TraitKind,
 } from '../constants/traits.ts';
@@ -93,6 +94,11 @@ export interface CharacterLanguageInput {
 
 /** One `character_techniques` row's contribution to the point ledger. */
 export interface CharacterTechniqueInput {
+  readonly points: number;
+}
+
+/** One `character_spells` row's contribution to the point ledger. */
+export interface CharacterSpellInput {
   readonly points: number;
 }
 
@@ -190,12 +196,21 @@ export interface PointBreakdown {
   readonly advantages: number;
   readonly disadvantages: number;
   readonly quirks: number;
-  /** `character_languages` rows — their own bucket, not advantages. */
+  /** `character_languages` rows (plus legacy `kind='language'` traits). */
   readonly languages: number;
   readonly skills: number;
+  /** `character_spells` rows — their own bucket, not lumped with skills. */
+  readonly spells: number;
   /** `character_techniques` rows — bought up from a default skill. */
   readonly techniques: number;
   readonly total: number;
+  /**
+   * `campaign.pointTarget - total`. Positive = points still to spend,
+   * negative = over budget. 0 when the campaign sets no target (or the
+   * character is campaignless) — there is nothing to be unspent against.
+   * Derived for display; never persisted.
+   */
+  readonly unspent: number;
 }
 
 /**
@@ -228,6 +243,8 @@ export function computePointBreakdown(
   skills: readonly CharacterSkillInput[],
   languages: readonly CharacterLanguageInput[] = [],
   techniques: readonly CharacterTechniqueInput[] = [],
+  spells: readonly CharacterSpellInput[] = [],
+  campaignPointTarget: number | null = null,
 ): PointBreakdown {
   const attributes = computeAttributePoints(attrs);
   const secondary = computeSecondaryPoints(attrs);
@@ -235,15 +252,20 @@ export function computePointBreakdown(
   let advantages = 0;
   let disadvantages = 0;
   let quirks = 0;
+  // Legacy `kind='language'` trait rows bill to the languages bucket, not
+  // advantages -- see LANGUAGE_TRAIT_KINDS.
+  let languageTraitPoints = 0;
   for (const t of traits) {
-    if (ADVANTAGE_KINDS.has(t.kind)) advantages += t.points;
+    if (LANGUAGE_TRAIT_KINDS.has(t.kind)) languageTraitPoints += t.points;
+    else if (ADVANTAGE_KINDS.has(t.kind)) advantages += t.points;
     else if (DISADVANTAGE_KINDS.has(t.kind)) disadvantages += t.points;
     else if (QUIRK_KINDS.has(t.kind)) quirks += t.points;
   }
 
   const skillPoints = skills.reduce((sum, s) => sum + s.points, 0);
-  const languagePoints = languages.reduce((sum, l) => sum + l.points, 0);
+  const languagePoints = languageTraitPoints + languages.reduce((sum, l) => sum + l.points, 0);
   const techniquePoints = techniques.reduce((sum, t) => sum + t.points, 0);
+  const spellPoints = spells.reduce((sum, sp) => sum + sp.points, 0);
 
   const total =
     attributes +
@@ -253,6 +275,7 @@ export function computePointBreakdown(
     quirks +
     languagePoints +
     skillPoints +
+    spellPoints +
     techniquePoints;
 
   return {
@@ -263,7 +286,9 @@ export function computePointBreakdown(
     quirks,
     languages: languagePoints,
     skills: skillPoints,
+    spells: spellPoints,
     techniques: techniquePoints,
     total,
+    unspent: campaignPointTarget === null ? 0 : campaignPointTarget - total,
   };
 }

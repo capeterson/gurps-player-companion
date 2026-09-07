@@ -238,9 +238,13 @@ export const pointBreakdownOut = z.object({
   /** `character_languages` rows, billed to their own bucket (not advantages). */
   languages: z.number().int(),
   skills: z.number().int(),
+  /** `character_spells` rows, totalled separately from skills. */
+  spells: z.number().int(),
   /** `character_techniques` rows, bought up from a default skill. */
   techniques: z.number().int(),
   total: z.number().int(),
+  /** `campaign.pointTarget - total`; 0 when the campaign sets no target. */
+  unspent: z.number().int(),
 });
 
 export const warningOut = z.object({

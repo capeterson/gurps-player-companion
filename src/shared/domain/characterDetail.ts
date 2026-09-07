@@ -28,6 +28,7 @@ import {
   type CharacterAttrs,
   type CharacterLanguageInput,
   type CharacterSkillInput,
+  type CharacterSpellInput,
   type CharacterTechniqueInput,
   type CharacterTraitInput,
   computeDerived,
@@ -482,13 +483,11 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     kind: t.kind,
     points: t.points,
   }));
-  // Spells are mechanically IQ/H skills, so their points roll into the
-  // skill point bucket alongside regular skills.  This keeps the point
-  // ledger consistent with how a paper sheet adds them up.
-  const skillInputs: CharacterSkillInput[] = [
-    ...skills.map((s) => ({ points: s.points })),
-    ...spells.map((s) => ({ points: s.points })),
-  ];
+  const skillInputs: CharacterSkillInput[] = skills.map((s) => ({ points: s.points }));
+  // Spells are mechanically IQ/H skills, but a printed sheet totals them
+  // in their own column and so do we -- they get a `spells` bucket rather
+  // than being folded into `skills` (which is what they used to do).
+  const spellInputs: CharacterSpellInput[] = spells.map((s) => ({ points: s.points }));
   // Use BASE attrs for point cost — trait-granted bonuses are paid for
   // by the trait itself, not double-billed against attribute spend.
   const languageInputs: CharacterLanguageInput[] = languages.map((l) => ({ points: l.points }));
@@ -499,6 +498,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     skillInputs,
     languageInputs,
     techniqueInputs,
+    spellInputs,
+    campaign?.pointTarget ?? null,
   );
 
   const weights = computeWeights(inventory.map(inventoryRowFor));

@@ -1098,10 +1098,20 @@ function PointsPanel({ character }: { character: CharacterDetail }) {
             <span>Techniques</span>
             <span className="num">{p.techniques}</span>
           </li>
+          <li className="flex justify-between">
+            <span>Spells</span>
+            <span className="num">{p.spells}</span>
+          </li>
           <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
             <span>Total</span>
             <span className="num">{p.total}</span>
           </li>
+          {character.campaignId !== null && character.points.unspent !== 0 && (
+            <li className="flex justify-between text-base-content/70">
+              <span>{p.unspent > 0 ? 'Unspent' : 'Over target'}</span>
+              <span className="num">{p.unspent > 0 ? p.unspent : -p.unspent}</span>
+            </li>
+          )}
         </ul>
       )}
     </StatCard>
