@@ -1,13 +1,33 @@
 import { describe, expect, it } from 'bun:test';
-import type { DrByLocationMap } from './armorDr.ts';
+import type { DrByLocationMap, TypedDrTotals } from './armorDr.ts';
 import { applyDamage, parseArmorDivisor, woundingMultiplier } from './injuryCalc.ts';
 
+const EMPTY: TypedDrTotals = {
+  cut: null,
+  imp: null,
+  pi: null,
+  pi_minus: null,
+  pi_plus: null,
+  pi_pp: null,
+  burn: null,
+  corr: null,
+  fat: null,
+  tox: null,
+};
+
+function typedDr(partial: Partial<TypedDrTotals>): TypedDrTotals {
+  return { ...EMPTY, ...partial };
+}
+
 function drMap(
-  entries: Record<string, { dr: number; drCrushing?: number | null }>,
+  entries: Record<
+    string,
+    { dr: number; drCrushing?: number | null; typedDr?: Partial<TypedDrTotals> }
+  >,
 ): DrByLocationMap {
   const map: DrByLocationMap = new Map();
   for (const [loc, v] of Object.entries(entries)) {
-    map.set(loc, { dr: v.dr, drCrushing: v.drCrushing ?? null });
+    map.set(loc, { dr: v.dr, drCrushing: v.drCrushing ?? null, typedDr: typedDr(v.typedDr ?? {}) });
   }
   return map;
 }
@@ -106,6 +126,32 @@ describe('applyDamage', () => {
     const map = drMap({ torso: { dr: 2, drCrushing: 6 } });
     expect(applyDamage(6, 'cr', 'torso', map, null).penetrating).toBe(0);
     expect(applyDamage(6, 'cut', 'torso', map, null).penetrating).toBe(4);
+  });
+
+  it('honors the typed DR override for the matching damage type', () => {
+    const map = drMap({ torso: { dr: 2, typedDr: { cut: 6 } } });
+    // 6 cut vs typed DR 6: fully stopped.
+    expect(applyDamage(6, 'cut', 'torso', map, null).penetrating).toBe(0);
+    expect(applyDamage(6, 'cut', 'torso', map, null).drAtLocation).toBe(6);
+    // Another type falls through to the base dr.
+    expect(applyDamage(6, 'imp', 'torso', map, null).penetrating).toBe(4);
+  });
+
+  it('typed override beats the crushing override for cr-adjacent types', () => {
+    const map = drMap({ torso: { dr: 2, drCrushing: 6, typedDr: { cut: 1 } } });
+    // cut uses typedDr (drCrushing is reserved for cr).
+    expect(applyDamage(6, 'cut', 'torso', map, null).penetrating).toBe(5);
+    // cr still uses the crushing override since typedDr has no cr key.
+    expect(applyDamage(6, 'cr', 'torso', map, null).penetrating).toBe(0);
+  });
+
+  it('applies the armor divisor against typed DR', () => {
+    const map = drMap({ torso: { dr: 10, typedDr: { imp: 8 } } });
+    // DR 8 imp / (2) = 4 effective; 10 imp -> 6 penetrating x2 = 12 injury.
+    const result = applyDamage(10, 'imp', 'torso', map, '2');
+    expect(result.effectiveDr).toBe(4);
+    expect(result.penetrating).toBe(6);
+    expect(result.injury).toBe(12);
   });
 
   it('divides DR by an armor divisor, rounding down', () => {

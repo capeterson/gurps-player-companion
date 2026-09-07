@@ -17,6 +17,7 @@
  */
 
 import type { DrByLocationMap } from './armorDr.ts';
+import { resolveDr } from './armorDr.ts';
 
 const LIMB_LOCATIONS = new Set(['arm_left', 'arm_right', 'leg_left', 'leg_right']);
 const EXTREMITY_LOCATIONS = new Set(['hand_left', 'hand_right', 'foot_left', 'foot_right']);
@@ -116,8 +117,7 @@ export function applyDamage(
   armorDivisor: string | null | undefined,
 ): DamageApplication {
   const entry = drMap.get(location);
-  const t = normalizeType(type);
-  const armorDr = t === 'cr' && entry?.drCrushing != null ? entry.drCrushing : (entry?.dr ?? 0);
+  const armorDr = resolveDr(type, entry);
   // The skull is naturally DR 2 (B400), stacking with any helmet DR.
   const naturalDr = location === 'skull' ? 2 : 0;
   const drAtLocation = armorDr + naturalDr;

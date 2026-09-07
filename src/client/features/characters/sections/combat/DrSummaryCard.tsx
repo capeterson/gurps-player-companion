@@ -3,6 +3,9 @@
  * combat tab's left column. Complements the AttacksCard's hit-location
  * aim presets: the player can see what DR protects each location while
  * choosing where to aim.
+ *
+ * When armor has typed DR overrides (cut/imp/pi/burn/etc.), the summary
+ * shows the base DR and annotates any types that differ from it.
  */
 
 import { useState } from 'react';
@@ -17,6 +20,31 @@ import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
 
 interface DrEntry extends DrByLocation {
   readonly loc: string;
+}
+
+/** Short labels for typed DR overrides that differ from base DR. */
+const TYPED_DR_LABELS: Record<string, string> = {
+  cut: 'cut',
+  imp: 'imp',
+  pi: 'pi',
+  pi_minus: 'pi−',
+  pi_plus: 'pi+',
+  pi_pp: 'pi++',
+  burn: 'burn',
+  corr: 'cor',
+  fat: 'fat',
+  tox: 'tox',
+};
+
+function typedDrAnnotations(entry: DrEntry): string[] {
+  const annotations: string[] = [];
+  for (const [key, label] of Object.entries(TYPED_DR_LABELS)) {
+    const val = entry.typedDr[key as keyof typeof entry.typedDr];
+    if (val != null && val !== entry.dr) {
+      annotations.push(`${val} vs ${label}`);
+    }
+  }
+  return annotations;
 }
 
 function capitalize(s: string): string {
@@ -102,13 +130,28 @@ export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryC
               {entry.drCrushing != null && entry.drCrushing !== entry.dr && (
                 <span className="text-base-content/50 text-xs ml-1">{entry.drCrushing} vs cr</span>
               )}
+              {typedDrAnnotations(entry).map((a) => (
+                <span key={a} className="text-base-content/50 text-xs ml-1">
+                  {a}
+                </span>
+              ))}
             </span>
           </li>
         ))}
         {custom.map((entry) => (
           <li key={entry.loc} className="flex items-baseline justify-between gap-2">
             <span className="text-base-content/80">{locationLabel(entry.loc)}</span>
-            <span className="num text-base-content">{entry.dr}</span>
+            <span className="num text-base-content">
+              {entry.dr}
+              {entry.drCrushing != null && entry.drCrushing !== entry.dr && (
+                <span className="text-base-content/50 text-xs ml-1">{entry.drCrushing} vs cr</span>
+              )}
+              {typedDrAnnotations(entry).map((a) => (
+                <span key={a} className="text-base-content/50 text-xs ml-1">
+                  {a}
+                </span>
+              ))}
+            </span>
           </li>
         ))}
       </ul>

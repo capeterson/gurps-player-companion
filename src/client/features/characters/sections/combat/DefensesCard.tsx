@@ -1,3 +1,4 @@
+import { sumArmorDb } from '../../../../../shared/domain/armorDr.ts';
 import {
   blockFromSkill,
   effectiveDodge,
@@ -30,11 +31,21 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   const equippedItems = character.inventory.filter((i) => i.equipped);
   const weapons = equippedItems.filter((i) => i.weaponData != null);
 
-  // The equipped shield (weaponData.db != null) adds its Defense Bonus
-  // to Dodge, every Parry, and Block (B287).
+  // Shield DB (from weaponData.db) and armor DB (from armor.db) stack
+  // and add to Dodge, every Parry, and Block (B287).
   const shield = pickShield(equippedItems);
-  const db = shield?.db ?? 0;
-  const dbCaption = shield && db > 0 ? ` + ${db} DB (${shield.name})` : '';
+  const shieldDb = shield?.db ?? 0;
+  const armorDb = sumArmorDb(character.inventory);
+  const db = shieldDb + armorDb;
+
+  const shieldDbCaption = shield && shieldDb > 0 ? `+ ${shieldDb} DB (${shield.name})` : '';
+  const armorDbCaption = armorDb > 0 ? `+ ${armorDb} armor DB` : '';
+  const dbCaption =
+    shieldDbCaption && armorDbCaption
+      ? ` ${shieldDbCaption} + ${armorDbCaption}`
+      : shieldDbCaption || armorDbCaption
+        ? ` ${shieldDbCaption}${armorDbCaption}`
+        : '';
 
   const dodge = effectiveDodge(character.derived.dodge, character.encumbrance.dodgePenalty) + db;
   const dodgeParts: string[] = [];
@@ -43,7 +54,8 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       `${character.derived.dodge} base − ${-character.encumbrance.dodgePenalty} ${character.encumbrance.label} encumbrance`,
     );
   }
-  if (db > 0 && shield) dodgeParts.push(`+ ${db} DB (${shield.name})`);
+  if (shield && shieldDb > 0) dodgeParts.push(`+ ${shieldDb} DB (${shield.name})`);
+  if (armorDb > 0) dodgeParts.push(`+ ${armorDb} armor DB`);
   const dodgeCaption = dodgeParts.length > 0 ? dodgeParts.join(' ') : undefined;
 
   const e = character.encumbrance;

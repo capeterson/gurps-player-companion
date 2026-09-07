@@ -5625,6 +5625,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -5636,6 +5702,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -8739,6 +8811,72 @@
                         "minimum": 0,
                         "maximum": 1000
                       },
+                      "typedDr": {
+                        "type": "object",
+                        "properties": {
+                          "cut": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "imp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_minus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_plus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_pp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "burn": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "corr": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "fat": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "tox": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          }
+                        },
+                        "default": {}
+                      },
                       "flexible": {
                         "type": "boolean",
                         "default": false
@@ -8750,6 +8888,12 @@
                       "backOnly": {
                         "type": "boolean",
                         "default": false
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
                       },
                       "notes": {
                         "type": "string",
@@ -9055,6 +9199,72 @@
                           "minimum": 0,
                           "maximum": 1000
                         },
+                        "typedDr": {
+                          "type": "object",
+                          "properties": {
+                            "cut": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "imp": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi_minus": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi_plus": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi_pp": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "burn": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "corr": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "fat": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "tox": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            }
+                          },
+                          "default": {}
+                        },
                         "flexible": {
                           "type": "boolean",
                           "default": false
@@ -9066,6 +9276,12 @@
                         "backOnly": {
                           "type": "boolean",
                           "default": false
+                        },
+                        "db": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 4
                         },
                         "notes": {
                           "type": "string",
@@ -9444,6 +9660,72 @@
                         "minimum": 0,
                         "maximum": 1000
                       },
+                      "typedDr": {
+                        "type": "object",
+                        "properties": {
+                          "cut": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "imp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_minus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_plus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_pp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "burn": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "corr": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "fat": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "tox": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          }
+                        },
+                        "default": {}
+                      },
                       "flexible": {
                         "type": "boolean",
                         "default": false
@@ -9455,6 +9737,12 @@
                       "backOnly": {
                         "type": "boolean",
                         "default": false
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
                       },
                       "notes": {
                         "type": "string",
@@ -9757,6 +10045,72 @@
                           "minimum": 0,
                           "maximum": 1000
                         },
+                        "typedDr": {
+                          "type": "object",
+                          "properties": {
+                            "cut": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "imp": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi_minus": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi_plus": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "pi_pp": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "burn": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "corr": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "fat": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            },
+                            "tox": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 1000
+                            }
+                          },
+                          "default": {}
+                        },
                         "flexible": {
                           "type": "boolean",
                           "default": false
@@ -9768,6 +10122,12 @@
                         "backOnly": {
                           "type": "boolean",
                           "default": false
+                        },
+                        "db": {
+                          "type": "integer",
+                          "nullable": true,
+                          "minimum": 0,
+                          "maximum": 4
                         },
                         "notes": {
                           "type": "string",
@@ -17008,6 +17368,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -17019,6 +17445,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -18520,6 +18952,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -18531,6 +19029,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -20280,6 +20784,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -20291,6 +20861,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -21861,6 +22437,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -21872,6 +22514,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -23606,6 +24254,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -23617,6 +24331,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -25362,6 +26082,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -25373,6 +26159,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -26886,6 +27678,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -26897,6 +27755,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -28567,6 +29431,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -28578,6 +29508,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -30258,6 +31194,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -30269,6 +31271,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -31782,6 +32790,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -31793,6 +32867,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -33482,6 +34562,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -33493,6 +34639,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -35194,6 +36346,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -35205,6 +36423,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -36718,6 +37942,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -36729,6 +38019,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -38363,6 +39659,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -38374,6 +39736,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -40020,6 +41388,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -40031,6 +41465,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -41544,6 +42984,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -41555,6 +43061,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -43196,6 +44708,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -43207,6 +44785,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -44859,6 +46443,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -44870,6 +46520,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -46383,6 +48039,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -46394,6 +48116,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -46948,6 +48676,72 @@
                         "minimum": 0,
                         "maximum": 1000
                       },
+                      "typedDr": {
+                        "type": "object",
+                        "properties": {
+                          "cut": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "imp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_minus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_plus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_pp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "burn": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "corr": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "fat": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "tox": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          }
+                        },
+                        "default": {}
+                      },
                       "flexible": {
                         "type": "boolean",
                         "default": false
@@ -46959,6 +48753,12 @@
                       "backOnly": {
                         "type": "boolean",
                         "default": false
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
                       },
                       "notes": {
                         "type": "string",
@@ -47276,6 +49076,72 @@
                               "minimum": 0,
                               "maximum": 1000
                             },
+                            "typedDr": {
+                              "type": "object",
+                              "properties": {
+                                "cut": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "imp": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi_minus": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi_plus": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi_pp": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "burn": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "corr": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "fat": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "tox": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                }
+                              },
+                              "default": {}
+                            },
                             "flexible": {
                               "type": "boolean",
                               "default": false
@@ -47287,6 +49153,12 @@
                             "backOnly": {
                               "type": "boolean",
                               "default": false
+                            },
+                            "db": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 4
                             },
                             "notes": {
                               "type": "string",
@@ -48572,6 +50444,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -48583,6 +50521,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -49152,6 +51096,72 @@
                         "minimum": 0,
                         "maximum": 1000
                       },
+                      "typedDr": {
+                        "type": "object",
+                        "properties": {
+                          "cut": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "imp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_minus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_plus": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "pi_pp": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "burn": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "corr": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "fat": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          },
+                          "tox": {
+                            "type": "integer",
+                            "nullable": true,
+                            "minimum": 0,
+                            "maximum": 1000
+                          }
+                        },
+                        "default": {}
+                      },
                       "flexible": {
                         "type": "boolean",
                         "default": false
@@ -49163,6 +51173,12 @@
                       "backOnly": {
                         "type": "boolean",
                         "default": false
+                      },
+                      "db": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 4
                       },
                       "notes": {
                         "type": "string",
@@ -49477,6 +51493,72 @@
                               "minimum": 0,
                               "maximum": 1000
                             },
+                            "typedDr": {
+                              "type": "object",
+                              "properties": {
+                                "cut": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "imp": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi_minus": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi_plus": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "pi_pp": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "burn": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "corr": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "fat": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                },
+                                "tox": {
+                                  "type": "integer",
+                                  "nullable": true,
+                                  "minimum": 0,
+                                  "maximum": 1000
+                                }
+                              },
+                              "default": {}
+                            },
                             "flexible": {
                               "type": "boolean",
                               "default": false
@@ -49488,6 +51570,12 @@
                             "backOnly": {
                               "type": "boolean",
                               "default": false
+                            },
+                            "db": {
+                              "type": "integer",
+                              "nullable": true,
+                              "minimum": 0,
+                              "maximum": 4
                             },
                             "notes": {
                               "type": "string",
@@ -50773,6 +52861,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -50784,6 +52938,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -52297,6 +54457,72 @@
                                 "minimum": 0,
                                 "maximum": 1000
                               },
+                              "typedDr": {
+                                "type": "object",
+                                "properties": {
+                                  "cut": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "imp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_minus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_plus": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "pi_pp": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "burn": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "corr": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "fat": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  },
+                                  "tox": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 1000
+                                  }
+                                },
+                                "default": {}
+                              },
                               "flexible": {
                                 "type": "boolean",
                                 "default": false
@@ -52308,6 +54534,12 @@
                               "backOnly": {
                                 "type": "boolean",
                                 "default": false
+                              },
+                              "db": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0,
+                                "maximum": 4
                               },
                               "notes": {
                                 "type": "string",
@@ -53922,6 +56154,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -53933,6 +56231,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -55459,6 +57763,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -55470,6 +57840,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",
@@ -56994,6 +59370,72 @@
                                     "minimum": 0,
                                     "maximum": 1000
                                   },
+                                  "typedDr": {
+                                    "type": "object",
+                                    "properties": {
+                                      "cut": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "imp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_minus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_plus": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "pi_pp": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "burn": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "corr": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "fat": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      },
+                                      "tox": {
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 0,
+                                        "maximum": 1000
+                                      }
+                                    },
+                                    "default": {}
+                                  },
                                   "flexible": {
                                     "type": "boolean",
                                     "default": false
@@ -57005,6 +59447,12 @@
                                   "backOnly": {
                                     "type": "boolean",
                                     "default": false
+                                  },
+                                  "db": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "minimum": 0,
+                                    "maximum": 4
                                   },
                                   "notes": {
                                     "type": "string",

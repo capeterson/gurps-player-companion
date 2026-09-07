@@ -183,15 +183,19 @@ on any sheet the viewer can edit — their own — it always shows).
     into one outbox patch and drop the first tap.
   - **Armor DR** — aggregates equipped armor DR per hit location
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
-    hit-location aim presets. Crushing-specific DR is shown where it
-    differs from the default. An **"Incoming damage…"** button opens a
-    dialog (`IncomingDamageDialog.tsx`) that resolves a hit against the
-    character's own DR: basic damage − DR(location, honoring an armor
-    divisor and the skull's natural DR 2, B400) → penetrating ×
-    wounding multiplier (B379/B398-400) = injury
-    (`src/shared/domain/injuryCalc.ts`), applied to HP through the same
-    shared `usePoolBumpers` instance as the rest of the tab. Crippling
-    is surfaced as a hint only, never auto-applied.
+    hit-location aim presets. Per-damage-type DR overrides
+    (`armorData.typedDr` — e.g. a hauberk with 6 vs cut, 4 vs imp) and
+    the legacy crushing-specific DR are shown where they differ from the
+    default. An **"Incoming damage…"** button opens a dialog
+    (`IncomingDamageDialog.tsx`) that resolves a hit against the
+    character's own DR: basic damage − DR(location) with the resolver
+    honoring the incoming type's typed override first, falling back to
+    the crushing override (`drCrushing`, for `cr`) then the default `dr`
+    (B378), dividing by an armor divisor and adding the skull's natural
+    DR 2 (B400) → penetrating × wounding multiplier (B379/B398-400) =
+    injury (`src/shared/domain/injuryCalc.ts`), applied to HP through
+    the same shared `usePoolBumpers` instance as the rest of the tab.
+    Crippling is surfaced as a hint only, never auto-applied.
   - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
     chip shows its blurb; tapping it again clears to no maneuver), plus
     a "Custom…" free-text fallback using the same `useDraftField`
@@ -210,7 +214,10 @@ on any sheet the viewer can edit — their own — it always shows).
     equipped shield — an item whose `weaponData.db` (Defense Bonus) is
     set, picked by `pickShield` — not merely the presence of a
     "Shield"-named skill; that shield's DB then adds to Dodge, every
-    Parry, and Block (B287). Every numeric defense opens the roll sheet.
+    Parry, and Block (B287), along with any **armor DB** from Deflect
+    enchantments (`armorData.db`, summed across all equipped armor by
+    `sumArmorDb`) — the captions break down both sources. Every numeric
+    defense opens the roll sheet.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
     thrust/swing + the weapon's modifiers) as **tappable chips that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
@@ -420,20 +427,23 @@ src/
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text
-     domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
-                  traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
-                  success-roll evaluation + NdM damage-dice rolling),
-                  damageParse (weapon damage-string parsing/resolution +
-                  the cut/imp/piercing 1-point damage floor), defenseCalc
-                  (Dodge/Parry/Block, explicit-or-fuzzy weapon-to-skill
-                  matching via `resolveWeaponSkill`, `skillDisplayName` for
-                  specialization-disambiguated skill names, ST-shortfall
-                  penalty, equipped-shield picking), injuryCalc (incoming-
-                  damage DR/divisor/wounding-multiplier resolution for the
-                  Armor DR card's damage dialog), armorDr (equipped-armor DR
-                  aggregation per hit location), conditions (snake_case
-                  condition normalization, tolerant of legacy Capitalized
-                  entries))
+domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
+                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
+                   success-roll evaluation + NdM damage-dice rolling),
+                   damageParse (weapon damage-string parsing/resolution +
+                   the cut/imp/piercing 1-point damage floor), defenseCalc
+                   (Dodge/Parry/Block, explicit-or-fuzzy weapon-to-skill
+                   matching via `resolveWeaponSkill`, `skillDisplayName` for
+                   specialization-disambiguated skill names, ST-shortfall
+                   penalty, equipped-shield picking), injuryCalc (incoming-
+                   damage DR/divisor/wounding-multiplier resolution for the
+                   Armor DR card's damage dialog), armorDr (equipped-armor DR
+                   aggregation per hit location + per-damage-type DR
+                   resolution via `resolveDr` with typed → crushing →
+                   default fallback, and armor DB summation via
+                   `sumArmorDb`), conditions (snake_case
+                   condition normalization, tolerant of legacy Capitalized
+                   entries))
     constants/   attributes, skills, traits, combat (postures, common
                  conditions, maneuvers), hitLocations (+ aim penalties),
                  rangePenalty (B550 speed/range roll presets), magic

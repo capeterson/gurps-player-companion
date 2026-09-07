@@ -269,9 +269,11 @@ export function InventoryPanel({
               locations: [],
               dr: 0,
               drCrushing: null,
+              typedDr: {},
               flexible: false,
               frontOnly: false,
               backOnly: false,
+              db: null,
               notes: null,
             })
           : null,

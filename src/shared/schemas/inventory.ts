@@ -1,14 +1,44 @@
 import { z } from 'zod';
 import { timestamps, uuid } from './common.ts';
 
+/**
+ * Per-damage-type DR overrides (GURPS B378, Martial Arts p. 100).
+ * Keys are canonical GURPS damage types. When present and non-null,
+ * the armor's DR against that type is this value instead of the base
+ * `dr`. Unset / null entries fall through to `drCrushing` (for `cr`)
+ * or `dr`.
+ */
+export const typedArmorDr = z.object({
+  cut: z.number().int().min(0).max(1000).nullable().optional(),
+  imp: z.number().int().min(0).max(1000).nullable().optional(),
+  pi: z.number().int().min(0).max(1000).nullable().optional(),
+  pi_minus: z.number().int().min(0).max(1000).nullable().optional(),
+  pi_plus: z.number().int().min(0).max(1000).nullable().optional(),
+  pi_pp: z.number().int().min(0).max(1000).nullable().optional(),
+  burn: z.number().int().min(0).max(1000).nullable().optional(),
+  corr: z.number().int().min(0).max(1000).nullable().optional(),
+  fat: z.number().int().min(0).max(1000).nullable().optional(),
+  tox: z.number().int().min(0).max(1000).nullable().optional(),
+});
+
 export const armorData = z.object({
   /** Hit-location strings; well-known values are in shared/constants/hitLocations.ts. */
   locations: z.array(z.string().min(1).max(40)).default([]),
+  /** Default DR against most damage types (B378). */
   dr: z.number().int().min(0).max(1000).default(0),
+  /** Crushing-specific DR override — legacy field preserved for backward compat. */
   drCrushing: z.number().int().min(0).max(1000).nullable().optional(),
+  /** Per-damage-type DR overrides (cut/imp/pi/burn/corr/fat/tox). */
+  typedDr: typedArmorDr.default({}),
   flexible: z.boolean().default(false),
   frontOnly: z.boolean().default(false),
   backOnly: z.boolean().default(false),
+  /**
+   * Defense Bonus from Deflect enchantments (B287). Non-null marks the
+   * armor as granting DB; when equipped, armor DB stacks with shield DB
+   * and adds to Dodge, every Parry, and Block.
+   */
+  db: z.number().int().min(0).max(4).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
 });
 
@@ -189,6 +219,7 @@ export const inventoryItemUpdate = inventoryItemCreate.partial();
 export type InventoryItemOut = z.infer<typeof inventoryItemOut>;
 export type InventoryItemCreate = z.infer<typeof inventoryItemCreate>;
 export type InventoryItemUpdate = z.infer<typeof inventoryItemUpdate>;
+export type TypedArmorDr = z.infer<typeof typedArmorDr>;
 export type ArmorData = z.infer<typeof armorData>;
 export type WeaponData = z.infer<typeof weaponData>;
 export type WeaponMode = z.infer<typeof weaponMode>;

@@ -1,9 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type { ArmorData } from '../../../../../shared/schemas/inventory.ts';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
 
-function makeCharacter(armor: Array<{ dr: number; locations: string[] }>): CharacterDetail {
+function makeCharacter(
+  armor: Array<{ dr: number; locations: string[]; typedDr?: ArmorData['typedDr'] }>,
+): CharacterDetail {
   return {
     id: 'char-1',
     inventory: armor.map((a, i) => ({
@@ -15,9 +18,11 @@ function makeCharacter(armor: Array<{ dr: number; locations: string[] }>): Chara
         locations: a.locations,
         dr: a.dr,
         drCrushing: null,
+        typedDr: a.typedDr ?? {},
         flexible: false,
         frontOnly: false,
         backOnly: false,
+        db: null,
         notes: null,
       },
       weaponData: null,
@@ -87,9 +92,11 @@ describe('DrSummaryCard', () => {
             locations: ['torso'],
             dr: 10,
             drCrushing: null,
+            typedDr: {},
             flexible: false,
             frontOnly: false,
             backOnly: false,
+            db: null,
             notes: null,
           },
           weaponData: null,
@@ -98,5 +105,36 @@ describe('DrSummaryCard', () => {
     } as unknown as CharacterDetail;
     render(<DrSummaryCard character={character} />);
     expect(screen.getByText(/No equipped armor/i)).toBeInTheDocument();
+  });
+
+  it('annotates typed DR overrides that differ from the base DR', () => {
+    render(
+      <DrSummaryCard
+        character={makeCharacter([{ dr: 4, locations: ['torso'], typedDr: { cut: 7, imp: 10 } }])}
+      />,
+    );
+    expect(screen.getByText('Torso')).toBeInTheDocument();
+    expect(screen.getByText('7 vs cut')).toBeInTheDocument();
+    expect(screen.getByText('10 vs imp')).toBeInTheDocument();
+  });
+
+  it('resolves typed DR through the incoming-damage dialog', () => {
+    const bumpHp = vi.fn();
+    // Torso base DR 4, cut override 6: 12 cut => 6 penetrating × 1.5 = 9 injury.
+    render(
+      <DrSummaryCard
+        character={makeCharacter([{ dr: 4, locations: ['torso'], typedDr: { cut: 6 } }])}
+        canWrite
+        hpMax={10}
+        bumpHp={bumpHp}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '12' } });
+    const [typeSelect] = screen.getAllByRole('combobox');
+    fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
+    // Base DR is 4 but the cut override stops 6 — the breakdown shows DR 6.
+    expect(screen.getByText(/− DR 6 →/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Apply −9 HP/ })).toBeInTheDocument();
   });
 });
