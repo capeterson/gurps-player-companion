@@ -28,3 +28,22 @@ test('registers a new user and lands on the authenticated shell', async ({ page 
   await expect(page).toHaveURL(/(\/|\/characters)$/, { timeout: 10_000 });
   await expect(page.getByRole('navigation')).toBeVisible();
 });
+
+test('campaign sub-menu stays inside a 320px viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('/register');
+  const email = `e2e-menu-${TIMESTAMP_SUFFIX()}@example.com`;
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Menu QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 10_000 });
+
+  await page.getByLabel('Campaign sub-menu').click();
+  const menu = page.getByRole('link', { name: 'Library', exact: true }).locator('..').locator('..');
+  await expect(menu).toBeVisible();
+  const bounds = await menu.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds?.x).toBeGreaterThanOrEqual(0);
+  expect(bounds ? bounds.x + bounds.width : 0).toBeLessThanOrEqual(320);
+});

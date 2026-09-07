@@ -71,7 +71,7 @@ export function HomePage() {
             {recent.map((c) => (
               <div
                 key={c.id}
-                className="card flex flex-col gap-1 p-card transition hover:border-border-strong"
+                className="card flex min-w-0 flex-col gap-1 p-card transition hover:border-border-strong"
               >
                 <Link to={`/characters/${c.id}`} className="min-w-0">
                   <p className="font-display text-lg font-semibold leading-tight truncate">

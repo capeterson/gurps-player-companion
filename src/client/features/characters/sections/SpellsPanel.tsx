@@ -482,8 +482,8 @@ export function SpellsPanel({
       {character.spells.length === 0 ? (
         <p className="text-sm text-base-content/60">No spells learned yet.</p>
       ) : (
-        <>
-          <div className="grid grid-cols-[1fr_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
+        <div className="overflow-x-auto">
+          <div className="grid min-w-[31rem] grid-cols-[1fr_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
             <span>Spell</span>
             <span>College</span>
             <span>Diff</span>
@@ -493,7 +493,7 @@ export function SpellsPanel({
             <span className="text-right">Cost</span>
             <span />
           </div>
-          <ul>
+          <ul className="min-w-[31rem]">
             {character.spells.map((s) => (
               <SpellRow
                 key={s.id}
@@ -506,7 +506,7 @@ export function SpellsPanel({
               />
             ))}
           </ul>
-        </>
+        </div>
       )}
 
       {casting && (

@@ -6,7 +6,7 @@
  * (the data is only cleared on Save).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
@@ -106,6 +106,44 @@ describe('ItemEditDialog facet chips', () => {
     // chip flips to active (aria-pressed; the ✕ is aria-hidden).
     expect(screen.getByPlaceholderText('e.g. Broadsword')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Weapon/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('uses the standard DaisyUI modal + backdrop structure with mobile-safe sizing', () => {
+    const { container } = renderWithToasts(
+      <ItemEditDialog open item={makeItem()} onSubmit={() => {}} onCancel={() => {}} />,
+    );
+
+    const dialog = container.querySelector('dialog');
+    expect(dialog).not.toBeNull();
+    // Project-standard structure: `.modal` shell, not the ad-hoc `.modal-back`.
+    expect(dialog).toHaveClass('modal');
+    expect(dialog).not.toHaveClass('modal-back');
+
+    const box = container.querySelector('.modal-box');
+    expect(box).not.toBeNull();
+    // Content stays scrollable and sized against the *dynamic* viewport so
+    // mobile browser chrome never hides the sticky actions.
+    expect(box?.className).toMatch(/overflow-y-auto/);
+    expect(box?.className).toMatch(/max-h-\[calc\(100dvh-/);
+    // No static viewport units left anywhere in the dialog subtree.
+    expect(dialog?.outerHTML).not.toContain('100vh');
+
+    // A real, dismissable backdrop.
+    expect(container.querySelector('form.modal-backdrop')).not.toBeNull();
+  });
+
+  it('keeps the Save/Cancel actions reachable and wired', () => {
+    const onCancel = vi.fn();
+    const { container } = renderWithToasts(
+      <ItemEditDialog open item={makeItem()} onSubmit={() => {}} onCancel={onCancel} />,
+    );
+
+    const actions = container.querySelector('.modal-action');
+    expect(actions).not.toBeNull();
+    const scoped = within(actions as HTMLElement);
+    fireEvent.click(scoped.getByRole('button', { name: 'Cancel' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(scoped.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 
   it('writes the governing skill into the submitted patch', () => {

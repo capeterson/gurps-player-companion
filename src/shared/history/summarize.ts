@@ -139,6 +139,16 @@ function humanizeFieldKey(k: string): string {
     .trim();
 }
 
+/**
+ * Fallback for a change that doesn't have a dedicated player-friendly
+ * phrasing: names which field(s) changed (using their humanized label,
+ * never the raw camelCase key) instead of a bare "X updated".
+ */
+function describeFieldChanges(subject: string, changes: FieldChange[]): string {
+  if (changes.length === 0) return `${subject} updated`;
+  return `${subject}: ${changes.map((c) => c.label).join(', ')} updated`;
+}
+
 function displayValue(v: unknown): string {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'boolean') return v ? 'on' : 'off';
@@ -246,8 +256,7 @@ function summarizeCharacter(
     return `${ATTR_LABELS[c.field]} ${c.oldValue} → ${c.newValue}`;
   }
   if (c.field === 'name') return `Renamed to ${c.newValue}`;
-  if (changes.length === 1) return `${humanizeFieldKey(c.field)} updated`;
-  return `${changes.length} attributes updated`;
+  return describeFieldChanges('Character', changes);
 }
 
 function summarizeCharacterTrait(
@@ -264,7 +273,7 @@ function summarizeCharacterTrait(
   if (c.field === 'points') return `${name} points ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'level') return `${name} level ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'name') return `Renamed trait to ${c.newValue}`;
-  return `${name} updated`;
+  return describeFieldChanges(String(name), changes);
 }
 
 function summarizeCharacterSkill(
@@ -284,7 +293,7 @@ function summarizeCharacterSkill(
   const c = changes[0] as FieldChange;
   if (c.field === 'points') return `${fullName} ${c.oldValue} → ${c.newValue} pts`;
   if (c.field === 'name') return `Renamed skill to ${c.newValue}`;
-  return `${fullName} updated`;
+  return describeFieldChanges(String(fullName), changes);
 }
 
 function summarizeCharacterSpell(
@@ -300,7 +309,7 @@ function summarizeCharacterSpell(
   const c = changes[0] as FieldChange;
   if (c.field === 'points') return `${name} ${c.oldValue} → ${c.newValue} pts`;
   if (c.field === 'college') return `${name} college updated`;
-  return `${name} updated`;
+  return describeFieldChanges(String(name), changes);
 }
 
 function summarizeCharacterLanguage(
@@ -364,8 +373,10 @@ function summarizeInventory(
   if (c.field === 'quantity') return `${name} qty ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'worn') return c.newValue ? `Wearing ${name}` : `Removed ${name} (worn)`;
   if (c.field === 'equipped') return c.newValue ? `Equipped ${name}` : `Unequipped ${name}`;
-  if (changes.length === 1) return `${name} ${c.field} updated`;
-  return `${name} updated`;
+  if (c.field === 'isArmor') return `${name}: ${c.newValue ? 'set' : 'unset'} as armor`;
+  if (c.field === 'isContainer') return `${name}: ${c.newValue ? 'set' : 'unset'} as container`;
+  if (c.field === 'name') return `Renamed ${old?.name ?? name} to ${c.newValue}`;
+  return describeFieldChanges(String(name), changes);
 }
 
 function summarizeCombat(
@@ -382,7 +393,7 @@ function summarizeCombat(
   if (c.field === 'posture') return `Posture ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'maneuver') return `Maneuver: ${c.newValue ?? 'none'}`;
   if (c.field === 'conditions') return 'Conditions updated';
-  return 'Combat state updated';
+  return describeFieldChanges('Combat state', changes);
 }
 
 function summarizeCampaign(
@@ -428,7 +439,7 @@ function summarizeMembership(
     const to = MEMBERSHIP_ROLE_LABELS[String(c.newValue)] ?? c.newValue;
     return `Member role ${from} → ${to}`;
   }
-  return 'Membership updated';
+  return describeFieldChanges('Membership', changes);
 }
 
 function summarizeLibraryTrait(
@@ -439,7 +450,7 @@ function summarizeLibraryTrait(
   const name = next?.name ?? old?.name ?? 'trait';
   if (op === 'insert') return `Added library trait ${name}`;
   if (op === 'delete') return `Removed library trait ${old?.name ?? ''}`;
-  return `Library trait ${name} updated`;
+  return describeFieldChanges(`Library trait ${name}`, diffRows(old, next));
 }
 
 function summarizeLibrarySkill(
@@ -450,7 +461,7 @@ function summarizeLibrarySkill(
   const name = next?.name ?? old?.name ?? 'skill';
   if (op === 'insert') return `Added library skill ${name}`;
   if (op === 'delete') return `Removed library skill ${old?.name ?? ''}`;
-  return `Library skill ${name} updated`;
+  return describeFieldChanges(`Library skill ${name}`, diffRows(old, next));
 }
 
 function summarizeLibrarySpell(
@@ -461,7 +472,7 @@ function summarizeLibrarySpell(
   const name = next?.name ?? old?.name ?? 'spell';
   if (op === 'insert') return `Added library spell ${name}`;
   if (op === 'delete') return `Removed library spell ${old?.name ?? ''}`;
-  return `Library spell ${name} updated`;
+  return describeFieldChanges(`Library spell ${name}`, diffRows(old, next));
 }
 
 function summarizeLibraryLanguage(
@@ -505,7 +516,7 @@ function summarizeLibraryItem(
   const name = next?.name ?? old?.name ?? 'item';
   if (op === 'insert') return `Added library item ${name}`;
   if (op === 'delete') return `Removed library item ${old?.name ?? ''}`;
-  return `Library item ${name} updated`;
+  return describeFieldChanges(`Library item ${name}`, diffRows(old, next));
 }
 
 function summarizeAdventureLog(
@@ -522,7 +533,7 @@ function summarizeAdventureLog(
   if (c.field === 'title') return `Log renamed to: ${c.newValue}`;
   if (c.field === 'body') return `Log ${title} content updated`;
   if (c.field === 'visibility') return `Log ${title} visibility → ${c.newValue}`;
-  return `Log ${title} updated`;
+  return describeFieldChanges(`Log ${title}`, changes);
 }
 
 // ---------- public API ----------
@@ -619,14 +630,70 @@ export interface HistoryGroup {
 }
 
 /**
- * Fold consecutive events that share a non-null batchId into one group.
- * Standalone events (no batchId) become single-item groups without a fold arrow.
+ * Consecutive events on the same item (same actor, same field-patch op)
+ * spaced no more than this far apart get folded together even without an
+ * explicit shared batchId (e.g. someone fiddling with a single item's
+ * fields one field-patch at a time).
+ */
+const SAME_ITEM_BURST_WINDOW_MS = 60_000;
+
+/**
+ * `batchId` is non-null for effectively every sync-backed write:
+ * `dispatchOperation` fills it in from `op.clientOpId` when the client
+ * didn't set one (see syncDispatch.ts), so a single un-batched field
+ * patch still gets its own distinct, non-null batch_id in entity_history.
+ * That id has no sibling — no other event shares it — so it isn't a real
+ * "one user gesture" batch the way a multi-item bulk move's shared
+ * batchId is. Treat a batchId as a real batch only when >1 event in the
+ * loaded page actually carries it; a singleton batchId is eligible for
+ * the same-item time-window burst heuristic below, same as a null one.
+ */
+function countBatchMembers(events: HistoryEventOut[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const ev of events) {
+    if (!ev.batchId) continue;
+    counts.set(ev.batchId, (counts.get(ev.batchId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Fold consecutive events into one group when either:
+ *   - they share a batchId that >1 loaded event carries (one explicit
+ *     user gesture, e.g. a bulk inventory move), or
+ *   - they're both plain field-patch updates to the same entity by the
+ *     same actor, neither carries a "real" (multi-member) batchId, and
+ *     they land within SAME_ITEM_BURST_WINDOW_MS of each other (a burst
+ *     of quick edits to one item that weren't explicitly batched).
+ * Standalone events become single-item groups without a fold arrow.
  */
 export function groupIntoBatches(events: HistoryEventOut[]): HistoryGroup[] {
+  const batchMembers = countBatchMembers(events);
+  const isRealBatch = (ev: HistoryEventOut) =>
+    Boolean(ev.batchId) &&
+    Math.max(ev.batchSize ?? 0, batchMembers.get(ev.batchId as string) ?? 0) > 1;
+
   const groups: HistoryGroup[] = [];
   for (const ev of events) {
     const last = groups[groups.length - 1];
-    if (ev.batchId && last && last.batchId === ev.batchId) {
+    const lastEvent = last?.events[last.events.length - 1];
+    const sharesBatch = isRealBatch(ev) && last?.batchId === ev.batchId;
+    const sameItemBurst =
+      !sharesBatch &&
+      !isRealBatch(ev) &&
+      last &&
+      lastEvent &&
+      !isRealBatch(lastEvent) &&
+      ev.op === 'update' &&
+      lastEvent.op === 'update' &&
+      lastEvent.entityId === ev.entityId &&
+      lastEvent.entityClass === ev.entityClass &&
+      lastEvent.actorUserId != null &&
+      ev.actorUserId != null &&
+      lastEvent.actorUserId === ev.actorUserId &&
+      Math.abs(new Date(ev.createdAt).getTime() - new Date(lastEvent.createdAt).getTime()) <=
+        SAME_ITEM_BURST_WINDOW_MS;
+    if (sharesBatch || sameItemBurst) {
       last.events.push(ev);
     } else {
       groups.push({
@@ -651,11 +718,31 @@ function makeBatchSummary(events: HistoryEventOut[]): string {
   const n = events.length;
   const first = events[0];
   if (!first) return `${n} changes`;
+  // A same-item burst (see SAME_ITEM_BURST_WINDOW_MS) is several quick
+  // edits to one thing, not one gesture touching several things — phrase
+  // it accordingly rather than reusing the "N items" bulk-gesture wording.
+  const sameItem = events.every((e) => e.entityId === first.entityId);
   // If all events share the same entity class and op, describe uniformly.
   const firstClass = first.entityClass;
   const firstOp = first.op;
   const uniform = events.every((e) => e.entityClass === firstClass && e.op === firstOp);
   if (!uniform) return `${n} changes`;
+  if (sameItem) {
+    switch (firstClass) {
+      case 'character_inventory':
+        return `${n} updates to this item`;
+      case 'character_skill':
+        return `${n} updates to this skill`;
+      case 'character_spell':
+        return `${n} updates to this spell`;
+      case 'character_trait':
+        return `${n} updates to this trait`;
+      case 'character':
+        return `${n} attribute changes`;
+      default:
+        return `${n} updates`;
+    }
+  }
   switch (firstClass) {
     case 'character_inventory':
       if (firstOp === 'update') return `Moved ${n} items`;

@@ -468,7 +468,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                 ) : (
                   <article key={t.id} className="card p-card">
                     <div className="mb-1 flex items-start justify-between gap-2">
-                      <span className="font-display text-lg font-semibold">{t.name}</span>
+                      <span className="min-w-0 break-words font-display text-lg font-semibold">
+                        {t.name}
+                      </span>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="num text-xs uppercase tracking-widest text-dim">
                           {t.kind} · {t.basePoints} pt
