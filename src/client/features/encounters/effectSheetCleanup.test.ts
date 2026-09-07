@@ -19,6 +19,7 @@ async function seedCharacter() {
     height: null,
     weight: null,
     age: null,
+    birthdate: null,
     appearance: null,
     st: 11,
     dx: 10,

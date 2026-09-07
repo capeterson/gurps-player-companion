@@ -146,6 +146,8 @@ export const characterIdentityShape = {
   height: z.string().max(40).nullable().optional(),
   weight: z.string().max(40).nullable().optional(),
   age: z.number().int().min(0).max(10_000).nullable().optional(),
+  /** Free-form birthdate text (e.g. "March 3, 1987"). Non-mechanical metadata. */
+  birthdate: z.string().max(40).nullable().optional(),
   appearance: z.string().max(20_000).nullable().optional(),
   campaignId: uuid.nullable().optional(),
 } as const;
@@ -334,6 +336,7 @@ export const characterMinimalOut = z.object({
   height: z.string().nullable(),
   weight: z.string().nullable(),
   age: z.number().int().nullable(),
+  birthdate: z.string().nullable(),
   appearance: z.string().nullable(),
   techLevel: z.number().int().nullable(),
   updatedAt: isoTimestamp,

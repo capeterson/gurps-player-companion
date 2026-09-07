@@ -63,6 +63,7 @@ export interface CharacterDetailInputCharacter {
   height: string | null;
   weight: string | null;
   age: number | null;
+  birthdate: string | null;
   appearance: string | null;
   st: number;
   dx: number;
@@ -580,6 +581,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     height: character.height,
     weight: character.weight,
     age: character.age,
+    birthdate: character.birthdate,
     appearance: character.appearance,
     st: character.st,
     dx: character.dx,

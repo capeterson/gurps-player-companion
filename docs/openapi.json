@@ -16165,6 +16165,11 @@
                     "minimum": 0,
                     "maximum": 10000
                   },
+                  "birthdate": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
                   "appearance": {
                     "type": "string",
                     "nullable": true,
@@ -16367,6 +16372,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -17952,6 +17962,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -19481,6 +19496,10 @@
                           "type": "integer",
                           "nullable": true
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true
@@ -19503,6 +19522,7 @@
                         "height",
                         "weight",
                         "age",
+                        "birthdate",
                         "appearance",
                         "techLevel",
                         "updatedAt"
@@ -19583,6 +19603,11 @@
                     "nullable": true,
                     "minimum": 0,
                     "maximum": 10000
+                  },
+                  "birthdate": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
                   },
                   "appearance": {
                     "type": "string",
@@ -19783,6 +19808,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -21436,6 +21466,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -23253,6 +23288,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 10000
+                        },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
                         },
                         "appearance": {
                           "type": "string",
@@ -25082,6 +25122,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -26677,6 +26722,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -28430,6 +28480,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 10000
+                        },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
                         },
                         "appearance": {
                           "type": "string",
@@ -30194,6 +30249,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -31789,6 +31849,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -33561,6 +33626,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 10000
+                        },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
                         },
                         "appearance": {
                           "type": "string",
@@ -35346,6 +35416,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -36941,6 +37016,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -38658,6 +38738,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 10000
+                        },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
                         },
                         "appearance": {
                           "type": "string",
@@ -40388,6 +40473,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -41983,6 +42073,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -43707,6 +43802,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 10000
+                        },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
                         },
                         "appearance": {
                           "type": "string",
@@ -45443,6 +45543,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -47038,6 +47143,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -49443,6 +49553,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 10000
+                        },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
                         },
                         "appearance": {
                           "type": "string",
@@ -51861,6 +51976,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -53456,6 +53576,11 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 10000
+                    },
+                    "birthdate": {
+                      "type": "string",
+                      "nullable": true,
+                      "maxLength": 40
                     },
                     "appearance": {
                       "type": "string",
@@ -55154,6 +55279,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -56763,6 +56893,11 @@
                           "minimum": 0,
                           "maximum": 10000
                         },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        },
                         "appearance": {
                           "type": "string",
                           "nullable": true,
@@ -58369,6 +58504,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 10000
+                        },
+                        "birthdate": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
                         },
                         "appearance": {
                           "type": "string",

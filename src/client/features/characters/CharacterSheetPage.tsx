@@ -562,6 +562,12 @@ function IdentityPanel({
     parse: nullableTextParser,
     ...buildSave('weight', { humanName: 'weight' }),
   });
+  const birthdateField = useDraftField<string | null>({
+    name: 'birthdate',
+    serverValue: character.birthdate ?? '',
+    parse: nullableTextParser,
+    ...buildSave('birthdate', { humanName: 'birthdate' }),
+  });
   const ageField = useDraftField<number | null>({
     name: 'age',
     serverValue: character.age ?? null,
@@ -629,6 +635,19 @@ function IdentityPanel({
             />
           ) : (
             <span>{character.weight ?? '—'}</span>
+          )}
+        </div>
+        <div className="form-control">
+          <span className="label-text-alt label-eyebrow">Birthdate</span>
+          {canWrite ? (
+            <input
+              aria-label="birthdate"
+              className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm`}
+              placeholder="e.g. March 3, 1987"
+              {...birthdateField.inputProps}
+            />
+          ) : (
+            <span>{character.birthdate ?? '—'}</span>
           )}
         </div>
         <div className="form-control">
@@ -1514,6 +1533,7 @@ export function CharacterSheetPage() {
           height: character.height ?? null,
           weight: character.weight ?? null,
           age: character.age ?? null,
+          birthdate: character.birthdate ?? null,
           appearance: character.appearance ?? null,
           techLevel: character.techLevel ?? null,
           updatedAt: character.updatedAt,

@@ -60,7 +60,8 @@ touches mid-session, front-loaded so one tap lands there; on a
 read-only view of a non-magical character the Magic tab is hidden, and
 on any sheet the viewer can edit — their own — it always shows).
 
-- **Identity tab.** Name, height, weight, age, campaign assignment, and
+- **Identity tab.** Name, height, weight, age, **birthdate** (free-form
+  text, e.g. "3/7/0402"), campaign assignment, and
   an **appearance/notes** field. No per-character "player" field is
   tracked — the character's owner (the authenticated user who created
   it) is the player. **Tech level** is likewise not set per character:

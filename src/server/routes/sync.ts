@@ -715,7 +715,8 @@ function upsertChange(
  * Project a character row down to the **identity-only** payload for sync
  * emission to a non-GM viewer of a campaign with
  * shareCharacterSheets=false. The viewer's IndexedDB receives a row that
- * carries id / ownerId / campaignId / public identity bits, plus the
+ * carries id / ownerId / campaignId / public identity bits (name / height /
+ * weight / age / birthdate / appearance), plus the
  * schema-default values for the columns the row still needs to satisfy
  * `LocalCharacter`. Every private column is set to its safe default so:
  *
@@ -746,6 +747,7 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     height: row.height,
     weight: row.weight,
     age: row.age,
+    birthdate: row.birthdate,
     appearance: row.appearance,
     // Stat defaults so the row stays schema-valid (notNull columns).
     // The minimal view never reads these, but if a future code path

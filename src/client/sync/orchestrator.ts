@@ -1542,7 +1542,7 @@ class SyncOrchestrator {
         // Rewrite each minimal character's row down to identity-only
         // fields, mirroring `projectCharacterRow` on the server. The
         // identity columns (id / ownerId / campaignId / name / height /
-        // weight / age / appearance / timestamps / revision) are
+        // weight / age / birthdate / appearance / timestamps / revision) are
         // preserved; every private column is reset to its schema
         // default so derived stats and the combat tab can't recover
         // the masked character's real state. Tech level is no longer a

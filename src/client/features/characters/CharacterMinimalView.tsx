@@ -19,6 +19,7 @@ export function CharacterMinimalView({ data }: { data: CharacterMinimalOut }) {
     { label: 'Height', value: data.height },
     { label: 'Weight', value: data.weight },
     { label: 'Age', value: data.age },
+    { label: 'Birthdate', value: data.birthdate },
     { label: 'Tech level', value: data.techLevel === null ? null : `TL ${data.techLevel}` },
   ];
 

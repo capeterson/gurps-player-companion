@@ -54,6 +54,7 @@ async function loadMinimalCharacter(id: string): Promise<CharacterMinimalOut> {
     height: c.height,
     weight: c.weight,
     age: c.age,
+    birthdate: c.birthdate,
     appearance: c.appearance,
     techLevel,
     updatedAt: c.updatedAt.toISOString(),

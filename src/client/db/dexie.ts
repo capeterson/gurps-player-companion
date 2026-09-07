@@ -48,6 +48,7 @@ export interface LocalCharacter {
   height: string | null;
   weight: string | null;
   age: number | null;
+  birthdate: string | null;
   appearance: string | null;
   st: number;
   dx: number;

@@ -62,6 +62,7 @@ export function characterInsertValues(
     height: body.height ?? null,
     weight: body.weight ?? null,
     age: body.age ?? null,
+    birthdate: body.birthdate ?? null,
     appearance: body.appearance ?? null,
     st: body.st,
     dx: body.dx,

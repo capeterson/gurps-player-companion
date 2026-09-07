@@ -355,6 +355,8 @@ export const characters = pgTable(
     height: varchar('height', { length: 40 }),
     weight: varchar('weight', { length: 40 }),
     age: integer('age'),
+    /** Free-form birthdate text (migration 0029). Non-mechanical metadata. */
+    birthdate: varchar('birthdate', { length: 40 }),
     appearance: text('appearance'),
 
     st: smallint('st').notNull().default(10),
