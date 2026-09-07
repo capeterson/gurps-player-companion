@@ -410,6 +410,7 @@ src/
                  campaigns, encounters, library, log, settings, history, home)
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Languages/Techniques/Inventory:
+                 LanguagesPanel and TechniquesPanel (the new P0 panels),
                  useAddEntityForm
                  (the add form), useEntityRowPatch (per-row field patch
                  dispatch, incl. useEntityEnumField for enum <select>s),
@@ -436,8 +437,10 @@ src/
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text
-domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
-                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
+     domain/      GURPS math (characterCalc, skillCalc, spellCalc,
+                  techniqueCalc (level from default skill + points offset for
+                  A/H difficulty), encumbrance,
+                  traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
                    success-roll evaluation + NdM damage-dice rolling),
                    damageParse (weapon damage-string parsing/resolution +
                    the cut/imp/piercing 1-point damage floor), defenseCalc

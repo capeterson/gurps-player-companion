@@ -279,6 +279,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   style survives a round trip into a campaign that has no matching technique
   rows yet. Both sections follow the same optional-section rule as
   `languages`.
+- **Item enchantments (v5):** `library.items` entries carry an optional
+  `enchantments: []` list (`enchantmentRef[]`: spellName, spellLevel?, category?,
+  notes?) which copies onto character inventory items upon add.
 - **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
   campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set
   p. 513) alongside `description`/`pointTarget`/`disadvantageCap`/`quirkCap`.
