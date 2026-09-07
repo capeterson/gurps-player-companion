@@ -105,7 +105,13 @@ works offline.**
 5. **Pull.** `POST /sync/cursor` returns rows + tombstones since each class's
    cursor position, plus the authoritative `accessible` id sets. The
    orchestrator merges rows into Dexie — but **never overwrites a field with a
-   pending/in-flight outbox op** (`applyServerRow`, `AGENTS.md` S4). Periodic
+   pending/in-flight outbox op**, and it also **never writes a row at all while
+   a pending/in-flight/transient-retry whole-entity delete for that same class
+   and id is queued** (`applyServerRow`, `AGENTS.md` S4). This prevents a
+   bootstrap/from-zero cursor pull from resurrecting a row the user deleted
+   locally before the server acknowledges or rejects that delete. The explicit
+   conflict/reconciliation path may bypass this protection when it must adopt
+   the server's authoritative row. Periodic
    pull runs every `PERIODIC_PULL_MS` (30s); WS nudges pull sooner.
 
 ## The protocol

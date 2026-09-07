@@ -1329,6 +1329,11 @@ class SyncOrchestrator {
             o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry',
         )
         .toArray();
+      // A queued whole-entity delete has already removed the local row.
+      // Do not let a bootstrap/from-zero cursor pull resurrect it before
+      // the delete is acknowledged or rejected. Field-level protection
+      // below is insufficient because delete operations have no fieldPath.
+      if (dirty.some((op) => op.command === 'delete' && !op.fieldPath)) return;
       for (const op of dirty) {
         if (op.fieldPath && op.fieldPath in merged) {
           // Caller had a pending edit on this field; keep the local

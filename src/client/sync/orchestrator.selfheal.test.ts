@@ -101,6 +101,132 @@ describe('applyServerRow local-intent preservation (rule S4)', () => {
   });
 });
 
+describe('queued whole-entity deletes', () => {
+  it.each(['pending', 'in_flight', 'transient_retry'] as const)(
+    'does not resurrect a locally deleted row during a cursor pull while its %s delete is queued',
+    async (status) => {
+      const db = getLocalDb();
+      await db.outbox.put({
+        clientOpId: `delete-${status}`,
+        entityClass: 'character',
+        entityId: CHAR_ID,
+        command: 'delete',
+        coalesceKey: `${CHAR_ID}|`,
+        attemptedValue: null,
+        prevValue: { id: CHAR_ID, ownerId: 'user-1', name: 'Locally deleted', revision: 1 },
+        validationVersion: 1,
+        status,
+        enqueuedAt: new Date().toISOString(),
+        attemptCount: 0,
+      });
+      loginAs('user-1');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          cursorResponse([
+            {
+              entityClass: 'character',
+              entityId: CHAR_ID,
+              command: 'patch',
+              revision: 2,
+              data: { id: CHAR_ID, ownerId: 'user-1', name: 'Server copy', revision: 2 },
+            },
+          ]),
+        ),
+      );
+
+      await getSyncOrchestrator().triggerCursorPull();
+
+      expect(await db.characters.get(CHAR_ID)).toBeUndefined();
+    },
+  );
+
+  it('does not resurrect a locally deleted row while bootstrap rehydrates from a zero cursor', async () => {
+    const db = getLocalDb();
+    await db.outbox.put({
+      clientOpId: 'delete-during-bootstrap',
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      command: 'delete',
+      coalesceKey: `${CHAR_ID}|`,
+      attemptedValue: null,
+      prevValue: { id: CHAR_ID, ownerId: 'user-1', name: 'Locally deleted', revision: 1 },
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'character',
+            entityId: CHAR_ID,
+            command: 'patch',
+            revision: 2,
+            data: { id: CHAR_ID, ownerId: 'user-1', name: 'Server copy', revision: 2 },
+          },
+        ]),
+      ),
+    );
+
+    await getSyncOrchestrator().bootstrap('user-1');
+
+    expect(await db.characters.get(CHAR_ID)).toBeUndefined();
+    expect(await db.syncMeta.get('bootstrap:user-1')).toBeTruthy();
+  });
+
+  it('allows an explicit conflict-bypass to reinsert a deleted row', async () => {
+    const db = getLocalDb();
+    await db.outbox.put({
+      clientOpId: 'delete-conflict-bypass',
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      command: 'delete',
+      coalesceKey: `${CHAR_ID}|`,
+      attemptedValue: null,
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'character',
+            entityId: CHAR_ID,
+            command: 'patch',
+            revision: 2,
+            data: { id: CHAR_ID, ownerId: 'user-1', name: 'Server copy', revision: 2 },
+          },
+        ]),
+      ),
+    );
+
+    // A stale-base/conflict reconciliation deliberately bypasses queued intent.
+    await (
+      getSyncOrchestrator() as unknown as {
+        applyServerRow(
+          entityClass: string,
+          row: Record<string, unknown>,
+          opts: { ignoreOutboxConflict: boolean },
+        ): Promise<void>;
+      }
+    ).applyServerRow(
+      'character',
+      { id: CHAR_ID, ownerId: 'user-1', name: 'Conflict winner', revision: 3 },
+      { ignoreOutboxConflict: true },
+    );
+
+    expect((await db.characters.get(CHAR_ID))?.name).toBe('Conflict winner');
+  });
+});
+
 describe('minimal-view sweep', () => {
   it('purges private child rows (incl. combat) for share=false campaigns without erroring', async () => {
     const db = getLocalDb();
