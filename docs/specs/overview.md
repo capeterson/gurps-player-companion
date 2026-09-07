@@ -153,8 +153,10 @@ on any sheet the viewer can edit — their own — it always shows).
   The same chip row appears in the item edit dialog and the inventory
   add form's "More options" expander. Weapon data (damage, reach,
   parry, ST required, governing **skill**, shield **Defense Bonus**,
-  and an optional **ranged** stat block — Acc/Range/RoF/Shots/Bulk/
-  Recoil) is editable from the item edit dialog, and copied from
+  an optional **ranged** stat block — Acc/Range/RoF/Shots/Bulk/
+  Recoil — and **alternate attack modes**: extra damage/reach/parry
+  rows beyond the primary line, e.g. swing + thrust + thrown) is
+  editable from the item edit dialog, and copied from
   campaign library items on the inventory add form. Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
@@ -219,7 +221,12 @@ on any sheet the viewer can edit — their own — it always shows).
     penalties, B398-399) plus, for ranged weapons, an Aim(+Acc) preset
     and the B550 speed/range-penalty presets. Vitals presets appear
     only for impaling and piercing attacks, and the eye preset only for
-    impaling, piercing, and tight-beam burning attacks.
+    impaling, piercing, and tight-beam burning attacks. A weapon with
+    **alternate attack modes** (swing/thrust/thrown, `weaponData.alternateModes`)
+    renders each mode as its own labelled damage chip row in addition
+    to the primary line, with an alternate's reach inherited from the
+    weapon when unset; vitals/eye presets are offered only when at
+    least one mode across every damage line can target them.
   - **Roll sheet** — an ephemeral bottom-sheet/dialog roller with two
     variants sharing one shell. The default **check** variant: modifier
     stepper (−25..+10 — deep enough that a 200 yd range preset, B550,

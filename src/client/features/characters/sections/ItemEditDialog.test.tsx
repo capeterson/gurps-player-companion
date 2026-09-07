@@ -62,6 +62,7 @@ describe('ItemEditDialog facet chips', () => {
             db: null,
             ranged: null,
             notes: null,
+            alternateModes: [],
           },
         })}
         skillNames={['Broadsword']}

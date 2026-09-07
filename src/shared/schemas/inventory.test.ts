@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { magicItemData, powerstoneData } from './inventory.ts';
+import { magicItemData, powerstoneData, weaponData } from './inventory.ts';
 
 describe('powerstoneData', () => {
   it('accepts a valid stone', () => {
@@ -63,5 +63,47 @@ describe('magicItemData', () => {
         energyCost: 4,
       }),
     ).not.toThrow();
+  });
+});
+
+describe('weaponData', () => {
+  it('defaults alternateModes to [] for a pre-existing weapon without the field', () => {
+    expect(weaponData.parse({ damage: 'sw+1 cut' })).toEqual({
+      damage: 'sw+1 cut',
+      alternateModes: [],
+    });
+  });
+
+  it('validates and round-trips a weapon with alternate modes', () => {
+    const parsed = weaponData.parse({
+      damage: 'sw-1 cut',
+      reach: '1',
+      parry: '0',
+      alternateModes: [
+        { name: 'Thrust', damage: 'thr imp', reach: '2', parry: '0' },
+        { name: 'Thrown', damage: 'thr imp' },
+      ],
+    });
+    expect(parsed.alternateModes).toHaveLength(2);
+    expect(parsed.alternateModes[0]).toEqual({
+      name: 'Thrust',
+      damage: 'thr imp',
+      reach: '2',
+      parry: '0',
+    });
+    // An alternate leaving reach/parry unset stays unset (not coerced to the weapon's).
+    expect(parsed.alternateModes[1]).toEqual({
+      name: 'Thrown',
+      damage: 'thr imp',
+    });
+  });
+
+  it('rejects more than 10 alternate modes', () => {
+    const modes = Array.from({ length: 11 }, (_, i) => ({ name: `Mode ${i}`, damage: '1d' }));
+    expect(() => weaponData.parse({ alternateModes: modes })).toThrow();
+  });
+
+  it('rejects an alternate mode missing its name', () => {
+    expect(() => weaponData.parse({ alternateModes: [{ damage: '1d' }] })).toThrow();
   });
 });

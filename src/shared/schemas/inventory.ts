@@ -27,6 +27,27 @@ export const rangedData = z.object({
   recoil: z.number().int().min(1).max(9).nullable().optional(),
 });
 
+/**
+ * One alternate attack mode on a weapon (Basic Set p. 271 weapon tables
+ * list several rows per weapon: a rapier swings AND thrusts, a spear can
+ * be thrown).  The weapon's own top-level `damage` / `reach` / `parry`
+ * are the PRIMARY mode; these are the extra rows.
+ *
+ * `reach` / `parry` are optional per mode: an alternate that leaves them
+ * unset inherits the weapon's primary values (a swing and a thrust with
+ * the same reach only has to state it once).  Defence math always uses
+ * the primary parry -- you parry with the weapon, not with one of its
+ * damage lines.
+ */
+export const weaponMode = z.object({
+  /** "Swing", "Thrust", "Thrown", ... */
+  name: z.string().min(1).max(40).trim(),
+  damage: z.string().max(160).optional(),
+  reach: z.string().max(40).nullable().optional(),
+  parry: z.string().max(40).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
 export const weaponData = z.object({
   damage: z.string().max(160).optional(),
   reach: z.string().max(40).nullable().optional(),
@@ -52,6 +73,11 @@ export const weaponData = z.object({
    *  top-level `damage` field. */
   ranged: rangedData.nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
+  /**
+   * Extra attack modes beyond the primary one (swing/thrust/thrown).
+   * Defaults to `[]`, so every pre-existing weapon row parses unchanged.
+   */
+  alternateModes: z.array(weaponMode).max(10).default([]),
 });
 
 /**
@@ -165,6 +191,7 @@ export type InventoryItemCreate = z.infer<typeof inventoryItemCreate>;
 export type InventoryItemUpdate = z.infer<typeof inventoryItemUpdate>;
 export type ArmorData = z.infer<typeof armorData>;
 export type WeaponData = z.infer<typeof weaponData>;
+export type WeaponMode = z.infer<typeof weaponMode>;
 export type RangedData = z.infer<typeof rangedData>;
 export type PowerstoneData = z.infer<typeof powerstoneData>;
 export type MagicItemData = z.infer<typeof magicItemData>;

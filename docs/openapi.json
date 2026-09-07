@@ -5722,6 +5722,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -8799,6 +8836,43 @@
                         "type": "string",
                         "nullable": true,
                         "maxLength": 2000
+                      },
+                      "alternateModes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 40
+                            },
+                            "damage": {
+                              "type": "string",
+                              "maxLength": 160
+                            },
+                            "reach": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "parry": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "notes": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 2000
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        },
+                        "maxItems": 10,
+                        "default": []
                       }
                     }
                   },
@@ -9078,6 +9152,43 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 2000
+                        },
+                        "alternateModes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 40
+                              },
+                              "damage": {
+                                "type": "string",
+                                "maxLength": 160
+                              },
+                              "reach": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 40
+                              },
+                              "parry": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 40
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ]
+                          },
+                          "maxItems": 10,
+                          "default": []
                         }
                       }
                     },
@@ -9430,6 +9541,43 @@
                         "type": "string",
                         "nullable": true,
                         "maxLength": 2000
+                      },
+                      "alternateModes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 40
+                            },
+                            "damage": {
+                              "type": "string",
+                              "maxLength": 160
+                            },
+                            "reach": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "parry": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "notes": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 2000
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        },
+                        "maxItems": 10,
+                        "default": []
                       }
                     }
                   },
@@ -9706,6 +9854,43 @@
                           "type": "string",
                           "nullable": true,
                           "maxLength": 2000
+                        },
+                        "alternateModes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 40
+                              },
+                              "damage": {
+                                "type": "string",
+                                "maxLength": 160
+                              },
+                              "reach": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 40
+                              },
+                              "parry": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 40
+                              },
+                              "notes": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 2000
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ]
+                          },
+                          "maxItems": 10,
+                          "default": []
                         }
                       }
                     },
@@ -16920,6 +17105,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -18395,6 +18617,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -20118,6 +20377,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -21662,6 +21958,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -23370,6 +23703,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -25089,6 +25459,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -26576,6 +26983,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -28220,6 +28664,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -29874,6 +30355,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -31361,6 +31879,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -33024,6 +33579,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -34699,6 +35291,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -36186,6 +36815,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -37794,6 +38460,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -39414,6 +40117,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -40901,6 +41641,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -42516,6 +43293,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -44142,6 +44956,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -45629,6 +46480,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -46157,6 +47045,43 @@
                         "type": "string",
                         "nullable": true,
                         "maxLength": 2000
+                      },
+                      "alternateModes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 40
+                            },
+                            "damage": {
+                              "type": "string",
+                              "maxLength": 160
+                            },
+                            "reach": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "parry": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "notes": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 2000
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        },
+                        "maxItems": 10,
+                        "default": []
                       }
                     }
                   },
@@ -46448,6 +47373,43 @@
                               "type": "string",
                               "nullable": true,
                               "maxLength": 2000
+                            },
+                            "alternateModes": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 40
+                                  },
+                                  "damage": {
+                                    "type": "string",
+                                    "maxLength": 160
+                                  },
+                                  "reach": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "parry": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "notes": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 2000
+                                  }
+                                },
+                                "required": [
+                                  "name"
+                                ]
+                              },
+                              "maxItems": 10,
+                              "default": []
                             }
                           }
                         },
@@ -47707,6 +48669,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -48250,6 +49249,43 @@
                         "type": "string",
                         "nullable": true,
                         "maxLength": 2000
+                      },
+                      "alternateModes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 40
+                            },
+                            "damage": {
+                              "type": "string",
+                              "maxLength": 160
+                            },
+                            "reach": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "parry": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 40
+                            },
+                            "notes": {
+                              "type": "string",
+                              "nullable": true,
+                              "maxLength": 2000
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        },
+                        "maxItems": 10,
+                        "default": []
                       }
                     }
                   },
@@ -48538,6 +49574,43 @@
                               "type": "string",
                               "nullable": true,
                               "maxLength": 2000
+                            },
+                            "alternateModes": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 40
+                                  },
+                                  "damage": {
+                                    "type": "string",
+                                    "maxLength": 160
+                                  },
+                                  "reach": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "parry": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 40
+                                  },
+                                  "notes": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "maxLength": 2000
+                                  }
+                                },
+                                "required": [
+                                  "name"
+                                ]
+                              },
+                              "maxItems": 10,
+                              "default": []
                             }
                           }
                         },
@@ -49797,6 +50870,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -51284,6 +52394,43 @@
                                 "type": "string",
                                 "nullable": true,
                                 "maxLength": 2000
+                              },
+                              "alternateModes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
+                                    },
+                                    "damage": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "reach": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "parry": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 40
+                                    },
+                                    "notes": {
+                                      "type": "string",
+                                      "nullable": true,
+                                      "maxLength": 2000
+                                    }
+                                  },
+                                  "required": [
+                                    "name"
+                                  ]
+                                },
+                                "maxItems": 10,
+                                "default": []
                               }
                             }
                           },
@@ -52872,6 +54019,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -54372,6 +55556,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },
@@ -55870,6 +57091,43 @@
                                     "type": "string",
                                     "nullable": true,
                                     "maxLength": 2000
+                                  },
+                                  "alternateModes": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
+                                        },
+                                        "damage": {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        "reach": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "parry": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 40
+                                        },
+                                        "notes": {
+                                          "type": "string",
+                                          "nullable": true,
+                                          "maxLength": 2000
+                                        }
+                                      },
+                                      "required": [
+                                        "name"
+                                      ]
+                                    },
+                                    "maxItems": 10,
+                                    "default": []
                                   }
                                 }
                               },

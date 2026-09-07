@@ -60,6 +60,7 @@ function defaultWeapon(): WeaponData {
     db: null,
     ranged: null,
     notes: null,
+    alternateModes: [],
   };
 }
 
@@ -306,6 +307,7 @@ export function ItemEditDialog({
         db: dbNum,
         ranged: rangedPatch,
         notes: weapon.notes?.trim() || null,
+        alternateModes: weapon.alternateModes ?? [],
       };
     }
     const patch: InventoryItemUpdate = {

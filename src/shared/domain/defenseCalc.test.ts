@@ -245,12 +245,12 @@ describe('pickShield', () => {
   const shield = (name: string, db: number | null, equipped = true) => ({
     equipped,
     name,
-    weaponData: { db },
+    weaponData: { db, alternateModes: [] },
   });
 
   it('picks the equipped item with a non-null db', () => {
     const items = [
-      { equipped: true, name: 'Broadsword', weaponData: {} },
+      { equipped: true, name: 'Broadsword', weaponData: { alternateModes: [] } },
       shield('Medium Shield', 2),
     ];
     expect(pickShield(items)).toMatchObject({ name: 'Medium Shield', db: 2 });
