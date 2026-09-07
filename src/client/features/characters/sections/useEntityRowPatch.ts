@@ -17,7 +17,7 @@
  * verbatim.
  */
 
-import { useCallback } from 'react';
+import { type ChangeEvent, useCallback } from 'react';
 import type { EntityClass } from '../../../../shared/schemas/sync.ts';
 import { type UseDraftFieldReturn, useDraftField } from '../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
@@ -59,16 +59,94 @@ export function useEntityRowPatch(
   return { patch, flashKey };
 }
 
+/**
+ * Shared `useDraftField` config for a trimmed text column on a row
+ * entity. `useEntityNameField` is the `field: 'name'` case; anything
+ * else with the same shape (a technique's `defaultSkillName`) goes
+ * through this rather than borrowing the name field's config and
+ * overriding `onBlur`, which would bypass the hook's queueing and
+ * rollback state machine (AGENTS.md S10).
+ */
+export function useEntityTextField(
+  row: EntityRowPatch,
+  label: string,
+  field: string,
+  serverValue: string,
+  validate?: (v: string) => string | null,
+): UseDraftFieldReturn {
+  return useDraftField<string>({
+    name: label,
+    serverValue,
+    parse: (s) => s.trim(),
+    validate,
+    onSave: (v) => row.patch(field, v),
+    flashKey: row.flashKey(field),
+  });
+}
+
 /** Shared `useDraftField` config for the "name" input on a row entity. */
 export function useEntityNameField(row: EntityRowPatch, entityName: string): UseDraftFieldReturn {
-  return useDraftField<string>({
-    name: `${entityName} name`,
-    serverValue: entityName,
-    parse: (s) => s.trim(),
-    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: (v) => row.patch('name', v),
-    flashKey: row.flashKey('name'),
+  return useEntityTextField(row, `${entityName} name`, 'name', entityName, (v) =>
+    v.length > 0 ? null : 'name cannot be empty',
+  );
+}
+
+/**
+ * Select-driven companion to `useEntityNameField`: a `<select>` bound to
+ * an enum column on a row entity (language fluency, technique
+ * difficulty).
+ *
+ * Deliberately a thin wrapper over `useDraftField` rather than a second
+ * draft pattern (AGENTS.md S10): the only difference from a text input
+ * is that a select commits on *change* instead of on blur, so `onChange`
+ * calls `setValue` (which updates the hook's draft ref synchronously)
+ * and then `commit()`. Queued same-field commits, per-field server
+ * sync, and the toast + flash rollback all come from the hook unchanged.
+ */
+export interface EntityEnumFieldReturn {
+  readonly value: string;
+  readonly isSaving: boolean;
+  readonly selectProps: {
+    readonly value: string;
+    readonly onChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+    readonly 'data-flashing': 'true' | 'false';
+    readonly 'data-flash-parity': '0' | '1';
+  };
+}
+
+export function useEntityEnumField<V extends string>(
+  row: EntityRowPatch,
+  label: string,
+  field: string,
+  serverValue: V,
+  allowed: readonly V[],
+): EntityEnumFieldReturn {
+  const draft = useDraftField<V>({
+    name: label,
+    serverValue,
+    parse: (s) => s as V,
+    validate: (v) => (allowed.includes(v) ? null : `unknown ${label}`),
+    onSave: (v) => row.patch(field, v),
+    flashKey: row.flashKey(field),
   });
+  const { setValue, commit } = draft;
+  const onChange = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      setValue(e.target.value);
+      commit();
+    },
+    [setValue, commit],
+  );
+  return {
+    value: draft.value,
+    isSaving: draft.isSaving,
+    selectProps: {
+      value: draft.value,
+      onChange,
+      'data-flashing': draft.inputProps['data-flashing'],
+      'data-flash-parity': draft.inputProps['data-flash-parity'],
+    },
+  };
 }
 
 /**
@@ -88,5 +166,33 @@ export function useEntityPointsField(
     parse,
     onSave: (v) => row.patch('points', v),
     flashKey: row.flashKey('points'),
+  });
+}
+
+/**
+ * Draft-on-blur field for a technique's `defaultModifier` (its default
+ * line below the governing skill: 0 or a negative integer down to -99).
+ * Same shared-hook shape as `useEntityPointsField` (S10) — no forked
+ * draft pattern.
+ */
+export function useEntityDefaultModifierField(
+  row: EntityRowPatch,
+  entityName: string,
+  serverValue: number,
+): UseDraftFieldReturn {
+  return useDraftField<number>({
+    name: `${entityName} default modifier`,
+    serverValue,
+    parse: (s: string): number => {
+      const t = s.trim();
+      if (t.length === 0) return 0;
+      const n = Number(t);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < -99 || n > 0) {
+        throw new Error('0 or a negative integer (down to -99)');
+      }
+      return n;
+    },
+    onSave: (v) => row.patch('defaultModifier', v),
+    flashKey: row.flashKey('defaultModifier'),
   });
 }

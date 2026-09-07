@@ -1535,6 +1535,7 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
       // doesn't wipe YAML-authored data.
       powerstoneData: initial?.powerstoneData ?? null,
       magicItemData: initial?.magicItemData ?? null,
+      enchantments: initial?.enchantments ?? [],
     });
   }
 

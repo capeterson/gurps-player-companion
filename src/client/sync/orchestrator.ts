@@ -31,8 +31,10 @@ import {
   type LocalCharacter,
   type LocalCharacterCombat,
   type LocalCharacterInventory,
+  type LocalCharacterLanguage,
   type LocalCharacterSkill,
   type LocalCharacterSpell,
+  type LocalCharacterTechnique,
   type LocalCharacterTrait,
   type OutboxEntry,
   type RejectionRecord,
@@ -66,6 +68,8 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
   'character_trait',
   'character_skill',
   'character_spell',
+  'character_language',
+  'character_technique',
   'character_inventory',
   'character_combat',
   // Campaigns are pulled READ-ONLY: rows land in Dexie so
@@ -350,6 +354,8 @@ class SyncOrchestrator {
           'character_trait',
           'character_skill',
           'character_spell',
+          'character_language',
+          'character_technique',
           'character_inventory',
           'character_combat',
         ]);
@@ -1074,6 +1080,8 @@ class SyncOrchestrator {
       db.characterTraits,
       db.characterSkills,
       db.characterSpells,
+      db.characterLanguages,
+      db.characterTechniques,
       db.characterInventory,
       db.characterCombat,
       db.campaigns,
@@ -1149,6 +1157,12 @@ class SyncOrchestrator {
       case 'character_spell':
         await db.characterSpells.update(entityId, { revision });
         return;
+      case 'character_language':
+        await db.characterLanguages.update(entityId, { revision });
+        return;
+      case 'character_technique':
+        await db.characterTechniques.update(entityId, { revision });
+        return;
       case 'character_inventory':
         await db.characterInventory.update(entityId, { revision });
         return;
@@ -1181,6 +1195,12 @@ class SyncOrchestrator {
       case 'character_spell':
         await db.characterSpells.update(entityId, updates as Partial<LocalCharacterSpell>);
         return;
+      case 'character_language':
+        await db.characterLanguages.update(entityId, updates as Partial<LocalCharacterLanguage>);
+        return;
+      case 'character_technique':
+        await db.characterTechniques.update(entityId, updates as Partial<LocalCharacterTechnique>);
+        return;
       case 'character_inventory':
         await db.characterInventory.update(entityId, updates as Partial<LocalCharacterInventory>);
         return;
@@ -1206,6 +1226,12 @@ class SyncOrchestrator {
         return;
       case 'character_spell':
         await db.characterSpells.delete(entityId);
+        return;
+      case 'character_language':
+        await db.characterLanguages.delete(entityId);
+        return;
+      case 'character_technique':
+        await db.characterTechniques.delete(entityId);
         return;
       case 'character_inventory':
         await db.characterInventory.delete(entityId);
@@ -1245,6 +1271,8 @@ class SyncOrchestrator {
       await db.characterTraits.where('characterId').equals(op.entityId).delete();
       await db.characterSkills.where('characterId').equals(op.entityId).delete();
       await db.characterSpells.where('characterId').equals(op.entityId).delete();
+      await db.characterLanguages.where('characterId').equals(op.entityId).delete();
+      await db.characterTechniques.where('characterId').equals(op.entityId).delete();
       await db.characterInventory.where('characterId').equals(op.entityId).delete();
       await db.characterCombat.delete(op.entityId);
     } else if (op.entityClass === 'character_inventory') {
@@ -1326,9 +1354,15 @@ class SyncOrchestrator {
         .equals(id)
         .and(
           (o) =>
-            o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry',
+            o.entityClass === entityClass &&
+            (o.status === 'pending' || o.status === 'in_flight' || o.status === 'transient_retry'),
         )
         .toArray();
+      // A queued whole-entity delete has already removed the local row.
+      // Do not let a bootstrap/from-zero cursor pull resurrect it before
+      // the delete is acknowledged or rejected. Field-level protection
+      // below is insufficient because delete operations have no fieldPath.
+      if (dirty.some((op) => op.command === 'delete' && !op.fieldPath)) return;
       for (const op of dirty) {
         if (op.fieldPath && op.fieldPath in merged) {
           // Caller had a pending edit on this field; keep the local
@@ -1356,6 +1390,22 @@ class SyncOrchestrator {
       case 'character_spell': {
         const existing = await db.characterSpells.get(id);
         await db.characterSpells.put({ ...(existing ?? {}), ...merged } as LocalCharacterSpell);
+        return;
+      }
+      case 'character_language': {
+        const existing = await db.characterLanguages.get(id);
+        await db.characterLanguages.put({
+          ...(existing ?? {}),
+          ...merged,
+        } as LocalCharacterLanguage);
+        return;
+      }
+      case 'character_technique': {
+        const existing = await db.characterTechniques.get(id);
+        await db.characterTechniques.put({
+          ...(existing ?? {}),
+          ...merged,
+        } as LocalCharacterTechnique);
         return;
       }
       case 'character_inventory': {
@@ -1472,6 +1522,8 @@ class SyncOrchestrator {
         db.characterTraits,
         db.characterSkills,
         db.characterSpells,
+        db.characterLanguages,
+        db.characterTechniques,
         db.characterInventory,
         db.characterCombat,
       ],
@@ -1479,6 +1531,8 @@ class SyncOrchestrator {
         await db.characterTraits.where('characterId').anyOf(idArray).delete();
         await db.characterSkills.where('characterId').anyOf(idArray).delete();
         await db.characterSpells.where('characterId').anyOf(idArray).delete();
+        await db.characterLanguages.where('characterId').anyOf(idArray).delete();
+        await db.characterTechniques.where('characterId').anyOf(idArray).delete();
         await db.characterInventory.where('characterId').anyOf(idArray).delete();
         // Combat's primary key IS the characterId (1:1), so a straight
         // bulkDelete by pk works.  (`where('id')` is wrong here — `id`
@@ -1488,7 +1542,7 @@ class SyncOrchestrator {
         // Rewrite each minimal character's row down to identity-only
         // fields, mirroring `projectCharacterRow` on the server. The
         // identity columns (id / ownerId / campaignId / name / height /
-        // weight / age / appearance / timestamps / revision) are
+        // weight / age / birthdate / appearance / timestamps / revision) are
         // preserved; every private column is reset to its schema
         // default so derived stats and the combat tab can't recover
         // the masked character's real state. Tech level is no longer a
@@ -1625,6 +1679,8 @@ class SyncOrchestrator {
         db.characterTraits,
         db.characterSkills,
         db.characterSpells,
+        db.characterLanguages,
+        db.characterTechniques,
         db.characterInventory,
         db.characterCombat,
         db.campaigns,
@@ -1634,6 +1690,8 @@ class SyncOrchestrator {
           await db.characterTraits.where('characterId').anyOf(charIdsToDelete).delete();
           await db.characterSkills.where('characterId').anyOf(charIdsToDelete).delete();
           await db.characterSpells.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterLanguages.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterTechniques.where('characterId').anyOf(charIdsToDelete).delete();
           await db.characterInventory.where('characterId').anyOf(charIdsToDelete).delete();
           // Combat's primary key IS the characterId -- bulkDelete by pk,
           // not `where('id')` (unindexed, throws SchemaError).

@@ -60,7 +60,8 @@ touches mid-session, front-loaded so one tap lands there; on a
 read-only view of a non-magical character the Magic tab is hidden, and
 on any sheet the viewer can edit — their own — it always shows).
 
-- **Identity tab.** Name, height, weight, age, campaign assignment, and
+- **Identity tab.** Name, height, weight, age, **birthdate** (free-form
+  text, e.g. "3/7/0402"), campaign assignment, and
   an **appearance/notes** field. No per-character "player" field is
   tracked — the character's owner (the authenticated user who created
   it) is the player. **Tech level** is likewise not set per character:
@@ -106,6 +107,41 @@ on any sheet the viewer can edit — their own — it always shows).
   tappable roll target: it opens the same roll sheet used everywhere
   else on the character (dispatch only, so read-only viewers can roll
   too); null-level rows stay plain text.
+- **Point ledger** with one bucket per source: attributes, secondary
+  characteristics, advantages, disadvantages, quirks, languages, skills,
+  spells, and techniques, plus a derived `unspent`
+  (`campaign.pointTarget - total`; 0 when the campaign sets no target).
+  Spells used to be folded into the skills bucket and languages into
+  advantages; both now total the way a printed sheet does. Legacy
+  `kind='language'` trait rows still bill to the languages bucket
+  (migration 0028 moved the existing ones into `character_languages`);
+  `cultural_familiarity` stays an advantage until it gets an entity of
+  its own.
+- **Techniques** (`character_techniques`, sync-backed): Martial Arts
+  p. 87 techniques bought up from a named default skill. Difficulty is
+  Average (+1 per point) or Hard (the first point buys nothing, then +1
+  per point), clamped by an optional `maxLevel` cap. Each technique
+  carries its **default line** (`defaultModifier`: how far below the
+  governing skill the technique starts, e.g. -6), so a technique with a
+  written penalty doesn't expose the full skill level as a roll target
+  until points are bought up. The default skill
+  is resolved by name against the sheet — bare name or
+  `Name (Specialization)` — using the skill's *effective* level, so
+  Talents flow through; an unresolvable default renders an em dash with
+  a "Skill 'X' not on sheet" tooltip instead of guessing. The default
+  line and points are editable per row. A resolved
+  level is a tappable roll target like a skill's. Rendered on the Skills
+  tab. Martial-arts **styles** live in the campaign library only
+  (name + technique/perk/skill lists); a character adopts one by adding
+  its pieces, so there is no per-character style row.
+- **Languages** (`character_languages`, sync-backed) with independent
+  **spoken** and **written** fluency (None / Broken / Accented / Native,
+  plus `n/a` for sign languages, B23-24). Points auto-seed from the
+  fluency pair on the add form and stay overridable, so a free mother
+  tongue and a house-ruled cost are both expressible. They bill to their
+  own **languages** bucket in the point ledger rather than inflating
+  advantages, and the add form autocompletes against the campaign's
+  language library. Rendered on the Skills tab under the skills table.
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
   Spells have no default: a 0-point (legacy) spell row has a null level,
@@ -123,9 +159,16 @@ on any sheet the viewer can edit — their own — it always shows).
   The same chip row appears in the item edit dialog and the inventory
   add form's "More options" expander. Weapon data (damage, reach,
   parry, ST required, governing **skill**, shield **Defense Bonus**,
-  and an optional **ranged** stat block — Acc/Range/RoF/Shots/Bulk/
-  Recoil) is editable from the item edit dialog, and copied from
-  campaign library items on the inventory add form. Encumbered Move
+  an optional **ranged** stat block — Acc/Range/RoF/Shots/Bulk/
+  Recoil — and **alternate attack modes**: extra damage/reach/parry
+  rows beyond the primary line, e.g. swing + thrust + thrown) is
+  editable from the item edit dialog, and copied from
+  campaign library items on the inventory add form. Items can also
+  carry an **enchantments** list (B262 multi-enchant economy — e.g.
+  "Fortify +3" plus "Deflect +2" on one item), edited from the item
+  edit dialog and copied from library templates; it is non-mechanical
+  display metadata (nothing consumes it in combat math yet).
+  Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
 - **Combat tab (live-gameplay surface)**. The first tab on the sheet
@@ -151,15 +194,19 @@ on any sheet the viewer can edit — their own — it always shows).
     into one outbox patch and drop the first tap.
   - **Armor DR** — aggregates equipped armor DR per hit location
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
-    hit-location aim presets. Crushing-specific DR is shown where it
-    differs from the default. An **"Incoming damage…"** button opens a
-    dialog (`IncomingDamageDialog.tsx`) that resolves a hit against the
-    character's own DR: basic damage − DR(location, honoring an armor
-    divisor and the skull's natural DR 2, B400) → penetrating ×
-    wounding multiplier (B379/B398-400) = injury
-    (`src/shared/domain/injuryCalc.ts`), applied to HP through the same
-    shared `usePoolBumpers` instance as the rest of the tab. Crippling
-    is surfaced as a hint only, never auto-applied.
+    hit-location aim presets. Per-damage-type DR overrides
+    (`armorData.typedDr` — e.g. a hauberk with 6 vs cut, 4 vs imp) and
+    the legacy crushing-specific DR are shown where they differ from the
+    default. An **"Incoming damage…"** button opens a dialog
+    (`IncomingDamageDialog.tsx`) that resolves a hit against the
+    character's own DR: basic damage − DR(location) with the resolver
+    honoring the incoming type's typed override first, falling back to
+    the crushing override (`drCrushing`, for `cr`) then the default `dr`
+    (B378), dividing by an armor divisor and adding the skull's natural
+    DR 2 (B400) → penetrating × wounding multiplier (B379/B398-400) =
+    injury (`src/shared/domain/injuryCalc.ts`), applied to HP through
+    the same shared `usePoolBumpers` instance as the rest of the tab.
+    Crippling is surfaced as a hint only, never auto-applied.
   - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
     chip shows its blurb; tapping it again clears to no maneuver), plus
     a "Custom…" free-text fallback using the same `useDraftField`
@@ -178,7 +225,10 @@ on any sheet the viewer can edit — their own — it always shows).
     equipped shield — an item whose `weaponData.db` (Defense Bonus) is
     set, picked by `pickShield` — not merely the presence of a
     "Shield"-named skill; that shield's DB then adds to Dodge, every
-    Parry, and Block (B287). Every numeric defense opens the roll sheet.
+    Parry, and Block (B287), along with any **armor DB** from Deflect
+    enchantments (`armorData.db`, summed across all equipped armor by
+    `sumArmorDb`) — the captions break down both sources. Every numeric
+    defense opens the roll sheet.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
     thrust/swing + the weapon's modifiers) as **tappable chips that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
@@ -189,7 +239,12 @@ on any sheet the viewer can edit — their own — it always shows).
     penalties, B398-399) plus, for ranged weapons, an Aim(+Acc) preset
     and the B550 speed/range-penalty presets. Vitals presets appear
     only for impaling and piercing attacks, and the eye preset only for
-    impaling, piercing, and tight-beam burning attacks.
+    impaling, piercing, and tight-beam burning attacks. A weapon with
+    **alternate attack modes** (swing/thrust/thrown, `weaponData.alternateModes`)
+    renders each mode as its own labelled damage chip row in addition
+    to the primary line, with an alternate's reach inherited from the
+    weapon when unset; vitals/eye presets are offered only when at
+    least one mode across every damage line can target them.
   - **Roll sheet** — an ephemeral bottom-sheet/dialog roller with two
     variants sharing one shell. The default **check** variant: modifier
     stepper (−25..+10 — deep enough that a 200 yd range preset, B550,
@@ -251,18 +306,28 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   characters are **excluded from `/characters`** and browsable only from the
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
-- **Campaign library**: per-campaign catalog of traits, skills, spells, and
-  items, editable by the owner and **importable/exportable as versioned YAML**
-  for sharing between campaigns. The catalog editor lives at
-  `/campaigns/:id/library`; the top-nav **Library** page (`/library`,
+- **Campaign library**: per-campaign catalog of traits, skills, spells,
+  items, languages, techniques, and styles. The in-app catalog editor
+  (`/campaigns/:id/library`) offers dedicated CRUD forms for **traits,
+  skills, spells, and items**; **languages, techniques, and styles** are
+  authored via the versioned YAML import/export flow (or the owner-only
+  `.../library/{languages|techniques|styles}` REST routes the generic
+  factory registers) — the dedicated character-sheet Languages and
+  Techniques panels consume them through their autocompletes, and the
+  editor's table shows the counts. The whole catalog is also
+  **importable/exportable as versioned YAML**
+  for sharing between campaigns. The top-nav **Library** page (`/library`,
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
 - **Adventure log**: session log entries with per-entry visibility
-  (campaign-wide or private). The body is **markdown** (CommonMark + GFM)
-  rendered through a sanitized pipeline that never interprets raw HTML or
-  scripts. The create/edit form offers a Tiptap **rich text editor** with a
-  raw-markdown toggle; entries can be **edited or deleted** by their author or
-  the campaign owner. See campaign-content-sharing.md.
+  (campaign-wide or private), an optional **session number** (running
+  session ordinal, e.g. 13) and **location** (free-form text, e.g. "The
+  Hollow Beneath Greymoor"), and an optional **XP award** list per entry.
+  The body is **markdown** (CommonMark + GFM) rendered through a sanitized
+  pipeline that never interprets raw HTML or scripts. The create/edit form
+  offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
+  can be **edited or deleted** by their author or the campaign owner. See
+  campaign-content-sharing.md.
 - **Campaign history view**: campaign-level audit log (settings, membership,
   library, log), plus an owner/manager roll-up across member characters.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
@@ -355,8 +420,11 @@ src/
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
       characters/sections/  Sheet-panel form plumbing shared across
-                 Traits/Skills/Spells/Inventory: useAddEntityForm (the add
-                 form), useEntityRowPatch (per-row field patch dispatch),
+                 Traits/Skills/Spells/Languages/Techniques/Inventory:
+                 LanguagesPanel and TechniquesPanel (the new P0 panels),
+                 useAddEntityForm
+                 (the add form), useEntityRowPatch (per-row field patch
+                 dispatch, incl. useEntityEnumField for enum <select>s),
                  useClampedJsonbBumper (powerstone/magic-item charge
                   steppers), useTempEffects (the temporary-effects list
                   backing the Attributes panel's modifier popovers), shared
@@ -380,20 +448,25 @@ src/
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text
-     domain/      GURPS math (characterCalc, skillCalc, spellCalc, encumbrance,
+     domain/      GURPS math (characterCalc, skillCalc, spellCalc,
+                  techniqueCalc (level from default skill + points offset for
+                  A/H difficulty), encumbrance,
                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
-                  success-roll evaluation + NdM damage-dice rolling),
-                  damageParse (weapon damage-string parsing/resolution +
-                  the cut/imp/piercing 1-point damage floor), defenseCalc
-                  (Dodge/Parry/Block, explicit-or-fuzzy weapon-to-skill
-                  matching via `resolveWeaponSkill`, `skillDisplayName` for
-                  specialization-disambiguated skill names, ST-shortfall
-                  penalty, equipped-shield picking), injuryCalc (incoming-
-                  damage DR/divisor/wounding-multiplier resolution for the
-                  Armor DR card's damage dialog), armorDr (equipped-armor DR
-                  aggregation per hit location), conditions (snake_case
-                  condition normalization, tolerant of legacy Capitalized
-                  entries))
+                   success-roll evaluation + NdM damage-dice rolling),
+                   damageParse (weapon damage-string parsing/resolution +
+                   the cut/imp/piercing 1-point damage floor), defenseCalc
+                   (Dodge/Parry/Block, explicit-or-fuzzy weapon-to-skill
+                   matching via `resolveWeaponSkill`, `skillDisplayName` for
+                   specialization-disambiguated skill names, ST-shortfall
+                   penalty, equipped-shield picking), injuryCalc (incoming-
+                   damage DR/divisor/wounding-multiplier resolution for the
+                   Armor DR card's damage dialog), armorDr (equipped-armor DR
+                   aggregation per hit location + per-damage-type DR
+                   resolution via `resolveDr` with typed → crushing →
+                   default fallback, and armor DB summation via
+                   `sumArmorDb`), conditions (snake_case
+                   condition normalization, tolerant of legacy Capitalized
+                   entries))
     constants/   attributes, skills, traits, combat (postures, common
                  conditions, maneuvers), hitLocations (+ aim penalties),
                  rangePenalty (B550 speed/range roll presets), magic
@@ -447,7 +520,8 @@ Things that repeatedly surprise people working in this repo:
 
 1. **Sync coverage is partial and deliberate.** Only the character family
    (`character`, `character_trait`, `character_skill`, `character_spell`,
-   `character_inventory`, `character_combat`) flows through the outbox. Campaigns
+   `character_language`, `character_technique`, `character_inventory`,
+   `character_combat`) flows through the outbox. Campaigns
    are pulled **read-only** into Dexie; the campaign library, adventure log,
    invitations, and notifications are still **online-only** React-Query/HTTP
    surfaces. The `entityClass` enum lists more than the orchestrator pulls —

@@ -226,6 +226,7 @@ describe('GET /api/v1/characters/{id} — access matrix', () => {
       name: 'Fixture Character',
       campaignId: campaign.id,
       st: 17,
+      birthdate: '3/7/0402',
     });
     return { gm, owner, viewer, outsider, campaign, character };
   }
@@ -272,6 +273,8 @@ describe('GET /api/v1/characters/{id} — access matrix', () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.view).toBe('minimal');
     expect(body.name).toBe('Fixture Character');
+    // Birthdate is a public identity bit, same class as height/age.
+    expect(body.birthdate).toBe('3/7/0402');
     // Unlike the list endpoint (which masks st/dx/iq/ht to 10), the detail
     // minimal view omits these keys entirely.
     expect(body).not.toHaveProperty('st');
@@ -310,6 +313,7 @@ describe('POST /api/v1/sync/cursor — minimal-view masking includes tempEffects
       name: 'Secretly Buffed',
       campaignId: campaign.id,
       st: 17,
+      birthdate: '3/7/0402',
     });
     await app.request(`/api/v1/characters/${character.id}`, {
       method: 'PATCH',
@@ -335,6 +339,7 @@ describe('POST /api/v1/sync/cursor — minimal-view masking includes tempEffects
     expect(change?.data?.id).toBe(character.id);
     expect(change?.data?.name).toBe('Secretly Buffed');
     expect(change?.data?.campaignId).toBe(campaign.id);
+    expect(change?.data?.birthdate).toBe('3/7/0402');
     // Private columns are masked to safe defaults — never the real values.
     expect(change?.data?.st).toBe(10);
     expect(change?.data?.dx).toBe(10);
@@ -387,6 +392,53 @@ describe('PATCH /api/v1/characters/{id}', () => {
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.name).toBe('After');
     expect(body.st).toBe(13);
+  });
+
+  it('create and PATCH round-trip a free-form birthdate', async () => {
+    const { accessToken } = await registerUser('patch-birthdate');
+    const character = await createCharacter(accessToken, {
+      name: 'Born Somewhere',
+      birthdate: 'March 3, 1987',
+    });
+    expect(character.birthdate).toBe('March 3, 1987');
+
+    const res = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ birthdate: '3/3/87' }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.birthdate).toBe('3/3/87');
+
+    const getRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    const getBody = (await getRes.json()) as Record<string, unknown>;
+    expect(getBody.birthdate).toBe('3/3/87');
+  });
+
+  it('PATCH clears birthdate with null and rejects over-length values', async () => {
+    const { accessToken } = await registerUser('patch-birthdate-clear');
+    const character = await createCharacter(accessToken, {
+      name: 'Bday',
+      birthdate: 'On a Tuesday',
+    });
+
+    const res = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ birthdate: null }),
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as Record<string, unknown>).birthdate).toBeNull();
+
+    const bad = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ birthdate: 'x'.repeat(41) }),
+    });
+    expect(bad.status).toBe(422);
   });
 
   it('a non-owner campaign member cannot patch (403 "owner only")', async () => {

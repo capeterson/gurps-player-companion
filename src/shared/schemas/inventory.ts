@@ -1,14 +1,44 @@
 import { z } from 'zod';
 import { timestamps, uuid } from './common.ts';
 
+/**
+ * Per-damage-type DR overrides (GURPS B378, Martial Arts p. 100).
+ * Keys are canonical GURPS damage types. When present and non-null,
+ * the armor's DR against that type is this value instead of the base
+ * `dr`. Unset / null entries fall through to `drCrushing` (for `cr`)
+ * or `dr`.
+ */
+export const typedArmorDr = z.object({
+  cut: z.number().int().min(0).max(1000).nullable().optional(),
+  imp: z.number().int().min(0).max(1000).nullable().optional(),
+  pi: z.number().int().min(0).max(1000).nullable().optional(),
+  pi_minus: z.number().int().min(0).max(1000).nullable().optional(),
+  pi_plus: z.number().int().min(0).max(1000).nullable().optional(),
+  pi_pp: z.number().int().min(0).max(1000).nullable().optional(),
+  burn: z.number().int().min(0).max(1000).nullable().optional(),
+  corr: z.number().int().min(0).max(1000).nullable().optional(),
+  fat: z.number().int().min(0).max(1000).nullable().optional(),
+  tox: z.number().int().min(0).max(1000).nullable().optional(),
+});
+
 export const armorData = z.object({
   /** Hit-location strings; well-known values are in shared/constants/hitLocations.ts. */
   locations: z.array(z.string().min(1).max(40)).default([]),
+  /** Default DR against most damage types (B378). */
   dr: z.number().int().min(0).max(1000).default(0),
+  /** Crushing-specific DR override — legacy field preserved for backward compat. */
   drCrushing: z.number().int().min(0).max(1000).nullable().optional(),
+  /** Per-damage-type DR overrides (cut/imp/pi/burn/corr/fat/tox). */
+  typedDr: typedArmorDr.default({}),
   flexible: z.boolean().default(false),
   frontOnly: z.boolean().default(false),
   backOnly: z.boolean().default(false),
+  /**
+   * Defense Bonus from Deflect enchantments (B287). Non-null marks the
+   * armor as granting DB; when equipped, armor DB stacks with shield DB
+   * and adds to Dodge, every Parry, and Block.
+   */
+  db: z.number().int().min(0).max(4).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
 });
 
@@ -25,6 +55,27 @@ export const rangedData = z.object({
   shots: z.string().max(20).nullable().optional(),
   bulk: z.number().int().min(-12).max(0).nullable().optional(),
   recoil: z.number().int().min(1).max(9).nullable().optional(),
+});
+
+/**
+ * One alternate attack mode on a weapon (Basic Set p. 271 weapon tables
+ * list several rows per weapon: a rapier swings AND thrusts, a spear can
+ * be thrown).  The weapon's own top-level `damage` / `reach` / `parry`
+ * are the PRIMARY mode; these are the extra rows.
+ *
+ * `reach` / `parry` are optional per mode: an alternate that leaves them
+ * unset inherits the weapon's primary values (a swing and a thrust with
+ * the same reach only has to state it once).  Defence math always uses
+ * the primary parry -- you parry with the weapon, not with one of its
+ * damage lines.
+ */
+export const weaponMode = z.object({
+  /** "Swing", "Thrust", "Thrown", ... */
+  name: z.string().min(1).max(40).trim(),
+  damage: z.string().max(160).optional(),
+  reach: z.string().max(40).nullable().optional(),
+  parry: z.string().max(40).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
 });
 
 export const weaponData = z.object({
@@ -52,6 +103,11 @@ export const weaponData = z.object({
    *  top-level `damage` field. */
   ranged: rangedData.nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
+  /**
+   * Extra attack modes beyond the primary one (swing/thrust/thrown).
+   * Defaults to `[]`, so every pre-existing weapon row parses unchanged.
+   */
+  alternateModes: z.array(weaponMode).max(10).default([]),
 });
 
 /**
@@ -89,6 +145,25 @@ export const powerstoneData = z
  * casting from a magic item is independent of the user's own Magery.
  */
 export const magicItemMode = z.enum(['charged', 'powered', 'continuous']);
+
+/**
+ * One enchantment on an inventory item (B262 enchantment economy, the
+ * veteran sheet's "Fortify +3" / "Deflect +2" / "Cornucopia" rows).
+ * Multiple enchantments stack on one item, so this is a list on the
+ * item row rather than a separate magicItemData block (which models a
+ * single *castable* spell). Non-mechanical metadata: nothing consumes
+ * it in combat math yet; it records what the enchantments are.
+ */
+export const enchantmentRef = z.object({
+  /** The enchantment's spell name, e.g. "Fortify". */
+  spellName: z.string().min(1).max(160),
+  /** Enchanter's skill when the item was made (GURPS item spells are
+   * cast at a fixed level); null = unknown/unrecorded. */
+  spellLevel: z.number().int().min(0).max(40).nullable().optional(),
+  /** Free-text category label, e.g. "Fortify +3" or "Deflect +2". */
+  category: z.string().max(80).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+});
 
 export const magicItemData = z
   .object({
@@ -131,6 +206,7 @@ export const inventoryItemOut = z.object({
   weaponData: weaponData.nullable(),
   powerstoneData: powerstoneData.nullable(),
   magicItemData: magicItemData.nullable(),
+  enchantments: z.array(enchantmentRef).max(50).default([]),
   libraryItemId: uuid.nullable(),
   /** Server-computed convenience field. */
   effectiveWeightLbs: z.number(),
@@ -155,6 +231,7 @@ export const inventoryItemCreate = z.object({
   weaponData: weaponData.nullable().optional(),
   powerstoneData: powerstoneData.nullable().optional(),
   magicItemData: magicItemData.nullable().optional(),
+  enchantments: z.array(enchantmentRef).max(50).default([]),
   libraryItemId: uuid.nullable().optional(),
 });
 
@@ -163,9 +240,12 @@ export const inventoryItemUpdate = inventoryItemCreate.partial();
 export type InventoryItemOut = z.infer<typeof inventoryItemOut>;
 export type InventoryItemCreate = z.infer<typeof inventoryItemCreate>;
 export type InventoryItemUpdate = z.infer<typeof inventoryItemUpdate>;
+export type TypedArmorDr = z.infer<typeof typedArmorDr>;
 export type ArmorData = z.infer<typeof armorData>;
 export type WeaponData = z.infer<typeof weaponData>;
+export type WeaponMode = z.infer<typeof weaponMode>;
 export type RangedData = z.infer<typeof rangedData>;
 export type PowerstoneData = z.infer<typeof powerstoneData>;
 export type MagicItemData = z.infer<typeof magicItemData>;
 export type MagicItemMode = z.infer<typeof magicItemMode>;
+export type EnchantmentRef = z.infer<typeof enchantmentRef>;

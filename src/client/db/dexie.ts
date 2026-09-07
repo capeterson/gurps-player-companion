@@ -11,6 +11,8 @@
  *   characters         pk=id
  *   characterTraits    pk=id
  *   characterSkills    pk=id
+ *   characterLanguages pk=id
+ *   characterTechniques pk=id
  *   characterInventory pk=id
  *   characterCombat    pk=characterId  (1:1 with characters)
  *   campaigns          pk=id
@@ -46,6 +48,7 @@ export interface LocalCharacter {
   height: string | null;
   weight: string | null;
   age: number | null;
+  birthdate: string | null;
   appearance: string | null;
   st: number;
   dx: number;
@@ -134,6 +137,36 @@ export interface LocalCharacterSpell {
   revision: number;
 }
 
+export interface LocalCharacterLanguage {
+  id: string;
+  characterId: string;
+  name: string;
+  spokenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  writtenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  points: number;
+  notes: string | null;
+  libraryLanguageId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCharacterTechnique {
+  id: string;
+  characterId: string;
+  name: string;
+  defaultSkillName: string;
+  difficulty: 'A' | 'H';
+  points: number;
+  defaultModifier: number;
+  maxLevel: number | null;
+  notes: string | null;
+  libraryTechniqueId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
 export interface LocalCharacterInventory {
   id: string;
   characterId: string;
@@ -154,6 +187,7 @@ export interface LocalCharacterInventory {
   weaponData: unknown | null;
   powerstoneData: unknown | null;
   magicItemData: unknown | null;
+  enchantments: unknown | null;
   libraryItemId: string | null;
   createdAt: string;
   updatedAt: string;
@@ -464,6 +498,8 @@ class LocalDb extends Dexie {
   characterTraits!: Table<LocalCharacterTrait, string>;
   characterSkills!: Table<LocalCharacterSkill, string>;
   characterSpells!: Table<LocalCharacterSpell, string>;
+  characterLanguages!: Table<LocalCharacterLanguage, string>;
+  characterTechniques!: Table<LocalCharacterTechnique, string>;
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
   campaigns!: Table<LocalCampaign, string>;
@@ -530,6 +566,14 @@ class LocalDb extends Dexie {
       // One private scratchpad per character, never synced to the server.
       soloEncounters: 'characterId, updatedAt',
     });
+    // v7 adds character_languages (sync-backed, S6).
+    this.version(7).stores({
+      characterLanguages: 'id, characterId, updatedAt, revision',
+    });
+    // v8 adds character_techniques (sync-backed, S6).
+    this.version(8).stores({
+      characterTechniques: 'id, characterId, updatedAt, revision',
+    });
   }
 }
 
@@ -562,6 +606,8 @@ export const ALL_STORE_NAMES = [
   'characterTraits',
   'characterSkills',
   'characterSpells',
+  'characterLanguages',
+  'characterTechniques',
   'characterInventory',
   'characterCombat',
   'campaigns',
@@ -588,6 +634,10 @@ export function storeForEntityClass(entityClass: EntityClass): keyof LocalDb | n
       return 'characterSkills';
     case 'character_spell':
       return 'characterSpells';
+    case 'character_language':
+      return 'characterLanguages';
+    case 'character_technique':
+      return 'characterTechniques';
     case 'character_inventory':
       return 'characterInventory';
     case 'character_combat':

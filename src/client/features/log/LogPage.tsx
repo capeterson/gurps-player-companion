@@ -22,16 +22,24 @@ type FilterKind = 'all' | 'shared' | 'private';
  * rather than `draft.title`. */
 interface DraftSnapshot {
   sessionDate: string;
+  sessionNumber: number | null;
   title: string;
+  location: string;
   body: string;
   visibility: AdventureLogCreate['visibility'];
   xpAwards: XpAward[];
 }
 
-function snapshotOf(draft: AdventureLogCreate, trimmedTitle: string): DraftSnapshot {
+function snapshotOf(
+  draft: AdventureLogCreate,
+  trimmedTitle: string,
+  trimmedLocation: string,
+): DraftSnapshot {
   return {
     sessionDate: draft.sessionDate,
+    sessionNumber: draft.sessionNumber ?? null,
     title: trimmedTitle,
+    location: trimmedLocation,
     body: draft.body,
     visibility: draft.visibility,
     xpAwards: draft.xpAwards,
@@ -45,7 +53,9 @@ function snapshotOf(draft: AdventureLogCreate, trimmedTitle: string): DraftSnaps
  * (string + number) */
 function snapshotMatches(a: DraftSnapshot, b: DraftSnapshot): boolean {
   if (a.sessionDate !== b.sessionDate) return false;
+  if (a.sessionNumber !== b.sessionNumber) return false;
   if (a.title !== b.title) return false;
+  if (a.location !== b.location) return false;
   if (a.body !== b.body) return false;
   if (a.visibility !== b.visibility) return false;
   if (a.xpAwards.length !== b.xpAwards.length) return false;
@@ -89,7 +99,9 @@ function formatDate(iso: string): string {
 function emptyDraft(): AdventureLogCreate {
   return {
     sessionDate: todayIso(),
+    sessionNumber: null,
     title: '',
+    location: '',
     body: '',
     visibility: 'campaign',
     xpAwards: [],
@@ -99,7 +111,9 @@ function emptyDraft(): AdventureLogCreate {
 function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
   return {
     sessionDate: entry.sessionDate,
+    sessionNumber: entry.sessionNumber,
     title: entry.title,
+    location: entry.location ?? '',
     body: entry.body,
     visibility: entry.visibility,
     xpAwards: entry.xpAwards,
@@ -187,7 +201,10 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       // it would silently throw away what they're typing.
       if (
         editor.kind === 'create' &&
-        snapshotMatches(snapshotOf(draft, draft.title.trim()), variables.snapshot)
+        snapshotMatches(
+          snapshotOf(draft, draft.title.trim(), (draft.location ?? '').trim()),
+          variables.snapshot,
+        )
       ) {
         setEditor({ kind: 'hidden' });
         setDraft(emptyDraft());
@@ -218,7 +235,10 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       if (
         editor.kind === 'edit' &&
         editor.entryId === entryId &&
-        snapshotMatches(snapshotOf(draft, draft.title.trim()), snapshot)
+        snapshotMatches(
+          snapshotOf(draft, draft.title.trim(), (draft.location ?? '').trim()),
+          snapshot,
+        )
       ) {
         setEditor({ kind: 'hidden' });
         setDraft(emptyDraft());
@@ -288,19 +308,24 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     e.preventDefault();
     const trimmed = draft.title.trim();
     if (!trimmed) return;
+    const trimmedLocation = (draft.location ?? '').trim();
+    // Explicit null (not undefined) so an emptied box clears the stored
+    // value on PATCH — buildPatchSet treats undefined as "field omitted".
+    const location = trimmedLocation === '' ? null : trimmedLocation;
+    const sessionNumber = draft.sessionNumber ?? null;
     // Snapshot the draft at submit time so the mutation's `onSuccess`
     // can tell whether the editor still corresponds to this save or
     // whether the user has typed further since (in which case we keep
     // the newer draft rather than silently wiping it).
-    const snapshot = snapshotOf(draft, trimmed);
+    const snapshot = snapshotOf(draft, trimmed, trimmedLocation);
     if (editor.kind === 'edit') {
       update.mutate({
         entryId: editor.entryId,
         snapshot,
-        patch: { ...draft, title: trimmed },
+        patch: { ...draft, title: trimmed, location, sessionNumber },
       });
     } else {
-      create.mutate({ snapshot, payload: { ...draft, title: trimmed } });
+      create.mutate({ snapshot, payload: { ...draft, title: trimmed, location, sessionNumber } });
     }
   };
 
@@ -432,6 +457,37 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
             </label>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-[7rem_1fr]">
+            <label className="form-control">
+              <span className="label-text">Session #</span>
+              <input
+                type="number"
+                min={1}
+                className="input input-bordered"
+                value={draft.sessionNumber ?? ''}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    sessionNumber: e.target.value === '' ? null : Number(e.target.value),
+                  })
+                }
+                placeholder="13"
+                aria-label="Session number"
+              />
+            </label>
+            <label className="form-control">
+              <span className="label-text">Location</span>
+              <input
+                type="text"
+                className="input input-bordered"
+                value={draft.location ?? ''}
+                onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+                placeholder="The Hollow Beneath Greymoor"
+                aria-label="Location"
+              />
+            </label>
+          </div>
+
           <div className="form-control">
             <span className="label-text">Body</span>
             <RichTextEditor
@@ -480,6 +536,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
               <div className="mb-1 flex items-baseline justify-between gap-3">
                 <span className="num text-xs uppercase tracking-widest text-dim">
                   {formatDate(entry.sessionDate)}
+                  {entry.sessionNumber !== null && <span> · Session {entry.sessionNumber}</span>}
                   <span className="ml-2 normal-case tracking-normal text-muted">
                     by <span className="text-base-content">{entry.authorDisplayName}</span>
                   </span>
@@ -516,6 +573,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                 </div>
               </div>
               <h3 className="font-display text-2xl font-semibold leading-tight">{entry.title}</h3>
+              {entry.location && <p className="mt-1 text-sm text-muted">{entry.location}</p>}
               <div className="log-entry-body mt-3">
                 <Markdown source={entry.body} className="text-sm leading-relaxed" />
               </div>

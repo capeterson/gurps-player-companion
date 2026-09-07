@@ -6,6 +6,8 @@ export * from './character.ts';
 export * from './trait.ts';
 export * from './skill.ts';
 export * from './inventory.ts';
+export * from './language.ts';
+export * from './technique.ts';
 export * from './combat.ts';
 export * from './adventureLog.ts';
 export * from './encounter.ts';

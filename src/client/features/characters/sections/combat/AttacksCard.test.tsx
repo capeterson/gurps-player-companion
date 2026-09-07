@@ -188,4 +188,86 @@ describe('AttacksCard', () => {
       armorDivisor: null,
     });
   });
+
+  it('renders each alternate mode as its own damage chip, reach inherited when unset', () => {
+    const openRoll = vi.fn();
+    // Primary: swing; alternates: thrust (reach set) + thrown (reach unset
+    // => inherited from the weapon's "1").
+    const character = {
+      id: 'char-1',
+      derived: { effectiveSt: 10 },
+      skills: [{ id: 's1', name: 'Broadsword', level: 14 }],
+      inventory: [
+        {
+          id: 'w1',
+          name: 'Rapier',
+          equipped: true,
+          weaponData: {
+            damage: 'sw-1 cut',
+            reach: '1',
+            parry: '0',
+            stRequired: null,
+            skill: 'Broadsword',
+            ranged: null,
+            alternateModes: [
+              { name: 'Thrust', damage: 'thr imp', reach: '2' },
+              { name: 'Thrown', damage: 'thr imp' },
+            ],
+          },
+        },
+      ],
+    } as unknown as CharacterDetail;
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+
+    // Primary chip (swing) plus two mode chips.
+    expect(screen.getByRole('button', { name: '1d-1 cut' })).toBeInTheDocument();
+    // Mode names render as labels.
+    expect(screen.getByText('Thrust')).toBeInTheDocument();
+    expect(screen.getByText('Thrown')).toBeInTheDocument();
+
+    // Two impulse damage chips (thrust + thrown) at ST 10 (thr = 1d-2).
+    expect(screen.getAllByRole('button', { name: '1d-2 imp' })).toHaveLength(2);
+
+    // A mode with its own reach shows that reach; an unset one inherits the
+    // weapon's "1". Each reach renders as "· reach <value>" in one span.
+    expect(screen.getByText(/reach 2/)).toBeInTheDocument();
+    expect(screen.getAllByText(/reach 1/)).toHaveLength(2);
+
+    // Rolling the thrust mode labels the roll with "Rapier (Thrust)".
+    const thrustChips = screen.getAllByRole('button', { name: '1d-2 imp' });
+    fireEvent.click(thrustChips[0] as HTMLElement);
+    const call = openRoll.mock.calls[0] as [RollRequest];
+    expect(call[0].label).toBe('Rapier (Thrust) damage');
+  });
+
+  it('a weapon with a cut-only primary but impaling alternates still offers Vitals/Eye', () => {
+    const openRoll = vi.fn();
+    const character = {
+      id: 'char-1',
+      derived: { effectiveSt: 10 },
+      skills: [{ id: 's1', name: 'Broadsword', level: 14 }],
+      inventory: [
+        {
+          id: 'w1',
+          name: 'Broadsword',
+          equipped: true,
+          weaponData: {
+            damage: 'sw+1 cut',
+            reach: '1',
+            parry: '0',
+            stRequired: null,
+            skill: 'Broadsword',
+            ranged: null,
+            alternateModes: [{ name: 'Thrust', damage: 'thr imp' }],
+          },
+        },
+      ],
+    } as unknown as CharacterDetail;
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
+    const presets = presetsFrom(openRoll);
+    expect(presets.some((p: { label: string }) => p.label.startsWith('Vitals'))).toBe(true);
+    expect(presets.some((p: { label: string }) => p.label.startsWith('Eye'))).toBe(true);
+  });
 });

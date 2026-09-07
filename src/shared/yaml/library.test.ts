@@ -313,6 +313,9 @@ describe('emitLibraryYaml', () => {
       skills: doc.library.skills,
       spells: doc.library.spells ?? [],
       items: doc.library.items,
+      languages: doc.library.languages ?? [],
+      techniques: doc.library.techniques ?? [],
+      styles: doc.library.styles ?? [],
     });
     const reparsed = parseLibraryYaml(reemit);
     expect(reparsed.library.spells).toHaveLength(2);
@@ -332,6 +335,9 @@ describe('emitLibraryYaml', () => {
       skills: doc.library.skills,
       spells: doc.library.spells ?? [],
       items: doc.library.items,
+      languages: doc.library.languages ?? [],
+      techniques: doc.library.techniques ?? [],
+      styles: doc.library.styles ?? [],
     });
     const docB = parseLibraryYaml(first);
     const second = emitLibraryYaml({
@@ -340,6 +346,9 @@ describe('emitLibraryYaml', () => {
       skills: docB.library.skills,
       spells: docB.library.spells ?? [],
       items: docB.library.items,
+      languages: docB.library.languages ?? [],
+      techniques: docB.library.techniques ?? [],
+      styles: docB.library.styles ?? [],
     });
     expect(second).toBe(first);
   });
@@ -352,8 +361,11 @@ describe('emitLibraryYaml', () => {
       skills: doc.library.skills,
       spells: doc.library.spells ?? [],
       items: doc.library.items,
+      languages: doc.library.languages ?? [],
+      techniques: doc.library.techniques ?? [],
+      styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 3');
+    expect(first).toContain('version: 5');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);
@@ -363,6 +375,9 @@ describe('emitLibraryYaml', () => {
       skills: docB.library.skills,
       spells: docB.library.spells ?? [],
       items: docB.library.items,
+      languages: docB.library.languages ?? [],
+      techniques: docB.library.techniques ?? [],
+      styles: docB.library.styles ?? [],
     });
     expect(second).toBe(first);
 
@@ -388,6 +403,9 @@ describe('emitLibraryYaml', () => {
       skills: [],
       spells: [],
       items: [],
+      languages: [],
+      techniques: [],
+      styles: [],
     });
     expect(out).not.toMatch(/tags:/);
     expect(out).toMatch(/Hard to Kill/);

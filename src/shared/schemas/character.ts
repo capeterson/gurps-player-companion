@@ -4,8 +4,10 @@ import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 import { effectTarget } from './effects.ts';
 import { inventoryItemOut } from './inventory.ts';
+import { languageOut } from './language.ts';
 import { skillOut } from './skill.ts';
 import { spellOut } from './spell.ts';
+import { techniqueOut } from './technique.ts';
 import { traitOut } from './trait.ts';
 
 const attr = z.number().int().min(1).max(99);
@@ -144,6 +146,8 @@ export const characterIdentityShape = {
   height: z.string().max(40).nullable().optional(),
   weight: z.string().max(40).nullable().optional(),
   age: z.number().int().min(0).max(10_000).nullable().optional(),
+  /** Free-form birthdate text (e.g. "March 3, 1987"). Non-mechanical metadata. */
+  birthdate: z.string().max(40).nullable().optional(),
   appearance: z.string().max(20_000).nullable().optional(),
   campaignId: uuid.nullable().optional(),
 } as const;
@@ -233,8 +237,16 @@ export const pointBreakdownOut = z.object({
   advantages: z.number().int(),
   disadvantages: z.number().int(),
   quirks: z.number().int(),
+  /** `character_languages` rows, billed to their own bucket (not advantages). */
+  languages: z.number().int(),
   skills: z.number().int(),
+  /** `character_spells` rows, totalled separately from skills. */
+  spells: z.number().int(),
+  /** `character_techniques` rows, bought up from a default skill. */
+  techniques: z.number().int(),
   total: z.number().int(),
+  /** `campaign.pointTarget - total`; 0 when the campaign sets no target. */
+  unspent: z.number().int(),
 });
 
 export const warningOut = z.object({
@@ -296,6 +308,8 @@ export const characterDetail = z.object({
   traits: z.array(traitOut),
   skills: z.array(skillOut),
   spells: z.array(spellOut),
+  languages: z.array(languageOut),
+  techniques: z.array(techniqueOut),
   inventory: z.array(inventoryItemOut),
   combat: combatStateOut.nullable(),
   /**
@@ -322,6 +336,7 @@ export const characterMinimalOut = z.object({
   height: z.string().nullable(),
   weight: z.string().nullable(),
   age: z.number().int().nullable(),
+  birthdate: z.string().nullable(),
   appearance: z.string().nullable(),
   techLevel: z.number().int().nullable(),
   updatedAt: isoTimestamp,

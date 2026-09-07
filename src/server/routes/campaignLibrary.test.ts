@@ -301,6 +301,26 @@ describe('YAML export/import round trip', () => {
       headers: jsonHeaders(ownerToken),
       body: JSON.stringify({ name: 'Rope (50ft)', weightLbs: 8 }),
     });
+    await app.request(`/api/v1/campaigns/${campaignId}/library/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(ownerToken),
+      body: JSON.stringify({ name: 'Elder Speech', source: 'B23' }),
+    });
+    await app.request(`/api/v1/campaigns/${campaignId}/library/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(ownerToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Fencing', difficulty: 'H' }),
+    });
+    await app.request(`/api/v1/campaigns/${campaignId}/library/styles`, {
+      method: 'POST',
+      headers: jsonHeaders(ownerToken),
+      body: JSON.stringify({
+        name: 'Sword-and-Buckler',
+        techniques: [{ name: 'Feint', defaultSkillName: 'Fencing', difficulty: 'H' }],
+        perks: ['Off-Hand Weapon Training'],
+        skills: ['Fencing'],
+      }),
+    });
   }
 
   async function exportYaml(ownerToken: string, campaignId: string): Promise<string> {
@@ -317,11 +337,13 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 3');
+    expect(yaml).toContain('version: 5');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
     expect(yaml).toContain('Rope');
+    expect(yaml).toContain('Elder Speech');
+    expect(yaml).toContain('Sword-and-Buckler');
   });
 
   it('export includes the campaign manaLevel', async () => {
@@ -716,6 +738,46 @@ library:
     const secondYaml = await exportYaml(owner.accessToken, campaign.id as string);
     expect(secondYaml).toBe(firstYaml);
   });
+
+  it('enchantments survive POST -> GET list -> export -> import -> export (v5 doc)', async () => {
+    const owner = await registerUser('item-enchant-roundtrip');
+    const campaign = await createCampaign(owner.accessToken);
+    const enchantments = [
+      { spellName: 'Fortify', spellLevel: 18, category: 'Fortify +3' },
+      { spellName: 'Deflect', category: 'Deflect +2' },
+    ];
+    const postRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Phoenix Cloak', enchantments }),
+    });
+    expect(postRes.status).toBe(201);
+    const created = (await postRes.json()) as { enchantments: unknown[] };
+    expect(created.enchantments).toEqual(enchantments);
+
+    // The aggregate library GET projects them too.
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const list = (await listRes.json()) as {
+      items: Array<{ name: string; enchantments: unknown[] }>;
+    };
+    expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
+
+    const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
+    expect(firstYaml).toContain('version: 5');
+    expect(firstYaml).toContain('enchantments:');
+
+    const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: firstYaml }),
+    });
+    expect(importRes.status).toBe(200);
+
+    const secondYaml = await exportYaml(owner.accessToken, campaign.id as string);
+    expect(secondYaml).toBe(firstYaml);
+  });
 });
 
 describe('case-insensitive natural keys (migration 0021)', () => {
@@ -797,5 +859,373 @@ library:
     expect(list.items.length).toBe(1);
     expect(list.items[0]?.name).toBe('Sword'); // existing row's name kept, not renamed
     expect(list.items[0]?.cost).toBe(75); // fields still updated in place
+  });
+});
+
+// ===================== LANGUAGES =====================
+
+describe('library language CRUD', () => {
+  it('POST creates with isSignLanguage defaulting to false; PATCH updates; DELETE removes', async () => {
+    const owner = await registerUser('lang-crud');
+    const campaign = await createCampaign(owner.accessToken);
+    const createRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Elder Speech' }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as Record<string, unknown>;
+    expect(created.isSignLanguage).toBe(false);
+    expect(created.description).toBeNull();
+
+    const patchRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/languages/${created.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ isSignLanguage: true, source: 'B24' }),
+      },
+    );
+    expect(patchRes.status).toBe(200);
+    const patched = (await patchRes.json()) as Record<string, unknown>;
+    expect(patched.isSignLanguage).toBe(true);
+    expect(patched.source).toBe('B24');
+
+    const delRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/languages/${created.id}`,
+      { method: 'DELETE', headers: bearer(owner.accessToken) },
+    );
+    expect(delRes.status).toBe(204);
+  });
+
+  it('rejects a duplicate name case-insensitively (409)', async () => {
+    const owner = await registerUser('lang-dupe');
+    const campaign = await createCampaign(owner.accessToken);
+    const post = (name: string) =>
+      app.request(`/api/v1/campaigns/${campaign.id}/library/languages`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ name }),
+      });
+    expect((await post('Elder Speech')).status).toBe(201);
+    expect((await post('elder speech')).status).toBe(409);
+  });
+
+  it('a non-owner member cannot write library languages (403) but can read the list', async () => {
+    const owner = await registerUser('lang-lib-owner');
+    const member = await registerUser('lang-lib-member');
+    const campaign = await createCampaign(owner.accessToken);
+    await addMember(owner.accessToken, campaign.id as string, member.email);
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Elder Speech' }),
+    });
+
+    const writeRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(member.accessToken),
+      body: JSON.stringify({ name: 'Sneaky' }),
+    });
+    expect(writeRes.status).toBe(403);
+
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(member.accessToken),
+    });
+    expect(listRes.status).toBe(200);
+    const list = (await listRes.json()) as { languages: { name: string }[] };
+    expect(list.languages.map((l) => l.name)).toEqual(['Elder Speech']);
+  });
+
+  it('YAML round-trips languages and a pre-v4 doc with no languages section never prunes them', async () => {
+    const owner = await registerUser('lang-yaml');
+    const campaign = await createCampaign(owner.accessToken);
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Elder Speech', source: 'B23', isSignLanguage: true }),
+    });
+
+    const exportRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/export`, {
+      headers: bearer(owner.accessToken),
+    });
+    const exported = await exportRes.text();
+    expect(exported).toContain('Elder Speech');
+    expect(exported).toContain('isSignLanguage: true');
+
+    // Replace-mode import of the same document is a no-op update.
+    const reimport = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: exported, mode: 'replace' }),
+    });
+    expect(reimport.status).toBe(200);
+    const counts = (await reimport.json()) as {
+      languages: { created: number; updated: number; deleted: number };
+    };
+    expect(counts.languages).toEqual({ created: 0, updated: 1, deleted: 0 });
+
+    // A legacy document with no `languages:` key must leave them alone
+    // even in replace mode (same contract as the pre-spell-library docs).
+    const legacy = 'version: 3\nlibrary:\n  traits: []\n  skills: []\n  items: []\n';
+    const legacyImport = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: legacy, mode: 'replace' }),
+    });
+    expect(legacyImport.status).toBe(200);
+    const legacyCounts = (await legacyImport.json()) as {
+      languages: { created: number; updated: number; deleted: number };
+    };
+    expect(legacyCounts.languages).toEqual({ created: 0, updated: 0, deleted: 0 });
+
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const list = (await listRes.json()) as { languages: { name: string }[] };
+    expect(list.languages.map((l) => l.name)).toEqual(['Elder Speech']);
+  });
+
+  it('an explicit empty languages section prunes them in replace mode', async () => {
+    const owner = await registerUser('lang-yaml-prune');
+    const campaign = await createCampaign(owner.accessToken);
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Elder Speech' }),
+    });
+    const yaml = 'version: 4\nlibrary:\n  traits: []\n  skills: []\n  items: []\n  languages: []\n';
+    const res = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml, mode: 'replace' }),
+    });
+    expect(res.status).toBe(200);
+    const counts = (await res.json()) as { languages: { deleted: number } };
+    expect(counts.languages.deleted).toBe(1);
+  });
+});
+
+// ===================== TECHNIQUES & STYLES =====================
+
+describe('library technique CRUD', () => {
+  it('POST creates with difficulty defaulting to A; PATCH updates; DELETE removes', async () => {
+    const owner = await registerUser('tech-lib-crud');
+    const campaign = await createCampaign(owner.accessToken);
+    const createRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword' }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as Record<string, unknown>;
+    expect(created.difficulty).toBe('A');
+    expect(created.maxLevel).toBeNull();
+    expect(created.defaultModifier).toBe(0);
+
+    const patchRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/techniques/${created.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          difficulty: 'H',
+          maxLevel: 4,
+          defaultModifier: -7,
+          prereq: 'Broadsword at DX+1',
+        }),
+      },
+    );
+    expect(patchRes.status).toBe(200);
+    const patched = (await patchRes.json()) as Record<string, unknown>;
+    expect(patched.difficulty).toBe('H');
+    expect(patched.maxLevel).toBe(4);
+    expect(patched.defaultModifier).toBe(-7);
+    expect(patched.prereq).toBe('Broadsword at DX+1');
+
+    const delRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/techniques/${created.id}`,
+      { method: 'DELETE', headers: bearer(owner.accessToken) },
+    );
+    expect(delRes.status).toBe(204);
+  });
+
+  it('rejects a duplicate technique name case-insensitively (409)', async () => {
+    const owner = await registerUser('tech-lib-dupe');
+    const campaign = await createCampaign(owner.accessToken);
+    const post = (name: string) =>
+      app.request(`/api/v1/campaigns/${campaign.id}/library/techniques`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ name, defaultSkillName: 'Broadsword' }),
+      });
+    expect((await post('Feint')).status).toBe(201);
+    expect((await post('feint')).status).toBe(409);
+  });
+});
+
+describe('library style CRUD', () => {
+  it('POST creates with empty technique/perk/skill lists; PATCH replaces them; DELETE removes', async () => {
+    const owner = await registerUser('style-crud');
+    const campaign = await createCampaign(owner.accessToken);
+    const createRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/styles`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Sword-and-Buckler' }),
+    });
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as Record<string, unknown>;
+    expect(created.techniques).toEqual([]);
+    expect(created.perks).toEqual([]);
+    expect(created.skills).toEqual([]);
+
+    const patchRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/styles/${created.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          techniques: [
+            { name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H', defaultModifier: -2 },
+          ],
+          perks: ['Off-Hand Weapon Training'],
+          skills: ['Broadsword', 'Shield'],
+        }),
+      },
+    );
+    expect(patchRes.status).toBe(200);
+    const patched = (await patchRes.json()) as {
+      techniques: {
+        name: string;
+        defaultSkillName: string;
+        difficulty: string;
+        defaultModifier?: number;
+      }[];
+      perks: string[];
+      skills: string[];
+    };
+    expect(patched.techniques).toEqual([
+      { name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H', defaultModifier: -2 },
+    ]);
+    expect(patched.perks).toEqual(['Off-Hand Weapon Training']);
+    expect(patched.skills).toEqual(['Broadsword', 'Shield']);
+
+    const delRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/styles/${created.id}`,
+      { method: 'DELETE', headers: bearer(owner.accessToken) },
+    );
+    expect(delRes.status).toBe(204);
+  });
+
+  it('rejects a style technique entry with an invalid difficulty (422)', async () => {
+    const owner = await registerUser('style-bad-jsonb');
+    const campaign = await createCampaign(owner.accessToken);
+    const res = await app.request(`/api/v1/campaigns/${campaign.id}/library/styles`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Bad Style',
+        techniques: [{ name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'VH' }],
+      }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('a non-owner member cannot write styles (403) but sees them in the list', async () => {
+    const owner = await registerUser('style-owner');
+    const member = await registerUser('style-member');
+    const campaign = await createCampaign(owner.accessToken);
+    await addMember(owner.accessToken, campaign.id as string, member.email);
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/styles`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Sword-and-Buckler', perks: ['Off-Hand Weapon Training'] }),
+    });
+
+    const writeRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/styles`, {
+      method: 'POST',
+      headers: jsonHeaders(member.accessToken),
+      body: JSON.stringify({ name: 'Sneaky Style' }),
+    });
+    expect(writeRes.status).toBe(403);
+
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(member.accessToken),
+    });
+    const list = (await listRes.json()) as { styles: { name: string; perks: string[] }[] };
+    expect(list.styles).toHaveLength(1);
+    expect(list.styles[0]?.perks).toEqual(['Off-Hand Weapon Training']);
+  });
+
+  it('YAML round-trips techniques and styles, and pre-v4 docs never prune them', async () => {
+    const owner = await registerUser('tech-style-yaml');
+    const campaign = await createCampaign(owner.accessToken);
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Feint',
+        defaultSkillName: 'Broadsword',
+        difficulty: 'H',
+        maxLevel: 4,
+        defaultModifier: -2,
+      }),
+    });
+    await app.request(`/api/v1/campaigns/${campaign.id}/library/styles`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Sword-and-Buckler',
+        techniques: [
+          { name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H', defaultModifier: -2 },
+        ],
+        perks: ['Off-Hand Weapon Training'],
+        skills: ['Broadsword'],
+      }),
+    });
+
+    const exportRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/export`, {
+      headers: bearer(owner.accessToken),
+    });
+    const exported = await exportRes.text();
+    expect(exported).toContain('Sword-and-Buckler');
+    expect(exported).toContain('Off-Hand Weapon Training');
+    expect(exported).toContain('defaultModifier: -2');
+
+    const reimport = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: exported, mode: 'replace' }),
+    });
+    expect(reimport.status).toBe(200);
+    const counts = (await reimport.json()) as {
+      techniques: { created: number; updated: number; deleted: number };
+      styles: { created: number; updated: number; deleted: number };
+    };
+    expect(counts.techniques).toEqual({ created: 0, updated: 1, deleted: 0 });
+    expect(counts.styles).toEqual({ created: 0, updated: 1, deleted: 0 });
+
+    const legacy = 'version: 3\nlibrary:\n  traits: []\n  skills: []\n  items: []\n';
+    const legacyRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: legacy, mode: 'replace' }),
+    });
+    const legacyCounts = (await legacyRes.json()) as {
+      techniques: { deleted: number };
+      styles: { deleted: number };
+    };
+    expect(legacyCounts.techniques.deleted).toBe(0);
+    expect(legacyCounts.styles.deleted).toBe(0);
+
+    const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const list = (await listRes.json()) as {
+      techniques: { name: string; maxLevel: number | null }[];
+      styles: { name: string; techniques: unknown[] }[];
+    };
+    expect(list.techniques[0]).toMatchObject({ name: 'Feint', maxLevel: 4 });
+    expect(list.styles[0]?.techniques).toHaveLength(1);
   });
 });

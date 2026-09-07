@@ -29,16 +29,20 @@ import {
 // and the wire contract can't drift apart.  The catalog of jsonb
 // columns and their owning schemas lives in docs/specs/json-fields.md.
 import type { XpAward } from '../../shared/schemas/adventureLog.ts';
+import type { StyleTechniqueRef } from '../../shared/schemas/campaignLibrary.ts';
 import type { TempEffect } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { CombatantConditionsField, EffectDuration } from '../../shared/schemas/encounter.ts';
 import type {
   ArmorData,
+  EnchantmentRef,
   MagicItemData,
   PowerstoneData,
   WeaponData,
 } from '../../shared/schemas/inventory.ts';
+import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
+import { TECHNIQUE_DIFFICULTIES } from '../../shared/schemas/technique.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
 
 // ---------- enums ----------
@@ -352,6 +356,8 @@ export const characters = pgTable(
     height: varchar('height', { length: 40 }),
     weight: varchar('weight', { length: 40 }),
     age: integer('age'),
+    /** Free-form birthdate text (migration 0029). Non-mechanical metadata. */
+    birthdate: varchar('birthdate', { length: 40 }),
     appearance: text('appearance'),
 
     st: smallint('st').notNull().default(10),
@@ -446,6 +452,75 @@ export const characterSkills = pgTable(
   }),
 );
 
+/**
+ * Languages the character speaks / reads.  Kept out of `character_traits`
+ * (where `kind='language'` used to live) so the fluency pair is a real
+ * pair of columns and the point ledger can bill languages to their own
+ * bucket instead of inflating advantages.  See migration 0026.
+ */
+export const characterLanguages = pgTable(
+  'character_languages',
+  {
+    id: id(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    /** FluencyLevel (src/shared/schemas/language.ts). */
+    spokenFluency: varchar('spoken_fluency', { length: 20, enum: FLUENCY_LEVELS })
+      .notNull()
+      .default('none'),
+    writtenFluency: varchar('written_fluency', { length: 20, enum: FLUENCY_LEVELS })
+      .notNull()
+      .default('none'),
+    points: integer('points').notNull().default(0),
+    notes: text('notes'),
+    libraryLanguageId: uuid('library_language_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    characterIdx: index('character_languages_character_idx').on(t.characterId),
+  }),
+);
+
+/**
+ * Techniques the character has bought up from a default skill (Martial
+ * Arts p. 87).  `default_skill_name` is a name rather than a skill id
+ * because the same technique definition is shared through
+ * campaign_library_techniques; see src/shared/domain/techniqueCalc.ts
+ * for the resolution and level math.  See migration 0027.
+ */
+export const characterTechniques = pgTable(
+  'character_techniques',
+  {
+    id: id(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    defaultSkillName: varchar('default_skill_name', { length: 160 }).notNull(),
+    /** TechniqueDifficulty (src/shared/schemas/technique.ts). */
+    difficulty: varchar('difficulty', { length: 2, enum: TECHNIQUE_DIFFICULTIES })
+      .notNull()
+      .default('A'),
+    points: integer('points').notNull().default(0),
+    /** Penalty of the technique's default line below its governing skill; 0 = full skill. */
+    defaultModifier: smallint('default_modifier').notNull().default(0),
+    /** Cap on the bonus above the default skill; null = uncapped. */
+    maxLevel: smallint('max_level'),
+    notes: text('notes'),
+    libraryTechniqueId: uuid('library_technique_id'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    characterIdx: index('character_techniques_character_idx').on(t.characterId),
+  }),
+);
+
 export const inventoryItems = pgTable(
   'inventory_items',
   {
@@ -479,6 +554,9 @@ export const inventoryItems = pgTable(
     /** Magic-item metadata (linked spell, charges, mode), validated by
      * `magicItemData` (src/shared/schemas/inventory.ts).  Null = mundane item. */
     magicItemData: jsonb('magic_item_data').$type<MagicItemData>(),
+    /** Enchantment list (multi-enchant items), validated by `enchantmentRef`
+     * (src/shared/schemas/inventory.ts).  Empty = unenchanted. */
+    enchantments: jsonb('enchantments').$type<EnchantmentRef[]>().notNull().default([]),
     libraryItemId: uuid('library_item_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -659,7 +737,11 @@ export const adventureLogEntries = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     sessionDate: date('session_date').notNull(),
+    /** Optional session ordinal for cross-referencing ("session 13"). */
+    sessionNumber: integer('session_number'),
     title: varchar('title', { length: 200 }).notNull(),
+    /** Free-form where-the-session-took-place text. */
+    location: varchar('location', { length: 200 }),
     body: text('body').notNull().default(''),
     visibility: visibilityEnum('visibility').notNull().default('campaign'),
     /** Validated by `xpAward` (src/shared/schemas/adventureLog.ts). */
@@ -784,6 +866,104 @@ export const campaignLibrarySpells = pgTable(
   }),
 );
 
+/**
+ * Campaign language library.  Mirrors the per-character language shape
+ * minus the per-character state (fluency, points);
+ * `character_languages.library_language_id` points here when a language
+ * was copied from the library.
+ */
+export const campaignLibraryLanguages = pgTable(
+  'campaign_library_languages',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 40 }),
+    isSignLanguage: boolean('is_sign_language').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    // Case-insensitive natural key -- see migration 0026.
+    naturalKey: uniqueIndex('campaign_library_languages_key').on(
+      t.campaignId,
+      sql`lower(${t.name})`,
+    ),
+  }),
+);
+
+/**
+ * Campaign technique library.  Mirrors the per-character technique shape
+ * minus the per-character state (points);
+ * `character_techniques.library_technique_id` points here when a
+ * technique was copied from the library.
+ */
+export const campaignLibraryTechniques = pgTable(
+  'campaign_library_techniques',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    defaultSkillName: varchar('default_skill_name', { length: 160 }).notNull(),
+    difficulty: varchar('difficulty', { length: 2, enum: TECHNIQUE_DIFFICULTIES })
+      .notNull()
+      .default('A'),
+    maxLevel: smallint('max_level'),
+    /** Penalty of the technique's default line below its governing skill; 0 = full skill. */
+    defaultModifier: smallint('default_modifier').notNull().default(0),
+    description: text('description'),
+    source: varchar('source', { length: 40 }),
+    prereq: text('prereq'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    // Case-insensitive natural key -- see migration 0027.
+    naturalKey: uniqueIndex('campaign_library_techniques_key').on(
+      t.campaignId,
+      sql`lower(${t.name})`,
+    ),
+  }),
+);
+
+/**
+ * Martial-arts styles (Martial Arts p. 139): named packages of
+ * techniques, perks, and skills.  Campaign-library-only -- a character
+ * adopts a style by adding its constituent pieces individually.
+ */
+export const campaignLibraryStyles = pgTable(
+  'campaign_library_styles',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 40 }),
+    /** Validated by `styleTechniqueRef[]` (src/shared/schemas/campaignLibrary.ts). */
+    techniques: jsonb('techniques').$type<StyleTechniqueRef[]>().notNull().default([]),
+    /** Validated by `styleNameList` (src/shared/schemas/campaignLibrary.ts). */
+    perks: jsonb('perks').$type<string[]>().notNull().default([]),
+    /** Validated by `styleNameList` (src/shared/schemas/campaignLibrary.ts). */
+    skills: jsonb('skills').$type<string[]>().notNull().default([]),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    // Case-insensitive natural key -- see migration 0027.
+    naturalKey: uniqueIndex('campaign_library_styles_key').on(t.campaignId, sql`lower(${t.name})`),
+  }),
+);
+
 export const campaignLibraryItems = pgTable(
   'campaign_library_items',
   {
@@ -812,6 +992,9 @@ export const campaignLibraryItems = pgTable(
     powerstoneData: jsonb('powerstone_data').$type<PowerstoneData>(),
     /** Validated by `magicItemData` (src/shared/schemas/inventory.ts).  Null = not a magic item. */
     magicItemData: jsonb('magic_item_data').$type<MagicItemData>(),
+    /** Enchantment list carried onto inventory copies, validated by
+     * `enchantmentRef` (src/shared/schemas/inventory.ts).  Empty = unenchanted. */
+    enchantments: jsonb('enchantments').$type<EnchantmentRef[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -828,6 +1011,8 @@ export type DbCharacter = typeof characters.$inferSelect;
 export type DbCharacterTrait = typeof characterTraits.$inferSelect;
 export type DbCharacterSkill = typeof characterSkills.$inferSelect;
 export type DbCharacterSpell = typeof characterSpells.$inferSelect;
+export type DbCharacterLanguage = typeof characterLanguages.$inferSelect;
+export type DbCharacterTechnique = typeof characterTechniques.$inferSelect;
 export type DbInventoryItem = typeof inventoryItems.$inferSelect;
 export type DbCombatState = typeof combatStates.$inferSelect;
 export type DbEncounter = typeof encounters.$inferSelect;
@@ -842,6 +1027,9 @@ export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
 export type DbCampaignLibrarySpell = typeof campaignLibrarySpells.$inferSelect;
 export type DbCampaignLibraryItem = typeof campaignLibraryItems.$inferSelect;
+export type DbCampaignLibraryLanguage = typeof campaignLibraryLanguages.$inferSelect;
+export type DbCampaignLibraryTechnique = typeof campaignLibraryTechniques.$inferSelect;
+export type DbCampaignLibraryStyle = typeof campaignLibraryStyles.$inferSelect;
 export type DbApiKey = typeof apiKeys.$inferSelect;
 export type DbRefreshToken = typeof refreshTokens.$inferSelect;
 export type DbPasswordResetToken = typeof passwordResetTokens.$inferSelect;

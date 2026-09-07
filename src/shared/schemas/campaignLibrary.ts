@@ -2,9 +2,16 @@ import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { timestamps, uuid } from './common.ts';
 import { traitEffect } from './effects.ts';
-import { armorData, magicItemData, powerstoneData, weaponData } from './inventory.ts';
+import {
+  armorData,
+  enchantmentRef,
+  magicItemData,
+  powerstoneData,
+  weaponData,
+} from './inventory.ts';
 import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
 import { spellDifficulty } from './spell.ts';
+import { techniqueDifficulty } from './technique.ts';
 import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
 
 const tagList = z.array(z.string().min(1).max(40)).default([]);
@@ -128,6 +135,118 @@ export const librarySpellCreate = z.object({
 
 export const librarySpellUpdate = librarySpellCreate.partial();
 
+/**
+ * Library languages hold the book-level definition (name, blurb, source)
+ * that a character copies when adding the language to their sheet.
+ * Fluency and points are per-character and live on `character_languages`.
+ */
+export const libraryLanguageOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  /** Sign languages have no written form; the UI defaults their written
+   * fluency to `'n/a'` when the language is copied onto a sheet. */
+  isSignLanguage: z.boolean(),
+  ...timestamps,
+});
+
+export const libraryLanguageCreate = z.object({
+  name: z.string().min(1).max(160).trim(),
+  description: z.string().max(20_000).nullable().optional(),
+  source: z.string().max(40).trim().nullable().optional(),
+  isSignLanguage: z.boolean().default(false),
+});
+
+export const libraryLanguageUpdate = libraryLanguageCreate.partial();
+
+/**
+ * Library technique: the book definition a character copies onto their
+ * sheet.  Per-character state (points invested) lives on
+ * `character_techniques`.
+ */
+export const libraryTechniqueOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  defaultSkillName: z.string().min(1).max(160),
+  difficulty: techniqueDifficulty,
+  /** Default cap on the bonus above the default skill; null = uncapped. */
+  maxLevel: z.number().int().min(0).max(20).nullable(),
+  /** The technique's default line below its governing skill; 0 = full skill. */
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  /** Capped at the character-technique note limit -- copied verbatim on learn. */
+  prereq: z.string().max(2000).nullable(),
+  ...timestamps,
+});
+
+export const libraryTechniqueCreate = z.object({
+  name: z.string().min(1).max(160).trim(),
+  defaultSkillName: z.string().min(1).max(160).trim(),
+  difficulty: techniqueDifficulty.default('A'),
+  maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
+  description: z.string().max(20_000).nullable().optional(),
+  source: z.string().max(40).trim().nullable().optional(),
+  prereq: z.string().max(2000).nullable().optional(),
+});
+
+export const libraryTechniqueUpdate = libraryTechniqueCreate.partial();
+
+/**
+ * One technique named by a style.  Denormalized (name + default skill +
+ * difficulty rather than a `campaign_library_techniques` id) so a style
+ * stays valid through a YAML round trip into a campaign that doesn't
+ * have the matching technique rows yet -- adopting the style creates the
+ * character techniques directly from these entries.
+ *
+ * Validates `campaign_library_styles.techniques` (jsonb) -- see
+ * docs/specs/json-fields.md.
+ */
+export const styleTechniqueRef = z.object({
+  name: z.string().min(1).max(160).trim(),
+  defaultSkillName: z.string().min(1).max(160).trim(),
+  difficulty: techniqueDifficulty.default('A'),
+  maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
+});
+export type StyleTechniqueRef = z.infer<typeof styleTechniqueRef>;
+
+/** Validates `campaign_library_styles.perks` / `.skills` (jsonb). */
+export const styleNameList = z.array(z.string().min(1).max(160).trim()).max(100).default([]);
+
+/**
+ * A martial-arts style (Martial Arts p. 139): a named package of
+ * techniques, perks, and skills.  Campaign-library-only -- characters
+ * "adopt" a style by adding its constituent pieces individually, so
+ * there is no per-character style join table.
+ */
+export const libraryStyleOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  techniques: z.array(styleTechniqueRef).max(100).default([]),
+  perks: styleNameList,
+  skills: styleNameList,
+  ...timestamps,
+});
+
+export const libraryStyleCreate = z.object({
+  name: z.string().min(1).max(160).trim(),
+  description: z.string().max(20_000).nullable().optional(),
+  source: z.string().max(40).trim().nullable().optional(),
+  techniques: z.array(styleTechniqueRef).max(100).default([]),
+  perks: styleNameList,
+  skills: styleNameList,
+});
+
+export const libraryStyleUpdate = libraryStyleCreate.partial();
+
 export const libraryItemOut = z.object({
   id: uuid,
   campaignId: uuid,
@@ -146,6 +265,8 @@ export const libraryItemOut = z.object({
   weightReductionPercent: z.number().int().min(0).max(100),
   powerstoneData: powerstoneData.nullable(),
   magicItemData: magicItemData.nullable(),
+  /** Non-mechanical enchantment list carried onto inventory copies. */
+  enchantments: z.array(enchantmentRef).max(50).default([]),
   ...timestamps,
 });
 
@@ -165,6 +286,7 @@ export const libraryItemCreate = z.object({
   weightReductionPercent: z.number().int().min(0).max(100).default(0),
   powerstoneData: powerstoneData.nullable().optional(),
   magicItemData: magicItemData.nullable().optional(),
+  enchantments: z.array(enchantmentRef).max(50).default([]),
 });
 
 export const libraryItemUpdate = libraryItemCreate.partial();
@@ -185,6 +307,9 @@ export const importResult = z.object({
   skills: importSectionResult,
   spells: importSectionResult,
   items: importSectionResult,
+  languages: importSectionResult,
+  techniques: importSectionResult,
+  styles: importSectionResult,
   /** Whether the opt-in `applyCampaignSettings` flag actually updated the
    * campaigns row (false when the flag was off or the doc had no `campaign`
    * block). */
@@ -194,14 +319,21 @@ export const importResult = z.object({
 // ---------- YAML doc shape (versioned) ----------
 
 /**
- * v1 docs (pre-effects), v2 docs (effects on traits/skills), and v3 docs
- * (container/powerstone/magic-item item fields + campaign.manaLevel) all
- * parse.  Schema unions on a literal version field so older library files
- * keep round-tripping without mutation.  v1/v2 docs that omit the newer
- * fields get their defaults (empty array / false / null) via the
- * library*Create schemas.
+ * v1 docs (pre-effects), v2 docs (effects on traits/skills), v3 docs
+ * (container/powerstone/magic-item item fields + campaign.manaLevel), v4
+ * docs (languages + techniques + styles sections), and v5 docs
+ * (enchantments on items) all parse.  Schema unions on a literal version
+ * field so older library files keep round-tripping without mutation.
+ * Older docs that omit the newer fields get their defaults (empty
+ * array / false / null) via the library*Create schemas.
  */
-export const libraryYamlVersion = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+export const libraryYamlVersion = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(5),
+]);
 
 export const libraryYamlDoc = z.object({
   version: libraryYamlVersion,
@@ -227,6 +359,14 @@ export const libraryYamlDoc = z.object({
      * explicit empty list (delete them all). */
     spells: z.array(librarySpellCreate).optional(),
     items: z.array(libraryItemCreate).default([]),
+    /** Optional for the same reason as `spells`: pre-v4 exports have no
+     * languages section, and a replace-mode import of one of those files
+     * must not wipe the campaign's language library. */
+    languages: z.array(libraryLanguageCreate).optional(),
+    /** Optional for the same reason as `languages`. */
+    techniques: z.array(libraryTechniqueCreate).optional(),
+    /** Optional for the same reason as `languages`. */
+    styles: z.array(libraryStyleCreate).optional(),
   }),
 });
 
@@ -239,6 +379,15 @@ export type LibrarySkillUpdate = z.infer<typeof librarySkillUpdate>;
 export type LibrarySpellOut = z.infer<typeof librarySpellOut>;
 export type LibrarySpellCreate = z.infer<typeof librarySpellCreate>;
 export type LibrarySpellUpdate = z.infer<typeof librarySpellUpdate>;
+export type LibraryTechniqueOut = z.infer<typeof libraryTechniqueOut>;
+export type LibraryTechniqueCreate = z.infer<typeof libraryTechniqueCreate>;
+export type LibraryTechniqueUpdate = z.infer<typeof libraryTechniqueUpdate>;
+export type LibraryStyleOut = z.infer<typeof libraryStyleOut>;
+export type LibraryStyleCreate = z.infer<typeof libraryStyleCreate>;
+export type LibraryStyleUpdate = z.infer<typeof libraryStyleUpdate>;
+export type LibraryLanguageOut = z.infer<typeof libraryLanguageOut>;
+export type LibraryLanguageCreate = z.infer<typeof libraryLanguageCreate>;
+export type LibraryLanguageUpdate = z.infer<typeof libraryLanguageUpdate>;
 export type LibraryItemOut = z.infer<typeof libraryItemOut>;
 export type LibraryItemCreate = z.infer<typeof libraryItemCreate>;
 export type LibraryItemUpdate = z.infer<typeof libraryItemUpdate>;

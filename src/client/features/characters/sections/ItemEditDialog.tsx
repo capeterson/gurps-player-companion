@@ -1,14 +1,17 @@
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { HIT_LOCATIONS, type HitLocation } from '../../../../shared/constants/hitLocations.ts';
 import type {
   ArmorData,
+  EnchantmentRef,
   InventoryItemOut,
   InventoryItemUpdate,
   MagicItemData,
   MagicItemMode,
   PowerstoneData,
   RangedData,
+  TypedArmorDr,
   WeaponData,
+  WeaponMode,
 } from '../../../../shared/schemas/inventory.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
@@ -17,15 +20,49 @@ import { FACET_LABELS, type Facet, FacetChipRow } from './FacetChips.tsx';
 
 const REDUCTIONS = [0, 25, 50] as const;
 const MAGIC_ITEM_MODES: readonly MagicItemMode[] = ['charged', 'powered', 'continuous'];
+const MAX_ENCHANTMENTS = 50;
+const MAX_ALT_MODES = 10;
+
+const TYPED_DR_KEYS = [
+  'cut',
+  'imp',
+  'pi',
+  'pi_minus',
+  'pi_plus',
+  'pi_pp',
+  'burn',
+  'corr',
+  'fat',
+  'tox',
+] as const;
+type TypedDrKey = (typeof TYPED_DR_KEYS)[number];
+const TYPED_DR_LABELS: Record<TypedDrKey, string> = {
+  cut: 'Cut',
+  imp: 'Imp',
+  pi: 'Pi',
+  pi_minus: 'Pi−',
+  pi_plus: 'Pi+',
+  pi_pp: 'Pi++',
+  burn: 'Burn',
+  corr: 'Corr',
+  fat: 'Fat',
+  tox: 'Tox',
+};
+const EMPTY_TYPED_DR_RAWS = Object.fromEntries(TYPED_DR_KEYS.map((k) => [k, ''])) as Record<
+  TypedDrKey,
+  string
+>;
 
 function defaultArmor(): ArmorData {
   return {
     locations: [],
     dr: 0,
     drCrushing: null,
+    typedDr: {},
     flexible: false,
     frontOnly: false,
     backOnly: false,
+    db: null,
     notes: null,
   };
 }
@@ -60,6 +97,7 @@ function defaultWeapon(): WeaponData {
     db: null,
     ranged: null,
     notes: null,
+    alternateModes: [],
   };
 }
 
@@ -100,6 +138,8 @@ export function ItemEditDialog({
   const [drRaw, setDrRaw] = useState('0');
   const [drCrushingRaw, setDrCrushingRaw] = useState('');
   const [customLocation, setCustomLocation] = useState('');
+  const [armorDbRaw, setArmorDbRaw] = useState('');
+  const [typedDrRaws, setTypedDrRaws] = useState<Record<TypedDrKey, string>>(EMPTY_TYPED_DR_RAWS);
 
   const [isPowerstone, setIsPowerstone] = useState(false);
   const [powerstone, setPowerstone] = useState<PowerstoneData>(defaultPowerstone());
@@ -116,6 +156,33 @@ export function ItemEditDialog({
   const [isWeapon, setIsWeapon] = useState(false);
   const [weapon, setWeapon] = useState<WeaponData>(defaultWeapon());
   const [stRequiredRaw, setStRequiredRaw] = useState('');
+
+  // Enchantments are item-level metadata, independent of the magic-item
+  // facet (an enchanted cloak has no castable spell, so no magicItemData).
+  // Rows carry a stable local key so removing one doesn't remount the
+  // rest, and the level is kept as a *raw string* draft (like every other
+  // numeric field here): a transient "41", a partial "1", or a typo never
+  // gets clamped or blanked before the user submits.
+  const [enchantments, setEnchantments] = useState<
+    Array<{ key: number; data: EnchantmentRef; spellLevelRaw: string }>
+  >([]);
+  const enchantKeyRef = useRef(0);
+
+  function nextEnchantKey(): number {
+    enchantKeyRef.current += 1;
+    return enchantKeyRef.current;
+  }
+
+  // Alternate attack modes beyond the primary damage/reach/parry line.
+  // Same stable-key list pattern as enchantments; the primary mode is
+  // the top-level weapon fields above, so these begin at "mode 2".
+  const [altModes, setAltModes] = useState<Array<{ key: number; data: WeaponMode }>>([]);
+  const altModeKeyRef = useRef(0);
+
+  function nextAltModeKey(): number {
+    altModeKeyRef.current += 1;
+    return altModeKeyRef.current;
+  }
 
   // A facet whose removal would clear data waits on a confirm.
   const [pendingRemoval, setPendingRemoval] = useState<Facet | null>(null);
@@ -147,6 +214,15 @@ export function ItemEditDialog({
     setDrRaw(String(armorData.dr));
     setDrCrushingRaw(armorData.drCrushing == null ? '' : String(armorData.drCrushing));
     setCustomLocation('');
+    setArmorDbRaw(armorData.db == null ? '' : String(armorData.db));
+    setTypedDrRaws(
+      Object.fromEntries(
+        TYPED_DR_KEYS.map((k) => [
+          k,
+          armorData.typedDr?.[k] == null ? '' : String(armorData.typedDr[k]),
+        ]),
+      ) as Record<TypedDrKey, string>,
+    );
     const ps = item.powerstoneData;
     setIsPowerstone(ps != null);
     setPowerstone(ps ?? defaultPowerstone());
@@ -163,6 +239,22 @@ export function ItemEditDialog({
     setIsWeapon(wd != null);
     setWeapon(wd ?? defaultWeapon());
     setStRequiredRaw(wd?.stRequired == null ? '' : String(wd.stRequired));
+    setEnchantments(
+      (item.enchantments ?? []).map((data) => {
+        enchantKeyRef.current += 1;
+        return {
+          key: enchantKeyRef.current,
+          data,
+          spellLevelRaw: data.spellLevel == null ? '' : String(data.spellLevel),
+        };
+      }),
+    );
+    setAltModes(
+      (wd?.alternateModes ?? []).map((data) => {
+        altModeKeyRef.current += 1;
+        return { key: altModeKeyRef.current, data };
+      }),
+    );
     setDbRaw(wd?.db == null ? '' : String(wd.db));
     const rg = wd?.ranged ?? null;
     setIsRanged(rg != null);
@@ -228,6 +320,55 @@ export function ItemEditDialog({
       return;
     }
     facetSetters[facet](next);
+  }
+
+  function updateEnchantment(index: number, patch: Partial<EnchantmentRef>) {
+    setEnchantments((list) =>
+      list.map((row, i) => (i === index ? { ...row, data: { ...row.data, ...patch } } : row)),
+    );
+  }
+
+  function updateEnchantmentSpellLevelRaw(index: number, raw: string) {
+    setEnchantments((list) =>
+      list.map((row, i) => (i === index ? { ...row, spellLevelRaw: raw } : row)),
+    );
+  }
+
+  function removeEnchantment(index: number) {
+    setEnchantments((list) => list.filter((_, i) => i !== index));
+  }
+
+  function addEnchantment() {
+    setEnchantments((list) =>
+      list.length >= MAX_ENCHANTMENTS
+        ? list
+        : [
+            ...list,
+            {
+              key: nextEnchantKey(),
+              data: { spellName: '', spellLevel: null, category: null, notes: null },
+              spellLevelRaw: '',
+            },
+          ],
+    );
+  }
+
+  function updateAltMode(index: number, patch: Partial<WeaponMode>) {
+    setAltModes((list) =>
+      list.map((row, i) => (i === index ? { ...row, data: { ...row.data, ...patch } } : row)),
+    );
+  }
+
+  function removeAltMode(index: number) {
+    setAltModes((list) => list.filter((_, i) => i !== index));
+  }
+
+  function addAltMode() {
+    setAltModes((list) =>
+      list.length >= MAX_ALT_MODES
+        ? list
+        : [...list, { key: nextAltModeKey(), data: { name: '' } }],
+    );
   }
 
   function handleSubmit(e: FormEvent) {
@@ -297,6 +438,22 @@ export function ItemEditDialog({
             recoil: recoilRaw === '' ? null : Math.max(1, Math.floor(Number(recoilRaw)) || 1),
           }
         : null;
+      const alternateModes: WeaponMode[] = [];
+      for (const [i, row] of altModes.entries()) {
+        // Primary mode is the weapon's own fields, so the first row here is "mode 2".
+        const modeName = row.data.name.trim();
+        if (!modeName) {
+          toasts.push(`Attack mode ${i + 2} needs a name`, { kind: 'error' });
+          return;
+        }
+        alternateModes.push({
+          name: modeName,
+          ...(row.data.damage?.trim() ? { damage: row.data.damage.trim() } : {}),
+          ...(row.data.reach?.trim() ? { reach: row.data.reach.trim() } : {}),
+          ...(row.data.parry?.trim() ? { parry: row.data.parry.trim() } : {}),
+          ...(row.data.notes?.trim() ? { notes: row.data.notes.trim() } : {}),
+        });
+      }
       weaponPatch = {
         damage: weapon.damage?.trim() || undefined,
         reach: weapon.reach?.trim() || null,
@@ -306,7 +463,62 @@ export function ItemEditDialog({
         db: dbNum,
         ranged: rangedPatch,
         notes: weapon.notes?.trim() || null,
+        alternateModes,
       };
+    }
+    const enchantmentPatch: EnchantmentRef[] = [];
+    for (const [i, row] of enchantments.entries()) {
+      const en = row.data;
+      const spellName = en.spellName.trim();
+      if (!spellName) {
+        toasts.push(`Enchantment ${i + 1} needs a spell name`, { kind: 'error' });
+        return;
+      }
+      let spellLevel: number | undefined;
+      if (row.spellLevelRaw.trim() !== '') {
+        const lvl = Number(row.spellLevelRaw);
+        if (!Number.isInteger(lvl) || lvl < 0 || lvl > 40) {
+          toasts.push(`Enchantment ${i + 1} level must be an integer between 0 and 40`, {
+            kind: 'error',
+          });
+          return;
+        }
+        spellLevel = lvl;
+      }
+      enchantmentPatch.push({
+        spellName,
+        ...(spellLevel !== undefined ? { spellLevel } : {}),
+        ...(en.category != null && en.category.trim() !== ''
+          ? { category: en.category.trim() }
+          : {}),
+        ...(en.notes != null && en.notes.trim() !== '' ? { notes: en.notes.trim() } : {}),
+      });
+    }
+    let armorPatch: ArmorData | null = null;
+    if (isArmor) {
+      let armorDb: number | null = null;
+      if (armorDbRaw.trim() !== '') {
+        const db = Number(armorDbRaw);
+        if (!Number.isInteger(db) || db < 0 || db > 4) {
+          toasts.push('Armor DB must be an integer between 0 and 4', { kind: 'error' });
+          return;
+        }
+        armorDb = db;
+      }
+      const typedDrPatch: TypedArmorDr = {};
+      for (const key of TYPED_DR_KEYS) {
+        const raw = typedDrRaws[key].trim();
+        if (raw === '') continue;
+        const v = Number(raw);
+        if (!Number.isInteger(v) || v < 0 || v > 1000) {
+          toasts.push(`Typed DR (${TYPED_DR_LABELS[key]}) must be an integer between 0 and 1000`, {
+            kind: 'error',
+          });
+          return;
+        }
+        typedDrPatch[key] = v;
+      }
+      armorPatch = { ...armor, db: armorDb, typedDr: typedDrPatch };
     }
     const patch: InventoryItemUpdate = {
       name: name.trim(),
@@ -322,10 +534,11 @@ export function ItemEditDialog({
       hideawayCapacityLbs: isContainer ? (Number.isFinite(parsedHideaway) ? parsedHideaway : 0) : 0,
       weightReductionPercent: isContainer ? reduction : 0,
       isArmor,
-      armor: isArmor ? armor : null,
+      armor: armorPatch,
       weaponData: weaponPatch,
       powerstoneData: powerstonePatch,
       magicItemData: magicItemPatch,
+      enchantments: enchantmentPatch,
     };
     onSubmit(patch);
   }
@@ -509,7 +722,36 @@ export function ItemEditDialog({
                         className="num input input-sm input-bordered text-right"
                       />
                     </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Armor DB</span>
+                      <input
+                        value={armorDbRaw}
+                        inputMode="numeric"
+                        placeholder="—"
+                        onChange={(e) => setArmorDbRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                      />
+                    </label>
                   </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {TYPED_DR_KEYS.map((key) => (
+                      <label key={key} className="flex flex-col gap-1">
+                        <span className="label-eyebrow">{TYPED_DR_LABELS[key]}</span>
+                        <input
+                          value={typedDrRaws[key]}
+                          inputMode="numeric"
+                          placeholder="—"
+                          onChange={(e) => setTypedDrRaws((r) => ({ ...r, [key]: e.target.value }))}
+                          className="num input input-xs input-bordered text-right"
+                          aria-label={`Typed DR ${key}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-base-content/50">
+                    Per-damage-type DR overrides (GURPS B378) — blank entries fall through to the
+                    base DR / crushing DR.
+                  </p>
                   <div className="flex flex-wrap gap-3">
                     <label className="flex items-center gap-2">
                       <input
@@ -785,6 +1027,89 @@ export function ItemEditDialog({
                       className="input input-sm input-bordered"
                     />
                   </label>
+                  <div className="space-y-1.5 border-t border-base-300/60 pt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="label-eyebrow">Attack modes (beyond the primary line)</span>
+                      <button
+                        type="button"
+                        className="btn btn-xs"
+                        onClick={addAltMode}
+                        disabled={altModes.length >= MAX_ALT_MODES}
+                      >
+                        + Add mode
+                      </button>
+                    </div>
+                    {altModes.length === 0 ? (
+                      <p className="text-xs text-base-content/50">
+                        Extra damage/reach/parry rows, e.g. a rapier that swings as well as thrusts.
+                        Empty reach/parry inherit the primary values.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {altModes.map(({ key, data: mode }, i) => (
+                          <div
+                            key={key}
+                            className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_5rem_5rem_auto] gap-2"
+                          >
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Mode {i + 2}</span>
+                              <input
+                                value={mode.name}
+                                onChange={(e) => updateAltMode(i, { name: e.target.value })}
+                                className="input input-xs input-bordered"
+                                placeholder="e.g. Thrust"
+                                aria-label={`Attack mode ${i + 2} name`}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Damage</span>
+                              <input
+                                value={mode.damage ?? ''}
+                                onChange={(e) => updateAltMode(i, { damage: e.target.value })}
+                                className="input input-xs input-bordered"
+                                placeholder="thr+1 imp"
+                                aria-label={`Attack mode ${i + 2} damage`}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Reach</span>
+                              <input
+                                value={mode.reach ?? ''}
+                                onChange={(e) =>
+                                  updateAltMode(i, { reach: e.target.value || undefined })
+                                }
+                                className="input input-xs input-bordered"
+                                placeholder="inherit"
+                                aria-label={`Attack mode ${i + 2} reach`}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Parry</span>
+                              <input
+                                value={mode.parry ?? ''}
+                                onChange={(e) =>
+                                  updateAltMode(i, { parry: e.target.value || undefined })
+                                }
+                                className="input input-xs input-bordered"
+                                placeholder="inherit"
+                                aria-label={`Attack mode ${i + 2} parry`}
+                              />
+                            </label>
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-ghost text-error"
+                                onClick={() => removeAltMode(i)}
+                                aria-label={`Remove attack mode ${i + 2}`}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </fieldset>
             )}
@@ -922,6 +1247,94 @@ export function ItemEditDialog({
                 </div>
               </fieldset>
             )}
+
+            <div className="space-y-1.5 border-t border-base-300/60 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="label-eyebrow">Enchantments</span>
+                <button
+                  type="button"
+                  className="btn btn-xs"
+                  onClick={addEnchantment}
+                  disabled={enchantments.length >= MAX_ENCHANTMENTS}
+                >
+                  + Add enchantment
+                </button>
+              </div>
+              {enchantments.length === 0 ? (
+                <p className="text-xs text-base-content/50">
+                  Stacked enchantments on this item, e.g. “Fortify +3” and “Deflect +2” (B262).
+                  Metadata only — no combat math consumes them yet.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {enchantments.map(({ key, data: en, spellLevelRaw }, i) => (
+                    <div
+                      key={key}
+                      className="grid grid-cols-1 sm:grid-cols-[1fr_4rem_8rem_1fr_auto] gap-2"
+                    >
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Spell</span>
+                        <input
+                          value={en.spellName}
+                          onChange={(e) => updateEnchantment(i, { spellName: e.target.value })}
+                          className="input input-xs input-bordered"
+                          placeholder="e.g. Fortify"
+                          aria-label={`Enchantment ${i + 1} spell`}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Level</span>
+                        <input
+                          value={spellLevelRaw}
+                          inputMode="numeric"
+                          onChange={(e) => updateEnchantmentSpellLevelRaw(i, e.target.value)}
+                          className="num input input-xs input-bordered text-right"
+                          placeholder="—"
+                          aria-label={`Enchantment ${i + 1} level`}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Category</span>
+                        <input
+                          value={en.category ?? ''}
+                          onChange={(e) =>
+                            updateEnchantment(i, {
+                              category: e.target.value === '' ? null : e.target.value,
+                            })
+                          }
+                          className="input input-xs input-bordered"
+                          placeholder="e.g. Fortify +3"
+                          aria-label={`Enchantment ${i + 1} category`}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1">
+                        <span className="label-eyebrow">Notes</span>
+                        <input
+                          value={en.notes ?? ''}
+                          onChange={(e) =>
+                            updateEnchantment(i, {
+                              notes: e.target.value === '' ? null : e.target.value,
+                            })
+                          }
+                          className="input input-xs input-bordered"
+                          aria-label={`Enchantment ${i + 1} notes`}
+                        />
+                      </label>
+                      <div className="flex items-end">
+                        <button
+                          type="button"
+                          className="btn btn-xs btn-ghost text-error"
+                          onClick={() => removeEnchantment(i)}
+                          aria-label={`Remove enchantment ${i + 1}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="modal-action sticky bottom-0 z-10 -mx-6 border-t border-base-300/60 bg-base-100 px-6 py-3">
               <button type="button" onClick={onCancel} className="btn btn-ghost">

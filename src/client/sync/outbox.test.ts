@@ -7,14 +7,17 @@ import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type OutboxEntry, getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
+import { flashBus } from './flashBus.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
 import {
   MAX_ATTEMPTS,
   backoffMs,
+  enqueueCreate,
   enqueueFieldPatch,
   readDrainableOps,
   recoverStaleInFlight,
 } from './outbox.ts';
+import { syncStateStore } from './state.ts';
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -42,6 +45,7 @@ async function seedCharacter() {
     height: null,
     weight: null,
     age: null,
+    birthdate: null,
     appearance: null,
     st: 10,
     dx: 10,
@@ -259,6 +263,233 @@ describe('coalescing + orchestrator rollback', () => {
       });
     } finally {
       getSyncOrchestrator().stop();
+    }
+  });
+});
+
+describe('character_language / character_technique outbox lifecycle (S11)', () => {
+  const LANG_ID = '0193b3c0-f1f0-7000-8000-00000000d011';
+  const TECH_ID = '0193b3c0-f1f0-7000-8000-00000000d012';
+  const USER_ID = '0193b3c0-f1f0-7000-8000-00000000d0aa';
+
+  async function seedCharWithRows() {
+    const db = getLocalDb();
+    await db.characters.put({
+      id: CHAR_ID,
+      ownerId: USER_ID,
+      campaignId: null,
+      name: 'Test',
+      st: 10,
+      dx: 10,
+      iq: 10,
+      ht: 10,
+      revision: 1,
+    } as never);
+    await db.characterLanguages.put({
+      id: LANG_ID,
+      characterId: CHAR_ID,
+      name: 'Cathrian',
+      spokenFluency: 'native',
+      writtenFluency: 'none',
+      points: 0,
+      notes: null,
+      libraryLanguageId: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 5,
+    } as never);
+    await db.characterTechniques.put({
+      id: TECH_ID,
+      characterId: CHAR_ID,
+      name: 'Combat Riding',
+      defaultSkillName: 'Riding (Equines)',
+      difficulty: 'H',
+      points: 0,
+      defaultModifier: 0,
+      maxLevel: null,
+      notes: null,
+      libraryTechniqueId: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 9,
+    } as never);
+  }
+
+  function login() {
+    tokenStore.write({
+      accessToken: jwtForUser(USER_ID),
+      refreshToken: 'r',
+      accessTokenExpiresIn: 0,
+    });
+  }
+
+  it('same-field language patches coalesce; the latest wins and prevValue is the original', async () => {
+    await seedCharWithRows();
+    await enqueueFieldPatch({
+      entityClass: 'character_language',
+      entityId: LANG_ID,
+      fieldPath: 'spokenFluency',
+      attemptedValue: 'broken',
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character_language',
+      entityId: LANG_ID,
+      fieldPath: 'spokenFluency',
+      attemptedValue: 'accented',
+    });
+    const ops = await getLocalDb().outbox.toArray();
+    expect(ops).toHaveLength(1);
+    expect(ops[0]?.attemptedValue).toBe('accented');
+    expect(ops[0]?.prevValue).toBe('native'); // original, not 'broken'
+    expect((await getLocalDb().characterLanguages.get(LANG_ID))?.spokenFluency).toBe('accented');
+  });
+
+  it('different-field technique patches stay independent and both land locally', async () => {
+    await seedCharWithRows();
+    await enqueueFieldPatch({
+      entityClass: 'character_technique',
+      entityId: TECH_ID,
+      fieldPath: 'defaultModifier',
+      attemptedValue: -7,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character_technique',
+      entityId: TECH_ID,
+      fieldPath: 'points',
+      attemptedValue: 2,
+    });
+    const ops = await getLocalDb().outbox.toArray();
+    expect(ops).toHaveLength(2);
+    const row = await getLocalDb().characterTechniques.get(TECH_ID);
+    expect(row?.defaultModifier).toBe(-7);
+    expect(row?.points).toBe(2);
+  });
+
+  it('a language create drains, applies server-side, and the indicator returns to synced', async () => {
+    await seedCharacter();
+    login();
+    const langId = '0193b3c0-f1f0-7000-8000-00000000d013';
+    await enqueueCreate({
+      entityClass: 'character_language',
+      entityId: langId,
+      characterId: CHAR_ID,
+      humanName: 'language',
+      attemptedValue: {
+        name: 'Elvish',
+        spokenFluency: 'native',
+        writtenFluency: 'none',
+        points: 0,
+      },
+    });
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'applied' as const,
+          newRevision: 6,
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) {
+        return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // The indicator store has no getter; subscribe and track the latest
+    // committed state (commit defers 'synced' by MIN_DWELL_MS).
+    let latest: string | null = null;
+    const off = syncStateStore.subscribe((s) => {
+      latest = s;
+    });
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        const row = await getLocalDb().characterLanguages.get(langId);
+        expect(row?.revision).toBe(6);
+      });
+      await waitFor(
+        () => {
+          expect(latest).toBe('synced');
+        },
+        { timeout: 3000 },
+      );
+      expect(await getLocalDb().rejectionToasts.count()).toBe(0);
+      expect(await getLocalDb().outbox.count()).toBe(0);
+    } finally {
+      getSyncOrchestrator().stop();
+      off();
+    }
+  });
+
+  it('a rejected technique patch rolls back, persists a toast record, and emits a flash', async () => {
+    await seedCharWithRows();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character_technique',
+      entityId: TECH_ID,
+      fieldPath: 'defaultModifier',
+      attemptedValue: -7,
+    });
+    // Subscribe before the drain so the async rollback event is captured.
+    const flashKey = `character_technique:${TECH_ID}:defaultModifier`;
+    const flashListener = vi.fn();
+    const off = flashBus.subscribe(flashKey, flashListener);
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string; entityId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'rejected' as const,
+          reason: 'defaultModifier rejected in test',
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor')) {
+        return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => {
+        // Rolled back to the pre-edit value…
+        const row = await getLocalDb().characterTechniques.get(TECH_ID);
+        expect(row?.defaultModifier).toBe(0);
+      });
+      // …the durable rejection record exists for the toast…
+      const recs = await getLocalDb().rejectionToasts.toArray();
+      expect(
+        recs.some(
+          (r) => r.entityClass === 'character_technique' && r.fieldPath === 'defaultModifier',
+        ),
+      ).toBe(true);
+      // …and the flash bus fired the row-level/field flash event.
+      await waitFor(() => expect(flashListener).toHaveBeenCalled());
+    } finally {
+      getSyncOrchestrator().stop();
+      off();
     }
   });
 });

@@ -1,5 +1,6 @@
 import { type DragEvent, Fragment, type MouseEvent, useState } from 'react';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
+import { useFlashState } from '../../../hooks/useFlashState.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
 
 export interface InventoryRowProps {
@@ -50,6 +51,12 @@ export function InventoryRow(props: InventoryRowProps) {
   const hasChildren = item.isContainer && children.length > 0;
   const [open, setOpen] = useState(true);
   const sel = isSelected(item.id);
+
+  // Row-level rollback flash: the item-edit dialog closes on submit, so
+  // any later rejection (e.g. an `enchantments`/`weaponData` patch that
+  // fails async) has no mounted input to flash. The row subscribes to
+  // every field of this item and pulses itself instead (AGENTS.md S5).
+  const rowFlash = useFlashState(undefined, undefined, `character_inventory:${item.id}:`);
 
   function stop(e: MouseEvent) {
     e.stopPropagation();
@@ -118,8 +125,6 @@ export function InventoryRow(props: InventoryRowProps) {
 
   return (
     <Fragment>
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: row click drives mouse-only range selection;
-          the per-row Edit button + cell inputs remain keyboard-reachable for the actual content edits. */}
       <tr
         onClick={canEdit ? (e) => onRowClick(item.id, e) : undefined}
         draggable={canEdit && !!drag}
@@ -131,6 +136,7 @@ export function InventoryRow(props: InventoryRowProps) {
         onDrop={canEdit && drag ? handleDrop : undefined}
         className={[
           'transition-colors',
+          rowFlash.flashing ? 'field-rollback-flash' : '',
           canEdit ? 'cursor-pointer' : '',
           isDragging ? 'opacity-40' : '',
           hoverValid ? '!bg-success/20 outline outline-2 outline-success/50' : '',
@@ -139,6 +145,7 @@ export function InventoryRow(props: InventoryRowProps) {
           !sel && !isHovered ? 'hover:bg-base-200/50' : '',
         ].join(' ')}
         aria-selected={sel}
+        {...rowFlash.flashProps}
       >
         <td className="align-top sm:align-middle">
           <div

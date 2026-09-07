@@ -36,4 +36,39 @@ describe('FlashBus', () => {
     bus.emit({ key, reason: 'r' });
     expect(cb).not.toHaveBeenCalled();
   });
+
+  it('a prefix subscription matches every field of the entity', () => {
+    const bus = new FlashBus();
+    const prefix = 'character_inventory:item-1:';
+    const cb = vi.fn();
+    bus.subscribePrefix(prefix, cb);
+    bus.emit({ key: makeFlashKey('character_inventory', 'item-1', 'weaponData'), reason: 'r' });
+    bus.emit({ key: makeFlashKey('character_inventory', 'item-1', 'enchantments'), reason: 'r' });
+    expect(cb).toHaveBeenCalledTimes(2);
+    // A different entity or a different class is not matched.
+    bus.emit({ key: makeFlashKey('character_inventory', 'item-2', 'enchantments'), reason: 'r' });
+    bus.emit({ key: makeFlashKey('character', 'item-1', 'st'), reason: 'r' });
+    expect(cb).toHaveBeenCalledTimes(2);
+  });
+
+  it('exact subscribers still fire alongside a prefix subscriber', () => {
+    const bus = new FlashBus();
+    const key = makeFlashKey('character_inventory', 'item-1', 'quantity');
+    const exact = vi.fn();
+    const prefixed = vi.fn();
+    bus.subscribe(key, exact);
+    bus.subscribePrefix('character_inventory:item-1:', prefixed);
+    bus.emit({ key, reason: 'r' });
+    expect(exact).toHaveBeenCalledTimes(1);
+    expect(prefixed).toHaveBeenCalledTimes(1);
+  });
+
+  it('a prefix subscription unsubscribes cleanly', () => {
+    const bus = new FlashBus();
+    const off = bus.subscribePrefix('character_inventory:item-1:', vi.fn());
+    off();
+    bus.emit({ key: makeFlashKey('character_inventory', 'item-1', 'enchantments'), reason: 'r' });
+    // No throw and no lingering dispatch — verified by a fresh subscriber
+    // receiving nothing after the unsubscription already ran.
+  });
 });

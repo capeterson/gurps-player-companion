@@ -1,8 +1,9 @@
 /**
  * DefensesCard — shield Defense Bonus flows into Dodge/Parry/Block from
- * an equipped shield item, Block is gated on that equipped shield (not a
- * bare skill), the ST shortfall lowers Parry, and 'No' parry weapons
- * render a non-rollable row.
+ * an equipped shield item, armor DB (Deflect enchantments) stacks on
+ * top of it, Block is gated on that equipped shield (not a bare skill),
+ * the ST shortfall lowers Parry, and 'No' parry weapons render a
+ * non-rollable row.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -21,31 +22,62 @@ interface WeaponItem {
   readonly stRequired?: number | null;
 }
 
+interface ArmorItem {
+  readonly id: string;
+  readonly name: string;
+  readonly equipped?: boolean;
+  /** armor.db — Defense Bonus from Deflect enchantments. */
+  readonly db?: number | null;
+}
+
 interface Skill {
   readonly name: string;
   readonly level: number;
 }
 
-function makeCharacter(items: WeaponItem[], skills: Skill[]): CharacterDetail {
+function makeCharacter(
+  items: WeaponItem[],
+  skills: Skill[],
+  armorItems: ArmorItem[] = [],
+): CharacterDetail {
+  const weaponRows = items.map((it) => ({
+    id: it.id,
+    name: it.name,
+    equipped: it.equipped ?? true,
+    weaponData: {
+      damage: '',
+      reach: '1',
+      parry: it.parry ?? null,
+      stRequired: it.stRequired ?? null,
+      skill: it.skill ?? null,
+      db: it.db ?? null,
+      ranged: null,
+    },
+  }));
+  const armorRows = armorItems.map((a) => ({
+    id: a.id,
+    name: a.name,
+    equipped: a.equipped ?? true,
+    isArmor: true,
+    armor: {
+      locations: ['torso'],
+      dr: 4,
+      drCrushing: null,
+      typedDr: {},
+      flexible: false,
+      frontOnly: false,
+      backOnly: false,
+      db: a.db ?? null,
+      notes: null,
+    },
+    weaponData: null,
+  }));
   return {
     id: 'char-1',
     derived: { dodge: 9, basicMove: 5, effectiveSt: 10 },
     encumbrance: { dodgePenalty: 0, moveMultiplier: 1, label: 'None', ratio: 1 },
     skills: skills.map((s, i) => ({ id: `s${i}`, name: s.name, level: s.level })),
-    inventory: items.map((it) => ({
-      id: it.id,
-      name: it.name,
-      equipped: it.equipped ?? true,
-      weaponData: {
-        damage: '',
-        reach: '1',
-        parry: it.parry ?? null,
-        stRequired: it.stRequired ?? null,
-        skill: it.skill ?? null,
-        db: it.db ?? null,
-        ranged: null,
-      },
-    })),
+    inventory: [...weaponRows, ...armorRows],
   } as unknown as CharacterDetail;
 }
 
@@ -135,5 +167,71 @@ describe('DefensesCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Parry \(Greatsword\)/ }));
     expect(targetFor(openRoll, 0)).toBe(9);
+  });
+
+  it('adds armor DB to Dodge, Parry, and Block (no shield)', () => {
+    const openRoll = vi.fn();
+    const character = makeCharacter(
+      [{ id: 'w1', name: 'Broadsword', parry: '0', skill: 'Broadsword' }],
+      [{ name: 'Broadsword', level: 14 }],
+      [{ id: 'a1', name: 'Deflect Hauberk', db: 1 }],
+    );
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+
+    // Dodge 9 + 1 armor DB = 10.
+    fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
+    expect(targetFor(openRoll, 0)).toBe(10);
+
+    // Parry = floor(14/2)+3 + 0 mod + 1 armor DB = 11.
+    fireEvent.click(screen.getByRole('button', { name: /Parry \(Broadsword\)/ }));
+    expect(targetFor(openRoll, 1)).toBe(11);
+
+    // The Dodge caption names the armor source.
+    expect(screen.getByText('+ 1 armor DB')).toBeInTheDocument();
+  });
+
+  it('stacks armor DB with shield DB on Dodge, Parry, and Block', () => {
+    const openRoll = vi.fn();
+    const character = makeCharacter(
+      [
+        { id: 'w1', name: 'Broadsword', parry: '0', skill: 'Broadsword' },
+        { id: 'sh', name: 'Medium Shield', db: 2, skill: 'Shield' },
+      ],
+      [
+        { name: 'Broadsword', level: 14 },
+        { name: 'Shield', level: 12 },
+      ],
+      [{ id: 'a1', name: 'Deflect Breastplate', db: 1 }],
+    );
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+
+    // Dodge 9 + 2 shield DB + 1 armor DB = 12.
+    fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
+    expect(targetFor(openRoll, 0)).toBe(12);
+
+    // Parry = floor(14/2)+3 + 0 mod + 3 total DB = 13.
+    fireEvent.click(screen.getByRole('button', { name: /Parry \(Broadsword\)/ }));
+    expect(targetFor(openRoll, 1)).toBe(13);
+
+    // Block = floor(12/2)+3 + 3 total DB = 12.
+    fireEvent.click(screen.getByRole('button', { name: /Block \(Medium Shield\)/ }));
+    expect(targetFor(openRoll, 2)).toBe(12);
+
+    // The Dodge caption names both sources in the breakdown.
+    expect(screen.getByText('+ 2 DB (Medium Shield) + 1 armor DB')).toBeInTheDocument();
+  });
+
+  it('ignores armor DB on unequipped armor', () => {
+    const openRoll = vi.fn();
+    const character = makeCharacter(
+      [{ id: 'w1', name: 'Broadsword', parry: '0', skill: 'Broadsword' }],
+      [{ name: 'Broadsword', level: 14 }],
+      [{ id: 'a1', name: 'Deflect Hauberk', db: 1, equipped: false }],
+    );
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
+    expect(targetFor(openRoll, 0)).toBe(9);
+    expect(screen.queryByText(/armor DB/)).not.toBeInTheDocument();
   });
 });

@@ -242,4 +242,64 @@ describe('POST /api/v1/sync/operations -- character field writability parity', (
     expect(body.outcomes[0]?.status).toBe('rejected');
     expect(body.outcomes[0]?.reason).toMatch(/not writable/);
   });
+
+  it('applies a birthdate field patch through /sync/operations', async () => {
+    const { accessToken } = await registerUser('birthdate-sync-ok');
+    const character = await createCharacter(accessToken);
+    const res = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: '0193b3c0-f1f0-7000-8000-0000000000b1',
+            entityClass: 'character',
+            entityId: character.id,
+            command: 'patch',
+            fieldPath: 'birthdate',
+            attemptedValue: 'Year of the Dragon',
+            baseRevision: character.revision,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ status: string }> };
+    expect(body.outcomes[0]?.status).toBe('applied');
+
+    const getRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    const loaded = (await getRes.json()) as { birthdate: string | null };
+    expect(loaded.birthdate).toBe('Year of the Dragon');
+  });
+
+  it('rejects an over-length birthdate patch', async () => {
+    const { accessToken } = await registerUser('birthdate-sync-bad');
+    const character = await createCharacter(accessToken);
+    const res = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: '0193b3c0-f1f0-7000-8000-0000000000b2',
+            entityClass: 'character',
+            entityId: character.id,
+            command: 'patch',
+            fieldPath: 'birthdate',
+            attemptedValue: 'x'.repeat(41),
+            baseRevision: character.revision,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ status: string }> };
+    expect(body.outcomes[0]?.status).toBe('rejected');
+  });
 });

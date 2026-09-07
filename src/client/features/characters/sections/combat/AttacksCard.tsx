@@ -16,7 +16,7 @@ import {
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
-import type { RangedData } from '../../../../../shared/schemas/inventory.ts';
+import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
 
@@ -76,6 +76,38 @@ function rangedStatLine(r: RangedData): string {
   return parts.join(' · ');
 }
 
+/**
+ * The weapon's damage lines, primary first, then each alternate mode.
+ *
+ * The primary line is unnamed (it IS the weapon); alternates carry the
+ * mode name so "Swing" and "Thrust" are distinguishable in the chip row.
+ * An alternate that leaves `reach` unset inherits the weapon's — a swing
+ * and a thrust with the same reach only state it once.
+ */
+interface DamageLine {
+  readonly key: string;
+  readonly modeName: string | null;
+  readonly damage: string | undefined;
+  readonly reach: string | null | undefined;
+}
+
+function damageLinesFor(weaponName: string, wd: WeaponData): DamageLine[] {
+  const lines: DamageLine[] = [
+    { key: `${weaponName}:primary`, modeName: null, damage: wd.damage, reach: wd.reach },
+  ];
+  for (const [i, mode] of (wd.alternateModes ?? []).entries()) {
+    lines.push({
+      key: `${weaponName}:mode:${i}:${mode.name}`,
+      modeName: mode.name,
+      damage: mode.damage,
+      reach: mode.reach ?? wd.reach,
+    });
+  }
+  // A weapon whose primary line carries no damage at all (alternates-only
+  // data entry) shouldn't render an empty leading row.
+  return lines.filter((line, i) => i > 0 || line.damage !== undefined || lines.length === 1);
+}
+
 export interface AttacksCardProps {
   character: CharacterDetail;
   openRoll: (req: RollRequest) => void;
@@ -112,15 +144,21 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
         {weapons.map((w) => {
           const wd = w.weaponData;
           if (!wd) return null;
-          const modes = wd.damage ? parseDamageSpec(wd.damage) : [];
+          const lines = damageLinesFor(w.name, wd);
+          const parsedByLine = lines.map((line) => ({
+            line,
+            modes: line.damage ? parseDamageSpec(line.damage) : [],
+          }));
+          const allModes = parsedByLine.flatMap((p) => p.modes);
           const stPenalty = stShortfallPenalty(wd.stRequired, character.derived.effectiveSt);
           const resolution = resolveWeaponSkill(w.name, wd.skill, skillCandidates);
           // Only offer the vitals/eye presets when at least one of the
-          // weapon's parsed damage modes can target them (B399). A
-          // weapon with no parseable modes at all (free-text homebrew
-          // damage) keeps the full preset list rather than being
-          // punished for not parsing.
-          const canHitVitals = modes.length === 0 || modes.some((m) => canTargetVitals(m.type));
+          // weapon's parsed damage modes -- across EVERY attack mode --
+          // can target them (B399). A weapon with no parseable modes at
+          // all (free-text homebrew damage) keeps the full preset list
+          // rather than being punished for not parsing.
+          const canHitVitals =
+            allModes.length === 0 || allModes.some((m) => canTargetVitals(m.type));
           const locationPresets = canHitVitals
             ? HIT_LOCATION_PRESETS
             : HIT_LOCATION_PRESETS_NO_VITALS;
@@ -146,41 +184,50 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
                   </span>
                 )}
               </div>
-              <div className="num flex flex-wrap items-center gap-1.5 text-xs text-base-content/70">
-                {modes.length > 0 ? (
-                  modes.map((m) => {
-                    const resolved = resolveDamage(m, thrust, swing);
-                    if (!resolved) return <span key={m.raw}>{m.raw}</span>;
-                    const dice = formatDamageDice(resolved.dice);
-                    const type = resolved.type ? ` ${resolved.type}` : '';
-                    const divisor = resolved.armorDivisor ? ` (${resolved.armorDivisor})` : '';
-                    const display = `${dice}${type}${divisor}`;
-                    return (
-                      <button
-                        key={m.raw}
-                        type="button"
-                        className="chip"
-                        onClick={() =>
-                          openRoll({
-                            label: `${w.name} damage`,
-                            baseTarget: 0,
-                            damage: {
-                              dice: resolved.dice,
-                              damageType: resolved.type,
-                              armorDivisor: resolved.armorDivisor,
-                            },
-                          })
-                        }
-                      >
-                        {display}
-                      </button>
-                    );
-                  })
-                ) : (
-                  <span>{wd.damage ?? '—'}</span>
-                )}
-                {wd.reach ? <span>· reach {wd.reach}</span> : null}
-              </div>
+              {parsedByLine.map(({ line, modes }) => (
+                <div
+                  key={line.key}
+                  className="num flex flex-wrap items-center gap-1.5 text-xs text-base-content/70"
+                >
+                  {line.modeName && <span className="label-eyebrow not-num">{line.modeName}</span>}
+                  {modes.length > 0 ? (
+                    modes.map((m) => {
+                      const resolved = resolveDamage(m, thrust, swing);
+                      if (!resolved) return <span key={`${line.key}:${m.raw}`}>{m.raw}</span>;
+                      const dice = formatDamageDice(resolved.dice);
+                      const type = resolved.type ? ` ${resolved.type}` : '';
+                      const divisor = resolved.armorDivisor ? ` (${resolved.armorDivisor})` : '';
+                      const display = `${dice}${type}${divisor}`;
+                      const rollLabel = line.modeName
+                        ? `${w.name} (${line.modeName}) damage`
+                        : `${w.name} damage`;
+                      return (
+                        <button
+                          key={`${line.key}:${m.raw}`}
+                          type="button"
+                          className="chip"
+                          onClick={() =>
+                            openRoll({
+                              label: rollLabel,
+                              baseTarget: 0,
+                              damage: {
+                                dice: resolved.dice,
+                                damageType: resolved.type,
+                                armorDivisor: resolved.armorDivisor,
+                              },
+                            })
+                          }
+                        >
+                          {display}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <span>{line.damage ?? '—'}</span>
+                  )}
+                  {line.reach ? <span>· reach {line.reach}</span> : null}
+                </div>
+              ))}
               {ranged && rangedStatLine(ranged) !== '' && (
                 <p className="num text-xs text-base-content/70">{rangedStatLine(ranged)}</p>
               )}

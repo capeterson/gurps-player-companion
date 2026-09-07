@@ -26,6 +26,18 @@ describe('characterSyncPatch', () => {
     ]);
   });
 
+  it('includes birthdate in the writable character surface (REST update + sync patch)', () => {
+    const restFields = Object.keys(characterUpdate.shape);
+    expect(restFields).toContain('birthdate');
+    expect(Object.keys(characterSyncPatch.shape)).toContain('birthdate');
+  });
+
+  it('validates birthdate as optional free-form text up to 40 chars', () => {
+    expect(characterUpdate.safeParse({ birthdate: 'March 3, 1987' }).success).toBe(true);
+    expect(characterUpdate.safeParse({ birthdate: null }).success).toBe(true);
+    expect(characterUpdate.safeParse({ birthdate: 'x'.repeat(41) }).success).toBe(false);
+  });
+
   it('rejects non-string warning codes and oversized codes', () => {
     expect(dismissedWarningsField.safeParse([42]).success).toBe(false);
     expect(dismissedWarningsField.safeParse(['x'.repeat(81)]).success).toBe(false);

@@ -32,15 +32,19 @@ export interface UseFlashStateReturn {
 }
 
 /**
- * @param flashKey Subscribe to the flashBus on this key; omit to disable
- *   the subscription (callers that only ever trigger manually).
+ * @param flashKey Subscribe to the flashBus on this exact key; omit to
+ *   disable the subscription (callers that only ever trigger manually).
  * @param onBusEvent Called (before the flash triggers) when a flashBus
  *   event arrives for `flashKey` — the hook's chance to revert its own
  *   local state to the last authoritative value.
+ * @param flashPrefix Instead of an exact key, subscribe to every event
+ *   whose key starts with this prefix (e.g. `character_inventory:${id}:`
+ *   for a row that should flash on any of its fields' rollbacks).
  */
 export function useFlashState(
   flashKey: string | undefined,
   onBusEvent?: () => void,
+  flashPrefix?: string,
 ): UseFlashStateReturn {
   const [flashing, setFlashing] = useState(false);
   const [flashParity, setFlashParity] = useState<'0' | '1'>('0');
@@ -69,14 +73,16 @@ export function useFlashState(
     }, FLASH_MS);
   }, []);
 
+  const handleBusEvent = useCallback(() => {
+    if (!mountedRef.current) return;
+    onBusEventRef.current?.();
+    trigger();
+  }, [trigger]);
+
   useEffect(() => {
-    if (!flashKey) return;
-    return flashBus.subscribe(flashKey, () => {
-      if (!mountedRef.current) return;
-      onBusEventRef.current?.();
-      trigger();
-    });
-  }, [flashKey, trigger]);
+    if (flashPrefix) return flashBus.subscribePrefix(flashPrefix, handleBusEvent);
+    if (flashKey) return flashBus.subscribe(flashKey, handleBusEvent);
+  }, [flashKey, flashPrefix, handleBusEvent]);
 
   return {
     flashing,

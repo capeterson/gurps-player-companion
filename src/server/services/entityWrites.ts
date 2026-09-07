@@ -26,12 +26,16 @@
 import type { Posture } from '../../shared/constants/combat.ts';
 import type { CharacterCreate } from '../../shared/schemas/character.ts';
 import type { InventoryItemCreate } from '../../shared/schemas/inventory.ts';
+import type { LanguageCreate } from '../../shared/schemas/language.ts';
 import type { SkillCreate } from '../../shared/schemas/skill.ts';
 import type { SpellCreate } from '../../shared/schemas/spell.ts';
+import type { TechniqueCreate } from '../../shared/schemas/technique.ts';
 import type { TraitCreate } from '../../shared/schemas/trait.ts';
 import type {
+  characterLanguages,
   characterSkills,
   characterSpells,
+  characterTechniques,
   characterTraits,
   characters,
   combatStates,
@@ -58,6 +62,7 @@ export function characterInsertValues(
     height: body.height ?? null,
     weight: body.weight ?? null,
     age: body.age ?? null,
+    birthdate: body.birthdate ?? null,
     appearance: body.appearance ?? null,
     st: body.st,
     dx: body.dx,
@@ -133,6 +138,42 @@ export function spellInsertValues(
   };
 }
 
+/** Values for a new `character_languages` row. See `characterInsertValues` re: `ctx.id`. */
+export function languageInsertValues(
+  body: LanguageCreate,
+  ctx: { readonly characterId: string; readonly id?: string },
+): typeof characterLanguages.$inferInsert {
+  return {
+    ...(ctx.id ? { id: ctx.id } : {}),
+    characterId: ctx.characterId,
+    name: body.name,
+    spokenFluency: body.spokenFluency ?? 'none',
+    writtenFluency: body.writtenFluency ?? 'none',
+    points: body.points ?? 0,
+    notes: body.notes ?? null,
+    libraryLanguageId: body.libraryLanguageId ?? null,
+  };
+}
+
+/** Values for a new `character_techniques` row. See `characterInsertValues` re: `ctx.id`. */
+export function techniqueInsertValues(
+  body: TechniqueCreate,
+  ctx: { readonly characterId: string; readonly id?: string },
+): typeof characterTechniques.$inferInsert {
+  return {
+    ...(ctx.id ? { id: ctx.id } : {}),
+    characterId: ctx.characterId,
+    name: body.name,
+    defaultSkillName: body.defaultSkillName,
+    difficulty: body.difficulty ?? 'A',
+    points: body.points ?? 0,
+    defaultModifier: body.defaultModifier ?? 0,
+    maxLevel: body.maxLevel ?? null,
+    notes: body.notes ?? null,
+    libraryTechniqueId: body.libraryTechniqueId ?? null,
+  };
+}
+
 /**
  * Values for a new `inventory_items` row. See `characterInsertValues` re:
  * `ctx.id`. Decimal columns (`weightLbs`, `cost`, `hideawayCapacityLbs`)
@@ -163,6 +204,7 @@ export function inventoryInsertValues(
     weaponData: body.weaponData ?? null,
     powerstoneData: body.powerstoneData ?? null,
     magicItemData: body.magicItemData ?? null,
+    enchantments: body.enchantments ?? [],
     libraryItemId: body.libraryItemId ?? null,
   };
 }

@@ -14,8 +14,12 @@ const okPoints = {
   advantages: 0,
   disadvantages: 0,
   quirks: 0,
+  languages: 0,
   skills: 0,
+  spells: 0,
+  techniques: 0,
   total: 0,
+  unspent: 0,
 } as const;
 
 const okEnc = {

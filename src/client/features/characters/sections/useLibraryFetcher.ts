@@ -1,5 +1,6 @@
 /**
- * Fetch a campaign's library (traits + skills + items) once via the
+ * Fetch a campaign's library (traits + skills + spells + items +
+ * languages + techniques) once via the
  * aggregate `GET /campaigns/{id}/library` endpoint, then return a
  * `fetchOptions(query)` function suitable for `<LibraryAutocomplete>`
  * that filters the requested kind client-side.
@@ -22,15 +23,23 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type {
   LibraryItemOut,
+  LibraryLanguageOut,
   LibrarySkillOut,
   LibrarySpellOut,
+  LibraryTechniqueOut,
   LibraryTraitOut,
 } from '../../../../shared/schemas/campaignLibrary.ts';
 import { ApiError, api } from '../../../lib/api.ts';
 
-type Kind = 'traits' | 'skills' | 'spells' | 'items';
+type Kind = 'traits' | 'skills' | 'spells' | 'items' | 'languages' | 'techniques';
 
-type LibraryEntry = LibraryTraitOut | LibrarySkillOut | LibrarySpellOut | LibraryItemOut;
+type LibraryEntry =
+  | LibraryTraitOut
+  | LibrarySkillOut
+  | LibrarySpellOut
+  | LibraryItemOut
+  | LibraryLanguageOut
+  | LibraryTechniqueOut;
 
 interface LibraryPayload {
   readonly traits: LibraryTraitOut[];
@@ -38,7 +47,20 @@ interface LibraryPayload {
   /** Optional: servers from before the spell library omit it. */
   readonly spells?: LibrarySpellOut[];
   readonly items: LibraryItemOut[];
+  /** Optional: servers from before the language library omit it. */
+  readonly languages?: LibraryLanguageOut[];
+  /** Optional: servers from before the technique library omit it. */
+  readonly techniques?: LibraryTechniqueOut[];
 }
+
+const EMPTY_LIBRARY: LibraryPayload = {
+  traits: [],
+  skills: [],
+  spells: [],
+  items: [],
+  languages: [],
+  techniques: [],
+};
 
 export function useLibraryFetcher<T extends LibraryEntry>(
   kind: Kind,
@@ -56,13 +78,13 @@ export function useLibraryFetcher<T extends LibraryEntry>(
     // cache too (and useLibraryEffectMaps', which shares it).
     queryKey: ['campaigns', campaignId, 'library'],
     queryFn: async (): Promise<LibraryPayload> => {
-      if (!campaignId) return { traits: [], skills: [], spells: [], items: [] };
+      if (!campaignId) return EMPTY_LIBRARY;
       try {
         return await api<LibraryPayload>(`/campaigns/${campaignId}/library`);
       } catch (err) {
         // 403 (member can't see campaign) shouldn't crash the form.
         if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
-          return { traits: [], skills: [], spells: [], items: [] };
+          return EMPTY_LIBRARY;
         }
         throw err;
       }
@@ -72,7 +94,7 @@ export function useLibraryFetcher<T extends LibraryEntry>(
 
   const fetchOptions = useCallback(
     async (q: string): Promise<T[]> => {
-      const payload = query.data ?? { traits: [], skills: [], spells: [], items: [] };
+      const payload = query.data ?? EMPTY_LIBRARY;
       // The caller's `T` is one of the union members; the kind arg
       // discriminates which array we want. TS can't narrow through
       // the indexed access so this cast is necessary at the boundary.

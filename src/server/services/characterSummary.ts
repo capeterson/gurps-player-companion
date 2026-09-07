@@ -22,8 +22,10 @@ import {
   buildCharacterDetail as buildCharacterDetailShared,
   buildCombatStateOut as buildCombatStateOutShared,
   buildInventoryItemOut as buildInventoryItemOutShared,
+  buildLanguageOut as buildLanguageOutShared,
   buildSkillOut as buildSkillOutShared,
   buildSpellOut as buildSpellOutShared,
+  buildTechniqueOut as buildTechniqueOutShared,
   buildTraitOut as buildTraitOutShared,
 } from '../../shared/domain/characterDetail.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
@@ -31,16 +33,20 @@ import { getDb } from '../db/client.ts';
 import {
   type DbCampaign,
   type DbCharacter,
+  type DbCharacterLanguage,
   type DbCharacterSkill,
   type DbCharacterSpell,
+  type DbCharacterTechnique,
   type DbCharacterTrait,
   type DbCombatState,
   type DbInventoryItem,
   campaignLibrarySkills,
   campaignLibraryTraits,
   campaigns,
+  characterLanguages,
   characterSkills,
   characterSpells,
+  characterTechniques,
   characterTraits,
   characters,
   combatStates,
@@ -75,6 +81,8 @@ export interface SummaryInput {
   readonly traits: readonly DbCharacterTrait[];
   readonly skills: readonly DbCharacterSkill[];
   readonly spells: readonly DbCharacterSpell[];
+  readonly languages: readonly DbCharacterLanguage[];
+  readonly techniques: readonly DbCharacterTechnique[];
   readonly inventory: readonly DbInventoryItem[];
   readonly combat: DbCombatState | null;
   readonly campaign: DbCampaign | null;
@@ -157,6 +165,8 @@ export function buildCharacterDetail(input: SummaryInput) {
           : [],
     })),
     spells: input.spells,
+    languages: input.languages,
+    techniques: input.techniques,
     inventory: input.inventory,
     combat: input.combat,
     campaign: input.campaign,
@@ -176,46 +186,59 @@ export async function loadCharacterDetail(id: string) {
   const db = getDb();
   const [c] = await db.select().from(characters).where(eq(characters.id, id));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, spells, inventory, combat, campaign] = await Promise.all([
-    db
-      .select()
-      .from(characterTraits)
-      .where(eq(characterTraits.characterId, id))
-      .orderBy(asc(characterTraits.kind), asc(characterTraits.name)),
-    db
-      .select()
-      .from(characterSkills)
-      .where(eq(characterSkills.characterId, id))
-      .orderBy(asc(characterSkills.name)),
-    db
-      .select()
-      .from(characterSpells)
-      .where(eq(characterSpells.characterId, id))
-      .orderBy(asc(characterSpells.name)),
-    db
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.characterId, id))
-      .orderBy(asc(inventoryItems.name)),
-    db
-      .select()
-      .from(combatStates)
-      .where(eq(combatStates.characterId, id))
-      .then((r) => r[0] ?? null),
-    c.campaignId
-      ? db
-          .select()
-          .from(campaigns)
-          .where(eq(campaigns.id, c.campaignId))
-          .then((r) => r[0] ?? null)
-      : Promise.resolve(null),
-  ]);
+  const [traits, skills, spells, languages, techniques, inventory, combat, campaign] =
+    await Promise.all([
+      db
+        .select()
+        .from(characterTraits)
+        .where(eq(characterTraits.characterId, id))
+        .orderBy(asc(characterTraits.kind), asc(characterTraits.name)),
+      db
+        .select()
+        .from(characterSkills)
+        .where(eq(characterSkills.characterId, id))
+        .orderBy(asc(characterSkills.name)),
+      db
+        .select()
+        .from(characterSpells)
+        .where(eq(characterSpells.characterId, id))
+        .orderBy(asc(characterSpells.name)),
+      db
+        .select()
+        .from(characterLanguages)
+        .where(eq(characterLanguages.characterId, id))
+        .orderBy(asc(characterLanguages.name)),
+      db
+        .select()
+        .from(characterTechniques)
+        .where(eq(characterTechniques.characterId, id))
+        .orderBy(asc(characterTechniques.name)),
+      db
+        .select()
+        .from(inventoryItems)
+        .where(eq(inventoryItems.characterId, id))
+        .orderBy(asc(inventoryItems.name)),
+      db
+        .select()
+        .from(combatStates)
+        .where(eq(combatStates.characterId, id))
+        .then((r) => r[0] ?? null),
+      c.campaignId
+        ? db
+            .select()
+            .from(campaigns)
+            .where(eq(campaigns.id, c.campaignId))
+            .then((r) => r[0] ?? null)
+        : Promise.resolve(null),
+    ]);
   const { libraryTraitEffects, librarySkillEffects } = await fetchLibraryEffects(traits, skills);
   return buildCharacterDetail({
     character: c,
     traits,
     skills,
     spells,
+    languages,
+    techniques,
     inventory,
     combat,
     campaign,
@@ -229,3 +252,5 @@ export const buildCombatStateOut = buildCombatStateOutShared;
 export const buildSkillOut = buildSkillOutShared;
 export const buildSpellOut = buildSpellOutShared;
 export const buildInventoryItemOut = buildInventoryItemOutShared;
+export const buildLanguageOut = buildLanguageOutShared;
+export const buildTechniqueOut = buildTechniqueOutShared;

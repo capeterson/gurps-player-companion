@@ -262,6 +262,213 @@ describe('summarizeEvent character_skill', () => {
   });
 });
 
+// ---------- summarizeEvent — character_language ----------
+
+describe('summarizeEvent character_language', () => {
+  it('insert: "Added language <name>"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'insert',
+      oldRow: null,
+      newRow: { name: 'Latin', spoken_fluency: 'accented', written_fluency: 'native', points: 5 },
+    });
+    expect(summary).toBe('Added language Latin');
+  });
+
+  it('delete: "Removed language <name>"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'delete',
+      oldRow: { name: 'Aramaic', spoken_fluency: 'broken', written_fluency: 'none', points: 1 },
+      newRow: null,
+    });
+    expect(summary).toBe('Removed language Aramaic');
+  });
+
+  it('update spoken fluency: names the transition (snake_case column camelized)', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', spoken_fluency: 'broken', written_fluency: 'none', points: 1 },
+      newRow: { name: 'Latin', spoken_fluency: 'accented', written_fluency: 'none', points: 1 },
+    });
+    expect(summary).toBe('Latin spoken broken → accented');
+  });
+
+  it('update written fluency: names the transition', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', spoken_fluency: 'native', written_fluency: 'none', points: 0 },
+      newRow: { name: 'Latin', spoken_fluency: 'native', written_fluency: 'native', points: 3 },
+    });
+    expect(summary).toBe('Latin written none → native');
+  });
+
+  it('update points only: reports the point delta', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', points: 1 },
+      newRow: { name: 'Latin', points: 3 },
+    });
+    expect(summary).toBe('Latin 1 → 3 pts');
+  });
+
+  it('rename: reports the new name', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', points: 1 },
+      newRow: { name: 'Vulgar Latin', points: 1 },
+    });
+    expect(summary).toBe('Renamed language to Vulgar Latin');
+  });
+});
+
+// ---------- summarizeEvent — campaign_library_language ----------
+
+describe('summarizeEvent campaign_library_language', () => {
+  it('insert / delete / update all name the library language', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_language',
+        op: 'insert',
+        oldRow: null,
+        newRow: { name: 'Elder Speech' },
+      }).summary,
+    ).toBe('Added library language Elder Speech');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_language',
+        op: 'delete',
+        oldRow: { name: 'Elder Speech' },
+        newRow: null,
+      }).summary,
+    ).toBe('Removed library language Elder Speech');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_language',
+        op: 'update',
+        oldRow: { name: 'Elder Speech', source: null },
+        newRow: { name: 'Elder Speech', source: 'B23' },
+      }).summary,
+    ).toBe('Library language Elder Speech updated');
+  });
+});
+
+// ---------- summarizeEvent — character_technique ----------
+
+describe('summarizeEvent character_technique', () => {
+  it('insert: names the technique and its default skill', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_technique',
+      op: 'insert',
+      oldRow: null,
+      newRow: { name: 'Feint', default_skill_name: 'Broadsword', difficulty: 'H', points: 2 },
+    });
+    expect(summary).toBe('Added technique Feint (Broadsword)');
+  });
+
+  it('delete: "Removed technique <name>"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_technique',
+      op: 'delete',
+      oldRow: { name: 'Feint', default_skill_name: 'Broadsword' },
+      newRow: null,
+    });
+    expect(summary).toBe('Removed technique Feint');
+  });
+
+  it('update points: reports the point delta', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_technique',
+      op: 'update',
+      oldRow: { name: 'Feint', points: 2 },
+      newRow: { name: 'Feint', points: 4 },
+    });
+    expect(summary).toBe('Feint 2 → 4 pts');
+  });
+
+  it('update default skill: names the new default', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_technique',
+      op: 'update',
+      oldRow: { name: 'Feint', default_skill_name: 'Broadsword' },
+      newRow: { name: 'Feint', default_skill_name: 'Rapier' },
+    });
+    expect(summary).toBe('Feint now defaults from Rapier');
+  });
+
+  it('update difficulty: names the transition', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_technique',
+      op: 'update',
+      oldRow: { name: 'Feint', difficulty: 'A' },
+      newRow: { name: 'Feint', difficulty: 'H' },
+    });
+    expect(summary).toBe('Feint difficulty A → H');
+  });
+});
+
+// ---------- summarizeEvent — campaign_library_technique / style ----------
+
+describe('summarizeEvent campaign library techniques and styles', () => {
+  it('names the library technique on every op', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_technique',
+        op: 'insert',
+        oldRow: null,
+        newRow: { name: 'Feint' },
+      }).summary,
+    ).toBe('Added library technique Feint');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_technique',
+        op: 'delete',
+        oldRow: { name: 'Feint' },
+        newRow: null,
+      }).summary,
+    ).toBe('Removed library technique Feint');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_technique',
+        op: 'update',
+        oldRow: { name: 'Feint', max_level: null },
+        newRow: { name: 'Feint', max_level: 4 },
+      }).summary,
+    ).toBe('Library technique Feint updated');
+  });
+
+  it('names the style on every op', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_style',
+        op: 'insert',
+        oldRow: null,
+        newRow: { name: 'Sword-and-Buckler' },
+      }).summary,
+    ).toBe('Added style Sword-and-Buckler');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_style',
+        op: 'delete',
+        oldRow: { name: 'Sword-and-Buckler' },
+        newRow: null,
+      }).summary,
+    ).toBe('Removed style Sword-and-Buckler');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_style',
+        op: 'update',
+        oldRow: { name: 'Sword-and-Buckler', perks: [] },
+        newRow: { name: 'Sword-and-Buckler', perks: ['Off-Hand Weapon Training'] },
+      }).summary,
+    ).toBe('Style Sword-and-Buckler updated');
+  });
+});
+
 // ---------- summarizeEvent — character_inventory ----------
 
 describe('summarizeEvent character_inventory', () => {
@@ -442,6 +649,29 @@ describe('groupIntoBatches', () => {
     ];
     const groups = groupIntoBatches(events);
     expect(groups).toHaveLength(2);
+  });
+
+  it('a batched language import folds under one "N language changes" header', () => {
+    const bid = crypto.randomUUID();
+    const events = [
+      makeEvent({ batchId: bid, entityClass: 'character_language', op: 'insert' }),
+      makeEvent({ batchId: bid, entityClass: 'character_language', op: 'insert' }),
+      makeEvent({ batchId: bid, entityClass: 'character_language', op: 'insert' }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.foldable).toBe(true);
+    expect(groups[0]?.groupSummary).toBe('3 language changes');
+  });
+
+  it('a batched style adoption folds under one "N technique changes" header', () => {
+    const bid = crypto.randomUUID();
+    const events = [
+      makeEvent({ batchId: bid, entityClass: 'character_technique', op: 'insert' }),
+      makeEvent({ batchId: bid, entityClass: 'character_technique', op: 'insert' }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups[0]?.groupSummary).toBe('2 technique changes');
   });
 
   it('null batchId always starts a new group even if surrounded by same batchId', () => {

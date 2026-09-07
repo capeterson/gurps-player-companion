@@ -41,9 +41,11 @@ import { CharacterMinimalView } from './CharacterMinimalView.tsx';
 import { ActiveConditionsPanel } from './sections/ActiveConditionsPanel.tsx';
 import { HistoryPanel } from './sections/HistoryPanel.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
+import { LanguagesPanel } from './sections/LanguagesPanel.tsx';
 import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { SpellsPanel } from './sections/SpellsPanel.tsx';
+import { TechniquesPanel } from './sections/TechniquesPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { CombatTab } from './sections/combat/CombatTab.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
@@ -560,6 +562,12 @@ function IdentityPanel({
     parse: nullableTextParser,
     ...buildSave('weight', { humanName: 'weight' }),
   });
+  const birthdateField = useDraftField<string | null>({
+    name: 'birthdate',
+    serverValue: character.birthdate ?? '',
+    parse: nullableTextParser,
+    ...buildSave('birthdate', { humanName: 'birthdate' }),
+  });
   const ageField = useDraftField<number | null>({
     name: 'age',
     serverValue: character.age ?? null,
@@ -627,6 +635,19 @@ function IdentityPanel({
             />
           ) : (
             <span>{character.weight ?? '—'}</span>
+          )}
+        </div>
+        <div className="form-control">
+          <span className="label-text-alt label-eyebrow">Birthdate</span>
+          {canWrite ? (
+            <input
+              aria-label="birthdate"
+              className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm`}
+              placeholder="e.g. March 3, 1987"
+              {...birthdateField.inputProps}
+            />
+          ) : (
+            <span>{character.birthdate ?? '—'}</span>
           )}
         </div>
         <div className="form-control">
@@ -1106,13 +1127,31 @@ function PointsPanel({
             <span className="num">{p.quirks}</span>
           </li>
           <li className="flex justify-between">
+            <span>Languages</span>
+            <span className="num">{p.languages}</span>
+          </li>
+          <li className="flex justify-between">
             <span>Skills</span>
             <span className="num">{p.skills}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Techniques</span>
+            <span className="num">{p.techniques}</span>
+          </li>
+          <li className="flex justify-between">
+            <span>Spells</span>
+            <span className="num">{p.spells}</span>
           </li>
           <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
             <span>Total</span>
             <span className="num">{p.total}</span>
           </li>
+          {character.campaignId !== null && character.points.unspent !== 0 && (
+            <li className="flex justify-between text-base-content/70">
+              <span>{p.unspent > 0 ? 'Unspent' : 'Over target'}</span>
+              <span className="num">{p.unspent > 0 ? p.unspent : -p.unspent}</span>
+            </li>
+          )}
         </ul>
       )}
     </StatCard>
@@ -1515,6 +1554,7 @@ export function CharacterSheetPage() {
           height: character.height ?? null,
           weight: character.weight ?? null,
           age: character.age ?? null,
+          birthdate: character.birthdate ?? null,
           appearance: character.appearance ?? null,
           techLevel: character.techLevel ?? null,
           updatedAt: character.updatedAt,
@@ -1596,7 +1636,13 @@ export function CharacterSheetPage() {
           />
         )}
         {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
-        {tab === 'Skills' && <SkillsPanel character={character} canWrite={canWrite} />}
+        {tab === 'Skills' && (
+          <div className="space-y-4">
+            <SkillsPanel character={character} canWrite={canWrite} />
+            <TechniquesPanel character={character} canWrite={canWrite} />
+            <LanguagesPanel character={character} canWrite={canWrite} />
+          </div>
+        )}
         {tab === 'Magic' && (
           <div className="space-y-4">
             <SpellsPanel character={character} canWrite={canWrite} />

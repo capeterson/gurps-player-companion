@@ -19,12 +19,17 @@ import type { CharacterDetail, ResolvedEffectOut, TempEffect } from '../schemas/
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { TraitEffect } from '../schemas/effects.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
+import type { LanguageOut } from '../schemas/language.ts';
 import type { SkillOut } from '../schemas/skill.ts';
 import type { SpellOut } from '../schemas/spell.ts';
+import type { TechniqueDifficulty, TechniqueOut } from '../schemas/technique.ts';
 import type { TraitModifier, TraitOut } from '../schemas/trait.ts';
 import {
   type CharacterAttrs,
+  type CharacterLanguageInput,
   type CharacterSkillInput,
+  type CharacterSpellInput,
+  type CharacterTechniqueInput,
   type CharacterTraitInput,
   computeDerived,
   computePointBreakdown,
@@ -39,6 +44,7 @@ import {
   mageryLevel,
   manaSkillModifier,
 } from './spellCalc.ts';
+import { computeTechniqueLevel, resolveDefaultSkillLevel } from './techniqueCalc.ts';
 import { applyEffectsToAttrs, resolveEffects, skillBonusFor } from './traitEffects.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
@@ -57,6 +63,7 @@ export interface CharacterDetailInputCharacter {
   height: string | null;
   weight: string | null;
   age: number | null;
+  birthdate: string | null;
   appearance: string | null;
   st: number;
   dx: number;
@@ -138,6 +145,7 @@ export interface CharacterDetailInputInventory {
   weaponData: unknown | null;
   powerstoneData: unknown | null;
   magicItemData: unknown | null;
+  enchantments: unknown | null;
   libraryItemId: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -159,6 +167,34 @@ export interface CharacterDetailInputSpell {
   prerequisites: string | null;
   notes: string | null;
   librarySpellId: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CharacterDetailInputLanguage {
+  id: string;
+  characterId: string;
+  name: string;
+  spokenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  writtenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  points: number;
+  notes: string | null;
+  libraryLanguageId: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CharacterDetailInputTechnique {
+  id: string;
+  characterId: string;
+  name: string;
+  defaultSkillName: string;
+  difficulty: TechniqueDifficulty;
+  points: number;
+  defaultModifier: number;
+  maxLevel: number | null;
+  notes: string | null;
+  libraryTechniqueId: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -190,6 +226,8 @@ export interface CharacterDetailInput {
   readonly traits: readonly CharacterDetailInputTrait[];
   readonly skills: readonly CharacterDetailInputSkill[];
   readonly spells: readonly CharacterDetailInputSpell[];
+  readonly languages: readonly CharacterDetailInputLanguage[];
+  readonly techniques: readonly CharacterDetailInputTechnique[];
   readonly inventory: readonly CharacterDetailInputInventory[];
   readonly combat: CharacterDetailInputCombat | null;
   readonly campaign: CharacterDetailInputCampaign | null;
@@ -249,6 +287,55 @@ export function buildTraitOut(trait: CharacterDetailInputTrait): TraitOut {
     libraryTraitId: trait.libraryTraitId,
     createdAt: toIso(trait.createdAt),
     updatedAt: toIso(trait.updatedAt),
+  };
+}
+
+export function buildLanguageOut(language: CharacterDetailInputLanguage): LanguageOut {
+  return {
+    id: language.id,
+    characterId: language.characterId,
+    name: language.name,
+    spokenFluency: language.spokenFluency,
+    writtenFluency: language.writtenFluency,
+    points: language.points,
+    notes: language.notes,
+    libraryLanguageId: language.libraryLanguageId,
+    createdAt: toIso(language.createdAt),
+    updatedAt: toIso(language.updatedAt),
+  };
+}
+
+/**
+ * `defaultSkillLevel` comes from resolving `defaultSkillName` against the
+ * character's already-computed skill levels (see `resolveDefaultSkillLevel`);
+ * pass null when the skill isn't on the sheet, which is what makes the
+ * technique's own `level` null.
+ */
+export function buildTechniqueOut(
+  technique: CharacterDetailInputTechnique,
+  defaultSkillLevel: number | null,
+): TechniqueOut {
+  return {
+    id: technique.id,
+    characterId: technique.characterId,
+    name: technique.name,
+    defaultSkillName: technique.defaultSkillName,
+    difficulty: technique.difficulty,
+    points: technique.points,
+    defaultModifier: technique.defaultModifier,
+    maxLevel: technique.maxLevel,
+    notes: technique.notes,
+    libraryTechniqueId: technique.libraryTechniqueId,
+    defaultSkillLevel,
+    level: computeTechniqueLevel(
+      technique.points,
+      defaultSkillLevel,
+      technique.difficulty,
+      technique.maxLevel,
+      technique.defaultModifier,
+    ),
+    createdAt: toIso(technique.createdAt),
+    updatedAt: toIso(technique.updatedAt),
   };
 }
 
@@ -316,6 +403,7 @@ export function buildInventoryItemOut(
     weaponData: (item.weaponData as InventoryItemOut['weaponData']) ?? null,
     powerstoneData: (item.powerstoneData as InventoryItemOut['powerstoneData']) ?? null,
     magicItemData: (item.magicItemData as InventoryItemOut['magicItemData']) ?? null,
+    enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
     libraryItemId: item.libraryItemId,
     effectiveWeightLbs: perItemEffective.get(item.id) ?? Number(item.weightLbs) * item.quantity,
     createdAt: toIso(item.createdAt),
@@ -368,7 +456,8 @@ export function buildSpellOut(
 }
 
 export function buildCharacterDetail(input: CharacterDetailInput): CharacterDetail {
-  const { character, traits, skills, spells, inventory, combat, campaign } = input;
+  const { character, traits, skills, spells, languages, techniques, inventory, combat, campaign } =
+    input;
   const baseAttrs = characterAttrsFromRow(character);
 
   // Resolve trait/skill effects FIRST.  Each character trait/skill carries
@@ -400,16 +489,24 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     kind: t.kind,
     points: t.points,
   }));
-  // Spells are mechanically IQ/H skills, so their points roll into the
-  // skill point bucket alongside regular skills.  This keeps the point
-  // ledger consistent with how a paper sheet adds them up.
-  const skillInputs: CharacterSkillInput[] = [
-    ...skills.map((s) => ({ points: s.points })),
-    ...spells.map((s) => ({ points: s.points })),
-  ];
+  const skillInputs: CharacterSkillInput[] = skills.map((s) => ({ points: s.points }));
+  // Spells are mechanically IQ/H skills, but a printed sheet totals them
+  // in their own column and so do we -- they get a `spells` bucket rather
+  // than being folded into `skills` (which is what they used to do).
+  const spellInputs: CharacterSpellInput[] = spells.map((s) => ({ points: s.points }));
   // Use BASE attrs for point cost — trait-granted bonuses are paid for
   // by the trait itself, not double-billed against attribute spend.
-  const points = computePointBreakdown(baseAttrs, traitInputs, skillInputs);
+  const languageInputs: CharacterLanguageInput[] = languages.map((l) => ({ points: l.points }));
+  const techniqueInputs: CharacterTechniqueInput[] = techniques.map((t) => ({ points: t.points }));
+  const points = computePointBreakdown(
+    baseAttrs,
+    traitInputs,
+    skillInputs,
+    languageInputs,
+    techniqueInputs,
+    spellInputs,
+    campaign?.pointTarget ?? null,
+  );
 
   const weights = computeWeights(inventory.map(inventoryRowFor));
   const encumbrance = computeEncumbrance(weights.playerWeightLbs, derived.basicLift);
@@ -427,6 +524,18 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   // of trusting a guess.  Campaignless characters are always 'known'.
   const manaLevelKnown = character.campaignId == null || campaign != null;
   const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery, manaLevel));
+  const languagesOut = languages.map(buildLanguageOut);
+  // Techniques default from a skill on the sheet, so they resolve against
+  // the ALREADY-COMPUTED skill rows (effectiveLevel, i.e. after Talents
+  // and other trait effects) rather than re-deriving levels here.
+  const techniqueSkillCandidates = skillsOut.map((s) => ({
+    name: s.name,
+    specialization: s.specialization,
+    level: s.effectiveLevel,
+  }));
+  const techniquesOut = techniques.map((t) =>
+    buildTechniqueOut(t, resolveDefaultSkillLevel(t.defaultSkillName, techniqueSkillCandidates)),
+  );
   const combatOut = combat ? buildCombatStateOut(combat) : null;
 
   // Strip the unused `sourceCharacterRecordId` field name — the schema
@@ -477,6 +586,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     height: character.height,
     weight: character.weight,
     age: character.age,
+    birthdate: character.birthdate,
     appearance: character.appearance,
     st: character.st,
     dx: character.dx,
@@ -504,6 +614,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     traits: traitsOut,
     skills: skillsOut,
     spells: spellsOut,
+    languages: languagesOut,
+    techniques: techniquesOut,
     inventory: inventoryOut,
     combat: combatOut,
     effects: effectsOut,

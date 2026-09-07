@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { magicItemData, powerstoneData } from './inventory.ts';
+import {
+  enchantmentRef,
+  inventoryItemCreate,
+  magicItemData,
+  powerstoneData,
+  weaponData,
+} from './inventory.ts';
 
 describe('powerstoneData', () => {
   it('accepts a valid stone', () => {
@@ -63,5 +69,94 @@ describe('magicItemData', () => {
         energyCost: 4,
       }),
     ).not.toThrow();
+  });
+});
+
+describe('weaponData', () => {
+  it('defaults alternateModes to [] for a pre-existing weapon without the field', () => {
+    expect(weaponData.parse({ damage: 'sw+1 cut' })).toEqual({
+      damage: 'sw+1 cut',
+      alternateModes: [],
+    });
+  });
+
+  it('validates and round-trips a weapon with alternate modes', () => {
+    const parsed = weaponData.parse({
+      damage: 'sw-1 cut',
+      reach: '1',
+      parry: '0',
+      alternateModes: [
+        { name: 'Thrust', damage: 'thr imp', reach: '2', parry: '0' },
+        { name: 'Thrown', damage: 'thr imp' },
+      ],
+    });
+    expect(parsed.alternateModes).toHaveLength(2);
+    expect(parsed.alternateModes[0]).toEqual({
+      name: 'Thrust',
+      damage: 'thr imp',
+      reach: '2',
+      parry: '0',
+    });
+    // An alternate leaving reach/parry unset stays unset (not coerced to the weapon's).
+    expect(parsed.alternateModes[1]).toEqual({
+      name: 'Thrown',
+      damage: 'thr imp',
+    });
+  });
+
+  it('rejects more than 10 alternate modes', () => {
+    const modes = Array.from({ length: 11 }, (_, i) => ({ name: `Mode ${i}`, damage: '1d' }));
+    expect(() => weaponData.parse({ alternateModes: modes })).toThrow();
+  });
+
+  it('rejects an alternate mode missing its name', () => {
+    expect(() => weaponData.parse({ alternateModes: [{ damage: '1d' }] })).toThrow();
+  });
+});
+
+describe('enchantmentRef', () => {
+  it('accepts a bare enchantment (spell name only)', () => {
+    expect(enchantmentRef.parse({ spellName: 'Cornucopia' })).toEqual({ spellName: 'Cornucopia' });
+  });
+
+  it('round-trips a fully-populated enchantment', () => {
+    const parsed = enchantmentRef.parse({
+      spellName: 'Fortify',
+      spellLevel: 18,
+      category: 'Fortify +3',
+      notes: 'Stacks with the shield Deflect +2',
+    });
+    expect(parsed).toEqual({
+      spellName: 'Fortify',
+      spellLevel: 18,
+      category: 'Fortify +3',
+      notes: 'Stacks with the shield Deflect +2',
+    });
+  });
+
+  it('rejects a blank spell name, a 41-level, and a non-integer level', () => {
+    expect(() => enchantmentRef.parse({ spellName: '' })).toThrow();
+    expect(() => enchantmentRef.parse({ spellName: 'X', spellLevel: 41 })).toThrow();
+    expect(() => enchantmentRef.parse({ spellName: 'X', spellLevel: 1.5 })).toThrow();
+  });
+});
+
+describe('inventoryItemCreate.enchantments', () => {
+  it('defaults to [] so pre-existing creates parse unchanged', () => {
+    const parsed = inventoryItemCreate.parse({ name: 'Cloak' });
+    expect(parsed.enchantments).toEqual([]);
+  });
+
+  it('carries multiple enchantments and enforces the 50 cap', () => {
+    const enchantments = Array.from({ length: 50 }, (_, i) => ({ spellName: `E${i}` }));
+    expect(inventoryItemCreate.parse({ name: 'Cloak', enchantments }).enchantments).toHaveLength(
+      50,
+    );
+    expect(() =>
+      inventoryItemCreate.parse({
+        name: 'Cloak',
+        enchantments: [...enchantments, { spellName: 'One too many' }],
+      }),
+    ).toThrow();
   });
 });

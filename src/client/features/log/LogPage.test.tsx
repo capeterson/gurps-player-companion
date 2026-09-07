@@ -60,7 +60,9 @@ function makeEntry(over: Partial<AdventureLogOut>): AdventureLogOut {
     authorId: ME_ID,
     authorDisplayName: 'Me',
     sessionDate: '2024-05-05',
+    sessionNumber: null,
     title: 'My entry',
+    location: null,
     body: '',
     visibility: 'campaign',
     xpAwards: [],
@@ -94,6 +96,8 @@ function setupResponses() {
           id: 'e-mine',
           authorId: ME_ID,
           title: 'My entry',
+          sessionNumber: 13,
+          location: 'The Hollow Beneath Greymoor',
           body: '## Hello\n\n**bold**',
         }),
         makeEntry({
@@ -167,6 +171,92 @@ describe('LogPage', () => {
         .mock.calls.find((c) => c[0] === `/campaigns/${CAMP_ID}/log` && c[1]?.method === 'POST');
       expect(call).toBeDefined();
       expect(call?.[1]?.body).toMatchObject({ title: 'Session 14', body: 'A _new_ log line.' });
+    });
+  });
+
+  it('renders session number and location metadata on entries that carry them', async () => {
+    setupResponses();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
+
+    // The seeded entry (session 13, The Hollow Beneath Greymoor) renders
+    // both; the other entry renders neither.
+    expect(screen.getByText('· Session 13')).toBeInTheDocument();
+    expect(screen.getByText('The Hollow Beneath Greymoor')).toBeInTheDocument();
+    expect(screen.queryByText(/Session 14/)).not.toBeInTheDocument();
+  });
+
+  it('create sends sessionNumber and location; empty boxes send explicit nulls', async () => {
+    setupResponses();
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: '+ New entry' }));
+    await user.type(screen.getByPlaceholderText(/Session 13/), 'Session 14');
+    await user.type(screen.getByLabelText('Session number'), '14');
+    await user.type(screen.getByLabelText('Location'), 'Tal Cabal');
+    await user.click(screen.getByRole('button', { name: 'Save entry' }));
+
+    await waitFor(() => {
+      const call = vi
+        .mocked(api)
+        .mock.calls.find((c) => c[0] === `/campaigns/${CAMP_ID}/log` && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+      expect(call?.[1]?.body).toMatchObject({ sessionNumber: 14, location: 'Tal Cabal' });
+    });
+  });
+
+  it('edit prefills session number and location, and PATCH carries them through', async () => {
+    setupResponses();
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
+
+    await user.click(screen.getByLabelText('Edit My entry'));
+    expect((screen.getByLabelText('Session number') as HTMLInputElement).value).toBe('13');
+    expect((screen.getByLabelText('Location') as HTMLInputElement).value).toBe(
+      'The Hollow Beneath Greymoor',
+    );
+
+    const locationInput = screen.getByLabelText('Location') as HTMLInputElement;
+    await user.clear(locationInput);
+    await user.type(locationInput, 'Tal Cabal');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      const call = vi
+        .mocked(api)
+        .mock.calls.find(
+          (c) => c[0] === `/campaigns/${CAMP_ID}/log/e-mine` && c[1]?.method === 'PATCH',
+        );
+      expect(call).toBeDefined();
+      expect(call?.[1]?.body).toMatchObject({
+        sessionNumber: 13,
+        location: 'Tal Cabal',
+      });
+    });
+  });
+
+  it('clearing location and session number sends explicit nulls on PATCH', async () => {
+    setupResponses();
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
+
+    await user.click(screen.getByLabelText('Edit My entry'));
+    await user.clear(screen.getByLabelText('Session number'));
+    await user.clear(screen.getByLabelText('Location'));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => {
+      const call = vi
+        .mocked(api)
+        .mock.calls.find(
+          (c) => c[0] === `/campaigns/${CAMP_ID}/log/e-mine` && c[1]?.method === 'PATCH',
+        );
+      expect(call).toBeDefined();
+      expect(call?.[1]?.body).toMatchObject({ sessionNumber: null, location: null });
     });
   });
 
