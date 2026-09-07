@@ -9,6 +9,7 @@ import type {
   MagicItemMode,
   PowerstoneData,
   RangedData,
+  TypedArmorDr,
   WeaponData,
   WeaponMode,
 } from '../../../../shared/schemas/inventory.ts';
@@ -21,6 +22,36 @@ const REDUCTIONS = [0, 25, 50] as const;
 const MAGIC_ITEM_MODES: readonly MagicItemMode[] = ['charged', 'powered', 'continuous'];
 const MAX_ENCHANTMENTS = 50;
 const MAX_ALT_MODES = 10;
+
+const TYPED_DR_KEYS = [
+  'cut',
+  'imp',
+  'pi',
+  'pi_minus',
+  'pi_plus',
+  'pi_pp',
+  'burn',
+  'corr',
+  'fat',
+  'tox',
+] as const;
+type TypedDrKey = (typeof TYPED_DR_KEYS)[number];
+const TYPED_DR_LABELS: Record<TypedDrKey, string> = {
+  cut: 'Cut',
+  imp: 'Imp',
+  pi: 'Pi',
+  pi_minus: 'Pi−',
+  pi_plus: 'Pi+',
+  pi_pp: 'Pi++',
+  burn: 'Burn',
+  corr: 'Corr',
+  fat: 'Fat',
+  tox: 'Tox',
+};
+const EMPTY_TYPED_DR_RAWS = Object.fromEntries(TYPED_DR_KEYS.map((k) => [k, ''])) as Record<
+  TypedDrKey,
+  string
+>;
 
 function defaultArmor(): ArmorData {
   return {
@@ -107,6 +138,8 @@ export function ItemEditDialog({
   const [drRaw, setDrRaw] = useState('0');
   const [drCrushingRaw, setDrCrushingRaw] = useState('');
   const [customLocation, setCustomLocation] = useState('');
+  const [armorDbRaw, setArmorDbRaw] = useState('');
+  const [typedDrRaws, setTypedDrRaws] = useState<Record<TypedDrKey, string>>(EMPTY_TYPED_DR_RAWS);
 
   const [isPowerstone, setIsPowerstone] = useState(false);
   const [powerstone, setPowerstone] = useState<PowerstoneData>(defaultPowerstone());
@@ -181,6 +214,15 @@ export function ItemEditDialog({
     setDrRaw(String(armorData.dr));
     setDrCrushingRaw(armorData.drCrushing == null ? '' : String(armorData.drCrushing));
     setCustomLocation('');
+    setArmorDbRaw(armorData.db == null ? '' : String(armorData.db));
+    setTypedDrRaws(
+      Object.fromEntries(
+        TYPED_DR_KEYS.map((k) => [
+          k,
+          armorData.typedDr?.[k] == null ? '' : String(armorData.typedDr[k]),
+        ]),
+      ) as Record<TypedDrKey, string>,
+    );
     const ps = item.powerstoneData;
     setIsPowerstone(ps != null);
     setPowerstone(ps ?? defaultPowerstone());
@@ -452,6 +494,32 @@ export function ItemEditDialog({
         ...(en.notes != null && en.notes.trim() !== '' ? { notes: en.notes.trim() } : {}),
       });
     }
+    let armorPatch: ArmorData | null = null;
+    if (isArmor) {
+      let armorDb: number | null = null;
+      if (armorDbRaw.trim() !== '') {
+        const db = Number(armorDbRaw);
+        if (!Number.isInteger(db) || db < 0 || db > 4) {
+          toasts.push('Armor DB must be an integer between 0 and 4', { kind: 'error' });
+          return;
+        }
+        armorDb = db;
+      }
+      const typedDrPatch: TypedArmorDr = {};
+      for (const key of TYPED_DR_KEYS) {
+        const raw = typedDrRaws[key].trim();
+        if (raw === '') continue;
+        const v = Number(raw);
+        if (!Number.isInteger(v) || v < 0 || v > 1000) {
+          toasts.push(`Typed DR (${TYPED_DR_LABELS[key]}) must be an integer between 0 and 1000`, {
+            kind: 'error',
+          });
+          return;
+        }
+        typedDrPatch[key] = v;
+      }
+      armorPatch = { ...armor, db: armorDb, typedDr: typedDrPatch };
+    }
     const patch: InventoryItemUpdate = {
       name: name.trim(),
       quantity: parsedQty,
@@ -466,7 +534,7 @@ export function ItemEditDialog({
       hideawayCapacityLbs: isContainer ? (Number.isFinite(parsedHideaway) ? parsedHideaway : 0) : 0,
       weightReductionPercent: isContainer ? reduction : 0,
       isArmor,
-      armor: isArmor ? armor : null,
+      armor: armorPatch,
       weaponData: weaponPatch,
       powerstoneData: powerstonePatch,
       magicItemData: magicItemPatch,
@@ -654,7 +722,36 @@ export function ItemEditDialog({
                         className="num input input-sm input-bordered text-right"
                       />
                     </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="label-eyebrow">Armor DB</span>
+                      <input
+                        value={armorDbRaw}
+                        inputMode="numeric"
+                        placeholder="—"
+                        onChange={(e) => setArmorDbRaw(e.target.value)}
+                        className="num input input-sm input-bordered text-right"
+                      />
+                    </label>
                   </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {TYPED_DR_KEYS.map((key) => (
+                      <label key={key} className="flex flex-col gap-1">
+                        <span className="label-eyebrow">{TYPED_DR_LABELS[key]}</span>
+                        <input
+                          value={typedDrRaws[key]}
+                          inputMode="numeric"
+                          placeholder="—"
+                          onChange={(e) => setTypedDrRaws((r) => ({ ...r, [key]: e.target.value }))}
+                          className="num input input-xs input-bordered text-right"
+                          aria-label={`Typed DR ${key}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-base-content/50">
+                    Per-damage-type DR overrides (GURPS B378) — blank entries fall through to the
+                    base DR / crushing DR.
+                  </p>
                   <div className="flex flex-wrap gap-3">
                     <label className="flex items-center gap-2">
                       <input

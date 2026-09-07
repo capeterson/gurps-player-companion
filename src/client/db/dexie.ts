@@ -158,6 +158,7 @@ export interface LocalCharacterTechnique {
   defaultSkillName: string;
   difficulty: 'A' | 'H';
   points: number;
+  defaultModifier: number;
   maxLevel: number | null;
   notes: string | null;
   libraryTechniqueId: string | null;

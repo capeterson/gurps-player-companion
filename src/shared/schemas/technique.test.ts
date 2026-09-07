@@ -56,6 +56,7 @@ describe('techniqueUpdate', () => {
 
   it('exposes every writable field in its shape (sync WRITABLE_FOR_PATCH source)', () => {
     expect(Object.keys(techniqueUpdate.shape).sort()).toEqual([
+      'defaultModifier',
       'defaultSkillName',
       'difficulty',
       'libraryTechniqueId',
@@ -68,23 +69,28 @@ describe('techniqueUpdate', () => {
 });
 
 describe('techniqueOut', () => {
-  it('round-trips a resolved row', () => {
+  it('round-trips a resolved row including the default modifier', () => {
     const row = {
       id: UUID,
       characterId: UUID,
-      name: 'Feint',
-      defaultSkillName: 'Broadsword',
+      name: 'Combat Riding',
+      defaultSkillName: 'Riding',
       difficulty: 'H' as const,
-      points: 3,
-      maxLevel: 4,
+      points: 0,
+      defaultModifier: -7,
+      maxLevel: null,
       notes: null,
       libraryTechniqueId: null,
-      defaultSkillLevel: 14,
+      defaultSkillLevel: 23,
       level: 16,
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     };
     expect(techniqueOut.parse(row)).toEqual(row);
+    // Absent defaultModifier coerces to 0 (full-skill default).
+    expect(
+      techniqueOut.parse({ ...row, defaultModifier: undefined, level: 23 }).defaultModifier,
+    ).toBe(0);
   });
 
   it('accepts a null level for an unresolvable default skill', () => {
@@ -95,6 +101,7 @@ describe('techniqueOut', () => {
       defaultSkillName: 'Karate',
       difficulty: 'A' as const,
       points: 2,
+      defaultModifier: 0,
       maxLevel: null,
       notes: null,
       libraryTechniqueId: null,
@@ -105,5 +112,19 @@ describe('techniqueOut', () => {
     });
     expect(parsed.level).toBeNull();
     expect(parsed.defaultSkillLevel).toBeNull();
+  });
+
+  it('validates the default modifier bounds on create and update', () => {
+    expect(
+      techniqueCreate.parse({ name: 'X', defaultSkillName: 'S', defaultModifier: -6 }),
+    ).toMatchObject({ defaultModifier: -6 });
+    expect(techniqueCreate.parse({ name: 'X', defaultSkillName: 'S' }).defaultModifier).toBe(0);
+    expect(() =>
+      techniqueCreate.parse({ name: 'X', defaultSkillName: 'S', defaultModifier: 1 }),
+    ).toThrow();
+    expect(() =>
+      techniqueCreate.parse({ name: 'X', defaultSkillName: 'S', defaultModifier: -100 }),
+    ).toThrow();
+    expect(() => techniqueUpdate.parse({ defaultModifier: 0.5 })).toThrow();
   });
 });

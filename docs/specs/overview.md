@@ -120,11 +120,16 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Techniques** (`character_techniques`, sync-backed): Martial Arts
   p. 87 techniques bought up from a named default skill. Difficulty is
   Average (+1 per point) or Hard (the first point buys nothing, then +1
-  per point), clamped by an optional `maxLevel` cap. The default skill
+  per point), clamped by an optional `maxLevel` cap. Each technique
+  carries its **default line** (`defaultModifier`: how far below the
+  governing skill the technique starts, e.g. -6), so a technique with a
+  written penalty doesn't expose the full skill level as a roll target
+  until points are bought up. The default skill
   is resolved by name against the sheet — bare name or
   `Name (Specialization)` — using the skill's *effective* level, so
   Talents flow through; an unresolvable default renders an em dash with
-  a "Skill 'X' not on sheet" tooltip instead of guessing. A resolved
+  a "Skill 'X' not on sheet" tooltip instead of guessing. The default
+  line and points are editable per row. A resolved
   level is a tappable roll target like a skill's. Rendered on the Skills
   tab. Martial-arts **styles** live in the campaign library only
   (name + technique/perk/skill lists); a character adopts one by adding

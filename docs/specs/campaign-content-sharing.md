@@ -277,11 +277,11 @@ mechanism for sharing content between campaigns or seeding a new one.
   document (which has no `languages:` key at all) leaves the campaign's
   language library alone; an explicit `languages: []` still deletes.
 - **Techniques and styles (v4):** `library.techniques` carries
-  `{ name, defaultSkillName, difficulty, maxLevel?, description?, source?,
+  `{ name, defaultSkillName, difficulty, maxLevel?, defaultModifier?, description?, source?,
   prereq? }`; `library.styles` carries
   `{ name, description?, source?, techniques[], perks[], skills[] }` where
   each `techniques[]` entry is a denormalized
-  `{ name, defaultSkillName, difficulty, maxLevel? }` rather than an id, so a
+  `{ name, defaultSkillName, difficulty, maxLevel?, defaultModifier? }` rather than an id, so a
   style survives a round trip into a campaign that has no matching technique
   rows yet. Both sections follow the same optional-section rule as
   `languages`.

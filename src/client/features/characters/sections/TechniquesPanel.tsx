@@ -18,6 +18,7 @@ import { RollSheet } from './RollSheet.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
+  useEntityDefaultModifierField,
   useEntityEnumField,
   useEntityNameField,
   useEntityPointsField,
@@ -40,6 +41,8 @@ interface TechniqueSnapshot {
   difficulty: TechniqueDifficulty;
   points: number;
   pointsRaw: string;
+  defaultModifier: number;
+  defaultModifierRaw: string;
   maxLevel: number | null;
   libraryTechniqueId: string | null;
 }
@@ -49,9 +52,12 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
   const [defaultSkillName, setDefaultSkillName] = useState('');
   const [difficulty, setDifficulty] = useState<TechniqueDifficulty>('A');
   const [points, setPoints] = useState('1');
+  // '' means "defaults at full skill" (0). Blank is the display form of 0.
+  const [defaultModifier, setDefaultModifier] = useState('');
   const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
   const [pickedMaxLevel, setPickedMaxLevel] = useState<number | null>(null);
   const [pointsError, setPointsError] = useState<string | null>(null);
+  const [defaultError, setDefaultError] = useState<string | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibraryTechniqueOut>('techniques', campaignId);
   const { creating, submit: submitEntity } = useAddEntityForm({
@@ -67,6 +73,7 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
         defaultSkillName: snap.defaultSkillName,
         difficulty: snap.difficulty,
         points: snap.points,
+        defaultModifier: snap.defaultModifier,
         ...(snap.maxLevel != null ? { maxLevel: snap.maxLevel } : {}),
         characterId,
         ...(snap.libraryTechniqueId ? { libraryTechniqueId: snap.libraryTechniqueId } : {}),
@@ -77,11 +84,13 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
         setName((cur) => (cur === snap.nameRaw ? '' : cur));
         setDefaultSkillName((cur) => (cur === snap.defaultSkillNameRaw ? '' : cur));
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
+        setDefaultModifier((cur) => (cur === snap.defaultModifierRaw ? '' : cur));
         // The library-derived cap follows the pick guard: a pick made
         // during the in-flight create must survive.
         setPickedLibraryId((cur) => (cur === snap.libraryTechniqueId ? null : cur));
         setPickedMaxLevel((cur) => (cur === snap.maxLevel ? null : cur));
         setPointsError(null);
+        setDefaultError(null);
       },
     );
   }
@@ -105,7 +114,17 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
           setPointsError('Points must be an integer between 0 and 100');
           return;
         }
+        // Blank default modifier = defaults at full skill (0).
+        let parsedDefault = 0;
+        if (defaultModifier.trim() !== '') {
+          parsedDefault = Number(defaultModifier);
+          if (!Number.isInteger(parsedDefault) || parsedDefault < -99 || parsedDefault > 0) {
+            setDefaultError('Default must be 0 or a negative integer (e.g. -6)');
+            return;
+          }
+        }
         setPointsError(null);
+        setDefaultError(null);
         void submit({
           name: name.trim(),
           nameRaw: name,
@@ -114,6 +133,8 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
           difficulty,
           points: parsed,
           pointsRaw: points,
+          defaultModifier: parsedDefault,
+          defaultModifierRaw: defaultModifier,
           maxLevel: pickedMaxLevel,
           libraryTechniqueId: pickedLibraryId,
         });
@@ -130,15 +151,18 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
               setName(v);
               setPickedLibraryId(null);
               setPickedMaxLevel(null);
+              setDefaultModifier('');
             }}
             onPick={(opt) => {
               setName(opt.name);
               setDefaultSkillName(opt.defaultSkillName);
               setDifficulty(opt.difficulty);
               setPickedLibraryId(opt.id);
-              // Carry the library technique's level cap onto the row so
-              // investing points can't exceed the technique's maximum.
+              // Carry the library technique's default line + level cap
+              // onto the row so the roll target starts at the correct
+              // penalty and investing points can't exceed its maximum.
               setPickedMaxLevel(opt.maxLevel ?? null);
+              setDefaultModifier(opt.defaultModifier === 0 ? '' : String(opt.defaultModifier));
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
@@ -186,6 +210,21 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
           ))}
         </select>
       </label>
+      <label
+        className="form-control w-20"
+        title="The technique's default line below its governing skill (e.g. -6). 0 = full skill."
+      >
+        <span className="label-text text-xs">Default</span>
+        <input
+          className="input input-bordered input-sm num"
+          value={defaultModifier}
+          onChange={(e) => {
+            setDefaultModifier(e.target.value);
+            setDefaultError(null);
+          }}
+          placeholder="0"
+        />
+      </label>
       <label className="form-control w-20">
         <span className="label-text text-xs">Pts</span>
         <input
@@ -201,6 +240,7 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
         {creating ? 'Adding…' : 'Add'}
       </button>
       {pointsError && <p className="basis-full text-error text-xs">{pointsError}</p>}
+      {defaultError && <p className="basis-full text-error text-xs">{defaultError}</p>}
     </form>
   );
 }
@@ -245,6 +285,11 @@ function TechniqueRow({ characterId, technique, canWrite, onRoll }: TechniqueRow
     }
     return n;
   });
+  const defaultModifierField = useEntityDefaultModifierField(
+    rowPatch,
+    technique.name,
+    technique.defaultModifier ?? 0,
+  );
 
   const removeTechnique = async () => {
     try {
@@ -264,12 +309,14 @@ function TechniqueRow({ characterId, technique, canWrite, onRoll }: TechniqueRow
   const levelTitle =
     technique.level === null
       ? `Skill "${technique.defaultSkillName}" not on sheet`
-      : `${technique.defaultSkillName} ${technique.defaultSkillLevel} ${bonus >= 0 ? '+' : ''}${bonus}${
-          technique.maxLevel !== null ? ` (capped at +${technique.maxLevel})` : ''
-        }`;
+      : `${technique.defaultSkillName} ${technique.defaultSkillLevel}${
+          technique.defaultModifier !== 0
+            ? ` ${technique.defaultModifier > 0 ? '+' : ''}${technique.defaultModifier}`
+            : ''
+        } +${bonus}${technique.maxLevel !== null ? ` (capped at +${technique.maxLevel})` : ''}`;
 
   return (
-    <li className="grid grid-cols-[1fr_1fr_5rem_4rem_4rem_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
+    <li className="grid grid-cols-[1fr_1fr_5rem_5rem_4rem_4rem_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
       {canWrite ? (
         <input
           aria-label={`${technique.name} name`}
@@ -303,6 +350,18 @@ function TechniqueRow({ characterId, technique, canWrite, onRoll }: TechniqueRow
       ) : (
         <span className="text-xs text-base-content/70 text-center">
           {TECHNIQUE_DIFFICULTY_LABELS[technique.difficulty]}
+        </span>
+      )}
+      {canWrite ? (
+        <input
+          aria-label={`${technique.name} default modifier`}
+          className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-center`}
+          {...defaultModifierField.inputProps}
+          title="Default line below the governing skill (0 or negative)"
+        />
+      ) : (
+        <span className="num text-center">
+          {technique.defaultModifier !== 0 ? technique.defaultModifier : 0}
         </span>
       )}
       {canWrite ? (
@@ -382,10 +441,11 @@ export function TechniquesPanel({
         <p className="text-sm text-base-content/60">No techniques yet.</p>
       ) : (
         <>
-          <div className="grid grid-cols-[1fr_1fr_5rem_4rem_4rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
+          <div className="grid grid-cols-[1fr_1fr_5rem_5rem_4rem_4rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
             <span>Technique</span>
             <span>Defaults from</span>
             <span className="text-center">Diff</span>
+            <span className="text-center">Mod</span>
             <span className="text-right">Pts</span>
             <span className="text-right">Lvl</span>
             <span />

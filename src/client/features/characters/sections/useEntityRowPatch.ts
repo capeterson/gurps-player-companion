@@ -168,3 +168,31 @@ export function useEntityPointsField(
     flashKey: row.flashKey('points'),
   });
 }
+
+/**
+ * Draft-on-blur field for a technique's `defaultModifier` (its default
+ * line below the governing skill: 0 or a negative integer down to -99).
+ * Same shared-hook shape as `useEntityPointsField` (S10) — no forked
+ * draft pattern.
+ */
+export function useEntityDefaultModifierField(
+  row: EntityRowPatch,
+  entityName: string,
+  serverValue: number,
+): UseDraftFieldReturn {
+  return useDraftField<number>({
+    name: `${entityName} default modifier`,
+    serverValue,
+    parse: (s: string): number => {
+      const t = s.trim();
+      if (t.length === 0) return 0;
+      const n = Number(t);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < -99 || n > 0) {
+        throw new Error('0 or a negative integer (down to -99)');
+      }
+      return n;
+    },
+    onSave: (v) => row.patch('defaultModifier', v),
+    flashKey: row.flashKey('defaultModifier'),
+  });
+}

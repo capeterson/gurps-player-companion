@@ -29,6 +29,15 @@ export const techniqueOut = z.object({
   difficulty: techniqueDifficulty,
   points: z.number().int().min(0).max(100),
   /**
+   * The technique's default line: how far below its governing skill it
+   * starts (GURPS Martial Arts p. 87 — "techniques default at a penalty
+   * to the controlling skill").  Stored separately from `points` so a
+   * technique that defaults at skill-6 doesn't expose the full skill
+   * level as a roll target until points are bought up.  0 = defaults at
+   * full skill level.
+   */
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
+  /**
    * Maximum bonus the technique may reach above its default skill
    * level.  Null = uncapped.  GURPS techniques usually cap at +N
    * stated in the technique's write-up.
@@ -38,9 +47,9 @@ export const techniqueOut = z.object({
   libraryTechniqueId: uuid.nullable(),
   /**
    * Server-computed: the default skill's effective level plus the
-   * point-derived bonus, capped by `maxLevel`.  Null when the default
-   * skill isn't on the sheet (or has no usable level), which is how the
-   * UI shows "Skill 'X' not on sheet".
+   * default line's penalty and the point-derived bonus, capped by
+   * `maxLevel`.  Null when the default skill isn't on the sheet (or has
+   * no usable level), which is how the UI shows "Skill 'X' not on sheet".
    */
   level: z.number().int().nullable(),
   /** Server-computed: the resolved default skill's effective level, or null. */
@@ -53,6 +62,7 @@ export const techniqueCreate = z.object({
   defaultSkillName: z.string().min(1).max(160).trim(),
   difficulty: techniqueDifficulty.default('A'),
   points: z.number().int().min(0).max(100).default(0),
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
   maxLevel: z.number().int().min(0).max(20).nullable().optional(),
   notes: z.string().max(20_000).nullable().optional(),
   libraryTechniqueId: uuid.nullable().optional(),

@@ -32,6 +32,15 @@ const TRAIT_KINDS = [
 
 type TraitKind = (typeof TRAIT_KINDS)[number];
 
+/**
+ * Kinds the add form may create. `language` was moved out of
+ * character_traits in migration 0028 (first-class character_languages
+ * owns fluency/cost now), so creating a legacy language trait today
+ * produces a row that never renders anywhere. The enum stays writable
+ * for old clients; this only stops the current UI offering it.
+ */
+const CREATABLE_TRAIT_KINDS: readonly TraitKind[] = TRAIT_KINDS.filter((k) => k !== 'language');
+
 interface AddTraitFormProps {
   characterId: string;
   campaignId: string | null;
@@ -268,7 +277,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
             value={kind}
             onChange={(e) => setKind(e.target.value as TraitKind)}
           >
-            {TRAIT_KINDS.map((k) => (
+            {CREATABLE_TRAIT_KINDS.map((k) => (
               <option key={k} value={k}>
                 {k.replace('_', ' ')}
               </option>

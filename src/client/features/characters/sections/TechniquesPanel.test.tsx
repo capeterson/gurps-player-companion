@@ -35,6 +35,7 @@ const pickCounterattack = vi.hoisted(() => ({
   defaultSkillName: 'Broadsword',
   difficulty: 'H',
   maxLevel: 4,
+  defaultModifier: -2,
   description: null,
   source: null,
   prereq: null,
@@ -50,6 +51,7 @@ const pickFeint = vi.hoisted(() => ({
   defaultSkillName: 'Rapier',
   difficulty: 'A',
   maxLevel: null,
+  defaultModifier: 0,
   description: null,
   source: null,
   prereq: null,
@@ -103,6 +105,7 @@ function makeTechnique(overrides: Partial<TechniqueOut> = {}): TechniqueOut {
     defaultSkillName: 'Broadsword',
     difficulty: 'A',
     points: 2,
+    defaultModifier: 0,
     maxLevel: null,
     notes: null,
     libraryTechniqueId: null,
@@ -367,7 +370,7 @@ describe('TechniquesPanel add form', () => {
 });
 
 describe('TechniquesPanel library picks', () => {
-  it('carries a picked library technique maxLevel onto the create payload', async () => {
+  it('carries a picked library technique maxLevel and default line onto the create payload', async () => {
     renderPanel({
       id: CHAR_ID,
       campaignId: 'camp-1',
@@ -389,6 +392,7 @@ describe('TechniquesPanel library picks', () => {
             defaultSkillName: 'Broadsword',
             difficulty: 'H',
             maxLevel: 4,
+            defaultModifier: -2,
             libraryTechniqueId: 'lib-tech-counterattack',
             characterId: CHAR_ID,
           }),
@@ -397,7 +401,7 @@ describe('TechniquesPanel library picks', () => {
     );
   });
 
-  it('keeps a library pick made during an in-flight create (including its cap)', async () => {
+  it('keeps a library pick made during an in-flight create (including its cap and default)', async () => {
     let resolveFirst: (() => void) | null = null;
     const attempted: Array<Record<string, unknown>> = [];
     enqueueCreate.mockImplementation((args: { attemptedValue: Record<string, unknown> }) => {
@@ -422,6 +426,7 @@ describe('TechniquesPanel library picks', () => {
     await waitFor(() => expect(attempted).toHaveLength(1));
     expect(attempted[0]?.libraryTechniqueId).toBe('lib-tech-counterattack');
     expect(attempted[0]?.maxLevel).toBe(4);
+    expect(attempted[0]?.defaultModifier).toBe(-2);
 
     // Pick a different technique while the first create is in flight.
     fireEvent.click(screen.getByRole('button', { name: 'Pick Feint' }));
@@ -434,9 +439,11 @@ describe('TechniquesPanel library picks', () => {
 
     fireEvent.submit(name.closest('form') as HTMLFormElement);
     await waitFor(() => expect(attempted).toHaveLength(2));
-    // The newer pick's (uncapped) link survives — and no stale cap leaks.
+    // The newer pick's (uncapped, full-skill-default) link survives —
+    // and no stale cap or penalty leaks.
     expect(attempted[1]?.libraryTechniqueId).toBe('lib-tech-feint');
     expect(attempted[1]?.maxLevel).toBeUndefined();
+    expect(attempted[1]?.defaultModifier).toBe(0);
   });
 });
 

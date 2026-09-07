@@ -167,6 +167,7 @@ export function techniqueInsertValues(
     defaultSkillName: body.defaultSkillName,
     difficulty: body.difficulty ?? 'A',
     points: body.points ?? 0,
+    defaultModifier: body.defaultModifier ?? 0,
     maxLevel: body.maxLevel ?? null,
     notes: body.notes ?? null,
     libraryTechniqueId: body.libraryTechniqueId ?? null,

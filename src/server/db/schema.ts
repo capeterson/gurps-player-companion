@@ -506,6 +506,8 @@ export const characterTechniques = pgTable(
       .notNull()
       .default('A'),
     points: integer('points').notNull().default(0),
+    /** Penalty of the technique's default line below its governing skill; 0 = full skill. */
+    defaultModifier: smallint('default_modifier').notNull().default(0),
     /** Cap on the bonus above the default skill; null = uncapped. */
     maxLevel: smallint('max_level'),
     notes: text('notes'),
@@ -913,6 +915,8 @@ export const campaignLibraryTechniques = pgTable(
       .notNull()
       .default('A'),
     maxLevel: smallint('max_level'),
+    /** Penalty of the technique's default line below its governing skill; 0 = full skill. */
+    defaultModifier: smallint('default_modifier').notNull().default(0),
     description: text('description'),
     source: varchar('source', { length: 40 }),
     prereq: text('prereq'),

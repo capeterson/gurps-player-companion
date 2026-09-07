@@ -191,6 +191,7 @@ export interface CharacterDetailInputTechnique {
   defaultSkillName: string;
   difficulty: TechniqueDifficulty;
   points: number;
+  defaultModifier: number;
   maxLevel: number | null;
   notes: string | null;
   libraryTechniqueId: string | null;
@@ -321,6 +322,7 @@ export function buildTechniqueOut(
     defaultSkillName: technique.defaultSkillName,
     difficulty: technique.difficulty,
     points: technique.points,
+    defaultModifier: technique.defaultModifier,
     maxLevel: technique.maxLevel,
     notes: technique.notes,
     libraryTechniqueId: technique.libraryTechniqueId,
@@ -330,6 +332,7 @@ export function buildTechniqueOut(
       defaultSkillLevel,
       technique.difficulty,
       technique.maxLevel,
+      technique.defaultModifier,
     ),
     createdAt: toIso(technique.createdAt),
     updatedAt: toIso(technique.updatedAt),

@@ -1123,6 +1123,56 @@ describe('POST /api/v1/sync/operations -- character_technique', () => {
     const second = await pull(first.nextCursor.character_technique ?? 0);
     expect(second.changes.find((c) => c.entityId === techniqueId)?.command).toBe('delete');
   });
+
+  it('create and patch carry the default modifier into the computed level', async () => {
+    const { accessToken } = await registerUser('sync-tech-defaultmod');
+    const character = await createCharacter(accessToken);
+    await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ dx: 14 }),
+    });
+    await addSkill(accessToken, character.id, {
+      name: 'Riding',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 8,
+    });
+
+    const { techniqueId, outcome } = await createTechniqueViaSync(accessToken, character.id, {
+      name: 'Combat Riding',
+      defaultSkillName: 'Riding',
+      difficulty: 'H',
+      points: 0,
+      defaultModifier: -7,
+    });
+    expect(outcome?.status).toBe('applied');
+    const afterCreate = await getCharacter(accessToken, character.id);
+    // Riding is DX 14 +2 (8 pts Average) = 16; default line -7 => 9, not 16.
+    const created = (
+      afterCreate.techniques as Array<{ level: number; defaultModifier: number }>
+    )[0];
+    expect(created?.defaultModifier).toBe(-7);
+    expect(created?.level).toBe(9);
+
+    const patch = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'patch' as const,
+        fieldPath: 'defaultModifier',
+        attemptedValue: -3,
+        baseRevision: outcome?.newRevision,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(patch.outcomes[0]?.status).toBe('applied');
+    const afterPatch = await getCharacter(accessToken, character.id);
+    expect((afterPatch.techniques as Array<{ level: number }>)[0]?.level).toBe(13);
+  });
 });
 
 describe('POST /api/v1/sync/operations -- inventory enchantments', () => {

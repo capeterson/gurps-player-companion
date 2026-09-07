@@ -54,9 +54,31 @@ describe('computeTechniqueLevel', () => {
     expect(computeTechniqueLevel(9, 12, 'A', 2)).toBe(14);
   });
 
+  it('applies the default-line penalty before the purchased bonus', () => {
+    // Combat Riding on the veteran sheet: Riding 23, default line -7,
+    // 0 points -> 16 (was 23 before the penalty was modeled).
+    expect(computeTechniqueLevel(0, 23, 'H', null, -7)).toBe(16);
+    // Points buy up from the default line: 1 pt (Hard) = still 16, 2 pts = 17.
+    expect(computeTechniqueLevel(1, 23, 'H', null, -7)).toBe(16);
+    expect(computeTechniqueLevel(2, 23, 'H', null, -7)).toBe(17);
+    // Average: every point improves from the default line.
+    expect(computeTechniqueLevel(1, 23, 'A', null, -7)).toBe(17);
+  });
+
+  it('treats a missing default modifier as 0 (full-skill default)', () => {
+    expect(computeTechniqueLevel(0, 14, 'A', null, undefined)).toBe(14);
+    expect(computeTechniqueLevel(0, 14, 'A', null, null)).toBe(14);
+  });
+
+  it('caps the improvement from the default line, not the raw level', () => {
+    // Default -6, cap +4, Hard 5 pts -> 4 pt bonus -> 14 + (-6) + 4 = 12.
+    expect(computeTechniqueLevel(5, 14, 'H', 4, -6)).toBe(12);
+  });
+
   it('is null when the default skill is not on the sheet', () => {
     expect(computeTechniqueLevel(4, null, 'A')).toBeNull();
     expect(computeTechniqueLevel(0, null, 'H', 3)).toBeNull();
+    expect(computeTechniqueLevel(0, null, 'A', null, -7)).toBeNull();
   });
 });
 

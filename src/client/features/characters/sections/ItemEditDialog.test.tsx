@@ -280,6 +280,89 @@ describe('ItemEditDialog enchantments', () => {
   });
 });
 
+describe('ItemEditDialog armor editor', () => {
+  it('writes typed DR overrides and armor DB into the submitted patch', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog
+        open
+        item={makeItem({ name: 'Coat' })}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Armor' }));
+    fireEvent.change(screen.getByLabelText('Typed DR cut'), { target: { value: '5' } });
+    fireEvent.change(screen.getByLabelText('Typed DR imp'), { target: { value: '9' } });
+    fireEvent.change(screen.getByLabelText('Typed DR burn'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Armor DB'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const patch = onSubmit.mock.calls[0]?.[0];
+    expect(patch.armor.typedDr).toEqual({ cut: 5, imp: 9, burn: 2 });
+    expect(patch.armor.db).toBe(1);
+  });
+
+  it('prefills armor typed DR and DB from the loaded item', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog
+        open
+        item={makeItem({
+          name: 'Coif',
+          isArmor: true,
+          armor: {
+            locations: ['skull'],
+            dr: 5,
+            drCrushing: 7,
+            typedDr: { cut: 6, imp: 4 },
+            db: 3,
+            flexible: false,
+            frontOnly: false,
+            backOnly: false,
+            notes: null,
+          },
+        })}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText('Typed DR cut')).toHaveValue('6');
+    expect(screen.getByLabelText('Typed DR imp')).toHaveValue('4');
+    expect(screen.getByLabelText('Armor DB')).toHaveValue('3');
+
+    // Saving preserves the loaded non-empty overrides, drops empties.
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const patch = onSubmit.mock.calls[0]?.[0];
+    expect(patch.armor.typedDr).toEqual({ cut: 6, imp: 4 });
+    expect(patch.armor.db).toBe(3);
+  });
+
+  it('blocks submit on an out-of-range typed DR value (keeps the draft)', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog
+        open
+        item={makeItem({ name: 'Coat' })}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '+ Armor' }));
+    const cut = screen.getByLabelText('Typed DR cut') as HTMLInputElement;
+    fireEvent.change(cut, { target: { value: '1001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('Typed DR (Cut) must be an integer between 0 and 1000'),
+    ).toBeInTheDocument();
+    expect(cut.value).toBe('1001');
+  });
+});
+
 describe('ItemEditDialog alternate attack modes', () => {
   it('adds an attack mode and writes it into the weapon patch', () => {
     const onSubmit = vi.fn();

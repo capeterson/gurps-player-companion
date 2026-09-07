@@ -99,6 +99,163 @@ describe('applyServerRow local-intent preservation (rule S4)', () => {
     expect(row?.st).toBe(14);
     expect(row?.revision).toBe(2);
   });
+
+  it('keeps a pending fluency edit on a language against a stale server row', async () => {
+    const db = getLocalDb();
+    const langId = '0193b3c0-f1f0-7000-8000-00000000d001';
+    await db.characters.put({
+      id: CHAR_ID,
+      ownerId: 'user-1',
+      name: 'Local',
+      revision: 1,
+    } as never);
+    await db.characterLanguages.put({
+      id: langId,
+      characterId: CHAR_ID,
+      name: 'Cathrian',
+      // The pending edit already optimized the local row to its intent.
+      spokenFluency: 'accented',
+      writtenFluency: 'none',
+      points: 0,
+      notes: null,
+      libraryLanguageId: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 3,
+    } as never);
+    await db.outbox.put({
+      clientOpId: 'lang-op',
+      entityClass: 'character_language',
+      entityId: langId,
+      command: 'patch',
+      coalesceKey: `${langId}|spokenFluency`,
+      fieldPath: 'spokenFluency',
+      attemptedValue: 'accented',
+      prevValue: 'native',
+      baseRevision: 3,
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'character_language',
+            entityId: langId,
+            command: 'patch',
+            revision: 4,
+            // The server's newer row still says the OLD fluency (another
+            // device, no knowledge of this client's pending edit).
+            data: {
+              id: langId,
+              characterId: CHAR_ID,
+              name: 'Cathrian',
+              spokenFluency: 'native',
+              writtenFluency: 'broken',
+              points: 1,
+              notes: null,
+              libraryLanguageId: null,
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:01.000Z',
+              revision: 4,
+            },
+          },
+        ]),
+      ),
+    );
+
+    await getSyncOrchestrator().triggerCursorPull();
+
+    const row = await db.characterLanguages.get(langId);
+    // S4: the pending spoken-fluency edit is preserved…
+    expect(row?.spokenFluency).toBe('accented');
+    // …while other fields (and the revision) take the server values.
+    expect(row?.writtenFluency).toBe('broken');
+    expect(row?.points).toBe(1);
+    expect(row?.revision).toBe(4);
+  });
+
+  it('keeps a pending default-modifier edit on a technique against a stale server row', async () => {
+    const db = getLocalDb();
+    const techId = '0193b3c0-f1f0-7000-8000-00000000d002';
+    await db.characters.put({
+      id: CHAR_ID,
+      ownerId: 'user-1',
+      name: 'Local',
+      revision: 1,
+    } as never);
+    await db.characterTechniques.put({
+      id: techId,
+      characterId: CHAR_ID,
+      name: 'Combat Riding',
+      defaultSkillName: 'Riding (Equines)',
+      difficulty: 'H',
+      points: 0,
+      // The pending edit already optimized the local row to its intent.
+      defaultModifier: -7,
+      maxLevel: null,
+      notes: null,
+      libraryTechniqueId: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 7,
+    } as never);
+    await db.outbox.put({
+      clientOpId: 'tech-op',
+      entityClass: 'character_technique',
+      entityId: techId,
+      command: 'patch',
+      coalesceKey: `${techId}|defaultModifier`,
+      fieldPath: 'defaultModifier',
+      attemptedValue: -7,
+      prevValue: 0,
+      baseRevision: 7,
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'character_technique',
+            entityId: techId,
+            command: 'patch',
+            revision: 8,
+            data: {
+              id: techId,
+              characterId: CHAR_ID,
+              name: 'Combat Riding',
+              defaultSkillName: 'Riding (Equines)',
+              difficulty: 'H',
+              points: 0,
+              defaultModifier: 0,
+              maxLevel: null,
+              notes: null,
+              libraryTechniqueId: null,
+              createdAt: '2026-01-01T00:00:00.000Z',
+              updatedAt: '2026-01-01T00:00:01.000Z',
+              revision: 8,
+            },
+          },
+        ]),
+      ),
+    );
+
+    await getSyncOrchestrator().triggerCursorPull();
+
+    const row = await db.characterTechniques.get(techId);
+    expect(row?.defaultModifier).toBe(-7);
+    expect(row?.name).toBe('Combat Riding');
+    expect(row?.revision).toBe(8);
+  });
 });
 
 describe('queued whole-entity deletes', () => {

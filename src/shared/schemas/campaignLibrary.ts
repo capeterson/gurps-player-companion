@@ -174,6 +174,8 @@ export const libraryTechniqueOut = z.object({
   difficulty: techniqueDifficulty,
   /** Default cap on the bonus above the default skill; null = uncapped. */
   maxLevel: z.number().int().min(0).max(20).nullable(),
+  /** The technique's default line below its governing skill; 0 = full skill. */
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
   /** Capped at the character-technique note limit -- copied verbatim on learn. */
@@ -186,6 +188,7 @@ export const libraryTechniqueCreate = z.object({
   defaultSkillName: z.string().min(1).max(160).trim(),
   difficulty: techniqueDifficulty.default('A'),
   maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
   description: z.string().max(20_000).nullable().optional(),
   source: z.string().max(40).trim().nullable().optional(),
   prereq: z.string().max(2000).nullable().optional(),
@@ -208,6 +211,7 @@ export const styleTechniqueRef = z.object({
   defaultSkillName: z.string().min(1).max(160).trim(),
   difficulty: techniqueDifficulty.default('A'),
   maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+  defaultModifier: z.number().int().min(-99).max(0).default(0),
 });
 export type StyleTechniqueRef = z.infer<typeof styleTechniqueRef>;
 

@@ -784,6 +784,49 @@ describe('technique sub-resource CRUD', () => {
     expect(body.technique.level).toBe(16);
   });
 
+  it('applies the default-line penalty to the level and PATCHes it through', async () => {
+    const { accessToken } = await registerUser('tech-default');
+    const character = await createCharacter(accessToken, { dx: 14 });
+    await addSkill(accessToken, character.id as string, {
+      name: 'Riding',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 8,
+    });
+    // DX 14, Average, 8 pts -> 16. A default line of -7 puts the
+    // 0-point technique at 9, matching how the veteran sheet records
+    // "Combat Riding" (Riding 23 shown as such, technique at 16 = 23-7).
+    const res = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        name: 'Combat Riding',
+        defaultSkillName: 'Riding',
+        difficulty: 'H',
+        points: 0,
+        defaultModifier: -7,
+      }),
+    });
+    const body = (await res.json()) as { technique: Record<string, unknown> };
+    expect(body.technique.defaultSkillLevel).toBe(16);
+    expect(body.technique.defaultModifier).toBe(-7);
+    // 0 points on a Hard technique sits at the default line (skill -7).
+    expect(body.technique.level).toBe(9);
+
+    // Buying up from the default line: Hard burns the first point.
+    const { technique } = body as unknown as { technique: { id: string } };
+    const patchRes = await app.request(
+      `/api/v1/characters/${character.id}/techniques/${technique.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({ points: 1 }),
+      },
+    );
+    const patched = (await patchRes.json()) as { technique: Record<string, unknown> };
+    expect(patched.technique.level).toBe(9);
+  });
+
   it('caps the level at maxLevel', async () => {
     const { accessToken } = await registerUser('tech-cap');
     const character = await createCharacter(accessToken, { dx: 14 });

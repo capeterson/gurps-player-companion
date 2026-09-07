@@ -6078,6 +6078,12 @@
                             "minimum": 0,
                             "maximum": 20
                           },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
+                          },
                           "description": {
                             "type": "string",
                             "nullable": true,
@@ -6173,6 +6179,12 @@
                                   "nullable": true,
                                   "minimum": 0,
                                   "maximum": 20
+                                },
+                                "defaultModifier": {
+                                  "type": "integer",
+                                  "minimum": -99,
+                                  "maximum": 0,
+                                  "default": 0
                                 }
                               },
                               "required": [
@@ -11034,6 +11046,12 @@
                     "minimum": 0,
                     "maximum": 20
                   },
+                  "defaultModifier": {
+                    "type": "integer",
+                    "minimum": -99,
+                    "maximum": 0,
+                    "default": 0
+                  },
                   "description": {
                     "type": "string",
                     "nullable": true,
@@ -11096,6 +11114,12 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 20
+                    },
+                    "defaultModifier": {
+                      "type": "integer",
+                      "minimum": -99,
+                      "maximum": 0,
+                      "default": 0
                     },
                     "description": {
                       "type": "string",
@@ -11223,6 +11247,12 @@
                     "minimum": 0,
                     "maximum": 20
                   },
+                  "defaultModifier": {
+                    "type": "integer",
+                    "minimum": -99,
+                    "maximum": 0,
+                    "default": 0
+                  },
                   "description": {
                     "type": "string",
                     "nullable": true,
@@ -11281,6 +11311,12 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 20
+                    },
+                    "defaultModifier": {
+                      "type": "integer",
+                      "minimum": -99,
+                      "maximum": 0,
+                      "default": 0
                     },
                     "description": {
                       "type": "string",
@@ -11484,6 +11520,12 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 20
+                        },
+                        "defaultModifier": {
+                          "type": "integer",
+                          "minimum": -99,
+                          "maximum": 0,
+                          "default": 0
                         }
                       },
                       "required": [
@@ -11581,6 +11623,12 @@
                             "nullable": true,
                             "minimum": 0,
                             "maximum": 20
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           }
                         },
                         "required": [
@@ -11737,6 +11785,12 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 20
+                        },
+                        "defaultModifier": {
+                          "type": "integer",
+                          "minimum": -99,
+                          "maximum": 0,
+                          "default": 0
                         }
                       },
                       "required": [
@@ -11831,6 +11885,12 @@
                             "nullable": true,
                             "minimum": 0,
                             "maximum": 20
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           }
                         },
                         "required": [
@@ -17459,6 +17519,12 @@
                             "minimum": 0,
                             "maximum": 100
                           },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
+                          },
                           "maxLevel": {
                             "type": "integer",
                             "nullable": true,
@@ -19081,6 +19147,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -20963,6 +21035,12 @@
                             "minimum": 0,
                             "maximum": 100
                           },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
+                          },
                           "maxLevel": {
                             "type": "integer",
                             "nullable": true,
@@ -22654,6 +22732,12 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           },
                           "maxLevel": {
                             "type": "integer",
@@ -24510,6 +24594,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -26378,6 +26468,12 @@
                                 "minimum": 0,
                                 "maximum": 100
                               },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
+                              },
                               "maxLevel": {
                                 "type": "integer",
                                 "nullable": true,
@@ -28012,6 +28108,12 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           },
                           "maxLevel": {
                             "type": "integer",
@@ -29804,6 +29906,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -31607,6 +31715,12 @@
                                 "minimum": 0,
                                 "maximum": 100
                               },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
+                              },
                               "maxLevel": {
                                 "type": "integer",
                                 "nullable": true,
@@ -33241,6 +33355,12 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           },
                           "maxLevel": {
                             "type": "integer",
@@ -35052,6 +35172,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -36876,6 +37002,12 @@
                                 "minimum": 0,
                                 "maximum": 100
                               },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
+                              },
                               "maxLevel": {
                                 "type": "integer",
                                 "nullable": true,
@@ -38510,6 +38642,12 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           },
                           "maxLevel": {
                             "type": "integer",
@@ -40266,6 +40404,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -42035,6 +42179,12 @@
                                 "minimum": 0,
                                 "maximum": 100
                               },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
+                              },
                               "maxLevel": {
                                 "type": "integer",
                                 "nullable": true,
@@ -43670,6 +43820,12 @@
                             "minimum": 0,
                             "maximum": 100
                           },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
+                          },
                           "maxLevel": {
                             "type": "integer",
                             "nullable": true,
@@ -44419,6 +44575,12 @@
                     "maximum": 100,
                     "default": 0
                   },
+                  "defaultModifier": {
+                    "type": "integer",
+                    "minimum": -99,
+                    "maximum": 0,
+                    "default": 0
+                  },
                   "maxLevel": {
                     "type": "integer",
                     "nullable": true,
@@ -44484,6 +44646,12 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 100
+                        },
+                        "defaultModifier": {
+                          "type": "integer",
+                          "minimum": -99,
+                          "maximum": 0,
+                          "default": 0
                         },
                         "maxLevel": {
                           "type": "integer",
@@ -45432,6 +45600,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -46197,6 +46371,12 @@
                     "maximum": 100,
                     "default": 0
                   },
+                  "defaultModifier": {
+                    "type": "integer",
+                    "minimum": -99,
+                    "maximum": 0,
+                    "default": 0
+                  },
                   "maxLevel": {
                     "type": "integer",
                     "nullable": true,
@@ -46258,6 +46438,12 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 100
+                        },
+                        "defaultModifier": {
+                          "type": "integer",
+                          "minimum": -99,
+                          "maximum": 0,
+                          "default": 0
                         },
                         "maxLevel": {
                           "type": "integer",
@@ -47206,6 +47392,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -48841,6 +49033,12 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           },
                           "maxLevel": {
                             "type": "integer",
@@ -51353,6 +51551,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",
@@ -53878,6 +54082,12 @@
                                 "minimum": 0,
                                 "maximum": 100
                               },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
+                              },
                               "maxLevel": {
                                 "type": "integer",
                                 "nullable": true,
@@ -55512,6 +55722,12 @@
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "defaultModifier": {
+                            "type": "integer",
+                            "minimum": -99,
+                            "maximum": 0,
+                            "default": 0
                           },
                           "maxLevel": {
                             "type": "integer",
@@ -57249,6 +57465,12 @@
                                 "minimum": 0,
                                 "maximum": 100
                               },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
+                              },
                               "maxLevel": {
                                 "type": "integer",
                                 "nullable": true,
@@ -58897,6 +59119,12 @@
                                 "minimum": 0,
                                 "maximum": 100
                               },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
+                              },
                               "maxLevel": {
                                 "type": "integer",
                                 "nullable": true,
@@ -60542,6 +60770,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100
+                              },
+                              "defaultModifier": {
+                                "type": "integer",
+                                "minimum": -99,
+                                "maximum": 0,
+                                "default": 0
                               },
                               "maxLevel": {
                                 "type": "integer",

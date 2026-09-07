@@ -164,15 +164,18 @@ for r in list(range(85,114))+list(range(118,126)):
     import_skill(name,attr,diff,pts,specialty,f'Legacy sheet relation {rel}; displayed source level {text(cell(a,r,7))}; source + column {text(cell(a,r,4))}.')
 
 # First-class martial-arts technique: Combat Riding defaulting to Riding (Equines)
+# at its source default line (Riding 23 -> technique 16 = -7); the app's
+# level math now applies the stored default modifier before any bought points.
 _, out_tech = call('POST', f'/characters/{cid}/techniques', {
     'name':'Combat Riding',
     'defaultSkillName':'Riding (Equines)',
     'difficulty':'H',
     'points':0,
+    'defaultModifier':-7,
     'notes':'Legacy technique: default Riding; listed level 16; source point cost 0.'
 }, token)
-manifest['created']['techniques'].append({'id':out_tech['technique']['id'],'name':'Combat Riding','level':out_tech['technique']['level']})
-manifest['source_representation_notes'].append('Combat Riding imported into first-class character_techniques entity, resolving level against Riding (Equines).')
+manifest['created']['techniques'].append({'id':out_tech['technique']['id'],'name':'Combat Riding','level':out_tech['technique']['level'],'defaultModifier':out_tech['technique']['defaultModifier']})
+manifest['source_representation_notes'].append('Combat Riding imported into first-class character_techniques entity with its default-line penalty, so its level resolves at the source value (16) instead of the full Riding skill level.')
 
 # Spells present on the live sheet.
 for name in ['Ignite Fire','Shape Fire']:

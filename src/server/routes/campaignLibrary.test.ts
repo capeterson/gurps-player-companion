@@ -1021,19 +1021,26 @@ describe('library technique CRUD', () => {
     const created = (await createRes.json()) as Record<string, unknown>;
     expect(created.difficulty).toBe('A');
     expect(created.maxLevel).toBeNull();
+    expect(created.defaultModifier).toBe(0);
 
     const patchRes = await app.request(
       `/api/v1/campaigns/${campaign.id}/library/techniques/${created.id}`,
       {
         method: 'PATCH',
         headers: jsonHeaders(owner.accessToken),
-        body: JSON.stringify({ difficulty: 'H', maxLevel: 4, prereq: 'Broadsword at DX+1' }),
+        body: JSON.stringify({
+          difficulty: 'H',
+          maxLevel: 4,
+          defaultModifier: -7,
+          prereq: 'Broadsword at DX+1',
+        }),
       },
     );
     expect(patchRes.status).toBe(200);
     const patched = (await patchRes.json()) as Record<string, unknown>;
     expect(patched.difficulty).toBe('H');
     expect(patched.maxLevel).toBe(4);
+    expect(patched.defaultModifier).toBe(-7);
     expect(patched.prereq).toBe('Broadsword at DX+1');
 
     const delRes = await app.request(
@@ -1078,7 +1085,9 @@ describe('library style CRUD', () => {
         method: 'PATCH',
         headers: jsonHeaders(owner.accessToken),
         body: JSON.stringify({
-          techniques: [{ name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H' }],
+          techniques: [
+            { name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H', defaultModifier: -2 },
+          ],
           perks: ['Off-Hand Weapon Training'],
           skills: ['Broadsword', 'Shield'],
         }),
@@ -1086,12 +1095,17 @@ describe('library style CRUD', () => {
     );
     expect(patchRes.status).toBe(200);
     const patched = (await patchRes.json()) as {
-      techniques: { name: string; defaultSkillName: string; difficulty: string }[];
+      techniques: {
+        name: string;
+        defaultSkillName: string;
+        difficulty: string;
+        defaultModifier?: number;
+      }[];
       perks: string[];
       skills: string[];
     };
     expect(patched.techniques).toEqual([
-      { name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H' },
+      { name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H', defaultModifier: -2 },
     ]);
     expect(patched.perks).toEqual(['Off-Hand Weapon Training']);
     expect(patched.skills).toEqual(['Broadsword', 'Shield']);
@@ -1154,6 +1168,7 @@ describe('library style CRUD', () => {
         defaultSkillName: 'Broadsword',
         difficulty: 'H',
         maxLevel: 4,
+        defaultModifier: -2,
       }),
     });
     await app.request(`/api/v1/campaigns/${campaign.id}/library/styles`, {
@@ -1161,7 +1176,9 @@ describe('library style CRUD', () => {
       headers: jsonHeaders(owner.accessToken),
       body: JSON.stringify({
         name: 'Sword-and-Buckler',
-        techniques: [{ name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H' }],
+        techniques: [
+          { name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'H', defaultModifier: -2 },
+        ],
         perks: ['Off-Hand Weapon Training'],
         skills: ['Broadsword'],
       }),
@@ -1173,6 +1190,7 @@ describe('library style CRUD', () => {
     const exported = await exportRes.text();
     expect(exported).toContain('Sword-and-Buckler');
     expect(exported).toContain('Off-Hand Weapon Training');
+    expect(exported).toContain('defaultModifier: -2');
 
     const reimport = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
       method: 'POST',

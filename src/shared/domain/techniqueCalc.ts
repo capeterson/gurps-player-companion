@@ -1,8 +1,10 @@
 /**
- * Technique math (GURPS Martial Arts p. 87).
+ * Technique math (GURPS Martial Arts p. 87-90).
  *
- * A technique is bought up from the level of the skill it defaults
- * from.  Point-to-bonus conversion depends on difficulty:
+ * A technique defaults from a governing skill at a **penalty** (its
+ * default line — e.g. "Defaults: Riding-6").  Points are then spent to
+ * buy it up from that line.  Point-to-bonus conversion depends on
+ * difficulty:
  *
  *   Average — every point buys +1 over the default.
  *   Hard    — the first point buys nothing (it only "unlocks" the
@@ -14,6 +16,11 @@
  * +0 (default), then +1 per point"). The book rule is implemented here;
  * it's no more complex and it produces the numbers a player expects off
  * a printed sheet.
+ *
+ * The default penalty itself is stored as `defaultModifier` on the
+ * technique (0 = no penalty, defaults at full skill), so a technique
+ * that starts at skill-6 doesn't expose the inflated full skill level
+ * as its roll target until the player buys it up.
  *
  * Techniques are also capped: `maxLevel` is the largest bonus the
  * technique may reach above its default, per its write-up. Null =
@@ -39,9 +46,11 @@ export function techniqueBonus(
 }
 
 /**
- * Technique level = default skill level + `techniqueBonus`.  Null when
- * the default skill isn't resolvable on the sheet (or has no usable
- * level, e.g. a 0-point Very Hard skill), because a technique without a
+ * Technique level = resolved default skill level + the technique's
+ * default-line penalty (`defaultModifier`) + `techniqueBonus` (the
+ * point-purchased improvement, capped by `maxLevel`).  Null when the
+ * default skill isn't resolvable on the sheet (or has no usable level,
+ * e.g. a 0-point Very Hard skill), because a technique without a
  * default has nothing to roll against.
  */
 export function computeTechniqueLevel(
@@ -49,9 +58,10 @@ export function computeTechniqueLevel(
   defaultSkillLevel: number | null,
   difficulty: TechniqueDifficulty,
   maxLevel: number | null | undefined = null,
+  defaultModifier: number | null | undefined = 0,
 ): number | null {
   if (defaultSkillLevel === null) return null;
-  return defaultSkillLevel + techniqueBonus(points, difficulty, maxLevel);
+  return defaultSkillLevel + (defaultModifier ?? 0) + techniqueBonus(points, difficulty, maxLevel);
 }
 
 /** One of the character's skills, as seen by the technique resolver. */
