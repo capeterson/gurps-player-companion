@@ -16,6 +16,7 @@ async function seedEveryStore() {
   await db.characterTraits.put({ id: 'trait-1', characterId: 'char-1', revision: 9 } as never);
   await db.characterSkills.put({ id: 'skill-1', characterId: 'char-1', revision: 9 } as never);
   await db.characterSpells.put({ id: 'spell-1', characterId: 'char-1', revision: 9 } as never);
+  await db.characterLanguages.put({ id: 'lang-1', characterId: 'char-1', revision: 9 } as never);
   await db.characterInventory.put({ id: 'item-1', characterId: 'char-1', revision: 9 } as never);
   await db.characterCombat.put({ id: 'combat-1', characterId: 'char-1', revision: 9 } as never);
   await db.campaigns.put({
@@ -102,6 +103,7 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
     expect(counts.characterTraits).toBe(0);
     expect(counts.characterSkills).toBe(0);
     expect(counts.characterSpells).toBe(0);
+    expect(counts.characterLanguages).toBe(0);
     expect(counts.characterInventory).toBe(0);
     expect(counts.characterCombat).toBe(0);
     expect(counts.campaigns).toBe(0);
@@ -127,6 +129,7 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
         expect.objectContaining({ entityClass: 'character_trait', sinceRevision: 0 }),
         expect.objectContaining({ entityClass: 'character_skill', sinceRevision: 0 }),
         expect.objectContaining({ entityClass: 'character_spell', sinceRevision: 0 }),
+        expect.objectContaining({ entityClass: 'character_language', sinceRevision: 0 }),
         expect.objectContaining({ entityClass: 'character_inventory', sinceRevision: 0 }),
         expect.objectContaining({ entityClass: 'character_combat', sinceRevision: 0 }),
       ]),

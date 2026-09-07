@@ -33,6 +33,7 @@ import {
   type DbCharacter,
   campaignMemberships,
   campaigns,
+  characterLanguages,
   characterSkills,
   characterSpells,
   characterTraits,
@@ -551,6 +552,17 @@ async function fetchClassUpserts(args: {
         idCol: characterSpells.id,
         revisionCol: characterSpells.revision,
         characterIdCol: characterSpells.characterId,
+        accessibleCharacterIds: fullAccessCharacterIds,
+        sinceRevision,
+        limit,
+      });
+    case 'character_language':
+      return await fetchChildClass({
+        entityClass,
+        table: characterLanguages,
+        idCol: characterLanguages.id,
+        revisionCol: characterLanguages.revision,
+        characterIdCol: characterLanguages.characterId,
         accessibleCharacterIds: fullAccessCharacterIds,
         sinceRevision,
         limit,

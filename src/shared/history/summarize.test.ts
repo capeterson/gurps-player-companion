@@ -262,6 +262,101 @@ describe('summarizeEvent character_skill', () => {
   });
 });
 
+// ---------- summarizeEvent — character_language ----------
+
+describe('summarizeEvent character_language', () => {
+  it('insert: "Added language <name>"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'insert',
+      oldRow: null,
+      newRow: { name: 'Latin', spoken_fluency: 'accented', written_fluency: 'native', points: 5 },
+    });
+    expect(summary).toBe('Added language Latin');
+  });
+
+  it('delete: "Removed language <name>"', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'delete',
+      oldRow: { name: 'Aramaic', spoken_fluency: 'broken', written_fluency: 'none', points: 1 },
+      newRow: null,
+    });
+    expect(summary).toBe('Removed language Aramaic');
+  });
+
+  it('update spoken fluency: names the transition (snake_case column camelized)', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', spoken_fluency: 'broken', written_fluency: 'none', points: 1 },
+      newRow: { name: 'Latin', spoken_fluency: 'accented', written_fluency: 'none', points: 1 },
+    });
+    expect(summary).toBe('Latin spoken broken → accented');
+  });
+
+  it('update written fluency: names the transition', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', spoken_fluency: 'native', written_fluency: 'none', points: 0 },
+      newRow: { name: 'Latin', spoken_fluency: 'native', written_fluency: 'native', points: 3 },
+    });
+    expect(summary).toBe('Latin written none → native');
+  });
+
+  it('update points only: reports the point delta', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', points: 1 },
+      newRow: { name: 'Latin', points: 3 },
+    });
+    expect(summary).toBe('Latin 1 → 3 pts');
+  });
+
+  it('rename: reports the new name', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_language',
+      op: 'update',
+      oldRow: { name: 'Latin', points: 1 },
+      newRow: { name: 'Vulgar Latin', points: 1 },
+    });
+    expect(summary).toBe('Renamed language to Vulgar Latin');
+  });
+});
+
+// ---------- summarizeEvent — campaign_library_language ----------
+
+describe('summarizeEvent campaign_library_language', () => {
+  it('insert / delete / update all name the library language', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_language',
+        op: 'insert',
+        oldRow: null,
+        newRow: { name: 'Elder Speech' },
+      }).summary,
+    ).toBe('Added library language Elder Speech');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_language',
+        op: 'delete',
+        oldRow: { name: 'Elder Speech' },
+        newRow: null,
+      }).summary,
+    ).toBe('Removed library language Elder Speech');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_language',
+        op: 'update',
+        oldRow: { name: 'Elder Speech', source: null },
+        newRow: { name: 'Elder Speech', source: 'B23' },
+      }).summary,
+    ).toBe('Library language Elder Speech updated');
+  });
+});
+
 // ---------- summarizeEvent — character_inventory ----------
 
 describe('summarizeEvent character_inventory', () => {
@@ -387,6 +482,19 @@ describe('groupIntoBatches', () => {
     ];
     const groups = groupIntoBatches(events);
     expect(groups).toHaveLength(2);
+  });
+
+  it('a batched language import folds under one "N language changes" header', () => {
+    const bid = crypto.randomUUID();
+    const events = [
+      makeEvent({ batchId: bid, entityClass: 'character_language', op: 'insert' }),
+      makeEvent({ batchId: bid, entityClass: 'character_language', op: 'insert' }),
+      makeEvent({ batchId: bid, entityClass: 'character_language', op: 'insert' }),
+    ];
+    const groups = groupIntoBatches(events);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.foldable).toBe(true);
+    expect(groups[0]?.groupSummary).toBe('3 language changes');
   });
 
   it('null batchId always starts a new group even if surrounded by same batchId', () => {

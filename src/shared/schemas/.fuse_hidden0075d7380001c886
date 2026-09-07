@@ -128,32 +128,6 @@ export const librarySpellCreate = z.object({
 
 export const librarySpellUpdate = librarySpellCreate.partial();
 
-/**
- * Library languages hold the book-level definition (name, blurb, source)
- * that a character copies when adding the language to their sheet.
- * Fluency and points are per-character and live on `character_languages`.
- */
-export const libraryLanguageOut = z.object({
-  id: uuid,
-  campaignId: uuid,
-  name: z.string().min(1).max(160),
-  description: z.string().max(20_000).nullable(),
-  source: z.string().max(40).nullable(),
-  /** Sign languages have no written form; the UI defaults their written
-   * fluency to `'n/a'` when the language is copied onto a sheet. */
-  isSignLanguage: z.boolean(),
-  ...timestamps,
-});
-
-export const libraryLanguageCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).trim().nullable().optional(),
-  isSignLanguage: z.boolean().default(false),
-});
-
-export const libraryLanguageUpdate = libraryLanguageCreate.partial();
-
 export const libraryItemOut = z.object({
   id: uuid,
   campaignId: uuid,
@@ -211,7 +185,6 @@ export const importResult = z.object({
   skills: importSectionResult,
   spells: importSectionResult,
   items: importSectionResult,
-  languages: importSectionResult,
   /** Whether the opt-in `applyCampaignSettings` flag actually updated the
    * campaigns row (false when the flag was off or the doc had no `campaign`
    * block). */
@@ -221,15 +194,14 @@ export const importResult = z.object({
 // ---------- YAML doc shape (versioned) ----------
 
 /**
- * v1 docs (pre-effects), v2 docs (effects on traits/skills), v3 docs
- * (container/powerstone/magic-item item fields + campaign.manaLevel), and
- * v4 docs (languages + techniques + styles sections) all parse.  Schema
- * unions on a literal version field so older library files keep
- * round-tripping without mutation.  Older docs that omit the newer fields
- * get their defaults (empty array / false / null) via the library*Create
- * schemas.
+ * v1 docs (pre-effects), v2 docs (effects on traits/skills), and v3 docs
+ * (container/powerstone/magic-item item fields + campaign.manaLevel) all
+ * parse.  Schema unions on a literal version field so older library files
+ * keep round-tripping without mutation.  v1/v2 docs that omit the newer
+ * fields get their defaults (empty array / false / null) via the
+ * library*Create schemas.
  */
-export const libraryYamlVersion = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
+export const libraryYamlVersion = z.union([z.literal(1), z.literal(2), z.literal(3)]);
 
 export const libraryYamlDoc = z.object({
   version: libraryYamlVersion,
@@ -255,10 +227,6 @@ export const libraryYamlDoc = z.object({
      * explicit empty list (delete them all). */
     spells: z.array(librarySpellCreate).optional(),
     items: z.array(libraryItemCreate).default([]),
-    /** Optional for the same reason as `spells`: pre-v4 exports have no
-     * languages section, and a replace-mode import of one of those files
-     * must not wipe the campaign's language library. */
-    languages: z.array(libraryLanguageCreate).optional(),
   }),
 });
 
@@ -271,9 +239,6 @@ export type LibrarySkillUpdate = z.infer<typeof librarySkillUpdate>;
 export type LibrarySpellOut = z.infer<typeof librarySpellOut>;
 export type LibrarySpellCreate = z.infer<typeof librarySpellCreate>;
 export type LibrarySpellUpdate = z.infer<typeof librarySpellUpdate>;
-export type LibraryLanguageOut = z.infer<typeof libraryLanguageOut>;
-export type LibraryLanguageCreate = z.infer<typeof libraryLanguageCreate>;
-export type LibraryLanguageUpdate = z.infer<typeof libraryLanguageUpdate>;
 export type LibraryItemOut = z.infer<typeof libraryItemOut>;
 export type LibraryItemCreate = z.infer<typeof libraryItemCreate>;
 export type LibraryItemUpdate = z.infer<typeof libraryItemUpdate>;

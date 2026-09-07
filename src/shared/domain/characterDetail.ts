@@ -19,11 +19,13 @@ import type { CharacterDetail, ResolvedEffectOut, TempEffect } from '../schemas/
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { TraitEffect } from '../schemas/effects.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
+import type { LanguageOut } from '../schemas/language.ts';
 import type { SkillOut } from '../schemas/skill.ts';
 import type { SpellOut } from '../schemas/spell.ts';
 import type { TraitModifier, TraitOut } from '../schemas/trait.ts';
 import {
   type CharacterAttrs,
+  type CharacterLanguageInput,
   type CharacterSkillInput,
   type CharacterTraitInput,
   computeDerived,
@@ -163,6 +165,19 @@ export interface CharacterDetailInputSpell {
   updatedAt: Date | string;
 }
 
+export interface CharacterDetailInputLanguage {
+  id: string;
+  characterId: string;
+  name: string;
+  spokenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  writtenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  points: number;
+  notes: string | null;
+  libraryLanguageId: string | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 export interface CharacterDetailInputCombat {
   id: string;
   characterId: string;
@@ -190,6 +205,7 @@ export interface CharacterDetailInput {
   readonly traits: readonly CharacterDetailInputTrait[];
   readonly skills: readonly CharacterDetailInputSkill[];
   readonly spells: readonly CharacterDetailInputSpell[];
+  readonly languages: readonly CharacterDetailInputLanguage[];
   readonly inventory: readonly CharacterDetailInputInventory[];
   readonly combat: CharacterDetailInputCombat | null;
   readonly campaign: CharacterDetailInputCampaign | null;
@@ -249,6 +265,21 @@ export function buildTraitOut(trait: CharacterDetailInputTrait): TraitOut {
     libraryTraitId: trait.libraryTraitId,
     createdAt: toIso(trait.createdAt),
     updatedAt: toIso(trait.updatedAt),
+  };
+}
+
+export function buildLanguageOut(language: CharacterDetailInputLanguage): LanguageOut {
+  return {
+    id: language.id,
+    characterId: language.characterId,
+    name: language.name,
+    spokenFluency: language.spokenFluency,
+    writtenFluency: language.writtenFluency,
+    points: language.points,
+    notes: language.notes,
+    libraryLanguageId: language.libraryLanguageId,
+    createdAt: toIso(language.createdAt),
+    updatedAt: toIso(language.updatedAt),
   };
 }
 
@@ -368,7 +399,7 @@ export function buildSpellOut(
 }
 
 export function buildCharacterDetail(input: CharacterDetailInput): CharacterDetail {
-  const { character, traits, skills, spells, inventory, combat, campaign } = input;
+  const { character, traits, skills, spells, languages, inventory, combat, campaign } = input;
   const baseAttrs = characterAttrsFromRow(character);
 
   // Resolve trait/skill effects FIRST.  Each character trait/skill carries
@@ -409,7 +440,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   ];
   // Use BASE attrs for point cost — trait-granted bonuses are paid for
   // by the trait itself, not double-billed against attribute spend.
-  const points = computePointBreakdown(baseAttrs, traitInputs, skillInputs);
+  const languageInputs: CharacterLanguageInput[] = languages.map((l) => ({ points: l.points }));
+  const points = computePointBreakdown(baseAttrs, traitInputs, skillInputs, languageInputs);
 
   const weights = computeWeights(inventory.map(inventoryRowFor));
   const encumbrance = computeEncumbrance(weights.playerWeightLbs, derived.basicLift);
@@ -427,6 +459,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   // of trusting a guess.  Campaignless characters are always 'known'.
   const manaLevelKnown = character.campaignId == null || campaign != null;
   const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery, manaLevel));
+  const languagesOut = languages.map(buildLanguageOut);
   const combatOut = combat ? buildCombatStateOut(combat) : null;
 
   // Strip the unused `sourceCharacterRecordId` field name — the schema
@@ -504,6 +537,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     traits: traitsOut,
     skills: skillsOut,
     spells: spellsOut,
+    languages: languagesOut,
     inventory: inventoryOut,
     combat: combatOut,
     effects: effectsOut,

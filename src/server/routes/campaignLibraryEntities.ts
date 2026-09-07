@@ -19,6 +19,9 @@ import {
   type LibraryItemCreate,
   type LibraryItemOut,
   type LibraryItemUpdate,
+  type LibraryLanguageCreate,
+  type LibraryLanguageOut,
+  type LibraryLanguageUpdate,
   type LibrarySkillCreate,
   type LibrarySkillOut,
   type LibrarySkillUpdate,
@@ -31,6 +34,9 @@ import {
   libraryItemCreate,
   libraryItemOut,
   libraryItemUpdate,
+  libraryLanguageCreate,
+  libraryLanguageOut,
+  libraryLanguageUpdate,
   librarySkillCreate,
   librarySkillOut,
   librarySkillUpdate,
@@ -43,6 +49,7 @@ import {
 } from '../../shared/schemas/campaignLibrary.ts';
 import {
   campaignLibraryItems,
+  campaignLibraryLanguages,
   campaignLibrarySkills,
   campaignLibrarySpells,
   campaignLibraryTraits,
@@ -68,7 +75,7 @@ export interface LibraryEntityConfig<
   /** Singular label used in 404 messages: `"<entityLabel> not found"`. */
   readonly entityLabel: string;
   /** Key into the YAML doc's `library` object and the import-result payload. */
-  readonly yamlKey: 'traits' | 'skills' | 'spells' | 'items';
+  readonly yamlKey: 'traits' | 'skills' | 'spells' | 'items' | 'languages';
   readonly table: TTable;
   /** List ordering for `GET /campaigns/{id}/library`. */
   readonly orderBy: readonly SQL[];
@@ -422,5 +429,69 @@ export const itemEntity: LibraryEntityConfig<
     }),
 };
 
-/** All four entity configs, in the order routes/list/export/import must process them. */
-export const libraryEntities = [traitEntity, skillEntity, spellEntity, itemEntity] as const;
+// ===================== languages =====================
+
+function languageEditableFields(body: LibraryLanguageCreate) {
+  return {
+    description: body.description ?? null,
+    source: body.source ?? null,
+    isSignLanguage: body.isSignLanguage ?? false,
+  };
+}
+
+export const languageEntity: LibraryEntityConfig<
+  typeof campaignLibraryLanguages,
+  LibraryLanguageCreate,
+  LibraryLanguageUpdate,
+  LibraryLanguageOut,
+  'languageId'
+> = {
+  pathSegment: 'languages',
+  paramName: 'languageId',
+  entityLabel: 'language',
+  yamlKey: 'languages',
+  table: campaignLibraryLanguages,
+  orderBy: [asc(campaignLibraryLanguages.name)],
+  createSchema: libraryLanguageCreate,
+  updateSchema: libraryLanguageUpdate,
+  outSchema: libraryLanguageOut,
+  summaries: {
+    post: 'Add a library language (owner only)',
+    patch: 'Update a library language (owner only)',
+    delete: 'Delete a library language (owner only)',
+  },
+  toOut: (row) =>
+    libraryLanguageOut.parse({
+      id: row.id,
+      campaignId: row.campaignId,
+      name: row.name,
+      description: row.description,
+      source: row.source,
+      isSignLanguage: row.isSignLanguage,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  keyOf: (input) => input.name.toLowerCase(),
+  toInsertValues: (campaignId, body) => ({
+    campaignId,
+    name: body.name,
+    ...languageEditableFields(body),
+  }),
+  toUpdateValues: (body) => languageEditableFields(body),
+  rowToCreate: (row) =>
+    libraryLanguageCreate.parse({
+      name: row.name,
+      description: row.description ?? undefined,
+      source: row.source ?? undefined,
+      isSignLanguage: row.isSignLanguage,
+    }),
+};
+
+/** All entity configs, in the order routes/list/export/import must process them. */
+export const libraryEntities = [
+  traitEntity,
+  skillEntity,
+  spellEntity,
+  itemEntity,
+  languageEntity,
+] as const;

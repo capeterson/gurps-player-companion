@@ -218,22 +218,28 @@ campaign's past-encounter list with an on-page final-round summary.
 
 ## The campaign library
 
-A per-campaign catalog of reusable content, backed by four tables:
+A per-campaign catalog of reusable content, backed by five tables:
 `campaign_library_traits`, `campaign_library_skills`,
-`campaign_library_spells`, `campaign_library_items`. It's what lets a GM define
-campaign-specific advantages, skills, spells, and gear once and have players
-pull them onto their sheets.
+`campaign_library_spells`, `campaign_library_items`, and
+`campaign_library_languages`. It's what lets a GM define campaign-specific
+advantages, skills, spells, gear, and languages once and have players pull
+them onto their sheets.
+
+Library languages carry only the book definition — `name`, `description`,
+`source`, and `isSignLanguage`. Fluency and point cost are per-character and
+live on `character_languages`; picking a sign language from the autocomplete
+seeds the character row's written fluency to `n/a`.
 
 - **Read** (`GET /campaigns/{id}/library`): any campaign **member**.
 - **Write** (per-entity CRUD): campaign **owner** only. Endpoints are
-  `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items}[/{id}]`
+  `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|languages}[/{id}]`
   in `src/server/routes/campaignLibrary.ts`. These back the library editor UI;
   library mutations do **not** go through the sync outbox.
 - Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor)
   and the top-nav `LibraryPage` (`/library`, the primary home for YAML
   import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
   character sheet, which let a player search the campaign library when adding a
-  trait/skill/spell/item.
+  trait/skill/spell/item/language.
 
 ### YAML import/export (cross-campaign sharing)
 
@@ -244,9 +250,11 @@ mechanism for sharing content between campaigns or seeding a new one.
   validates against the `campaignLibrary` Zod schemas and rejects duplicate
   keys; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 3`; max payload 20 MB. v1 (pre-effects)
-  and v2 (effects on traits/skills) documents still parse — the parser unions
-  on the literal `version` field and newer fields default/absent on older docs.
+  the same bytes. `LIBRARY_YAML_VERSION = 4`; max payload 20 MB. v1
+  (pre-effects), v2 (effects on traits/skills), and v3 (container/powerstone/
+  magic-item item fields + `campaign.manaLevel`) documents still parse — the
+  parser unions on the literal `version` field and newer fields
+  default/absent on older docs.
 - **Item fields (v3):** library items carry the same container/powerstone/
   magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):
   `isContainer`, `hideawayCapacityLbs`, `weightReductionPercent`,
@@ -256,6 +264,11 @@ mechanism for sharing content between campaigns or seeding a new one.
   character copy path (`InventoryPanel.onPickLibraryItem`/`onCreate`) verbatim,
   the same way `armor`/`weaponData` already did — a picked powerstone or magic
   item arrives on the character's inventory row with its template charge state.
+- **Languages (v4):** the `library.languages` section carries
+  `{ name, description?, source?, isSignLanguage }`. Like `spells`, the key is
+  **optional rather than defaulted**, so a `replace` import of a pre-v4
+  document (which has no `languages:` key at all) leaves the campaign's
+  language library alone; an explicit `languages: []` still deletes.
 - **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
   campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set
   p. 513) alongside `description`/`pointTarget`/`disadvantageCap`/`quirkCap`.
@@ -267,7 +280,8 @@ mechanism for sharing content between campaigns or seeding a new one.
     **Careful edge case, encoded in the importer:** a `replace` import only
     prunes spells when the document actually carried a `spells:` section, so a
     pre-spell-library export (which omits it) doesn't wipe the current spell
-    library. An explicit `spells: []` still deletes.
+    library. An explicit `spells: []` still deletes. The `languages` section
+    (v4) follows the same optional-section rule.
   - Returns per-section `{ created, updated, deleted }` counts.
   - **`applyCampaignSettings`** (boolean, default `false`): opt-in. When
     true and the document carries a `campaign` block, `description`,
@@ -283,8 +297,8 @@ mechanism for sharing content between campaigns or seeding a new one.
   campaign by `db:seed`.
 
 Keys used for upsert matching: traits by `kind::lower(name)`; skills, spells,
-and items by `lower(name)`. The natural-key unique indexes on all four
-`campaign_library_*` tables are **case-insensitive** (`UNIQUE (campaign_id,
+items, and languages by `lower(name)`. The natural-key unique indexes on all
+five `campaign_library_*` tables are **case-insensitive** (`UNIQUE (campaign_id,
 lower(name))`, traits additionally scoped by `kind`; see migration 0021), so
 `POST`/`PATCH` reject a case-insensitive duplicate with `409` and an import's
 name match can never be shadowed by a differently-cased row created through

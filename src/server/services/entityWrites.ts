@@ -26,10 +26,12 @@
 import type { Posture } from '../../shared/constants/combat.ts';
 import type { CharacterCreate } from '../../shared/schemas/character.ts';
 import type { InventoryItemCreate } from '../../shared/schemas/inventory.ts';
+import type { LanguageCreate } from '../../shared/schemas/language.ts';
 import type { SkillCreate } from '../../shared/schemas/skill.ts';
 import type { SpellCreate } from '../../shared/schemas/spell.ts';
 import type { TraitCreate } from '../../shared/schemas/trait.ts';
 import type {
+  characterLanguages,
   characterSkills,
   characterSpells,
   characterTraits,
@@ -130,6 +132,23 @@ export function spellInsertValues(
     prerequisites: body.prerequisites ?? null,
     notes: body.notes ?? null,
     librarySpellId: body.librarySpellId ?? null,
+  };
+}
+
+/** Values for a new `character_languages` row. See `characterInsertValues` re: `ctx.id`. */
+export function languageInsertValues(
+  body: LanguageCreate,
+  ctx: { readonly characterId: string; readonly id?: string },
+): typeof characterLanguages.$inferInsert {
+  return {
+    ...(ctx.id ? { id: ctx.id } : {}),
+    characterId: ctx.characterId,
+    name: body.name,
+    spokenFluency: body.spokenFluency ?? 'none',
+    writtenFluency: body.writtenFluency ?? 'none',
+    points: body.points ?? 0,
+    notes: body.notes ?? null,
+    libraryLanguageId: body.libraryLanguageId ?? null,
   };
 }
 

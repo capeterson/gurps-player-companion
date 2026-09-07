@@ -22,6 +22,7 @@ import {
   inventoryItemOut,
   inventoryItemUpdate,
 } from '../../shared/schemas/inventory.ts';
+import { languageCreate, languageOut, languageUpdate } from '../../shared/schemas/language.ts';
 import { skillCreate, skillOut, skillUpdate } from '../../shared/schemas/skill.ts';
 import { spellCreate, spellOut, spellUpdate } from '../../shared/schemas/spell.ts';
 import { traitCreate, traitOut, traitUpdate } from '../../shared/schemas/trait.ts';
@@ -30,6 +31,7 @@ import { assertWrite, loadCharacterOr403 } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
+  characterLanguages,
   characterSkills,
   characterSpells,
   characterTraits,
@@ -42,6 +44,7 @@ import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import {
   buildCombatStateOut,
   buildInventoryItemOut,
+  buildLanguageOut,
   buildSkillOut,
   buildSpellOut,
   buildTraitOut,
@@ -51,6 +54,7 @@ import {
 import {
   combatUpsertValues,
   inventoryInsertValues,
+  languageInsertValues,
   skillInsertValues,
   spellInsertValues,
   traitInsertValues,
@@ -469,6 +473,131 @@ router.openapi(
         .returning({ id: characterSpells.id }),
     );
     if (result.length === 0) throw new HTTPException(404, { message: 'spell not found' });
+    return c.json(await loadCharacterDetail(id), 200);
+  },
+);
+
+// ===================== LANGUAGES =====================
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/characters/{id}/languages',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Add a language to a character (owner only)',
+    request: {
+      params: z.object({ id: uuid }),
+      body: { required: true, content: { 'application/json': { schema: languageCreate } } },
+    },
+    responses: {
+      201: {
+        description: 'Language created — response includes the refreshed character',
+        content: {
+          'application/json': {
+            schema: z.object({ language: languageOut, character: characterDetail }),
+          },
+        },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const [created] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .insert(characterLanguages)
+        .values(languageInsertValues(body, { characterId: id }))
+        .returning(),
+    );
+    if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    return c.json(
+      { language: buildLanguageOut(created), character: await loadCharacterDetail(id) },
+      201,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/characters/{id}/languages/{languageId}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Update a language (owner only)',
+    request: {
+      params: z.object({ id: uuid, languageId: uuid }),
+      body: { required: true, content: { 'application/json': { schema: languageUpdate } } },
+    },
+    responses: {
+      200: {
+        description: 'Updated language + refreshed character',
+        content: {
+          'application/json': {
+            schema: z.object({ language: languageOut, character: characterDetail }),
+          },
+        },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, languageId } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const updates = buildPatchSet(body);
+    const [updated] = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .update(characterLanguages)
+        .set(updates)
+        .where(and(eq(characterLanguages.id, languageId), eq(characterLanguages.characterId, id)))
+        .returning(),
+    );
+    if (!updated) throw new HTTPException(404, { message: 'language not found' });
+    return c.json(
+      { language: buildLanguageOut(updated), character: await loadCharacterDetail(id) },
+      200,
+    );
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'delete',
+    path: '/characters/{id}/languages/{languageId}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Delete a language (owner only)',
+    request: { params: z.object({ id: uuid, languageId: uuid }) },
+    responses: {
+      200: {
+        description: 'Refreshed character (after deletion)',
+        content: { 'application/json': { schema: characterDetail } },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id, languageId } = c.req.valid('param');
+    const access = await loadCharacterOr403(id, user.id);
+    assertWrite(access);
+    const result = await withAudit(user.id, undefined, (tx) =>
+      tx
+        .delete(characterLanguages)
+        .where(and(eq(characterLanguages.id, languageId), eq(characterLanguages.characterId, id)))
+        .returning({ id: characterLanguages.id }),
+    );
+    if (result.length === 0) throw new HTTPException(404, { message: 'language not found' });
     return c.json(await loadCharacterDetail(id), 200);
   },
 );

@@ -38,7 +38,6 @@ import type {
   PowerstoneData,
   WeaponData,
 } from '../../shared/schemas/inventory.ts';
-import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
 
@@ -447,39 +446,6 @@ export const characterSkills = pgTable(
   }),
 );
 
-/**
- * Languages the character speaks / reads.  Kept out of `character_traits`
- * (where `kind='language'` used to live) so the fluency pair is a real
- * pair of columns and the point ledger can bill languages to their own
- * bucket instead of inflating advantages.  See migration 0026.
- */
-export const characterLanguages = pgTable(
-  'character_languages',
-  {
-    id: id(),
-    characterId: uuid('character_id')
-      .notNull()
-      .references(() => characters.id, { onDelete: 'cascade' }),
-    name: varchar('name', { length: 160 }).notNull(),
-    /** FluencyLevel (src/shared/schemas/language.ts). */
-    spokenFluency: varchar('spoken_fluency', { length: 20, enum: FLUENCY_LEVELS })
-      .notNull()
-      .default('none'),
-    writtenFluency: varchar('written_fluency', { length: 20, enum: FLUENCY_LEVELS })
-      .notNull()
-      .default('none'),
-    points: integer('points').notNull().default(0),
-    notes: text('notes'),
-    libraryLanguageId: uuid('library_language_id'),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-    revision: revision(),
-  },
-  (t) => ({
-    characterIdx: index('character_languages_character_idx').on(t.characterId),
-  }),
-);
-
 export const inventoryItems = pgTable(
   'inventory_items',
   {
@@ -818,36 +784,6 @@ export const campaignLibrarySpells = pgTable(
   }),
 );
 
-/**
- * Campaign language library.  Mirrors the per-character language shape
- * minus the per-character state (fluency, points);
- * `character_languages.library_language_id` points here when a language
- * was copied from the library.
- */
-export const campaignLibraryLanguages = pgTable(
-  'campaign_library_languages',
-  {
-    id: id(),
-    campaignId: uuid('campaign_id')
-      .notNull()
-      .references(() => campaigns.id, { onDelete: 'cascade' }),
-    name: varchar('name', { length: 160 }).notNull(),
-    description: text('description'),
-    source: varchar('source', { length: 40 }),
-    isSignLanguage: boolean('is_sign_language').notNull().default(false),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-    revision: revision(),
-  },
-  (t) => ({
-    // Case-insensitive natural key -- see migration 0026.
-    naturalKey: uniqueIndex('campaign_library_languages_key').on(
-      t.campaignId,
-      sql`lower(${t.name})`,
-    ),
-  }),
-);
-
 export const campaignLibraryItems = pgTable(
   'campaign_library_items',
   {
@@ -892,7 +828,6 @@ export type DbCharacter = typeof characters.$inferSelect;
 export type DbCharacterTrait = typeof characterTraits.$inferSelect;
 export type DbCharacterSkill = typeof characterSkills.$inferSelect;
 export type DbCharacterSpell = typeof characterSpells.$inferSelect;
-export type DbCharacterLanguage = typeof characterLanguages.$inferSelect;
 export type DbInventoryItem = typeof inventoryItems.$inferSelect;
 export type DbCombatState = typeof combatStates.$inferSelect;
 export type DbEncounter = typeof encounters.$inferSelect;
@@ -907,7 +842,6 @@ export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
 export type DbCampaignLibrarySpell = typeof campaignLibrarySpells.$inferSelect;
 export type DbCampaignLibraryItem = typeof campaignLibraryItems.$inferSelect;
-export type DbCampaignLibraryLanguage = typeof campaignLibraryLanguages.$inferSelect;
 export type DbApiKey = typeof apiKeys.$inferSelect;
 export type DbRefreshToken = typeof refreshTokens.$inferSelect;
 export type DbPasswordResetToken = typeof passwordResetTokens.$inferSelect;

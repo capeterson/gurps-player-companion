@@ -4,6 +4,7 @@ import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 import { effectTarget } from './effects.ts';
 import { inventoryItemOut } from './inventory.ts';
+import { languageOut } from './language.ts';
 import { skillOut } from './skill.ts';
 import { spellOut } from './spell.ts';
 import { traitOut } from './trait.ts';
@@ -233,6 +234,8 @@ export const pointBreakdownOut = z.object({
   advantages: z.number().int(),
   disadvantages: z.number().int(),
   quirks: z.number().int(),
+  /** `character_languages` rows, billed to their own bucket (not advantages). */
+  languages: z.number().int(),
   skills: z.number().int(),
   total: z.number().int(),
 });
@@ -296,6 +299,7 @@ export const characterDetail = z.object({
   traits: z.array(traitOut),
   skills: z.array(skillOut),
   spells: z.array(spellOut),
+  languages: z.array(languageOut),
   inventory: z.array(inventoryItemOut),
   combat: combatStateOut.nullable(),
   /**

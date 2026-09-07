@@ -478,3 +478,193 @@ describe('combat state upsert', () => {
     expect(res.status).toBe(403);
   });
 });
+
+// ===================== LANGUAGES =====================
+
+describe('language sub-resource CRUD', () => {
+  it('POST creates a language with fluency defaults and refreshes the point ledger', async () => {
+    const { accessToken } = await registerUser('lang-create');
+    const character = await createCharacter(accessToken);
+    const res = await app.request(`/api/v1/characters/${character.id}/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Latin', spokenFluency: 'accented', points: 2 }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      language: Record<string, unknown>;
+      character: { languages: unknown[]; points: Record<string, number> };
+    };
+    expect(body.language.name).toBe('Latin');
+    expect(body.language.spokenFluency).toBe('accented');
+    // Not supplied -> column default.
+    expect(body.language.writtenFluency).toBe('none');
+    expect(body.language.points).toBe(2);
+    expect(body.character.languages).toHaveLength(1);
+    expect(body.character.points.languages).toBe(2);
+    // Languages must NOT leak into the advantages bucket.
+    expect(body.character.points.advantages).toBe(0);
+    expect(body.character.points.total).toBe(2);
+  });
+
+  it('PATCH updates fluency and points and returns the refreshed character', async () => {
+    const { accessToken } = await registerUser('lang-patch');
+    const character = await createCharacter(accessToken);
+    const createRes = await app.request(`/api/v1/characters/${character.id}/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Aramaic', spokenFluency: 'broken', points: 1 }),
+    });
+    const { language } = (await createRes.json()) as { language: { id: string } };
+    const patchRes = await app.request(
+      `/api/v1/characters/${character.id}/languages/${language.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({ spokenFluency: 'native', writtenFluency: 'accented', points: 2 }),
+      },
+    );
+    expect(patchRes.status).toBe(200);
+    const body = (await patchRes.json()) as {
+      language: Record<string, unknown>;
+      character: { points: Record<string, number> };
+    };
+    expect(body.language.spokenFluency).toBe('native');
+    expect(body.language.writtenFluency).toBe('accented');
+    expect(body.character.points.languages).toBe(2);
+  });
+
+  it('DELETE removes the language and drops it out of the point ledger', async () => {
+    const { accessToken } = await registerUser('lang-delete');
+    const character = await createCharacter(accessToken);
+    const createRes = await app.request(`/api/v1/characters/${character.id}/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Greek', points: 3 }),
+    });
+    const { language } = (await createRes.json()) as { language: { id: string } };
+    const delRes = await app.request(
+      `/api/v1/characters/${character.id}/languages/${language.id}`,
+      { method: 'DELETE', headers: bearer(accessToken) },
+    );
+    expect(delRes.status).toBe(200);
+    const body = (await delRes.json()) as {
+      languages: unknown[];
+      points: Record<string, number>;
+    };
+    expect(body.languages).toEqual([]);
+    expect(body.points.languages).toBe(0);
+  });
+
+  it('PATCH on another character’s language id 404s (scoped by characterId)', async () => {
+    const { accessToken } = await registerUser('lang-scope');
+    const a = await createCharacter(accessToken);
+    const b = await createCharacter(accessToken);
+    const createRes = await app.request(`/api/v1/characters/${a.id}/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Latin' }),
+    });
+    const { language } = (await createRes.json()) as { language: { id: string } };
+    const res = await app.request(`/api/v1/characters/${b.id}/languages/${language.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ points: 5 }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an unknown fluency level (422)', async () => {
+    const { accessToken } = await registerUser('lang-bad-fluency');
+    const character = await createCharacter(accessToken);
+    const res = await app.request(`/api/v1/characters/${character.id}/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Latin', spokenFluency: 'fluent' }),
+    });
+    expect(res.status).toBe(422);
+  });
+
+  it('non-owner campaign member cannot create a language (403)', async () => {
+    const gm = await registerUser('lang-gm');
+    const owner = await registerUser('lang-owner');
+    const viewer = await registerUser('lang-viewer');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ name: `Camp ${Date.now()}` }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    for (const member of [owner, viewer]) {
+      await app.request(`/api/v1/campaigns/${campaign.id}/members`, {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ email: member.email }),
+      });
+    }
+    const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+    const res = await app.request(`/api/v1/characters/${character.id}/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(viewer.accessToken),
+      body: JSON.stringify({ name: 'Latin' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('bulk import: ten languages land and the ledger sums all of them', async () => {
+    const { accessToken } = await registerUser('lang-bulk');
+    const character = await createCharacter(accessToken);
+    const names = Array.from({ length: 10 }, (_, i) => `Tongue ${i}`);
+    for (const name of names) {
+      const res = await app.request(`/api/v1/characters/${character.id}/languages`, {
+        method: 'POST',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({ name, spokenFluency: 'broken', points: 1 }),
+      });
+      expect(res.status).toBe(201);
+    }
+    const detailRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    const detail = (await detailRes.json()) as {
+      languages: { name: string }[];
+      points: Record<string, number>;
+    };
+    expect(detail.languages).toHaveLength(10);
+    expect(detail.languages.map((l) => l.name).sort()).toEqual([...names].sort());
+    expect(detail.points.languages).toBe(10);
+    expect(detail.points.total).toBe(10);
+  });
+
+  it('every language write lands in the character history feed', async () => {
+    const { accessToken } = await registerUser('lang-history');
+    const character = await createCharacter(accessToken);
+    const createRes = await app.request(`/api/v1/characters/${character.id}/languages`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Latin', points: 1 }),
+    });
+    const { language } = (await createRes.json()) as { language: { id: string } };
+    await app.request(`/api/v1/characters/${character.id}/languages/${language.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ points: 3 }),
+    });
+    const historyRes = await app.request(`/api/v1/characters/${character.id}/history`, {
+      headers: bearer(accessToken),
+    });
+    expect(historyRes.status).toBe(200);
+    const events = (await historyRes.json()) as {
+      entityClass: string;
+      op: string;
+      summary: string;
+      actorUserId: string | null;
+    }[];
+    const langEvents = events.filter((e) => e.entityClass === 'character_language');
+    expect(langEvents.map((e) => e.op).sort()).toEqual(['insert', 'update']);
+    // H4: the trigger picked up the actor from withAudit's GUC.
+    expect(langEvents.every((e) => e.actorUserId !== null)).toBe(true);
+    expect(langEvents.some((e) => e.summary === 'Added language Latin')).toBe(true);
+    expect(langEvents.some((e) => e.summary === 'Latin 1 → 3 pts')).toBe(true);
+  });
+});

@@ -10,6 +10,7 @@ export const entityClass = z.enum([
   'character_trait',
   'character_skill',
   'character_spell',
+  'character_language',
   'character_inventory',
   'character_combat',
   'campaign',
@@ -18,6 +19,7 @@ export const entityClass = z.enum([
   'campaign_library_skill',
   'campaign_library_spell',
   'campaign_library_item',
+  'campaign_library_language',
   'adventure_log',
 ]);
 export type EntityClass = z.infer<typeof entityClass>;

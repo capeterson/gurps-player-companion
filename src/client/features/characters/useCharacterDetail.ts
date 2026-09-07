@@ -61,10 +61,11 @@ export function useCharacterDetail(
     const db = getLocalDb();
     const character = await db.characters.get(id);
     if (!character) return null;
-    const [traits, skills, spells, inventory, combat, campaign] = await Promise.all([
+    const [traits, skills, spells, languages, inventory, combat, campaign] = await Promise.all([
       db.characterTraits.where({ characterId: id }).sortBy('name'),
       db.characterSkills.where({ characterId: id }).sortBy('name'),
       db.characterSpells.where({ characterId: id }).sortBy('name'),
+      db.characterLanguages.where({ characterId: id }).sortBy('name'),
       db.characterInventory.where({ characterId: id }).sortBy('name'),
       db.characterCombat.get(id),
       character.campaignId ? db.campaigns.get(character.campaignId) : Promise.resolve(undefined),
@@ -86,6 +87,7 @@ export function useCharacterDetail(
             : [],
       })),
       spells,
+      languages,
       inventory,
       combat: combat ?? null,
       campaign: campaign

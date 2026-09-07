@@ -313,6 +313,7 @@ describe('emitLibraryYaml', () => {
       skills: doc.library.skills,
       spells: doc.library.spells ?? [],
       items: doc.library.items,
+      languages: doc.library.languages ?? [],
     });
     const reparsed = parseLibraryYaml(reemit);
     expect(reparsed.library.spells).toHaveLength(2);
@@ -332,6 +333,7 @@ describe('emitLibraryYaml', () => {
       skills: doc.library.skills,
       spells: doc.library.spells ?? [],
       items: doc.library.items,
+      languages: doc.library.languages ?? [],
     });
     const docB = parseLibraryYaml(first);
     const second = emitLibraryYaml({
@@ -340,6 +342,7 @@ describe('emitLibraryYaml', () => {
       skills: docB.library.skills,
       spells: docB.library.spells ?? [],
       items: docB.library.items,
+      languages: docB.library.languages ?? [],
     });
     expect(second).toBe(first);
   });
@@ -352,8 +355,9 @@ describe('emitLibraryYaml', () => {
       skills: doc.library.skills,
       spells: doc.library.spells ?? [],
       items: doc.library.items,
+      languages: doc.library.languages ?? [],
     });
-    expect(first).toContain('version: 3');
+    expect(first).toContain('version: 4');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);
@@ -363,6 +367,7 @@ describe('emitLibraryYaml', () => {
       skills: docB.library.skills,
       spells: docB.library.spells ?? [],
       items: docB.library.items,
+      languages: docB.library.languages ?? [],
     });
     expect(second).toBe(first);
 
@@ -388,6 +393,7 @@ describe('emitLibraryYaml', () => {
       skills: [],
       spells: [],
       items: [],
+      languages: [],
     });
     expect(out).not.toMatch(/tags:/);
     expect(out).toMatch(/Hard to Kill/);

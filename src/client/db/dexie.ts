@@ -11,6 +11,7 @@
  *   characters         pk=id
  *   characterTraits    pk=id
  *   characterSkills    pk=id
+ *   characterLanguages pk=id
  *   characterInventory pk=id
  *   characterCombat    pk=characterId  (1:1 with characters)
  *   campaigns          pk=id
@@ -129,6 +130,20 @@ export interface LocalCharacterSpell {
   prerequisites: string | null;
   notes: string | null;
   librarySpellId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCharacterLanguage {
+  id: string;
+  characterId: string;
+  name: string;
+  spokenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  writtenFluency: 'none' | 'broken' | 'accented' | 'native' | 'n/a';
+  points: number;
+  notes: string | null;
+  libraryLanguageId: string | null;
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -464,6 +479,7 @@ class LocalDb extends Dexie {
   characterTraits!: Table<LocalCharacterTrait, string>;
   characterSkills!: Table<LocalCharacterSkill, string>;
   characterSpells!: Table<LocalCharacterSpell, string>;
+  characterLanguages!: Table<LocalCharacterLanguage, string>;
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
   campaigns!: Table<LocalCampaign, string>;
@@ -530,6 +546,10 @@ class LocalDb extends Dexie {
       // One private scratchpad per character, never synced to the server.
       soloEncounters: 'characterId, updatedAt',
     });
+    // v7 adds character_languages (sync-backed, S6).
+    this.version(7).stores({
+      characterLanguages: 'id, characterId, updatedAt, revision',
+    });
   }
 }
 
@@ -562,6 +582,7 @@ export const ALL_STORE_NAMES = [
   'characterTraits',
   'characterSkills',
   'characterSpells',
+  'characterLanguages',
   'characterInventory',
   'characterCombat',
   'campaigns',
@@ -588,6 +609,8 @@ export function storeForEntityClass(entityClass: EntityClass): keyof LocalDb | n
       return 'characterSkills';
     case 'character_spell':
       return 'characterSpells';
+    case 'character_language':
+      return 'characterLanguages';
     case 'character_inventory':
       return 'characterInventory';
     case 'character_combat':

@@ -254,6 +254,26 @@ describe('computePointBreakdown', () => {
     expect(result.disadvantages).toBe(-15);
     expect(result.quirks).toBe(-2);
     expect(result.skills).toBe(7);
+    expect(result.languages).toBe(0);
     expect(result.total).toBe(20 + 2 + 29 - 15 - 2 + 7);
+  });
+
+  it('sums character_languages rows into their own bucket', () => {
+    const result = computePointBreakdown(
+      baseAttrs,
+      [],
+      [{ points: 4 }],
+      [{ points: 3 }, { points: 2 }, { points: 0 }],
+    );
+    expect(result.languages).toBe(5);
+    expect(result.advantages).toBe(0);
+    expect(result.skills).toBe(4);
+    expect(result.total).toBe(9);
+  });
+
+  it('defaults the languages bucket to 0 when the argument is omitted', () => {
+    const result = computePointBreakdown(baseAttrs, [], []);
+    expect(result.languages).toBe(0);
+    expect(result.total).toBe(0);
   });
 });

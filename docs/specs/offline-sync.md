@@ -12,7 +12,7 @@ The outbox + cursor system covers **only the character family**:
 
 ```
 character  character_trait  character_skill  character_spell
-character_inventory  character_combat
+character_language  character_inventory  character_combat
 ```
 
 Everything else is either read-only in the local store or fully online:

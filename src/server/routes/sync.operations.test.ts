@@ -36,7 +36,7 @@ async function registerUser(suffix: string) {
     body: JSON.stringify({ email, password: 'TestPassword1!', displayName: `Test ${suffix}` }),
   });
   const body = (await res.json()) as { accessToken: string };
-  return { accessToken: body.accessToken };
+  return { accessToken: body.accessToken, email };
 }
 
 async function createCharacter(
@@ -367,5 +367,404 @@ describe('POST /api/v1/sync/operations -- batch-local revision fast-forward', ()
 
     expect(body.outcomes[0]?.status).toBe('applied');
     expect(body.outcomes[1]?.status).toBe('applied');
+  });
+});
+
+// ===================== character_language =====================
+
+/**
+ * S11 coverage for the `character_language` sync surface: success,
+ * server rejection, stale-base, and the S12 authorization parity check
+ * (a campaign member who can only READ another player's sheet must not
+ * be able to write a language through /sync any more than through REST).
+ */
+describe('POST /api/v1/sync/operations -- character_language', () => {
+  async function createLanguageViaSync(
+    accessToken: string,
+    characterId: string,
+    attemptedValue: Record<string, unknown>,
+  ) {
+    const languageId = crypto.randomUUID();
+    const body = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'create' as const,
+        attemptedValue: { ...attemptedValue, characterId },
+        parentId: characterId,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    return { languageId, outcome: body.outcomes[0] };
+  }
+
+  it('create → patch → delete all apply and the detail payload follows', async () => {
+    const { accessToken } = await registerUser('sync-lang-crud');
+    const character = await createCharacter(accessToken);
+
+    const { languageId, outcome } = await createLanguageViaSync(accessToken, character.id, {
+      name: 'Latin',
+      spokenFluency: 'accented',
+      writtenFluency: 'none',
+      points: 2,
+    });
+    expect(outcome?.status).toBe('applied');
+    expect(typeof outcome?.newRevision).toBe('number');
+
+    const afterCreate = await getCharacter(accessToken, character.id);
+    expect((afterCreate.languages as { name: string }[])[0]?.name).toBe('Latin');
+    expect((afterCreate.points as Record<string, number>).languages).toBe(2);
+
+    const patch = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'patch' as const,
+        fieldPath: 'writtenFluency',
+        attemptedValue: 'native',
+        baseRevision: outcome?.newRevision,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(patch.outcomes[0]?.status).toBe('applied');
+    const afterPatch = await getCharacter(accessToken, character.id);
+    expect((afterPatch.languages as { writtenFluency: string }[])[0]?.writtenFluency).toBe(
+      'native',
+    );
+
+    const del = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'delete' as const,
+        attemptedValue: { characterId: character.id },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(del.outcomes[0]?.status).toBe('applied');
+    const afterDelete = await getCharacter(accessToken, character.id);
+    expect(afterDelete.languages).toEqual([]);
+  });
+
+  it('a replayed delete of an already-deleted language is idempotently applied', async () => {
+    const { accessToken } = await registerUser('sync-lang-redelete');
+    const character = await createCharacter(accessToken);
+    const { languageId } = await createLanguageViaSync(accessToken, character.id, {
+      name: 'Greek',
+    });
+    const deleteOp = () => ({
+      clientOpId: crypto.randomUUID(),
+      entityClass: 'character_language' as const,
+      entityId: languageId,
+      command: 'delete' as const,
+      attemptedValue: { characterId: character.id },
+      parentId: character.id,
+      validationVersion: 1,
+      createdAt: new Date().toISOString(),
+    });
+    expect((await postOperations(accessToken, [deleteOp()])).outcomes[0]?.status).toBe('applied');
+    expect((await postOperations(accessToken, [deleteOp()])).outcomes[0]?.status).toBe('applied');
+  });
+
+  it('a replayed create with the same id settles as applied, not conflict', async () => {
+    const { accessToken } = await registerUser('sync-lang-recreate');
+    const character = await createCharacter(accessToken);
+    const languageId = crypto.randomUUID();
+    const createOp = () => ({
+      clientOpId: crypto.randomUUID(),
+      entityClass: 'character_language' as const,
+      entityId: languageId,
+      command: 'create' as const,
+      attemptedValue: { name: 'Latin', characterId: character.id },
+      parentId: character.id,
+      validationVersion: 1,
+      createdAt: new Date().toISOString(),
+    });
+    expect((await postOperations(accessToken, [createOp()])).outcomes[0]?.status).toBe('applied');
+    const replay = await postOperations(accessToken, [createOp()]);
+    expect(replay.outcomes[0]?.status).toBe('applied');
+    const detail = await getCharacter(accessToken, character.id);
+    expect(detail.languages).toHaveLength(1);
+  });
+
+  it('rejects an out-of-range fluency value', async () => {
+    const { accessToken } = await registerUser('sync-lang-reject');
+    const character = await createCharacter(accessToken);
+    const { languageId, outcome } = await createLanguageViaSync(accessToken, character.id, {
+      name: 'Latin',
+    });
+    expect(outcome?.status).toBe('applied');
+    const body = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'patch' as const,
+        fieldPath: 'spokenFluency',
+        attemptedValue: 'fluent',
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(body.outcomes[0]?.status).toBe('rejected');
+  });
+
+  it('rejects a fieldPath that is not on languageUpdate (writable-field parity, S12.3)', async () => {
+    const { accessToken } = await registerUser('sync-lang-field');
+    const character = await createCharacter(accessToken);
+    const { languageId } = await createLanguageViaSync(accessToken, character.id, {
+      name: 'Latin',
+    });
+    const body = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'patch' as const,
+        fieldPath: 'characterId',
+        attemptedValue: crypto.randomUUID(),
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(body.outcomes[0]?.status).toBe('rejected');
+    expect(body.outcomes[0]?.reason).toContain('not writable');
+  });
+
+  it('returns stale_base when the server row moved past the op base revision', async () => {
+    const { accessToken } = await registerUser('sync-lang-stale');
+    const character = await createCharacter(accessToken);
+    const { languageId, outcome } = await createLanguageViaSync(accessToken, character.id, {
+      name: 'Latin',
+      points: 1,
+    });
+    const staleBase = outcome?.newRevision as number;
+    // A foreign write advances the row past `staleBase`.
+    const bump = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'patch' as const,
+        fieldPath: 'points',
+        attemptedValue: 5,
+        baseRevision: staleBase,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(bump.outcomes[0]?.status).toBe('applied');
+
+    const stale = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'patch' as const,
+        fieldPath: 'name',
+        attemptedValue: 'Vulgar Latin',
+        baseRevision: staleBase,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(stale.outcomes[0]?.status).toBe('stale_base');
+    expect(stale.outcomes[0]?.latestEntity).toBeTruthy();
+  });
+
+  it('a read-only campaign member cannot create or patch another player’s language (S12.1)', async () => {
+    const gm = await registerUser('sync-lang-gm');
+    const owner = await registerUser('sync-lang-owner');
+    const viewer = await registerUser('sync-lang-viewer');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ name: `Camp ${Date.now()}-${Math.random()}` }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    for (const member of [owner, viewer]) {
+      await app.request(`/api/v1/campaigns/${campaign.id}/members`, {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ email: member.email }),
+      });
+    }
+    const charRes = await app.request('/api/v1/characters', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Shared PC', campaignId: campaign.id }),
+    });
+    const character = (await charRes.json()) as { id: string };
+
+    const { outcome } = await createLanguageViaSync(viewer.accessToken, character.id, {
+      name: 'Latin',
+    });
+    expect(outcome?.status).toBe('unauthorized');
+
+    // And the owner's own create still works, proving the block is about
+    // the actor rather than the payload.
+    const ownerCreate = await createLanguageViaSync(owner.accessToken, character.id, {
+      name: 'Latin',
+    });
+    expect(ownerCreate.outcome?.status).toBe('applied');
+
+    const viewerPatch = await postOperations(viewer.accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: ownerCreate.languageId,
+        command: 'patch' as const,
+        fieldPath: 'points',
+        attemptedValue: 99,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(viewerPatch.outcomes[0]?.status).toBe('unauthorized');
+  });
+
+  it('a bulk batch of ten language creates all apply under one batchId', async () => {
+    const { accessToken } = await registerUser('sync-lang-bulk');
+    const character = await createCharacter(accessToken);
+    const batchId = crypto.randomUUID();
+    const ops = Array.from({ length: 10 }, (_, i) => ({
+      clientOpId: crypto.randomUUID(),
+      entityClass: 'character_language' as const,
+      entityId: crypto.randomUUID(),
+      command: 'create' as const,
+      attemptedValue: {
+        name: `Tongue ${i}`,
+        spokenFluency: 'broken',
+        points: 1,
+        characterId: character.id,
+      },
+      parentId: character.id,
+      batchId,
+      validationVersion: 1,
+      createdAt: new Date().toISOString(),
+    }));
+    const body = await postOperations(accessToken, ops);
+    expect(body.outcomes.every((o) => o.status === 'applied')).toBe(true);
+
+    const detail = await getCharacter(accessToken, character.id);
+    expect(detail.languages).toHaveLength(10);
+    expect((detail.points as Record<string, number>).languages).toBe(10);
+
+    const historyRes = await app.request(`/api/v1/characters/${character.id}/history`, {
+      headers: bearer(accessToken),
+    });
+    const events = (await historyRes.json()) as { entityClass: string; batchId: string | null }[];
+    const langEvents = events.filter((e) => e.entityClass === 'character_language');
+    expect(langEvents).toHaveLength(10);
+    // H5: every op in the gesture shares the client-supplied batch id.
+    expect(new Set(langEvents.map((e) => e.batchId))).toEqual(new Set([batchId]));
+  });
+
+  it('a cursor pull returns the language rows and their tombstone after deletion', async () => {
+    const { accessToken } = await registerUser('sync-lang-cursor');
+    const character = await createCharacter(accessToken);
+    const { languageId } = await createLanguageViaSync(accessToken, character.id, {
+      name: 'Latin',
+      points: 2,
+    });
+
+    const pull = async (since: number) => {
+      const res = await app.request('/api/v1/sync/cursor', {
+        method: 'POST',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({
+          cursors: [{ entityClass: 'character_language', sinceRevision: since }],
+        }),
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as {
+        changes: Array<{
+          entityClass: string;
+          entityId: string;
+          command: string;
+          revision: number;
+          data?: Record<string, unknown>;
+        }>;
+        nextCursor: Record<string, number>;
+      };
+    };
+
+    const first = await pull(0);
+    const upsert = first.changes.find((c) => c.entityId === languageId);
+    expect(upsert?.command).toBe('patch');
+    expect(upsert?.data?.name).toBe('Latin');
+    expect(upsert?.data?.spokenFluency).toBe('none');
+    expect(upsert?.data?.points).toBe(2);
+
+    await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_language' as const,
+        entityId: languageId,
+        command: 'delete' as const,
+        attemptedValue: { characterId: character.id },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    const second = await pull(first.nextCursor.character_language ?? 0);
+    const tombstone = second.changes.find((c) => c.entityId === languageId);
+    expect(tombstone?.command).toBe('delete');
+  });
+
+  it('a minimal-view member does not receive another player’s language rows on cursor pull', async () => {
+    const gm = await registerUser('sync-lang-minimal-gm');
+    const owner = await registerUser('sync-lang-minimal-owner');
+    const viewer = await registerUser('sync-lang-minimal-viewer');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        name: `Camp ${Date.now()}-${Math.random()}`,
+        shareCharacterSheets: false,
+      }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    for (const member of [owner, viewer]) {
+      await app.request(`/api/v1/campaigns/${campaign.id}/members`, {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ email: member.email }),
+      });
+    }
+    const charRes = await app.request('/api/v1/characters', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Private PC', campaignId: campaign.id }),
+    });
+    const character = (await charRes.json()) as { id: string };
+    const { languageId } = await createLanguageViaSync(owner.accessToken, character.id, {
+      name: 'Secret Tongue',
+    });
+
+    const res = await app.request('/api/v1/sync/cursor', {
+      method: 'POST',
+      headers: jsonHeaders(viewer.accessToken),
+      body: JSON.stringify({
+        cursors: [{ entityClass: 'character_language', sinceRevision: 0 }],
+      }),
+    });
+    const body = (await res.json()) as { changes: Array<{ entityId: string }> };
+    expect(body.changes.some((c) => c.entityId === languageId)).toBe(false);
   });
 });

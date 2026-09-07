@@ -26,6 +26,7 @@ import { computeDerived } from '../../shared/domain/characterCalc.ts';
 import { characterCreate, characterSyncPatch } from '../../shared/schemas/character.ts';
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
+import { languageCreate, languageUpdate } from '../../shared/schemas/language.ts';
 import { skillCreate, skillUpdate } from '../../shared/schemas/skill.ts';
 import { spellCreate, spellUpdate } from '../../shared/schemas/spell.ts';
 import type {
@@ -41,6 +42,7 @@ import { isUniqueViolation } from '../db/errors.ts';
 import {
   campaignMemberships,
   campaigns,
+  characterLanguages,
   characterSkills,
   characterSpells,
   characterTraits,
@@ -53,6 +55,7 @@ import {
   characterInsertValues,
   combatUpsertValues,
   inventoryInsertValues,
+  languageInsertValues,
   skillInsertValues,
   spellInsertValues,
   traitInsertValues,
@@ -75,6 +78,7 @@ const FIELD_VALIDATORS = {
   character_trait: traitUpdate,
   character_skill: skillUpdate,
   character_spell: spellUpdate,
+  character_language: languageUpdate,
   character_inventory: inventoryItemUpdate,
   character_combat: combatStateUpdate,
 } as const;
@@ -86,6 +90,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   character_trait: Object.keys(traitUpdate.shape) as readonly string[],
   character_skill: Object.keys(skillUpdate.shape) as readonly string[],
   character_spell: Object.keys(spellUpdate.shape) as readonly string[],
+  character_language: Object.keys(languageUpdate.shape) as readonly string[],
   character_inventory: Object.keys(inventoryItemUpdate.shape) as readonly string[],
   character_combat: Object.keys(combatStateUpdate.shape) as readonly string[],
   // Not yet exposed via /sync (no client UI mutations today).
@@ -95,6 +100,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_library_skill: null,
   campaign_library_spell: null,
   campaign_library_item: null,
+  campaign_library_language: null,
   adventure_log: null,
 };
 
@@ -111,6 +117,7 @@ const DISPATCHABLE_CLASSES = new Set<EntityClass>([
   'character_trait',
   'character_skill',
   'character_spell',
+  'character_language',
   'character_inventory',
   'character_combat',
 ]);
@@ -322,6 +329,20 @@ async function resolveReplayedCreate(
           );
         return row ? appliedOutcome(op, Number(row.revision)) : null;
       }
+      case 'character_language': {
+        const characterId = requireParentId(op);
+        assertWrite(await loadCharacterOr403(characterId, userId));
+        const [row] = await db
+          .select()
+          .from(characterLanguages)
+          .where(
+            and(
+              eq(characterLanguages.id, op.entityId),
+              eq(characterLanguages.characterId, characterId),
+            ),
+          );
+        return row ? appliedOutcome(op, Number(row.revision)) : null;
+      }
       case 'character_inventory': {
         const characterId = requireParentId(op);
         assertWrite(await loadCharacterOr403(characterId, userId));
@@ -359,6 +380,8 @@ async function dispatchOperationInner(
       return dispatchSkill(ctx, op, tx);
     case 'character_spell':
       return dispatchSpell(ctx, op, tx);
+    case 'character_language':
+      return dispatchLanguage(ctx, op, tx);
     case 'character_inventory':
       return dispatchInventory(ctx, op, tx);
     case 'character_combat':
@@ -604,6 +627,69 @@ async function dispatchSpell(
     },
     childWhere: () =>
       and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+  });
+}
+
+// ---------- character_language ----------
+
+async function dispatchLanguage(
+  ctx: DispatchContext,
+  op: OperationEnvelope,
+  tx: AuditTx,
+): Promise<OperationOutcome> {
+  if (op.command === 'create') {
+    const body = languageCreate.parse(op.attemptedValue);
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    const [created] = await tx
+      .insert(characterLanguages)
+      .values(languageInsertValues(body, { characterId, id: op.entityId }))
+      .returning();
+    if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    return appliedOutcome(op, Number(created.revision));
+  }
+
+  if (op.command === 'delete') {
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    // Idempotent delete — see the trait dispatcher for rationale.
+    await tx
+      .delete(characterLanguages)
+      .where(
+        and(
+          eq(characterLanguages.id, op.entityId),
+          eq(characterLanguages.characterId, characterId),
+        ),
+      );
+    return { clientOpId: op.clientOpId, status: 'applied' };
+  }
+
+  const characterId = requireParentId(op);
+  const access = await loadCharacterOr403(characterId, ctx.userId);
+  assertWrite(access);
+  return await patchEntity({
+    op,
+    userId: ctx.userId,
+    entityClass: 'character_language',
+    tx,
+    table: characterLanguages,
+    parentLookup: async () => {
+      const [row] = await getDb()
+        .select()
+        .from(characterLanguages)
+        .where(
+          and(
+            eq(characterLanguages.id, op.entityId),
+            eq(characterLanguages.characterId, characterId),
+          ),
+        );
+      if (!row) throw new HTTPException(404, { message: 'language not found' });
+      return row;
+    },
+    childWhere: () =>
+      and(eq(characterLanguages.id, op.entityId), eq(characterLanguages.characterId, characterId)),
   });
 }
 

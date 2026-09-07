@@ -303,6 +303,24 @@ function summarizeCharacterSpell(
   return `${name} updated`;
 }
 
+function summarizeCharacterLanguage(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'language';
+  if (op === 'insert') return `Added language ${name}`;
+  if (op === 'delete') return `Removed language ${old?.name ?? ''}`;
+  const changes = diffRows(old, next);
+  if (changes.length === 0) return `Language ${name} updated`;
+  const c = changes[0] as FieldChange;
+  if (c.field === 'spokenFluency') return `${name} spoken ${c.oldValue} → ${c.newValue}`;
+  if (c.field === 'writtenFluency') return `${name} written ${c.oldValue} → ${c.newValue}`;
+  if (c.field === 'points') return `${name} ${c.oldValue} → ${c.newValue} pts`;
+  if (c.field === 'name') return `Renamed language to ${c.newValue}`;
+  return `${name} updated`;
+}
+
 function summarizeInventory(
   op: string,
   old: Record<string, unknown> | null,
@@ -424,6 +442,17 @@ function summarizeLibrarySpell(
   return `Library spell ${name} updated`;
 }
 
+function summarizeLibraryLanguage(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'language';
+  if (op === 'insert') return `Added library language ${name}`;
+  if (op === 'delete') return `Removed library language ${old?.name ?? ''}`;
+  return `Library language ${name} updated`;
+}
+
 function summarizeLibraryItem(
   op: string,
   old: Record<string, unknown> | null,
@@ -486,6 +515,9 @@ export function summarizeEvent(event: {
     case 'character_spell':
       summary = summarizeCharacterSpell(op, oldRow, newRow);
       break;
+    case 'character_language':
+      summary = summarizeCharacterLanguage(op, oldRow, newRow);
+      break;
     case 'character_inventory':
       summary = summarizeInventory(op, oldRow, newRow);
       break;
@@ -509,6 +541,9 @@ export function summarizeEvent(event: {
       break;
     case 'campaign_library_item':
       summary = summarizeLibraryItem(op, oldRow, newRow);
+      break;
+    case 'campaign_library_language':
+      summary = summarizeLibraryLanguage(op, oldRow, newRow);
       break;
     case 'adventure_log':
       summary = summarizeAdventureLog(op, oldRow, newRow);
@@ -582,6 +617,8 @@ function makeBatchSummary(events: HistoryEventOut[]): string {
       return `${n} spell changes`;
     case 'character_trait':
       return `${n} trait changes`;
+    case 'character_language':
+      return `${n} language changes`;
     default:
       return `${n} changes`;
   }

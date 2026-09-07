@@ -22,6 +22,7 @@ import {
   buildCharacterDetail as buildCharacterDetailShared,
   buildCombatStateOut as buildCombatStateOutShared,
   buildInventoryItemOut as buildInventoryItemOutShared,
+  buildLanguageOut as buildLanguageOutShared,
   buildSkillOut as buildSkillOutShared,
   buildSpellOut as buildSpellOutShared,
   buildTraitOut as buildTraitOutShared,
@@ -31,6 +32,7 @@ import { getDb } from '../db/client.ts';
 import {
   type DbCampaign,
   type DbCharacter,
+  type DbCharacterLanguage,
   type DbCharacterSkill,
   type DbCharacterSpell,
   type DbCharacterTrait,
@@ -39,6 +41,7 @@ import {
   campaignLibrarySkills,
   campaignLibraryTraits,
   campaigns,
+  characterLanguages,
   characterSkills,
   characterSpells,
   characterTraits,
@@ -75,6 +78,7 @@ export interface SummaryInput {
   readonly traits: readonly DbCharacterTrait[];
   readonly skills: readonly DbCharacterSkill[];
   readonly spells: readonly DbCharacterSpell[];
+  readonly languages: readonly DbCharacterLanguage[];
   readonly inventory: readonly DbInventoryItem[];
   readonly combat: DbCombatState | null;
   readonly campaign: DbCampaign | null;
@@ -157,6 +161,7 @@ export function buildCharacterDetail(input: SummaryInput) {
           : [],
     })),
     spells: input.spells,
+    languages: input.languages,
     inventory: input.inventory,
     combat: input.combat,
     campaign: input.campaign,
@@ -176,7 +181,7 @@ export async function loadCharacterDetail(id: string) {
   const db = getDb();
   const [c] = await db.select().from(characters).where(eq(characters.id, id));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, spells, inventory, combat, campaign] = await Promise.all([
+  const [traits, skills, spells, languages, inventory, combat, campaign] = await Promise.all([
     db
       .select()
       .from(characterTraits)
@@ -192,6 +197,11 @@ export async function loadCharacterDetail(id: string) {
       .from(characterSpells)
       .where(eq(characterSpells.characterId, id))
       .orderBy(asc(characterSpells.name)),
+    db
+      .select()
+      .from(characterLanguages)
+      .where(eq(characterLanguages.characterId, id))
+      .orderBy(asc(characterLanguages.name)),
     db
       .select()
       .from(inventoryItems)
@@ -216,6 +226,7 @@ export async function loadCharacterDetail(id: string) {
     traits,
     skills,
     spells,
+    languages,
     inventory,
     combat,
     campaign,
@@ -229,3 +240,4 @@ export const buildCombatStateOut = buildCombatStateOutShared;
 export const buildSkillOut = buildSkillOutShared;
 export const buildSpellOut = buildSpellOutShared;
 export const buildInventoryItemOut = buildInventoryItemOutShared;
+export const buildLanguageOut = buildLanguageOutShared;

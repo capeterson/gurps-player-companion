@@ -41,6 +41,7 @@ import { CharacterMinimalView } from './CharacterMinimalView.tsx';
 import { ActiveConditionsPanel } from './sections/ActiveConditionsPanel.tsx';
 import { HistoryPanel } from './sections/HistoryPanel.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
+import { LanguagesPanel } from './sections/LanguagesPanel.tsx';
 import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { SpellsPanel } from './sections/SpellsPanel.tsx';
@@ -1085,6 +1086,10 @@ function PointsPanel({ character }: { character: CharacterDetail }) {
             <span className="num">{p.quirks}</span>
           </li>
           <li className="flex justify-between">
+            <span>Languages</span>
+            <span className="num">{p.languages}</span>
+          </li>
+          <li className="flex justify-between">
             <span>Skills</span>
             <span className="num">{p.skills}</span>
           </li>
@@ -1575,7 +1580,12 @@ export function CharacterSheetPage() {
           />
         )}
         {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
-        {tab === 'Skills' && <SkillsPanel character={character} canWrite={canWrite} />}
+        {tab === 'Skills' && (
+          <div className="space-y-4">
+            <SkillsPanel character={character} canWrite={canWrite} />
+            <LanguagesPanel character={character} canWrite={canWrite} />
+          </div>
+        )}
         {tab === 'Magic' && (
           <div className="space-y-4">
             <SpellsPanel character={character} canWrite={canWrite} />

@@ -17,7 +17,7 @@
  * verbatim.
  */
 
-import { useCallback } from 'react';
+import { type ChangeEvent, useCallback } from 'react';
 import type { EntityClass } from '../../../../shared/schemas/sync.ts';
 import { type UseDraftFieldReturn, useDraftField } from '../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
@@ -69,6 +69,64 @@ export function useEntityNameField(row: EntityRowPatch, entityName: string): Use
     onSave: (v) => row.patch('name', v),
     flashKey: row.flashKey('name'),
   });
+}
+
+/**
+ * Select-driven companion to `useEntityNameField`: a `<select>` bound to
+ * an enum column on a row entity (language fluency, technique
+ * difficulty).
+ *
+ * Deliberately a thin wrapper over `useDraftField` rather than a second
+ * draft pattern (AGENTS.md S10): the only difference from a text input
+ * is that a select commits on *change* instead of on blur, so `onChange`
+ * calls `setValue` (which updates the hook's draft ref synchronously)
+ * and then `commit()`. Queued same-field commits, per-field server
+ * sync, and the toast + flash rollback all come from the hook unchanged.
+ */
+export interface EntityEnumFieldReturn {
+  readonly value: string;
+  readonly isSaving: boolean;
+  readonly selectProps: {
+    readonly value: string;
+    readonly onChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+    readonly 'data-flashing': 'true' | 'false';
+    readonly 'data-flash-parity': '0' | '1';
+  };
+}
+
+export function useEntityEnumField<V extends string>(
+  row: EntityRowPatch,
+  label: string,
+  field: string,
+  serverValue: V,
+  allowed: readonly V[],
+): EntityEnumFieldReturn {
+  const draft = useDraftField<V>({
+    name: label,
+    serverValue,
+    parse: (s) => s as V,
+    validate: (v) => (allowed.includes(v) ? null : `unknown ${label}`),
+    onSave: (v) => row.patch(field, v),
+    flashKey: row.flashKey(field),
+  });
+  const { setValue, commit } = draft;
+  const onChange = useCallback(
+    (e: ChangeEvent<HTMLSelectElement>) => {
+      setValue(e.target.value);
+      commit();
+    },
+    [setValue, commit],
+  );
+  return {
+    value: draft.value,
+    isSaving: draft.isSaving,
+    selectProps: {
+      value: draft.value,
+      onChange,
+      'data-flashing': draft.inputProps['data-flashing'],
+      'data-flash-parity': draft.inputProps['data-flash-parity'],
+    },
+  };
 }
 
 /**
