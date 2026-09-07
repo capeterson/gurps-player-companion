@@ -200,6 +200,25 @@ describe('migration 0028 — language trait backfill', () => {
     expect(rows[0]?.points).toBe(0);
   });
 
+  it('clamps an over-cap language trait to the schema maximum of 100', async () => {
+    if (!pool) return;
+    const characterId = await seedCharacter('overcap');
+    // traitCreate allows up to 1000 points, but languageCreate/languageOut
+    // cap points at 100 — the backfill must not produce a row the API
+    // contract rejects (Codex review).
+    await pool.query(
+      `INSERT INTO character_traits (character_id, kind, name, points)
+       VALUES ($1, 'language', 'Ancient Script', 1000)`,
+      [characterId],
+    );
+    await runBackfill();
+    const { rows } = await pool.query<{ points: number }>(
+      'SELECT points FROM character_languages WHERE character_id = $1',
+      [characterId],
+    );
+    expect(rows[0]?.points).toBe(100);
+  });
+
   it('writes history rows for both the insert and the delete', async () => {
     if (!pool) return;
     const characterId = await seedCharacter('history');

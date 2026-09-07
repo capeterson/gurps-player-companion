@@ -17,7 +17,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { LanguageOut } from '../../../../shared/schemas/language.ts';
@@ -34,6 +34,63 @@ vi.mock('../../../sync/outbox.ts', () => ({
   enqueueCreate,
   enqueueDelete,
   newClientId,
+}));
+
+// Deterministic library fixtures + a mocked LibraryAutocomplete so the
+// panel's library-pick logic (id + race preservation) is tested without
+// the real combobox's debounced network fetch.
+const pickCathrian = vi.hoisted(() => ({
+  id: 'lib-lang-cathrian',
+  name: 'Cathrian',
+  description: null,
+  source: null,
+  isSignLanguage: false,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+const pickLatin = vi.hoisted(() => ({
+  id: 'lib-lang-latin',
+  name: 'Latin',
+  description: null,
+  source: null,
+  isSignLanguage: false,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+vi.mock('./useLibraryFetcher.ts', () => ({
+  useLibraryFetcher: () => ({ fetchOptions: async () => [], isLoading: false }),
+}));
+
+vi.mock('../../../components/ui/LibraryAutocomplete.tsx', () => ({
+  LibraryAutocomplete: ({
+    value,
+    onChange,
+    onPick,
+    placeholder,
+    inputProps,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    onPick: (o: { id: string }) => void;
+    placeholder?: string;
+    inputProps?: InputHTMLAttributes<HTMLInputElement>;
+  }) => (
+    <div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        {...inputProps}
+      />
+      <button type="button" onClick={() => onPick(pickCathrian)}>
+        Pick Cathrian
+      </button>
+      <button type="button" onClick={() => onPick(pickLatin)}>
+        Pick Latin
+      </button>
+    </div>
+  ),
 }));
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000f001';
@@ -324,6 +381,105 @@ describe('LanguagesPanel add form', () => {
       resolveCreate?.();
     });
     expect(name.value).toBe('Greek');
+  });
+
+  it('blocks an invalid points draft instead of silently using the suggestion', () => {
+    renderPanel(makeCharacter([]));
+    const name = screen.getByLabelText('Language') as HTMLInputElement;
+    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+
+    for (const bad of ['-2', '1.5', 'abc']) {
+      fireEvent.change(points, { target: { value: bad } });
+    }
+    expect(points.value).toBe('abc');
+    fireEvent.change(name, { target: { value: 'Elvish' } });
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+
+    // Never enqueued, the typed value stays in the box, and the error is shown.
+    expect(enqueueCreate).not.toHaveBeenCalled();
+    expect(screen.getByText('Points must be an integer between 0 and 100')).toBeInTheDocument();
+    expect(points.value).toBe('abc');
+
+    // Correcting the value and re-submitting clears the error and works.
+    fireEvent.change(points, { target: { value: '4' } });
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    expect(
+      screen.queryByText('Points must be an integer between 0 and 100'),
+    ).not.toBeInTheDocument();
+    expect(enqueueCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptedValue: expect.objectContaining({ name: 'Elvish', points: 4 }),
+      }),
+    );
+  });
+
+  it('an empty points box falls back to the fluency-derived suggestion', () => {
+    renderPanel(makeCharacter([]));
+    const name = screen.getByLabelText('Language') as HTMLInputElement;
+    const spoken = screen.getByLabelText('Spoken') as HTMLSelectElement;
+    const written = screen.getByLabelText('Written') as HTMLSelectElement;
+    fireEvent.change(spoken, { target: { value: 'accented' } });
+    fireEvent.change(written, { target: { value: 'none' } });
+
+    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+    fireEvent.change(points, { target: { value: '' } });
+    expect(points.value).toBe('2'); // accented spoken only
+
+    fireEvent.change(name, { target: { value: 'Elvish' } });
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    expect(enqueueCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptedValue: expect.objectContaining({ name: 'Elvish', points: 2 }),
+      }),
+    );
+  });
+});
+
+describe('LanguagesPanel library picks', () => {
+  it('a library pick made during an in-flight create keeps the newer link', async () => {
+    let resolveCreate: (() => void) | null = null;
+    enqueueCreate.mockImplementation(
+      () =>
+        new Promise<void>((res) => {
+          resolveCreate = res;
+        }),
+    );
+    // campaignId present ⇨ the autocomplete branch renders (mocked).
+    renderPanel({
+      id: CHAR_ID,
+      campaignId: 'camp-1',
+      languages: [],
+    } as unknown as CharacterDetail);
+    const name = screen.getByLabelText('Language') as HTMLInputElement;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Cathrian' }));
+    expect(name.value).toBe('Cathrian');
+
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledTimes(1));
+    expect(
+      (enqueueCreate.mock.calls[0]?.[0] as { attemptedValue: { libraryLanguageId: string } })
+        .attemptedValue.libraryLanguageId,
+    ).toBe('lib-lang-cathrian');
+
+    // Pick a different library language while the create is still in flight.
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Latin' }));
+    expect(name.value).toBe('Latin');
+
+    await act(async () => {
+      resolveCreate?.();
+    });
+
+    // The visible pick (Latin) survives the first create settling.
+    expect(name.value).toBe('Latin');
+
+    // Submitting again now uses the preserved newer library link.
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledTimes(2));
+    expect(
+      (enqueueCreate.mock.calls[1]?.[0] as { attemptedValue: { libraryLanguageId: string } })
+        .attemptedValue.libraryLanguageId,
+    ).toBe('lib-lang-latin');
   });
 });
 

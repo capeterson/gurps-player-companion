@@ -46,9 +46,12 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
   // typed an override and we stop re-seeding it from the fluency pair.
   const [pointsOverride, setPointsOverride] = useState<string | null>(null);
   const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
+  const [pointsError, setPointsError] = useState<string | null>(null);
 
   const suggestedPoints = computeLanguagePoints(spoken, written);
-  const points = pointsOverride ?? String(suggestedPoints);
+  // An empty override means "follow the fluency dropdowns" again.
+  const points =
+    pointsOverride === null || pointsOverride === '' ? String(suggestedPoints) : pointsOverride;
 
   const { fetchOptions } = useLibraryFetcher<LibraryLanguageOut>('languages', campaignId);
   const { creating, submit: submitEntity } = useAddEntityForm({
@@ -73,7 +76,10 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
         // functional setter — an edit made during the await survives.
         setName((cur) => (cur === snap.nameRaw ? '' : cur));
         setPointsOverride((cur) => (cur === snap.pointsRaw ? null : cur));
-        setPickedLibraryId(null);
+        // Same guard on the library link: a pick made while the create
+        // was in flight must survive (the name it set did).
+        setPickedLibraryId((cur) => (cur === snap.libraryLanguageId ? null : cur));
+        setPointsError(null);
       },
     );
   }
@@ -86,13 +92,24 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
-        const parsed = Number(points);
+        // Never silently substitute the auto-suggested points for a
+        // value the user actually typed: an invalid draft blocks the
+        // submit (and stays in the box for correction) instead of
+        // durably saving something they never entered.
+        const override = pointsOverride;
+        const hasOverride = override !== null && override.trim() !== '';
+        const parsed = Number(override);
+        if (hasOverride && (!Number.isInteger(parsed) || parsed < 0 || parsed > 100)) {
+          setPointsError('Points must be an integer between 0 and 100');
+          return;
+        }
+        setPointsError(null);
         void submit({
           name: name.trim(),
           nameRaw: name,
           spokenFluency: spoken,
           writtenFluency: written,
-          points: Number.isInteger(parsed) && parsed >= 0 ? parsed : suggestedPoints,
+          points: hasOverride ? parsed : suggestedPoints,
           pointsRaw: pointsOverride ?? String(suggestedPoints),
           libraryLanguageId: pickedLibraryId,
         });
@@ -170,12 +187,16 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
         <input
           className="input input-bordered input-sm num"
           value={points}
-          onChange={(e) => setPointsOverride(e.target.value)}
+          onChange={(e) => {
+            setPointsOverride(e.target.value);
+            setPointsError(null);
+          }}
         />
       </label>
       <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
         {creating ? 'Adding…' : 'Add'}
       </button>
+      {pointsError && <p className="basis-full text-error text-xs">{pointsError}</p>}
     </form>
   );
 }

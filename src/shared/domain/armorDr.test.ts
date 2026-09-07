@@ -66,27 +66,42 @@ describe('aggregateDrByLocation', () => {
       item(3, ['torso'], { typedDr: { cut: 2, imp: 10 } }),
     ]);
     expect(result.get('torso')?.dr).toBe(5);
+    // cut: 4 + 2 (override wins on both pieces)
     expect(result.get('torso')?.typedDr.cut).toBe(6);
-    expect(result.get('torso')?.typedDr.imp).toBe(10);
-    // Types with no override stay null.
-    expect(result.get('torso')?.typedDr.burn).toBeNull();
-    expect(result.get('torso')?.typedDr.pi).toBeNull();
+    // imp: 10 (override) + 2 (base dr of the piece without an override)
+    expect(result.get('torso')?.typedDr.imp).toBe(12);
+    // No override on either piece: base dr of each layer.
+    expect(result.get('torso')?.typedDr.burn).toBe(5);
+    expect(result.get('torso')?.typedDr.pi).toBe(5);
   });
 
-  it('keeps typed DR null per-location when no armor overrides any type', () => {
+  it('each layer contributes its override or its base dr to the typed total', () => {
+    // The review regression: base DR 4 armor plus DR 2 armor with a
+    // cut override must give cut 9, not 5.
+    const result = aggregateDrByLocation([
+      item(4, ['torso']),
+      item(2, ['torso'], { typedDr: { cut: 5 } }),
+    ]);
+    expect(result.get('torso')?.dr).toBe(6);
+    expect(result.get('torso')?.typedDr.cut).toBe(9);
+    // imp has no override: both pieces contribute base dr.
+    expect(result.get('torso')?.typedDr.imp).toBe(6);
+  });
+
+  it('fill typed DR per-location with the computed stack when no armor overrides any type', () => {
     const result = aggregateDrByLocation([item(3, ['torso'])]);
     const entry = result.get('torso');
     expect(entry?.typedDr).toEqual({
-      cut: null,
-      imp: null,
-      pi: null,
-      pi_minus: null,
-      pi_plus: null,
-      pi_pp: null,
-      burn: null,
-      corr: null,
-      fat: null,
-      tox: null,
+      cut: 3,
+      imp: 3,
+      pi: 3,
+      pi_minus: 3,
+      pi_plus: 3,
+      pi_pp: 3,
+      burn: 3,
+      corr: 3,
+      fat: 3,
+      tox: 3,
     });
   });
 
@@ -95,8 +110,9 @@ describe('aggregateDrByLocation', () => {
       item(2, ['torso'], { typedDr: { cut: 9 } }),
       item(1, ['arm_left']),
     ]);
-    // The arm_left piece carries no typed override.
-    expect(result.get('arm_left')?.typedDr.cut).toBeNull();
+    // The arm_left piece carries no typed override, so its typed total
+    // is just its own base dr.
+    expect(result.get('arm_left')?.typedDr.cut).toBe(1);
     expect(result.get('torso')?.typedDr.cut).toBe(9);
   });
 });

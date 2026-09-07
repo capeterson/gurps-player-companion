@@ -302,10 +302,16 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
-  items, languages, techniques, and styles, editable by the owner and
+  items, languages, techniques, and styles. The in-app catalog editor
+  (`/campaigns/:id/library`) offers dedicated CRUD forms for **traits,
+  skills, spells, and items**; **languages, techniques, and styles** are
+  authored via the versioned YAML import/export flow (or the owner-only
+  `.../library/{languages|techniques|styles}` REST routes the generic
+  factory registers) — the dedicated character-sheet Languages and
+  Techniques panels consume them through their autocompletes, and the
+  editor's table shows the counts. The whole catalog is also
   **importable/exportable as versioned YAML**
-  for sharing between campaigns. The catalog editor lives at
-  `/campaigns/:id/library`; the top-nav **Library** page (`/library`,
+  for sharing between campaigns. The top-nav **Library** page (`/library`,
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
 - **Adventure log**: session log entries with per-entry visibility

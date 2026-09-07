@@ -10,6 +10,7 @@ import type {
   PowerstoneData,
   RangedData,
   WeaponData,
+  WeaponMode,
 } from '../../../../shared/schemas/inventory.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
@@ -19,6 +20,7 @@ import { FACET_LABELS, type Facet, FacetChipRow } from './FacetChips.tsx';
 const REDUCTIONS = [0, 25, 50] as const;
 const MAGIC_ITEM_MODES: readonly MagicItemMode[] = ['charged', 'powered', 'continuous'];
 const MAX_ENCHANTMENTS = 50;
+const MAX_ALT_MODES = 10;
 
 function defaultArmor(): ArmorData {
   return {
@@ -124,15 +126,29 @@ export function ItemEditDialog({
 
   // Enchantments are item-level metadata, independent of the magic-item
   // facet (an enchanted cloak has no castable spell, so no magicItemData).
-  // Rows carry a stable local key so removing one doesn't remount the rest.
-  const [enchantments, setEnchantments] = useState<Array<{ key: number; data: EnchantmentRef }>>(
-    [],
-  );
+  // Rows carry a stable local key so removing one doesn't remount the
+  // rest, and the level is kept as a *raw string* draft (like every other
+  // numeric field here): a transient "41", a partial "1", or a typo never
+  // gets clamped or blanked before the user submits.
+  const [enchantments, setEnchantments] = useState<
+    Array<{ key: number; data: EnchantmentRef; spellLevelRaw: string }>
+  >([]);
   const enchantKeyRef = useRef(0);
 
   function nextEnchantKey(): number {
     enchantKeyRef.current += 1;
     return enchantKeyRef.current;
+  }
+
+  // Alternate attack modes beyond the primary damage/reach/parry line.
+  // Same stable-key list pattern as enchantments; the primary mode is
+  // the top-level weapon fields above, so these begin at "mode 2".
+  const [altModes, setAltModes] = useState<Array<{ key: number; data: WeaponMode }>>([]);
+  const altModeKeyRef = useRef(0);
+
+  function nextAltModeKey(): number {
+    altModeKeyRef.current += 1;
+    return altModeKeyRef.current;
   }
 
   // A facet whose removal would clear data waits on a confirm.
@@ -184,7 +200,17 @@ export function ItemEditDialog({
     setEnchantments(
       (item.enchantments ?? []).map((data) => {
         enchantKeyRef.current += 1;
-        return { key: enchantKeyRef.current, data };
+        return {
+          key: enchantKeyRef.current,
+          data,
+          spellLevelRaw: data.spellLevel == null ? '' : String(data.spellLevel),
+        };
+      }),
+    );
+    setAltModes(
+      (wd?.alternateModes ?? []).map((data) => {
+        altModeKeyRef.current += 1;
+        return { key: altModeKeyRef.current, data };
       }),
     );
     setDbRaw(wd?.db == null ? '' : String(wd.db));
@@ -260,6 +286,12 @@ export function ItemEditDialog({
     );
   }
 
+  function updateEnchantmentSpellLevelRaw(index: number, raw: string) {
+    setEnchantments((list) =>
+      list.map((row, i) => (i === index ? { ...row, spellLevelRaw: raw } : row)),
+    );
+  }
+
   function removeEnchantment(index: number) {
     setEnchantments((list) => list.filter((_, i) => i !== index));
   }
@@ -273,8 +305,27 @@ export function ItemEditDialog({
             {
               key: nextEnchantKey(),
               data: { spellName: '', spellLevel: null, category: null, notes: null },
+              spellLevelRaw: '',
             },
           ],
+    );
+  }
+
+  function updateAltMode(index: number, patch: Partial<WeaponMode>) {
+    setAltModes((list) =>
+      list.map((row, i) => (i === index ? { ...row, data: { ...row.data, ...patch } } : row)),
+    );
+  }
+
+  function removeAltMode(index: number) {
+    setAltModes((list) => list.filter((_, i) => i !== index));
+  }
+
+  function addAltMode() {
+    setAltModes((list) =>
+      list.length >= MAX_ALT_MODES
+        ? list
+        : [...list, { key: nextAltModeKey(), data: { name: '' } }],
     );
   }
 
@@ -345,6 +396,22 @@ export function ItemEditDialog({
             recoil: recoilRaw === '' ? null : Math.max(1, Math.floor(Number(recoilRaw)) || 1),
           }
         : null;
+      const alternateModes: WeaponMode[] = [];
+      for (const [i, row] of altModes.entries()) {
+        // Primary mode is the weapon's own fields, so the first row here is "mode 2".
+        const modeName = row.data.name.trim();
+        if (!modeName) {
+          toasts.push(`Attack mode ${i + 2} needs a name`, { kind: 'error' });
+          return;
+        }
+        alternateModes.push({
+          name: modeName,
+          ...(row.data.damage?.trim() ? { damage: row.data.damage.trim() } : {}),
+          ...(row.data.reach?.trim() ? { reach: row.data.reach.trim() } : {}),
+          ...(row.data.parry?.trim() ? { parry: row.data.parry.trim() } : {}),
+          ...(row.data.notes?.trim() ? { notes: row.data.notes.trim() } : {}),
+        });
+      }
       weaponPatch = {
         damage: weapon.damage?.trim() || undefined,
         reach: weapon.reach?.trim() || null,
@@ -354,7 +421,7 @@ export function ItemEditDialog({
         db: dbNum,
         ranged: rangedPatch,
         notes: weapon.notes?.trim() || null,
-        alternateModes: weapon.alternateModes ?? [],
+        alternateModes,
       };
     }
     const enchantmentPatch: EnchantmentRef[] = [];
@@ -365,9 +432,20 @@ export function ItemEditDialog({
         toasts.push(`Enchantment ${i + 1} needs a spell name`, { kind: 'error' });
         return;
       }
+      let spellLevel: number | undefined;
+      if (row.spellLevelRaw.trim() !== '') {
+        const lvl = Number(row.spellLevelRaw);
+        if (!Number.isInteger(lvl) || lvl < 0 || lvl > 40) {
+          toasts.push(`Enchantment ${i + 1} level must be an integer between 0 and 40`, {
+            kind: 'error',
+          });
+          return;
+        }
+        spellLevel = lvl;
+      }
       enchantmentPatch.push({
         spellName,
-        ...(en.spellLevel != null ? { spellLevel: en.spellLevel } : {}),
+        ...(spellLevel !== undefined ? { spellLevel } : {}),
         ...(en.category != null && en.category.trim() !== ''
           ? { category: en.category.trim() }
           : {}),
@@ -852,6 +930,89 @@ export function ItemEditDialog({
                       className="input input-sm input-bordered"
                     />
                   </label>
+                  <div className="space-y-1.5 border-t border-base-300/60 pt-3">
+                    <div className="flex items-center justify-between">
+                      <span className="label-eyebrow">Attack modes (beyond the primary line)</span>
+                      <button
+                        type="button"
+                        className="btn btn-xs"
+                        onClick={addAltMode}
+                        disabled={altModes.length >= MAX_ALT_MODES}
+                      >
+                        + Add mode
+                      </button>
+                    </div>
+                    {altModes.length === 0 ? (
+                      <p className="text-xs text-base-content/50">
+                        Extra damage/reach/parry rows, e.g. a rapier that swings as well as thrusts.
+                        Empty reach/parry inherit the primary values.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {altModes.map(({ key, data: mode }, i) => (
+                          <div
+                            key={key}
+                            className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_5rem_5rem_auto] gap-2"
+                          >
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Mode {i + 2}</span>
+                              <input
+                                value={mode.name}
+                                onChange={(e) => updateAltMode(i, { name: e.target.value })}
+                                className="input input-xs input-bordered"
+                                placeholder="e.g. Thrust"
+                                aria-label={`Attack mode ${i + 2} name`}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Damage</span>
+                              <input
+                                value={mode.damage ?? ''}
+                                onChange={(e) => updateAltMode(i, { damage: e.target.value })}
+                                className="input input-xs input-bordered"
+                                placeholder="thr+1 imp"
+                                aria-label={`Attack mode ${i + 2} damage`}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Reach</span>
+                              <input
+                                value={mode.reach ?? ''}
+                                onChange={(e) =>
+                                  updateAltMode(i, { reach: e.target.value || undefined })
+                                }
+                                className="input input-xs input-bordered"
+                                placeholder="inherit"
+                                aria-label={`Attack mode ${i + 2} reach`}
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="label-eyebrow">Parry</span>
+                              <input
+                                value={mode.parry ?? ''}
+                                onChange={(e) =>
+                                  updateAltMode(i, { parry: e.target.value || undefined })
+                                }
+                                className="input input-xs input-bordered"
+                                placeholder="inherit"
+                                aria-label={`Attack mode ${i + 2} parry`}
+                              />
+                            </label>
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                className="btn btn-xs btn-ghost text-error"
+                                onClick={() => removeAltMode(i)}
+                                aria-label={`Remove attack mode ${i + 2}`}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </fieldset>
             )}
@@ -1009,7 +1170,7 @@ export function ItemEditDialog({
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {enchantments.map(({ key, data: en }, i) => (
+                  {enchantments.map(({ key, data: en, spellLevelRaw }, i) => (
                     <div
                       key={key}
                       className="grid grid-cols-1 sm:grid-cols-[1fr_4rem_8rem_1fr_auto] gap-2"
@@ -1027,20 +1188,9 @@ export function ItemEditDialog({
                       <label className="flex flex-col gap-1">
                         <span className="label-eyebrow">Level</span>
                         <input
-                          value={en.spellLevel == null ? '' : String(en.spellLevel)}
+                          value={spellLevelRaw}
                           inputMode="numeric"
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            const v = Number(raw);
-                            updateEnchantment(i, {
-                              spellLevel:
-                                raw === ''
-                                  ? null
-                                  : Number.isFinite(v)
-                                    ? Math.max(0, Math.min(40, Math.floor(v)))
-                                    : null,
-                            });
-                          }}
+                          onChange={(e) => updateEnchantmentSpellLevelRaw(i, e.target.value)}
                           className="num input input-xs input-bordered text-right"
                           placeholder="—"
                           aria-label={`Enchantment ${i + 1} level`}

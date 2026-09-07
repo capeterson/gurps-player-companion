@@ -7,7 +7,8 @@ describes the three sharing mechanisms as they exist today:
 2. **The character-sheet share gate** — how much of a player's sheet other
    members can see, enforced on both server and client.
 3. **The campaign library** — a per-campaign catalog of traits/skills/spells/
-   items, editable by the owner and portable as versioned YAML.
+   items/languages/techniques/styles, editable by the owner and portable as
+   versioned YAML.
 
 Plus the **adventure log** (per-entry visibility) and **invitations**
 (how people join). Sharing is an **online-only, REST + React-Query** surface —
@@ -234,8 +235,12 @@ seeds the character row's written fluency to `n/a`.
 - **Read** (`GET /campaigns/{id}/library`): any campaign **member**.
 - **Write** (per-entity CRUD): campaign **owner** only. Endpoints are
   `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|languages|techniques|styles}[/{id}]`
-  in `src/server/routes/campaignLibrary.ts`. These back the library editor UI;
-  library mutations do **not** go through the sync outbox.
+  in `src/server/routes/campaignLibrary.ts`. These back the library editor UI
+  (traits/skills/spells/items have dedicated editor forms; the
+  languages/techniques/styles routes are primarily exercised via the YAML
+  import flow and consumed on the character sheet — the editor's own tabs
+  do not yet render those kinds); library mutations do **not** go through
+  the sync outbox.
 - Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor)
   and the top-nav `LibraryPage` (`/library`, the primary home for YAML
   import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
@@ -251,9 +256,10 @@ mechanism for sharing content between campaigns or seeding a new one.
   validates against the `campaignLibrary` Zod schemas and rejects duplicate
   keys; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 4`; max payload 20 MB. v1
-  (pre-effects), v2 (effects on traits/skills), and v3 (container/powerstone/
-  magic-item item fields + `campaign.manaLevel`) documents still parse — the
+  the same bytes. `LIBRARY_YAML_VERSION = 5`; max payload 20 MB. v1
+  (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
+  magic-item item fields + `campaign.manaLevel`), and v4 (languages +
+  techniques/styles sections) documents still parse — the
   parser unions on the literal `version` field and newer fields
   default/absent on older docs.
 - **Item fields (v3):** library items carry the same container/powerstone/

@@ -40,6 +40,7 @@ interface TechniqueSnapshot {
   difficulty: TechniqueDifficulty;
   points: number;
   pointsRaw: string;
+  maxLevel: number | null;
   libraryTechniqueId: string | null;
 }
 
@@ -49,6 +50,8 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
   const [difficulty, setDifficulty] = useState<TechniqueDifficulty>('A');
   const [points, setPoints] = useState('1');
   const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
+  const [pickedMaxLevel, setPickedMaxLevel] = useState<number | null>(null);
+  const [pointsError, setPointsError] = useState<string | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibraryTechniqueOut>('techniques', campaignId);
   const { creating, submit: submitEntity } = useAddEntityForm({
@@ -64,6 +67,7 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
         defaultSkillName: snap.defaultSkillName,
         difficulty: snap.difficulty,
         points: snap.points,
+        ...(snap.maxLevel != null ? { maxLevel: snap.maxLevel } : {}),
         characterId,
         ...(snap.libraryTechniqueId ? { libraryTechniqueId: snap.libraryTechniqueId } : {}),
       },
@@ -73,7 +77,11 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
         setName((cur) => (cur === snap.nameRaw ? '' : cur));
         setDefaultSkillName((cur) => (cur === snap.defaultSkillNameRaw ? '' : cur));
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
-        setPickedLibraryId(null);
+        // The library-derived cap follows the pick guard: a pick made
+        // during the in-flight create must survive.
+        setPickedLibraryId((cur) => (cur === snap.libraryTechniqueId ? null : cur));
+        setPickedMaxLevel((cur) => (cur === snap.maxLevel ? null : cur));
+        setPointsError(null);
       },
     );
   }
@@ -86,15 +94,27 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim() || !defaultSkillName.trim()) return;
+        // Never silently substitute 1 for an invalid points draft; block
+        // the submit and keep the typed value for correction instead.
+        if (points.trim() === '') {
+          setPointsError('Points must be an integer between 0 and 100');
+          return;
+        }
         const parsed = Number(points);
+        if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
+          setPointsError('Points must be an integer between 0 and 100');
+          return;
+        }
+        setPointsError(null);
         void submit({
           name: name.trim(),
           nameRaw: name,
           defaultSkillName: defaultSkillName.trim(),
           defaultSkillNameRaw: defaultSkillName,
           difficulty,
-          points: Number.isInteger(parsed) && parsed >= 0 ? parsed : 1,
+          points: parsed,
           pointsRaw: points,
+          maxLevel: pickedMaxLevel,
           libraryTechniqueId: pickedLibraryId,
         });
       }}
@@ -109,12 +129,16 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
             onChange={(v) => {
               setName(v);
               setPickedLibraryId(null);
+              setPickedMaxLevel(null);
             }}
             onPick={(opt) => {
               setName(opt.name);
               setDefaultSkillName(opt.defaultSkillName);
               setDifficulty(opt.difficulty);
               setPickedLibraryId(opt.id);
+              // Carry the library technique's level cap onto the row so
+              // investing points can't exceed the technique's maximum.
+              setPickedMaxLevel(opt.maxLevel ?? null);
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
@@ -167,12 +191,16 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
         <input
           className="input input-bordered input-sm num"
           value={points}
-          onChange={(e) => setPoints(e.target.value)}
+          onChange={(e) => {
+            setPoints(e.target.value);
+            setPointsError(null);
+          }}
         />
       </label>
       <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
         {creating ? 'Adding…' : 'Add'}
       </button>
+      {pointsError && <p className="basis-full text-error text-xs">{pointsError}</p>}
     </form>
   );
 }

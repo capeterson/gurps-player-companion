@@ -7,7 +7,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { TechniqueOut } from '../../../../shared/schemas/technique.ts';
@@ -24,6 +24,72 @@ vi.mock('../../../sync/outbox.ts', () => ({
   enqueueCreate,
   enqueueDelete,
   newClientId,
+}));
+
+// Deterministic library fixtures + a mocked LibraryAutocomplete so the
+// panel's library-pick logic (maxLevel carry + race preservation) is
+// tested without the real combobox's debounced network fetch.
+const pickCounterattack = vi.hoisted(() => ({
+  id: 'lib-tech-counterattack',
+  name: 'Counterattack',
+  defaultSkillName: 'Broadsword',
+  difficulty: 'H',
+  maxLevel: 4,
+  description: null,
+  source: null,
+  prereq: null,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+const pickFeint = vi.hoisted(() => ({
+  id: 'lib-tech-feint',
+  name: 'Feint',
+  // A distinct default so the post-create reset guard (which clears a
+  // field still equal to the submitted snapshot) can't collide with the
+  // previous pick.
+  defaultSkillName: 'Rapier',
+  difficulty: 'A',
+  maxLevel: null,
+  description: null,
+  source: null,
+  prereq: null,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+}));
+
+vi.mock('./useLibraryFetcher.ts', () => ({
+  useLibraryFetcher: () => ({ fetchOptions: async () => [], isLoading: false }),
+}));
+
+vi.mock('../../../components/ui/LibraryAutocomplete.tsx', () => ({
+  LibraryAutocomplete: ({
+    value,
+    onChange,
+    onPick,
+    placeholder,
+    inputProps,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    onPick: (o: { id: string }) => void;
+    placeholder?: string;
+    inputProps?: InputHTMLAttributes<HTMLInputElement>;
+  }) => (
+    <div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        {...inputProps}
+      />
+      <button type="button" onClick={() => onPick(pickCounterattack)}>
+        Pick Counterattack
+      </button>
+      <button type="button" onClick={() => onPick(pickFeint)}>
+        Pick Feint
+      </button>
+    </div>
+  ),
 }));
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000c001';
@@ -271,6 +337,106 @@ describe('TechniquesPanel add form', () => {
     fireEvent.change(name, { target: { value: 'Feint' } });
     fireEvent.submit(form);
     expect(enqueueCreate).not.toHaveBeenCalled();
+  });
+
+  it('blocks an invalid points draft instead of silently substituting 1', () => {
+    renderPanel(makeCharacter([]));
+    const name = screen.getByLabelText('Technique') as HTMLInputElement;
+    const skill = screen.getByLabelText('Defaults from') as HTMLInputElement;
+    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+
+    fireEvent.change(name, { target: { value: 'Disarming' } });
+    fireEvent.change(skill, { target: { value: 'Broadsword' } });
+    for (const bad of ['-1', '2.5', 'xyz']) {
+      fireEvent.change(points, { target: { value: bad } });
+    }
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+
+    expect(enqueueCreate).not.toHaveBeenCalled();
+    expect(screen.getByText('Points must be an integer between 0 and 100')).toBeInTheDocument();
+    expect(points.value).toBe('xyz');
+
+    fireEvent.change(points, { target: { value: '3' } });
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    expect(enqueueCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptedValue: expect.objectContaining({ name: 'Disarming', points: 3 }),
+      }),
+    );
+  });
+});
+
+describe('TechniquesPanel library picks', () => {
+  it('carries a picked library technique maxLevel onto the create payload', async () => {
+    renderPanel({
+      id: CHAR_ID,
+      campaignId: 'camp-1',
+      techniques: [],
+    } as unknown as CharacterDetail);
+    const name = screen.getByLabelText('Technique') as HTMLInputElement;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Counterattack' }));
+    expect(name.value).toBe('Counterattack');
+    expect((screen.getByLabelText('Defaults from') as HTMLInputElement).value).toBe('Broadsword');
+    expect((screen.getByLabelText('Diff') as HTMLSelectElement).value).toBe('H');
+
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    await waitFor(() =>
+      expect(enqueueCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attemptedValue: expect.objectContaining({
+            name: 'Counterattack',
+            defaultSkillName: 'Broadsword',
+            difficulty: 'H',
+            maxLevel: 4,
+            libraryTechniqueId: 'lib-tech-counterattack',
+            characterId: CHAR_ID,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('keeps a library pick made during an in-flight create (including its cap)', async () => {
+    let resolveFirst: (() => void) | null = null;
+    const attempted: Array<Record<string, unknown>> = [];
+    enqueueCreate.mockImplementation((args: { attemptedValue: Record<string, unknown> }) => {
+      attempted.push(args.attemptedValue);
+      if (attempted.length === 1) {
+        return new Promise<void>((res) => {
+          resolveFirst = res;
+        });
+      }
+      return Promise.resolve();
+    });
+
+    renderPanel({
+      id: CHAR_ID,
+      campaignId: 'camp-1',
+      techniques: [],
+    } as unknown as CharacterDetail);
+    const name = screen.getByLabelText('Technique') as HTMLInputElement;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Counterattack' }));
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(attempted).toHaveLength(1));
+    expect(attempted[0]?.libraryTechniqueId).toBe('lib-tech-counterattack');
+    expect(attempted[0]?.maxLevel).toBe(4);
+
+    // Pick a different technique while the first create is in flight.
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Feint' }));
+    expect(name.value).toBe('Feint');
+
+    await act(async () => {
+      resolveFirst?.();
+    });
+    expect(name.value).toBe('Feint');
+
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(attempted).toHaveLength(2));
+    // The newer pick's (uncapped) link survives — and no stale cap leaks.
+    expect(attempted[1]?.libraryTechniqueId).toBe('lib-tech-feint');
+    expect(attempted[1]?.maxLevel).toBeUndefined();
   });
 });
 

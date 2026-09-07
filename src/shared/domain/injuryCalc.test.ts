@@ -2,21 +2,26 @@ import { describe, expect, it } from 'bun:test';
 import type { DrByLocationMap, TypedDrTotals } from './armorDr.ts';
 import { applyDamage, parseArmorDivisor, woundingMultiplier } from './injuryCalc.ts';
 
-const EMPTY: TypedDrTotals = {
-  cut: null,
-  imp: null,
-  pi: null,
-  pi_minus: null,
-  pi_plus: null,
-  pi_pp: null,
-  burn: null,
-  corr: null,
-  fat: null,
-  tox: null,
-};
-
-function typedDr(partial: Partial<TypedDrTotals>): TypedDrTotals {
-  return { ...EMPTY, ...partial };
+/**
+ * Build a typed-DR total for a fixture entry in the style
+ * `aggregateDrByLocation` now emits: every type defaults to the base
+ * `dr` (a layer without an override still contributes its base DR) and
+ * a provided override replaces it for that single type.
+ */
+function typedDr(base: number, partial: Partial<TypedDrTotals> = {}): TypedDrTotals {
+  return {
+    cut: base,
+    imp: base,
+    pi: base,
+    pi_minus: base,
+    pi_plus: base,
+    pi_pp: base,
+    burn: base,
+    corr: base,
+    fat: base,
+    tox: base,
+    ...partial,
+  };
 }
 
 function drMap(
@@ -27,7 +32,11 @@ function drMap(
 ): DrByLocationMap {
   const map: DrByLocationMap = new Map();
   for (const [loc, v] of Object.entries(entries)) {
-    map.set(loc, { dr: v.dr, drCrushing: v.drCrushing ?? null, typedDr: typedDr(v.typedDr ?? {}) });
+    map.set(loc, {
+      dr: v.dr,
+      drCrushing: v.drCrushing ?? null,
+      typedDr: typedDr(v.dr, v.typedDr),
+    });
   }
   return map;
 }

@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
 """Create a high-fidelity test copy of Raphaël Costeau through the public API.
 Writes a verified manifest only; it does not alter app source code or wipe data.
+
+Paths are configurable: `--source` (spreadsheet) and `--out` (manifest).
+Defaults assume the author's checkout layout so a bare invocation works there,
+but any checkout can point them elsewhere.
 """
-import json, os, re, sys, time, urllib.error, urllib.request
+import argparse, json, re, time, urllib.error, urllib.request
 from datetime import datetime
 from pathlib import Path
 import openpyxl
 
 BASE = 'http://localhost:3001/api/v1'
-OUT = Path('/home/hermes/workspace/gurps-player-companion/veteran-replication-manifest.json')
-SOURCE = Path('/home/hermes/workspace/veteran-character-source.xlsx')
+
+parser = argparse.ArgumentParser(description='Replicate the veteran GURPS sheet into the app.')
+parser.add_argument('--source', default='/home/hermes/workspace/veteran-character-source.xlsx',
+                    help='Path to the source workbook (default: author checkout layout).')
+parser.add_argument('--out', default='/home/hermes/workspace/gurps-player-companion/veteran-replication-manifest.json',
+                    help='Where to write the verified manifest (default: repo root).')
+args = parser.parse_args()
+SOURCE = Path(args.source)
+OUT = Path(args.out)
 
 def call(method, path, body=None, token=None):
     data = None if body is None else json.dumps(body, ensure_ascii=False).encode()
@@ -213,7 +224,10 @@ armors=[
  ('Spider Heavy Cloak',2.5,0,[],3,None,{},False,'Source DB 4. Deflect 2, Fortify 2.',4,[{'spellName':'Deflect','category':'Deflect +2'},{'spellName':'Fortify','category':'Fortify +2'}]),
 ]
 for n,w,c,loc,dr,cr,typed,flex,note,db,ench in armors:
-    add_item(n,w,c,note,worn=True,equipped=True,isArmor=True,armor={'locations':loc,'dr':dr,'drCrushing':cr,'typedDr':typed,'db':db,'flexible':flex},weaponData={'db':db} if db else None,enchantments=ench)
+    # Armor DB lives on `armor.db` (Deflect enchantments) — writing it to
+    # `weaponData.db` too would count the piece as a shield (pickShield),
+    # double-adding the DB and enabling Block on a coif or cloak.
+    add_item(n,w,c,note,worn=True,equipped=True,isArmor=True,armor={'locations':loc,'dr':dr,'drCrushing':cr,'typedDr':typed,'db':db,'flexible':flex},enchantments=ench)
 
 # Remaining source equipment, including worn, carried, stored, and consumable items.
 items=[

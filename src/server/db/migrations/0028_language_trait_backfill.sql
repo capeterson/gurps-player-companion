@@ -12,10 +12,14 @@
 -- keeps the common case (a mother tongue recorded as a 0-point trait)
 -- right and is obvious enough to spot for the rest.
 --
--- `GREATEST(points, 0)` clamps the (nonsensical but storable) case of a
--- negative-point language trait into the 0..100 range the language schema
--- validates, so the migrated row stays editable through the API. GURPS
--- languages never cost negative points, so this should never fire.
+-- `LEAST(GREATEST(points, 0), 100)` clamps into the 0..100 range the
+-- language schema validates on both sides (languageCreate/languageOut
+-- cap points at 100). A legacy trait may hold up to 1000 points under
+-- traitCreate; backfilling a >100 value verbatim would produce a row the
+-- API contract rejects, so the upper bound is applied too. GURPS
+-- languages never cost negative points or exceed 100, so this should
+-- never fire in practice — it exists so the migrated row stays editable
+-- through the API no matter what the legacy data held.
 --
 -- Idempotent two ways: the DELETE at the end removes the source rows, so
 -- a rerun finds nothing to migrate; and the INSERT's NOT EXISTS guard
@@ -30,7 +34,7 @@ SELECT
   t.name,
   'native',
   'none',
-  GREATEST(t.points, 0),
+  LEAST(GREATEST(t.points, 0), 100),
   t.notes,
   t.created_at,
   t.updated_at

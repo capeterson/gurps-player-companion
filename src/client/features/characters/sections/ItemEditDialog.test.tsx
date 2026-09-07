@@ -243,4 +243,112 @@ describe('ItemEditDialog enchantments', () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText('Enchantment 1 needs a spell name')).toBeInTheDocument();
   });
+
+  it('keeps the enchantment level as a raw draft and validates it on submit', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog open item={makeItem()} onSubmit={onSubmit} onCancel={() => {}} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add enchantment' }));
+    fireEvent.change(screen.getByLabelText('Enchantment 1 spell'), {
+      target: { value: 'Fortify' },
+    });
+    const level = screen.getByLabelText('Enchantment 1 level') as HTMLInputElement;
+
+    // Typing out-of-range must NOT clamp the field silently.
+    fireEvent.change(level, { target: { value: '41' } });
+    expect(level.value).toBe('41');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('Enchantment 1 level must be an integer between 0 and 40'),
+    ).toBeInTheDocument();
+    expect(level.value).toBe('41');
+
+    // A transient non-numeric edit must NOT blank the field mid-typing.
+    fireEvent.change(level, { target: { value: '4x' } });
+    expect(level.value).toBe('4x');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    // Correcting to a valid value submits cleanly.
+    fireEvent.change(level, { target: { value: '4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const patch = onSubmit.mock.calls[0]?.[0];
+    expect(patch.enchantments).toEqual([{ spellName: 'Fortify', spellLevel: 4 }]);
+  });
+});
+
+describe('ItemEditDialog alternate attack modes', () => {
+  it('adds an attack mode and writes it into the weapon patch', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog
+        open
+        item={makeItem({ name: 'Rapier' })}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Weapon' }));
+    fireEvent.click(screen.getByRole('button', { name: '+ Add mode' }));
+    fireEvent.change(screen.getByLabelText('Attack mode 2 name'), {
+      target: { value: 'Thrust' },
+    });
+    fireEvent.change(screen.getByLabelText('Attack mode 2 damage'), {
+      target: { value: 'thr+1 imp' },
+    });
+    fireEvent.change(screen.getByLabelText('Attack mode 2 reach'), {
+      target: { value: '1,2' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    const patch = onSubmit.mock.calls[0]?.[0];
+    expect(patch.weaponData.alternateModes).toEqual([
+      { name: 'Thrust', damage: 'thr+1 imp', reach: '1,2' },
+    ]);
+  });
+
+  it('prefills loaded modes and blocks a blank mode name', () => {
+    const onSubmit = vi.fn();
+    renderWithToasts(
+      <ItemEditDialog
+        open
+        item={makeItem({
+          name: 'Rapier',
+          weaponData: {
+            damage: 'sw+1 cut',
+            reach: '1,2',
+            parry: '0',
+            stRequired: null,
+            skill: 'Melee (Rapier)',
+            db: null,
+            ranged: null,
+            notes: null,
+            alternateModes: [{ name: 'Thrust', damage: 'thr+1 imp' }],
+          },
+        })}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
+    );
+
+    expect(screen.getByLabelText('Attack mode 2 name')).toHaveValue('Thrust');
+    expect(screen.getByLabelText('Attack mode 2 damage')).toHaveValue('thr+1 imp');
+
+    // A newly added blank mode blocks submit with a visible error.
+    fireEvent.click(screen.getByRole('button', { name: '+ Add mode' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('Attack mode 3 needs a name')).toBeInTheDocument();
+
+    // Removing the blank one saves the loaded mode through.
+    fireEvent.click(screen.getByLabelText('Remove attack mode 3'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    const patch = onSubmit.mock.calls[0]?.[0];
+    expect(patch.weaponData.alternateModes).toEqual([{ name: 'Thrust', damage: 'thr+1 imp' }]);
+  });
 });

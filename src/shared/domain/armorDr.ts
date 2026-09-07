@@ -3,8 +3,12 @@
  *
  * Iterates over a character's inventory, filtering to equipped armor
  * items (`equipped && isArmor && armor != null`). For each location the
- * item covers, sums the `dr` (and tracks typed DR overrides where
- * present). Returns a Map keyed by location string — well-known
+ * item covers, sums the `dr` into the base total and adds each layer's
+ * contribution to the per-type totals — a layer with a type override
+ * contributes the override, otherwise its base `dr`, so a base-DR 4
+ * jacket plus a DR 2 coif with a `cut: 5` override gives cut DR 9, not
+ * 5 (the override replaces the affected layer's contribution, never the
+ * whole stack). Returns a Map keyed by location string — well-known
  * locations are from `HIT_LOCATIONS`, but custom homebrew location
  * strings pass through unchanged.
  *
@@ -15,7 +19,7 @@
  * Pure TS (shared domain) — runs in Bun, browser, and service worker.
  */
 
-import type { ArmorData, TypedArmorDr } from '../schemas/inventory.ts';
+import type { ArmorData } from '../schemas/inventory.ts';
 
 export interface ArmorItemRow {
   readonly equipped: boolean;
@@ -25,35 +29,37 @@ export interface ArmorItemRow {
 
 /**
  * Per-type DR totals for a single location. Each key mirrors a
- * `typedArmorDr` field — when a non-null value is present it is the
- * summed DR from all equipped armor pieces that override that type at
- * this location. `null` means no armor at this location provides a
- * type-specific override (the resolver falls through to `dr`).
+ * `typedArmorDr` field. A location's per-type value is the sum, across
+ * every equipped piece covering that location, of that piece's
+ * type-specific override when present and otherwise its base `dr` — so
+ * a base-DR 4 jacket plus a DR 2 coif with `cut: 5` gives 9 vs cut,
+ * not 5 (type overrides replace the affected piece's contribution, they
+ * do not replace the whole stack).
  */
 export interface TypedDrTotals {
-  readonly cut: number | null;
-  readonly imp: number | null;
-  readonly pi: number | null;
-  readonly pi_minus: number | null;
-  readonly pi_plus: number | null;
-  readonly pi_pp: number | null;
-  readonly burn: number | null;
-  readonly corr: number | null;
-  readonly fat: number | null;
-  readonly tox: number | null;
+  readonly cut: number;
+  readonly imp: number;
+  readonly pi: number;
+  readonly pi_minus: number;
+  readonly pi_plus: number;
+  readonly pi_pp: number;
+  readonly burn: number;
+  readonly corr: number;
+  readonly fat: number;
+  readonly tox: number;
 }
 
 const EMPTY_TYPED_DR: TypedDrTotals = {
-  cut: null,
-  imp: null,
-  pi: null,
-  pi_minus: null,
-  pi_plus: null,
-  pi_pp: null,
-  burn: null,
-  corr: null,
-  fat: null,
-  tox: null,
+  cut: 0,
+  imp: 0,
+  pi: 0,
+  pi_minus: 0,
+  pi_plus: 0,
+  pi_pp: 0,
+  burn: 0,
+  corr: 0,
+  fat: 0,
+  tox: 0,
 };
 
 export interface DrByLocation {
@@ -70,17 +76,18 @@ export type DrByLocationMap = Map<string, DrByLocation>;
 
 function mergeTypedDr(
   prev: TypedDrTotals | undefined,
-  armor: TypedArmorDr | undefined,
+  armor: ArmorData | undefined,
 ): TypedDrTotals {
-  const result: Record<string, number | null> = {};
+  const result: Record<string, number> = {};
+  // A layer with no override for a given type still contributes its
+  // base `dr`; an override replaces that layer's contribution only.
+  const contribution: Record<string, number> = {};
   for (const key of Object.keys(EMPTY_TYPED_DR) as (keyof TypedDrTotals)[]) {
-    const newVal = armor?.[key];
-    const prevVal = prev?.[key];
-    if (newVal != null) {
-      result[key] = (prevVal ?? 0) + newVal;
-    } else {
-      result[key] = prevVal ?? null;
-    }
+    const override = armor?.typedDr?.[key];
+    contribution[key] = override ?? armor?.dr ?? 0;
+  }
+  for (const key of Object.keys(EMPTY_TYPED_DR) as (keyof TypedDrTotals)[]) {
+    result[key] = (prev?.[key] ?? 0) + (contribution[key] ?? 0);
   }
   return result as unknown as TypedDrTotals;
 }
@@ -97,7 +104,7 @@ export function aggregateDrByLocation(items: readonly ArmorItemRow[]): DrByLocat
         armor.drCrushing != null
           ? (prev?.drCrushing ?? 0) + armor.drCrushing
           : (prev?.drCrushing ?? null);
-      const typedDr = mergeTypedDr(prev?.typedDr, armor.typedDr ?? undefined);
+      const typedDr = mergeTypedDr(prev?.typedDr, armor);
       map.set(loc, { dr, drCrushing, typedDr });
     }
   }
@@ -143,9 +150,11 @@ const TYPE_MAP: Record<string, DamageTypeKey> = {
  * Resolve DR against an incoming damage type for a location.
  *
  * Fallback order (GURPS B378):
- *   1. `typedDr[damageType]` — per-type override from the armor.
- *   2. `drCrushing` — legacy crushing override (only for `cr`).
- *   3. `dr` — the base/default DR.
+ *   1. `typedDr[damageType]` — per-type total (always populated; each
+ *      layer contributes its override or its base `dr`).
+ *   2. `drCrushing` — legacy crushing override (only for `cr`, which
+ *      has no typedDr key).
+ *   3. `dr` — the base/default DR (for unknown / untyped damage).
  */
 export function resolveDr(
   type: string | null | undefined,
@@ -156,8 +165,7 @@ export function resolveDr(
   const key = TYPE_MAP[normalized];
 
   if (key != null) {
-    const typedValue = entry.typedDr[key];
-    if (typedValue != null) return typedValue;
+    return entry.typedDr[key];
   }
 
   // Legacy crushing override for 'cr' type
