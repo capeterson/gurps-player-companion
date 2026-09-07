@@ -106,6 +106,18 @@ on any sheet the viewer can edit — their own — it always shows).
   tappable roll target: it opens the same roll sheet used everywhere
   else on the character (dispatch only, so read-only viewers can roll
   too); null-level rows stay plain text.
+- **Techniques** (`character_techniques`, sync-backed): Martial Arts
+  p. 87 techniques bought up from a named default skill. Difficulty is
+  Average (+1 per point) or Hard (the first point buys nothing, then +1
+  per point), clamped by an optional `maxLevel` cap. The default skill
+  is resolved by name against the sheet — bare name or
+  `Name (Specialization)` — using the skill's *effective* level, so
+  Talents flow through; an unresolvable default renders an em dash with
+  a "Skill 'X' not on sheet" tooltip instead of guessing. A resolved
+  level is a tappable roll target like a skill's. Rendered on the Skills
+  tab. Martial-arts **styles** live in the campaign library only
+  (name + technique/perk/skill lists); a character adopts one by adding
+  its pieces, so there is no per-character style row.
 - **Languages** (`character_languages`, sync-backed) with independent
   **spoken** and **written** fluency (None / Broken / Accented / Native,
   plus `n/a` for sign languages, B23-24). Points auto-seed from the
@@ -260,7 +272,7 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
-  items, and languages, editable by the owner and
+  items, languages, techniques, and styles, editable by the owner and
   **importable/exportable as versioned YAML**
   for sharing between campaigns. The catalog editor lives at
   `/campaigns/:id/library`; the top-nav **Library** page (`/library`,
@@ -364,7 +376,8 @@ src/
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
       characters/sections/  Sheet-panel form plumbing shared across
-                 Traits/Skills/Spells/Languages/Inventory: useAddEntityForm
+                 Traits/Skills/Spells/Languages/Techniques/Inventory:
+                 useAddEntityForm
                  (the add form), useEntityRowPatch (per-row field patch
                  dispatch, incl. useEntityEnumField for enum <select>s),
                  useClampedJsonbBumper (powerstone/magic-item charge
@@ -457,8 +470,8 @@ Things that repeatedly surprise people working in this repo:
 
 1. **Sync coverage is partial and deliberate.** Only the character family
    (`character`, `character_trait`, `character_skill`, `character_spell`,
-   `character_language`, `character_inventory`, `character_combat`) flows
-   through the outbox. Campaigns
+   `character_language`, `character_technique`, `character_inventory`,
+   `character_combat`) flows through the outbox. Campaigns
    are pulled **read-only** into Dexie; the campaign library, adventure log,
    invitations, and notifications are still **online-only** React-Query/HTTP
    surfaces. The `entityClass` enum lists more than the orchestrator pulls —

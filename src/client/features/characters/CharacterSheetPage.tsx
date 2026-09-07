@@ -45,6 +45,7 @@ import { LanguagesPanel } from './sections/LanguagesPanel.tsx';
 import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { SpellsPanel } from './sections/SpellsPanel.tsx';
+import { TechniquesPanel } from './sections/TechniquesPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { CombatTab } from './sections/combat/CombatTab.tsx';
 import { hpVarFor } from './sections/hpColor.ts';
@@ -1093,6 +1094,10 @@ function PointsPanel({ character }: { character: CharacterDetail }) {
             <span>Skills</span>
             <span className="num">{p.skills}</span>
           </li>
+          <li className="flex justify-between">
+            <span>Techniques</span>
+            <span className="num">{p.techniques}</span>
+          </li>
           <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
             <span>Total</span>
             <span className="num">{p.total}</span>
@@ -1583,6 +1588,7 @@ export function CharacterSheetPage() {
         {tab === 'Skills' && (
           <div className="space-y-4">
             <SkillsPanel character={character} canWrite={canWrite} />
+            <TechniquesPanel character={character} canWrite={canWrite} />
             <LanguagesPanel character={character} canWrite={canWrite} />
           </div>
         )}

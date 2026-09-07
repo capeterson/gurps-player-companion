@@ -59,16 +59,36 @@ export function useEntityRowPatch(
   return { patch, flashKey };
 }
 
+/**
+ * Shared `useDraftField` config for a trimmed text column on a row
+ * entity. `useEntityNameField` is the `field: 'name'` case; anything
+ * else with the same shape (a technique's `defaultSkillName`) goes
+ * through this rather than borrowing the name field's config and
+ * overriding `onBlur`, which would bypass the hook's queueing and
+ * rollback state machine (AGENTS.md S10).
+ */
+export function useEntityTextField(
+  row: EntityRowPatch,
+  label: string,
+  field: string,
+  serverValue: string,
+  validate?: (v: string) => string | null,
+): UseDraftFieldReturn {
+  return useDraftField<string>({
+    name: label,
+    serverValue,
+    parse: (s) => s.trim(),
+    validate,
+    onSave: (v) => row.patch(field, v),
+    flashKey: row.flashKey(field),
+  });
+}
+
 /** Shared `useDraftField` config for the "name" input on a row entity. */
 export function useEntityNameField(row: EntityRowPatch, entityName: string): UseDraftFieldReturn {
-  return useDraftField<string>({
-    name: `${entityName} name`,
-    serverValue: entityName,
-    parse: (s) => s.trim(),
-    validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    onSave: (v) => row.patch('name', v),
-    flashKey: row.flashKey('name'),
-  });
+  return useEntityTextField(row, `${entityName} name`, 'name', entityName, (v) =>
+    v.length > 0 ? null : 'name cannot be empty',
+  );
 }
 
 /**

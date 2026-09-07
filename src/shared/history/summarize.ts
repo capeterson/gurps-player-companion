@@ -321,6 +321,28 @@ function summarizeCharacterLanguage(
   return `${name} updated`;
 }
 
+function summarizeCharacterTechnique(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'technique';
+  const defaultSkill = next?.defaultSkillName ?? old?.defaultSkillName;
+  if (op === 'insert') {
+    return defaultSkill ? `Added technique ${name} (${defaultSkill})` : `Added technique ${name}`;
+  }
+  if (op === 'delete') return `Removed technique ${old?.name ?? ''}`;
+  const changes = diffRows(old, next);
+  if (changes.length === 0) return `Technique ${name} updated`;
+  const c = changes[0] as FieldChange;
+  if (c.field === 'points') return `${name} ${c.oldValue} → ${c.newValue} pts`;
+  if (c.field === 'difficulty') return `${name} difficulty ${c.oldValue} → ${c.newValue}`;
+  if (c.field === 'defaultSkillName') return `${name} now defaults from ${c.newValue}`;
+  if (c.field === 'maxLevel') return `${name} max level ${displayValue(c.newValue)}`;
+  if (c.field === 'name') return `Renamed technique to ${c.newValue}`;
+  return `${name} updated`;
+}
+
 function summarizeInventory(
   op: string,
   old: Record<string, unknown> | null,
@@ -453,6 +475,28 @@ function summarizeLibraryLanguage(
   return `Library language ${name} updated`;
 }
 
+function summarizeLibraryTechnique(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'technique';
+  if (op === 'insert') return `Added library technique ${name}`;
+  if (op === 'delete') return `Removed library technique ${old?.name ?? ''}`;
+  return `Library technique ${name} updated`;
+}
+
+function summarizeLibraryStyle(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'style';
+  if (op === 'insert') return `Added style ${name}`;
+  if (op === 'delete') return `Removed style ${old?.name ?? ''}`;
+  return `Style ${name} updated`;
+}
+
 function summarizeLibraryItem(
   op: string,
   old: Record<string, unknown> | null,
@@ -518,6 +562,9 @@ export function summarizeEvent(event: {
     case 'character_language':
       summary = summarizeCharacterLanguage(op, oldRow, newRow);
       break;
+    case 'character_technique':
+      summary = summarizeCharacterTechnique(op, oldRow, newRow);
+      break;
     case 'character_inventory':
       summary = summarizeInventory(op, oldRow, newRow);
       break;
@@ -544,6 +591,12 @@ export function summarizeEvent(event: {
       break;
     case 'campaign_library_language':
       summary = summarizeLibraryLanguage(op, oldRow, newRow);
+      break;
+    case 'campaign_library_technique':
+      summary = summarizeLibraryTechnique(op, oldRow, newRow);
+      break;
+    case 'campaign_library_style':
+      summary = summarizeLibraryStyle(op, oldRow, newRow);
       break;
     case 'adventure_log':
       summary = summarizeAdventureLog(op, oldRow, newRow);
@@ -619,6 +672,8 @@ function makeBatchSummary(events: HistoryEventOut[]): string {
       return `${n} trait changes`;
     case 'character_language':
       return `${n} language changes`;
+    case 'character_technique':
+      return `${n} technique changes`;
     default:
       return `${n} changes`;
   }

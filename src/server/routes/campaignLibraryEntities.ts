@@ -28,6 +28,12 @@ import {
   type LibrarySpellCreate,
   type LibrarySpellOut,
   type LibrarySpellUpdate,
+  type LibraryStyleCreate,
+  type LibraryStyleOut,
+  type LibraryStyleUpdate,
+  type LibraryTechniqueCreate,
+  type LibraryTechniqueOut,
+  type LibraryTechniqueUpdate,
   type LibraryTraitCreate,
   type LibraryTraitOut,
   type LibraryTraitUpdate,
@@ -43,6 +49,12 @@ import {
   librarySpellCreate,
   librarySpellOut,
   librarySpellUpdate,
+  libraryStyleCreate,
+  libraryStyleOut,
+  libraryStyleUpdate,
+  libraryTechniqueCreate,
+  libraryTechniqueOut,
+  libraryTechniqueUpdate,
   libraryTraitCreate,
   libraryTraitOut,
   libraryTraitUpdate,
@@ -52,6 +64,8 @@ import {
   campaignLibraryLanguages,
   campaignLibrarySkills,
   campaignLibrarySpells,
+  campaignLibraryStyles,
+  campaignLibraryTechniques,
   campaignLibraryTraits,
 } from '../db/schema.ts';
 
@@ -75,7 +89,14 @@ export interface LibraryEntityConfig<
   /** Singular label used in 404 messages: `"<entityLabel> not found"`. */
   readonly entityLabel: string;
   /** Key into the YAML doc's `library` object and the import-result payload. */
-  readonly yamlKey: 'traits' | 'skills' | 'spells' | 'items' | 'languages';
+  readonly yamlKey:
+    | 'traits'
+    | 'skills'
+    | 'spells'
+    | 'items'
+    | 'languages'
+    | 'techniques'
+    | 'styles';
   readonly table: TTable;
   /** List ordering for `GET /campaigns/{id}/library`. */
   readonly orderBy: readonly SQL[];
@@ -487,6 +508,137 @@ export const languageEntity: LibraryEntityConfig<
     }),
 };
 
+// ===================== techniques =====================
+
+function techniqueEditableFields(body: LibraryTechniqueCreate) {
+  return {
+    defaultSkillName: body.defaultSkillName,
+    difficulty: body.difficulty ?? 'A',
+    maxLevel: body.maxLevel ?? null,
+    description: body.description ?? null,
+    source: body.source ?? null,
+    prereq: body.prereq ?? null,
+  };
+}
+
+export const techniqueEntity: LibraryEntityConfig<
+  typeof campaignLibraryTechniques,
+  LibraryTechniqueCreate,
+  LibraryTechniqueUpdate,
+  LibraryTechniqueOut,
+  'techniqueId'
+> = {
+  pathSegment: 'techniques',
+  paramName: 'techniqueId',
+  entityLabel: 'technique',
+  yamlKey: 'techniques',
+  table: campaignLibraryTechniques,
+  orderBy: [asc(campaignLibraryTechniques.name)],
+  createSchema: libraryTechniqueCreate,
+  updateSchema: libraryTechniqueUpdate,
+  outSchema: libraryTechniqueOut,
+  summaries: {
+    post: 'Add a library technique (owner only)',
+    patch: 'Update a library technique (owner only)',
+    delete: 'Delete a library technique (owner only)',
+  },
+  toOut: (row) =>
+    libraryTechniqueOut.parse({
+      id: row.id,
+      campaignId: row.campaignId,
+      name: row.name,
+      defaultSkillName: row.defaultSkillName,
+      difficulty: row.difficulty,
+      maxLevel: row.maxLevel,
+      description: row.description,
+      source: row.source,
+      prereq: row.prereq,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  keyOf: (input) => input.name.toLowerCase(),
+  toInsertValues: (campaignId, body) => ({
+    campaignId,
+    name: body.name,
+    ...techniqueEditableFields(body),
+  }),
+  toUpdateValues: (body) => techniqueEditableFields(body),
+  rowToCreate: (row) =>
+    libraryTechniqueCreate.parse({
+      name: row.name,
+      defaultSkillName: row.defaultSkillName,
+      difficulty: row.difficulty,
+      maxLevel: row.maxLevel ?? undefined,
+      description: row.description ?? undefined,
+      source: row.source ?? undefined,
+      prereq: row.prereq ?? undefined,
+    }),
+};
+
+// ===================== styles =====================
+
+function styleEditableFields(body: LibraryStyleCreate) {
+  return {
+    description: body.description ?? null,
+    source: body.source ?? null,
+    techniques: body.techniques ?? [],
+    perks: body.perks ?? [],
+    skills: body.skills ?? [],
+  };
+}
+
+export const styleEntity: LibraryEntityConfig<
+  typeof campaignLibraryStyles,
+  LibraryStyleCreate,
+  LibraryStyleUpdate,
+  LibraryStyleOut,
+  'styleId'
+> = {
+  pathSegment: 'styles',
+  paramName: 'styleId',
+  entityLabel: 'style',
+  yamlKey: 'styles',
+  table: campaignLibraryStyles,
+  orderBy: [asc(campaignLibraryStyles.name)],
+  createSchema: libraryStyleCreate,
+  updateSchema: libraryStyleUpdate,
+  outSchema: libraryStyleOut,
+  summaries: {
+    post: 'Add a library style (owner only)',
+    patch: 'Update a library style (owner only)',
+    delete: 'Delete a library style (owner only)',
+  },
+  toOut: (row) =>
+    libraryStyleOut.parse({
+      id: row.id,
+      campaignId: row.campaignId,
+      name: row.name,
+      description: row.description,
+      source: row.source,
+      techniques: row.techniques ?? [],
+      perks: row.perks ?? [],
+      skills: row.skills ?? [],
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  keyOf: (input) => input.name.toLowerCase(),
+  toInsertValues: (campaignId, body) => ({
+    campaignId,
+    name: body.name,
+    ...styleEditableFields(body),
+  }),
+  toUpdateValues: (body) => styleEditableFields(body),
+  rowToCreate: (row) =>
+    libraryStyleCreate.parse({
+      name: row.name,
+      description: row.description ?? undefined,
+      source: row.source ?? undefined,
+      techniques: row.techniques ?? [],
+      perks: row.perks ?? [],
+      skills: row.skills ?? [],
+    }),
+};
+
 /** All entity configs, in the order routes/list/export/import must process them. */
 export const libraryEntities = [
   traitEntity,
@@ -494,4 +646,6 @@ export const libraryEntities = [
   spellEntity,
   itemEntity,
   languageEntity,
+  techniqueEntity,
+  styleEntity,
 ] as const;

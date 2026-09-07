@@ -34,6 +34,7 @@ import type {
   OperationEnvelope,
   OperationOutcome,
 } from '../../shared/schemas/sync.ts';
+import { techniqueCreate, techniqueUpdate } from '../../shared/schemas/technique.ts';
 import { traitCreate, traitUpdate } from '../../shared/schemas/trait.ts';
 import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
 import { type AuditTx, withAudit } from '../db/auditContext.ts';
@@ -45,6 +46,7 @@ import {
   characterLanguages,
   characterSkills,
   characterSpells,
+  characterTechniques,
   characterTraits,
   characters,
   combatStates,
@@ -58,6 +60,7 @@ import {
   languageInsertValues,
   skillInsertValues,
   spellInsertValues,
+  techniqueInsertValues,
   traitInsertValues,
 } from './entityWrites.ts';
 import { buildPatchSet } from './patchSet.ts';
@@ -79,6 +82,7 @@ const FIELD_VALIDATORS = {
   character_skill: skillUpdate,
   character_spell: spellUpdate,
   character_language: languageUpdate,
+  character_technique: techniqueUpdate,
   character_inventory: inventoryItemUpdate,
   character_combat: combatStateUpdate,
 } as const;
@@ -91,6 +95,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   character_skill: Object.keys(skillUpdate.shape) as readonly string[],
   character_spell: Object.keys(spellUpdate.shape) as readonly string[],
   character_language: Object.keys(languageUpdate.shape) as readonly string[],
+  character_technique: Object.keys(techniqueUpdate.shape) as readonly string[],
   character_inventory: Object.keys(inventoryItemUpdate.shape) as readonly string[],
   character_combat: Object.keys(combatStateUpdate.shape) as readonly string[],
   // Not yet exposed via /sync (no client UI mutations today).
@@ -101,6 +106,8 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_library_spell: null,
   campaign_library_item: null,
   campaign_library_language: null,
+  campaign_library_technique: null,
+  campaign_library_style: null,
   adventure_log: null,
 };
 
@@ -118,6 +125,7 @@ const DISPATCHABLE_CLASSES = new Set<EntityClass>([
   'character_skill',
   'character_spell',
   'character_language',
+  'character_technique',
   'character_inventory',
   'character_combat',
 ]);
@@ -343,6 +351,20 @@ async function resolveReplayedCreate(
           );
         return row ? appliedOutcome(op, Number(row.revision)) : null;
       }
+      case 'character_technique': {
+        const characterId = requireParentId(op);
+        assertWrite(await loadCharacterOr403(characterId, userId));
+        const [row] = await db
+          .select()
+          .from(characterTechniques)
+          .where(
+            and(
+              eq(characterTechniques.id, op.entityId),
+              eq(characterTechniques.characterId, characterId),
+            ),
+          );
+        return row ? appliedOutcome(op, Number(row.revision)) : null;
+      }
       case 'character_inventory': {
         const characterId = requireParentId(op);
         assertWrite(await loadCharacterOr403(characterId, userId));
@@ -382,6 +404,8 @@ async function dispatchOperationInner(
       return dispatchSpell(ctx, op, tx);
     case 'character_language':
       return dispatchLanguage(ctx, op, tx);
+    case 'character_technique':
+      return dispatchTechnique(ctx, op, tx);
     case 'character_inventory':
       return dispatchInventory(ctx, op, tx);
     case 'character_combat':
@@ -690,6 +714,72 @@ async function dispatchLanguage(
     },
     childWhere: () =>
       and(eq(characterLanguages.id, op.entityId), eq(characterLanguages.characterId, characterId)),
+  });
+}
+
+// ---------- character_technique ----------
+
+async function dispatchTechnique(
+  ctx: DispatchContext,
+  op: OperationEnvelope,
+  tx: AuditTx,
+): Promise<OperationOutcome> {
+  if (op.command === 'create') {
+    const body = techniqueCreate.parse(op.attemptedValue);
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    const [created] = await tx
+      .insert(characterTechniques)
+      .values(techniqueInsertValues(body, { characterId, id: op.entityId }))
+      .returning();
+    if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    return appliedOutcome(op, Number(created.revision));
+  }
+
+  if (op.command === 'delete') {
+    const characterId = requireParentId(op);
+    const access = await loadCharacterOr403(characterId, ctx.userId);
+    assertWrite(access);
+    // Idempotent delete — see the trait dispatcher for rationale.
+    await tx
+      .delete(characterTechniques)
+      .where(
+        and(
+          eq(characterTechniques.id, op.entityId),
+          eq(characterTechniques.characterId, characterId),
+        ),
+      );
+    return { clientOpId: op.clientOpId, status: 'applied' };
+  }
+
+  const characterId = requireParentId(op);
+  const access = await loadCharacterOr403(characterId, ctx.userId);
+  assertWrite(access);
+  return await patchEntity({
+    op,
+    userId: ctx.userId,
+    entityClass: 'character_technique',
+    tx,
+    table: characterTechniques,
+    parentLookup: async () => {
+      const [row] = await getDb()
+        .select()
+        .from(characterTechniques)
+        .where(
+          and(
+            eq(characterTechniques.id, op.entityId),
+            eq(characterTechniques.characterId, characterId),
+          ),
+        );
+      if (!row) throw new HTTPException(404, { message: 'technique not found' });
+      return row;
+    },
+    childWhere: () =>
+      and(
+        eq(characterTechniques.id, op.entityId),
+        eq(characterTechniques.characterId, characterId),
+      ),
   });
 }
 

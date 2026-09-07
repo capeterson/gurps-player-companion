@@ -276,4 +276,24 @@ describe('computePointBreakdown', () => {
     expect(result.languages).toBe(0);
     expect(result.total).toBe(0);
   });
+
+  it('sums character_techniques rows into their own bucket', () => {
+    const result = computePointBreakdown(
+      baseAttrs,
+      [],
+      [{ points: 4 }],
+      [{ points: 1 }],
+      [{ points: 2 }, { points: 3 }],
+    );
+    expect(result.techniques).toBe(5);
+    expect(result.skills).toBe(4);
+    expect(result.languages).toBe(1);
+    expect(result.total).toBe(10);
+  });
+
+  it('defaults the techniques bucket to 0 when the argument is omitted', () => {
+    const result = computePointBreakdown(baseAttrs, [], [], [{ points: 2 }]);
+    expect(result.techniques).toBe(0);
+    expect(result.total).toBe(2);
+  });
 });

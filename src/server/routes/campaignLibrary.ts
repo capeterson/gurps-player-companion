@@ -32,6 +32,8 @@ import {
   libraryLanguageOut,
   librarySkillOut,
   librarySpellOut,
+  libraryStyleOut,
+  libraryTechniqueOut,
   libraryTraitOut,
 } from '../../shared/schemas/campaignLibrary.ts';
 import { uuid } from '../../shared/schemas/common.ts';
@@ -49,6 +51,8 @@ import {
   languageEntity,
   skillEntity,
   spellEntity,
+  styleEntity,
+  techniqueEntity,
   traitEntity,
 } from './campaignLibraryEntities.ts';
 
@@ -76,6 +80,8 @@ router.openapi(
               spells: z.array(librarySpellOut),
               items: z.array(libraryItemOut),
               languages: z.array(libraryLanguageOut),
+              techniques: z.array(libraryTechniqueOut),
+              styles: z.array(libraryStyleOut),
             }),
           },
         },
@@ -89,12 +95,14 @@ router.openapi(
     const { id } = c.req.valid('param');
     await requireCampaignMember(id, user.id);
     const db = getDb();
-    const [traits, skills, spells, items, languages] = await Promise.all([
+    const [traits, skills, spells, items, languages, techniques, styles] = await Promise.all([
       selectLibrarySection(db, traitEntity, id),
       selectLibrarySection(db, skillEntity, id),
       selectLibrarySection(db, spellEntity, id),
       selectLibrarySection(db, itemEntity, id),
       selectLibrarySection(db, languageEntity, id),
+      selectLibrarySection(db, techniqueEntity, id),
+      selectLibrarySection(db, styleEntity, id),
     ]);
     return c.json(
       {
@@ -103,6 +111,8 @@ router.openapi(
         spells: spells.map(spellEntity.toOut),
         items: items.map(itemEntity.toOut),
         languages: languages.map(languageEntity.toOut),
+        techniques: techniques.map(techniqueEntity.toOut),
+        styles: styles.map(styleEntity.toOut),
       },
       200,
     );
@@ -116,6 +126,8 @@ registerLibraryCrud(router, skillEntity);
 registerLibraryCrud(router, spellEntity);
 registerLibraryCrud(router, itemEntity);
 registerLibraryCrud(router, languageEntity);
+registerLibraryCrud(router, techniqueEntity);
+registerLibraryCrud(router, styleEntity);
 
 // ===================== YAML EXPORT =====================
 
@@ -154,12 +166,14 @@ router.openapi(
     const { id } = c.req.valid('param');
     const { campaign } = await requireCampaignMember(id, user.id);
     const db = getDb();
-    const [traits, skills, spells, items, languages] = await Promise.all([
+    const [traits, skills, spells, items, languages, techniques, styles] = await Promise.all([
       selectLibrarySection(db, traitEntity, id),
       selectLibrarySection(db, skillEntity, id),
       selectLibrarySection(db, spellEntity, id),
       selectLibrarySection(db, itemEntity, id),
       selectLibrarySection(db, languageEntity, id),
+      selectLibrarySection(db, techniqueEntity, id),
+      selectLibrarySection(db, styleEntity, id),
     ]);
     const yamlText = emitLibraryYaml({
       campaign: {
@@ -176,6 +190,8 @@ router.openapi(
       spells: spells.map(spellEntity.rowToCreate),
       items: items.map(itemEntity.rowToCreate),
       languages: languages.map(languageEntity.rowToCreate),
+      techniques: techniques.map(techniqueEntity.rowToCreate),
+      styles: styles.map(styleEntity.rowToCreate),
     });
     return c.body(yamlText, 200, {
       'content-type': 'application/yaml; charset=utf-8',
@@ -280,6 +296,8 @@ router.openapi(
       // exports omit it entirely and a replace-mode import of one of
       // those files must not wipe the campaign's language library.
       const languages = await upsertByKey(tx, languageEntity, id, doc.library.languages, mode);
+      const techniques = await upsertByKey(tx, techniqueEntity, id, doc.library.techniques, mode);
+      const styles = await upsertByKey(tx, styleEntity, id, doc.library.styles, mode);
 
       // Opt-in campaign-settings apply (validated above): only fields
       // actually present in the doc get copied (undefined = leave
@@ -296,7 +314,17 @@ router.openapi(
         }
       }
 
-      return { mode, traits, skills, spells, items, languages, campaignSettingsApplied };
+      return {
+        mode,
+        traits,
+        skills,
+        spells,
+        items,
+        languages,
+        techniques,
+        styles,
+        campaignSettingsApplied,
+      };
     });
     return c.json(result, 200);
   },

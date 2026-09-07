@@ -43,6 +43,8 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_traits.effects` | `traitEffect[]` (effects.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
 | `campaign_library_skills.situational_modifiers` | `situationalModifier[]` (skill.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
 | `campaign_library_skills.effects` | `traitEffect[]` (effects.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
+| `campaign_library_styles.techniques` | `styleTechniqueRef[]` (campaignLibrary.ts) — `{ name, defaultSkillName, difficulty, maxLevel? }`, max 100. Denormalized (no technique id) so a style survives a YAML round trip into a campaign whose technique rows don't exist yet | REST library CRUD + YAML import (`libraryStyleCreate`) |
+| `campaign_library_styles.perks` / `.skills` | `styleNameList` (campaignLibrary.ts) — `string[]`, each 1–160 chars, max 100 | REST library CRUD + YAML import (`libraryStyleCreate`) |
 | `campaign_library_items.armor` | `armorData` (inventory.ts), nullable | REST library CRUD + YAML import (`libraryItemCreate`) |
 | `campaign_library_items.weapon_data` | `weaponData` (inventory.ts), nullable — same shape as `inventory_items.weapon_data` incl. `skill`/`db`/`ranged` | REST library CRUD + YAML import |
 | `encounter_combatants.conditions` | `combatantConditionsField` (encounter.ts) — `string[]`, each 1–80 chars, max 64 | Encounter combatant create defaults to `[]`; REST combatant patch (`combatantUpdate`) |

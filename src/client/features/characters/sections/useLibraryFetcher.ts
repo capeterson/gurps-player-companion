@@ -26,18 +26,20 @@ import type {
   LibraryLanguageOut,
   LibrarySkillOut,
   LibrarySpellOut,
+  LibraryTechniqueOut,
   LibraryTraitOut,
 } from '../../../../shared/schemas/campaignLibrary.ts';
 import { ApiError, api } from '../../../lib/api.ts';
 
-type Kind = 'traits' | 'skills' | 'spells' | 'items' | 'languages';
+type Kind = 'traits' | 'skills' | 'spells' | 'items' | 'languages' | 'techniques';
 
 type LibraryEntry =
   | LibraryTraitOut
   | LibrarySkillOut
   | LibrarySpellOut
   | LibraryItemOut
-  | LibraryLanguageOut;
+  | LibraryLanguageOut
+  | LibraryTechniqueOut;
 
 interface LibraryPayload {
   readonly traits: LibraryTraitOut[];
@@ -47,6 +49,8 @@ interface LibraryPayload {
   readonly items: LibraryItemOut[];
   /** Optional: servers from before the language library omit it. */
   readonly languages?: LibraryLanguageOut[];
+  /** Optional: servers from before the technique library omit it. */
+  readonly techniques?: LibraryTechniqueOut[];
 }
 
 const EMPTY_LIBRARY: LibraryPayload = {
@@ -55,6 +59,7 @@ const EMPTY_LIBRARY: LibraryPayload = {
   spells: [],
   items: [],
   languages: [],
+  techniques: [],
 };
 
 export function useLibraryFetcher<T extends LibraryEntry>(

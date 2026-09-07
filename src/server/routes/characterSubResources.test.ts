@@ -668,3 +668,291 @@ describe('language sub-resource CRUD', () => {
     expect(langEvents.some((e) => e.summary === 'Latin 1 → 3 pts')).toBe(true);
   });
 });
+
+// ===================== TECHNIQUES =====================
+
+async function addSkill(
+  accessToken: string,
+  characterId: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const res = await app.request(`/api/v1/characters/${characterId}/skills`, {
+    method: 'POST',
+    headers: jsonHeaders(accessToken),
+    body: JSON.stringify(body),
+  });
+  expect(res.status).toBe(201);
+}
+
+describe('technique sub-resource CRUD', () => {
+  it('POST resolves the level from the default skill and bills its own point bucket', async () => {
+    const { accessToken } = await registerUser('tech-create');
+    // DX 14 + Average skill at 2 points => level 14.
+    const character = await createCharacter(accessToken, { dx: 14 });
+    await addSkill(accessToken, character.id as string, {
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 2,
+    });
+    const res = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword', points: 3 }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as {
+      technique: Record<string, unknown>;
+      character: { techniques: unknown[]; points: Record<string, number> };
+    };
+    expect(body.technique.name).toBe('Feint');
+    // Not supplied -> Average default.
+    expect(body.technique.difficulty).toBe('A');
+    expect(body.technique.defaultSkillLevel).toBe(14);
+    expect(body.technique.level).toBe(17);
+    expect(body.character.techniques).toHaveLength(1);
+    expect(body.character.points.techniques).toBe(3);
+    expect(body.character.points.skills).toBe(2);
+  });
+
+  it('a Hard technique burns its first point on the default', async () => {
+    const { accessToken } = await registerUser('tech-hard');
+    const character = await createCharacter(accessToken, { dx: 14 });
+    await addSkill(accessToken, character.id as string, {
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 2,
+    });
+    const res = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        name: 'Disarming',
+        defaultSkillName: 'Broadsword',
+        difficulty: 'H',
+        points: 3,
+      }),
+    });
+    const body = (await res.json()) as { technique: Record<string, unknown> };
+    expect(body.technique.level).toBe(16);
+  });
+
+  it('caps the level at maxLevel', async () => {
+    const { accessToken } = await registerUser('tech-cap');
+    const character = await createCharacter(accessToken, { dx: 14 });
+    await addSkill(accessToken, character.id as string, {
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 2,
+    });
+    const res = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        name: 'Feint',
+        defaultSkillName: 'Broadsword',
+        points: 9,
+        maxLevel: 2,
+      }),
+    });
+    const body = (await res.json()) as { technique: Record<string, unknown> };
+    expect(body.technique.level).toBe(16);
+  });
+
+  it('level is null while the default skill is missing, and resolves once it is added', async () => {
+    const { accessToken } = await registerUser('tech-missing-skill');
+    const character = await createCharacter(accessToken, { dx: 14 });
+    const createRes = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword', points: 2 }),
+    });
+    const created = (await createRes.json()) as { technique: Record<string, unknown> };
+    expect(created.technique.level).toBeNull();
+    expect(created.technique.defaultSkillLevel).toBeNull();
+
+    await addSkill(accessToken, character.id as string, {
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 2,
+    });
+    const detailRes = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    const detail = (await detailRes.json()) as { techniques: { level: number | null }[] };
+    expect(detail.techniques[0]?.level).toBe(16);
+  });
+
+  it('a specialized skill resolves through its "Name (Spec)" display form', async () => {
+    const { accessToken } = await registerUser('tech-spec');
+    const character = await createCharacter(accessToken, { dx: 14 });
+    await addSkill(accessToken, character.id as string, {
+      name: 'Savoir-Faire',
+      specialization: 'Dojo',
+      attribute: 'IQ',
+      difficulty: 'E',
+      points: 1,
+    });
+    const res = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        name: 'Style Familiarity',
+        defaultSkillName: 'Savoir-Faire (Dojo)',
+        points: 1,
+      }),
+    });
+    const body = (await res.json()) as { technique: Record<string, unknown> };
+    expect(body.technique.defaultSkillLevel).toBe(10); // IQ 10, Easy, 1 pt
+    expect(body.technique.level).toBe(11);
+  });
+
+  it('PATCH updates points and re-resolves the level', async () => {
+    const { accessToken } = await registerUser('tech-patch');
+    const character = await createCharacter(accessToken, { dx: 14 });
+    await addSkill(accessToken, character.id as string, {
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 2,
+    });
+    const createRes = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword', points: 1 }),
+    });
+    const { technique } = (await createRes.json()) as { technique: { id: string } };
+    const patchRes = await app.request(
+      `/api/v1/characters/${character.id}/techniques/${technique.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({ points: 4 }),
+      },
+    );
+    expect(patchRes.status).toBe(200);
+    const body = (await patchRes.json()) as {
+      technique: Record<string, unknown>;
+      character: { points: Record<string, number> };
+    };
+    expect(body.technique.points).toBe(4);
+    expect(body.technique.level).toBe(18);
+    expect(body.character.points.techniques).toBe(4);
+  });
+
+  it('DELETE removes the technique and drops it from the ledger', async () => {
+    const { accessToken } = await registerUser('tech-delete');
+    const character = await createCharacter(accessToken);
+    const createRes = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword', points: 3 }),
+    });
+    const { technique } = (await createRes.json()) as { technique: { id: string } };
+    const delRes = await app.request(
+      `/api/v1/characters/${character.id}/techniques/${technique.id}`,
+      { method: 'DELETE', headers: bearer(accessToken) },
+    );
+    expect(delRes.status).toBe(200);
+    const body = (await delRes.json()) as {
+      techniques: unknown[];
+      points: Record<string, number>;
+    };
+    expect(body.techniques).toEqual([]);
+    expect(body.points.techniques).toBe(0);
+  });
+
+  it('rejects a difficulty outside A/H (422) and a missing default skill (422)', async () => {
+    const { accessToken } = await registerUser('tech-invalid');
+    const character = await createCharacter(accessToken);
+    const badDifficulty = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword', difficulty: 'VH' }),
+    });
+    expect(badDifficulty.status).toBe(422);
+    const missingSkill = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint' }),
+    });
+    expect(missingSkill.status).toBe(422);
+  });
+
+  it('PATCH on another character’s technique id 404s (scoped by characterId)', async () => {
+    const { accessToken } = await registerUser('tech-scope');
+    const a = await createCharacter(accessToken);
+    const b = await createCharacter(accessToken);
+    const createRes = await app.request(`/api/v1/characters/${a.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword' }),
+    });
+    const { technique } = (await createRes.json()) as { technique: { id: string } };
+    const res = await app.request(`/api/v1/characters/${b.id}/techniques/${technique.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ points: 5 }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('non-owner campaign member cannot create a technique (403)', async () => {
+    const gm = await registerUser('tech-gm');
+    const owner = await registerUser('tech-owner');
+    const viewer = await registerUser('tech-viewer');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ name: `Camp ${Date.now()}` }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    for (const member of [owner, viewer]) {
+      await app.request(`/api/v1/campaigns/${campaign.id}/members`, {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ email: member.email }),
+      });
+    }
+    const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+    const res = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(viewer.accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword' }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('technique writes land in the character history feed', async () => {
+    const { accessToken } = await registerUser('tech-history');
+    const character = await createCharacter(accessToken);
+    const createRes = await app.request(`/api/v1/characters/${character.id}/techniques`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Feint', defaultSkillName: 'Broadsword', points: 1 }),
+    });
+    const { technique } = (await createRes.json()) as { technique: { id: string } };
+    await app.request(`/api/v1/characters/${character.id}/techniques/${technique.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ points: 3 }),
+    });
+    const historyRes = await app.request(`/api/v1/characters/${character.id}/history`, {
+      headers: bearer(accessToken),
+    });
+    const events = (await historyRes.json()) as {
+      entityClass: string;
+      op: string;
+      summary: string;
+      actorUserId: string | null;
+    }[];
+    const techEvents = events.filter((e) => e.entityClass === 'character_technique');
+    expect(techEvents.map((e) => e.op).sort()).toEqual(['insert', 'update']);
+    expect(techEvents.every((e) => e.actorUserId !== null)).toBe(true);
+    expect(techEvents.some((e) => e.summary === 'Added technique Feint (Broadsword)')).toBe(true);
+    expect(techEvents.some((e) => e.summary === 'Feint 1 → 3 pts')).toBe(true);
+  });
+});

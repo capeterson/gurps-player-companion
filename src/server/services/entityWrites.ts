@@ -29,11 +29,13 @@ import type { InventoryItemCreate } from '../../shared/schemas/inventory.ts';
 import type { LanguageCreate } from '../../shared/schemas/language.ts';
 import type { SkillCreate } from '../../shared/schemas/skill.ts';
 import type { SpellCreate } from '../../shared/schemas/spell.ts';
+import type { TechniqueCreate } from '../../shared/schemas/technique.ts';
 import type { TraitCreate } from '../../shared/schemas/trait.ts';
 import type {
   characterLanguages,
   characterSkills,
   characterSpells,
+  characterTechniques,
   characterTraits,
   characters,
   combatStates,
@@ -149,6 +151,24 @@ export function languageInsertValues(
     points: body.points ?? 0,
     notes: body.notes ?? null,
     libraryLanguageId: body.libraryLanguageId ?? null,
+  };
+}
+
+/** Values for a new `character_techniques` row. See `characterInsertValues` re: `ctx.id`. */
+export function techniqueInsertValues(
+  body: TechniqueCreate,
+  ctx: { readonly characterId: string; readonly id?: string },
+): typeof characterTechniques.$inferInsert {
+  return {
+    ...(ctx.id ? { id: ctx.id } : {}),
+    characterId: ctx.characterId,
+    name: body.name,
+    defaultSkillName: body.defaultSkillName,
+    difficulty: body.difficulty ?? 'A',
+    points: body.points ?? 0,
+    maxLevel: body.maxLevel ?? null,
+    notes: body.notes ?? null,
+    libraryTechniqueId: body.libraryTechniqueId ?? null,
   };
 }
 

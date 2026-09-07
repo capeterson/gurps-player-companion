@@ -768,3 +768,359 @@ describe('POST /api/v1/sync/operations -- character_language', () => {
     expect(body.changes.some((c) => c.entityId === languageId)).toBe(false);
   });
 });
+
+// ===================== character_technique =====================
+
+describe('POST /api/v1/sync/operations -- character_technique', () => {
+  async function createTechniqueViaSync(
+    accessToken: string,
+    characterId: string,
+    attemptedValue: Record<string, unknown>,
+  ) {
+    const techniqueId = crypto.randomUUID();
+    const body = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'create' as const,
+        attemptedValue: { ...attemptedValue, characterId },
+        parentId: characterId,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    return { techniqueId, outcome: body.outcomes[0] };
+  }
+
+  async function addSkill(accessToken: string, characterId: string, body: Record<string, unknown>) {
+    const res = await app.request(`/api/v1/characters/${characterId}/skills`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify(body),
+    });
+    expect(res.status).toBe(201);
+  }
+
+  it('create → patch → delete all apply and the resolved level follows', async () => {
+    const { accessToken } = await registerUser('sync-tech-crud');
+    const character = await createCharacter(accessToken);
+    await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ dx: 14 }),
+    });
+    await addSkill(accessToken, character.id, {
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      points: 2,
+    });
+
+    const { techniqueId, outcome } = await createTechniqueViaSync(accessToken, character.id, {
+      name: 'Feint',
+      defaultSkillName: 'Broadsword',
+      difficulty: 'A',
+      points: 1,
+    });
+    expect(outcome?.status).toBe('applied');
+
+    const afterCreate = await getCharacter(accessToken, character.id);
+    expect((afterCreate.techniques as { level: number }[])[0]?.level).toBe(15);
+    expect((afterCreate.points as Record<string, number>).techniques).toBe(1);
+
+    const patch = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'patch' as const,
+        fieldPath: 'points',
+        attemptedValue: 4,
+        baseRevision: outcome?.newRevision,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(patch.outcomes[0]?.status).toBe('applied');
+    const afterPatch = await getCharacter(accessToken, character.id);
+    expect((afterPatch.techniques as { level: number }[])[0]?.level).toBe(18);
+
+    const del = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'delete' as const,
+        attemptedValue: { characterId: character.id },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(del.outcomes[0]?.status).toBe('applied');
+    expect((await getCharacter(accessToken, character.id)).techniques).toEqual([]);
+  });
+
+  it('a create whose defaultSkillName is not on the sheet still applies, with a null level', async () => {
+    const { accessToken } = await registerUser('sync-tech-nolevel');
+    const character = await createCharacter(accessToken);
+    const { outcome } = await createTechniqueViaSync(accessToken, character.id, {
+      name: 'Feint',
+      defaultSkillName: 'Broadsword',
+      points: 2,
+    });
+    expect(outcome?.status).toBe('applied');
+    const detail = await getCharacter(accessToken, character.id);
+    expect((detail.techniques as { level: number | null }[])[0]?.level).toBeNull();
+    // The points are still spent even though the technique can't roll yet.
+    expect((detail.points as Record<string, number>).techniques).toBe(2);
+  });
+
+  it('a replayed create settles as applied and does not duplicate the row', async () => {
+    const { accessToken } = await registerUser('sync-tech-replay');
+    const character = await createCharacter(accessToken);
+    const techniqueId = crypto.randomUUID();
+    const createOp = () => ({
+      clientOpId: crypto.randomUUID(),
+      entityClass: 'character_technique' as const,
+      entityId: techniqueId,
+      command: 'create' as const,
+      attemptedValue: {
+        name: 'Feint',
+        defaultSkillName: 'Broadsword',
+        characterId: character.id,
+      },
+      parentId: character.id,
+      validationVersion: 1,
+      createdAt: new Date().toISOString(),
+    });
+    expect((await postOperations(accessToken, [createOp()])).outcomes[0]?.status).toBe('applied');
+    expect((await postOperations(accessToken, [createOp()])).outcomes[0]?.status).toBe('applied');
+    expect((await getCharacter(accessToken, character.id)).techniques).toHaveLength(1);
+  });
+
+  it('rejects an invalid difficulty and an unwritable fieldPath', async () => {
+    const { accessToken } = await registerUser('sync-tech-reject');
+    const character = await createCharacter(accessToken);
+    const { techniqueId } = await createTechniqueViaSync(accessToken, character.id, {
+      name: 'Feint',
+      defaultSkillName: 'Broadsword',
+    });
+
+    const badValue = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'patch' as const,
+        fieldPath: 'difficulty',
+        attemptedValue: 'VH',
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(badValue.outcomes[0]?.status).toBe('rejected');
+
+    const badField = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'patch' as const,
+        fieldPath: 'level',
+        attemptedValue: 99,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(badField.outcomes[0]?.status).toBe('rejected');
+    expect(badField.outcomes[0]?.reason).toContain('not writable');
+  });
+
+  it('returns stale_base when the server row moved past the op base revision', async () => {
+    const { accessToken } = await registerUser('sync-tech-stale');
+    const character = await createCharacter(accessToken);
+    const { techniqueId, outcome } = await createTechniqueViaSync(accessToken, character.id, {
+      name: 'Feint',
+      defaultSkillName: 'Broadsword',
+      points: 1,
+    });
+    const staleBase = outcome?.newRevision as number;
+    const bump = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'patch' as const,
+        fieldPath: 'points',
+        attemptedValue: 5,
+        baseRevision: staleBase,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(bump.outcomes[0]?.status).toBe('applied');
+
+    const stale = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'patch' as const,
+        fieldPath: 'defaultSkillName',
+        attemptedValue: 'Rapier',
+        baseRevision: staleBase,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(stale.outcomes[0]?.status).toBe('stale_base');
+  });
+
+  it('a read-only campaign member cannot write another player’s technique (S12.1)', async () => {
+    const gm = await registerUser('sync-tech-gm');
+    const owner = await registerUser('sync-tech-owner');
+    const viewer = await registerUser('sync-tech-viewer');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ name: `Camp ${Date.now()}-${Math.random()}` }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    for (const member of [owner, viewer]) {
+      await app.request(`/api/v1/campaigns/${campaign.id}/members`, {
+        method: 'POST',
+        headers: jsonHeaders(gm.accessToken),
+        body: JSON.stringify({ email: member.email }),
+      });
+    }
+    const charRes = await app.request('/api/v1/characters', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Shared PC', campaignId: campaign.id }),
+    });
+    const character = (await charRes.json()) as { id: string };
+
+    const viewerCreate = await createTechniqueViaSync(viewer.accessToken, character.id, {
+      name: 'Feint',
+      defaultSkillName: 'Broadsword',
+    });
+    expect(viewerCreate.outcome?.status).toBe('unauthorized');
+
+    const ownerCreate = await createTechniqueViaSync(owner.accessToken, character.id, {
+      name: 'Feint',
+      defaultSkillName: 'Broadsword',
+    });
+    expect(ownerCreate.outcome?.status).toBe('applied');
+
+    const viewerPatch = await postOperations(viewer.accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: ownerCreate.techniqueId,
+        command: 'patch' as const,
+        fieldPath: 'points',
+        attemptedValue: 99,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(viewerPatch.outcomes[0]?.status).toBe('unauthorized');
+  });
+
+  it('adopting a style: a batch of technique creates all apply under one batchId', async () => {
+    const { accessToken } = await registerUser('sync-tech-style');
+    const character = await createCharacter(accessToken);
+    const batchId = crypto.randomUUID();
+    const names = ['Feint', 'Disarming', 'Retain Weapon', 'Close Combat'];
+    const ops = names.map((name) => ({
+      clientOpId: crypto.randomUUID(),
+      entityClass: 'character_technique' as const,
+      entityId: crypto.randomUUID(),
+      command: 'create' as const,
+      attemptedValue: {
+        name,
+        defaultSkillName: 'Broadsword',
+        difficulty: 'H',
+        points: 2,
+        characterId: character.id,
+      },
+      parentId: character.id,
+      batchId,
+      validationVersion: 1,
+      createdAt: new Date().toISOString(),
+    }));
+    const body = await postOperations(accessToken, ops);
+    expect(body.outcomes.every((o) => o.status === 'applied')).toBe(true);
+
+    const detail = await getCharacter(accessToken, character.id);
+    expect(detail.techniques).toHaveLength(4);
+    expect((detail.points as Record<string, number>).techniques).toBe(8);
+
+    const historyRes = await app.request(`/api/v1/characters/${character.id}/history`, {
+      headers: bearer(accessToken),
+    });
+    const events = (await historyRes.json()) as { entityClass: string; batchId: string | null }[];
+    const techEvents = events.filter((e) => e.entityClass === 'character_technique');
+    expect(techEvents).toHaveLength(4);
+    expect(new Set(techEvents.map((e) => e.batchId))).toEqual(new Set([batchId]));
+  });
+
+  it('a cursor pull returns technique rows and their tombstone after deletion', async () => {
+    const { accessToken } = await registerUser('sync-tech-cursor');
+    const character = await createCharacter(accessToken);
+    const { techniqueId } = await createTechniqueViaSync(accessToken, character.id, {
+      name: 'Feint',
+      defaultSkillName: 'Broadsword',
+      difficulty: 'H',
+      points: 2,
+    });
+
+    const pull = async (since: number) => {
+      const res = await app.request('/api/v1/sync/cursor', {
+        method: 'POST',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({
+          cursors: [{ entityClass: 'character_technique', sinceRevision: since }],
+        }),
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as {
+        changes: Array<{
+          entityId: string;
+          command: string;
+          data?: Record<string, unknown>;
+        }>;
+        nextCursor: Record<string, number>;
+      };
+    };
+
+    const first = await pull(0);
+    const upsert = first.changes.find((c) => c.entityId === techniqueId);
+    expect(upsert?.command).toBe('patch');
+    expect(upsert?.data?.defaultSkillName).toBe('Broadsword');
+    expect(upsert?.data?.difficulty).toBe('H');
+
+    await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_technique' as const,
+        entityId: techniqueId,
+        command: 'delete' as const,
+        attemptedValue: { characterId: character.id },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    const second = await pull(first.nextCursor.character_technique ?? 0);
+    expect(second.changes.find((c) => c.entityId === techniqueId)?.command).toBe('delete');
+  });
+});

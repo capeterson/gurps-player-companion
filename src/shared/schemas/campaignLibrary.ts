@@ -5,6 +5,7 @@ import { traitEffect } from './effects.ts';
 import { armorData, magicItemData, powerstoneData, weaponData } from './inventory.ts';
 import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
 import { spellDifficulty } from './spell.ts';
+import { techniqueDifficulty } from './technique.ts';
 import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
 
 const tagList = z.array(z.string().min(1).max(40)).default([]);
@@ -154,6 +155,88 @@ export const libraryLanguageCreate = z.object({
 
 export const libraryLanguageUpdate = libraryLanguageCreate.partial();
 
+/**
+ * Library technique: the book definition a character copies onto their
+ * sheet.  Per-character state (points invested) lives on
+ * `character_techniques`.
+ */
+export const libraryTechniqueOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  defaultSkillName: z.string().min(1).max(160),
+  difficulty: techniqueDifficulty,
+  /** Default cap on the bonus above the default skill; null = uncapped. */
+  maxLevel: z.number().int().min(0).max(20).nullable(),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  /** Capped at the character-technique note limit -- copied verbatim on learn. */
+  prereq: z.string().max(2000).nullable(),
+  ...timestamps,
+});
+
+export const libraryTechniqueCreate = z.object({
+  name: z.string().min(1).max(160).trim(),
+  defaultSkillName: z.string().min(1).max(160).trim(),
+  difficulty: techniqueDifficulty.default('A'),
+  maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+  description: z.string().max(20_000).nullable().optional(),
+  source: z.string().max(40).trim().nullable().optional(),
+  prereq: z.string().max(2000).nullable().optional(),
+});
+
+export const libraryTechniqueUpdate = libraryTechniqueCreate.partial();
+
+/**
+ * One technique named by a style.  Denormalized (name + default skill +
+ * difficulty rather than a `campaign_library_techniques` id) so a style
+ * stays valid through a YAML round trip into a campaign that doesn't
+ * have the matching technique rows yet -- adopting the style creates the
+ * character techniques directly from these entries.
+ *
+ * Validates `campaign_library_styles.techniques` (jsonb) -- see
+ * docs/specs/json-fields.md.
+ */
+export const styleTechniqueRef = z.object({
+  name: z.string().min(1).max(160).trim(),
+  defaultSkillName: z.string().min(1).max(160).trim(),
+  difficulty: techniqueDifficulty.default('A'),
+  maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+});
+export type StyleTechniqueRef = z.infer<typeof styleTechniqueRef>;
+
+/** Validates `campaign_library_styles.perks` / `.skills` (jsonb). */
+export const styleNameList = z.array(z.string().min(1).max(160).trim()).max(100).default([]);
+
+/**
+ * A martial-arts style (Martial Arts p. 139): a named package of
+ * techniques, perks, and skills.  Campaign-library-only -- characters
+ * "adopt" a style by adding its constituent pieces individually, so
+ * there is no per-character style join table.
+ */
+export const libraryStyleOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  techniques: z.array(styleTechniqueRef).max(100).default([]),
+  perks: styleNameList,
+  skills: styleNameList,
+  ...timestamps,
+});
+
+export const libraryStyleCreate = z.object({
+  name: z.string().min(1).max(160).trim(),
+  description: z.string().max(20_000).nullable().optional(),
+  source: z.string().max(40).trim().nullable().optional(),
+  techniques: z.array(styleTechniqueRef).max(100).default([]),
+  perks: styleNameList,
+  skills: styleNameList,
+});
+
+export const libraryStyleUpdate = libraryStyleCreate.partial();
+
 export const libraryItemOut = z.object({
   id: uuid,
   campaignId: uuid,
@@ -212,6 +295,8 @@ export const importResult = z.object({
   spells: importSectionResult,
   items: importSectionResult,
   languages: importSectionResult,
+  techniques: importSectionResult,
+  styles: importSectionResult,
   /** Whether the opt-in `applyCampaignSettings` flag actually updated the
    * campaigns row (false when the flag was off or the doc had no `campaign`
    * block). */
@@ -259,6 +344,10 @@ export const libraryYamlDoc = z.object({
      * languages section, and a replace-mode import of one of those files
      * must not wipe the campaign's language library. */
     languages: z.array(libraryLanguageCreate).optional(),
+    /** Optional for the same reason as `languages`. */
+    techniques: z.array(libraryTechniqueCreate).optional(),
+    /** Optional for the same reason as `languages`. */
+    styles: z.array(libraryStyleCreate).optional(),
   }),
 });
 
@@ -271,6 +360,12 @@ export type LibrarySkillUpdate = z.infer<typeof librarySkillUpdate>;
 export type LibrarySpellOut = z.infer<typeof librarySpellOut>;
 export type LibrarySpellCreate = z.infer<typeof librarySpellCreate>;
 export type LibrarySpellUpdate = z.infer<typeof librarySpellUpdate>;
+export type LibraryTechniqueOut = z.infer<typeof libraryTechniqueOut>;
+export type LibraryTechniqueCreate = z.infer<typeof libraryTechniqueCreate>;
+export type LibraryTechniqueUpdate = z.infer<typeof libraryTechniqueUpdate>;
+export type LibraryStyleOut = z.infer<typeof libraryStyleOut>;
+export type LibraryStyleCreate = z.infer<typeof libraryStyleCreate>;
+export type LibraryStyleUpdate = z.infer<typeof libraryStyleUpdate>;
 export type LibraryLanguageOut = z.infer<typeof libraryLanguageOut>;
 export type LibraryLanguageCreate = z.infer<typeof libraryLanguageCreate>;
 export type LibraryLanguageUpdate = z.infer<typeof libraryLanguageUpdate>;

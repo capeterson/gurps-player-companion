@@ -163,12 +163,13 @@ Tables (grouped):
   `notifications`.
 - **Characters (sync-backed)**: `characters`, `character_traits`,
   `character_skills`, `inventory_items` (self-FK for nesting),
-  `character_spells`, `character_languages`, `combat_states` (1:1 by
-  `character_id`).
+  `character_spells`, `character_languages`, `character_techniques`,
+  `combat_states` (1:1 by `character_id`).
 - **Campaign content**: `adventure_log_entries`, `campaign_library_traits`,
   `campaign_library_skills`, `campaign_library_spells`,
-  `campaign_library_items`, `campaign_library_languages`, plus online-only
-  live-session `encounters`, `encounter_combatants`, and
+  `campaign_library_items`, `campaign_library_languages`,
+  `campaign_library_techniques`, `campaign_library_styles`, plus
+  online-only live-session `encounters`, `encounter_combatants`, and
   `encounter_effects`.
 - **Sync/audit infra**: `entity_tombstones` (deletes for cursor backfill),
   `entity_history` (append-only audit log).

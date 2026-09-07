@@ -7,6 +7,7 @@ import { inventoryItemOut } from './inventory.ts';
 import { languageOut } from './language.ts';
 import { skillOut } from './skill.ts';
 import { spellOut } from './spell.ts';
+import { techniqueOut } from './technique.ts';
 import { traitOut } from './trait.ts';
 
 const attr = z.number().int().min(1).max(99);
@@ -237,6 +238,8 @@ export const pointBreakdownOut = z.object({
   /** `character_languages` rows, billed to their own bucket (not advantages). */
   languages: z.number().int(),
   skills: z.number().int(),
+  /** `character_techniques` rows, bought up from a default skill. */
+  techniques: z.number().int(),
   total: z.number().int(),
 });
 
@@ -300,6 +303,7 @@ export const characterDetail = z.object({
   skills: z.array(skillOut),
   spells: z.array(spellOut),
   languages: z.array(languageOut),
+  techniques: z.array(techniqueOut),
   inventory: z.array(inventoryItemOut),
   combat: combatStateOut.nullable(),
   /**

@@ -12,6 +12,7 @@
  *   characterTraits    pk=id
  *   characterSkills    pk=id
  *   characterLanguages pk=id
+ *   characterTechniques pk=id
  *   characterInventory pk=id
  *   characterCombat    pk=characterId  (1:1 with characters)
  *   campaigns          pk=id
@@ -144,6 +145,21 @@ export interface LocalCharacterLanguage {
   points: number;
   notes: string | null;
   libraryLanguageId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+export interface LocalCharacterTechnique {
+  id: string;
+  characterId: string;
+  name: string;
+  defaultSkillName: string;
+  difficulty: 'A' | 'H';
+  points: number;
+  maxLevel: number | null;
+  notes: string | null;
+  libraryTechniqueId: string | null;
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -480,6 +496,7 @@ class LocalDb extends Dexie {
   characterSkills!: Table<LocalCharacterSkill, string>;
   characterSpells!: Table<LocalCharacterSpell, string>;
   characterLanguages!: Table<LocalCharacterLanguage, string>;
+  characterTechniques!: Table<LocalCharacterTechnique, string>;
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
   campaigns!: Table<LocalCampaign, string>;
@@ -550,6 +567,10 @@ class LocalDb extends Dexie {
     this.version(7).stores({
       characterLanguages: 'id, characterId, updatedAt, revision',
     });
+    // v8 adds character_techniques (sync-backed, S6).
+    this.version(8).stores({
+      characterTechniques: 'id, characterId, updatedAt, revision',
+    });
   }
 }
 
@@ -583,6 +604,7 @@ export const ALL_STORE_NAMES = [
   'characterSkills',
   'characterSpells',
   'characterLanguages',
+  'characterTechniques',
   'characterInventory',
   'characterCombat',
   'campaigns',
@@ -611,6 +633,8 @@ export function storeForEntityClass(entityClass: EntityClass): keyof LocalDb | n
       return 'characterSpells';
     case 'character_language':
       return 'characterLanguages';
+    case 'character_technique':
+      return 'characterTechniques';
     case 'character_inventory':
       return 'characterInventory';
     case 'character_combat':

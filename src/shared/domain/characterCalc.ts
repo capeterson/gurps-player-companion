@@ -91,6 +91,11 @@ export interface CharacterLanguageInput {
   readonly points: number;
 }
 
+/** One `character_techniques` row's contribution to the point ledger. */
+export interface CharacterTechniqueInput {
+  readonly points: number;
+}
+
 export interface DerivedStats {
   readonly effectiveSt: number;
   readonly effectiveDx: number;
@@ -188,6 +193,8 @@ export interface PointBreakdown {
   /** `character_languages` rows — their own bucket, not advantages. */
   readonly languages: number;
   readonly skills: number;
+  /** `character_techniques` rows — bought up from a default skill. */
+  readonly techniques: number;
   readonly total: number;
 }
 
@@ -220,6 +227,7 @@ export function computePointBreakdown(
   traits: readonly CharacterTraitInput[],
   skills: readonly CharacterSkillInput[],
   languages: readonly CharacterLanguageInput[] = [],
+  techniques: readonly CharacterTechniqueInput[] = [],
 ): PointBreakdown {
   const attributes = computeAttributePoints(attrs);
   const secondary = computeSecondaryPoints(attrs);
@@ -235,9 +243,17 @@ export function computePointBreakdown(
 
   const skillPoints = skills.reduce((sum, s) => sum + s.points, 0);
   const languagePoints = languages.reduce((sum, l) => sum + l.points, 0);
+  const techniquePoints = techniques.reduce((sum, t) => sum + t.points, 0);
 
   const total =
-    attributes + secondary + advantages + disadvantages + quirks + languagePoints + skillPoints;
+    attributes +
+    secondary +
+    advantages +
+    disadvantages +
+    quirks +
+    languagePoints +
+    skillPoints +
+    techniquePoints;
 
   return {
     attributes,
@@ -247,6 +263,7 @@ export function computePointBreakdown(
     quirks,
     languages: languagePoints,
     skills: skillPoints,
+    techniques: techniquePoints,
     total,
   };
 }

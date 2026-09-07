@@ -12,6 +12,8 @@ import {
   type LibraryLanguageCreate,
   type LibrarySkillCreate,
   type LibrarySpellCreate,
+  type LibraryStyleCreate,
+  type LibraryTechniqueCreate,
   type LibraryTraitCreate,
   type LibraryYamlDoc,
   libraryYamlDoc,
@@ -93,6 +95,18 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     if (languageKeys.has(k)) throw new LibraryYamlError(`duplicate language (${l.name})`);
     languageKeys.add(k);
   }
+  const techniqueKeys = new Set<string>();
+  for (const t of doc.library.techniques ?? []) {
+    const k = t.name.toLowerCase();
+    if (techniqueKeys.has(k)) throw new LibraryYamlError(`duplicate technique (${t.name})`);
+    techniqueKeys.add(k);
+  }
+  const styleKeys = new Set<string>();
+  for (const st of doc.library.styles ?? []) {
+    const k = st.name.toLowerCase();
+    if (styleKeys.has(k)) throw new LibraryYamlError(`duplicate style (${st.name})`);
+    styleKeys.add(k);
+  }
 }
 
 export interface LibraryYamlExportInput {
@@ -102,6 +116,8 @@ export interface LibraryYamlExportInput {
   readonly spells: readonly LibrarySpellCreate[];
   readonly items: readonly LibraryItemCreate[];
   readonly languages: readonly LibraryLanguageCreate[];
+  readonly techniques: readonly LibraryTechniqueCreate[];
+  readonly styles: readonly LibraryStyleCreate[];
 }
 
 /** Stable ordering for byte-stable round trip. */
@@ -138,10 +154,12 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
   const spells = sortedByName(input.spells).map((s) => compact(s));
   const items = sortedByName(input.items).map((i) => compact(i));
   const languages = sortedByName(input.languages).map((l) => compact(l));
+  const techniques = sortedByName(input.techniques).map((t) => compact(t));
+  const styles = sortedByName(input.styles).map((st) => compact(st));
 
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };
   if (input.campaign) payload.campaign = compact(input.campaign);
-  payload.library = { traits, skills, spells, items, languages };
+  payload.library = { traits, skills, spells, items, languages, techniques, styles };
 
   const doc = new Document(payload);
   return stringify(doc, {

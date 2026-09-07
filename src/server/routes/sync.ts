@@ -36,6 +36,7 @@ import {
   characterLanguages,
   characterSkills,
   characterSpells,
+  characterTechniques,
   characterTraits,
   characters,
   combatStates,
@@ -563,6 +564,17 @@ async function fetchClassUpserts(args: {
         idCol: characterLanguages.id,
         revisionCol: characterLanguages.revision,
         characterIdCol: characterLanguages.characterId,
+        accessibleCharacterIds: fullAccessCharacterIds,
+        sinceRevision,
+        limit,
+      });
+    case 'character_technique':
+      return await fetchChildClass({
+        entityClass,
+        table: characterTechniques,
+        idCol: characterTechniques.id,
+        revisionCol: characterTechniques.revision,
+        characterIdCol: characterTechniques.characterId,
         accessibleCharacterIds: fullAccessCharacterIds,
         sinceRevision,
         limit,
