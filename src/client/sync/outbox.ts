@@ -53,6 +53,8 @@ export function newClientId(): string {
 export interface EnqueueFieldPatchArgs {
   /** Internal retry metadata; never part of the wire value. */
   readonly localCampaignTransferUndo?: OutboxEntry['localCampaignTransferUndo'];
+  /** Internal stale-base replay retains the current assignment generation. */
+  readonly preserveCampaignCreateDependencies?: boolean;
   readonly entityClass: EntityClass;
   readonly entityId: string;
   readonly fieldPath: string;
@@ -133,6 +135,25 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
   //    once in quick succession (conditions toggles, pool bumpers,
   //    temp-effect steppers).
   const dupes = await db.outbox.where('coalesceKey').equals(ckey).toArray();
+  if (
+    args.entityClass === 'character' &&
+    args.fieldPath === 'campaignId' &&
+    !args.preserveCampaignCreateDependencies &&
+    !dupes.some((op) => ['pending', 'in_flight', 'transient_retry'].includes(op.status))
+  ) {
+    // A new assignment generation starts only after the previous one settled.
+    // Existing creates now belong before this move, even if they originally
+    // waited for the previous assignment. Reclassify in the enqueue transaction
+    // so a drain can never observe the new move with stale dependency flags.
+    await db.outbox
+      .filter(
+        (op) =>
+          op.command === 'create' &&
+          op.parentId === args.entityId &&
+          op.localWaitForCampaignAssignment === true,
+      )
+      .modify({ localWaitForCampaignAssignment: false });
+  }
   const coalescable = dupes.filter((d) => d.status === 'pending' || d.status === 'transient_retry');
   let carriedPrev: { value: unknown } | undefined;
   let localCampaignTransferUndo = args.localCampaignTransferUndo;
@@ -363,6 +384,21 @@ export async function enqueueCreate<T extends Record<string, unknown>>(
     batchId: args.batchId,
   };
   await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
+    if (op.parentId) {
+      op.localWaitForCampaignAssignment = Boolean(
+        await db.outbox
+          .where('entityId')
+          .equals(op.parentId)
+          .filter(
+            (entry) =>
+              entry.entityClass === 'character' &&
+              entry.command === 'patch' &&
+              entry.fieldPath === 'campaignId' &&
+              ['pending', 'in_flight', 'transient_retry'].includes(entry.status),
+          )
+          .first(),
+      );
+    }
     await applyLocalCreate(args);
     await db.outbox.add(op);
   });
@@ -603,14 +639,37 @@ async function applyLocalDelete(entityClass: EntityClass, entityId: string): Pro
  * and the orchestrator rolls the user's queued edit back (data loss)
  * even though the create would have succeeded seconds later.
  *
- * Patches never gate other patches: same-field commits coalesce into a
- * single op (rule S3) and different fields are order-independent
- * ("different fields save in parallel").
+ * Campaign assignments wait for older creates and gate destination creates until
+ * acknowledged: even a parent
+ * patch included earlier in the same batch can fail transiently, so its children
+ * must wait for a later drain. Ordinary independent field patches stay parallel.
  */
 export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   const db = getLocalDb();
   const now = new Date().toISOString();
-  const all = await db.outbox.where('status').anyOf(['pending', 'transient_retry']).toArray();
+  const unsettled = await db.outbox
+    .where('status')
+    .anyOf(['pending', 'transient_retry', 'in_flight'])
+    .toArray();
+  const all = unsettled.filter((op) => op.status !== 'in_flight');
+  const campaignAssignments = new Set(
+    unsettled
+      .filter(
+        (op) =>
+          op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
+      )
+      .map((op) => op.entityId),
+  );
+  const parentsWithEarlierCreates = new Set(
+    unsettled
+      .filter(
+        (op) =>
+          op.command === 'create' &&
+          !op.localWaitForCampaignAssignment &&
+          op.parentId !== undefined,
+      )
+      .map((op) => op.parentId),
+  );
   // Deterministic replay order: enqueue time, then create < patch <
   // delete so a create+patch enqueued in the same millisecond can never
   // invert (the server applies the batch in array order).
@@ -625,8 +684,15 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   for (const op of all) {
     const backingOff = op.nextEarliestAttemptAt !== undefined && op.nextEarliestAttemptAt > now;
     const dependencyHeld =
+      (op.entityClass === 'character' &&
+        op.fieldPath === 'campaignId' &&
+        parentsWithEarlierCreates.has(op.entityId)) ||
       heldBackCreates.has(op.entityId) ||
-      (op.parentId !== undefined && heldBackCreates.has(op.parentId));
+      (op.parentId !== undefined && heldBackCreates.has(op.parentId)) ||
+      (op.command === 'create' &&
+        op.localWaitForCampaignAssignment === true &&
+        op.parentId !== undefined &&
+        campaignAssignments.has(op.parentId));
     if (!backingOff && !dependencyHeld && ready.length < limit) {
       ready.push(op);
     } else if (op.command === 'create') {

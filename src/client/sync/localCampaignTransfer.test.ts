@@ -4,7 +4,7 @@ import type { EntityClass, OperationOutcome } from '../../shared/schemas/sync.ts
 import { type LocalCharacter, type OutboxEntry, getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { flashBus } from './flashBus.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
-import { enqueueCreate, enqueueFieldPatch } from './outbox.ts';
+import { enqueueCreate, enqueueFieldPatch, readDrainableOps } from './outbox.ts';
 
 const characterId = '0193b3c0-f1f0-7000-8000-00000000c001';
 const campaignA = '0193b3c0-f1f0-7000-8000-00000000c002';
@@ -82,6 +82,288 @@ afterEach(async () => {
 });
 
 describe('local campaign transfer', () => {
+  it('keeps destination creates behind a stale-base assignment retry', async () => {
+    await seed();
+    await patch(campaignB);
+    const first = await queued();
+    const id = crypto.randomUUID();
+    await enqueueCreate({
+      entityClass: 'character_trait',
+      entityId: id,
+      characterId,
+      attemptedValue: { name: 'B rules', libraryTraitId: sourceId },
+      localLibraryMechanics: { ...snapshot, campaignId: campaignB },
+    });
+    await internals().applyOutcomes(
+      [first],
+      [
+        {
+          clientOpId: first.clientOpId,
+          status: 'stale_base',
+          latestEntity: { id: characterId, campaignId: campaignA, revision: 10 },
+        },
+      ],
+    );
+    const ready = await readDrainableOps(50);
+    expect(ready).toHaveLength(1);
+    expect(ready[0]?.fieldPath).toBe('campaignId');
+    const retry = ready[0];
+    if (!retry) throw new Error('Missing retry');
+    await finish(retry, 'applied');
+    expect((await readDrainableOps(50)).map((op) => op.entityId)).toEqual([id]);
+  });
+  it.each(['pending', 'transient_retry'] as const)(
+    'reclassifies a %s destination create before the next transfer generation',
+    async (status) => {
+      await seed();
+      const db = getLocalDb();
+      await patch(campaignB);
+      const first = await queued();
+      const id = crypto.randomUUID();
+      await enqueueCreate({
+        entityClass: 'character_skill',
+        entityId: id,
+        characterId,
+        attemptedValue: { name: 'B rules', librarySkillId: sourceId },
+        localLibraryMechanics: { ...snapshot, campaignId: campaignB },
+      });
+      const create = (await db.outbox.toArray()).find((op) => op.entityId === id);
+      if (!create) throw new Error('Missing create');
+      await finish(first, 'applied');
+      await db.outbox.update(create.clientOpId, {
+        status,
+        ...(status === 'transient_retry'
+          ? { nextEarliestAttemptAt: new Date(Date.now() + 60000).toISOString() }
+          : {}),
+      });
+      db.close();
+      await db.open();
+      await patch(campaignC);
+      expect((await db.outbox.get(create.clientOpId))?.localWaitForCampaignAssignment).toBe(false);
+      expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual(
+        status === 'pending' ? [create.clientOpId] : [],
+      );
+      await finish(create, 'applied');
+      const [second] = await readDrainableOps(50);
+      expect(second?.attemptedValue).toBe(campaignC);
+    },
+  );
+  it('refreshes rollback metadata while a child relink is pending and both edits are rejected', async () => {
+    await seed();
+    const db = getLocalDb();
+    const original = await db.characterTraits.get(traitId);
+    await patch(campaignB);
+    const sent = await queued();
+    await enqueueFieldPatch({
+      entityClass: 'character_trait',
+      entityId: traitId,
+      characterId,
+      fieldPath: 'libraryTraitId',
+      attemptedValue: campaignC,
+    });
+    const relink = (await db.outbox.toArray()).find((op) => op.entityId === traitId);
+    if (!relink) throw new Error('Missing relink');
+    const updated = { ...snapshot, sourceRevision: 8, effects: [{ ...effects[0], value: 5 }] };
+    await internals().applyServerRow(
+      'character_trait',
+      { ...original, revision: 9, libraryMechanics: updated },
+      {},
+    );
+    expect((await db.characterTraits.get(traitId))?.libraryTraitId).toBe(campaignC);
+    await finish(relink, 'rejected');
+    await finish(sent, 'rejected');
+    expect((await db.characterTraits.get(traitId))?.libraryMechanics).toEqual(updated);
+    expect((await db.characterTraits.get(traitId))?.libraryTraitId).toBe(sourceId);
+  });
+  it.each(['pending', 'transient_retry', 'in_flight'] as const)(
+    'waits for an earlier %s create before transferring, then releases destination creates',
+    async (status) => {
+      await seed();
+      const db = getLocalDb();
+      const oldId = crypto.randomUUID();
+      await enqueueCreate({
+        entityClass: 'character_trait',
+        entityId: oldId,
+        characterId,
+        attemptedValue: { name: 'Original', libraryTraitId: sourceId },
+        localLibraryMechanics: snapshot,
+      });
+      const old = await queued();
+      await db.outbox.update(old.clientOpId, {
+        status,
+        ...(status === 'transient_retry'
+          ? { nextEarliestAttemptAt: new Date(Date.now() + 60000).toISOString() }
+          : {}),
+      });
+      await patch(campaignB);
+      const newId = crypto.randomUUID();
+      await enqueueCreate({
+        entityClass: 'character_trait',
+        entityId: newId,
+        characterId,
+        attemptedValue: { name: 'Destination', libraryTraitId: campaignC },
+        localLibraryMechanics: { ...snapshot, sourceId: campaignC, campaignId: campaignB },
+      });
+      const ready = await readDrainableOps(50);
+      expect(ready.map((op) => op.entityId)).toEqual(status === 'pending' ? [oldId] : []);
+      // A transient outcome must not release the assignment from the same batch.
+      await internals().applyOutcomes([old], [{ clientOpId: old.clientOpId, status: 'transient' }]);
+      expect(await readDrainableOps(50)).toHaveLength(0);
+      await finish(old, 'applied');
+      const [transfer] = await readDrainableOps(50);
+      expect(transfer?.fieldPath).toBe('campaignId');
+      if (!transfer) throw new Error('Missing transfer');
+      await finish(transfer, 'applied');
+      expect((await readDrainableOps(50)).map((op) => op.entityId)).toEqual([newId]);
+    },
+  );
+  it.each(['rejected', 'retry', 'queued-retry', 'coalesced-return'] as const)(
+    'retains refreshed child rollback state after %s, including a sent request and reload',
+    async (ending) => {
+      await seed();
+      const db = getLocalDb();
+      const serverTrait = await db.characterTraits.get(traitId);
+      const serverSkill = await db.characterSkills.get(skillId);
+      await patch(campaignB);
+      const sent = await queued();
+      if (ending !== 'coalesced-return')
+        await db.outbox.update(sent.clientOpId, { status: 'in_flight' });
+      if (ending === 'queued-retry') await patch(campaignC);
+      const updated = { ...snapshot, sourceRevision: 8, effects: [{ ...effects[0], value: 5 }] };
+      await internals().applyServerRow(
+        'character_trait',
+        { ...serverTrait, revision: 9, libraryMechanics: updated },
+        {},
+      );
+      await internals().applyServerRow(
+        'character_skill',
+        { ...serverSkill, revision: 9, libraryMechanics: updated },
+        {},
+      );
+      expect((await db.characterTraits.get(traitId))?.libraryMechanics).toEqual({
+        ...snapshot,
+        detached: true,
+      });
+      expect((await db.characterSkills.get(skillId))?.librarySkillId).toBeNull();
+      db.close();
+      await db.open();
+      if (ending === 'coalesced-return') await patch(campaignA);
+      else if (ending === 'rejected') await finish(sent, 'rejected');
+      else {
+        await internals().applyOutcomes(
+          [sent],
+          [
+            {
+              clientOpId: sent.clientOpId,
+              status: 'stale_base',
+              latestEntity: { id: characterId, campaignId: campaignA, revision: 3 },
+            },
+          ],
+        );
+        await finish(await queued(), 'rejected');
+      }
+      expect((await db.characterTraits.get(traitId))?.libraryMechanics).toEqual(updated);
+      expect((await db.characterSkills.get(skillId))?.libraryMechanics).toEqual(updated);
+      expect((await db.characterTraits.get(traitId))?.libraryTraitId).toBe(sourceId);
+    },
+  );
+  it('does not adopt a destination campaign declaration as original-campaign rollback state', async () => {
+    await seed();
+    const db = getLocalDb();
+    const serverTrait = await db.characterTraits.get(traitId);
+    await patch(campaignB);
+    const sent = await queued();
+    await internals().applyServerRow(
+      'character_trait',
+      {
+        ...serverTrait,
+        libraryMechanics: { ...snapshot, campaignId: campaignB, sourceRevision: 9 },
+      },
+      {},
+    );
+    await finish(sent, 'rejected');
+    expect((await db.characterTraits.get(traitId))?.libraryMechanics).toEqual(snapshot);
+  });
+  it.each(['pending', 'transient_retry', 'in_flight'] as const)(
+    'holds destination creates and their patches behind a %s campaign assignment',
+    async (status) => {
+      await seed();
+      const db = getLocalDb();
+      await patch(campaignB);
+      const transfer = await queued();
+      await db.outbox.update(transfer.clientOpId, {
+        status,
+        ...(status === 'transient_retry'
+          ? { nextEarliestAttemptAt: new Date(Date.now() + 60000).toISOString() }
+          : {}),
+      });
+      const ids: string[] = [];
+      for (const [entityClass, field] of [
+        ['character_trait', 'libraryTraitId'],
+        ['character_skill', 'librarySkillId'],
+      ] as const) {
+        const entityId = crypto.randomUUID();
+        ids.push(entityId);
+        await enqueueCreate({
+          entityClass,
+          entityId,
+          characterId,
+          attemptedValue: { name: 'Destination', [field]: sourceId },
+          localLibraryMechanics: { ...snapshot, campaignId: campaignB },
+        });
+        await enqueueFieldPatch({
+          entityClass,
+          entityId,
+          characterId,
+          fieldPath: 'points',
+          attemptedValue: 20,
+        });
+      }
+      await enqueueFieldPatch({
+        entityClass: 'character',
+        entityId: characterId,
+        fieldPath: 'notes',
+        attemptedValue: 'Independent',
+      });
+      db.close();
+      await db.open();
+      const ready = await readDrainableOps(50);
+      expect(ready.some((op) => ids.includes(op.entityId))).toBe(false);
+      expect(ready.some((op) => op.fieldPath === 'notes')).toBe(true);
+      expect(ready.some((op) => op.clientOpId === transfer.clientOpId)).toBe(status === 'pending');
+      // Coalescing changes the assignment operation ID, but the dependency survives.
+      if (status !== 'in_flight') await patch(campaignC);
+      expect((await readDrainableOps(50)).some((op) => ids.includes(op.entityId))).toBe(false);
+      const current = (await db.outbox.toArray()).find((op) => op.fieldPath === 'campaignId');
+      if (!current) throw new Error('Missing assignment');
+      await finish(current, 'applied');
+      const released = await readDrainableOps(50);
+      expect(released.filter((op) => ids.includes(op.entityId))).toHaveLength(4);
+      await internals().applyOutcomes(
+        released,
+        released.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'applied',
+          newRevision: 10,
+        })),
+      );
+      expect(await db.outbox.count()).toBe(0);
+      expect((await db.characterTraits.get(ids[0] ?? ''))?.points).toBe(20);
+    },
+  );
+  it('does not hold a create queued before a campaign transfer as a destination create', async () => {
+    await seed();
+    const id = crypto.randomUUID();
+    await enqueueCreate({
+      entityClass: 'character_trait',
+      entityId: id,
+      characterId,
+      attemptedValue: { name: 'Original', libraryTraitId: sourceId },
+      localLibraryMechanics: snapshot,
+    });
+    await patch(campaignB);
+    expect((await readDrainableOps(50)).some((op) => op.entityId === id)).toBe(true);
+  });
   it('keeps newly arrived destination item and spell links after a delayed transfer acknowledgement', async () => {
     await seed();
     const db = getLocalDb();

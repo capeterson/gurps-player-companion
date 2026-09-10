@@ -538,6 +538,19 @@ parent transfer is pending. The same applies to trait/skill rows first downloade
 during that transfer when their provenance identifies the original campaign: their saved rules
 are detached locally and their rollback data joins the durable operation. This
 also survives an outcome received from a request sent before the child arrived.
+Newer source declarations received from the original campaign update the durable
+rollback state without replacing the visible retained copy. Rejection or an unsent
+return therefore restores the latest received rules even after the cursor advances.
+Child creates queued during an optimistic campaign assignment carry a local-only
+`localWaitForCampaignAssignment` flag. They and their dependent patches/deletes wait
+until that character's assignment settles, including backoff, reload and coalesced
+assignments. They are never sent in the assignment's batch; an earlier operation
+in the same batch can fail. Independent field edits continue draining normally.
+Conversely, the assignment waits for child creates queued before it to settle,
+so a delayed original-campaign create cannot be replayed into the destination.
+Starting a fresh assignment atomically reclassifies surviving creates from the
+previous assignment as earlier work. Automatic stale-base retries preserve the
+existing dependency generation.
 New references without source-campaign evidence stay intact until authoritative
 sync reconciliation; they may already belong to the destination campaign.
 Resubmitting an already-null source reference does

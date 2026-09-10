@@ -293,6 +293,8 @@ export interface LocalCampaignTransferUndo {
 }
 
 export interface OutboxEntry {
+  /** Create was queued under an optimistic campaign; wait for assignment settlement. Never sent. */
+  localWaitForCampaignAssignment?: boolean;
   localCampaignTransferUndo?: LocalCampaignTransferUndo[] | undefined;
   clientOpId: string;
   entityClass: EntityClass;
