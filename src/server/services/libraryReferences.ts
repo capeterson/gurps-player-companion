@@ -54,7 +54,7 @@ export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string
     .for('update');
   if (!parent) throw new HTTPException(404, { message: 'character not found' });
   if (parent.campaignId !== observed?.campaignId)
-    throw new HTTPException(403, { message: 'Character campaign changed; retry this edit' });
+    throw new HTTPException(503, { message: 'Character campaign changed; retry this edit' });
   return { parent, campaign };
 }
 
@@ -89,8 +89,11 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
       ? (existing as Record<string, unknown> | undefined)?.[cfg.field]
       : values[cfg.field];
   if (sourceId === null || sourceId === undefined) {
-    if (values[cfg.field] !== undefined && (kind === 'traits' || kind === 'skills') &&
-      (!existing || (existing as unknown as Record<string, unknown>)[cfg.field] !== null))
+    if (
+      values[cfg.field] !== undefined &&
+      (kind === 'traits' || kind === 'skills') &&
+      (!existing || (existing as unknown as Record<string, unknown>)[cfg.field] !== null)
+    )
       (values as Record<string, unknown>).libraryMechanics = null;
     return values;
   }
