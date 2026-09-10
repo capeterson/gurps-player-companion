@@ -44,6 +44,60 @@ function fixture(mage = true, cost = 3, fp = 5, hp = 10) {
 }
 
 describe('very high mana spending', () => {
+  it('discards an open roll across an unknown campaign mana transition', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const props = fixture();
+    const client = new QueryClient();
+    const panel = (manaLevel: CharacterDetail['manaLevel'], manaLevelKnown = true) => (
+      <QueryClientProvider client={client}>
+        <SpellsPanel
+          character={{ ...props.character, spells: [props.spell], manaLevel, manaLevelKnown }}
+          canWrite={false}
+        />
+      </QueryClientProvider>
+    );
+    const view = render(panel('normal'));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
+    expect(screen.getByRole('button', { name: 'Roll 3d6' })).toBeInTheDocument();
+    view.rerender(panel('normal', false));
+    expect(screen.queryByRole('button', { name: 'Roll 3d6' })).not.toBeInTheDocument();
+    view.rerender(panel('very_high'));
+    expect(screen.queryByRole('button', { name: 'Roll 3d6' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    expect(screen.getByText('Critical failure')).toBeInTheDocument();
+  });
+  it('holds spell rolls until campaign mana is known, then applies its real failure rule', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const props = fixture();
+    const client = new QueryClient();
+    const view = render(
+      <QueryClientProvider client={client}>
+        <SpellsPanel
+          character={{
+            ...props.character,
+            spells: [props.spell],
+            manaLevel: 'normal',
+            manaLevelKnown: false,
+          }}
+          canWrite={false}
+        />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryByRole('button', { name: 'Roll Light' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Light level')).toHaveAttribute(
+      'title',
+      'Waiting for campaign mana',
+    );
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <SpellsPanel character={{ ...props.character, spells: [props.spell] }} canWrite={false} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    expect(screen.getByText('Critical failure')).toBeInTheDocument();
+  });
   it('carries campaign mana from the spell table into the actual roll result', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const props = fixture();
@@ -83,31 +137,41 @@ describe('very high mana spending', () => {
     expect(screen.getByText('15 more needed')).toBeInTheDocument();
   });
 
-  it('limits the recovery reminder to personal FP in mixed funding', async () => {
-    const props = fixture(true, 6, 2, 10);
-    const stone = {
-      id: 'stone',
-      name: 'Ruby',
-      externalLocation: null,
-      characterId: id,
-      powerstoneData: { currentEnergy: 3, maxEnergy: 3 },
-      revision: 1,
-    };
-    props.character.inventory = [stone] as unknown as CharacterDetail['inventory'];
-    await getLocalDb().characterInventory.put(stone as never);
-    const close = vi.fn();
-    render(<CastSpellDialog {...props} onClose={close} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cast' }));
-    await waitFor(() => expect(close).toHaveBeenCalled());
-    expect(await getLocalDb().characterCombat.get(id)).toMatchObject({
-      currentHp: 9,
-      currentFp: 0,
-    });
-    expect((await getLocalDb().characterInventory.get('stone'))?.powerstoneData).toMatchObject({
-      currentEnergy: 0,
-    });
-    expect(push.mock.calls.at(-1)?.[0]).toContain('restore 2 FP manually');
-  });
+  it.each(['cast', 'maintain'] as const)(
+    'groups mixed-resource %s and limits recovery to personal FP',
+    async (mode) => {
+      const props = fixture(true, 6, 2, 10);
+      props.spell.effectiveMaintenanceCost = 6;
+      const stone = {
+        id: 'stone',
+        name: 'Ruby',
+        externalLocation: null,
+        characterId: id,
+        powerstoneData: { currentEnergy: 3, maxEnergy: 3 },
+        revision: 1,
+      };
+      props.character.inventory = [stone] as unknown as CharacterDetail['inventory'];
+      await getLocalDb().characterInventory.put(stone as never);
+      const close = vi.fn();
+      render(<CastSpellDialog {...props} mode={mode} onClose={close} />);
+      fireEvent.click(
+        screen.getByRole('button', { name: mode === 'cast' ? 'Cast' : 'Pay upkeep' }),
+      );
+      await waitFor(() => expect(close).toHaveBeenCalled());
+      expect(await getLocalDb().characterCombat.get(id)).toMatchObject({
+        currentHp: 9,
+        currentFp: 0,
+      });
+      expect((await getLocalDb().characterInventory.get('stone'))?.powerstoneData).toMatchObject({
+        currentEnergy: 0,
+      });
+      expect(push.mock.calls.at(-1)?.[0]).toContain('restore 2 FP manually');
+      const ops = await getLocalDb().outbox.toArray();
+      expect(ops).toHaveLength(3);
+      expect(ops.every((op) => typeof op.batchId === 'string')).toBe(true);
+      expect(new Set(ops.map((op) => op.batchId)).size).toBe(1);
+    },
+  );
 
   it('charges maintenance now with the same next-turn recovery reminder', async () => {
     const close = vi.fn();

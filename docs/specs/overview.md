@@ -181,7 +181,11 @@ on any sheet the viewer can edit — their own — it always shows).
   personal FP spent on their own turn at the start of their next turn, capped at maximum FP;
   there is no automatic or timed refund, and HP/powerstones never recover
   this way. Spell rolls promote every failure to critical and distinguish
-  a rolled critical failure's spectacular disaster (B235).
+  a rolled critical failure's spectacular disaster (B235), including after closing
+  the roll sheet or reloading local roll history. Spell rolls wait until campaign
+  mana is known, and changing campaign or mana context closes any pending roll.
+  Each cast/maintenance gesture shares one audit batch across its
+  FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
   encumbrance, armor and weapon data, cost/weight rollups. Equipped
   armor DR is aggregated per hit location on the Combat tab's Armor DR

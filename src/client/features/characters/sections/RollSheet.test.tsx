@@ -6,6 +6,7 @@
 
 import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RollHistoryStrip } from './RollHistoryStrip.tsx';
 import { RollSheet } from './RollSheet.tsx';
 import { __resetRollHistoryForTests, useRollHistory } from './rollHistory.ts';
 import type { RollRequest } from './rollTypes.ts';
@@ -25,7 +26,7 @@ describe('RollSheet', () => {
     'resolves and records spell outcomes in %s mana (dice %s)',
     (mana, random, target, crit, notice) => {
       vi.spyOn(Math, 'random').mockReturnValue(random);
-      render(
+      const view = render(
         <RollSheet
           request={{ label: 'Light', baseTarget: target, spellManaLevel: mana }}
           characterId="mage"
@@ -35,8 +36,23 @@ describe('RollSheet', () => {
       const history = renderHook(() => useRollHistory('mage'));
       fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
       expect(history.result.current[0]?.crit).toBe(crit);
+      expect(history.result.current[0]?.manaDisaster).toBe(notice === 'spectacular disaster');
       if (notice) expect(screen.getByText(new RegExp(notice))).toBeInTheDocument();
       else expect(screen.queryByText(/Very high mana/)).not.toBeInTheDocument();
+      const stored = localStorage.getItem('gurps:rollHistory:mage');
+      if (!stored) throw new Error('Missing persisted roll');
+      view.unmount();
+      history.unmount();
+      __resetRollHistoryForTests();
+      localStorage.setItem('gurps:rollHistory:mage', stored);
+      render(<RollHistoryStrip characterId="mage" />);
+      expect(Boolean(screen.queryByText('disaster'))).toBe(notice === 'spectacular disaster');
+      if (notice === 'spectacular disaster')
+        expect(screen.getByText('disaster')).toHaveAttribute(
+          'title',
+          'Very high mana: critical failure and spectacular disaster',
+        );
+      else if (crit === 'failure') expect(screen.getByText('crit fail')).toBeInTheDocument();
     },
   );
 

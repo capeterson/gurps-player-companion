@@ -53,8 +53,17 @@ export function RollHistoryStrip({ characterId }: RollHistoryStripProps) {
                       {r.crit && (
                         <span
                           className={`badge badge-xs ${r.crit === 'success' ? 'badge-success' : 'badge-error'}`}
+                          title={
+                            r.manaDisaster
+                              ? 'Very high mana: critical failure and spectacular disaster'
+                              : undefined
+                          }
                         >
-                          {r.crit === 'success' ? 'crit' : 'crit fail'}
+                          {r.manaDisaster
+                            ? 'disaster'
+                            : r.crit === 'success'
+                              ? 'crit'
+                              : 'crit fail'}
                         </span>
                       )}
                     </span>

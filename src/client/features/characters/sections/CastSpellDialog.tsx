@@ -8,7 +8,7 @@ import type { SpellOut } from '../../../../shared/schemas/spell.ts';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueFieldPatch } from '../../../sync/outbox.ts';
+import { enqueueFieldPatch, newBatchId } from '../../../sync/outbox.ts';
 import { useCombatPatch } from './useCombatPatch.ts';
 
 interface CastSpellDialogProps {
@@ -162,6 +162,7 @@ export function CastSpellDialog({
     }
     setCasting(true);
     try {
+      const batchId = newBatchId();
       // Share the B426 calculation and atomically queue the pool fields.
       if (alloc.fromFp > 0 || alloc.fromHp > 0) {
         const fatigue = applyFatigueLoss(fpAvailable, alloc.fromFp, character.derived.fp);
@@ -169,7 +170,7 @@ export function CastSpellDialog({
         if (alloc.fromFp > 0) pools.currentFp = fatigue.fp;
         if (alloc.fromHp > 0 || fatigue.hpCost > 0)
           pools.currentHp = hpAvailable - alloc.fromHp - fatigue.hpCost;
-        await patchCombat(pools);
+        await patchCombat(pools, undefined, batchId);
       }
       // Each stone we drew from gets its own patch.  Whole-jsonb so the
       // field validator accepts the full PowerstoneData shape.
@@ -190,6 +191,7 @@ export function CastSpellDialog({
           humanName: `${stone.name} charge`,
           flashKey: makeFlashKey('character_inventory', stone.id, 'powerstoneData'),
           characterId: character.id,
+          batchId,
         });
       }
       const verb = maintaining ? 'Maintained' : 'Cast';

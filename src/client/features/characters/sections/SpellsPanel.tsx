@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SPELL_DIFFICULTIES, type SpellDifficulty } from '../../../../shared/constants/skills.ts';
 import { characterCanCast, hasMagery } from '../../../../shared/domain/spellCalc.ts';
 import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary.ts';
@@ -213,11 +213,20 @@ interface SpellRowProps {
   canWrite: boolean;
   /** False when the ambient mana level forbids this character casting. */
   castable: boolean;
+  manaKnown: boolean;
   onCast(spell: SpellOut, mode: 'cast' | 'maintain'): void;
   onRoll(req: RollRequest): void;
 }
 
-function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: SpellRowProps) {
+function SpellRow({
+  characterId,
+  spell,
+  canWrite,
+  castable,
+  manaKnown,
+  onCast,
+  onRoll,
+}: SpellRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
   // A spell with no points has no skill level (spells have no default
@@ -305,9 +314,15 @@ function SpellRow({ characterId, spell, canWrite, castable, onCast, onRoll }: Sp
         <span className="num text-right">{spell.points}</span>
       )}
       <RollLevelChip
-        level={spell.level}
+        level={manaKnown ? spell.level : null}
         name={spell.name}
-        title={spell.level == null ? 'No points invested — spells have no default' : undefined}
+        title={
+          !manaKnown
+            ? 'Waiting for campaign mana'
+            : spell.level == null
+              ? 'No points invested — spells have no default'
+              : undefined
+        }
         onRoll={(level) => onRoll({ label: spell.name, baseTarget: level })}
       />
       {canWrite ? (
@@ -452,6 +467,12 @@ export function SpellsPanel({
   // Hosted once here (not per row), same as SkillsPanel, so every
   // roll-target tap opens the same sheet instance.
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
+  // A roll captures its target and mana rules. Never resume that snapshot
+  // after a campaign/mana transition, including a temporary unknown state.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: context changes invalidate the captured roll
+  useEffect(() => {
+    setRollRequest(null);
+  }, [character.id, character.campaignId, character.manaLevel, character.manaLevelKnown]);
   const characterHasMagery = hasMagery(character.traits);
   const notice = manaNotice(character.manaLevel, character.manaLevelKnown, characterHasMagery);
   // Hold casting entirely while the campaign row (and thus the real
@@ -501,6 +522,7 @@ export function SpellsPanel({
                 spell={s}
                 canWrite={canWrite}
                 castable={castable}
+                manaKnown={character.manaLevelKnown}
                 onCast={(spell, mode) => setCasting({ spell, mode })}
                 onRoll={(request) =>
                   setRollRequest({ ...request, spellManaLevel: character.manaLevel })
@@ -520,7 +542,7 @@ export function SpellsPanel({
         />
       )}
 
-      {rollRequest && (
+      {rollRequest && character.manaLevelKnown && (
         <RollSheet
           request={rollRequest}
           characterId={character.id}

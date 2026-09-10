@@ -31,6 +31,8 @@ export interface RollHistoryEntry {
   /** Check rolls only. */
   readonly margin?: number;
   readonly crit?: CritKind;
+  /** Actual critical failure in very high mana; absent in older stored entries. */
+  readonly manaDisaster?: boolean;
   /** Damage rolls only: type suffix for display (e.g. "cut"). */
   readonly damageType?: string | null;
 }
@@ -50,6 +52,7 @@ interface StoredEntry {
   readonly total: number;
   readonly margin?: number;
   readonly crit?: CritKind;
+  readonly manaDisaster?: boolean;
   readonly damageType?: string | null;
 }
 

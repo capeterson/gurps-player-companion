@@ -13,6 +13,7 @@ import { enqueueFieldPatches } from '../../../sync/outbox.ts';
 export type CombatPatch = (
   field: string | Readonly<Record<string, unknown>>,
   value?: unknown,
+  batchId?: string,
 ) => Promise<void>;
 
 /**
@@ -43,7 +44,11 @@ export function useCombatPatch(character: CharacterDetail): CombatPatch {
   const defaultFp = character.derived.fp;
 
   return useCallback(
-    async (field: string | Readonly<Record<string, unknown>>, value?: unknown) => {
+    async (
+      field: string | Readonly<Record<string, unknown>>,
+      value?: unknown,
+      batchId?: string,
+    ) => {
       const db = getLocalDb();
       await db.transaction('rw', db.characterCombat, async () => {
         const existing = await db.characterCombat.get(characterId);
@@ -82,6 +87,7 @@ export function useCombatPatch(character: CharacterDetail): CombatPatch {
           humanName: key === 'currentHp' ? 'HP' : key === 'currentFp' ? 'FP' : key,
           flashKey: makeFlashKey('character_combat', characterId, key),
           characterId,
+          batchId,
         })),
       );
     },

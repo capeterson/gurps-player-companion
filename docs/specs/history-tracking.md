@@ -89,6 +89,9 @@ A "batch" = the set of mutations from one user gesture (e.g. multi-select invent
 - `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` in `src/client/sync/outbox.ts` accept an optional `batchId`; a new helper `runBatch(fn)` generates one id and tags every op enqueued within the callback. Wire the concrete multi-row gestures: the inventory bulk toolbar / drag-move in `sections/InventoryPanel.tsx`, and any bulk add-from-library flows that enqueue multiple creates. Single edits, including the Attributes panel's "Revert all temporary buffs" (`useTempEffects.ts`'s `clearAll()`, a single whole-array `enqueueFieldPatch` on `tempEffects`), omit `batchId` and render as standalone one-liners.
 - The orchestrator already sends the full envelope; pass `batchId` through to the server, where `dispatchOperation` sets `app.batch_id`. History rows from one gesture therefore share a `batch_id` regardless of how the outbox coalesces/drains them.
 
+Spell casting and maintenance generate one batch ID for the gesture and pass it
+through both combat-pool deductions and every powerstone charge patch.
+
 ---
 
 ## Delivery: paginated REST read endpoints
