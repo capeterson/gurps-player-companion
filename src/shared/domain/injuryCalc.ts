@@ -6,8 +6,8 @@
  * Deliberately partial, matching `damageParse.ts`'s lenient-by-contract
  * stance: the B379 core table plus the high-traffic location overrides
  * (skull/eye ×4, vitals ×3 for imp/pi, neck cr/cut, limb & extremity
- * caps). The skull's natural DR 2 (B400) is added on top of any armor
- * at that location. Not modeled: tight-beam burning ×2 vs vitals/eye
+ * caps). The supplied effective DR map includes innate and natural skull DR
+ * (B46/B400). Not modeled: tight-beam burning ×2 vs vitals/eye
  * (can't be told apart from area burn in free text), huge-piercing vs
  * homebrew hybrids, diffuse/homogenous injury tolerance, and blunt
  * trauma. Unknown/homebrew damage types get ×1; unknown/custom
@@ -105,7 +105,7 @@ export interface DamageApplication {
 }
 
 /**
- * Resolve incoming basic damage against the character's own armor:
+ * Resolve incoming basic damage against a complete `effectiveDrByLocation` map:
  * basic − DR(location)/divisor → penetrating × wounding multiplier =
  * injury (B378-379).
  */
@@ -117,10 +117,7 @@ export function applyDamage(
   armorDivisor: string | null | undefined,
 ): DamageApplication {
   const entry = drMap.get(location);
-  const armorDr = resolveDr(type, entry);
-  // The skull is naturally DR 2 (B400), stacking with any helmet DR.
-  const naturalDr = location === 'skull' ? 2 : 0;
-  const drAtLocation = armorDr + naturalDr;
+  const drAtLocation = resolveDr(type, entry);
 
   const divisor = parseArmorDivisor(armorDivisor);
   const effectiveDr = divisor != null ? Math.floor(drAtLocation / divisor) : drAtLocation;

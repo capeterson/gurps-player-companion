@@ -52,6 +52,20 @@ function trait(
 }
 
 describe('resolveEffects', () => {
+  it('keeps location-only DR out of the global derived total', () => {
+    const effects = resolveEffects(
+      [
+        trait('skin', 'Skin', 1, [
+          { target: 'dr', value: 5, scaling: 'flat' },
+          { target: 'dr', value: 3, scaling: 'flat', hitLocation: 'skull' },
+        ]),
+      ],
+      [],
+      new Set(),
+    );
+    expect(computeDerived(applyEffectsToAttrs(baseAttrs, effects)).traitDr).toBe(5);
+    expect(effects.find((e) => e.hitLocation === 'skull')?.value).toBe(3);
+  });
   it('emits one ResolvedEffect per library effect', () => {
     const traits = [
       trait('t1', 'Combat Reflexes', null, [

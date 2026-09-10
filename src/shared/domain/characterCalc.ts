@@ -128,7 +128,7 @@ export interface DerivedStats {
   readonly parryMod: number;
   /** Per-shield block depends on Shield skill; the +N from traits is global. */
   readonly blockMod: number;
-  /** Damage resistance contributed by traits (e.g. Damage Resistance), not armor. */
+  /** Unscoped innate DR; location-specific effects remain in the resolved effect list. */
   readonly traitDr: number;
   /** Aggregate fright-check bonus from traits (Combat Reflexes, etc.). */
   readonly frightCheckMod: number;

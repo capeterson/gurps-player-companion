@@ -19,6 +19,8 @@
  * Pure TS (shared domain) — runs in Bun, browser, and service worker.
  */
 
+import { HIT_LOCATIONS } from '../constants/hitLocations.ts';
+import type { ResolvedEffectOut } from '../schemas/character.ts';
 import type { ArmorData } from '../schemas/inventory.ts';
 
 export interface ArmorItemRow {
@@ -101,12 +103,53 @@ export function aggregateDrByLocation(items: readonly ArmorItemRow[]): DrByLocat
       const prev = map.get(loc);
       const dr = (prev?.dr ?? 0) + armor.dr;
       const drCrushing =
-        armor.drCrushing != null
-          ? (prev?.drCrushing ?? 0) + armor.drCrushing
-          : (prev?.drCrushing ?? null);
+        armor.drCrushing != null || prev?.drCrushing != null
+          ? (prev?.drCrushing ?? prev?.dr ?? 0) + (armor.drCrushing ?? armor.dr)
+          : null;
       const typedDr = mergeTypedDr(prev?.typedDr, armor);
       map.set(loc, { dr, drCrushing, typedDr });
     }
+  }
+  return map;
+}
+
+/** Complete protection for the readout and damage resolver (B46/B400).
+ * Unscoped innate DR excludes eyes; an explicit eye declaration can cover them.
+ * Location declarations retain their exact schema keys, including custom locations.
+ * Natural skull DR is included here, before any incoming armor divisor.
+ */
+export function effectiveDrByLocation(
+  items: readonly ArmorItemRow[],
+  effects: readonly Pick<ResolvedEffectOut, 'target' | 'active' | 'value' | 'hitLocation'>[] = [],
+): DrByLocationMap {
+  const map = aggregateDrByLocation(items);
+  const drEffects = effects.filter((effect) => effect.active && effect.target === 'dr');
+  const locations = new Set<string>([
+    ...HIT_LOCATIONS,
+    ...map.keys(),
+    ...drEffects.flatMap((effect) => (effect.hitLocation ? [effect.hitLocation] : [])),
+  ]);
+  for (const location of locations) {
+    const innate = drEffects.reduce(
+      (sum, effect) =>
+        sum +
+        ((effect.hitLocation ? effect.hitLocation === location : location !== 'eye')
+          ? effect.value
+          : 0),
+      0,
+    );
+    const extra = innate + (location === 'skull' ? 2 : 0);
+    const armor = map.get(location);
+    if (!armor && extra === 0) continue;
+    const typedDr = { ...EMPTY_TYPED_DR };
+    for (const key of Object.keys(typedDr) as (keyof TypedDrTotals)[]) {
+      typedDr[key] = Math.max(0, (armor?.typedDr[key] ?? 0) + extra);
+    }
+    map.set(location, {
+      dr: Math.max(0, (armor?.dr ?? 0) + extra),
+      drCrushing: armor?.drCrushing == null ? null : Math.max(0, armor.drCrushing + extra),
+      typedDr,
+    });
   }
   return map;
 }

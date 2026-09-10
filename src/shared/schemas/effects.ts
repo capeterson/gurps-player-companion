@@ -31,7 +31,7 @@ export const EFFECT_TARGETS = [
   'dodge',
   'parry',
   'block',
-  // damage resistance — global; per-location is a future iteration
+  // innate damage resistance — global or hitLocation-scoped
   'dr',
   // self-control / will-roll
   'fright_check',

@@ -201,7 +201,7 @@ export const derivedStatsOut = z.object({
   parryMod: z.number().int(),
   /** Aggregate +N to all block rolls from active trait effects. */
   blockMod: z.number().int(),
-  /** Aggregate DR contributed by traits (separate from armor DR). */
+  /** Unscoped innate DR (separate from armor and location-specific effects). */
   traitDr: z.number().int(),
   /** Aggregate +N to fright check rolls from active trait effects. */
   frightCheckMod: z.number().int(),
