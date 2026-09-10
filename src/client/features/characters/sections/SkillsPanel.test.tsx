@@ -8,13 +8,64 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { InputHTMLAttributes, ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
+import { skillCreate } from '../../../../shared/schemas/skill.ts';
+import { getLocalDb, resetLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { SkillsPanel } from './SkillsPanel.tsx';
+
+const enqueueCreate = vi.hoisted(() => vi.fn());
+vi.mock('../../../sync/outbox.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../sync/outbox.ts')>()),
+  enqueueCreate,
+}));
+const picks = vi.hoisted(() =>
+  ['Pistol', 'Rifle'].map((specialty, index) => ({
+    id: `0193b3c0-f1f0-7000-8000-00000000f00${index}`,
+    name: 'Guns',
+    attribute: 'DX',
+    difficulty: 'E',
+    defaultSpecialization: specialty,
+    techLevel: 8 + index,
+    description: `${specialty} training`,
+    source: 'B198',
+    prerequisites: 'Training',
+  })),
+);
+vi.mock('./useLibraryFetcher.ts', () => ({
+  useLibraryFetcher: () => ({ fetchOptions: async () => [], isLoading: false }),
+}));
+vi.mock('../../../components/ui/LibraryAutocomplete.tsx', () => ({
+  LibraryAutocomplete: ({
+    value,
+    onChange,
+    onPick,
+    inputProps,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    onPick: (value: unknown) => void;
+    inputProps?: InputHTMLAttributes<HTMLInputElement>;
+  }) => (
+    <div>
+      <input value={value} onChange={(event) => onChange(event.target.value)} {...inputProps} />
+      {picks.map((pick) => (
+        <button key={pick.id} type="button" onClick={() => onPick(pick)}>
+          Pick {pick.defaultSpecialization}
+        </button>
+      ))}
+    </div>
+  ),
+}));
+beforeEach(() => {
+  enqueueCreate.mockReset();
+  enqueueCreate.mockResolvedValue(undefined);
+});
 
 function makeSkill(overrides: Partial<SkillOut> = {}): SkillOut {
   const base: SkillOut = {
@@ -62,6 +113,147 @@ function renderPanel(character: CharacterDetail, canWrite = false) {
 }
 
 describe('SkillsPanel', () => {
+  it('accepts the combined maximum-length library descriptions without truncation', async () => {
+    const original = picks[0];
+    if (!original) throw new Error('Missing fixture');
+    const long = {
+      ...original,
+      description: 'D'.repeat(20_000),
+      prerequisites: 'P'.repeat(20_000),
+      source: 'S'.repeat(40),
+    };
+    picks[0] = long;
+    try {
+      renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+      fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+      await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+      const body = skillCreate.parse(enqueueCreate.mock.calls[0]?.[0].attemptedValue);
+      expect(body.notes).toContain(long.description);
+      expect(body.notes).toContain(long.prerequisites);
+      expect(body.notes).toContain(long.source);
+    } finally {
+      picks[0] = original;
+    }
+  });
+
+  it('durably queues picked metadata and restores it after reopening IndexedDB', async () => {
+    await resetLocalDb();
+    const actual =
+      await vi.importActual<typeof import('../../../sync/outbox.ts')>('../../../sync/outbox.ts');
+    enqueueCreate.mockImplementation(actual.enqueueCreate);
+    const view = renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+      await waitFor(() => expect(screen.getByLabelText('Skill')).toHaveValue(''));
+      view.unmount();
+      const db = getLocalDb();
+      db.close();
+      await db.open();
+      const [row] = await db.characterSkills.toArray();
+      const [op] = await db.outbox.toArray();
+      expect(row).toMatchObject({ name: 'Guns', specialization: 'Pistol', techLevel: 8 });
+      expect(op?.attemptedValue).toMatchObject({ specialization: 'Pistol', techLevel: 8 });
+      expect(op?.status).toBe('pending');
+    } finally {
+      await resetLocalDb();
+    }
+  });
+
+  it('retains the picked definition on failure and retries with the same metadata', async () => {
+    enqueueCreate.mockRejectedValueOnce(new Error('Disk full'));
+    renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/Couldn't add skill.*Disk full/);
+    expect(screen.getByLabelText('Skill')).toHaveValue('Guns');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledTimes(2));
+    expect(enqueueCreate.mock.calls[1]?.[0].attemptedValue).toEqual(
+      enqueueCreate.mock.calls[0]?.[0].attemptedValue,
+    );
+  });
+
+  it('copies specialty, learned TL and explicit descriptive fields from a picked definition', async () => {
+    const character = { ...makeCharacter([]), campaignId: 'campaign', techLevel: 3 };
+    renderPanel(character, true);
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0].attemptedValue).toEqual({
+      characterId: 'char-1',
+      name: 'Guns',
+      attribute: 'DX',
+      difficulty: 'E',
+      points: 1,
+      specialization: 'Pistol',
+      techLevel: 8,
+      librarySkillId: picks[0]?.id,
+      notes: 'Pistol training\n\nSource: B198\n\nPrerequisites: Training',
+    });
+    expect(enqueueCreate.mock.calls[0]?.[0].humanName).toBe('skill "Guns (Pistol)"');
+    await waitFor(() => expect(screen.getByLabelText('Skill')).toHaveValue(''));
+  });
+
+  it('detaches picked metadata after a manual name change', async () => {
+    renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    fireEvent.change(screen.getByLabelText('Skill'), { target: { value: 'Custom' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0].attemptedValue).toMatchObject({
+      name: 'Custom',
+      specialization: null,
+      techLevel: null,
+      librarySkillId: null,
+      notes: null,
+    });
+  });
+
+  it('keeps a newer same-name library pick while a prior add is pending', async () => {
+    let finish = () => {};
+    enqueueCreate.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Rifle' }));
+    await act(async () => finish());
+    expect(screen.getByLabelText('Skill')).toHaveValue('Guns');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledTimes(2));
+    expect(enqueueCreate.mock.calls[0]?.[0].attemptedValue.specialization).toBe('Pistol');
+    expect(enqueueCreate.mock.calls[1]?.[0].attemptedValue).toMatchObject({
+      specialization: 'Rifle',
+      techLevel: 9,
+      librarySkillId: picks[1]?.id,
+    });
+  });
+
+  it('shows distinct specialized row and roll/history labels while preserving learned TL', () => {
+    const skills = ['Pistol', 'Rifle'].map((specialization) =>
+      makeSkill({
+        id: specialization,
+        name: 'Guns',
+        specialization,
+        techLevel: 8,
+      }),
+    );
+    renderPanel({ ...makeCharacter(skills), techLevel: 4 });
+    expect(screen.getByText('Guns (Pistol) / TL8')).toBeInTheDocument();
+    expect(screen.getByText('Guns (Rifle) / TL8')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Guns (Pistol)' }));
+    expect(screen.getByRole('dialog', { name: 'Roll Guns (Pistol)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    const history = JSON.parse(localStorage.getItem('gurps:rollHistory:char-1') ?? '[]');
+    expect(history[0].label).toBe('Guns (Pistol)');
+  });
+
   it('renders a roll button for a skill with a computed level that opens the roll sheet at that target', () => {
     const skill = makeSkill({ name: 'Broadsword', level: 14 });
     renderPanel(makeCharacter([skill]));

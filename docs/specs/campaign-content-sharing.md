@@ -247,6 +247,15 @@ seeds the character row's written fluency to `n/a`.
   character sheet, which let a player search the campaign library when adding a
   trait/skill/spell/item/language/technique.
 
+Picking a library skill copies its base name, attribute, difficulty, default
+specialization and learned TL into the character row, with description, source
+and prerequisites in notes. This snapshot is queued durably through the character
+outbox. Changing the campaign TL does not rewrite learned skill TL. Editing the
+add form's name detaches its selected definition; a pending save cannot clear a
+newer selection, even one with the same base name. Sheet rows, rolls, roll history and
+GM lookup identify specialized skills by `skillDisplayName`; the GM lookup keeps
+each specialty selectable and reports its effective level.
+
 ### YAML import/export (cross-campaign sharing)
 
 The library is portable as a **versioned, round-trippable YAML document** — the

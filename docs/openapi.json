@@ -17313,7 +17313,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -18942,7 +18942,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -20829,7 +20829,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -22527,7 +22527,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -24389,7 +24389,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -26262,7 +26262,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -27903,7 +27903,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -28946,7 +28946,7 @@
                   "notes": {
                     "type": "string",
                     "nullable": true,
-                    "maxLength": 20000
+                    "maxLength": 40100
                   },
                   "librarySkillId": {
                     "type": "string",
@@ -29027,7 +29027,7 @@
                         "notes": {
                           "type": "string",
                           "nullable": true,
-                          "maxLength": 20000
+                          "maxLength": 40100
                         },
                         "librarySkillId": {
                           "type": "string",
@@ -29701,7 +29701,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -30759,7 +30759,7 @@
                   "notes": {
                     "type": "string",
                     "nullable": true,
-                    "maxLength": 20000
+                    "maxLength": 40100
                   },
                   "librarySkillId": {
                     "type": "string",
@@ -30835,7 +30835,7 @@
                         "notes": {
                           "type": "string",
                           "nullable": true,
-                          "maxLength": 20000
+                          "maxLength": 40100
                         },
                         "librarySkillId": {
                           "type": "string",
@@ -31509,7 +31509,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -33150,7 +33150,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -34967,7 +34967,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -36796,7 +36796,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -38437,7 +38437,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -40199,7 +40199,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -41973,7 +41973,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -43614,7 +43614,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -45395,7 +45395,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -47187,7 +47187,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -48828,7 +48828,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -51346,7 +51346,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -53876,7 +53876,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -55517,7 +55517,7 @@
                           "notes": {
                             "type": "string",
                             "nullable": true,
-                            "maxLength": 20000
+                            "maxLength": 40100
                           },
                           "librarySkillId": {
                             "type": "string",
@@ -57259,7 +57259,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -58913,7 +58913,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",
@@ -60565,7 +60565,7 @@
                               "notes": {
                                 "type": "string",
                                 "nullable": true,
-                                "maxLength": 20000
+                                "maxLength": 40100
                               },
                               "librarySkillId": {
                                 "type": "string",

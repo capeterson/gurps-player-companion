@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
+import { skillDisplayName } from '../../../shared/domain/defenseCalc.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { LibraryAutocomplete } from '../../components/ui/LibraryAutocomplete.tsx';
 import { useDialogState } from '../../hooks/useDialogState.ts';
@@ -37,8 +38,9 @@ export function SkillLookupDialog({ open, characters, onClose, onSelect }: Props
     const seen = new Map<string, string>();
     for (const character of characters) {
       for (const skill of character.skills) {
-        const key = skill.name.toLowerCase();
-        if (!seen.has(key)) seen.set(key, skill.name);
+        const label = skillDisplayName(skill.name, skill.specialization);
+        const key = label.toLowerCase();
+        if (!seen.has(key)) seen.set(key, label);
       }
     }
     const skillNames = Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
