@@ -835,8 +835,8 @@ class SyncOrchestrator {
               const fieldPath = op.fieldPath;
               await db.transaction('rw', ALL_STORE_NAMES, async () => {
                 const transferUndo = mergeCampaignTransferUndo(
-                  op.localCampaignTransferUndo,
                   (await db.outbox.get(op.clientOpId))?.localCampaignTransferUndo,
+                  op.localCampaignTransferUndo,
                 );
 
                 await this.stampRevision(op.entityClass, op.entityId, newRevision);
@@ -876,6 +876,7 @@ class SyncOrchestrator {
                     // of falling back to a fresh clientOpId batch.
                     batchId: op.batchId,
                     localCampaignTransferUndo: transferUndo,
+                    preserveCampaignCreateDependencies: true,
                   });
                 } else {
                   // Refresh the superseding op so Guard 1 passes on its next
@@ -960,8 +961,8 @@ class SyncOrchestrator {
       // when merging a returned server row, preserving every other dirty field.
       return db.transaction('rw', ALL_STORE_NAMES, async () => {
         const transferUndo = mergeCampaignTransferUndo(
-          op.localCampaignTransferUndo,
           (await db.outbox.get(op.clientOpId))?.localCampaignTransferUndo,
+          op.localCampaignTransferUndo,
         );
 
         const newer = await db.outbox
@@ -1493,13 +1494,44 @@ class SyncOrchestrator {
         )
         .toArray();
       let protectedReference = false;
-      for (const op of transfers)
+      // Rollback baselines follow authoritative rows even when an independent
+      // child edit protects the visible reference from those server values.
+      const serverFields = row;
+      for (const op of transfers) {
+        let undoChanged = false;
         for (const entry of op.localCampaignTransferUndo ?? []) {
-          if (entry.entityId === id) {
+          if (entry.entityId === id && entry.store === storeForEntityClass(entityClass)) {
             protectedReference = true;
+            // Keep optimistic detachment visible, but don't lose a newer source
+            // declaration after the cursor advances. Rejection must restore the
+            // latest server state from the original campaign, not the old copy.
+            const saved = libraryMechanics.safeParse(serverFields.libraryMechanics);
+            const previous = libraryMechanics.safeParse(entry.before.libraryMechanics);
+            const fields = Object.keys(entry.before);
+            if (
+              saved.success &&
+              saved.data.campaignId === entry.campaignId &&
+              fields.every((field) => field in serverFields) &&
+              (!previous.success ||
+                saved.data.sourceId !== previous.data.sourceId ||
+                (saved.data.sourceRevision ?? -1) >= (previous.data.sourceRevision ?? -1))
+            ) {
+              entry.before = Object.fromEntries(
+                fields.map((field) => [
+                  field,
+                  field === 'libraryMechanics' ? saved.data : serverFields[field],
+                ]),
+              );
+              undoChanged = true;
+            }
             for (const field of Object.keys(entry.after)) delete merged[field];
           }
         }
+        if (undoChanged)
+          await db.outbox.update(op.clientOpId, {
+            localCampaignTransferUndo: op.localCampaignTransferUndo,
+          });
+      }
       const store = storeForEntityClass(entityClass);
       const table = campaignTransferStores().find((candidate) => candidate.name === store);
       if (!protectedReference && table && !(await table.get(id))) {
