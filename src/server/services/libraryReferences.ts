@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { assertWrite, canWriteCharacter } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
   campaignLibraryItems,
@@ -39,7 +40,7 @@ const references = {
 type ReferenceKind = keyof typeof references;
 
 /** Lock campaign before character, matching library writes and member removal. */
-export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string) {
+export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string, userId: string) {
   const [observed] = await tx
     .select({ campaignId: characters.campaignId })
     .from(characters)
@@ -55,7 +56,22 @@ export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string
   if (!parent) throw new HTTPException(404, { message: 'character not found' });
   if (parent.campaignId !== observed?.campaignId)
     throw new HTTPException(503, { message: 'Character campaign changed; retry this edit' });
-  return { parent, campaign };
+  const [membership] =
+    campaign && campaign.ownerId !== userId
+      ? await tx
+          .select()
+          .from(campaignMemberships)
+          .where(
+            and(
+              eq(campaignMemberships.campaignId, campaign.id),
+              eq(campaignMemberships.userId, userId),
+            ),
+          )
+          .for('share')
+      : [];
+  const role = campaign?.ownerId === userId ? 'owner' : (membership?.role ?? null);
+  assertWrite({ character: parent, canWrite: canWriteCharacter(parent, userId, campaign, role) });
+  return { parent, campaign, membership };
 }
 
 /** Validate every new/reassigned reference in its audited write transaction. */
@@ -68,10 +84,15 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
   existingId?: string,
 ): Promise<T> {
   const cfg = references[kind];
+  const { parent, campaign, membership } = await lockLibraryReferenceScope(tx, characterId, userId);
   if (values[cfg.field] === undefined && !(kind === 'traits' && values.kind !== undefined))
     return values;
-  const { parent, campaign } = await lockLibraryReferenceScope(tx, characterId);
-  if (kind === 'traits' && existingId && values.kind !== undefined && values[cfg.field] === undefined) {
+  if (
+    kind === 'traits' &&
+    existingId &&
+    values.kind !== undefined &&
+    values[cfg.field] === undefined
+  ) {
     await reconcileOwnedTraitKind(tx, characterId, values, existingId);
     return values;
   }
@@ -106,16 +127,6 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
   if (values[cfg.field] !== undefined)
     (values as Record<string, unknown>)[cfg.field] = canonicalSourceId;
   if (campaign.ownerId !== userId) {
-    const [membership] = await tx
-      .select({ id: campaignMemberships.id })
-      .from(campaignMemberships)
-      .where(
-        and(
-          eq(campaignMemberships.campaignId, campaign.id),
-          eq(campaignMemberships.userId, userId),
-        ),
-      )
-      .for('share');
     if (!membership) throw denied();
   }
   const [source] = await tx

@@ -122,6 +122,19 @@ export interface CharacterAccess {
   readonly canWrite: boolean;
 }
 
+/** Shared decision for both ordinary reads and authorization under write locks. */
+export function canWriteCharacter(
+  character: Pick<DbCharacter, 'ownerId'>,
+  userId: string,
+  campaign: Pick<DbCampaign, 'allowGmCharacterEditing'> | undefined,
+  role: CampaignRole | null,
+): boolean {
+  return (
+    character.ownerId === userId ||
+    Boolean(campaign?.allowGmCharacterEditing && (role === 'owner' || role === 'manager'))
+  );
+}
+
 /**
  * Load a character if the user can read it.  `canWrite` is true if the
  * user is the owner, or campaign staff editing is enabled for an
@@ -139,10 +152,9 @@ export async function loadCharacterOr403(
   if (character.campaignId) {
     const access = await lookupCampaignRole(character.campaignId, userId);
     if (access?.role) {
-      const isStaff = access.role === 'owner' || access.role === 'manager';
       return {
         character,
-        canWrite: access.campaign.allowGmCharacterEditing && isStaff,
+        canWrite: canWriteCharacter(character, userId, access.campaign, access.role),
       };
     }
   }

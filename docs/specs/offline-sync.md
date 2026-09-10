@@ -567,6 +567,9 @@ away. Concurrent campaign changes during source-scope locking produce a
 transient retry, preserving the queued edit until its new scope can be checked.
 The twelve REST child create/patch contracts declare the corresponding HTTP 503
 JSON error response so API clients can retry the same edit.
+Child creates and patches also recheck current write permission under these locks.
+A staff-editing revocation or manager demotion yields an unauthorized outcome,
+including for source-free edits, so normal rejection toast/flash and rollback apply.
 
 The orchestrator recovers from partial/interrupted states rather than assuming
 a clean world (see `orchestrator.recovery.test.ts`,

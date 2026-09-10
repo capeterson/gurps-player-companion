@@ -905,7 +905,7 @@ router.openapi(
       // changes for this character serialize.  Without it two parent
       // changes can each pass their own pre-checks against pre-write
       // state and then both commit a cycle.
-      await lockLibraryReferenceScope(tx, id);
+      await lockLibraryReferenceScope(tx, id, user.id);
       if (body.parentId) await assertParentBelongsToCharacter(tx, body.parentId, id);
       // POST has no descendants yet, so no cycle check is needed here —
       // a fresh row's id can't appear in any existing parent chain.
@@ -995,7 +995,7 @@ router.openapi(
     // can't each pass their own pre-checks against pre-write state and
     // then both commit a cycle.
     const updated = await withAudit(user.id, undefined, async (tx) => {
-      await lockLibraryReferenceScope(tx, id);
+      await lockLibraryReferenceScope(tx, id, user.id);
       if (body.parentId !== undefined && body.parentId !== null) {
         await assertParentBelongsToCharacter(tx, body.parentId, id);
         await assertNoParentCycle(tx, body.parentId, itemId, id);

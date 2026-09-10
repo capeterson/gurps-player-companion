@@ -307,6 +307,10 @@ wrong-kind and campaignless references return the same generic forbidden error;
 no private definition is looked up for calculations. Campaign and character locks
 serialize reference assignment with transfers and membership removal. Cleanup
 rechecks the original campaign under the character lock before detaching a copy.
+Every child create/patch rechecks write access under the campaign, character and
+membership locks, including edits without a source reference. The locked decision
+uses the same owner/staff rules as ordinary authorization: revoking staff editing
+or demoting a manager while a write waits prevents that write from committing.
 
 ### YAML import/export (cross-campaign sharing)
 

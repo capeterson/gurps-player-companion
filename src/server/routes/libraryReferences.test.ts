@@ -5,7 +5,7 @@ import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import { createApp } from '../app.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
-import { campaigns, characterTraits } from '../db/schema.ts';
+import { campaignMemberships, campaigns, characterTraits } from '../db/schema.ts';
 import { prepareLibraryReference } from '../services/libraryReferences.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
@@ -78,6 +78,145 @@ const configs = [
   },
 ] as const;
 const doors = ['rest-create', 'rest-patch', 'sync-create', 'sync-field', 'sync-body'] as const;
+
+for (const change of ['editing-disabled', 'manager-demoted'] as const) {
+  for (const linked of [false, true]) {
+    it.each([...doors])(
+      `rejects %s after ${change} commits while waiting (linked=${linked})`,
+      async (door) => {
+        const gm = await register();
+        const manager = await register();
+        const player = await register();
+        const campaign = await create(gm.token, '/campaigns', { name: 'Locked permissions' });
+        for (const person of [manager, player])
+          expect(
+            (await request(gm.token, `/campaigns/${campaign.id}/members`, { email: person.email }))
+              .status,
+          ).toBe(200);
+        expect(
+          (
+            await request(
+              gm.token,
+              `/campaigns/${campaign.id}/members/${manager.userId}`,
+              { role: 'manager' },
+              'PATCH',
+            )
+          ).status,
+        ).toBe(200);
+        expect(
+          (
+            await request(
+              gm.token,
+              `/campaigns/${campaign.id}`,
+              { allowGmCharacterEditing: true },
+              'PATCH',
+            )
+          ).status,
+        ).toBe(200);
+        const character = await create(player.token, '/characters', {
+          name: 'Player',
+          campaignId: campaign.id,
+        });
+        const source = await create(gm.token, `/campaigns/${campaign.id}/library/traits`, {
+          name: 'Rules',
+          kind: 'advantage',
+          effects: [{ target: 'dx', value: 2 }],
+        });
+        const created = await request(player.token, `/characters/${character.id}/traits`, {
+          name: 'Before',
+          kind: 'advantage',
+        });
+        expect(created.status).toBe(201);
+        const { trait } = (await created.json()) as { trait: { id: string } };
+        const [before] = await getDb()
+          .select()
+          .from(characterTraits)
+          .where(eq(characterTraits.id, trait.id));
+        if (!before) throw new Error('Missing owned trait fixture');
+        const isCreate = door.endsWith('create');
+        const patch = linked ? { libraryTraitId: source.id } : { notes: 'Forbidden change' };
+        const body = isCreate
+          ? {
+              name: 'Forbidden create',
+              kind: 'advantage',
+              ...(linked ? { libraryTraitId: source.id } : {}),
+            }
+          : patch;
+        const operation = {
+          clientOpId: crypto.randomUUID(),
+          entityClass: 'character_trait',
+          parentId: character.id,
+          entityId: isCreate ? crypto.randomUUID() : trait.id,
+          command: isCreate ? 'create' : 'patch',
+          ...(door === 'sync-field' ? { fieldPath: linked ? 'libraryTraitId' : 'notes' } : {}),
+          attemptedValue: door === 'sync-field' ? (linked ? source.id : 'Forbidden change') : body,
+          createdAt: new Date().toISOString(),
+        };
+        const send = () =>
+          door.startsWith('rest')
+            ? request(
+                manager.token,
+                `/characters/${character.id}/traits${isCreate ? '' : `/${trait.id}`}`,
+                body,
+                isCreate ? 'POST' : 'PATCH',
+              )
+            : request(manager.token, '/sync/operations', { operations: [operation] });
+        const ready = Promise.withResolvers<number>();
+        const release = Promise.withResolvers<void>();
+        const holding = withAudit(gm.userId, null, async (tx) => {
+          if (change === 'editing-disabled')
+            await tx
+              .update(campaigns)
+              .set({ allowGmCharacterEditing: false })
+              .where(eq(campaigns.id, campaign.id));
+          else
+            await tx
+              .update(campaignMemberships)
+              .set({ role: 'member' })
+              .where(
+                sql`${campaignMemberships.campaignId} = ${campaign.id} AND ${campaignMemberships.userId} = ${manager.userId}`,
+              );
+          const pid = await tx.execute(sql`SELECT pg_backend_pid() AS pid`);
+          ready.resolve(Number(pid.rows[0]?.pid));
+          await release.promise;
+        });
+        const pid = await ready.promise;
+        const racing = send();
+        try {
+          let blocked = false;
+          for (let attempt = 0; attempt < 200; attempt++) {
+            const result = await getDb().execute(sql`SELECT EXISTS (
+            SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))
+          ) AS blocked`);
+            if (result.rows[0]?.blocked) {
+              blocked = true;
+              break;
+            }
+            await Bun.sleep(10);
+          }
+          expect(blocked).toBe(true);
+        } finally {
+          release.resolve();
+          await holding;
+        }
+        const response = await racing;
+        if (door.startsWith('rest')) expect(response.status).toBe(403);
+        else {
+          expect(response.status).toBe(200);
+          expect(
+            ((await response.json()) as { outcomes: { status: string }[] }).outcomes[0]?.status,
+          ).toBe('unauthorized');
+        }
+        const rows = await getDb()
+          .select()
+          .from(characterTraits)
+          .where(eq(characterTraits.characterId, character.id));
+        expect(rows).toEqual([before]);
+      },
+      15000,
+    );
+  }
+}
 
 it.each(['source-delete', 'campaign-transfer', 'membership-removal'] as const)(
   'acknowledges lost-response creates after %s without reapplying stale source links',
@@ -440,12 +579,25 @@ for (const cfg of configs) {
     if (cfg.kind === 'traits')
       for (const door of ['rest-patch', 'sync-field', 'sync-body'] as const) {
         await write(door, character.id, childId, source.id, true, { kind: 'disadvantage' });
-        const [detached] = await getDb().select().from(characterTraits).where(eq(characterTraits.id, childId));
+        const [detached] = await getDb()
+          .select()
+          .from(characterTraits)
+          .where(eq(characterTraits.id, childId));
         expect(detached?.libraryTraitId).toBeNull();
         expect(detached?.libraryMechanics?.detached).toBe(true);
-        expect((await request(player.token, `/characters/${character.id}/traits/${childId}`, {
-          kind: 'advantage', libraryTraitId: source.id,
-        }, 'PATCH')).status).toBe(200);
+        expect(
+          (
+            await request(
+              player.token,
+              `/characters/${character.id}/traits/${childId}`,
+              {
+                kind: 'advantage',
+                libraryTraitId: source.id,
+              },
+              'PATCH',
+            )
+          ).status,
+        ).toBe(200);
       }
     const detail = async () =>
       (await (

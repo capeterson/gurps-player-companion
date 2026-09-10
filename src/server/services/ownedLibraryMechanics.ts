@@ -190,7 +190,6 @@ export async function detachLibraryReferencesForTransfer(
   }
 }
 
-
 /** Called after patch validation/stale checks, in the write transaction. */
 export async function reconcileOwnedTraitKind(
   tx: AuditTx,
