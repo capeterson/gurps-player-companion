@@ -51,6 +51,80 @@ async function createCharacter(
 // ===================== TRAITS =====================
 
 describe('trait sub-resource CRUD', () => {
+  it('persists level zero through REST and sync without granting a per-level bonus', async () => {
+    const { accessToken } = await registerUser('trait-zero');
+    const campaignResponse = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Zero-level effects' }),
+    });
+    expect(campaignResponse.status).toBe(201);
+    const campaign = (await campaignResponse.json()) as { id: string };
+    const libraryResponse = await app.request(`/api/v1/campaigns/${campaign.id}/library/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        kind: 'advantage',
+        name: 'Enhanced Dodge',
+        pointsPerLevel: 15,
+        effects: [{ target: 'dodge', value: 1, scaling: 'per_level' }],
+      }),
+    });
+    expect(libraryResponse.status).toBe(201);
+    const library = (await libraryResponse.json()) as { id: string };
+    const character = await createCharacter(accessToken, { campaignId: campaign.id });
+    const response = await app.request(`/api/v1/characters/${character.id}/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        kind: 'advantage',
+        name: 'Enhanced Dodge',
+        level: 0,
+        libraryTraitId: library.id,
+      }),
+    });
+    expect(response.status).toBe(201);
+    const { trait, character: created } = (await response.json()) as {
+      trait: { id: string; level: number };
+      character: { derived: { dodge: number } };
+    };
+    expect(trait.level).toBe(0);
+    expect(created.derived.dodge).toBe(8);
+    for (const level of [1, 0]) {
+      const sync = await app.request('/api/v1/sync/operations', {
+        method: 'POST',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({
+          operations: [
+            {
+              clientOpId: crypto.randomUUID(),
+              entityClass: 'character_trait',
+              entityId: trait.id,
+              parentId: character.id,
+              command: 'patch',
+              fieldPath: 'level',
+              attemptedValue: level,
+              validationVersion: 1,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        }),
+      });
+      expect(sync.status).toBe(200);
+      const result = (await sync.json()) as { outcomes: Array<{ status: string }> };
+      expect(result.outcomes[0]?.status).toBe('applied');
+      const reload = await app.request(`/api/v1/characters/${character.id}`, {
+        headers: bearer(accessToken),
+      });
+      const detail = (await reload.json()) as {
+        traits: Array<{ level: number }>;
+        derived: { dodge: number };
+      };
+      expect(detail.traits[0]?.level).toBe(level);
+      expect(detail.derived.dodge).toBe(8 + level);
+    }
+  });
+
   it('POST creates a trait with points defaulting to 0', async () => {
     const { accessToken } = await registerUser('trait-create');
     const character = await createCharacter(accessToken);

@@ -41,7 +41,7 @@ export const traitOut = z.object({
   kind: traitKindEnum,
   name: z.string().min(1).max(160),
   points: z.number().int().min(-1000).max(1000),
-  level: z.number().int().min(1).max(99).nullable(),
+  level: z.number().int().min(0).max(99).nullable(),
   /** Selected variant name (must match a library variant's `name`).  Null = base. */
   variantName: z.string().min(1).max(80).nullable(),
   notes: z.string().max(20_000).nullable(),
@@ -54,7 +54,7 @@ export const traitCreate = z.object({
   kind: traitKindEnum,
   name: z.string().min(1).max(160).trim(),
   points: z.number().int().min(-1000).max(1000).default(0),
-  level: z.number().int().min(1).max(99).nullable().optional(),
+  level: z.number().int().min(0).max(99).nullable().optional(),
   variantName: z.string().min(1).max(80).trim().nullable().optional(),
   notes: z.string().max(20_000).nullable().optional(),
   modifiers: z.array(traitModifier).default([]),

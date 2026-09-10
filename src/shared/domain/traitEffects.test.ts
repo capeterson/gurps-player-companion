@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { TraitEffect } from '../schemas/effects.ts';
+import { traitCreate, traitUpdate } from '../schemas/trait.ts';
+import { parseLibraryYaml } from '../yaml/library.ts';
 import { type CharacterAttrs, computeDerived } from './characterCalc.ts';
 import {
   type CharacterTraitWithEffects,
@@ -72,13 +74,70 @@ describe('resolveEffects', () => {
     expect(out[0]?.value).toBe(3);
   });
 
-  it('treats null/0 level as level 1 for per_level scaling', () => {
+  it('treats a legacy null level as level 1 for per_level scaling', () => {
     const traits = [
       trait('t1', 'Enhanced Dodge', null, [{ target: 'dodge', value: 1, scaling: 'per_level' }]),
     ];
     const out = resolveEffects(traits, [], new Set());
     expect(out[0]?.value).toBe(1);
   });
+
+  it.each([null, 0, 1, 4])('scales level %s without changing flat effects', (level) => {
+    const effects = resolveEffects(
+      [
+        trait('t1', 'Enhanced defenses', level, [
+          { target: 'dodge', value: 2, scaling: 'per_level' },
+          { target: 'parry', value: 3, scaling: 'flat' },
+        ]),
+      ],
+      [],
+      new Set(),
+    );
+    const derived = computeDerived(applyEffectsToAttrs(baseAttrs, effects));
+    expect(derived.dodge - computeDerived(baseAttrs).dodge).toBe(2 * (level ?? 1));
+    expect(derived.parryMod).toBe(3);
+  });
+
+  it('keeps an imported leveled trait at zero and recalculates zero/one changes', () => {
+    const doc = parseLibraryYaml(`version: 5
+library:
+  traits:
+    - name: Enhanced Dodge
+      kind: advantage
+      basePoints: 0
+      pointsPerLevel: 15
+      effects:
+        - target: dodge
+          value: 1
+          scaling: per_level
+  skills: []
+  items: []
+`);
+    const definition = doc.library.traits[0];
+    if (!definition) throw new Error('Missing imported trait');
+    const copy = traitCreate.parse({ kind: definition.kind, name: definition.name, level: 0 });
+    for (const level of [copy.level ?? 0, 1, 0]) {
+      const updated = traitUpdate.parse({ level });
+      const effects = resolveEffects(
+        [trait('copy', copy.name, updated.level ?? null, definition.effects)],
+        [],
+        new Set(),
+      );
+      expect(computeDerived(applyEffectsToAttrs(baseAttrs, effects)).dodge).toBe(
+        computeDerived(baseAttrs).dodge + level,
+      );
+    }
+  });
+
+  it.each([-1, 0.5, 100, Number.NaN, Number.POSITIVE_INFINITY])(
+    'still rejects invalid trait level %s at both write boundaries',
+    (level) => {
+      expect(traitCreate.safeParse({ kind: 'advantage', name: 'Invalid', level }).success).toBe(
+        false,
+      );
+      expect(traitUpdate.safeParse({ level }).success).toBe(false);
+    },
+  );
 
   it('marks conditional effects inactive when their group is OFF', () => {
     const traits = [
