@@ -55,6 +55,7 @@ function clampMod(n: number): number {
 }
 
 interface RollResult {
+  readonly manaDisaster: boolean;
   readonly dice: readonly [number, number, number];
   readonly total: number;
   readonly margin: number;
@@ -152,11 +153,14 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     }
     const { dice, total } = roll3d6();
     const outcome = evaluateRoll(effectiveTarget, total);
+    const veryHighFailure = request.spellManaLevel === 'very_high' && !outcome.success;
+    const crit = veryHighFailure ? 'failure' : outcome.crit;
     setResult({
+      manaDisaster: veryHighFailure && outcome.crit === 'failure',
       dice,
       total,
       margin: outcome.margin,
-      crit: outcome.crit,
+      crit,
       success: outcome.success,
       target: effectiveTarget,
     });
@@ -170,7 +174,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
       dice,
       total,
       margin: outcome.margin,
-      crit: outcome.crit,
+      crit,
     });
   }
 
@@ -329,6 +333,13 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
               >
                 {result.crit === 'success' ? 'Critical success' : 'Critical failure'}
               </span>
+            )}
+            {request.spellManaLevel === 'very_high' && !result.success && (
+              <p className="text-sm text-error">
+                {result.manaDisaster
+                  ? 'Very high mana: this rolled critical failure causes a spectacular disaster. Ask the GM to resolve it.'
+                  : 'Very high mana turns this failure into a critical failure. Resolve the spell critical-failure consequences.'}
+              </p>
             )}
           </div>
         )}

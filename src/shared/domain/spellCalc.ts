@@ -109,9 +109,14 @@ export function canCastInMana(casterHasMagery: boolean, mana: ManaLevel): boolea
   return casterHasMagery;
 }
 
-/** In very high mana, spells cost no energy to cast or maintain (B235). */
-export function isFreeCastingMana(mana: ManaLevel): boolean {
-  return mana === 'very_high';
+/** B235 recovery amount, eligible only if spent on the mage's own turn.
+ * The UI qualifies the manual next-turn reminder; this does not schedule a refund. */
+export function spellFpRecovery(
+  mana: ManaLevel,
+  casterHasMagery: boolean,
+  fpSpent: number,
+): number {
+  return mana === 'very_high' && casterHasMagery ? Math.max(0, fpSpent) : 0;
 }
 
 /**

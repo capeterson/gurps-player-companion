@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MANA_LEVEL_LABELS } from '../../../../shared/constants/magic.ts';
 import { applyFatigueLoss } from '../../../../shared/domain/fatigue.ts';
+import { hasMagery, spellFpRecovery } from '../../../../shared/domain/spellCalc.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
@@ -131,6 +132,7 @@ export function CastSpellDialog({
   }, [cost, fpAvailable, hpAvailable, stones]);
 
   const allocated = totalAllocation(alloc);
+  const recovery = spellFpRecovery(character.manaLevel, hasMagery(character.traits), alloc.fromFp);
   const remaining = cost - allocated;
   const overspent = allocated > cost;
   // One casting can draw from at most one powerstone (B481 / M69).
@@ -192,7 +194,12 @@ export function CastSpellDialog({
       }
       const verb = maintaining ? 'Maintained' : 'Cast';
       toasts.push(
-        cost === 0 ? `${verb} ${spell.name} (free).` : `${verb} ${spell.name} for ${cost} energy.`,
+        (cost === 0
+          ? `${verb} ${spell.name} (free).`
+          : `${verb} ${spell.name} for ${cost} energy.`) +
+          (recovery > 0
+            ? ` If spent on your turn, at the start of your next turn restore ${recovery} FP manually (up to your maximum).`
+            : ''),
         { kind: 'success' },
       );
       onClose();
@@ -261,8 +268,10 @@ export function CastSpellDialog({
           <p className="text-xs text-base-content/60">
             {maintaining
               ? 'Paid once per duration interval; a maintenance of 0 keeps the spell up for free.'
-              : 'Critical success costs 0, a failure costs 1, a critical failure costs the full ' +
-                'base cost; Area and Missile spells scale with size.'}
+              : character.manaLevel === 'very_high'
+                ? 'Critical success costs 0. Every failure is critical and costs the full base cost; a rolled critical failure causes a spectacular disaster.'
+                : 'Critical success costs 0, a failure costs 1, a critical failure costs the full ' +
+                  'base cost; Area and Missile spells scale with size.'}
           </p>
         </div>
         {!maintaining && (
@@ -272,6 +281,17 @@ export function CastSpellDialog({
           </p>
         )}
         <p className="label-eyebrow mb-2">Draw {cost} energy from</p>
+        {character.manaLevel === 'very_high' && (
+          <p className="text-xs text-base-content/70 mb-2">
+            Pay all energy now.{' '}
+            {recovery > 0
+              ? `If spent on your turn, at the start of your next turn restore ${recovery} personal FP manually (up to your maximum). No automatic refund occurs.`
+              : hasMagery(character.traits)
+                ? 'Only personal FP spent on your own turn can recover at the start of your next turn.'
+                : 'Without Magery, personal FP does not recover next turn.'}{' '}
+            HP and powerstone energy are not refunded.
+          </p>
+        )}
         <ul className="space-y-2">
           <SourceRow
             label="Fatigue Points (FP)"
@@ -354,6 +374,7 @@ function SourceRow({ label, available, value, onChange, tone }: SourceRowProps) 
       <span className="text-xs text-base-content/60 num">avail {available}</span>
       <input
         type="number"
+        aria-label={label}
         className="input input-bordered input-sm w-20 num text-right"
         value={value}
         min={0}
