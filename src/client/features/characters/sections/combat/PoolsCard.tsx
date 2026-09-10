@@ -220,7 +220,7 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
         {reelingSuggested && (
           <p className="mt-1.5 text-[11px] text-warning">
             <InfoTooltip
-              content={`HP (${hp}) has dropped below ⅓ of max (${reelingThreshold + 1}) — GURPS applies Reeling until HP rises back above that line (B419). While Reeling, Move and Dodge are both halved (round up).`}
+              content={`HP (${hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; the Reeling chip is a manual reminder and adds no extra penalty. The reduction ends when HP reaches at least one-third of maximum.`}
             >
               Reeling suggested
             </InfoTooltip>{' '}

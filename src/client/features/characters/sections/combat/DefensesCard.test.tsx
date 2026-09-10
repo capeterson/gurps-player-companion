@@ -6,7 +6,7 @@
  * non-rollable row.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterAttrs } from '../../../../../shared/domain/characterCalc.ts';
 import { applyEffectsToAttrs, resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
@@ -90,6 +90,99 @@ function targetFor(openRoll: ReturnType<typeof vi.fn>, index: number): number {
 }
 
 describe('DefensesCard', () => {
+  function liveCharacter() {
+    const c = makeCharacter(
+      [
+        { id: 'sword', name: 'Sword', parry: '0', skill: 'Sword' },
+        { id: 'shield', name: 'Shield', db: 2, skill: 'Shield' },
+      ],
+      [
+        { name: 'Sword', level: 14 },
+        { name: 'Shield', level: 14 },
+      ],
+    );
+    c.derived = { ...c.derived, hp: 12, fp: 12, parryMod: 1, blockMod: 1 };
+    c.encumbrance = { ...c.encumbrance, dodgePenalty: -1, moveMultiplier: 0.8, label: 'Light' };
+    c.combat = {
+      id: c.id,
+      characterId: c.id,
+      createdAt: '',
+      updatedAt: '',
+      currentHp: 12,
+      currentFp: 12,
+      posture: 'standing',
+      conditions: [],
+      maneuver: null,
+    } as CharacterDetail['combat'];
+    return c;
+  }
+  it('dispatches pool-adjusted Dodge with encumbrance and DB, then clears restrictions', () => {
+    const c = liveCharacter();
+    c.combat = {
+      ...c.combat,
+      currentHp: 3,
+      currentFp: 3,
+      conditions: ['Reeling'],
+    } as CharacterDetail['combat'];
+    const openRoll = vi.fn();
+    const view = render(<DefensesCard character={c} openRoll={openRoll} />);
+    const moveRow = () => within(screen.getByText('Move').parentElement as HTMLElement);
+    expect(moveRow().getByText('1')).toBeInTheDocument(); // ceil(encumbered Move 4 / 4)
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(targetFor(openRoll, 0)).toBe(4); // ceil((9-1)/4) + DB2
+    fireEvent.click(screen.getByRole('button', { name: /^Parry/ }));
+    expect(targetFor(openRoll, 1)).toBe(13); // 7+3+trait1+DB2
+    c.combat = {
+      ...c.combat,
+      currentHp: 12,
+      currentFp: 12,
+      posture: 'prone',
+      conditions: ['Stunned'],
+    } as CharacterDetail['combat'];
+    view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
+    expect(moveRow().getByText('0')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(targetFor(openRoll, 2)).toBe(3); // 8+2-3-4
+    c.combat = { ...c.combat, posture: 'standing', conditions: [] } as CharacterDetail['combat'];
+    view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(targetFor(openRoll, 3)).toBe(10);
+    expect(moveRow().getByText('4')).toBeInTheDocument();
+  });
+
+  it('shows unavailable defenses for All-Out Attack and limits All-Out Defense to a chosen option', () => {
+    const c = liveCharacter();
+    c.combat = { ...c.combat, maneuver: 'All-Out Attack' } as CharacterDetail['combat'];
+    const openRoll = vi.fn();
+    const view = render(<DefensesCard character={c} openRoll={openRoll} />);
+    expect(screen.queryByRole('button', { name: /^Dodge/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Parry/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Block/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Dodge — unavailable')).toBeInTheDocument();
+    c.combat = { ...c.combat, maneuver: 'All-Out Defense' } as CharacterDetail['combat'];
+    view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: '+2 dodge' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(targetFor(openRoll, 0)).toBe(12);
+    fireEvent.click(screen.getByRole('button', { name: /^Block/ }));
+    expect(targetFor(openRoll, 1)).toBe(13);
+    fireEvent.click(screen.getByRole('button', { name: 'Double defense' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(targetFor(openRoll, 2)).toBe(10);
+    c.combat = { ...c.combat, maneuver: 'Move and Attack' } as CharacterDetail['combat'];
+    view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
+    expect(screen.queryByRole('button', { name: /^Parry/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Block/ })).toBeInTheDocument();
+    c.combat = { ...c.combat, maneuver: 'All-Out Defense' } as CharacterDetail['combat'];
+    view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
+    expect(screen.getByRole('button', { name: 'Double defense' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(targetFor(openRoll, 3)).toBe(10);
+  });
+
   it.each([0, 2])('dispatches trait-adjusted defense targets exactly once with DB %i', (db) => {
     const openRoll = vi.fn();
     const base = makeCharacter(
