@@ -15,11 +15,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { buildCharacterDetail } from '../../../shared/domain/characterDetail.ts';
 import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
-import type { TraitEffect } from '../../../shared/schemas/effects.ts';
 import { getLocalDb } from '../../db/dexie.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { characterIdsToMinimize } from '../../sync/minimalViewSweep.ts';
-import { useLibraryEffectMaps } from './useLibraryEffectMaps.ts';
+import { type LibraryEffectOverrides, joinCharacterMechanics } from './joinCharacterMechanics.ts';
 
 /**
  * `undefined` while the live query is still mounting; `null` for
@@ -31,33 +30,13 @@ import { useLibraryEffectMaps } from './useLibraryEffectMaps.ts';
 export type EffectAwareCharacterDetail = CharacterDetail & { libraryEffectsKnown?: boolean };
 export type CharacterDetailResult = EffectAwareCharacterDetail | null | undefined;
 
-export interface UseCharacterDetailOptions {
-  /**
-   * Library trait id → effects[] map.  When omitted (the default), the
-   * hook fetches the campaign library itself via `useLibraryEffectMaps`
-   * and joins effects automatically.  Pass an explicit map here only if
-   * you need to override the auto-fetch (e.g. in tests).
-   */
-  readonly libraryTraitEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
-  readonly librarySkillEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
-}
+/** Explicit overrides are for tests; production reads only synced declarations. */
+export type UseCharacterDetailOptions = LibraryEffectOverrides;
 
 export function useCharacterDetail(
   id: string | undefined,
   options: UseCharacterDetailOptions = {},
 ): CharacterDetailResult {
-  // Pre-fetch the campaignId so the library hook can run with the
-  // correct key.  Two live queries are cheap; the second depends on the
-  // library maps which themselves depend on this campaignId.
-  const campaignId = useLiveQuery(async () => {
-    if (!id) return null;
-    const c = await getLocalDb().characters.get(id);
-    return c?.campaignId ?? null;
-  }, [id]);
-
-  const autoMaps = useLibraryEffectMaps(campaignId ?? null);
-  const traitEffects = options.libraryTraitEffects ?? autoMaps.libraryTraitEffects;
-  const skillEffects = options.librarySkillEffects ?? autoMaps.librarySkillEffects;
   return useLiveQuery(async () => {
     if (!id) return null;
     const db = getLocalDb();
@@ -74,35 +53,11 @@ export function useCharacterDetail(
         db.characterCombat.get(id),
         character.campaignId ? db.campaigns.get(character.campaignId) : Promise.resolve(undefined),
       ]);
-    const libraryEffectsKnown =
-      traits.every(
-        (t) =>
-          !t.libraryTraitId ||
-          ((options.libraryTraitEffects !== undefined || campaignId === character.campaignId) &&
-            traitEffects.has(t.libraryTraitId)),
-      ) &&
-      skills.every(
-        (s) =>
-          !s.librarySkillId ||
-          ((options.librarySkillEffects !== undefined || campaignId === character.campaignId) &&
-            skillEffects.has(s.librarySkillId)),
-      );
+    const joined = joinCharacterMechanics(character.campaignId, traits, skills, options);
     const detail = buildCharacterDetail({
       character,
-      traits: traits.map((t) => ({
-        ...t,
-        libraryEffects:
-          t.libraryTraitId && traitEffects?.has(t.libraryTraitId)
-            ? [...(traitEffects.get(t.libraryTraitId) ?? [])]
-            : [],
-      })),
-      skills: skills.map((s) => ({
-        ...s,
-        libraryEffects:
-          s.librarySkillId && skillEffects?.has(s.librarySkillId)
-            ? [...(skillEffects.get(s.librarySkillId) ?? [])]
-            : [],
-      })),
+      traits: joined.traits,
+      skills: joined.skills,
       spells,
       languages,
       techniques,
@@ -118,19 +73,8 @@ export function useCharacterDetail(
           }
         : null,
     });
-    return { ...detail, libraryEffectsKnown };
-    // The maps are memoized on the library query's data (see
-    // useLibraryEffectMaps), so their identity changes exactly when the
-    // library payload does — including value-only edits a size-based
-    // key would miss.
-  }, [
-    id,
-    campaignId,
-    traitEffects,
-    skillEffects,
-    options.libraryTraitEffects,
-    options.librarySkillEffects,
-  ]);
+    return { ...detail, libraryEffectsKnown: joined.libraryEffectsKnown };
+  }, [id, options.libraryTraitEffects, options.librarySkillEffects]);
 }
 
 export type CharacterListResult = CharacterListItem[] | undefined;

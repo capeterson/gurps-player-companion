@@ -18,6 +18,7 @@
  */
 
 import { liveQuery } from 'dexie';
+import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type {
   EntityClass,
   OperationEnvelope,
@@ -1442,11 +1443,15 @@ class SyncOrchestrator {
       }
       case 'character_trait': {
         const existing = await db.characterTraits.get(id);
+        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
+          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
         await db.characterTraits.put({ ...(existing ?? {}), ...merged } as LocalCharacterTrait);
         return;
       }
       case 'character_skill': {
         const existing = await db.characterSkills.get(id);
+        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
+          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
         await db.characterSkills.put({ ...(existing ?? {}), ...merged } as LocalCharacterSkill);
         return;
       }

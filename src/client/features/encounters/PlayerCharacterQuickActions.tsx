@@ -1,6 +1,7 @@
 import { COMMON_CONDITIONS } from '../../../shared/constants/combat.ts';
 import { conditionLabel, conditionsInclude } from '../../../shared/domain/conditions.ts';
 import { useFlashState } from '../../hooks/useFlashState.ts';
+import { MechanicsUnavailable } from '../characters/MechanicsUnavailable.tsx';
 import { useCombatPatch } from '../characters/sections/useCombatPatch.ts';
 import { useConditionsToggle } from '../characters/sections/useConditionsToggle.ts';
 import { usePoolBumpers } from '../characters/sections/usePoolBumpers.ts';
@@ -22,6 +23,7 @@ export function PlayerCharacterQuickActions({
   const character = useCharacterDetail(characterId ?? undefined);
   const access = useCharacterAccessLocal(character, meId);
   if (!character || !access.isOwner || !access.canWrite || access.isMinimal) return null;
+  if (character.libraryEffectsKnown === false) return <MechanicsUnavailable />;
   return <OwnCharacterQuickActions character={character} />;
 }
 

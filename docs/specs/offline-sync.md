@@ -25,6 +25,23 @@ Everything else is either read-only in the local store or fully online:
 - **Online-only** (HTTP + React Query, no offline support): the campaign
   library, adventure log, invitations, notifications, settings, admin.
 
+Library editing remains online-only, but calculation no longer depends on its
+React Query cache. The trait/skill cursor projects `libraryMechanics` onto each
+character child: source ID, current campaign, source revision and raw effect
+declarations. `effects: []` is known empty; `effects: null` is unresolved. Source
+lookups are restricted to the character's campaign and the viewer's accessible
+campaigns, after the character share gate. No names or other source metadata are
+copied. The projection is read-only and never accepted as an outbox field.
+
+The declarations live in existing character stores, so normal logout/account
+switch purge and minimal-view cleanup remove them with their owning rows. Cursor
+application validates them transactionally while preserving pending local fields;
+readers also verify the source ID/campaign against current local intent. Dexie v9
+clears only trait/skill cursors once so existing installations backfill on their
+next online pull. Until then unresolved linked calculations show an unavailable
+state. A failed pull retains the last valid declarations. Current refresh policy
+is tied to child-row pulls; a full resync picks up library-only changes as well.
+
 The authoritative list of pulled classes is `ALL_ENTITY_CLASSES` in
 `src/client/sync/orchestrator.ts`. The `entityClass` enum in
 `src/shared/schemas/sync.ts` intentionally lists **more** classes than the

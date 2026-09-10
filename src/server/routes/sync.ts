@@ -44,6 +44,7 @@ import {
   inventoryItems,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { withLibraryMechanics } from '../services/libraryMechanics.ts';
 import { dispatchOperation } from '../services/syncDispatch.ts';
 
 const router = createOpenApiApp();
@@ -525,27 +526,33 @@ async function fetchClassUpserts(args: {
       });
     }
     case 'character_trait':
-      return await fetchChildClass({
-        entityClass,
-        table: characterTraits,
-        idCol: characterTraits.id,
-        revisionCol: characterTraits.revision,
-        characterIdCol: characterTraits.characterId,
-        accessibleCharacterIds: fullAccessCharacterIds,
-        sinceRevision,
-        limit,
-      });
+      return await withLibraryMechanics(
+        await fetchChildClass({
+          entityClass,
+          table: characterTraits,
+          idCol: characterTraits.id,
+          revisionCol: characterTraits.revision,
+          characterIdCol: characterTraits.characterId,
+          accessibleCharacterIds: fullAccessCharacterIds,
+          sinceRevision,
+          limit,
+        }),
+        accessibleCampaignIds,
+      );
     case 'character_skill':
-      return await fetchChildClass({
-        entityClass,
-        table: characterSkills,
-        idCol: characterSkills.id,
-        revisionCol: characterSkills.revision,
-        characterIdCol: characterSkills.characterId,
-        accessibleCharacterIds: fullAccessCharacterIds,
-        sinceRevision,
-        limit,
-      });
+      return await withLibraryMechanics(
+        await fetchChildClass({
+          entityClass,
+          table: characterSkills,
+          idCol: characterSkills.id,
+          revisionCol: characterSkills.revision,
+          characterIdCol: characterSkills.characterId,
+          accessibleCharacterIds: fullAccessCharacterIds,
+          sinceRevision,
+          limit,
+        }),
+        accessibleCampaignIds,
+      );
     case 'character_spell':
       return await fetchChildClass({
         entityClass,

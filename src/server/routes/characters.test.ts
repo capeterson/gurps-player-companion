@@ -8,12 +8,158 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
 configureIntegrationTestEnvironment();
 
 const app = createApp(integrationTestConfig);
+
+describe('character-owned library declarations in the cursor', () => {
+  it.each(['traits', 'skills'] as const)(
+    'syncs versioned %s effects and exposes missing entries as unresolved',
+    async (kind) => {
+      const owner = await registerUser(`mechanics-${kind}`);
+      const campaign = await createCampaign(owner.accessToken);
+      const request = async (path: string, body?: unknown, method = 'POST') =>
+        app.request(`/api/v1${path}`, {
+          method,
+          headers: jsonHeaders(owner.accessToken),
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        });
+      const create = await request(`/campaigns/${campaign.id}/library/${kind}`, {
+        name: 'Augmented',
+        ...(kind === 'traits'
+          ? { kind: 'advantage', basePoints: 10 }
+          : { attribute: 'DX', difficulty: 'A' }),
+        effects: [{ target: 'dx', value: 2, scaling: 'flat' }],
+      });
+      expect(create.status).toBe(201);
+      const source = (await create.json()) as { id: string };
+      const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+      const attach = await request(`/characters/${character.id}/${kind}`, {
+        name: 'Augmented',
+        points: 10,
+        ...(kind === 'traits'
+          ? { kind: 'advantage', libraryTraitId: source.id }
+          : { attribute: 'DX', difficulty: 'A', librarySkillId: source.id }),
+      });
+      expect(attach.status).toBe(201);
+      const attached = (await attach.json()) as {
+        trait?: { id: string };
+        skill?: { id: string };
+        character: { derived: { effectiveDx: number } };
+      };
+      expect(attached.character.derived.effectiveDx).toBe(12);
+      const entityId = attached.trait?.id ?? attached.skill?.id;
+      const pull = async () => {
+        const response = await request('/sync/cursor', {
+          cursors: [
+            {
+              entityClass: kind === 'traits' ? 'character_trait' : 'character_skill',
+              sinceRevision: 0,
+            },
+          ],
+        });
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as SyncCursorResponse;
+        return (
+          body.changes.find((change) => change.entityId === entityId)?.data as Record<
+            string,
+            unknown
+          >
+        )?.libraryMechanics;
+      };
+      const initial = libraryMechanics.parse(await pull());
+      expect(initial).toMatchObject({
+        sourceId: source.id,
+        campaignId: campaign.id,
+        effects: [{ target: 'dx', value: 2, scaling: 'flat' }],
+      });
+      expect(initial.sourceRevision).toBeGreaterThan(0);
+      expect(
+        (
+          await request(
+            `/campaigns/${campaign.id}/library/${kind}/${source.id}`,
+            { effects: [] },
+            'PATCH',
+          )
+        ).status,
+      ).toBe(200);
+      const empty = libraryMechanics.parse(await pull());
+      expect(empty.effects).toEqual([]);
+      expect(empty.sourceRevision).toBeGreaterThan(initial.sourceRevision ?? 0);
+      const deleted = await request(
+        `/campaigns/${campaign.id}/library/${kind}/${source.id}`,
+        undefined,
+        'DELETE',
+      );
+      expect([200, 204]).toContain(deleted.status);
+      expect(libraryMechanics.parse(await pull())).toMatchObject({
+        sourceId: source.id,
+        effects: null,
+        sourceRevision: null,
+      });
+    },
+  );
+
+  it('never projects foreign private effects or a minimal-view character child', async () => {
+    const owner = await registerUser('mechanics-owner');
+    const member = await registerUser('mechanics-member');
+    const privateCampaign = await createCampaign(owner.accessToken);
+    const sharedCampaign = await createCampaign(owner.accessToken, { shareCharacterSheets: false });
+    await addMember(owner.accessToken, String(sharedCampaign.id), member.email);
+    const created = await app.request(`/api/v1/campaigns/${privateCampaign.id}/library/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Private secret',
+        kind: 'advantage',
+        effects: [{ target: 'dx', value: 7 }],
+      }),
+    });
+    const source = (await created.json()) as { id: string };
+    const character = await createCharacter(member.accessToken, { campaignId: sharedCampaign.id });
+    // Legacy unscoped references exist before GPC31's write validation; the cursor must never expose their source.
+    const attached = await app.request(`/api/v1/characters/${character.id}/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(member.accessToken),
+      body: JSON.stringify({
+        name: 'Owned',
+        kind: 'advantage',
+        points: 5,
+        libraryTraitId: source.id,
+      }),
+    });
+    expect(attached.status).toBe(201);
+    const foreignChild = ((await attached.json()) as { trait: { id: string } }).trait.id;
+    const otherCharacter = await createCharacter(owner.accessToken, {
+      campaignId: sharedCampaign.id,
+    });
+    const other = await app.request(`/api/v1/characters/${otherCharacter.id}/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Other private', kind: 'advantage', points: 5 }),
+    });
+    const privateChild = ((await other.json()) as { trait: { id: string } }).trait.id;
+    const res = await app.request('/api/v1/sync/cursor', {
+      method: 'POST',
+      headers: jsonHeaders(member.accessToken),
+      body: JSON.stringify({ cursors: [{ entityClass: 'character_trait', sinceRevision: 0 }] }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as SyncCursorResponse;
+    expect(body.changes.find((change) => change.entityId === privateChild)).toBeUndefined();
+    const row = body.changes.find((change) => change.entityId === foreignChild)?.data as Record<
+      string,
+      unknown
+    >;
+    expect(libraryMechanics.parse(row.libraryMechanics).effects).toBeNull();
+    expect(JSON.stringify(body)).not.toContain('Private secret');
+  });
+});
 
 function bearer(token: string) {
   return { Authorization: `Bearer ${token}` };

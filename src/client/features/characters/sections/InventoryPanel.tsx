@@ -19,7 +19,6 @@
 import { type FormEvent, type ReactNode, useMemo, useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import type { LibraryItemOut } from '../../../../shared/schemas/campaignLibrary.ts';
-import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type {
   InventoryItemOut,
   InventoryItemUpdate,
@@ -31,6 +30,7 @@ import { useRangeSelect } from '../../../hooks/useRangeSelect.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueDelete, enqueueFieldPatch } from '../../../sync/outbox.ts';
+import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharacterDetail.ts';
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
 import { ItemEditDialog } from './ItemEditDialog.tsx';
@@ -451,96 +451,98 @@ export function InventoryPanel({
 
   return (
     <section className="card border border-base-300/60 bg-base-100 rounded-2xl overflow-visible">
-      <header className="flex flex-wrap items-baseline gap-2 border-b border-base-300/60 px-5 py-3 text-sm">
-        <span className="num text-base-content/60">
-          {encumbrance.playerWeightLbs.toFixed(1)} lbs
-        </span>
-        <span className="text-base-content/40">·</span>
-        <InfoTooltip
-          content={
-            <div className="grid gap-1.5">
-              <div className="font-semibold text-base-content">Basic Lift</div>
-              <div>
-                How much you can lift overhead with one hand for a second. Drives encumbrance,
-                hand-to-hand damage, and shove distance.
-              </div>
-              <div className="num text-base-content/60">
-                BL = ST² ÷ 5 ={' '}
-                <span className="text-base-content">{encumbrance.basicLift.toFixed(1)} lbs</span>
-              </div>
-            </div>
-          }
-        >
+      {character.libraryEffectsKnown !== false && (
+        <header className="flex flex-wrap items-baseline gap-2 border-b border-base-300/60 px-5 py-3 text-sm">
           <span className="num text-base-content/60">
-            BL {encumbrance.basicLift.toFixed(1)} lbs
+            {encumbrance.playerWeightLbs.toFixed(1)} lbs
           </span>
-        </InfoTooltip>
-        <span className="text-base-content/40">·</span>
-        <InfoTooltip
-          content={
-            <div className="grid gap-1.5">
-              <div className="font-semibold text-base-content">Encumbrance</div>
-              <div className="text-base-content/60">
-                Carried weight relative to your Basic Lift.
+          <span className="text-base-content/40">·</span>
+          <InfoTooltip
+            content={
+              <div className="grid gap-1.5">
+                <div className="font-semibold text-base-content">Basic Lift</div>
+                <div>
+                  How much you can lift overhead with one hand for a second. Drives encumbrance,
+                  hand-to-hand damage, and shove distance.
+                </div>
+                <div className="num text-base-content/60">
+                  BL = ST² ÷ 5 ={' '}
+                  <span className="text-base-content">{encumbrance.basicLift.toFixed(1)} lbs</span>
+                </div>
               </div>
-              <ul className="num grid gap-0.5">
-                {[
-                  { label: 'None', from: 0, to: encumbrance.basicLift, level: 0 },
-                  {
-                    label: 'Light',
-                    from: encumbrance.basicLift,
-                    to: encumbrance.basicLift * 2,
-                    level: 1,
-                  },
-                  {
-                    label: 'Medium',
-                    from: encumbrance.basicLift * 2,
-                    to: encumbrance.basicLift * 3,
-                    level: 2,
-                  },
-                  {
-                    label: 'Heavy',
-                    from: encumbrance.basicLift * 3,
-                    to: encumbrance.basicLift * 6,
-                    level: 3,
-                  },
-                  {
-                    label: 'X-Heavy',
-                    from: encumbrance.basicLift * 6,
-                    to: encumbrance.basicLift * 10,
-                    level: 4,
-                  },
-                ].map((row) => (
-                  <li
-                    key={row.label}
-                    className={`flex justify-between gap-3 ${
-                      row.level === encumbrance.level
-                        ? 'text-base-content font-semibold'
-                        : 'text-base-content/60'
-                    }`}
-                  >
-                    <span>{row.label}</span>
-                    <span>
-                      {row.from.toFixed(1)} – {row.to.toFixed(1)} lbs
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          }
-        >
-          <span className="inline-flex items-center gap-1">
-            Encumbrance{' '}
-            <span className="font-semibold text-base-content">
-              {LEVEL_LABELS[encumbrance.level]}
+            }
+          >
+            <span className="num text-base-content/60">
+              BL {encumbrance.basicLift.toFixed(1)} lbs
             </span>
+          </InfoTooltip>
+          <span className="text-base-content/40">·</span>
+          <InfoTooltip
+            content={
+              <div className="grid gap-1.5">
+                <div className="font-semibold text-base-content">Encumbrance</div>
+                <div className="text-base-content/60">
+                  Carried weight relative to your Basic Lift.
+                </div>
+                <ul className="num grid gap-0.5">
+                  {[
+                    { label: 'None', from: 0, to: encumbrance.basicLift, level: 0 },
+                    {
+                      label: 'Light',
+                      from: encumbrance.basicLift,
+                      to: encumbrance.basicLift * 2,
+                      level: 1,
+                    },
+                    {
+                      label: 'Medium',
+                      from: encumbrance.basicLift * 2,
+                      to: encumbrance.basicLift * 3,
+                      level: 2,
+                    },
+                    {
+                      label: 'Heavy',
+                      from: encumbrance.basicLift * 3,
+                      to: encumbrance.basicLift * 6,
+                      level: 3,
+                    },
+                    {
+                      label: 'X-Heavy',
+                      from: encumbrance.basicLift * 6,
+                      to: encumbrance.basicLift * 10,
+                      level: 4,
+                    },
+                  ].map((row) => (
+                    <li
+                      key={row.label}
+                      className={`flex justify-between gap-3 ${
+                        row.level === encumbrance.level
+                          ? 'text-base-content font-semibold'
+                          : 'text-base-content/60'
+                      }`}
+                    >
+                      <span>{row.label}</span>
+                      <span>
+                        {row.from.toFixed(1)} – {row.to.toFixed(1)} lbs
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            }
+          >
+            <span className="inline-flex items-center gap-1">
+              Encumbrance{' '}
+              <span className="font-semibold text-base-content">
+                {LEVEL_LABELS[encumbrance.level]}
+              </span>
+            </span>
+          </InfoTooltip>
+          <span className="grow" />
+          <span className="num text-base-content/40 text-xs">
+            tip: shift-click to select a range; ⌘/ctrl-click to toggle
           </span>
-        </InfoTooltip>
-        <span className="grow" />
-        <span className="num text-base-content/40 text-xs">
-          tip: shift-click to select a range; ⌘/ctrl-click to toggle
-        </span>
-      </header>
+        </header>
+      )}
 
       {canWrite && count > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-base-300/60 bg-primary/5 px-5 py-2.5 text-sm">
@@ -797,9 +799,11 @@ export function InventoryPanel({
               <span className="text-base-content/40">cost </span>
               {totalCost.toFixed(0)}
             </span>
-            <span className="num text-base-content/40">
-              BL {encumbrance.basicLift.toFixed(0)} → {LEVEL_LABELS[encumbrance.level]}
-            </span>
+            {character.libraryEffectsKnown !== false && (
+              <span className="num text-base-content/40">
+                BL {encumbrance.basicLift.toFixed(0)} → {LEVEL_LABELS[encumbrance.level]}
+              </span>
+            )}
           </div>
         </div>
       )}
