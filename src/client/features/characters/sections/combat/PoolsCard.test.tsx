@@ -107,7 +107,10 @@ describe('PoolsCard', () => {
       />,
     );
     fireEvent.mouseEnter(screen.getByRole('button', { name: 'Reeling suggested' }));
-    expect(screen.getByRole('tooltip')).toHaveTextContent(/HP.*below.*⅓ of max/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/HP.*below.*one-third of maximum/);
+    expect(screen.getByRole('tooltip')).toHaveTextContent(
+      'manual reminder and adds no extra penalty',
+    );
   });
 
   it('shows a death check roll button once HP drops to 0 or below', () => {

@@ -1,4 +1,9 @@
+import { useEffect, useState } from 'react';
 import { sumArmorDb } from '../../../../../shared/domain/armorDr.ts';
+import {
+  type AllOutDefenseOption,
+  combatAdjustments,
+} from '../../../../../shared/domain/combatAdjustments.ts';
 import {
   blockFromSkill,
   effectiveDodge,
@@ -32,6 +37,20 @@ function modifierCaption(value: number): string {
 }
 
 export function DefensesCard({ character, openRoll }: DefensesCardProps) {
+  const [defenseOption, setDefenseOption] = useState<AllOutDefenseOption>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: changing character or maneuver ends this local turn option.
+  useEffect(() => {
+    setDefenseOption(null);
+  }, [character.id, character.combat?.maneuver]);
+  const state = combatAdjustments({
+    hp: character.combat?.currentHp ?? character.derived.hp,
+    maxHp: character.derived.hp,
+    fp: character.combat?.currentFp ?? character.derived.fp,
+    maxFp: character.derived.fp,
+    posture: character.combat?.posture ?? 'standing',
+    conditions: character.combat?.conditions ?? [],
+    maneuver: character.combat?.maneuver ?? null,
+  });
   const equippedItems = character.inventory.filter((i) => i.equipped);
   const weapons = equippedItems.filter((i) => i.weaponData != null);
 
@@ -51,7 +70,12 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         ? ` ${shieldDbCaption}${armorDbCaption}`
         : '';
 
-  const dodge = effectiveDodge(character.derived.dodge, character.encumbrance.dodgePenalty) + db;
+  const dodge = state.defense(
+    'dodge',
+    effectiveDodge(character.derived.dodge, character.encumbrance.dodgePenalty),
+    defenseOption,
+    db,
+  );
   const dodgeParts: string[] = [];
   if (character.encumbrance.dodgePenalty !== 0) {
     dodgeParts.push(
@@ -66,10 +90,11 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   const d = character.derived;
   const overCarryCap = e.ratio > 10;
   const moveFloor = d.basicMove > 0 ? 1 : 0;
-  const moveNet = overCarryCap
+  const encumberedMove = overCarryCap
     ? 0
     : Math.max(moveFloor, Math.floor(d.basicMove * e.moveMultiplier));
-  const movePenalty = d.basicMove - moveNet;
+  const moveNet = state.movement(encumberedMove, defenseOption);
+  const movePenalty = d.basicMove - encumberedMove;
   const moveCaption =
     character.encumbrance.moveMultiplier !== 1
       ? `${d.basicMove} base − ${movePenalty} ${e.label} encumbrance`
@@ -99,11 +124,17 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         // The ST-shortfall penalty applies to the weapon skill (B270),
         // so it lands before the halving — Parry drops by half as much.
         const adjusted =
-          resolution.level - stShortfallPenalty(wd?.stRequired, character.derived.effectiveSt);
+          resolution.level -
+          stShortfallPenalty(wd?.stRequired, state.strength(character.derived.effectiveSt));
         return {
           key: i.id,
           name: i.name,
-          value: parryFromSkill(adjusted, parsed.mod, character.derived.parryMod) + db,
+          value: state.defense(
+            'parry',
+            parryFromSkill(adjusted, parsed.mod, character.derived.parryMod),
+            defenseOption,
+            db,
+          ),
           caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}${dbCaption}`,
           raw,
         };
@@ -129,6 +160,28 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   return (
     <section className="card space-y-2 p-5">
       <p className="label-eyebrow">Defenses</p>
+      {state.notes.length > 0 && (
+        <p className="text-xs text-base-content/70">{state.notes.join(' · ')}</p>
+      )}
+      {state.allOutDefense && (
+        <div className="flex flex-wrap gap-2" aria-label="All-Out Defense option">
+          {(['dodge', 'parry', 'block', 'double'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`chip${defenseOption === option ? ' on' : ''}`}
+              aria-pressed={defenseOption === option}
+              onClick={() => setDefenseOption(option)}
+            >
+              {option === 'double' ? 'Double defense' : `+2 ${option}`}
+            </button>
+          ))}
+          <p className="w-full text-xs text-base-content/60">
+            Choose for these rolls. Double defense grants a second, different defense after the
+            first fails; it adds no numerical bonus.
+          </p>
+        </div>
+      )}
 
       {/* GURPS defenses share the 3d6-vs-target shape with skill rolls but
           use a different "critical" table (auto success on 3-4, auto
@@ -140,6 +193,11 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         <span className="min-w-0 truncate text-sm font-medium">Move</span>
         <span className="num shrink-0 text-sm text-base-content">
           {moveNet}
+          {(moveNet !== encumberedMove || state.maneuver) && (
+            <span className="block text-[11px] text-base-content/60">
+              {encumberedMove} before pool, posture, and maneuver limits
+            </span>
+          )}
           {moveCaption && (
             <span className="block text-[11px] text-base-content/60">{moveCaption}</span>
           )}
@@ -148,7 +206,8 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
 
       <RollableRow
         label="Dodge"
-        baseTarget={dodge}
+        baseTarget={dodge ?? 0}
+        unavailableReason={state.reason('dodge')}
         openRoll={openRoll}
         sublabel={
           dodgeCaption ? (
@@ -158,11 +217,12 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       />
 
       {parryRows.map((row) =>
-        row.value != null ? (
+        row.value != null || state.reason('parry') ? (
           <RollableRow
             key={row.key}
             label={`Parry (${row.name})`}
-            baseTarget={row.value}
+            baseTarget={row.value ?? 0}
+            unavailableReason={state.reason('parry')}
             openRoll={openRoll}
             sublabel={<span className="block text-[11px] text-base-content/60">{row.caption}</span>}
           />
@@ -185,7 +245,15 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       {shield && blockResolution && blockResolution.kind === 'matched' && (
         <RollableRow
           label={`Block (${shield.name})`}
-          baseTarget={blockFromSkill(blockResolution.level, character.derived.blockMod) + db}
+          baseTarget={
+            state.defense(
+              'block',
+              blockFromSkill(blockResolution.level, character.derived.blockMod),
+              defenseOption,
+              db,
+            ) ?? 0
+          }
+          unavailableReason={state.reason('block')}
           openRoll={openRoll}
           sublabel={
             <span className="block text-[11px] text-base-content/60">
@@ -207,12 +275,14 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
 
       {parryRows.length === 0 && shield == null && (
         <p className="text-xs text-base-content/60">
-          No parryable weapons or shield equipped — Dodge is always available.
+          Equip a parryable weapon or shield to add those defenses.
         </p>
       )}
 
       <p className="text-[11px] text-base-content/50">
-        Active trait bonuses are included. Add any situational modifiers when rolling.
+        Active trait bonuses and recorded combat restrictions are included. Add situational
+        modifiers when rolling; shield DB assumes a covered attack. Move includes posture and
+        maneuver limits.
       </p>
     </section>
   );

@@ -8,6 +8,8 @@ export interface RollableRowProps {
   openRoll: (req: RollRequest) => void;
   /** Small caption under the label, e.g. provenance ("via Broadsword–14"). */
   sublabel?: ReactNode;
+  /** Known rules restriction: show an unavailable value without a roll action. */
+  unavailableReason?: string | null;
 }
 
 /**
@@ -19,7 +21,21 @@ export interface RollableRowProps {
  * Purely a dispatcher: it never mutates synced state, so it works
  * identically whether or not the viewer has write access.
  */
-export function RollableRow({ label, baseTarget, presets, openRoll, sublabel }: RollableRowProps) {
+export function RollableRow({
+  label,
+  baseTarget,
+  presets,
+  openRoll,
+  sublabel,
+  unavailableReason,
+}: RollableRowProps) {
+  if (unavailableReason)
+    return (
+      <div className="rounded-lg border border-base-300/60 px-3 py-2 text-sm">
+        <span className="font-medium">{label} — unavailable</span>
+        <span className="block text-xs text-base-content/60">{unavailableReason}</span>
+      </div>
+    );
   return (
     <button
       type="button"

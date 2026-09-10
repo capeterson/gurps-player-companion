@@ -274,7 +274,7 @@ on any sheet the viewer can edit — their own — it always shows).
     chip shows its blurb; tapping it again clears to no maneuver), plus
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
-  - **Defenses** — Move (read-only, net of encumbrance), Dodge (with
+  - **Defenses** — Move (read-only, net of encumbrance and combat restrictions), Dodge (with
     the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is
     resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
@@ -295,6 +295,23 @@ on any sheet the viewer can edit — their own — it always shows).
     Dodge already includes its derived modifier. Captions show these totals,
     including enabled conditional effects such as Enhanced Defenses. Additional
     situational modifiers can still be supplied in the roll sheet.
+    The shared `combatAdjustments.ts` layer halves current Move/Dodge below
+    one-third HP and below one-third FP, cumulatively with rounding up
+    (B419/B426; [official FAQ 3.4.5.7](https://www.sjgames.com/gurps/faq/FAQ4-3.html)).
+    Encumbrance precedes these reductions; DB and situational defense modifiers
+    follow them (B374). Low FP also halves usable ST for weapon parry shortfall,
+    without changing ST-based damage. Manual Reeling and Shock chips do not
+    trigger a second numerical penalty. Recorded stun adds −4, posture adds
+    the B551 defense penalty and limits movement, and known maneuvers limit
+    movement to their full/half/step/none allowance. All-Out Attack, unconsciousness,
+    sleeping, and the negative-FP floor disable defense actions; Move and Attack
+    disables parry. All-Out Defense offers a local roll option: +2 to the chosen
+    defense or Double Defense (no numerical bonus), with the selected chip highlighted.
+    Only Increased Dodge permits half Move; the other options permit a step (B366).
+    Evaluate permits a step; Wait permits no movement until its trigger (B364/B366).
+    Dodge has no minimum introduced by pool reductions. Changing character/maneuver
+    clears that selection. Breakdowns name pool/posture/stun/maneuver adjustments;
+    unmodeled tactical situations and custom maneuvers remain player-supplied.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
     thrust/swing + the weapon's modifiers) as **tappable chips that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
@@ -524,7 +541,8 @@ src/
                    (Dodge/Parry/Block, explicit-or-fuzzy weapon-to-skill
                    matching via `resolveWeaponSkill`, `skillDisplayName` for
                    specialization-disambiguated skill names, ST-shortfall
-                   penalty, equipped-shield picking), injuryCalc (incoming-
+                   penalty, equipped-shield picking), combatAdjustments (pool,
+                   posture, stun and maneuver limits on live defenses and Move), injuryCalc (incoming-
                    damage DR/divisor/wounding-multiplier resolution for the
                    Effective DR card's damage dialog), armorDr (armor + innate DR
                    aggregation per hit location + per-damage-type DR
