@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { MANA_LEVEL_LABELS } from '../../../shared/constants/magic.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
-import { api } from '../../lib/api.ts';
+import { getLocalDb } from '../../db/dexie.ts';
+import { ApiError, api } from '../../lib/api.ts';
+import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { useMirrorCampaigns } from '../characters/useMirrorCampaigns.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 import { GmChangeFeed } from './GmChangeFeed.tsx';
@@ -24,26 +27,28 @@ export function GmCampaignDashboardPage() {
     enabled: id.length > 0,
   });
   const characters = useCampaignCharacterDetails(id);
-  // Mirror the fetched campaign into Dexie so a settings save (e.g. tech
-  // level) is reflected on the GM cards immediately, without waiting on
-  // whatever last synced it there — this page is otherwise not one of the
-  // routes that keeps the local campaign mirror fresh (see
-  // useMirrorCampaigns.ts: campaigns have no outbox/cursor sync path, this
-  // REST fetch is the only route campaign rows have into Dexie).
+  const localCampaign = useLiveQuery(() => getLocalDb().campaigns.get(id), [id]);
+  // Refresh the read-only campaign mirror after settings edits. The cursor
+  // also populates it, allowing the dashboard to reopen without HTTP access.
   useMirrorCampaigns(campaign.data ? [campaign.data] : undefined);
 
   if (!id) return <p className="alert alert-error">Missing campaign id.</p>;
-  if (campaign.isLoading) return <p className="text-sm text-base-content/60">Loading campaign…</p>;
-  if (campaign.isError || !campaign.data)
+  const denied =
+    campaign.error instanceof ApiError && [401, 403, 404].includes(campaign.error.status);
+  const c = denied ? undefined : (campaign.data ?? localCampaign);
+  if (!c && campaign.isLoading)
+    return <p className="text-sm text-base-content/60">Loading campaign…</p>;
+  if (!c)
     return (
       <p className="alert alert-error">
         {(campaign.error as Error)?.message ?? 'Campaign not found.'}
       </p>
     );
 
-  const c = campaign.data;
-  const membership = c.members.find((member) => member.userId === me.data?.id);
-  const viewerRole = me.data?.id === c.ownerId ? 'owner' : (membership?.role ?? 'member');
+  const viewerId = me.data?.id ?? readUserIdFromToken();
+  const membership = campaign.data?.members.find((member) => member.userId === viewerId);
+  const viewerRole =
+    viewerId === c.ownerId ? 'owner' : (membership?.role ?? localCampaign?.viewerRole ?? 'member');
   const canManage = viewerRole === 'owner' || viewerRole === 'manager';
   const names = new Map(characters?.map((character) => [character.id, character.name]));
 
@@ -60,7 +65,9 @@ export function GmCampaignDashboardPage() {
               <span className="chip on text-xs">
                 {viewerRole === 'owner' ? 'Owner' : viewerRole === 'manager' ? 'Manager' : 'Player'}
               </span>
-              <span className="chip text-xs">{MANA_LEVEL_LABELS[c.manaLevel]} mana</span>
+              <span className="chip text-xs">
+                {MANA_LEVEL_LABELS[c.manaLevel ?? 'normal']} mana
+              </span>
               <span className="chip text-xs">
                 Sheets {c.shareCharacterSheets ? 'shared' : 'private'}
               </span>
@@ -83,7 +90,7 @@ export function GmCampaignDashboardPage() {
             >
               Skill lookup
             </button>
-            {canManage && (
+            {canManage && campaign.data && (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -137,10 +144,10 @@ export function GmCampaignDashboardPage() {
         )}
       </main>
 
-      {settingsOpen && (
+      {settingsOpen && campaign.data && (
         <CampaignSettingsDialog
           open
-          campaign={c}
+          campaign={campaign.data}
           viewerRole={viewerRole}
           onClose={() => setSettingsOpen(false)}
         />

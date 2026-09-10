@@ -1,17 +1,37 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { LibraryMechanics } from '../../../shared/schemas/libraryMechanics.ts';
 import { getLocalDb } from '../../db/dexie.ts';
-import { api } from '../../lib/api.ts';
+import { tokenStore } from '../../lib/tokenStore.ts';
+import { getSyncOrchestrator, resetSyncOrchestratorForTests } from '../../sync/orchestrator.ts';
+import { enqueueFieldPatch } from '../../sync/outbox.ts';
+import { GmCampaignDashboardPage } from '../campaigns/GmCampaignDashboardPage.tsx';
+import { GmCharacterCard } from '../campaigns/GmCharacterCard.tsx';
+import { useCampaignCharacterDetails } from '../campaigns/useCampaignCharacterDetails.ts';
+import { CharacterSheetPage } from './CharacterSheetPage.tsx';
+import { DefensesCard } from './sections/combat/DefensesCard.tsx';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
-vi.mock('../../lib/api.ts', async (original) => ({
-  ...(await original<typeof import('../../lib/api.ts')>()),
-  api: vi.fn(),
-}));
+vi.mock('../../lib/toast.tsx', () => ({ useToasts: () => ({ push: vi.fn() }) }));
 
-async function seed() {
+const CID = '0193b3c0-f1f0-7000-8000-00000000c001';
+const CAMPAIGN = '0193b3c0-f1f0-7000-8000-00000000c002';
+const SOURCE = '0193b3c0-f1f0-7000-8000-00000000c003';
+const SKILL = '0193b3c0-f1f0-7000-8000-00000000c004';
+const TRAIT = '0193b3c0-f1f0-7000-8000-00000000c005';
+const snapshot: LibraryMechanics = {
+  sourceId: SOURCE,
+  campaignId: CAMPAIGN,
+  sourceRevision: 4,
+  effects: [
+    { target: 'dx', value: 2, scaling: 'flat' },
+    { target: 'dodge', value: 1, scaling: 'flat' },
+  ],
+};
+
+async function seed(mechanics: LibraryMechanics | undefined = snapshot) {
   const db = getLocalDb();
   const dates = {
     createdAt: new Date().toISOString(),
@@ -19,10 +39,10 @@ async function seed() {
     revision: 1,
   };
   await db.characters.put({
-    id: 'character',
+    id: CID,
     ownerId: 'owner',
-    campaignId: 'campaign',
-    name: 'Test',
+    campaignId: CAMPAIGN,
+    name: 'Test Hero',
     height: null,
     weight: null,
     age: null,
@@ -44,66 +64,230 @@ async function seed() {
     ...dates,
   });
   await db.characterTraits.put({
-    id: 'trait',
-    characterId: 'character',
-    name: 'Skin',
+    id: TRAIT,
+    characterId: CID,
+    name: 'Reflexes',
     kind: 'advantage',
-    points: 5,
+    points: 15,
     level: 1,
     variantName: null,
     notes: null,
     modifiers: [],
-    libraryTraitId: 'skin',
+    libraryTraitId: SOURCE,
+    libraryMechanics: mechanics,
+    ...dates,
+  });
+  await db.characterSkills.put({
+    id: SKILL,
+    characterId: CID,
+    name: 'Sword',
+    attribute: 'DX',
+    difficulty: 'A',
+    points: 2,
+    techLevel: null,
+    specialization: null,
+    notes: null,
+    librarySkillId: SKILL,
+    libraryMechanics: {
+      ...snapshot,
+      sourceId: SKILL,
+      effects: [{ target: 'skill', skillName: 'Sword', value: 1, scaling: 'flat' }],
+    },
     ...dates,
   });
 }
 
-function setup() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  );
-  return { client, ...renderHook(() => useCharacterDetail('character'), { wrapper }) };
-}
+afterEach(() => {
+  vi.unstubAllGlobals();
+  tokenStore.clear();
+  resetSyncOrchestratorForTests();
+});
 
-describe('local library effect availability', () => {
-  it('keeps linked effects unknown until loading finishes, including known empty definitions', async () => {
-    await seed();
-    let complete: (value: unknown) => void = () => {};
-    vi.mocked(api).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          complete = resolve;
-        }),
-    );
-    const { result, client } = setup();
-    await waitFor(() => expect(result.current?.libraryEffectsKnown).toBe(false));
-    await act(async () => complete({ traits: [{ id: 'skin', effects: [] }], skills: [] }));
-    await waitFor(() => expect(result.current?.libraryEffectsKnown).toBe(true));
-    expect(result.current?.derived.traitDr).toBe(0);
-    act(() =>
-      client.setQueryData(['campaigns', 'campaign', 'library'], {
-        traits: [{ id: 'skin', effects: [{ target: 'dr', value: 5, scaling: 'flat' }] }],
-        skills: [],
-      }),
-    );
-    await waitFor(() => expect(result.current?.derived.traitDr).toBe(5));
-    expect(result.current?.libraryEffectsKnown).toBe(true);
-  });
-
-  it.each(['missing', 'offline'])(
-    'keeps %s definitions unknown instead of treating them as zero',
-    async (mode) => {
+describe('durable character mechanics', () => {
+  it.each(['player', 'gm'])(
+    'keeps the %s page available offline and hides unresolved calculations',
+    async (view) => {
       await seed();
-      if (mode === 'offline') vi.mocked(api).mockRejectedValue(new Error('Offline'));
-      else vi.mocked(api).mockResolvedValue({ traits: [], skills: [] });
-      const { result, client } = setup();
-      await waitFor(() =>
-        expect(client.getQueryState(['campaigns', 'campaign', 'library'])?.fetchStatus).toBe(
-          'idle',
-        ),
+      await getLocalDb().characterTraits.update(TRAIT, { libraryMechanics: null });
+      await getLocalDb().campaigns.put({
+        id: CAMPAIGN,
+        ownerId: 'owner',
+        viewerRole: 'owner',
+        name: 'Local Campaign',
+        description: null,
+        pointTarget: null,
+        disadvantageCap: null,
+        quirkCap: null,
+        revision: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      tokenStore.write({
+        accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+        refreshToken: 'refresh',
+        accessTokenExpiresIn: 0,
+      });
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+      const path = view === 'player' ? `/characters/${CID}` : `/campaigns/${CAMPAIGN}/gm`;
+      render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/characters/:id" element={<CharacterSheetPage />} />
+              <Route path="/campaigns/:id/gm" element={<GmCampaignDashboardPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
       );
-      await waitFor(() => expect(result.current?.libraryEffectsKnown).toBe(false));
+      await waitFor(() =>
+        expect(screen.getByText(/Linked rules are unavailable/)).toBeInTheDocument(),
+      );
+      expect(screen.queryByText('Dodge')).not.toBeInTheDocument();
+      await act(async () => {
+        await getLocalDb().characterTraits.update(TRAIT, { libraryMechanics: snapshot });
+      });
+      await waitFor(() =>
+        expect(screen.queryByText(/Linked rules are unavailable/)).not.toBeInTheDocument(),
+      );
+      expect(screen.getAllByText('Dodge').length).toBeGreaterThan(0);
     },
   );
+
+  it('validates synced declarations, preserves pending input, and retains definitions on HTTP failure', async () => {
+    await seed();
+    const db = getLocalDb();
+    const row = await db.characterTraits.get(TRAIT);
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 0,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character_trait',
+      entityId: TRAIT,
+      fieldPath: 'name',
+      attemptedValue: 'My edited name',
+    });
+    const updated = {
+      ...snapshot,
+      sourceRevision: 9,
+      effects: [{ target: 'dx' as const, value: 4, scaling: 'flat' as const }],
+    };
+    const response = (mechanics: unknown) =>
+      new Response(
+        JSON.stringify({
+          changes: [
+            {
+              entityClass: 'character_trait',
+              entityId: TRAIT,
+              command: 'patch',
+              revision: 2,
+              data: { ...row, name: 'Stale server name', revision: 2, libraryMechanics: mechanics },
+            },
+          ],
+          nextCursor: { character_trait: 2 },
+          hasMore: {},
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() => Promise.resolve(response(updated))),
+    );
+    await getSyncOrchestrator().triggerCursorPull(true);
+    expect((await db.characterTraits.get(TRAIT))?.name).toBe('My edited name');
+    expect((await db.characterTraits.get(TRAIT))?.libraryMechanics).toEqual(updated);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    await expect(getSyncOrchestrator().triggerCursorPull(true)).rejects.toThrow();
+    expect((await db.characterTraits.get(TRAIT))?.libraryMechanics).toEqual(updated);
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementation(() =>
+          Promise.resolve(response({ ...updated, effects: [{ target: 'invalid' }] })),
+        ),
+    );
+    await expect(getSyncOrchestrator().triggerCursorPull(true)).rejects.toThrow();
+    expect((await db.characterTraits.get(TRAIT))?.libraryMechanics).toEqual(updated);
+  });
+
+  it('preserves player and GM derivations and dispatched defenses through an offline DB close/reopen', async () => {
+    await seed();
+    const first = renderHook(() => useCharacterDetail(CID));
+    await waitFor(() => expect(first.result.current?.libraryEffectsKnown).toBe(true));
+    const online = first.result.current;
+    first.unmount();
+    const db = getLocalDb();
+    db.close();
+    await db.open();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    const player = renderHook(() => useCharacterDetail(CID));
+    const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
+    await waitFor(() => expect(player.result.current?.libraryEffectsKnown).toBe(true));
+    await waitFor(() => expect(gm.result.current?.[0]?.libraryEffectsKnown).toBe(true));
+    expect(player.result.current).toEqual(online);
+    expect(gm.result.current?.[0]).toEqual(online);
+    expect(online?.derived.effectiveDx).toBe(12);
+    expect(online?.skills[0]?.effectiveLevel).toBe(13);
+    if (!player.result.current) throw new Error('Missing character');
+    const openRoll = vi.fn();
+    render(<DefensesCard character={player.result.current} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(openRoll.mock.calls[0]?.[0].baseTarget).toBe(9);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['legacy', 'deleted', 'different-source', 'different-campaign'])(
+    'shows %s mechanics as unavailable on both readers and the GM card',
+    async (mode) => {
+      await seed();
+      const value =
+        mode === 'legacy'
+          ? null
+          : {
+              ...snapshot,
+              ...(mode === 'deleted' ? { sourceRevision: null, effects: null } : {}),
+              ...(mode === 'different-source' ? { sourceId: SKILL } : {}),
+              ...(mode === 'different-campaign' ? { campaignId: SKILL } : {}),
+            };
+      await getLocalDb().characterTraits.update(TRAIT, { libraryMechanics: value });
+      const player = renderHook(() => useCharacterDetail(CID));
+      const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
+      await waitFor(() => expect(player.result.current?.libraryEffectsKnown).toBe(false));
+      await waitFor(() => expect(gm.result.current?.[0]?.libraryEffectsKnown).toBe(false));
+      const character = gm.result.current?.[0];
+      if (!character) throw new Error('Missing character');
+      render(<GmCharacterCard character={character} dense={false} lookup="Sword" />);
+      expect(screen.getByRole('alert')).toHaveTextContent('Linked rules are unavailable');
+      expect(screen.queryByText('Dodge')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sword')).not.toBeInTheDocument();
+    },
+  );
+
+  it('recognizes known empty effects and updates both views when a subsequent synced revision arrives', async () => {
+    await seed({ ...snapshot, effects: [] });
+    const player = renderHook(() => useCharacterDetail(CID));
+    const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
+    await waitFor(() => expect(player.result.current?.libraryEffectsKnown).toBe(true));
+    expect(player.result.current?.derived.effectiveDx).toBe(10);
+    await act(async () => {
+      await getLocalDb().characterTraits.update(TRAIT, {
+        libraryMechanics: { ...snapshot, sourceRevision: 5 },
+      });
+    });
+    await waitFor(() => expect(player.result.current?.derived.effectiveDx).toBe(12));
+    await waitFor(() => expect(gm.result.current?.[0]?.derived.effectiveDx).toBe(12));
+  });
+
+  it('purges definitions with their character rows before another account uses the DB', async () => {
+    await seed();
+    await getSyncOrchestrator().purge();
+    expect(await getLocalDb().characterTraits.count()).toBe(0);
+    expect(await getLocalDb().characterSkills.count()).toBe(0);
+    const player = renderHook(() => useCharacterDetail(CID));
+    await waitFor(() => expect(player.result.current).toBeNull());
+  });
 });

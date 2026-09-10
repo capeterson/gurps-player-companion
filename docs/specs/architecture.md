@@ -71,9 +71,9 @@ lives in the **page** orchestrator, not the service worker — see below.)
   OpenAPI).
 - **`src/client/`** — the React PWA (`features/`, `sync/`, `db/`, `hooks/`,
   `components/`), plus a separate `admin/` SPA entry.
-- **`src/sw/`** — service worker registration only: app-shell precache + a few
-  read-only GET caches (library, `/auth/me`) so a fresh device has a fallback
-  when Dexie is empty. It **never** caches mutations or replays sync ops —
+- **`src/sw/`** — service worker registration and app-shell precache. Authenticated
+  API responses are not cached by URL. Mechanical declarations needed offline
+  arrive with character cursor rows and persist in Dexie. It never caches mutations or replays sync ops —
   outbox replay is page-orchestrator territory (`src/sw/registerSW.ts`).
   It also owns **update discovery** — see below.
 

@@ -197,6 +197,13 @@ payload and no WebSocket row streaming. The activity rail polls the existing
 campaign character-history endpoint every five seconds and visually fades newly
 observed events over 30 seconds.
 
+Player sheets and GM cards share `joinCharacterMechanics`, reading the validated
+source/version declarations on synced trait/skill rows. The GM dashboard uses its
+local campaign mirror when HTTP is unavailable, while an explicit authorization
+failure still blocks it. Missing definitions show an unavailable notice instead
+of baseline stats or skill-lookup numbers. No authenticated service-worker cache
+is involved; closing the app offline retains the same local derivation.
+
 ## Encounter tracker
 
 The online-only encounter REST aggregate lives in

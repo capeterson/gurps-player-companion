@@ -81,11 +81,12 @@ persists JSON of its own:
 
 | Store.field | Shape |
 |---|---|
+| `characterTraits.libraryMechanics`, `characterSkills.libraryMechanics` | `libraryMechanics` (libraryMechanics.ts): nullable `{ sourceId, campaignId, sourceRevision, effects }` read-only cursor projection. Null effects mean unavailable, an empty array means known empty. Validated during server projection, client cursor application and local derivation. Typed as `LibraryMechanics` in Dexie; there is no corresponding Postgres column. |
 | `outbox.attemptedValue` / `prevValue` | The **bare field value** for `patch` ops (rule S2), the full create payload for `create`, the deleted row snapshot for `delete`. Never a wrapper object. |
 | `syncMeta.value` | Per-key blobs (e.g. `bootstrap:<userId>` → `{ bootstrappedAt }`). Owned by the orchestrator. |
 | `rejectionToasts` rows | `RejectionRecord` interface in dexie.ts. |
 
-These are client-internal (never sent verbatim to the server — `outbox`
+The remaining sync bookkeeping rows are client-internal (never sent verbatim to the server — `outbox`
 entries are re-validated server-side per field) so TypeScript interfaces in
 `dexie.ts` are their schema documents.
 

@@ -37,6 +37,7 @@ import {
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { CharacterMinimalView } from './CharacterMinimalView.tsx';
+import { MechanicsUnavailable } from './MechanicsUnavailable.tsx';
 import { ActiveConditionsPanel } from './sections/ActiveConditionsPanel.tsx';
 import { HistoryPanel } from './sections/HistoryPanel.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
@@ -1602,19 +1603,27 @@ export function CharacterSheetPage() {
 
       <IdentityHero character={character} pointTarget={pointTarget} canWrite={canWrite} />
 
-      <WarningsPanel character={character} canWrite={canWrite} />
+      {character.libraryEffectsKnown === false && <MechanicsUnavailable />}
+      {character.libraryEffectsKnown !== false && (
+        <>
+          <WarningsPanel character={character} canWrite={canWrite} />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AttributesPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
-        <SecondaryModsPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
-        <StatusPanel character={character} canWrite={canWrite} />
-        <div className="grid grid-cols-1 gap-4">
-          <PointsPanel character={character} pointTarget={pointTarget} />
-          <EncumbrancePanel character={character} />
-          <ActiveConditionsPanel character={character} canWrite={canWrite} />
-        </div>
-      </div>
-
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <AttributesPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
+            <SecondaryModsPanel
+              character={character}
+              canWrite={canWrite}
+              tempEffects={tempEffects}
+            />
+            <StatusPanel character={character} canWrite={canWrite} />
+            <div className="grid grid-cols-1 gap-4">
+              <PointsPanel character={character} pointTarget={pointTarget} />
+              <EncumbrancePanel character={character} />
+              <ActiveConditionsPanel character={character} canWrite={canWrite} />
+            </div>
+          </div>
+        </>
+      )}
       <div className="panel-tabs">
         {visibleTabs.map((t) => {
           const count = counts[t as keyof CountByTab];
@@ -1633,7 +1642,9 @@ export function CharacterSheetPage() {
       </div>
 
       <div>
-        {tab === 'Combat' && <CombatTab character={character} canWrite={canWrite} />}
+        {tab === 'Combat' && character.libraryEffectsKnown !== false && (
+          <CombatTab character={character} canWrite={canWrite} />
+        )}
         {tab === 'Identity' && (
           <IdentityPanel
             character={character}
@@ -1642,14 +1653,14 @@ export function CharacterSheetPage() {
           />
         )}
         {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
-        {tab === 'Skills' && (
+        {tab === 'Skills' && character.libraryEffectsKnown !== false && (
           <div className="space-y-4">
             <SkillsPanel character={character} canWrite={canWrite} />
             <TechniquesPanel character={character} canWrite={canWrite} />
             <LanguagesPanel character={character} canWrite={canWrite} />
           </div>
         )}
-        {tab === 'Magic' && (
+        {tab === 'Magic' && character.libraryEffectsKnown !== false && (
           <div className="space-y-4">
             <SpellsPanel character={character} canWrite={canWrite} />
             <PowerstonesPanel character={character} canWrite={canWrite} />

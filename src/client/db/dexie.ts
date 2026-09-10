@@ -33,6 +33,7 @@ import {
   type TempEffect,
   type TempStatAxis,
 } from '../../shared/schemas/character.ts';
+import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
 
 /**
@@ -95,6 +96,8 @@ export interface LocalCharacterTrait {
   notes: string | null;
   modifiers: unknown[];
   libraryTraitId: string | null;
+  /** Validated read-only declaration projection from the sync cursor; absent on legacy rows. */
+  libraryMechanics?: LibraryMechanics | null;
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -111,6 +114,7 @@ export interface LocalCharacterSkill {
   specialization: string | null;
   notes: string | null;
   librarySkillId: string | null;
+  libraryMechanics?: LibraryMechanics | null;
   defaults?: import('../../shared/schemas/skill.ts').SkillDefaults;
   createdAt: string;
   updatedAt: string;
@@ -575,6 +579,12 @@ class LocalDb extends Dexie {
     this.version(8).stores({
       characterTechniques: 'id, characterId, updatedAt, revision',
     });
+    // Re-pull legacy rows once online to obtain their mechanical declarations.
+    this.version(9)
+      .stores({ syncCursors: 'entityClass' })
+      .upgrade(async (tx) => {
+        await tx.table('syncCursors').bulkDelete(['character_trait', 'character_skill']);
+      });
   }
 }
 
