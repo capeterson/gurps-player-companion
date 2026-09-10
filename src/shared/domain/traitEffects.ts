@@ -245,24 +245,36 @@ export function applyEffectsToAttrs(
 }
 
 /**
- * Sum of ACTIVE skill-target effects matching the given skill name.
- * Used to compute effectiveSkillLevel = base + skillBonusFor(name).
- *
- * Matching is case-insensitive and substring-tolerant on the trailing
- * "(specialty)" suffix — "Stealth" matches both "Stealth" and "Stealth
- * (Urban)" effects.
+ * Sum ACTIVE skill bonuses matching name and specialization. Unqualified
+ * effects cover every specialty; explicit specialties match exactly. `*`
+ * matches any name/specialty in its own field. Legacy "Name (Specialty)"
+ * strings retain their specialty; a separate specialty field takes priority.
  */
 export function skillBonusFor(
   skillName: string,
   effects: ReadonlyArray<ResolvedEffect>,
+  specialization?: string | null,
 ): { total: number; sources: ReadonlyArray<ResolvedEffect> } {
-  const wantedBase = skillName.toLowerCase().replace(/\s*\(.*\)\s*$/, '');
+  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  function split(name: string, specialty?: string | null) {
+    const match = name.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+    return {
+      name: normalize(match?.[1] ?? name),
+      specialty: normalize(specialty?.trim() || match?.[2] || ''),
+    };
+  }
+  const wanted = split(skillName, specialization);
   const matches: ResolvedEffect[] = [];
   let total = 0;
   for (const eff of effects) {
     if (eff.target !== 'skill' || !eff.active || !eff.skillName) continue;
-    const candidate = eff.skillName.toLowerCase().replace(/\s*\(.*\)\s*$/, '');
-    if (candidate === wantedBase || candidate === '*') {
+    const candidate = split(eff.skillName, eff.skillSpecialty);
+    if (
+      (candidate.name === wanted.name || candidate.name === '*') &&
+      (!candidate.specialty ||
+        candidate.specialty === '*' ||
+        candidate.specialty === wanted.specialty)
+    ) {
       matches.push(eff);
       total += eff.value;
     }

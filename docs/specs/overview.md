@@ -105,6 +105,10 @@ on any sheet the viewer can edit — their own — it always shows).
   rounds against the character (B102), then flat modifiers add.
   Per-level mechanical effects scale by the purchased level, including zero;
   legacy null levels count as one. Flat effects apply independently of level.
+  Skill-target effects respect explicit specializations (case/whitespace
+  normalized). Unqualified names cover every specialty; `*` matches any name
+  or specialty in its own field. Legacy `Name (Specialty)` effects retain
+  that restriction unless an explicit `skillSpecialty` overrides it.
 - **Skills** with attribute/difficulty relative levels. A 0-point skill
   shows its **attribute default** (attr-4/-5/-6 for E/A/H per B173);
   0-point Very Hard skills have no default, so their level renders as

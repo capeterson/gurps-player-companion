@@ -513,7 +513,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const inventoryOut = inventory.map((i) => buildInventoryItemOut(i, weights.perItem));
   const traitsOut = traits.map(buildTraitOut);
   const skillsOut = skills.map((s) =>
-    buildSkillOut(s, derived, skillBonusFor(s.name, resolved).total),
+    buildSkillOut(s, derived, skillBonusFor(s.name, resolved, s.specialization).total),
   );
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
