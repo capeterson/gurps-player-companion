@@ -25,6 +25,12 @@ describe('effectiveDodge', () => {
 });
 
 describe('parryFromSkill', () => {
+  it('adds defense modifiers after halving skill, once', () => {
+    expect(parryFromSkill(14, 0, 1)).toBe(11);
+    expect(parryFromSkill(14, 2, -1)).toBe(11);
+    expect(blockFromSkill(14, 1)).toBe(11);
+    expect(blockFromSkill(14, -2)).toBe(8);
+  });
   it('computes floor(skill/2) + 3 + weapon mod', () => {
     expect(parryFromSkill(14, 0)).toBe(10);
     expect(parryFromSkill(15, 1)).toBe(11);

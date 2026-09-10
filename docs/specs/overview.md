@@ -240,8 +240,7 @@ on any sheet the viewer can edit — their own — it always shows).
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
   - **Defenses** — Move (read-only, net of encumbrance), Dodge (with
-    the encumbrance-penalty breakdown and no invented minimum;
-    situational trait-based active-defense bonuses remain unmodeled),
+    the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is
     resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
     an explicit `weaponData.skill` binding (exact case-insensitive
@@ -256,7 +255,11 @@ on any sheet the viewer can edit — their own — it always shows).
     Parry, and Block (B287), along with any **armor DB** from Deflect
     enchantments (`armorData.db`, summed across all equipped armor by
     `sumArmorDb`) — the captions break down both sources. Every numeric
-    defense opens the roll sheet.
+    defense opens the roll sheet. Active derived Parry/Block modifiers are
+    added once after halving skill, through the shared defense helpers;
+    Dodge already includes its derived modifier. Captions show these totals,
+    including enabled conditional effects such as Enhanced Defenses. Additional
+    situational modifiers can still be supplied in the roll sheet.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
     thrust/swing + the weapon's modifiers) as **tappable chips that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing

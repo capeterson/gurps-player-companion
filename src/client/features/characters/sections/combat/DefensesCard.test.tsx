@@ -8,6 +8,8 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { CharacterAttrs } from '../../../../../shared/domain/characterCalc.ts';
+import { applyEffectsToAttrs, resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { DefensesCard } from './DefensesCard.tsx';
@@ -88,6 +90,80 @@ function targetFor(openRoll: ReturnType<typeof vi.fn>, index: number): number {
 }
 
 describe('DefensesCard', () => {
+  it.each([0, 2])('dispatches trait-adjusted defense targets exactly once with DB %i', (db) => {
+    const openRoll = vi.fn();
+    const base = makeCharacter(
+      [
+        { id: 'w1', name: 'Broadsword', parry: '0', skill: 'Broadsword' },
+        { id: 'w2', name: 'Saber', parry: '0F', skill: 'Saber' },
+        { id: 'missing', name: 'Axe', parry: '0', skill: 'Axe/Mace' },
+        { id: 'shield', name: 'Shield', db, skill: 'Shield' },
+      ],
+      [
+        { name: 'Broadsword', level: 14 },
+        { name: 'Saber', level: 14 },
+        { name: 'Shield', level: 14 },
+      ],
+    );
+    const withEffects = (enabled: boolean): CharacterDetail => {
+      const resolved = resolveEffects(
+        [
+          {
+            id: 'cr',
+            name: 'Combat Reflexes',
+            level: null,
+            libraryEffects: [
+              { target: 'dodge', value: 1, scaling: 'flat' },
+              { target: 'parry', value: 1, scaling: 'flat' },
+              { target: 'block', value: 1, scaling: 'flat' },
+            ],
+          },
+          {
+            id: 'enhanced',
+            name: 'Enhanced Defenses',
+            level: 2,
+            libraryEffects: [
+              { target: 'parry', value: 1, scaling: 'per_level', conditionGroup: 'ready' },
+              { target: 'block', value: 1, scaling: 'flat', conditionGroup: 'ready' },
+            ],
+          },
+        ],
+        [],
+        new Set(enabled ? ['ready'] : []),
+      );
+      const mods = applyEffectsToAttrs(
+        { dodgeMod: 0, parryMod: 0, blockMod: 0 } as CharacterAttrs,
+        resolved,
+      );
+      return {
+        ...base,
+        derived: {
+          ...base.derived,
+          dodge: 9 + mods.dodgeMod,
+          parryMod: mods.parryMod,
+          blockMod: mods.blockMod,
+        },
+      };
+    };
+    const view = render(<DefensesCard character={withEffects(false)} openRoll={openRoll} />);
+    const rollTargets = () => {
+      openRoll.mockClear();
+      for (const name of ['Dodge', 'Parry (Broadsword)', 'Parry (Saber)', 'Block (Shield)']) {
+        fireEvent.click(
+          screen.getByRole('button', { name: new RegExp(name.replace(/[()]/g, '\\$&')) }),
+        );
+      }
+      return openRoll.mock.calls.map((call) => (call[0] as RollRequest).baseTarget);
+    };
+    expect(rollTargets()).toEqual([10 + db, 11 + db, 11 + db, 11 + db]);
+    expect(screen.queryByRole('button', { name: /Parry \(Axe\)/ })).not.toBeInTheDocument();
+    view.rerender(<DefensesCard character={withEffects(true)} openRoll={openRoll} />);
+    expect(rollTargets()).toEqual([10 + db, 13 + db, 13 + db, 12 + db]);
+    expect(screen.getAllByText(/\+ 3 defense modifiers/)).toHaveLength(2);
+    view.rerender(<DefensesCard character={withEffects(false)} openRoll={openRoll} />);
+    expect(rollTargets()).toEqual([10 + db, 11 + db, 11 + db, 11 + db]);
+  });
+
   it('adds shield DB to Dodge, Parry, and Block', () => {
     const openRoll = vi.fn();
     const character = makeCharacter(
