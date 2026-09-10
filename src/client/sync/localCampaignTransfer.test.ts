@@ -82,6 +82,127 @@ afterEach(async () => {
 });
 
 describe('local campaign transfer', () => {
+  it('keeps newly arrived destination item and spell links after a delayed transfer acknowledgement', async () => {
+    await seed();
+    const db = getLocalDb();
+    await patch(campaignB);
+    const sent = await queued();
+    await db.outbox.update(sent.clientOpId, { status: 'in_flight' });
+    const itemId = crypto.randomUUID();
+    const spellId = crypto.randomUUID();
+    await internals().applyServerRow(
+      'character_inventory',
+      { id: itemId, characterId, name: 'Destination item', libraryItemId: sourceId },
+      {},
+    );
+    await internals().applyServerRow(
+      'character_spell',
+      { id: spellId, characterId, name: 'Destination spell', librarySpellId: sourceId },
+      {},
+    );
+    await finish(sent, 'applied');
+    expect((await db.characterInventory.get(itemId))?.libraryItemId).toBe(sourceId);
+    expect((await db.characterSpells.get(spellId))?.librarySpellId).toBe(sourceId);
+  });
+  it('detaches proven old-campaign rules and preserves new references without campaign evidence', async () => {
+    await seed();
+    const db = getLocalDb();
+    const rows = [
+      [
+        'character_trait',
+        db.characterTraits,
+        'libraryTraitId',
+        { ...(await db.characterTraits.get(traitId)) },
+      ],
+      [
+        'character_skill',
+        db.characterSkills,
+        'librarySkillId',
+        { ...(await db.characterSkills.get(skillId)) },
+      ],
+      ['character_spell', db.characterSpells, 'librarySpellId', {}],
+      ['character_inventory', db.characterInventory, 'libraryItemId', {}],
+      ['character_language', db.characterLanguages, 'libraryLanguageId', {}],
+      ['character_technique', db.characterTechniques, 'libraryTechniqueId', {}],
+    ] as const;
+    await db.characterTraits.clear();
+    await db.characterSkills.clear();
+    await patch(campaignB);
+    const sent = await queued();
+    const ids: string[] = [];
+    for (const [entityClass, table, field, data] of rows) {
+      const id = crypto.randomUUID();
+      ids.push(id);
+      await internals().applyServerRow(
+        entityClass,
+        { ...data, id, characterId, [field]: sourceId },
+        {},
+      );
+      expect(await table.get(id)).toHaveProperty(
+        field,
+        entityClass === 'character_trait' || entityClass === 'character_skill' ? null : sourceId,
+      );
+    }
+    expect((await queued()).localCampaignTransferUndo).toHaveLength(2);
+    await finish(sent, 'rejected');
+    for (const [index, [, table, field]] of rows.entries()) {
+      const id = ids[index];
+      if (!id) throw new Error('Missing fixture');
+      expect(await table.get(id)).toHaveProperty(field, sourceId);
+    }
+  });
+  it.each(['applied', 'rejected', 'stale_base'] as const)(
+    'retains newly downloaded child rules through %s using durable transfer undo',
+    async (status) => {
+      await seed();
+      const db = getLocalDb();
+      const incoming = await db.characterTraits.get(traitId);
+      await db.characterTraits.delete(traitId);
+      await patch(campaignB);
+      const beforePull = await queued();
+      await db.outbox.update(beforePull.clientOpId, { status: 'in_flight' });
+      await internals().applyServerRow('character_trait', { ...incoming }, {});
+      const owned = await db.characterTraits.get(traitId);
+      expect(owned?.libraryTraitId).toBeNull();
+      expect(ownedLibraryEffects(null, campaignB, owned?.libraryMechanics)).toEqual(effects);
+      db.close();
+      await db.open();
+      expect((await queued()).localCampaignTransferUndo).toHaveLength(2);
+      if (status === 'stale_base') {
+        await patch(campaignC);
+        await internals().applyOutcomes(
+          [beforePull],
+          [
+            {
+              clientOpId: beforePull.clientOpId,
+              status: 'stale_base',
+              newRevision: 4,
+              latestEntity: { id: characterId, campaignId: campaignA, revision: 4 },
+            },
+          ],
+        );
+        await finish(await queued(), 'rejected');
+      } else await finish(beforePull, status);
+      expect((await db.characterTraits.get(traitId))?.libraryMechanics).toEqual(
+        status === 'applied' ? { ...snapshot, detached: true } : snapshot,
+      );
+    },
+  );
+
+  it('leaves a newly downloaded destination definition linked', async () => {
+    await seed();
+    const db = getLocalDb();
+    const incoming = await db.characterSkills.get(skillId);
+    await db.characterSkills.delete(skillId);
+    await patch(campaignB);
+    await internals().applyServerRow(
+      'character_skill',
+      { ...incoming, libraryMechanics: { ...snapshot, campaignId: campaignB } },
+      {},
+    );
+    expect((await db.characterSkills.get(skillId))?.librarySkillId).toBe(sourceId);
+    expect((await queued()).localCampaignTransferUndo).toHaveLength(1);
+  });
   it('restores links for a queued return when the first transfer only received stale_base', async () => {
     await seed();
     const db = getLocalDb();

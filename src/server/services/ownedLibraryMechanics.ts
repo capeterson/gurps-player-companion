@@ -1,6 +1,7 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import { traitKindEnum } from '../../shared/schemas/trait.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
   campaignLibrarySkills,
@@ -78,6 +79,39 @@ export async function refreshOwnedLibraryMechanics(
     effects: source.effects,
     ...(detach ? { detached: true } : {}),
   });
+  if (kind === 'traits' && 'kind' in source && !detach) {
+    // A paid trait keeps its category. If the source changes categories,
+    // capture its last owned declaration and end the incompatible live link.
+    const mismatches = await tx
+      .select()
+      .from(characterTraits)
+      .where(
+        and(
+          eq(characterTraits.libraryTraitId, sourceId),
+          ne(characterTraits.kind, traitKindEnum.parse(source.kind)),
+          inArray(
+            characterTraits.id,
+            children.map((child) => child.id),
+          ),
+        ),
+      )
+      .for('update');
+    for (const child of mismatches) {
+      const saved = libraryMechanics.safeParse(child.libraryMechanics);
+      const retained =
+        saved.success && saved.data.sourceId === sourceId && saved.data.campaignId === campaignId
+          ? saved.data
+          : { sourceId, campaignId, sourceRevision: null, effects: null };
+      await tx
+        .update(characterTraits)
+        .set({
+          libraryTraitId: null,
+          libraryMechanics: libraryMechanics.parse({ ...retained, detached: true }),
+          updatedAt: new Date(),
+        })
+        .where(eq(characterTraits.id, child.id));
+    }
+  }
   await tx
     .update(childTable)
     .set({

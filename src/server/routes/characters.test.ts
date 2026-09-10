@@ -423,6 +423,84 @@ function bearer(token: string) {
 }
 
 describe('owned mechanics survive source lifecycle changes', () => {
+  it('detaches owned traits when a live source changes kind and freezes their paid rules', async () => {
+    const owner = await registerUser('source-kind-change');
+    const campaign = await createCampaign(owner.accessToken);
+    const request = (path: string, body: unknown, method = 'POST') =>
+      app.request(`/api/v1${path}`, {
+        method,
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify(body),
+      });
+    const sourceResponse = await request(`/campaigns/${campaign.id}/library/traits`, {
+      name: 'Mutable kind',
+      kind: 'advantage',
+      effects: [{ target: 'dx', value: 2 }],
+    });
+    expect(sourceResponse.status).toBe(201);
+    const source = (await sourceResponse.json()) as { id: string };
+    const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+    const attached = await request(`/characters/${character.id}/traits`, {
+      name: 'Paid advantage',
+      kind: 'advantage',
+      points: 20,
+      level: 2,
+      libraryTraitId: source.id,
+    });
+    expect(attached.status).toBe(201);
+    const paidId = ((await attached.json()) as { trait: { id: string } }).trait.id;
+    await getDb()
+      .insert(characterTraits)
+      .values({
+        characterId: String(character.id),
+        name: 'Legacy unknown',
+        kind: 'advantage',
+        libraryTraitId: source.id,
+        libraryMechanics: null,
+      });
+    const detail = async () =>
+      (await (
+        await app.request(`/api/v1/characters/${character.id}`, {
+          headers: bearer(owner.accessToken),
+        })
+      ).json()) as CharacterDetail;
+    const before = await detail();
+    expect(
+      (
+        await request(
+          `/campaigns/${campaign.id}/library/traits/${source.id}`,
+          { kind: 'disadvantage', effects: [{ target: 'dx', value: -5 }] },
+          'PATCH',
+        )
+      ).status,
+    ).toBe(200);
+    const detached = await detail();
+    expect(detached.traits.find((row) => row.id === paidId)).toMatchObject({
+      kind: 'advantage',
+      points: 20,
+      level: 2,
+      libraryTraitId: null,
+      libraryMechanics: {
+        ...before.traits.find((row) => row.id === paidId)?.libraryMechanics,
+        detached: true,
+      },
+    });
+    expect(detached.traits.find((row) => row.name === 'Legacy unknown')).toMatchObject({
+      libraryTraitId: null,
+      libraryMechanics: { effects: null, detached: true },
+    });
+    expect(detached.derived).toEqual(before.derived);
+    expect(
+      (
+        await request(
+          `/campaigns/${campaign.id}/library/traits/${source.id}`,
+          { effects: [{ target: 'dx', value: -9 }] },
+          'PATCH',
+        )
+      ).status,
+    ).toBe(200);
+    expect((await detail()).traits).toEqual(detached.traits);
+  });
   it('backfills and detaches same-campaign legacy traits whose source kind changed', async () => {
     const owner = await registerUser('legacy-kind-change');
     const campaign = await createCampaign(owner.accessToken);
