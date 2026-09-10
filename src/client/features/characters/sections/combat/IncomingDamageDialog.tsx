@@ -13,7 +13,7 @@
 
 import { type FormEvent, useMemo, useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
-import { aggregateDrByLocation } from '../../../../../shared/domain/armorDr.ts';
+import { effectiveDrByLocation } from '../../../../../shared/domain/armorDr.ts';
 import { applyDamage } from '../../../../../shared/domain/injuryCalc.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { useDialogState } from '../../../../hooks/useDialogState.ts';
@@ -71,7 +71,10 @@ export function IncomingDamageDialog({
   const [location, setLocation] = useState('torso');
   const [divisorRaw, setDivisorRaw] = useState('');
 
-  const drMap = useMemo(() => aggregateDrByLocation(character.inventory), [character.inventory]);
+  const drMap = useMemo(
+    () => effectiveDrByLocation(character.inventory, character.effects),
+    [character.inventory, character.effects],
+  );
 
   // Custom armor locations the character actually has, beyond the
   // canonical set, so a homebrew "wing"/"tail" location can be targeted.

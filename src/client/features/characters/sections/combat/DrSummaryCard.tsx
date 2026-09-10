@@ -1,5 +1,5 @@
 /**
- * DrSummaryCard — aggregates equipped armor DR per hit location for the
+ * DrSummaryCard — shows effective armor + innate DR per hit location for the
  * combat tab's left column. Complements the AttacksCard's hit-location
  * aim presets: the player can see what DR protects each location while
  * choosing where to aim.
@@ -13,7 +13,7 @@ import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import {
   type DrByLocation,
   type DrByLocationMap,
-  aggregateDrByLocation,
+  effectiveDrByLocation,
 } from '../../../../../shared/domain/armorDr.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
@@ -68,7 +68,7 @@ export interface DrSummaryCardProps {
 }
 
 export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryCardProps) {
-  const map: DrByLocationMap = aggregateDrByLocation(character.inventory);
+  const map: DrByLocationMap = effectiveDrByLocation(character.inventory, character.effects);
   const [damageOpen, setDamageOpen] = useState(false);
 
   // The incoming-damage helper only makes sense when it can actually
@@ -92,21 +92,6 @@ export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryC
       />
     ) : null;
 
-  if (map.size === 0) {
-    return (
-      <section className="card space-y-2 p-5">
-        <div className="flex items-center justify-between gap-2">
-          <p className="label-eyebrow">Armor DR</p>
-          {damageButton}
-        </div>
-        <p className="text-sm text-base-content/60">
-          No equipped armor — add armor in the Inventory tab.
-        </p>
-        {damageDialog}
-      </section>
-    );
-  }
-
   const wellKnown: DrEntry[] = HIT_LOCATIONS.flatMap((loc) => {
     const entry = map.get(loc);
     return entry ? [{ loc, ...entry }] : [];
@@ -118,9 +103,13 @@ export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryC
   return (
     <section className="card space-y-2 p-5">
       <div className="flex items-center justify-between gap-2">
-        <p className="label-eyebrow">Armor DR</p>
+        <p className="label-eyebrow">Effective DR</p>
         {damageButton}
       </div>
+      <p className="text-xs text-base-content/60">
+        Armor + active innate DR; skull includes natural DR 2. Unscoped innate DR excludes eyes
+        (B46).
+      </p>
       <ul className="space-y-0.5 text-sm">
         {wellKnown.map((entry) => (
           <li key={entry.loc} className="flex items-baseline justify-between gap-2">

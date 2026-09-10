@@ -1,8 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { ArmorData } from '../../../../../shared/schemas/inventory.ts';
+import { getLocalDb } from '../../../../db/dexie.ts';
+import { useCombatPatch } from '../useCombatPatch.ts';
+import { usePoolBumpers } from '../usePoolBumpers.ts';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
+vi.mock('../../../../lib/toast.tsx', () => ({ useToasts: () => ({ push: vi.fn() }) }));
 
 function makeCharacter(
   armor: Array<{ dr: number; locations: string[]; typedDr?: ArmorData['typedDr'] }>,
@@ -31,9 +36,77 @@ function makeCharacter(
 }
 
 describe('DrSummaryCard', () => {
-  it('shows empty state when no equipped armor exists', () => {
+  it.each([
+    ['torso', false, 'cr', '', 5, 1],
+    ['skull', false, 'cr', '', 9, 0],
+    ['torso', true, 'cut', '2', 9, 1],
+    ['eye', false, 'cr', '', 0, 24],
+  ] as const)(
+    'displays effective DR and applies actual HP loss at %s (armor %s)',
+    async (location, armored, type, divisor, dr, injury) => {
+      const character = makeCharacter(
+        armored ? [{ dr: 4, locations: ['torso'], typedDr: { cut: 5 } }] : [],
+      );
+      character.id = '0193b3c0-f1f0-7000-8000-00000000d044';
+      character.derived = { hp: 30, fp: 10 } as CharacterDetail['derived'];
+      character.combat = null;
+      character.effects = resolveEffects(
+        [
+          {
+            id: 'skin',
+            name: 'Skin',
+            level: 1,
+            libraryEffects: [
+              { target: 'dr', value: 5, scaling: 'flat' },
+              { target: 'dr', value: 2, scaling: 'flat', hitLocation: 'skull' },
+              { target: 'dr', value: 10, scaling: 'flat', conditionGroup: 'shield' },
+            ],
+          },
+        ],
+        [],
+        new Set(),
+      );
+      function Sheet() {
+        const patch = useCombatPatch(character);
+        const { bumpHp } = usePoolBumpers(character, true, patch);
+        return <DrSummaryCard character={character} canWrite hpMax={30} bumpHp={bumpHp} />;
+      }
+      render(<Sheet />);
+      const label = location === 'torso' ? 'Torso' : location === 'skull' ? 'Skull' : 'Eye';
+      if (dr > 0) {
+        const row = within(screen.getByRole('list')).getByText(label).closest('li');
+        expect(row).not.toBeNull();
+        expect(within(row as HTMLElement).getByText(String(dr))).toBeInTheDocument();
+      }
+      fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+      fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '6' } });
+      fireEvent.change(screen.getByLabelText('Type'), { target: { value: type } });
+      fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: location } });
+      if (divisor)
+        fireEvent.change(screen.getByLabelText('Armor divisor'), { target: { value: divisor } });
+      const apply = screen.getByRole('button', { name: `Apply −${injury} HP` });
+      if (injury === 0) {
+        expect(apply).toBeDisabled();
+        expect(await getLocalDb().outbox.count()).toBe(0);
+      } else {
+        fireEvent.click(apply);
+        await waitFor(async () =>
+          expect((await getLocalDb().characterCombat.get(character.id))?.currentHp).toBe(
+            30 - injury,
+          ),
+        );
+        expect((await getLocalDb().outbox.toArray())[0]).toMatchObject({
+          fieldPath: 'currentHp',
+          attemptedValue: 30 - injury,
+        });
+      }
+    },
+  );
+
+  it('shows natural skull protection when no equipped armor exists', () => {
     render(<DrSummaryCard character={{ id: 'c', inventory: [] } as unknown as CharacterDetail} />);
-    expect(screen.getByText(/No equipped armor/i)).toBeInTheDocument();
+    expect(screen.getByText('Skull')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 
   it('aggregates and displays DR per hit location', () => {
@@ -104,7 +177,8 @@ describe('DrSummaryCard', () => {
       ],
     } as unknown as CharacterDetail;
     render(<DrSummaryCard character={character} />);
-    expect(screen.getByText(/No equipped armor/i)).toBeInTheDocument();
+    expect(screen.queryByText('Torso')).not.toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
   });
 
   it('annotates typed DR overrides that differ from the base DR', () => {
