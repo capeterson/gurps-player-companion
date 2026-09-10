@@ -860,7 +860,7 @@ async function dispatchInventory(
     assertWrite(access);
     // Lock the character row to prevent race conditions on inventory parent
     // validation, then validate the parent item if specified.
-    await lockLibraryReferenceScope(tx, characterId);
+    await lockLibraryReferenceScope(tx, characterId, ctx.userId);
     if (body.parentId) {
       const [parent] = await tx
         .select({ id: inventoryItems.id })
@@ -921,7 +921,7 @@ async function dispatchInventory(
   // Serialize inventory-tree checks with REST mutations for this character.
   // Validation and the write must share this transaction; otherwise two
   // concurrent reparent operations can both approve a cycle.
-  await lockLibraryReferenceScope(tx, characterId);
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return await patchEntity({
     op,
     userId: ctx.userId,
