@@ -16,6 +16,7 @@
  * This module is page-only — never imported by the server.
  */
 
+import { invalidateLibrary } from '../features/campaigns/libraryInvalidation.ts';
 import { invalidateEncounter } from '../features/encounters/encounterInvalidation.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator } from './orchestrator.ts';
@@ -127,6 +128,7 @@ class SyncWsSubscriber {
       }
       if (!parsed) return;
       if (parsed.kind === 'sync_invalidate') {
+        if (parsed.campaignId) invalidateLibrary(parsed.campaignId);
         getSyncOrchestrator().triggerDrain();
       }
       if (parsed.kind === 'encounter_invalidate' && parsed.campaignId && parsed.encounterId) {
