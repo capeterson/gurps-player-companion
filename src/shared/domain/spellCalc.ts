@@ -109,7 +109,7 @@ export function canCastInMana(casterHasMagery: boolean, mana: ManaLevel): boolea
   return casterHasMagery;
 }
 
-/** B235 recovery amount, eligible only if spent on the mage's own turn.
+/** B235 recovery amount, eligible only if spent casting on the mage's own turn.
  * The UI qualifies the manual next-turn reminder; this does not schedule a refund. */
 export function spellFpRecovery(
   mana: ManaLevel,

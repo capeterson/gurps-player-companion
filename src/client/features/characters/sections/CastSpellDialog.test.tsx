@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useLayoutEffect } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { buildSpellOut } from '../../../../shared/domain/characterDetail.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
@@ -44,6 +45,35 @@ function fixture(mage = true, cost = 3, fp = 5, hp = 10) {
 }
 
 describe('very high mana spending', () => {
+  it('removes a stale roll before layout effects on a direct known-mana change', () => {
+    const props = fixture();
+    const client = new QueryClient();
+    function AfterCommit({ changed }: { changed: boolean }) {
+      useLayoutEffect(() => {
+        if (changed)
+          expect(screen.queryByRole('button', { name: 'Roll 3d6' })).not.toBeInTheDocument();
+      }, [changed]);
+      return null;
+    }
+    const panel = (changed: boolean) => (
+      <QueryClientProvider client={client}>
+        <SpellsPanel
+          character={{
+            ...props.character,
+            spells: [props.spell],
+            manaLevel: changed ? 'very_high' : 'normal',
+          }}
+          canWrite={false}
+        />
+        <AfterCommit changed={changed} />
+      </QueryClientProvider>
+    );
+    const view = render(panel(false));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
+    expect(screen.getByRole('button', { name: 'Roll 3d6' })).toBeInTheDocument();
+    view.rerender(panel(true));
+    expect(screen.getByRole('button', { name: 'Roll Light' })).toBeInTheDocument();
+  });
   it('discards an open roll across an unknown campaign mana transition', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const props = fixture();
@@ -165,7 +195,8 @@ describe('very high mana spending', () => {
       expect((await getLocalDb().characterInventory.get('stone'))?.powerstoneData).toMatchObject({
         currentEnergy: 0,
       });
-      expect(push.mock.calls.at(-1)?.[0]).toContain('restore 2 FP manually');
+      if (mode === 'cast') expect(push.mock.calls.at(-1)?.[0]).toContain('restore 2 FP manually');
+      else expect(push.mock.calls.at(-1)?.[0]).not.toContain('restore');
       const ops = await getLocalDb().outbox.toArray();
       expect(ops).toHaveLength(3);
       expect(ops.every((op) => typeof op.batchId === 'string')).toBe(true);
@@ -173,13 +204,16 @@ describe('very high mana spending', () => {
     },
   );
 
-  it('charges maintenance now with the same next-turn recovery reminder', async () => {
+  it('charges maintenance without a next-turn recovery reminder', async () => {
     const close = vi.fn();
     render(<CastSpellDialog {...fixture()} mode="maintain" onClose={close} />);
+    expect(
+      screen.getByText(/FP spent maintaining a spell does not recover next turn/),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Pay upkeep' }));
     await waitFor(() => expect(close).toHaveBeenCalled());
     expect((await getLocalDb().characterCombat.get(id))?.currentFp).toBe(3);
-    expect(push.mock.calls.at(-1)?.[0]).toContain('restore 2 FP manually');
+    expect(push.mock.calls.at(-1)?.[0]).not.toContain('restore');
   });
 
   it('does not generate a refund or operation for a zero discounted cost', async () => {

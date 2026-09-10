@@ -40,7 +40,7 @@ Endpoints (`src/server/routes/campaigns.ts`):
 Campaign settings that shape shared play: `pointTarget`, `disadvantageCap`,
 `quirkCap`, `manaLevel` (the campaign's ambient mana, which shapes
 spellcasting for member characters: very high mana keeps up-front energy
-costs, grants mages next-turn recovery of personal FP spent on their own turn, and makes failures
+costs, grants mages next-turn recovery of personal FP spent casting on their own turn, and makes failures
 critical), `techLevel` (the campaign's tech
 level, resolved onto every member character's `CharacterDetail.techLevel`
 the same way `manaLevel` is — characters no longer set their own),

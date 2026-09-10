@@ -6,7 +6,7 @@
  *   low        -5 to all spell skill; Magery required to cast
  *   normal     baseline; Magery required to cast
  *   high       anyone can cast, Magery not required
- *   very_high  as high; mages recover personal FP spent on their turn at the start
+ *   very_high  as high; mages recover personal FP spent casting on their turn at the start
  *              of their next turn, after paying the normal costs.
  *              Any failure is critical; a rolled critical failure
  *              causes a spectacular disaster.

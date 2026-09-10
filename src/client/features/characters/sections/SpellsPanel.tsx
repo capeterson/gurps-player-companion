@@ -438,7 +438,7 @@ function manaNotice(
       tone: 'text-base-content/60',
       text:
         mana === 'very_high'
-          ? 'Very high mana: pay energy up front. Mages recover personal FP spent on their own turn at the start of their next turn; HP and powerstone energy are not refunded. Every failure is critical; a rolled critical failure causes a spectacular disaster.'
+          ? 'Very high mana: pay energy up front. Mages recover personal FP spent casting on their own turn at the start of their next turn; Maintenance FP, HP and powerstone energy are not refunded. Every failure is critical; a rolled critical failure causes a spectacular disaster.'
           : 'High mana: anyone can cast here — Magery is not required.',
     };
   }
@@ -466,13 +466,21 @@ export function SpellsPanel({
   );
   // Hosted once here (not per row), same as SkillsPanel, so every
   // roll-target tap opens the same sheet instance.
-  const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
+  const [pendingRoll, setPendingRoll] = useState<{
+    request: RollRequest;
+    context: string;
+  } | null>(null);
+  const rollContext = JSON.stringify([
+    character.id,
+    character.campaignId,
+    character.manaLevel,
+    character.manaLevelKnown,
+  ]);
   // A roll captures its target and mana rules. Never resume that snapshot
   // after a campaign/mana transition, including a temporary unknown state.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: context changes invalidate the captured roll
   useEffect(() => {
-    setRollRequest(null);
-  }, [character.id, character.campaignId, character.manaLevel, character.manaLevelKnown]);
+    setPendingRoll((pending) => (pending?.context === rollContext ? pending : null));
+  }, [rollContext]);
   const characterHasMagery = hasMagery(character.traits);
   const notice = manaNotice(character.manaLevel, character.manaLevelKnown, characterHasMagery);
   // Hold casting entirely while the campaign row (and thus the real
@@ -525,7 +533,10 @@ export function SpellsPanel({
                 manaKnown={character.manaLevelKnown}
                 onCast={(spell, mode) => setCasting({ spell, mode })}
                 onRoll={(request) =>
-                  setRollRequest({ ...request, spellManaLevel: character.manaLevel })
+                  setPendingRoll({
+                    request: { ...request, spellManaLevel: character.manaLevel },
+                    context: rollContext,
+                  })
                 }
               />
             ))}
@@ -542,11 +553,11 @@ export function SpellsPanel({
         />
       )}
 
-      {rollRequest && character.manaLevelKnown && (
+      {pendingRoll && pendingRoll.context === rollContext && character.manaLevelKnown && (
         <RollSheet
-          request={rollRequest}
+          request={pendingRoll.request}
           characterId={character.id}
-          onClose={() => setRollRequest(null)}
+          onClose={() => setPendingRoll(null)}
         />
       )}
     </section>

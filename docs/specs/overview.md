@@ -178,7 +178,8 @@ on any sheet the viewer can edit — their own — it always shows).
   energy is allocated from more than one (B481).
   Very high mana retains normal up-front casting and maintenance costs.
   Mages (including Magery 0) receive a reminder to manually restore only
-  personal FP spent on their own turn at the start of their next turn, capped at maximum FP;
+  personal FP spent casting on their own turn at the start of their next turn, capped at maximum FP;
+  maintenance FP is not eligible for this recovery;
   there is no automatic or timed refund, and HP/powerstones never recover
   this way. Spell rolls promote every failure to critical and distinguish
   a rolled critical failure's spectacular disaster (B235), including after closing

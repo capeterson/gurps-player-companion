@@ -132,7 +132,10 @@ export function CastSpellDialog({
   }, [cost, fpAvailable, hpAvailable, stones]);
 
   const allocated = totalAllocation(alloc);
-  const recovery = spellFpRecovery(character.manaLevel, hasMagery(character.traits), alloc.fromFp);
+  const recovery =
+    mode === 'cast'
+      ? spellFpRecovery(character.manaLevel, hasMagery(character.traits), alloc.fromFp)
+      : 0;
   const remaining = cost - allocated;
   const overspent = allocated > cost;
   // One casting can draw from at most one powerstone (B481 / M69).
@@ -286,11 +289,13 @@ export function CastSpellDialog({
         {character.manaLevel === 'very_high' && (
           <p className="text-xs text-base-content/70 mb-2">
             Pay all energy now.{' '}
-            {recovery > 0
-              ? `If spent on your turn, at the start of your next turn restore ${recovery} personal FP manually (up to your maximum). No automatic refund occurs.`
-              : hasMagery(character.traits)
-                ? 'Only personal FP spent on your own turn can recover at the start of your next turn.'
-                : 'Without Magery, personal FP does not recover next turn.'}{' '}
+            {mode === 'maintain'
+              ? 'FP spent maintaining a spell does not recover next turn.'
+              : recovery > 0
+                ? `If spent on your turn, at the start of your next turn restore ${recovery} personal FP manually (up to your maximum). No automatic refund occurs.`
+                : hasMagery(character.traits)
+                  ? 'Only personal FP spent on your own turn can recover at the start of your next turn.'
+                  : 'Without Magery, personal FP does not recover next turn.'}{' '}
             HP and powerstone energy are not refunded.
           </p>
         )}
