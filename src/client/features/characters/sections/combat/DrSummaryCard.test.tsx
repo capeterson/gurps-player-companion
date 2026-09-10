@@ -79,6 +79,32 @@ describe('DrSummaryCard', () => {
   });
 
   it.each([
+    ['arm_left', 6],
+    ['hand_right', 4],
+  ] as const)('caps actual HP loss for a destroyed %s', async (location, cap) => {
+    const character = makeCharacter([]);
+    character.id = '0193b3c0-f1f0-7000-8000-00000000d046';
+    character.derived = { hp: 10, fp: 10 } as CharacterDetail['derived'];
+    character.combat = null;
+    function Sheet() {
+      const patch = useCombatPatch(character);
+      const pools = usePoolBumpers(character, true, patch);
+      return <DrSummaryCard character={character} canWrite hpMax={10} bumpHp={pools.bumpHp} />;
+    }
+    render(<Sheet />);
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: location } });
+    expect(screen.getByText(/20 injury; capped/)).toBeInTheDocument();
+    expect(screen.getByText(/body part is destroyed/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: `Apply −${cap} HP` }));
+    await waitFor(async () =>
+      expect((await getLocalDb().characterCombat.get(character.id))?.currentHp).toBe(10 - cap),
+    );
+    expect((await getLocalDb().outbox.toArray())[0]?.attemptedValue).toBe(10 - cap);
+  });
+
+  it.each([
     ['torso', false, 'cr', '', 5, 1],
     ['skull', false, 'cr', '', 9, 0],
     ['torso', true, 'cut', '2', 9, 1],

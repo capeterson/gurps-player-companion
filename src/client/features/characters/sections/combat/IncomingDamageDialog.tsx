@@ -6,9 +6,8 @@
  * single-character companion, so "incoming damage" lives on the
  * defender's own sheet rather than an attack-side damage-vs-DR flow.
  *
- * Crippling (B420) is surfaced as a hint only — auto-capping limb
- * injury needs limb-vs-extremity thresholds and an override UI that
- * outgrow this one dialog.
+ * Limb/extremity HP loss is capped at the minimum crippling injury
+ * (B421). Conditions remain manual; hints retain the full pre-cap injury.
  */
 
 import { type FormEvent, useMemo, useState } from 'react';
@@ -31,9 +30,6 @@ const DAMAGE_TYPES = [
   'cor',
   'tox',
 ] as const;
-
-const LIMB_LOCATIONS = new Set(['arm_left', 'arm_right', 'leg_left', 'leg_right']);
-const EXTREMITY_LOCATIONS = new Set(['hand_left', 'hand_right', 'foot_left', 'foot_right']);
 
 function capitalize(s: string): string {
   return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
@@ -85,14 +81,11 @@ export function IncomingDamageDialog({
   );
 
   const basic = Math.max(0, Math.floor(Number(basicRaw)) || 0);
-  const result = applyDamage(basic, type, location, drMap, divisorRaw.trim() || null);
-
-  // Crippling threshold (B420): >HP/2 to a limb, >HP/3 to an extremity.
-  const cripplingHint =
-    hpMax > 0 &&
-    ((LIMB_LOCATIONS.has(location) && result.injury > Math.floor(hpMax / 2)) ||
-      (EXTREMITY_LOCATIONS.has(location) && result.injury > Math.floor(hpMax / 3)))
-      ? `Injury exceeds the crippling threshold for this ${EXTREMITY_LOCATIONS.has(location) ? 'extremity' : 'limb'} (B420).`
+  const result = applyDamage(basic, type, location, drMap, divisorRaw.trim() || null, hpMax);
+  const cripplingHint = result.destroyed
+    ? 'Pre-cap injury is at least twice the crippling threshold: the body part is destroyed (severed by cutting damage). Apply the condition manually (B421).'
+    : result.crippled
+      ? 'This injury cripples the body part. Apply the condition manually (B421).'
       : null;
 
   function handleApply(e: FormEvent) {
@@ -108,7 +101,9 @@ export function IncomingDamageDialog({
     : basic > 0
       ? `${basic} ${type} − DR ${result.drAtLocation}${divisorText}${
           divisorText ? `=${result.effectiveDr}` : ''
-        } → ${result.penetrating} × ${result.multiplier} = ${result.injury} injury`
+        } → ${result.penetrating} × ${result.multiplier} = ${result.preCapInjury} injury${
+          result.preCapInjury !== result.injury ? `; capped at ${result.injury} HP loss` : ''
+        }`
       : 'Enter incoming basic damage.';
 
   return (
