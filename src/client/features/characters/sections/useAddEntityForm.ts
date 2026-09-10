@@ -37,6 +37,7 @@ export interface UseAddEntityFormOptions {
 export interface UseAddEntityFormReturn {
   readonly creating: boolean;
   readonly flashProps: FlashDataProps;
+  readonly reject: (reason: string) => void;
   /**
    * Create the entity from `attemptedValue`. On success, `onCreated`
    * runs before `creating` is cleared — callers use it to reset their
@@ -57,6 +58,13 @@ export function useAddEntityForm({
   const toasts = useToasts();
   const [creating, setCreating] = useState(false);
   const flash = useFlashState(`${entityClass}:${characterId}:create`);
+  const reject = useCallback(
+    (reason: string) => {
+      flash.trigger();
+      toasts.push(`Couldn't add ${label} — ${reason}`, { kind: 'error' });
+    },
+    [label, toasts, flash.trigger],
+  );
 
   const submit = useCallback(
     async (
@@ -76,14 +84,13 @@ export function useAddEntityForm({
         });
         onCreated();
       } catch (err) {
-        flash.trigger();
-        toasts.push(`Couldn't add ${label} — ${(err as Error).message}`, { kind: 'error' });
+        reject((err as Error).message);
       } finally {
         setCreating(false);
       }
     },
-    [entityClass, characterId, label, toasts, flash.trigger],
+    [entityClass, characterId, label, reject],
   );
 
-  return { creating, submit, flashProps: flash.flashProps };
+  return { creating, submit, reject, flashProps: flash.flashProps };
 }

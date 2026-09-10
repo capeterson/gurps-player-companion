@@ -50,11 +50,17 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   const [points, setPoints] = useState('1');
   const [picked, setPicked] = useState<LibrarySkillOut | null>(null);
   const nameVersion = useRef(0);
+  const editName = (value: string) => {
+    setName(value);
+    nameVersion.current++;
+    setPicked(null);
+  };
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
   const {
     creating,
     submit: submitEntity,
+    reject,
     flashProps,
   } = useAddEntityForm({
     entityClass: 'character_skill',
@@ -63,6 +69,10 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   });
 
   async function submit(snap: SkillSnapshot) {
+    if (snap.picked && snap.picked.campaignId !== campaignId) {
+      reject('Campaign changed — select a skill from the current campaign library');
+      return;
+    }
     await submitEntity(
       {
         name: snap.name,
@@ -101,7 +111,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
       snap.picked
         ? libraryMechanics.parse({
             sourceId: snap.picked.id,
-            campaignId,
+            campaignId: snap.picked.campaignId,
             sourceRevision: null,
             effects: snap.picked.effects ?? null,
           })
@@ -138,11 +148,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         {campaignId ? (
           <LibraryAutocomplete<LibrarySkillOut>
             value={name}
-            onChange={(v) => {
-              setName(v);
-              nameVersion.current++;
-              setPicked(null);
-            }}
+            onChange={editName}
             onPick={(opt) => {
               setName(opt.name);
               setAttribute(opt.attribute as SkillAttribute);
@@ -171,7 +177,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
             aria-labelledby="add-skill-name-label"
             className="input input-bordered input-sm"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => editName(e.target.value)}
             placeholder="e.g. Broadsword"
           />
         )}

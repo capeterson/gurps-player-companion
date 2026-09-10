@@ -29,6 +29,7 @@ const picks = vi.hoisted(() =>
   ['Pistol', 'Rifle'].map((specialty, index) => ({
     id: `0193b3c0-f1f0-7000-8000-00000000f00${index}`,
     name: 'Guns',
+    campaignId: '0193b3c0-f1f0-7000-8000-00000000c002',
     attribute: 'DX',
     difficulty: 'E',
     defaultSpecialization: specialty,
@@ -116,6 +117,55 @@ function renderPanel(character: CharacterDetail, canWrite = false) {
 }
 
 describe('SkillsPanel', () => {
+  it('allows a custom skill after a picked character becomes campaignless', async () => {
+    const view = renderPanel(
+      { ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' },
+      true,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    view.rerender(<SkillsPanel character={makeCharacter([])} canWrite />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/Couldn't add skill.*Campaign changed/);
+    fireEvent.change(screen.getByLabelText('Skill'), { target: { value: 'Custom' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0]).toMatchObject({
+      attemptedValue: {
+        name: 'Custom',
+        librarySkillId: null,
+        defaults: null,
+        specialization: null,
+        notes: null,
+      },
+      localLibraryMechanics: null,
+    });
+  });
+  it('rejects a previous campaign pick without discarding the draft', async () => {
+    const view = renderPanel(
+      { ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' },
+      true,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    view.rerender(
+      <SkillsPanel character={{ ...makeCharacter([]), campaignId: 'other-campaign' }} canWrite />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/Couldn't add skill.*Campaign changed/);
+    expect(enqueueCreate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Skill')).toHaveValue('Guns');
+    expect(screen.getByLabelText('Skill').closest('form')).toHaveAttribute('data-flashing', 'true');
+    view.rerender(
+      <SkillsPanel
+        character={{ ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' }}
+        canWrite
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0].localLibraryMechanics.campaignId).toBe(
+      '0193b3c0-f1f0-7000-8000-00000000c002',
+    );
+  });
   it('accepts the combined maximum-length library descriptions without truncation', async () => {
     const original = picks[0];
     if (!original) throw new Error('Missing fixture');

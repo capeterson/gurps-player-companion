@@ -33,6 +33,100 @@ configureIntegrationTestEnvironment();
 const app = createApp(integrationTestConfig);
 
 describe('library changes propagate through incremental character cursors', () => {
+  it.each(['rest', 'sync-field', 'sync-body'] as const)(
+    'detaches an owned kind change through %s and preserves its prior mechanics',
+    async (door) => {
+      const owner = await registerUser(`owned-kind-${door}`);
+      const campaign = await createCampaign(owner.accessToken);
+      const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+      const request = (path: string, body: unknown, method = 'POST') =>
+        app.request(`/api/v1${path}`, {
+          method,
+          headers: jsonHeaders(owner.accessToken),
+          body: JSON.stringify(body),
+        });
+      const sourceResponse = await request(`/campaigns/${campaign.id}/library/traits`, {
+        name: 'Source advantage',
+        kind: 'advantage',
+        effects: [{ target: 'dx', value: 2 }],
+      });
+      expect(sourceResponse.status).toBe(201);
+      const source = (await sourceResponse.json()) as { id: string };
+      const created = await request(`/characters/${character.id}/traits`, {
+        name: 'Owned',
+        kind: 'advantage',
+        points: 20,
+        level: 2,
+        libraryTraitId: source.id,
+      });
+      expect(created.status).toBe(201);
+      const { trait } = (await created.json()) as { trait: { id: string } };
+      const [before] = await getDb()
+        .select()
+        .from(characterTraits)
+        .where(eq(characterTraits.id, trait.id));
+      if (door === 'rest') {
+        expect(
+          (
+            await request(
+              `/characters/${character.id}/traits/${trait.id}`,
+              { kind: 'disadvantage' },
+              'PATCH',
+            )
+          ).status,
+        ).toBe(200);
+      } else {
+        const response = await request('/sync/operations', {
+          operations: [
+            {
+              clientOpId: crypto.randomUUID(),
+              entityClass: 'character_trait',
+              entityId: trait.id,
+              parentId: character.id,
+              command: 'patch',
+              ...(door === 'sync-field' ? { fieldPath: 'kind' } : {}),
+              validationVersion: 1,
+              attemptedValue: door === 'sync-field' ? 'disadvantage' : { kind: 'disadvantage' },
+              prevValue: door === 'sync-field' ? 'advantage' : { kind: 'advantage' },
+              baseRevision: Number(before?.revision),
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        });
+        expect(response.status).toBe(200);
+        expect(
+          ((await response.json()) as { outcomes: { status: string }[] }).outcomes[0]?.status,
+        ).toBe('applied');
+      }
+      const [after] = await getDb()
+        .select()
+        .from(characterTraits)
+        .where(eq(characterTraits.id, trait.id));
+      expect(after).toMatchObject({
+        kind: 'disadvantage',
+        points: 20,
+        level: 2,
+        libraryTraitId: null,
+        libraryMechanics: { ...before?.libraryMechanics, detached: true },
+      });
+      expect(
+        (
+          await request(
+            `/campaigns/${campaign.id}/library/traits/${source.id}`,
+            {
+              effects: [{ target: 'dx', value: -8 }],
+            },
+            'PATCH',
+          )
+        ).status,
+      ).toBe(200);
+      const [refreshed] = await getDb()
+        .select()
+        .from(characterTraits)
+        .where(eq(characterTraits.id, trait.id));
+      expect(refreshed).toEqual(after);
+    },
+  );
   it.each(['traits', 'skills'] as const)('repairs pre-migration %s cursors', async (kind) => {
     const owner = await registerUser(`fanout-migration-${kind}`);
     const campaign = await createCampaign(owner.accessToken);
