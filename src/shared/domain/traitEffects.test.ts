@@ -254,6 +254,40 @@ describe('applyEffectsToAttrs', () => {
 });
 
 describe('skillBonusFor', () => {
+  it.each([
+    ['Guns', 'Pistol', 'Guns', 'Pistol', 2],
+    ['Guns', 'Rifle', 'Guns', 'Pistol', 0],
+    ['Guns', null, 'Guns', 'Pistol', 0],
+    ['Guns', 'Rifle', 'Guns', undefined, 2],
+    ['Guns', null, 'Guns', '*', 2],
+    ['Guns', 'Rifle', '*', undefined, 2],
+    ['Guns', 'Rifle', '*', 'Pistol', 0],
+    [' GUNS ', '  Auto   Pistol ', 'guns', 'auto pistol', 2],
+    ['Guns', 'Pistol', 'Guns (Pistol)', undefined, 2],
+    ['Guns', 'Rifle', 'Guns (Pistol)', undefined, 0],
+    ['Guns (Pistol)', null, 'Guns', 'Pistol', 2],
+    ['Guns', 'Rifle', 'Guns (Pistol)', 'Rifle', 2],
+  ] as const)('matches %s/%s against %s/%s: %s', (name, spec, effectName, effectSpec, total) => {
+    const effects = resolveEffects(
+      [
+        trait('t1', 'Talent', 1, [
+          {
+            target: 'skill',
+            value: 2,
+            scaling: 'flat',
+            skillName: effectName,
+            ...(effectSpec !== undefined ? { skillSpecialty: effectSpec } : {}),
+          },
+        ]),
+      ],
+      [],
+      new Set(),
+    );
+    const result = skillBonusFor(name, effects, spec);
+    expect(result.total).toBe(total);
+    expect(result.sources).toHaveLength(total ? 1 : 0);
+  });
+
   it('matches by base skill name (case-insensitive, specialty-stripped)', () => {
     const traits = [
       trait('t1', 'Outdoorsman', 2, [
