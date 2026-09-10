@@ -12,6 +12,7 @@ import {
   isRecordAccessRestricted,
 } from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
+import { resolveLegacyCampaignDependency } from '../sync/outbox.ts';
 import { readRevokedCharacters } from '../sync/syncLog.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
@@ -52,6 +53,15 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
 
   const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4);
   const pending = (outbox ?? []).filter((op) => op.attemptCount < 4);
+  const campaignHolds = (outbox ?? []).filter((op) => op.localCampaignDependencyUnknown);
+  const confirmCampaignOrder = async (op: OutboxEntry, wait: boolean) => {
+    try {
+      await resolveLegacyCampaignDependency(op.clientOpId, wait);
+      toasts.push('Campaign order saved. Your addition remains queued.', { kind: 'success' });
+    } catch (err) {
+      toasts.push(`Could not save campaign order — ${errorMessage(err)}`, { kind: 'error' });
+    }
+  };
 
   const revert = async () => {
     if (!revertTarget) return;
@@ -137,6 +147,37 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           </header>
 
           <div className="min-h-0 space-y-6 overflow-y-auto px-5 py-4">
+            {campaignHolds.length > 0 && (
+              <section aria-label="Confirm campaign order">
+                <h3 className="font-semibold text-warning">Confirm an older unsaved addition</h3>
+                <p className="text-sm">
+                  The app update could not recover which campaign this library addition belongs to.
+                  Your addition and campaign change are saved locally and paused. Choose the library
+                  you selected it from to continue syncing.
+                </p>
+                {campaignHolds.map((op) => (
+                  <article key={op.clientOpId} className="mt-3 space-y-2">
+                    <p>{changeName(op, isOutboxAccessRestricted(op, access))}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => void confirmCampaignOrder(op, false)}
+                      >
+                        Original campaign
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => void confirmCampaignOrder(op, true)}
+                      >
+                        Destination campaign
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            )}
             {status.state === 'error' && status.error && (
               // The badge that opens this dialog says something is
               // wrong; this is where it says *what*.  Cycle-level

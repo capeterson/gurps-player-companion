@@ -644,6 +644,47 @@ async function applyLocalDelete(entityClass: EntityClass, entityId: string): Pro
  * patch included earlier in the same batch can fail transiently, so its children
  * must wait for a later drain. Ordinary independent field patches stay parallel.
  */
+export async function resolveLegacyCampaignDependency(
+  clientOpId: string,
+  wait: boolean,
+): Promise<void> {
+  const db = getLocalDb();
+  await db.transaction('rw', [db.outbox, db.characters], async () => {
+    const op = await db.outbox.get(clientOpId);
+    if (!op?.localCampaignDependencyUnknown) return;
+    const assignments = (
+      await db.outbox
+        .where('entityId')
+        .equals(op.parentId ?? '')
+        .toArray()
+    )
+      .filter(
+        (entry) =>
+          entry.entityClass === 'character' &&
+          entry.command === 'patch' &&
+          entry.fieldPath === 'campaignId' &&
+          ['pending', 'in_flight', 'transient_retry'].includes(entry.status),
+      )
+      .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
+    const current = (await db.characters.get(op.parentId ?? ''))?.campaignId;
+    const chosen =
+      assignments.length > 0
+        ? wait
+          ? assignments.at(-1)?.attemptedValue
+          : assignments[0]?.prevValue
+        : current;
+    if (op.localRequiredCampaignId !== undefined && chosen !== op.localRequiredCampaignId)
+      throw new Error(
+        'Move the character to the library addition’s campaign before confirming its order.',
+      );
+    await db.outbox.update(clientOpId, {
+      localWaitForCampaignAssignment: wait,
+      localCampaignDependencyUnknown: false,
+      ...(typeof chosen === 'string' || chosen === null ? { localRequiredCampaignId: chosen } : {}),
+    });
+  });
+}
+
 export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   const db = getLocalDb();
   const now = new Date().toISOString();
@@ -651,6 +692,37 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
     .where('status')
     .anyOf(['pending', 'transient_retry', 'in_flight'])
     .toArray();
+  const assignmentOps = unsettled
+    .filter(
+      (op) =>
+        op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
+    )
+    .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
+  const assignmentsFor = (parentId: string | undefined) =>
+    assignmentOps.filter((op) => op.entityId === parentId);
+  const campaignCreateReady = new Set<string>();
+  for (const op of unsettled) {
+    if (op.command !== 'create' || op.localRequiredCampaignId === undefined) continue;
+    const moves = assignmentsFor(op.parentId);
+    const current =
+      moves.length > 0
+        ? moves[0]?.prevValue
+        : (await db.characters.get(op.parentId ?? ''))?.campaignId;
+    if (
+      current === op.localRequiredCampaignId &&
+      !moves.some((move) => move.status === 'in_flight')
+    )
+      campaignCreateReady.add(op.clientOpId);
+    else if (
+      current !== op.localRequiredCampaignId &&
+      !moves.some((move) => move.attemptedValue === op.localRequiredCampaignId)
+    ) {
+      // A rejected/coalesced prerequisite must not release a linked create
+      // against the wrong campaign or strand it without recovery guidance.
+      op.localCampaignDependencyUnknown = true;
+      await db.outbox.update(op.clientOpId, { localCampaignDependencyUnknown: true });
+    }
+  }
   const all = unsettled.filter((op) => op.status !== 'in_flight');
   const campaignAssignments = new Set(
     unsettled
@@ -665,7 +737,8 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
       .filter(
         (op) =>
           op.command === 'create' &&
-          !op.localWaitForCampaignAssignment &&
+          (op.localCampaignDependencyUnknown ||
+            (op.localRequiredCampaignId === undefined && !op.localWaitForCampaignAssignment)) &&
           op.parentId !== undefined,
       )
       .map((op) => op.parentId),
@@ -684,12 +757,24 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   for (const op of all) {
     const backingOff = op.nextEarliestAttemptAt !== undefined && op.nextEarliestAttemptAt > now;
     const dependencyHeld =
+      op.localCampaignDependencyUnknown === true ||
       (op.entityClass === 'character' &&
         op.fieldPath === 'campaignId' &&
-        parentsWithEarlierCreates.has(op.entityId)) ||
+        (parentsWithEarlierCreates.has(op.entityId) ||
+          unsettled.some(
+            (child) =>
+              child.command === 'create' &&
+              child.parentId === op.entityId &&
+              child.localRequiredCampaignId !== undefined &&
+              child.localRequiredCampaignId === op.prevValue,
+          ))) ||
       heldBackCreates.has(op.entityId) ||
       (op.parentId !== undefined && heldBackCreates.has(op.parentId)) ||
       (op.command === 'create' &&
+        op.localRequiredCampaignId !== undefined &&
+        !campaignCreateReady.has(op.clientOpId)) ||
+      (op.command === 'create' &&
+        op.localRequiredCampaignId === undefined &&
         op.localWaitForCampaignAssignment === true &&
         op.parentId !== undefined &&
         campaignAssignments.has(op.parentId));

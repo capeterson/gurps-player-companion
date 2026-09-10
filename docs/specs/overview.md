@@ -19,6 +19,10 @@ anything touches the network, so a player can keep editing a stale tab with no
 connectivity indefinitely and converge later. See
 [offline-sync.md](offline-sync.md).
 
+When an older unsaved library addition lacks enough evidence to recover its
+campaign-change order during an app upgrade, sync retains it and asks the user
+to confirm the original or destination campaign in the sync log before replay.
+
 ## Document map
 
 | Doc | Covers |

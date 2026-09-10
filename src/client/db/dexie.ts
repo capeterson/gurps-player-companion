@@ -35,6 +35,7 @@ import {
 } from '../../shared/schemas/character.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
+import { inferLegacyCampaignOrder, legacyReferenceFields } from './legacyCampaignDependencies.ts';
 
 /**
  * Local mirror of the server's character row.  Fields match the
@@ -295,6 +296,10 @@ export interface LocalCampaignTransferUndo {
 export interface OutboxEntry {
   /** Create was queued under an optimistic campaign; wait for assignment settlement. Never sent. */
   localWaitForCampaignAssignment?: boolean;
+  /** Legacy ordering lacked sufficient evidence. Retain until explicitly resolved. Never sent. */
+  localCampaignDependencyUnknown?: boolean;
+  /** Proven campaign for a migrated create; permits replay between successive assignments. */
+  localRequiredCampaignId?: string | null;
   localCampaignTransferUndo?: LocalCampaignTransferUndo[] | undefined;
   clientOpId: string;
   entityClass: EntityClass;
@@ -596,6 +601,47 @@ class LocalDb extends Dexie {
       .stores({ syncCursors: 'entityClass' })
       .upgrade(async (tx) => {
         await tx.table('syncCursors').bulkDelete(['character_trait', 'character_skill']);
+      });
+    // Older outboxes predate the explicit campaign/create dependency flag.
+    // Recover their ordering before any drain can send a destination child
+    // against the original campaign. Preserve flags written by newer clients.
+    this.version(10)
+      .stores({
+        outbox: 'clientOpId, status, coalesceKey, enqueuedAt, entityId, [status+enqueuedAt]',
+      })
+      .upgrade(async (tx) => {
+        const outbox = tx.table<OutboxEntry, string>('outbox');
+        const entries = await outbox.toArray();
+        const assignments = entries.filter(
+          (op) =>
+            op.entityClass === 'character' &&
+            op.command === 'patch' &&
+            op.fieldPath === 'campaignId' &&
+            ['pending', 'in_flight', 'transient_retry'].includes(op.status),
+        );
+        for (const op of entries) {
+          if (
+            op.command !== 'create' ||
+            !op.parentId ||
+            op.localWaitForCampaignAssignment !== undefined
+          )
+            continue;
+          const mapping =
+            legacyReferenceFields[op.entityClass as keyof typeof legacyReferenceFields];
+          const row = mapping ? await tx.table(mapping[0]).get(op.entityId) : undefined;
+          const order = inferLegacyCampaignOrder(
+            op,
+            assignments.filter((assignment) => assignment.entityId === op.parentId),
+            row?.libraryMechanics,
+          );
+          await outbox.update(op.clientOpId, {
+            ...(order === undefined ? {} : { localWaitForCampaignAssignment: order.wait }),
+            ...(order?.campaignId === undefined
+              ? {}
+              : { localRequiredCampaignId: order.campaignId }),
+            localCampaignDependencyUnknown: order === undefined,
+          });
+        }
       });
   }
 }

@@ -556,6 +556,19 @@ so a delayed original-campaign create cannot be replayed into the destination.
 Starting a fresh assignment atomically reclassifies surviving creates from the
 previous assignment as earlier work. Automatic stale-base retries preserve the
 existing dependency generation.
+Dexie v10 backfills missing dependency flags in pre-upgrade outboxes before
+draining. Explicit flags, validated source-campaign snapshots, and matching
+transfer undo records take precedence over enqueue times. A create strictly
+after the active assignments waits for acknowledgement. Earlier/equal timestamps
+without provenance are ambiguous because retries/coalescing replace assignment
+times: those additions and their assignment remain durable and paused. The sync
+indicator names the hold; the sync log lets the user confirm the original or
+destination campaign. Confirmation changes only queue ordering, never the saved
+addition. Holds and confirmed ordering survive reload.
+Proven campaign IDs also sequence intermediate additions between successive
+assignments: a B-linked addition waits for A→B acknowledgement and precedes B→C.
+If its prerequisite is rejected or superseded, the addition stays held with
+recovery guidance until that campaign is reachable again.
 New references without source-campaign evidence stay intact until authoritative
 sync reconciliation; they may already belong to the destination campaign.
 Resubmitting an already-null source reference does
