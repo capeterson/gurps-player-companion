@@ -32,6 +32,10 @@ Authorization is centralized in `src/server/auth/permissions.ts`:
 (owner **or** manager), `requireCampaignMember`. The owner short-circuits every
 check — an owner is treated as having every role.
 
+Removing a member detaches the live library references on that member's characters
+in the campaign while retaining their saved rules and campaign association. Later
+library edits no longer change those copies. New links require current library access.
+
 Endpoints (`src/server/routes/campaigns.ts`):
 `POST/GET /campaigns`, `GET/PATCH/DELETE /campaigns/{id}`,
 `POST /campaigns/{id}/members`, `PATCH/DELETE /campaigns/{id}/members/{userId}`,
@@ -294,6 +298,15 @@ campaign before enumerating characters, excluding incoming assignments during cl
 Migration 0036 backfills only sources matching the character's campaign. Legacy
 traits whose mutable kind no longer matches their source retain those declarations
 as detached copies; no foreign library lookup is used for calculations.
+
+Character links to all six library definition types pass through
+`services/libraryReferences.ts` on REST create/patch and sync create/field/whole-body
+patch. The definition must exist in the character's current campaign, the actor
+must still be a member or owner, and a trait's kind must match. Foreign, missing,
+wrong-kind and campaignless references return the same generic forbidden error;
+no private definition is looked up for calculations. Campaign and character locks
+serialize reference assignment with transfers and membership removal. Cleanup
+rechecks the original campaign under the character lock before detaching a copy.
 
 ### YAML import/export (cross-campaign sharing)
 

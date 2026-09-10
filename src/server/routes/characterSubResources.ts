@@ -64,9 +64,9 @@ import {
   traitInsertValues,
 } from '../services/entityWrites.ts';
 import {
-  captureLibraryMechanics,
-  prepareOwnedMechanicsPatch,
-} from '../services/ownedLibraryMechanics.ts';
+  lockLibraryReferenceScope,
+  prepareLibraryReference,
+} from '../services/libraryReferences.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
@@ -127,10 +127,15 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterTraits)
-        .values({
-          ...traitInsertValues(body, { characterId: id }),
-          libraryMechanics: await captureLibraryMechanics(tx, id, 'traits', body.libraryTraitId),
-        })
+        .values(
+          await prepareLibraryReference(
+            tx,
+            user.id,
+            id,
+            'traits',
+            traitInsertValues(body, { characterId: id }),
+          ),
+        )
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -170,7 +175,7 @@ router.openapi(
     assertWrite(access);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) => {
-      await prepareOwnedMechanicsPatch(tx, 'traits', id, updates, traitId);
+      await prepareLibraryReference(tx, user.id, id, 'traits', updates, traitId);
       return tx
         .update(characterTraits)
         .set(updates)
@@ -204,7 +209,7 @@ router.openapi(
     const { id, traitId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await withAudit(user.id, undefined, (tx) =>
+    const result = await withAudit(user.id, undefined, async (tx) =>
       tx
         .delete(characterTraits)
         .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
@@ -250,10 +255,15 @@ router.openapi(
     const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterSkills)
-        .values({
-          ...skillInsertValues(body, { characterId: id }),
-          libraryMechanics: await captureLibraryMechanics(tx, id, 'skills', body.librarySkillId),
-        })
+        .values(
+          await prepareLibraryReference(
+            tx,
+            user.id,
+            id,
+            'skills',
+            skillInsertValues(body, { characterId: id }),
+          ),
+        )
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -296,7 +306,7 @@ router.openapi(
     assertWrite(access);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) => {
-      await prepareOwnedMechanicsPatch(tx, 'skills', id, updates, skillId);
+      await prepareLibraryReference(tx, user.id, id, 'skills', updates, skillId);
       return tx
         .update(characterSkills)
         .set(updates)
@@ -333,7 +343,7 @@ router.openapi(
     const { id, skillId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await withAudit(user.id, undefined, (tx) =>
+    const result = await withAudit(user.id, undefined, async (tx) =>
       tx
         .delete(characterSkills)
         .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
@@ -377,10 +387,18 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const db = getDb();
-    const [created] = await withAudit(user.id, undefined, (tx) =>
+    const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterSpells)
-        .values(spellInsertValues(body, { characterId: id }))
+        .values(
+          await prepareLibraryReference(
+            tx,
+            user.id,
+            id,
+            'spells',
+            spellInsertValues(body, { characterId: id }),
+          ),
+        )
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -433,10 +451,10 @@ router.openapi(
     assertWrite(access);
     const db = getDb();
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, (tx) =>
+    const [updated] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .update(characterSpells)
-        .set(updates)
+        .set(await prepareLibraryReference(tx, user.id, id, 'spells', updates, spellId))
         .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
         .returning(),
     );
@@ -480,7 +498,7 @@ router.openapi(
     const { id, spellId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await withAudit(user.id, undefined, (tx) =>
+    const result = await withAudit(user.id, undefined, async (tx) =>
       tx
         .delete(characterSpells)
         .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
@@ -523,10 +541,18 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const [created] = await withAudit(user.id, undefined, (tx) =>
+    const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterLanguages)
-        .values(languageInsertValues(body, { characterId: id }))
+        .values(
+          await prepareLibraryReference(
+            tx,
+            user.id,
+            id,
+            'languages',
+            languageInsertValues(body, { characterId: id }),
+          ),
+        )
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -568,10 +594,10 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, (tx) =>
+    const [updated] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .update(characterLanguages)
-        .set(updates)
+        .set(await prepareLibraryReference(tx, user.id, id, 'languages', updates, languageId))
         .where(and(eq(characterLanguages.id, languageId), eq(characterLanguages.characterId, id)))
         .returning(),
     );
@@ -605,7 +631,7 @@ router.openapi(
     const { id, languageId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await withAudit(user.id, undefined, (tx) =>
+    const result = await withAudit(user.id, undefined, async (tx) =>
       tx
         .delete(characterLanguages)
         .where(and(eq(characterLanguages.id, languageId), eq(characterLanguages.characterId, id)))
@@ -664,10 +690,18 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const [created] = await withAudit(user.id, undefined, (tx) =>
+    const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterTechniques)
-        .values(techniqueInsertValues(body, { characterId: id }))
+        .values(
+          await prepareLibraryReference(
+            tx,
+            user.id,
+            id,
+            'techniques',
+            techniqueInsertValues(body, { characterId: id }),
+          ),
+        )
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -707,10 +741,10 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, (tx) =>
+    const [updated] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .update(characterTechniques)
-        .set(updates)
+        .set(await prepareLibraryReference(tx, user.id, id, 'techniques', updates, techniqueId))
         .where(
           and(eq(characterTechniques.id, techniqueId), eq(characterTechniques.characterId, id)),
         )
@@ -744,7 +778,7 @@ router.openapi(
     const { id, techniqueId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const result = await withAudit(user.id, undefined, (tx) =>
+    const result = await withAudit(user.id, undefined, async (tx) =>
       tx
         .delete(characterTechniques)
         .where(
@@ -860,17 +894,21 @@ router.openapi(
       // changes for this character serialize.  Without it two parent
       // changes can each pass their own pre-checks against pre-write
       // state and then both commit a cycle.
-      await tx
-        .select({ id: characters.id })
-        .from(characters)
-        .where(eq(characters.id, id))
-        .for('update');
+      await lockLibraryReferenceScope(tx, id);
       if (body.parentId) await assertParentBelongsToCharacter(tx, body.parentId, id);
       // POST has no descendants yet, so no cycle check is needed here —
       // a fresh row's id can't appear in any existing parent chain.
       const [row] = await tx
         .insert(inventoryItems)
-        .values(inventoryInsertValues(body, { characterId: id }))
+        .values(
+          await prepareLibraryReference(
+            tx,
+            user.id,
+            id,
+            'items',
+            inventoryInsertValues(body, { characterId: id }),
+          ),
+        )
         .returning();
       return row;
     });
@@ -945,18 +983,14 @@ router.openapi(
     // can't each pass their own pre-checks against pre-write state and
     // then both commit a cycle.
     const updated = await withAudit(user.id, undefined, async (tx) => {
-      await tx
-        .select({ id: characters.id })
-        .from(characters)
-        .where(eq(characters.id, id))
-        .for('update');
+      await lockLibraryReferenceScope(tx, id);
       if (body.parentId !== undefined && body.parentId !== null) {
         await assertParentBelongsToCharacter(tx, body.parentId, id);
         await assertNoParentCycle(tx, body.parentId, itemId, id);
       }
       const [row] = await tx
         .update(inventoryItems)
-        .set(updates)
+        .set(await prepareLibraryReference(tx, user.id, id, 'items', updates, itemId))
         .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)))
         .returning();
       return row;
@@ -1078,7 +1112,7 @@ router.openapi(
     // and then collide on the unique constraint, rolling one save back.
     const derived = computeDerived(characterAttrsFromRow(access.character));
     const setOnUpdate = buildPatchSet(body);
-    const [row] = await withAudit(user.id, undefined, (tx) =>
+    const [row] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(combatStates)
         .values(combatUpsertValues(body, { characterId: id, derived }))

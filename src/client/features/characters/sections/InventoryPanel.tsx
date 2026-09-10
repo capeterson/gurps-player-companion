@@ -96,7 +96,11 @@ export function InventoryPanel({
   const [newIsWeapon, setNewIsWeapon] = useState(false);
   const [newWorn, setNewWorn] = useState(false);
   const [newEquipped, setNewEquipped] = useState(false);
-  const { creating, submit: submitNewItem } = useAddEntityForm({
+  const {
+    creating,
+    flashProps,
+    submit: submitNewItem,
+  } = useAddEntityForm({
     entityClass: 'character_inventory',
     characterId,
     label: 'item',
@@ -810,8 +814,9 @@ export function InventoryPanel({
 
       {canWrite && (
         <form
+          {...flashProps}
           onSubmit={(e) => void onCreate(e)}
-          className="flex flex-col gap-2 border-t border-base-300/60 bg-base-200/40 px-4 py-3"
+          className="field-rollback-flash flex flex-col gap-2 border-t border-base-300/60 bg-base-200/40 px-4 py-3"
         >
           <div className="flex flex-wrap items-center gap-2">
             {campaignId ? (

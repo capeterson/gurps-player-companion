@@ -1,3 +1,4 @@
+import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
 /**
  * Per-operation dispatcher for /api/v1/sync/operations.
  *
@@ -63,11 +64,7 @@ import {
   techniqueInsertValues,
   traitInsertValues,
 } from './entityWrites.ts';
-import {
-  captureLibraryMechanics,
-  detachLibraryReferencesForTransfer,
-  prepareOwnedMechanicsPatch,
-} from './ownedLibraryMechanics.ts';
+import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 import { buildPatchSet } from './patchSet.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
@@ -498,15 +495,15 @@ async function dispatchTrait(
     assertWrite(access);
     const [created] = await tx
       .insert(characterTraits)
-      .values({
-        ...traitInsertValues(body, { characterId, id: op.entityId }),
-        libraryMechanics: await captureLibraryMechanics(
+      .values(
+        await prepareLibraryReference(
           tx,
+          ctx.userId,
           characterId,
           'traits',
-          body.libraryTraitId,
+          traitInsertValues(body, { characterId, id: op.entityId }),
         ),
-      })
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -539,8 +536,9 @@ async function dispatchTrait(
     entityClass: 'character_trait',
     tx,
     table: characterTraits,
-    prepareUpdates: (updates) =>
-      prepareOwnedMechanicsPatch(tx, 'traits', characterId, updates, op.entityId),
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'traits', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -570,15 +568,15 @@ async function dispatchSkill(
     assertWrite(access);
     const [created] = await tx
       .insert(characterSkills)
-      .values({
-        ...skillInsertValues(body, { characterId, id: op.entityId }),
-        libraryMechanics: await captureLibraryMechanics(
+      .values(
+        await prepareLibraryReference(
           tx,
+          ctx.userId,
           characterId,
           'skills',
-          body.librarySkillId,
+          skillInsertValues(body, { characterId, id: op.entityId }),
         ),
-      })
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -606,8 +604,9 @@ async function dispatchSkill(
     entityClass: 'character_skill',
     tx,
     table: characterSkills,
-    prepareUpdates: (updates) =>
-      prepareOwnedMechanicsPatch(tx, 'skills', characterId, updates, op.entityId),
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'skills', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -637,7 +636,15 @@ async function dispatchSpell(
     assertWrite(access);
     const [created] = await tx
       .insert(characterSpells)
-      .values(spellInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'spells',
+          spellInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -665,6 +672,9 @@ async function dispatchSpell(
     entityClass: 'character_spell',
     tx,
     table: characterSpells,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'spells', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -694,7 +704,15 @@ async function dispatchLanguage(
     assertWrite(access);
     const [created] = await tx
       .insert(characterLanguages)
-      .values(languageInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'languages',
+          languageInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -725,6 +743,9 @@ async function dispatchLanguage(
     entityClass: 'character_language',
     tx,
     table: characterLanguages,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'languages', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -757,7 +778,15 @@ async function dispatchTechnique(
     assertWrite(access);
     const [created] = await tx
       .insert(characterTechniques)
-      .values(techniqueInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'techniques',
+          techniqueInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -788,6 +817,16 @@ async function dispatchTechnique(
     entityClass: 'character_technique',
     tx,
     table: characterTechniques,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(
+        tx,
+        ctx.userId,
+        characterId,
+        'techniques',
+        updates,
+        op.entityId,
+      );
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -823,11 +862,7 @@ async function dispatchInventory(
     assertWrite(access);
     // Lock the character row to prevent race conditions on inventory parent
     // validation, then validate the parent item if specified.
-    await tx
-      .select({ id: characters.id })
-      .from(characters)
-      .where(eq(characters.id, characterId))
-      .for('update');
+    await lockLibraryReferenceScope(tx, characterId);
     if (body.parentId) {
       const [parent] = await tx
         .select({ id: inventoryItems.id })
@@ -843,7 +878,15 @@ async function dispatchInventory(
     }
     const [created] = await tx
       .insert(inventoryItems)
-      .values(inventoryInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'items',
+          inventoryInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -880,17 +923,16 @@ async function dispatchInventory(
   // Serialize inventory-tree checks with REST mutations for this character.
   // Validation and the write must share this transaction; otherwise two
   // concurrent reparent operations can both approve a cycle.
-  await tx
-    .select({ id: characters.id })
-    .from(characters)
-    .where(eq(characters.id, characterId))
-    .for('update');
+  await lockLibraryReferenceScope(tx, characterId);
   return await patchEntity({
     op,
     userId: ctx.userId,
     entityClass: 'character_inventory',
     tx,
     table: inventoryItems,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'items', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await tx
         .select()

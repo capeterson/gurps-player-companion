@@ -290,7 +290,7 @@ router.openapi(
         .from(characters)
         .where(eq(characters.campaignId, id));
       for (const character of ownedCharacters)
-        await detachLibraryReferencesForTransfer(tx, character.id, { campaignId: null });
+        await detachLibraryReferencesForTransfer(tx, character.id, { campaignId: null }, id);
       await tx.delete(campaigns).where(eq(campaigns.id, id));
     });
     return c.body(null, 204);
@@ -384,7 +384,7 @@ router.openapi(
     const { id, userId } = c.req.valid('param');
     const body = c.req.valid('json');
     const campaign = await requireCampaignOwner(id, user.id);
-    if (userId === campaign.ownerId) {
+    if (userId.toLowerCase() === campaign.ownerId) {
       throw new HTTPException(400, {
         message: "cannot change the owner's role; use transfer-ownership instead",
       });
@@ -422,7 +422,7 @@ router.openapi(
     const user = c.get('user');
     const { id, userId } = c.req.valid('param');
     const { campaign, role: actorRole } = await requireCampaignAdmin(id, user.id);
-    if (userId === campaign.ownerId) {
+    if (userId.toLowerCase() === campaign.ownerId) {
       throw new HTTPException(400, { message: 'cannot remove owner; transfer ownership first' });
     }
     const db = getDb();
@@ -437,10 +437,23 @@ router.openapi(
       }
     }
     const result = await withAudit(user.id, undefined, async (tx) => {
-      return tx
+      await tx
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .for('update');
+      const owned = await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(and(eq(characters.campaignId, id), eq(characters.ownerId, userId)));
+      for (const character of owned)
+        await detachLibraryReferencesForTransfer(tx, character.id, { campaignId: null }, id);
+      const deleted = await tx
         .delete(campaignMemberships)
         .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
         .returning({ id: campaignMemberships.id });
+      if (deleted.length === 0) throw new HTTPException(404, { message: 'membership not found' });
+      return deleted;
     });
     if (result.length === 0) throw new HTTPException(404, { message: 'membership not found' });
     return c.body(null, 204);

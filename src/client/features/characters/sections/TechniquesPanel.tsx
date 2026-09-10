@@ -60,7 +60,11 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
   const [defaultError, setDefaultError] = useState<string | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibraryTechniqueOut>('techniques', campaignId);
-  const { creating, submit: submitEntity } = useAddEntityForm({
+  const {
+    creating,
+    flashProps,
+    submit: submitEntity,
+  } = useAddEntityForm({
     entityClass: 'character_technique',
     characterId,
     label: 'technique',
@@ -99,7 +103,8 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
 
   return (
     <form
-      className="flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      {...flashProps}
+      className="field-rollback-flash flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim() || !defaultSkillName.trim()) return;

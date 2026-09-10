@@ -17,6 +17,8 @@ migration 0036). Existing child history triggers record the old/new declarations
 with the library writer as actor. Summaries distinguish a new source version,
 retained rules after detachment, cleared rules, and unresolved copies. The campaign
 library event records the definition edit too; transfers retain the source version.
+Member removal detaches the removed member's library copies in its audited transaction,
+so character history records retained rules and the actor who ended the live link.
 
 Chosen approach: **Postgres triggers** for capture, **paginated REST endpoints** for delivery, **indefinite retention**.
 
