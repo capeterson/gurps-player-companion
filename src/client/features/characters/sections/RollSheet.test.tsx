@@ -4,10 +4,11 @@
  * chips are exercised through the effective-target display.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RollHistoryStrip } from './RollHistoryStrip.tsx';
 import { RollSheet } from './RollSheet.tsx';
-import { __resetRollHistoryForTests } from './rollHistory.ts';
+import { __resetRollHistoryForTests, useRollHistory } from './rollHistory.ts';
 import type { RollRequest } from './rollTypes.ts';
 
 afterEach(() => {
@@ -16,6 +17,45 @@ afterEach(() => {
 });
 
 describe('RollSheet', () => {
+  it.each([
+    ['very_high', 0.5, 10, 'failure', 'turns this failure into a critical failure'],
+    ['very_high', 0.99, 10, 'failure', 'spectacular disaster'],
+    ['normal', 0.5, 10, null, null],
+    ['very_high', 0, 10, 'success', null],
+  ] as const)(
+    'resolves and records spell outcomes in %s mana (dice %s)',
+    (mana, random, target, crit, notice) => {
+      vi.spyOn(Math, 'random').mockReturnValue(random);
+      const view = render(
+        <RollSheet
+          request={{ label: 'Light', baseTarget: target, spellManaLevel: mana }}
+          characterId="mage"
+          onClose={() => {}}
+        />,
+      );
+      const history = renderHook(() => useRollHistory('mage'));
+      fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+      expect(history.result.current[0]?.crit).toBe(crit);
+      expect(history.result.current[0]?.manaDisaster).toBe(notice === 'spectacular disaster');
+      if (notice) expect(screen.getByText(new RegExp(notice))).toBeInTheDocument();
+      else expect(screen.queryByText(/Very high mana/)).not.toBeInTheDocument();
+      const stored = localStorage.getItem('gurps:rollHistory:mage');
+      if (!stored) throw new Error('Missing persisted roll');
+      view.unmount();
+      history.unmount();
+      __resetRollHistoryForTests();
+      localStorage.setItem('gurps:rollHistory:mage', stored);
+      render(<RollHistoryStrip characterId="mage" />);
+      expect(Boolean(screen.queryByText('disaster'))).toBe(notice === 'spectacular disaster');
+      if (notice === 'spectacular disaster')
+        expect(screen.getByText('disaster')).toHaveAttribute(
+          'title',
+          'Very high mana: critical failure and spectacular disaster',
+        );
+      else if (crit === 'failure') expect(screen.getByText('crit fail')).toBeInTheDocument();
+    },
+  );
+
   it('rolls 3d6 against the effective target and shows total/margin/crit', () => {
     // Math.random() -> 0 for every die => floor(0*6)+1 = 1,1,1 => total 3,
     // which B556 always calls a critical success regardless of skill.

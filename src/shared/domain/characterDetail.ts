@@ -40,7 +40,6 @@ import {
   computeSpellLevel,
   effectiveCastingCost,
   effectiveMaintenanceCost,
-  isFreeCastingMana,
   mageryLevel,
   manaSkillModifier,
 } from './spellCalc.ts';
@@ -429,7 +428,6 @@ export function buildSpellOut(
   // an unknown spell gets no skill discount either.
   const baseLevel = computeSpellLevel(spell.points, iq, magery, difficulty);
   const level = baseLevel == null ? null : baseLevel + manaSkillModifier(mana);
-  const freeCasting = isFreeCastingMana(mana);
   return {
     id: spell.id,
     characterId: spell.characterId,
@@ -445,16 +443,10 @@ export function buildSpellOut(
     notes: spell.notes,
     librarySpellId: spell.librarySpellId,
     level,
-    effectiveCost: freeCasting
-      ? 0
-      : level == null
-        ? spell.baseEnergyCost
-        : effectiveCastingCost(spell.baseEnergyCost, level),
-    effectiveMaintenanceCost: freeCasting
-      ? spell.maintenanceCost == null
-        ? null
-        : 0
-      : level == null
+    effectiveCost:
+      level == null ? spell.baseEnergyCost : effectiveCastingCost(spell.baseEnergyCost, level),
+    effectiveMaintenanceCost:
+      level == null
         ? spell.maintenanceCost
         : effectiveMaintenanceCost(spell.maintenanceCost, level),
     createdAt: toIso(spell.createdAt),

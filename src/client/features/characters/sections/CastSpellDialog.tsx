@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MANA_LEVEL_LABELS } from '../../../../shared/constants/magic.ts';
+import { applyFatigueLoss } from '../../../../shared/domain/fatigue.ts';
+import { hasMagery, spellFpRecovery } from '../../../../shared/domain/spellCalc.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
-import { getLocalDb } from '../../../db/dexie.ts';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueFieldPatch } from '../../../sync/outbox.ts';
+import { enqueueFieldPatch, newBatchId } from '../../../sync/outbox.ts';
+import { useCombatPatch } from './useCombatPatch.ts';
 
 interface CastSpellDialogProps {
   character: CharacterDetail;
@@ -89,6 +91,7 @@ export function CastSpellDialog({
 }: CastSpellDialogProps) {
   const ref = useDialogState(true);
   const toasts = useToasts();
+  const patchCombat = useCombatPatch(character);
 
   const maintaining = mode === 'maintain';
   const seedCost = maintaining ? (spell.effectiveMaintenanceCost ?? 0) : spell.effectiveCost;
@@ -129,6 +132,10 @@ export function CastSpellDialog({
   }, [cost, fpAvailable, hpAvailable, stones]);
 
   const allocated = totalAllocation(alloc);
+  const recovery =
+    mode === 'cast'
+      ? spellFpRecovery(character.manaLevel, hasMagery(character.traits), alloc.fromFp)
+      : 0;
   const remaining = cost - allocated;
   const overspent = allocated > cost;
   // One casting can draw from at most one powerstone (B481 / M69).
@@ -158,48 +165,15 @@ export function CastSpellDialog({
     }
     setCasting(true);
     try {
-      // FP / HP go through the combat-state field patch path.  We need
-      // a local combat row to patch, so materialize one if missing
-      // (mirrors CombatPanel's first-edit upsert).
+      const batchId = newBatchId();
+      // Share the B426 calculation and atomically queue the pool fields.
       if (alloc.fromFp > 0 || alloc.fromHp > 0) {
-        const db = getLocalDb();
-        const existing = await db.characterCombat.get(character.id);
-        if (!existing) {
-          await db.characterCombat.put({
-            id: character.id,
-            characterId: character.id,
-            currentHp: character.derived.hp,
-            currentFp: character.derived.fp,
-            conditions: [],
-            maneuver: null,
-            posture: 'standing',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            revision: -1,
-          });
-        }
-        if (alloc.fromFp > 0) {
-          await enqueueFieldPatch({
-            entityClass: 'character_combat',
-            entityId: character.id,
-            fieldPath: 'currentFp',
-            attemptedValue: fpAvailable - alloc.fromFp,
-            humanName: 'FP',
-            flashKey: makeFlashKey('character_combat', character.id, 'currentFp'),
-            characterId: character.id,
-          });
-        }
-        if (alloc.fromHp > 0) {
-          await enqueueFieldPatch({
-            entityClass: 'character_combat',
-            entityId: character.id,
-            fieldPath: 'currentHp',
-            attemptedValue: hpAvailable - alloc.fromHp,
-            humanName: 'HP',
-            flashKey: makeFlashKey('character_combat', character.id, 'currentHp'),
-            characterId: character.id,
-          });
-        }
+        const fatigue = applyFatigueLoss(fpAvailable, alloc.fromFp, character.derived.fp);
+        const pools: Record<string, number> = {};
+        if (alloc.fromFp > 0) pools.currentFp = fatigue.fp;
+        if (alloc.fromHp > 0 || fatigue.hpCost > 0)
+          pools.currentHp = hpAvailable - alloc.fromHp - fatigue.hpCost;
+        await patchCombat(pools, undefined, batchId);
       }
       // Each stone we drew from gets its own patch.  Whole-jsonb so the
       // field validator accepts the full PowerstoneData shape.
@@ -220,11 +194,17 @@ export function CastSpellDialog({
           humanName: `${stone.name} charge`,
           flashKey: makeFlashKey('character_inventory', stone.id, 'powerstoneData'),
           characterId: character.id,
+          batchId,
         });
       }
       const verb = maintaining ? 'Maintained' : 'Cast';
       toasts.push(
-        cost === 0 ? `${verb} ${spell.name} (free).` : `${verb} ${spell.name} for ${cost} energy.`,
+        (cost === 0
+          ? `${verb} ${spell.name} (free).`
+          : `${verb} ${spell.name} for ${cost} energy.`) +
+          (recovery > 0
+            ? ` If spent on your turn, at the start of your next turn restore ${recovery} FP manually (up to your maximum).`
+            : ''),
         { kind: 'success' },
       );
       onClose();
@@ -293,8 +273,10 @@ export function CastSpellDialog({
           <p className="text-xs text-base-content/60">
             {maintaining
               ? 'Paid once per duration interval; a maintenance of 0 keeps the spell up for free.'
-              : 'Critical success costs 0, a failure costs 1, a critical failure costs the full ' +
-                'base cost; Area and Missile spells scale with size.'}
+              : character.manaLevel === 'very_high'
+                ? 'Critical success costs 0. Every failure is critical and costs the full base cost; a rolled critical failure causes a spectacular disaster.'
+                : 'Critical success costs 0, a failure costs 1, a critical failure costs the full ' +
+                  'base cost; Area and Missile spells scale with size.'}
           </p>
         </div>
         {!maintaining && (
@@ -304,6 +286,19 @@ export function CastSpellDialog({
           </p>
         )}
         <p className="label-eyebrow mb-2">Draw {cost} energy from</p>
+        {character.manaLevel === 'very_high' && (
+          <p className="text-xs text-base-content/70 mb-2">
+            Pay all energy now.{' '}
+            {mode === 'maintain'
+              ? 'FP spent maintaining a spell does not recover next turn.'
+              : recovery > 0
+                ? `If spent on your turn, at the start of your next turn restore ${recovery} personal FP manually (up to your maximum). No automatic refund occurs.`
+                : hasMagery(character.traits)
+                  ? 'Only personal FP spent on your own turn can recover at the start of your next turn.'
+                  : 'Without Magery, personal FP does not recover next turn.'}{' '}
+            HP and powerstone energy are not refunded.
+          </p>
+        )}
         <ul className="space-y-2">
           <SourceRow
             label="Fatigue Points (FP)"
@@ -386,6 +381,7 @@ function SourceRow({ label, available, value, onChange, tone }: SourceRowProps) 
       <span className="text-xs text-base-content/60 num">avail {available}</span>
       <input
         type="number"
+        aria-label={label}
         className="input input-bordered input-sm w-20 num text-right"
         value={value}
         min={0}

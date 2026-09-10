@@ -21,13 +21,13 @@ export function effectiveDodge(dodge: number, encumbrancePenalty: number): numbe
 }
 
 /** Parry score from a weapon skill level and the weapon's parry modifier (B376). */
-export function parryFromSkill(skillLevel: number, weaponParryMod: number): number {
-  return Math.floor(skillLevel / 2) + 3 + weaponParryMod;
+export function parryFromSkill(skillLevel: number, weaponParryMod: number, defenseMod = 0): number {
+  return Math.floor(skillLevel / 2) + 3 + weaponParryMod + defenseMod;
 }
 
 /** Block score from a shield/weapon skill level (B375). */
-export function blockFromSkill(skillLevel: number): number {
-  return Math.floor(skillLevel / 2) + 3;
+export function blockFromSkill(skillLevel: number, defenseMod = 0): number {
+  return Math.floor(skillLevel / 2) + 3 + defenseMod;
 }
 
 export type ParsedParry =

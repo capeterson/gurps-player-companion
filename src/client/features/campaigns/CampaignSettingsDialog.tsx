@@ -238,8 +238,10 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
                 ))}
               </select>
               <span className="label-text-alt text-xs text-base-content/60">
-                Low mana is −5 to every spell; high or better lets non-mages cast; very high makes
-                casting free. Applied to every character sheet in this campaign.
+                Low mana is −5 to every spell; high or better lets non-mages cast. Very high mana
+                requires energy up front, restores mages' personal FP spent casting on their own
+                turn next turn, and makes every failure critical. Applied to every character sheet
+                in this campaign.
               </span>
             </label>
           )}

@@ -1,8 +1,47 @@
 import { describe, expect, it } from 'bun:test';
 import { libraryTraitCreate } from '../schemas/campaignLibrary.ts';
 import { emitLibraryYaml, parseLibraryYaml } from '../yaml/library.ts';
-import { type CharacterDetailInput, buildCharacterDetail } from './characterDetail.ts';
+import {
+  type CharacterDetailInput,
+  buildCharacterDetail,
+  buildSpellOut,
+} from './characterDetail.ts';
 import { resolveWeaponSkill, skillDisplayName } from './defenseCalc.ts';
+
+describe('very high mana up-front spell costs', () => {
+  const spell = {
+    id: 'spell',
+    characterId: 'character',
+    name: 'Light',
+    college: 'Light',
+    points: 4,
+    baseEnergyCost: 5,
+    maintenanceCost: 3,
+    castingTime: null,
+    duration: null,
+    prerequisites: null,
+    notes: null,
+    librarySpellId: null,
+    createdAt: '',
+    updatedAt: '',
+  };
+  it.each([0, 2])('retains discounted casting and maintenance costs at Magery %s', (magery) => {
+    const out = buildSpellOut(spell, 15, magery, 'very_high');
+    expect(out.effectiveCost).toBe(4);
+    expect(out.effectiveMaintenanceCost).toBe(2);
+    expect(out).toEqual(buildSpellOut(spell, 15, magery, 'normal'));
+  });
+  it('keeps skill-discounted zero costs free and null maintenance unavailable', () => {
+    const out = buildSpellOut(
+      { ...spell, baseEnergyCost: 1, maintenanceCost: null },
+      15,
+      0,
+      'very_high',
+    );
+    expect(out.effectiveCost).toBe(0);
+    expect(out.effectiveMaintenanceCost).toBeNull();
+  });
+});
 
 describe('character skill effect specialization', () => {
   it('preserves YAML specialty scope in skill, weapon and technique targets', () => {

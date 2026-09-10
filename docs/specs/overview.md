@@ -176,6 +176,17 @@ on any sheet the viewer can edit — their own — it always shows).
   gets no energy discount, and its Cast/Maintain actions are held. The
   cast dialog suggests drawing from a single powerstone and warns when
   energy is allocated from more than one (B481).
+  Very high mana retains normal up-front casting and maintenance costs.
+  Mages (including Magery 0) receive a reminder to manually restore only
+  personal FP spent casting on their own turn at the start of their next turn, capped at maximum FP;
+  maintenance FP is not eligible for this recovery;
+  there is no automatic or timed refund, and HP/powerstones never recover
+  this way. Spell rolls promote every failure to critical and distinguish
+  a rolled critical failure's spectacular disaster (B235), including after closing
+  the roll sheet or reloading local roll history. Spell rolls wait until campaign
+  mana is known, and changing campaign or mana context closes any pending roll.
+  Each cast/maintenance gesture shares one audit batch across its
+  FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
   encumbrance, armor and weapon data, cost/weight rollups. Equipped
   armor DR is aggregated per hit location on the Combat tab's Armor DR
@@ -213,8 +224,12 @@ on any sheet the viewer can edit — their own — it always shows).
     *and* death-check thresholds (B419/B423) in one caption, pulses a
     "suggested" highlight on the Reeling chip when HP drops below ⅓ max
     and it isn't set yet — never auto-applied — and tracks HP down to
-    the certain-death floor at −5×HP; FP floors at −FP, with further
-    fatigue charged against HP one-for-one (B426). One shared
+    the certain-death floor at −5×HP. Each FP lost below zero also costs
+    one HP, including a decrement crossing zero (B426); FP stops at −FP,
+    after which loss is HP-only. Bumpers and spell spending reuse
+    `applyFatigueLoss`. Combined HP/FP edits enter one local transaction
+    with a shared history batch; each field retains ordinary outbox coalescing,
+    server settlement and rollback toast/flash behavior. One shared
     `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
     sticky mobile bottom bar so a fast tap on both UIs never races;
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
@@ -240,8 +255,7 @@ on any sheet the viewer can edit — their own — it always shows).
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
   - **Defenses** — Move (read-only, net of encumbrance), Dodge (with
-    the encumbrance-penalty breakdown and no invented minimum;
-    situational trait-based active-defense bonuses remain unmodeled),
+    the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is
     resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
     an explicit `weaponData.skill` binding (exact case-insensitive
@@ -256,7 +270,11 @@ on any sheet the viewer can edit — their own — it always shows).
     Parry, and Block (B287), along with any **armor DB** from Deflect
     enchantments (`armorData.db`, summed across all equipped armor by
     `sumArmorDb`) — the captions break down both sources. Every numeric
-    defense opens the roll sheet.
+    defense opens the roll sheet. Active derived Parry/Block modifiers are
+    added once after halving skill, through the shared defense helpers;
+    Dodge already includes its derived modifier. Captions show these totals,
+    including enabled conditional effects such as Enhanced Defenses. Additional
+    situational modifiers can still be supplied in the roll sheet.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
     thrust/swing + the weapon's modifiers) as **tappable chips that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing

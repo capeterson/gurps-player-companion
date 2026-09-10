@@ -14,6 +14,7 @@ import {
   backoffMs,
   enqueueCreate,
   enqueueFieldPatch,
+  enqueueFieldPatches,
   readDrainableOps,
   recoverStaleInFlight,
 } from './outbox.ts';
@@ -202,6 +203,285 @@ describe('enqueueFieldPatch', () => {
 });
 
 describe('coalescing + orchestrator rollback', () => {
+  it.each(['rejected', 'conflict', 'suspended'] as const)(
+    'preserves later pool edits after an earlier %s pair and repairs rollback anchors',
+    async (status) => {
+      await seedCharacter();
+      const db = getLocalDb();
+      await db.characterCombat.put({
+        id: CHAR_ID,
+        characterId: CHAR_ID,
+        currentHp: 10,
+        currentFp: 0,
+        posture: 'standing',
+        conditions: [],
+        maneuver: null,
+        revision: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      tokenStore.write({
+        accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+        refreshToken: 'refresh',
+        accessTokenExpiresIn: 3600,
+      });
+      const patch = (fieldPath: string, attemptedValue: number) => ({
+        entityClass: 'character_combat' as const,
+        entityId: CHAR_ID,
+        fieldPath,
+        attemptedValue,
+      });
+      await enqueueFieldPatches([patch('currentHp', 9), patch('currentFp', -1)]);
+      let releaseFirst = () => {};
+      let releaseSecond = () => {};
+      const first = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      const second = new Promise<void>((resolve) => {
+        releaseSecond = resolve;
+      });
+      let requests = 0;
+      const response = (value: unknown) =>
+        new Response(JSON.stringify(value), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (!url.includes('/sync/operations'))
+            return response({ changes: [], nextCursor: {}, hasMore: {} });
+          const body = JSON.parse(String(init?.body)) as { operations: OutboxEntry[] };
+          requests++;
+          await (requests === 1 ? first : second);
+          return response({
+            outcomes: body.operations.map((op) => ({
+              clientOpId: op.clientOpId,
+              status,
+              reason: 'Pool rejected',
+              ...(status === 'conflict'
+                ? {
+                    latestEntity: {
+                      characterId: CHAR_ID,
+                      currentHp: 10,
+                      currentFp: 0,
+                      maneuver: 'do_nothing',
+                      revision: 2,
+                    },
+                  }
+                : {}),
+            })),
+          });
+        }),
+      );
+      getSyncOrchestrator().start();
+      try {
+        await waitFor(() => expect(requests).toBe(1));
+        await enqueueFieldPatches([patch('currentHp', 8), patch('currentFp', -2)]);
+        await enqueueFieldPatch(patch('currentHp', 7));
+        await enqueueFieldPatch({
+          ...patch('currentHp', 7),
+          fieldPath: 'maneuver',
+          attemptedValue: 'attack',
+        });
+        releaseFirst();
+        await waitFor(() => {
+          getSyncOrchestrator().triggerDrain();
+          expect(requests).toBe(2);
+        });
+        expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({
+          currentHp: 7,
+          currentFp: -2,
+          maneuver: 'attack',
+        });
+        releaseSecond();
+        await waitFor(async () => expect(await db.outbox.count()).toBe(0));
+        expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({
+          currentHp: 10,
+          currentFp: 0,
+        });
+      } finally {
+        releaseFirst();
+        releaseSecond();
+        getSyncOrchestrator().stop();
+      }
+    },
+  );
+
+  it.each(['applied', 'rejected'] as const)(
+    'settles both queued fatigue fields with %s outcomes',
+    async (status) => {
+      await seedCharacter();
+      const db = getLocalDb();
+      await db.characterCombat.put({
+        id: CHAR_ID,
+        characterId: CHAR_ID,
+        currentHp: 10,
+        currentFp: 0,
+        posture: 'standing',
+        conditions: [],
+        maneuver: null,
+        revision: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      tokenStore.write({
+        accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+        refreshToken: 'refresh',
+        accessTokenExpiresIn: 3600,
+      });
+      const patches = (hp: number, fp: number) =>
+        Object.entries({ currentHp: hp, currentFp: fp }).map(([fieldPath, attemptedValue]) => ({
+          entityClass: 'character_combat' as const,
+          entityId: CHAR_ID,
+          fieldPath,
+          attemptedValue,
+          humanName: fieldPath === 'currentHp' ? 'HP' : 'FP',
+        }));
+      await enqueueFieldPatches(patches(9, -1));
+      await enqueueFieldPatches(patches(8, -2));
+      const flash = vi.spyOn(flashBus, 'emit');
+      const response = (value: unknown) =>
+        new Response(JSON.stringify(value), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      let latest: string = syncStateStore.value;
+      const off = syncStateStore.subscribe((s) => {
+        latest = s;
+      });
+      let sentStaleCursor = false;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (url.includes('/sync/operations')) {
+            const body = JSON.parse(String(init?.body)) as { operations: OutboxEntry[] };
+            return response({
+              outcomes: body.operations.map((op) => ({
+                clientOpId: op.clientOpId,
+                status,
+                newRevision: 2,
+                reason: 'Pool rejected',
+              })),
+            });
+          }
+          const changes = sentStaleCursor
+            ? []
+            : [
+                {
+                  entityClass: 'character_combat',
+                  entityId: CHAR_ID,
+                  command: 'patch',
+                  revision: 2,
+                  data: {
+                    id: CHAR_ID,
+                    characterId: CHAR_ID,
+                    currentHp: 10,
+                    currentFp: 0,
+                    posture: 'kneeling',
+                    revision: 2,
+                  },
+                },
+              ];
+          sentStaleCursor = true;
+          return response({ changes, nextCursor: {}, hasMore: {} });
+        }),
+      );
+      await getSyncOrchestrator().triggerCursorPull();
+      expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({
+        currentHp: 8,
+        currentFp: -2,
+        posture: 'kneeling',
+      });
+      getSyncOrchestrator().start();
+      try {
+        await waitFor(async () => expect(await db.outbox.count()).toBe(0));
+        expect(await db.characterCombat.get(CHAR_ID)).toMatchObject(
+          status === 'applied' ? { currentHp: 8, currentFp: -2 } : { currentHp: 10, currentFp: 0 },
+        );
+        if (status === 'rejected') {
+          expect((await db.rejectionToasts.toArray()).map((r) => r.fieldPath).sort()).toEqual([
+            'currentFp',
+            'currentHp',
+          ]);
+          expect(flash.mock.calls.map((call) => call[0].key).sort()).toEqual([
+            `character_combat:${CHAR_ID}:currentFp`,
+            `character_combat:${CHAR_ID}:currentHp`,
+          ]);
+        }
+        await waitFor(() => expect(latest).toBe('synced'), { timeout: 3000 });
+      } finally {
+        getSyncOrchestrator().stop();
+        off();
+      }
+    },
+  );
+
+  it.each(['rejected', 'conflict', 'suspended'] as const)(
+    'retains the optimistic edit and retry path when a %s notice cannot be persisted',
+    async (status) => {
+      await seedCharacter();
+      const db = getLocalDb();
+      tokenStore.write({
+        accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+        refreshToken: 'refresh',
+        accessTokenExpiresIn: 3600,
+      });
+      await enqueueFieldPatch({
+        entityClass: 'character',
+        entityId: CHAR_ID,
+        fieldPath: 'st',
+        attemptedValue: 11,
+      });
+      const persist = vi.spyOn(db.rejectionToasts, 'put').mockRejectedValue(new Error('Disk full'));
+      const flash = vi.spyOn(flashBus, 'emit');
+      const response = (body: unknown) =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (!url.includes('/sync/operations'))
+            return response({ changes: [], nextCursor: {}, hasMore: {} });
+          const body = JSON.parse(String(init?.body)) as { operations: OutboxEntry[] };
+          return response({
+            outcomes: body.operations.map((op) => ({
+              clientOpId: op.clientOpId,
+              status,
+              reason: 'Rejected edit',
+              ...(status === 'conflict'
+                ? { latestEntity: { id: CHAR_ID, st: 10, revision: 2 } }
+                : {}),
+            })),
+          });
+        }),
+      );
+      getSyncOrchestrator().start();
+      try {
+        await waitFor(() => expect(persist).toHaveBeenCalled());
+        // Wait for the failed transaction to finish before checking recovery state.
+        await waitFor(async () => {
+          expect((await db.characters.get(CHAR_ID))?.st).toBe(11);
+          expect(await db.outbox.count()).toBe(1);
+          expect(await db.rejectionToasts.count()).toBe(0);
+        });
+        expect(flash).not.toHaveBeenCalled();
+        persist.mockRestore();
+        await waitFor(async () => {
+          getSyncOrchestrator().triggerDrain();
+          expect(await db.outbox.count()).toBe(0);
+        });
+        expect((await db.characters.get(CHAR_ID))?.st).toBe(10);
+        expect(await db.rejectionToasts.count()).toBe(1);
+        await waitFor(() => expect(flash).toHaveBeenCalled());
+      } finally {
+        getSyncOrchestrator().stop();
+      }
+    },
+  );
+
   it('rejection after coalescing restores the ORIGINAL pre-edit value, not an intermediate one', async () => {
     // End-to-end version of the two prior coalescing tests: drive the
     // surviving op through the real orchestrator and confirm the

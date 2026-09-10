@@ -69,98 +69,117 @@ export interface EnqueueFieldPatchArgs {
  * for the same (entityId, fieldPath).
  */
 export async function enqueueFieldPatch(args: EnqueueFieldPatchArgs): Promise<void> {
+  await enqueueFieldPatches([args]);
+}
+
+/** One gesture's fields become durable together. Each retains its raw value,
+ * coalescing key and rollback/flash behavior; batchId groups their audit history.
+ */
+export async function enqueueFieldPatches(
+  patches: readonly EnqueueFieldPatchArgs[],
+): Promise<void> {
+  if (patches.length === 0) return;
+  const db = getLocalDb();
+  const batchId = patches.length > 1 ? newBatchId() : undefined;
+  const stores = patches.flatMap((args) =>
+    storesForOp(args.entityClass).map((store) => store.name),
+  );
+  await db.transaction('rw', [db.outbox, ...stores], async () => {
+    for (const args of patches) {
+      await enqueueFieldPatchInTransaction({ ...args, batchId: args.batchId ?? batchId });
+    }
+  });
+}
+
+async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Promise<void> {
   const db = getLocalDb();
   const ckey = coalesceKey(args.entityId, args.fieldPath);
   const now = new Date().toISOString();
-  await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
-    // 1. Find any pending/transient_retry op(s) for the same field so we
-    //    can coalesce them away -- AND, critically, carry forward the
-    //    OLDEST one's prevValue instead of re-reading the local row.
-    //    Bug this guards against (PR #46 review): the local row already
-    //    holds the about-to-be-deleted op's optimistic attemptedValue,
-    //    so reading "current local value" here would capture that
-    //    unsynced intermediate value as the surviving op's prevValue.
-    //    If the surviving op is later rejected, the orchestrator writes
-    //    prevValue straight back into the row (S2) -- rolling back to a
-    //    value the server never actually had, which then only heals on
-    //    a later cursor pull (S4's pending-op skip no longer protects
-    //    it once the outbox row is gone). Carrying forward the oldest
-    //    delete's prevValue keeps rollback anchored to the last
-    //    server-confirmed value through any number of coalesced taps.
-    //    Affects every rapid-tap surface that patches a field more than
-    //    once in quick succession (conditions toggles, pool bumpers,
-    //    temp-effect steppers).
-    const dupes = await db.outbox.where('coalesceKey').equals(ckey).toArray();
-    const coalescable = dupes.filter(
-      (d) => d.status === 'pending' || d.status === 'transient_retry',
-    );
-    let carriedPrev: { value: unknown } | undefined;
-    if (coalescable.length > 0) {
-      // enqueueFieldPatch runs inside a Dexie transaction, so in
-      // practice at most one coalescable dupe exists at a time; sort
-      // defensively by enqueuedAt in case that invariant is ever
-      // violated, so we always carry forward the OLDEST value.
-      const oldest = coalescable.reduce((a, b) => (a.enqueuedAt <= b.enqueuedAt ? a : b));
-      carriedPrev = { value: oldest.prevValue };
-    }
-    for (const d of coalescable) {
-      await db.outbox.delete(d.clientOpId);
-    }
+  // 1. Find any pending/transient_retry op(s) for the same field so we
+  //    can coalesce them away -- AND, critically, carry forward the
+  //    OLDEST one's prevValue instead of re-reading the local row.
+  //    Bug this guards against (PR #46 review): the local row already
+  //    holds the about-to-be-deleted op's optimistic attemptedValue,
+  //    so reading "current local value" here would capture that
+  //    unsynced intermediate value as the surviving op's prevValue.
+  //    If the surviving op is later rejected, the orchestrator writes
+  //    prevValue straight back into the row (S2) -- rolling back to a
+  //    value the server never actually had, which then only heals on
+  //    a later cursor pull (S4's pending-op skip no longer protects
+  //    it once the outbox row is gone). Carrying forward the oldest
+  //    delete's prevValue keeps rollback anchored to the last
+  //    server-confirmed value through any number of coalesced taps.
+  //    Affects every rapid-tap surface that patches a field more than
+  //    once in quick succession (conditions toggles, pool bumpers,
+  //    temp-effect steppers).
+  const dupes = await db.outbox.where('coalesceKey').equals(ckey).toArray();
+  const coalescable = dupes.filter((d) => d.status === 'pending' || d.status === 'transient_retry');
+  let carriedPrev: { value: unknown } | undefined;
+  if (coalescable.length > 0) {
+    // enqueueFieldPatch runs inside a Dexie transaction, so in
+    // practice at most one coalescable dupe exists at a time; sort
+    // defensively by enqueuedAt in case that invariant is ever
+    // violated, so we always carry forward the OLDEST value.
+    const oldest = coalescable.reduce((a, b) => (a.enqueuedAt <= b.enqueuedAt ? a : b));
+    carriedPrev = { value: oldest.prevValue };
+  }
+  for (const d of coalescable) {
+    await db.outbox.delete(d.clientOpId);
+  }
 
-    // 2. prevValue precedence: an explicit caller override always wins
-    //    (e.g. the orchestrator's stale_base self-heal passes the
-    //    server-confirmed current value when refreshing a superseding
-    //    op -- see orchestrator.ts's `newerPending` branch, which
-    //    applies the exact same "carry the true original value forward"
-    //    idea by hand). Otherwise carry forward the oldest coalesced
-    //    op's prevValue. Only when nothing was pending for this field
-    //    do we fall back to reading the local row fresh -- there's
-    //    nothing to coalesce, so the local row's current value IS the
-    //    last-synced value.
-    const prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
-    // baseRevision does NOT need the same carry-forward treatment:
-    // applyLocalPatch (step 3 below) only ever touches `fieldPath` and
-    // `updatedAt` on the local row, never `revision` -- local writes
-    // don't bump it. So re-reading the local row's revision here
-    // returns exactly the same last-known-server revision the coalesced
-    // op captured, unless a cursor pull landed a newer one in between,
-    // in which case picking up the fresher revision is correct, not a
-    // bug.
-    const baseRev = args.baseRevision ?? (await readEntityRevision(args));
+  // 2. prevValue precedence: an explicit caller override always wins
+  //    (e.g. the orchestrator's stale_base self-heal passes the
+  //    server-confirmed current value when refreshing a superseding
+  //    op -- see orchestrator.ts's `newerPending` branch, which
+  //    applies the exact same "carry the true original value forward"
+  //    idea by hand). Otherwise carry forward the oldest coalesced
+  //    op's prevValue. Only when nothing was pending for this field
+  //    do we fall back to reading the local row fresh -- there's
+  //    nothing to coalesce, so the local row's current value IS the
+  //    last-synced value.
+  const prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
+  // baseRevision does NOT need the same carry-forward treatment:
+  // applyLocalPatch (step 3 below) only ever touches `fieldPath` and
+  // `updatedAt` on the local row, never `revision` -- local writes
+  // don't bump it. So re-reading the local row's revision here
+  // returns exactly the same last-known-server revision the coalesced
+  // op captured, unless a cursor pull landed a newer one in between,
+  // in which case picking up the fresher revision is correct, not a
+  // bug.
+  const baseRev = args.baseRevision ?? (await readEntityRevision(args));
 
-    // 3. Apply the local row mutation immediately so `useLiveQuery`
-    //    sees the user's typed value before the server even hears
-    //    about it.  For child entities we need to know which parent
-    //    table to touch -- the entityClass alone tells us.
-    await applyLocalPatch(args);
-    // 4. Insert the outbox row last so any rollback of step 3 (Dexie
-    //    transaction abort) also drops the queued op.
-    const op: OutboxEntry = {
-      clientOpId: newClientId(),
-      entityClass: args.entityClass,
-      entityId: args.entityId,
-      command: 'patch',
-      coalesceKey: ckey,
-      fieldPath: args.fieldPath,
-      // attemptedValue is the raw new field value -- wrapping it with
-      // a parent hint here would mean the orchestrator's rollback
-      // path (which writes prevValue back into the local row) would
-      // need to know to unwrap.  Carry the parent on `parentId`
-      // instead so attemptedValue / prevValue stay primitive.
-      attemptedValue: args.attemptedValue,
-      prevValue: prev,
-      baseRevision: baseRev,
-      parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
-      validationVersion: 1,
-      status: 'pending',
-      enqueuedAt: now,
-      attemptCount: 0,
-      humanName: args.humanName,
-      flashKey: args.flashKey,
-      batchId: args.batchId,
-    };
-    await db.outbox.add(op);
-  });
+  // 3. Apply the local row mutation immediately so `useLiveQuery`
+  //    sees the user's typed value before the server even hears
+  //    about it.  For child entities we need to know which parent
+  //    table to touch -- the entityClass alone tells us.
+  await applyLocalPatch(args);
+  // 4. Insert the outbox row last so any rollback of step 3 (Dexie
+  //    transaction abort) also drops the queued op.
+  const op: OutboxEntry = {
+    clientOpId: newClientId(),
+    entityClass: args.entityClass,
+    entityId: args.entityId,
+    command: 'patch',
+    coalesceKey: ckey,
+    fieldPath: args.fieldPath,
+    // attemptedValue is the raw new field value -- wrapping it with
+    // a parent hint here would mean the orchestrator's rollback
+    // path (which writes prevValue back into the local row) would
+    // need to know to unwrap.  Carry the parent on `parentId`
+    // instead so attemptedValue / prevValue stay primitive.
+    attemptedValue: args.attemptedValue,
+    prevValue: prev,
+    baseRevision: baseRev,
+    parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
+    validationVersion: 1,
+    status: 'pending',
+    enqueuedAt: now,
+    attemptCount: 0,
+    humanName: args.humanName,
+    flashKey: args.flashKey,
+    batchId: args.batchId,
+  };
+  await db.outbox.add(op);
 }
 
 /**

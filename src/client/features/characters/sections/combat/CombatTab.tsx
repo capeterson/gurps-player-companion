@@ -17,6 +17,8 @@
 
 import { useState } from 'react';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { useFlashState } from '../../../../hooks/useFlashState.ts';
+import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { RollHistoryStrip } from '../RollHistoryStrip.tsx';
 import { RollSheet } from '../RollSheet.tsx';
 import { hpVarFor } from '../hpColor.ts';
@@ -39,6 +41,8 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
   const patchCombat = useCombatPatch(character);
   const bumpers = usePoolBumpers(character, canWrite, patchCombat);
+  const hpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentHp'));
+  const fpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentFp'));
 
   const hpRatio = bumpers.hpMax > 0 ? bumpers.hp / bumpers.hpMax : 0;
   const hpColor = hpVarFor(hpRatio);
@@ -79,7 +83,11 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
           instance as PoolsCard (lifted above) — a second instance here
           would race the first and silently drop a rapid tap. */}
       <div className="combat-bottom-bar md:hidden">
-        <span className="num text-2xl font-bold" style={{ color: hpColor }}>
+        <span
+          {...hpFlash.flashProps}
+          className="field-rollback-flash num text-2xl font-bold"
+          style={{ color: hpColor }}
+        >
           {bumpers.hp}
         </span>
         <span className="num text-xs text-dim">/ {bumpers.hpMax}</span>
@@ -103,9 +111,10 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
             </button>
             <button
               type="button"
-              className="btn btn-sm"
+              className="field-rollback-flash btn btn-sm"
               onClick={() => bumpers.bumpFp(-1)}
               aria-label="FP -1"
+              {...fpFlash.flashProps}
             >
               FP −1
             </button>

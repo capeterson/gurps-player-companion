@@ -4,6 +4,7 @@
  */
 
 import type { DamageDice } from '../../../../shared/constants/damage.ts';
+import type { ManaLevel } from '../../../../shared/constants/magic.ts';
 
 export interface RollPreset {
   readonly label: string;
@@ -19,6 +20,8 @@ export interface DamageRollSpec {
 }
 
 export interface RollRequest {
+  /** Spell checks apply the ambient mana's failure consequences. */
+  readonly spellManaLevel?: ManaLevel;
   readonly label: string;
   /** Ignored when `damage` is present. */
   readonly baseTarget: number;

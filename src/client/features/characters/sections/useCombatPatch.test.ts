@@ -13,7 +13,7 @@
  */
 
 import { renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { getLocalDb } from '../../../db/dexie.ts';
 import { useCombatPatch } from './useCombatPatch.ts';
@@ -34,6 +34,42 @@ function makeCharacter(hp = 10, fp = 12): CharacterDetail {
 }
 
 describe('useCombatPatch', () => {
+  it('queues combined pools in one transaction and preserves field coalescing/history', async () => {
+    const { result } = renderHook(() => useCombatPatch(makeCharacter(10, 0)));
+    await result.current({ currentHp: 9, currentFp: -1 });
+    await result.current({ currentHp: 8, currentFp: -2 });
+    const db = getLocalDb();
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(2);
+    expect(new Set(ops.map((op) => op.batchId)).size).toBe(1);
+    expect(ops[0]?.batchId).toBeTruthy();
+    expect(ops.find((op) => op.fieldPath === 'currentHp')).toMatchObject({
+      attemptedValue: 8,
+      prevValue: 10,
+    });
+    expect(ops.find((op) => op.fieldPath === 'currentFp')).toMatchObject({
+      attemptedValue: -2,
+      prevValue: 0,
+    });
+  });
+
+  it('aborts both pool writes and queued ops if the second enqueue fails', async () => {
+    const { result } = renderHook(() => useCombatPatch(makeCharacter(10, 0)));
+    const db = getLocalDb();
+    const add = db.outbox.add.bind(db.outbox);
+    const spy = vi.spyOn(db.outbox, 'add').mockImplementation((...args) => {
+      if (args[0].fieldPath === 'currentFp') throw new Error('Disk full');
+      return add(...args);
+    });
+    try {
+      await expect(result.current({ currentHp: 9, currentFp: -1 })).rejects.toThrow('Disk full');
+      expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({ currentHp: 10, currentFp: 0 });
+      expect(await db.outbox.count()).toBe(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('materializes a default combat row when absent and enqueues the patch', async () => {
     const character = makeCharacter(10, 12);
     const { result } = renderHook(() => useCombatPatch(character));
