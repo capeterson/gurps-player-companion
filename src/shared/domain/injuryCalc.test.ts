@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { DrByLocationMap, TypedDrTotals } from './armorDr.ts';
+import { effectiveDrByLocation } from './armorDr.ts';
 import { applyDamage, parseArmorDivisor, woundingMultiplier } from './injuryCalc.ts';
 
 /**
@@ -193,7 +194,7 @@ describe('applyDamage', () => {
 
   it('adds the skull natural DR 2 even when unarmored (B400)', () => {
     // 2 cr to a bare skull: fully stopped by the natural DR 2.
-    const result = applyDamage(2, 'cr', 'skull', drMap({}), null);
+    const result = applyDamage(2, 'cr', 'skull', effectiveDrByLocation([]), null);
     expect(result.drAtLocation).toBe(2);
     expect(result.penetrating).toBe(0);
     expect(result.injury).toBe(0);
@@ -201,7 +202,11 @@ describe('applyDamage', () => {
 
   it('stacks the skull natural DR 2 with helmet armor', () => {
     // Helmet DR 4 + natural 2 = 6; 10 imp -> 4 penetrating x4 (skull) = 16.
-    const result = applyDamage(10, 'imp', 'skull', drMap({ skull: { dr: 4 } }), null);
+    const map = effectiveDrByLocation(
+      [],
+      [{ target: 'dr', value: 4, active: true, hitLocation: 'skull' }],
+    );
+    const result = applyDamage(10, 'imp', 'skull', map, null);
     expect(result.drAtLocation).toBe(6);
     expect(result.penetrating).toBe(4);
     expect(result.injury).toBe(16);

@@ -43,9 +43,9 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_traits.available_modifiers` | `traitModifier[]` (trait.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
 | `campaign_library_traits.tags` | `tagList` (campaignLibrary.ts) — `string[]`, each 1–40 chars | REST library CRUD + YAML import |
 | `campaign_library_traits.variants` | `traitVariant[]` (trait.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
-| `campaign_library_traits.effects` | `traitEffect[]` (effects.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
+| `campaign_library_traits.effects` | `traitEffect[]` (effects.ts); active `dr` effects retain optional `hitLocation` in the effective protection map. Unscoped innate DR excludes eyes; explicit eye/custom locations are supported. | REST library CRUD + YAML import (`libraryTraitCreate`) |
 | `campaign_library_skills.situational_modifiers` | `situationalModifier[]` (skill.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
-| `campaign_library_skills.effects` | `traitEffect[]` (effects.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
+| `campaign_library_skills.effects` | `traitEffect[]` (effects.ts); same DR location semantics as trait effects | REST library CRUD + YAML import (`librarySkillCreate`) |
 | `campaign_library_styles.techniques` | `styleTechniqueRef[]` (campaignLibrary.ts) — `{ name, defaultSkillName, difficulty, maxLevel? }`, max 100. Denormalized (no technique id) so a style survives a YAML round trip into a campaign whose technique rows don't exist yet | REST library CRUD + YAML import (`libraryStyleCreate`) |
 | `campaign_library_styles.perks` / `.skills` | `styleNameList` (campaignLibrary.ts) — `string[]`, each 1–160 chars, max 100 | REST library CRUD + YAML import (`libraryStyleCreate`) |
 | `campaign_library_items.armor` | `armorData` (inventory.ts), nullable — same shape as `inventory_items.armor` incl. `typedDr` / `db` | REST library CRUD + YAML import (`libraryItemCreate`) |

@@ -63,11 +63,12 @@ export function useLibraryEffectMaps(campaignId: string | null | undefined): Lib
     }
     const traitMap = new Map<string, ReadonlyArray<TraitEffect>>();
     for (const t of data.traits) {
-      if (t.effects && t.effects.length > 0) traitMap.set(t.id, t.effects);
+      // A known empty definition is different from an unavailable library row.
+      if (t.effects) traitMap.set(t.id, t.effects);
     }
     const skillMap = new Map<string, ReadonlyArray<TraitEffect>>();
     for (const s of data.skills) {
-      if (s.effects && s.effects.length > 0) skillMap.set(s.id, s.effects);
+      if (s.effects) skillMap.set(s.id, s.effects);
     }
     return { libraryTraitEffects: traitMap, librarySkillEffects: skillMap };
   }, [data]);

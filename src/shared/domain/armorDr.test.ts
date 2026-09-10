@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { aggregateDrByLocation, resolveDr, sumArmorDb } from './armorDr.ts';
+import { aggregateDrByLocation, effectiveDrByLocation, resolveDr, sumArmorDb } from './armorDr.ts';
 import type { ArmorItemRow } from './armorDr.ts';
+import { applyDamage } from './injuryCalc.ts';
+import { resolveEffects } from './traitEffects.ts';
 
 function item(
   dr: number,
@@ -47,7 +49,7 @@ describe('aggregateDrByLocation', () => {
       item(2, ['torso'], { drCrushing: null }),
     ]);
     expect(result.get('torso')?.dr).toBe(5);
-    expect(result.get('torso')?.drCrushing).toBe(5);
+    expect(result.get('torso')?.drCrushing).toBe(7);
   });
 
   it('returns null crushing DR when no item overrides it', () => {
@@ -114,6 +116,54 @@ describe('aggregateDrByLocation', () => {
     // is just its own base dr.
     expect(result.get('arm_left')?.typedDr.cut).toBe(1);
     expect(result.get('torso')?.typedDr.cut).toBe(9);
+  });
+});
+
+describe('effective armor and innate DR', () => {
+  const effects = resolveEffects(
+    [
+      {
+        id: 'skin',
+        name: 'Skin',
+        level: 2,
+        libraryEffects: [
+          { target: 'dr', value: 5, scaling: 'flat' },
+          { target: 'dr', value: 2, scaling: 'per_level', hitLocation: 'skull' },
+          { target: 'dr', value: 10, scaling: 'flat', conditionGroup: 'shield' },
+        ],
+      },
+    ],
+    [],
+    new Set(),
+  );
+  it('applies global and scaled location DR without globalizing skull protection', () => {
+    const map = effectiveDrByLocation([], effects);
+    expect(map.get('torso')?.dr).toBe(5);
+    expect(map.get('skull')?.dr).toBe(11); // global 5 + scoped 4 + natural 2
+    expect(resolveDr('cr', map.get('eye'))).toBe(0);
+    expect(applyDamage(6, 'cr', 'torso', map, null).injury).toBe(1);
+    expect(applyDamage(12, 'cr', 'skull', map, '2').injury).toBe(28);
+  });
+  it('layers innate DR with per-type armor overrides before a divisor', () => {
+    const armor = [item(2, ['torso'], { typedDr: { cut: 4 }, drCrushing: 1 }), item(3, ['torso'])];
+    const map = effectiveDrByLocation(armor, effects);
+    expect(resolveDr('cut', map.get('torso'))).toBe(12);
+    expect(resolveDr('cr', map.get('torso'))).toBe(9);
+    expect(applyDamage(14, 'cut', 'torso', map, '2').injury).toBe(12);
+    expect(effectiveDrByLocation([...armor].reverse(), effects)).toEqual(map);
+  });
+  it('supports explicit eye/custom locations and ignores inactive effects', () => {
+    const map = effectiveDrByLocation(
+      [],
+      [
+        { target: 'dr', value: 3, active: true, hitLocation: 'eye' },
+        { target: 'dr', value: 4, active: true, hitLocation: 'wing' },
+        { target: 'dr', value: 10, active: false },
+      ],
+    );
+    expect(map.get('eye')?.dr).toBe(3);
+    expect(map.get('wing')?.dr).toBe(4);
+    expect(resolveDr('cr', map.get('torso'))).toBe(0);
   });
 });
 

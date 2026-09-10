@@ -205,7 +205,8 @@ export function applyEffectsToAttrs(
         blockMod += eff.value;
         break;
       case 'dr':
-        drMod += eff.value;
+        // Scoped DR remains in the resolved effects for the location map.
+        if (!eff.hitLocation) drMod += eff.value;
         break;
       case 'fright_check':
         frightCheckMod += eff.value;

@@ -189,7 +189,7 @@ on any sheet the viewer can edit — their own — it always shows).
   FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
   encumbrance, armor and weapon data, cost/weight rollups. Equipped
-  armor DR is aggregated per hit location on the Combat tab's Armor DR
+  armor and active innate DR are aggregated per hit location on the Combat tab's Effective DR
   card. An item's categories (container/armor/weapon/powerstone/magic
   item) are **derived facet chips** (`FacetChips.tsx`) rather than
   independent checkboxes — clicking an inactive chip (`+ Weapon`)
@@ -216,7 +216,7 @@ on any sheet the viewer can edit — their own — it always shows).
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
   hop. Two-column "state vs. action" layout: the left column holds
-  Pools and Armor DR; the right column stacks Maneuver, Defenses (with
+  Pools and Effective DR; the right column stacks Maneuver, Defenses (with
   Move), and Attacks; the roll history strip spans full width below.
   - **Pools** — HP/FP with bumpers/reset, posture chips, and all 12
     common-condition chips (normalized against legacy Capitalized entries
@@ -235,18 +235,27 @@ on any sheet the viewer can edit — their own — it always shows).
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
     so two rapid condition taps before Dexie re-renders don't coalesce
     into one outbox patch and drop the first tap.
-  - **Armor DR** — aggregates equipped armor DR per hit location
+  - **Effective DR** — combines equipped armor, active global/location
+    innate DR, and natural skull DR 2 into one map per hit location
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
     hit-location aim presets. Per-damage-type DR overrides
     (`armorData.typedDr` — e.g. a hauberk with 6 vs cut, 4 vs imp) and
     the legacy crushing-specific DR are shown where they differ from the
-    default. An **"Incoming damage…"** button opens a dialog
+    default. Every layer contributes its override or base DR, including
+    crushing overrides. Unscoped innate DR excludes eyes (B46); an explicit
+    eye effect can protect them. Scoped effects, including custom locations,
+    never inflate the global `derived.traitDr` total; inactive effects do not
+    protect. The global trait-DR breakdown lists only unscoped effects. While
+    linked trait/skill definitions are unavailable (including a cold offline
+    load), DR is marked unavailable and the damage dialog cannot apply HP loss.
+    Known empty effect definitions remain distinguishable from missing entries.
+    An **"Incoming damage…"** button opens a dialog
     (`IncomingDamageDialog.tsx`) that resolves a hit against the
     character's own DR: basic damage − DR(location) with the resolver
     honoring the incoming type's typed override first, falling back to
     the crushing override (`drCrushing`, for `cr`) then the default `dr`
-    (B378), dividing by an armor divisor and adding the skull's natural
-    DR 2 (B400) → penetrating × wounding multiplier (B379/B398-400) =
+    (B378), dividing the complete protection (including natural skull
+    DR) by an armor divisor → penetrating × wounding multiplier (B379/B398-400) =
     injury (`src/shared/domain/injuryCalc.ts`), applied to HP through
     the same shared `usePoolBumpers` instance as the rest of the tab.
     Crippling is surfaced as a hint only, never auto-applied.
@@ -506,7 +515,7 @@ src/
                    specialization-disambiguated skill names, ST-shortfall
                    penalty, equipped-shield picking), injuryCalc (incoming-
                    damage DR/divisor/wounding-multiplier resolution for the
-                   Armor DR card's damage dialog), armorDr (equipped-armor DR
+                   Effective DR card's damage dialog), armorDr (armor + innate DR
                    aggregation per hit location + per-damage-type DR
                    resolution via `resolveDr` with typed → crushing →
                    default fallback, and armor DB summation via
