@@ -423,7 +423,7 @@ function manaNotice(
       tone: 'text-base-content/60',
       text:
         mana === 'very_high'
-          ? 'Very high mana: anyone can cast here (no Magery needed) and spells cost no energy.'
+          ? 'Very high mana: pay energy up front. Mages recover personal FP spent on their own turn at the start of their next turn; HP and powerstone energy are not refunded. Every failure is critical; a rolled critical failure causes a spectacular disaster.'
           : 'High mana: anyone can cast here — Magery is not required.',
     };
   }
@@ -502,7 +502,9 @@ export function SpellsPanel({
                 canWrite={canWrite}
                 castable={castable}
                 onCast={(spell, mode) => setCasting({ spell, mode })}
-                onRoll={setRollRequest}
+                onRoll={(request) =>
+                  setRollRequest({ ...request, spellManaLevel: character.manaLevel })
+                }
               />
             ))}
           </ul>

@@ -176,6 +176,12 @@ on any sheet the viewer can edit — their own — it always shows).
   gets no energy discount, and its Cast/Maintain actions are held. The
   cast dialog suggests drawing from a single powerstone and warns when
   energy is allocated from more than one (B481).
+  Very high mana retains normal up-front casting and maintenance costs.
+  Mages (including Magery 0) receive a reminder to manually restore only
+  personal FP spent on their own turn at the start of their next turn, capped at maximum FP;
+  there is no automatic or timed refund, and HP/powerstones never recover
+  this way. Spell rolls promote every failure to critical and distinguish
+  a rolled critical failure's spectacular disaster (B235).
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
   encumbrance, armor and weapon data, cost/weight rollups. Equipped
   armor DR is aggregated per hit location on the Combat tab's Armor DR

@@ -8,9 +8,9 @@ import {
   effectiveCastingCost,
   effectiveMaintenanceCost,
   hasMagery,
-  isFreeCastingMana,
   mageryLevel,
   manaSkillModifier,
+  spellFpRecovery,
   totalPowerstoneEnergy,
 } from './spellCalc.ts';
 
@@ -193,10 +193,12 @@ describe('mana levels (B235)', () => {
     expect(canCastInMana(true, 'low')).toBe(true);
   });
 
-  it('only very high mana makes casting free', () => {
-    expect(isFreeCastingMana('very_high')).toBe(true);
-    expect(isFreeCastingMana('high')).toBe(false);
-    expect(isFreeCastingMana('normal')).toBe(false);
+  it('only mages in very high mana can recover personal FP actually spent next turn', () => {
+    expect(spellFpRecovery('very_high', true, 3)).toBe(3);
+    expect(spellFpRecovery('very_high', false, 3)).toBe(0);
+    expect(spellFpRecovery('very_high', true, 0)).toBe(0);
+    expect(spellFpRecovery('high', true, 3)).toBe(0);
+    expect(spellFpRecovery('normal', true, 3)).toBe(0);
   });
 });
 
