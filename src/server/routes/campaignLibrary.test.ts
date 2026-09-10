@@ -115,6 +115,10 @@ it.each(['traits', 'skills', 'spells', 'items', 'languages', 'techniques', 'styl
       revision = result.nextCursor.campaign ?? row.revision;
     };
     await assertAdvanced();
+    expect(
+      (await request(`/api/v1/campaigns/${campaign.id}`, { name: 'Real campaign edit' }, 'PATCH'))
+        .status,
+    ).toBe(200);
     const createdResponse = await request(`${path}/${kind}`, {
       name: 'Cursor source',
       ...(kind === 'traits' ? { kind: 'advantage' } : {}),
@@ -139,6 +143,20 @@ it.each(['traits', 'skills', 'spells', 'items', 'languages', 'techniques', 'styl
       ).status,
     ).toBe(200);
     await assertAdvanced();
+    const history = (await (
+      await request(`/api/v1/campaigns/${campaign.id}/history`, undefined, 'GET')
+    ).json()) as { entityClass: string; op: string }[];
+    expect(
+      history.filter((event) => event.entityClass === 'campaign' && event.op === 'update'),
+    ).toHaveLength(1);
+    expect(
+      history.filter((event) => event.entityClass.startsWith('campaign_library_')),
+    ).toHaveLength(3);
+    const firstPage = (await (
+      await request(`/api/v1/campaigns/${campaign.id}/history?limit=1`, undefined, 'GET')
+    ).json()) as { entityClass: string; op: string }[];
+    expect(firstPage[0]?.entityClass).toMatch(/^campaign_library_/);
+    expect(firstPage[0]?.op).toBe('delete');
   },
 );
 

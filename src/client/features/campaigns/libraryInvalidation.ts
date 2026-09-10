@@ -1,17 +1,18 @@
 import type { QueryClient } from '@tanstack/react-query';
-
-let invalidate: ((campaignId: string) => void) | null = null;
+import { liveQuery } from 'dexie';
+import { getLocalDb } from '../../db/dexie.ts';
 
 export function mountLibraryInvalidations(queryClient: QueryClient): () => void {
-  const callback = (campaignId: string) => {
-    void queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
-  };
-  invalidate = callback;
-  return () => {
-    if (invalidate === callback) invalidate = null;
-  };
-}
-
-export function invalidateLibrary(campaignId: string): void {
-  invalidate?.(campaignId);
+  let revisions = new Map<string, number>();
+  // Dexie observes committed changes across browser tabs. Every tab has its own
+  // QueryClient, even when another tab consumes the shared HTTP cursor first.
+  const subscription = liveQuery(() => getLocalDb().campaigns.toArray()).subscribe((rows) => {
+    const next = new Map(rows.map((row) => [row.id, row.revision]));
+    for (const id of new Set([...revisions.keys(), ...next.keys()])) {
+      if (revisions.get(id) !== next.get(id))
+        void queryClient.invalidateQueries({ queryKey: ['campaigns', id, 'library'] });
+    }
+    revisions = next;
+  });
+  return () => subscription.unsubscribe();
 }

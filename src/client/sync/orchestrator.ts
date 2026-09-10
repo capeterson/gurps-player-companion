@@ -1,4 +1,3 @@
-import { invalidateLibrary } from '../features/campaigns/libraryInvalidation.ts';
 /**
  * Sync orchestrator -- the long-lived singleton that:
  *   - drains the Dexie outbox into POST /sync/operations,
@@ -340,11 +339,6 @@ class SyncOrchestrator {
           appliedAnything = true;
         }
         await this.applyCursorResponse(res);
-        // Refresh online library queries only after the durable HTTP cycle commits.
-        // Campaign revisions cover definitions with no character references as well.
-        for (const change of res.changes ?? []) {
-          if (change.entityClass === 'campaign') invalidateLibrary(change.entityId);
-        }
         lastAccessible = res.accessible;
         hasMore = Object.values(res.hasMore ?? {}).some((v) => v);
       }
