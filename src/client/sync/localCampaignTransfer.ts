@@ -23,6 +23,31 @@ const fields = [
   'libraryTechniqueId',
 ] as const;
 
+export function localCampaignReferenceUndo(
+  store: string,
+  row: Record<string, unknown>,
+  campaignId: string | null,
+): LocalCampaignTransferUndo | null {
+  const index = campaignTransferStores().findIndex((table) => table.name === store);
+  const field = fields[index];
+  if (!field || typeof row[field] !== 'string') return null;
+  const before: Record<string, unknown> = { [field]: row[field] };
+  const after: Record<string, unknown> = { [field]: null };
+  if (index < 2) {
+    before.libraryMechanics = row.libraryMechanics ?? null;
+    const saved = libraryMechanics.safeParse(row.libraryMechanics);
+    const trusted =
+      saved.success && saved.data.sourceId === row[field] && saved.data.campaignId === campaignId
+        ? saved.data
+        : null;
+    after.libraryMechanics = libraryMechanics.parse({
+      ...(trusted ?? { sourceId: row[field], campaignId, sourceRevision: null, effects: null }),
+      detached: true,
+    });
+  }
+  return { store, entityId: String(row.id), campaignId, before, after };
+}
+
 /** Called inside the same transaction as the character patch and its outbox entry. */
 export async function detachLocalCampaignReferences(
   characterId: string,
@@ -30,31 +55,13 @@ export async function detachLocalCampaignReferences(
 ) {
   const undo: LocalCampaignTransferUndo[] = [];
   const stores = campaignTransferStores();
-  for (const [index, store] of stores.entries()) {
-    const field = fields[index];
-    if (!field) continue;
+  for (const store of stores) {
     const table = store as unknown as Table<Record<string, unknown>, string>;
     for (const row of await table.where('characterId').equals(characterId).toArray()) {
-      if (typeof row[field] !== 'string') continue;
-      const before: Record<string, unknown> = { [field]: row[field] };
-      const after: Record<string, unknown> = { [field]: null };
-      if (index < 2) {
-        before.libraryMechanics = row.libraryMechanics ?? null;
-        const saved = libraryMechanics.safeParse(row.libraryMechanics);
-        const trusted =
-          saved.success &&
-          saved.data.sourceId === row[field] &&
-          saved.data.campaignId === campaignId
-            ? saved.data
-            : null;
-        after.libraryMechanics = libraryMechanics.parse({
-          ...(trusted ?? { sourceId: row[field], campaignId, sourceRevision: null, effects: null }),
-          detached: true,
-        });
-      }
-      const entityId = String(row.id);
-      undo.push({ store: table.name, entityId, campaignId, before, after });
-      await table.update(entityId, after);
+      const entry = localCampaignReferenceUndo(table.name, row, campaignId);
+      if (!entry) continue;
+      undo.push(entry);
+      await table.update(entry.entityId, entry.after);
     }
   }
   return undo;

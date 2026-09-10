@@ -534,7 +534,13 @@ and if an acknowledged transfer is followed by a failed cursor pull. Local-only
 undo data on the operation restores links when the transfer is rejected or
 explicitly discarded, preserves unrelated child edits, and follows coalesced
 or queued campaign changes. Cursor pulls protect these child fields while the
-parent transfer is pending. Resubmitting an already-null source reference does
+parent transfer is pending. The same applies to trait/skill rows first downloaded
+during that transfer when their provenance identifies the original campaign: their saved rules
+are detached locally and their rollback data joins the durable operation. This
+also survives an outcome received from a request sent before the child arrived.
+New references without source-campaign evidence stay intact until authoritative
+sync reconciliation; they may already belong to the destination campaign.
+Resubmitting an already-null source reference does
 not erase a retained declaration; new links to missing sources are rejected.
 
 The orchestrator recovers from partial/interrupted states rather than assuming

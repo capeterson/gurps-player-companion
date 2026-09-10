@@ -41,12 +41,15 @@ import {
   type RejectionRecord,
   coalesceKey,
   getLocalDb,
+  storeForEntityClass,
 } from '../db/dexie.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { clearActiveUser } from './activeUser.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
 import {
+  campaignTransferStores,
+  localCampaignReferenceUndo,
   mergeCampaignTransferUndo,
   restoreLocalCampaignReferences,
 } from './localCampaignTransfer.ts';
@@ -831,6 +834,11 @@ class SyncOrchestrator {
             if (newRevision !== undefined && fieldUnchanged) {
               const fieldPath = op.fieldPath;
               await db.transaction('rw', ALL_STORE_NAMES, async () => {
+                const transferUndo = mergeCampaignTransferUndo(
+                  op.localCampaignTransferUndo,
+                  (await db.outbox.get(op.clientOpId))?.localCampaignTransferUndo,
+                );
+
                 await this.stampRevision(op.entityClass, op.entityId, newRevision);
                 await db.outbox.delete(op.clientOpId);
                 await appendSyncLog({
@@ -867,7 +875,7 @@ class SyncOrchestrator {
                     // temporary buffs") stays in the same history fold instead
                     // of falling back to a fresh clientOpId batch.
                     batchId: op.batchId,
-                    localCampaignTransferUndo: op.localCampaignTransferUndo,
+                    localCampaignTransferUndo: transferUndo,
                   });
                 } else {
                   // Refresh the superseding op so Guard 1 passes on its next
@@ -877,15 +885,12 @@ class SyncOrchestrator {
                     baseRevision: newRevision,
                     prevValue: entity[fieldPath],
                     localCampaignTransferUndo: mergeCampaignTransferUndo(
-                      op.localCampaignTransferUndo,
+                      transferUndo,
                       newerPending.localCampaignTransferUndo,
                     ),
                   });
                   await restoreLocalCampaignReferences(
-                    mergeCampaignTransferUndo(
-                      op.localCampaignTransferUndo,
-                      newerPending.localCampaignTransferUndo,
-                    ),
+                    mergeCampaignTransferUndo(transferUndo, newerPending.localCampaignTransferUndo),
                     newerPending.attemptedValue,
                   );
                 }
@@ -954,6 +959,11 @@ class SyncOrchestrator {
       // slip between the lookup and rollback. Exclude only the rejected op
       // when merging a returned server row, preserving every other dirty field.
       return db.transaction('rw', ALL_STORE_NAMES, async () => {
+        const transferUndo = mergeCampaignTransferUndo(
+          op.localCampaignTransferUndo,
+          (await db.outbox.get(op.clientOpId))?.localCampaignTransferUndo,
+        );
+
         const newer = await db.outbox
           .where('coalesceKey')
           .equals(coalesceKey(op.entityId, fieldPath))
@@ -976,7 +986,7 @@ class SyncOrchestrator {
           await db.outbox.update(newer.clientOpId, {
             prevValue: restored,
             localCampaignTransferUndo: mergeCampaignTransferUndo(
-              op.localCampaignTransferUndo,
+              transferUndo,
               newer.localCampaignTransferUndo,
             ),
             ...(typeof latest?.revision === 'number' ? { baseRevision: latest.revision } : {}),
@@ -986,9 +996,9 @@ class SyncOrchestrator {
           await this.applyServerRow(op.entityClass, latest, { ignoreOutboxConflict: false });
         else if (!newer && restored !== undefined)
           await this.revertField(op.entityClass, op.entityId, fieldPath, restored);
-        if (op.localCampaignTransferUndo)
+        if (transferUndo)
           await restoreLocalCampaignReferences(
-            op.localCampaignTransferUndo,
+            transferUndo,
             newer ? newer.attemptedValue : restored,
           );
         return newer ? { preservedValue: newer.attemptedValue } : undefined;
@@ -1421,31 +1431,25 @@ class SyncOrchestrator {
     opts: { ignoreOutboxConflict?: boolean },
   ): Promise<void> {
     const db = getLocalDb();
+    await db.transaction(
+      'rw',
+      [db.outbox, db.characters, db.campaigns, db.characterCombat, ...campaignTransferStores()],
+      () => this.mergeServerRow(entityClass, row, opts),
+    );
+  }
+
+  private async mergeServerRow(
+    entityClass: EntityClass,
+    row: Record<string, unknown>,
+    opts: { ignoreOutboxConflict?: boolean },
+  ): Promise<void> {
+    const db = getLocalDb();
     const id =
       entityClass === 'character_combat'
         ? (row.characterId as string | undefined)
         : (row.id as string | undefined);
     if (!id) return;
     const merged: Record<string, unknown> = { ...row };
-    // Campaign moves also change child links locally. Cursor rows must not
-    // overwrite those side effects while the parent mutation is unconfirmed.
-    if (!opts.ignoreOutboxConflict && typeof row.characterId === 'string') {
-      const transfers = await db.outbox
-        .where('entityId')
-        .equals(row.characterId)
-        .filter(
-          (op) =>
-            op.entityClass === 'character' &&
-            op.fieldPath === 'campaignId' &&
-            ['pending', 'in_flight', 'transient_retry'].includes(op.status),
-        )
-        .toArray();
-      for (const op of transfers)
-        for (const entry of op.localCampaignTransferUndo ?? []) {
-          if (entry.entityId === id)
-            for (const field of Object.keys(entry.after)) delete merged[field];
-        }
-    }
     if (!opts.ignoreOutboxConflict) {
       // `entityId` is indexed on the outbox (Dexie v3).  Do NOT wrap
       // this in a swallowing catch: if the query ever breaks again the
@@ -1472,6 +1476,55 @@ class SyncOrchestrator {
           // Caller had a pending edit on this field; keep the local
           // value, drop the server's.
           delete merged[op.fieldPath];
+        }
+      }
+    }
+    // Campaign moves also change child links locally. Cursor rows must not
+    // overwrite those side effects while the parent mutation is unconfirmed.
+    if (!opts.ignoreOutboxConflict && typeof row.characterId === 'string') {
+      const transfers = await db.outbox
+        .where('entityId')
+        .equals(row.characterId)
+        .filter(
+          (op) =>
+            op.entityClass === 'character' &&
+            op.fieldPath === 'campaignId' &&
+            ['pending', 'in_flight', 'transient_retry'].includes(op.status),
+        )
+        .toArray();
+      let protectedReference = false;
+      for (const op of transfers)
+        for (const entry of op.localCampaignTransferUndo ?? []) {
+          if (entry.entityId === id) {
+            protectedReference = true;
+            for (const field of Object.keys(entry.after)) delete merged[field];
+          }
+        }
+      const store = storeForEntityClass(entityClass);
+      const table = campaignTransferStores().find((candidate) => candidate.name === store);
+      if (!protectedReference && table && !(await table.get(id))) {
+        // This child may have been created on another device before we moved
+        // campaigns. Capture its undo as part of the same cursor transaction.
+        const saved = libraryMechanics.safeParse(row.libraryMechanics);
+        const transfer = transfers
+          .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt))
+          .find(
+            (op) =>
+              op.prevValue !== op.attemptedValue &&
+              saved.success &&
+              saved.data.campaignId === op.prevValue,
+          );
+        if (transfer && (typeof transfer.prevValue === 'string' || transfer.prevValue === null)) {
+          const entry = localCampaignReferenceUndo(table.name, merged, transfer.prevValue);
+          if (entry) {
+            await db.outbox.update(transfer.clientOpId, {
+              localCampaignTransferUndo: mergeCampaignTransferUndo(
+                transfer.localCampaignTransferUndo,
+                [entry],
+              ),
+            });
+            Object.assign(merged, entry.after);
+          }
         }
       }
     }

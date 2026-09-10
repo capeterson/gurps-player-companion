@@ -274,7 +274,10 @@ HTTP pulls invalidate its library editor/autocomplete query, including definitio
 with no owned copies. Post-commit campaign-scoped nudges only accelerate the pull. Character share
 gates still apply to every emitted child row; nudges carry no definitions.
 
-Deletion first detaches owned copies and retains their last effects and source
+Changing a source trait's kind detaches owned traits that retain
+the previous kind; their last saved rules and paid choices remain unchanged by
+that edit or later source updates. Deletion detaches owned copies and retains
+their last effects and source
 version. YAML replacement with a renamed natural key follows the same path;
 recreating the old name cannot reconnect a different UUID. Campaign transfers
 detach all six live library reference types and preserve owned trait/skill rules,
