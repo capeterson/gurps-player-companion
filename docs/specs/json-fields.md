@@ -89,6 +89,12 @@ These are client-internal (never sent verbatim to the server — `outbox`
 entries are re-validated server-side per field) so TypeScript interfaces in
 `dexie.ts` are their schema documents.
 
+For both library effect arrays, `damage_thrust` / `damage_swing` values are
+signed flat adds to the corresponding final ST-based damage dice. Scaling
+and active conditions apply before summation; temporary ST changes the base
+table lookup first. Weapon adds then apply once; explicit weapon dice do not
+receive these ST-based bonuses.
+
 ## Checklist for adding a new JSON field
 
 1. Define the Zod schema in `src/shared/schemas/*.ts` next to its entity.

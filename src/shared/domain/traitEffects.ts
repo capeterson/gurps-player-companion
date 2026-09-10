@@ -11,7 +11,7 @@
  *
  *   2. Aggregate modifier values applied via `applyEffectsToAttrs` —
  *      these populate `attrs.dodgeMod`, `parryMod`, `blockMod`, `drMod`,
- *      `frightCheckMod` and the existing `*Mod` fields BEFORE
+ *      `frightCheckMod`, `damageThrustMod`, `damageSwingMod` and existing `*Mod` fields BEFORE
  *      `computeDerived` runs in `buildCharacterDetail`.
  *
  *   3. Per-skill bonus aggregates via `skillBonusFor(name)` — used to
@@ -82,6 +82,8 @@ const ATTR_TARGETS: ReadonlySet<EffectTarget> = new Set<EffectTarget>([
   'block',
   'dr',
   'fright_check',
+  'damage_thrust',
+  'damage_swing',
 ]);
 
 function scaledValue(effect: TraitEffect, traitLevel: number | null): number {
@@ -190,11 +192,19 @@ export function applyEffectsToAttrs(
   let blockMod = attrs.blockMod;
   let drMod = attrs.drMod;
   let frightCheckMod = attrs.frightCheckMod;
+  let damageThrustMod = attrs.damageThrustMod ?? 0;
+  let damageSwingMod = attrs.damageSwingMod ?? 0;
 
   for (const eff of effects) {
     if (!eff.active) continue;
     if (!ATTR_TARGETS.has(eff.target)) continue;
     switch (eff.target) {
+      case 'damage_thrust':
+        damageThrustMod += eff.value;
+        break;
+      case 'damage_swing':
+        damageSwingMod += eff.value;
+        break;
       case 'dodge':
         dodgeMod += eff.value;
         break;
@@ -242,6 +252,8 @@ export function applyEffectsToAttrs(
     blockMod,
     drMod,
     frightCheckMod,
+    damageThrustMod,
+    damageSwingMod,
   };
 }
 

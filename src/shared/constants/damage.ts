@@ -18,6 +18,17 @@ export interface StDamage {
   readonly swing: DamageDice;
 }
 
+/** Parse our formatted derived dice without the free-text weapon input's 100d limit. */
+export function parseDerivedDamage(raw: string): DamageDice | null {
+  const match = /^(\d+)d([+-]\d+)?$/.exec(raw);
+  if (!match) return null;
+  const dice = Number(match[1]);
+  const adds = Number(match[2] ?? 0);
+  return Number.isSafeInteger(dice) && dice > 0 && Number.isSafeInteger(adds)
+    ? { dice, adds }
+    : null;
+}
+
 function d(dice: number, adds: number): DamageDice {
   return { dice, adds };
 }

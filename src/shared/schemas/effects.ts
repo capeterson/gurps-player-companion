@@ -37,7 +37,7 @@ export const EFFECT_TARGETS = [
   'fright_check',
   // skill bonus — requires skillName
   'skill',
-  // damage adjustments
+  // flat adds to final ST-based thrust/swing dice, after temporary ST
   'damage_thrust',
   'damage_swing',
 ] as const;
