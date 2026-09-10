@@ -1,9 +1,11 @@
 import { expect, it } from 'bun:test';
+import { eq, sql } from 'drizzle-orm';
 import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import { createApp } from '../app.ts';
 import { withAudit } from '../db/auditContext.ts';
-import { characterTraits } from '../db/schema.ts';
+import { getDb } from '../db/client.ts';
+import { campaigns, characterTraits } from '../db/schema.ts';
 import { prepareLibraryReference } from '../services/libraryReferences.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
@@ -76,6 +78,193 @@ const configs = [
   },
 ] as const;
 const doors = ['rest-create', 'rest-patch', 'sync-create', 'sync-field', 'sync-body'] as const;
+
+it.each(['source-delete', 'campaign-transfer', 'membership-removal'] as const)(
+  'acknowledges lost-response creates after %s without reapplying stale source links',
+  async (action) => {
+    const gm = await register();
+    const player = await register();
+    const outsider = await register();
+    const campaign = await create(gm.token, '/campaigns', { name: 'Replay source' });
+    await request(gm.token, `/campaigns/${campaign.id}/members`, { email: player.email });
+    const character = await create(player.token, '/characters', {
+      name: 'Owned replay',
+      campaignId: campaign.id,
+    });
+    const operations: Record<string, unknown>[] = [];
+    const sources = [];
+    for (const cfg of configs) {
+      const libraryKind = 'library' in cfg ? cfg.library : cfg.kind;
+      const source = await create(gm.token, `/campaigns/${campaign.id}/library/${libraryKind}`, {
+        name: 'Replay rules',
+        ...cfg.body,
+        ...(cfg.kind === 'traits' || cfg.kind === 'skills'
+          ? { effects: [{ target: 'dx', value: 2 }] }
+          : {}),
+      });
+      sources.push({ id: source.id, libraryKind });
+      operations.push({
+        clientOpId: crypto.randomUUID(),
+        entityClass: cfg.entity,
+        entityId: crypto.randomUUID(),
+        parentId: character.id,
+        command: 'create',
+        attemptedValue: { name: 'Saved copy', ...cfg.body, [cfg.field]: source.id },
+        createdAt: new Date().toISOString(),
+      });
+    }
+    const send = async (token = player.token) => {
+      const response = await request(token, '/sync/operations', { operations });
+      expect(response.status).toBe(200);
+      return (await response.json()) as { outcomes: { status: string; newRevision?: number }[] };
+    };
+    expect((await send()).outcomes.map((outcome) => outcome.status)).toEqual(
+      configs.map(() => 'applied'),
+    );
+    if (action === 'source-delete') {
+      for (const source of sources)
+        expect(
+          (
+            await request(
+              gm.token,
+              `/campaigns/${campaign.id}/library/${source.libraryKind}/${source.id}`,
+              undefined,
+              'DELETE',
+            )
+          ).status,
+        ).toBe(204);
+    } else if (action === 'campaign-transfer') {
+      const destination = await create(player.token, '/campaigns', { name: 'Replay destination' });
+      expect(
+        (
+          await request(
+            player.token,
+            `/characters/${character.id}`,
+            { campaignId: destination.id },
+            'PATCH',
+          )
+        ).status,
+      ).toBe(200);
+    } else
+      expect(
+        (
+          await request(
+            gm.token,
+            `/campaigns/${campaign.id}/members/${player.userId}`,
+            undefined,
+            'DELETE',
+          )
+        ).status,
+      ).toBe(204);
+    const detail = async () =>
+      (await (
+        await request(player.token, `/characters/${character.id}`, undefined, 'GET')
+      ).json()) as CharacterDetail;
+    const before = await detail();
+    const replay = await send();
+    expect(replay.outcomes.map((outcome) => outcome.status)).toEqual(configs.map(() => 'applied'));
+    const after = await detail();
+    for (const [index, cfg] of configs.entries()) {
+      const rows = after[cfg.kind] as unknown[];
+      expect(rows).toHaveLength(1);
+      expect(rows).toEqual(before[cfg.kind]);
+      expect(replay.outcomes[index]?.newRevision).toBeGreaterThan(0);
+    }
+    // Knowing the ID does not permit another actor to acknowledge a private row.
+    expect(
+      (await send(outsider.token)).outcomes.every((outcome) => outcome.status === 'unauthorized'),
+    ).toBe(true);
+  },
+);
+
+it.each(['rest-create', 'sync-create', 'sync-inventory-patch'] as const)(
+  'retries a concurrent campaign-scope change for %s',
+  async (door) => {
+    const owner = await register();
+    const campaign = await create(owner.token, '/campaigns', { name: 'Before scope race' });
+    const destination = await create(owner.token, '/campaigns', { name: 'After scope race' });
+    const character = await create(owner.token, '/characters', {
+      name: 'Scope race',
+      campaignId: campaign.id,
+    });
+    const inventory = await create(owner.token, `/characters/${character.id}/inventory`, {
+      name: 'Bag',
+    });
+    const child = (inventory as unknown as { item: { id: string } }).item.id;
+    const operation = {
+      clientOpId: crypto.randomUUID(),
+      entityClass: door === 'sync-inventory-patch' ? 'character_inventory' : 'character_trait',
+      entityId: door === 'sync-inventory-patch' ? child : crypto.randomUUID(),
+      parentId: character.id,
+      command: door === 'sync-inventory-patch' ? 'patch' : 'create',
+      ...(door === 'sync-inventory-patch' ? { fieldPath: 'notes' } : {}),
+      attemptedValue:
+        door === 'sync-inventory-patch'
+          ? 'Keep this edit'
+          : { name: 'Source-free copy', kind: 'advantage' },
+      createdAt: new Date().toISOString(),
+    };
+    const send = () =>
+      door === 'rest-create'
+        ? request(owner.token, `/characters/${character.id}/traits`, operation.attemptedValue)
+        : request(owner.token, '/sync/operations', { operations: [operation] });
+    const ready = Promise.withResolvers<number>();
+    const release = Promise.withResolvers<void>();
+    const holding = withAudit(owner.userId, null, async (tx) => {
+      await tx.select().from(campaigns).where(eq(campaigns.id, campaign.id)).for('update');
+      const pid = await tx.execute(sql`SELECT pg_backend_pid() AS pid`);
+      ready.resolve(Number(pid.rows[0]?.pid));
+      await release.promise;
+    });
+    const pid = await ready.promise;
+    const racing = send();
+    try {
+      let blocked = false;
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const result = await getDb().execute(sql`SELECT EXISTS (
+          SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))
+        ) AS blocked`);
+        if (result.rows[0]?.blocked) {
+          blocked = true;
+          break;
+        }
+        await Bun.sleep(10);
+      }
+      expect(blocked).toBe(true);
+      expect(
+        (
+          await request(
+            owner.token,
+            `/characters/${character.id}`,
+            { campaignId: destination.id },
+            'PATCH',
+          )
+        ).status,
+      ).toBe(200);
+    } finally {
+      release.resolve();
+      await holding;
+    }
+    const first = await racing;
+    if (door === 'rest-create') expect(first.status).toBe(503);
+    else
+      expect(((await first.json()) as { outcomes: { status: string }[] }).outcomes[0]?.status).toBe(
+        'transient',
+      );
+    const retried = await send();
+    if (door === 'rest-create') expect(retried.status).toBe(201);
+    else
+      expect(
+        ((await retried.json()) as { outcomes: { status: string }[] }).outcomes[0]?.status,
+      ).toBe('applied');
+    const detail = (await (
+      await request(owner.token, `/characters/${character.id}`, undefined, 'GET')
+    ).json()) as CharacterDetail;
+    if (door === 'sync-inventory-patch') expect(detail.inventory[0]?.notes).toBe('Keep this edit');
+    else expect(detail.traits).toHaveLength(1);
+  },
+  15000,
+);
 
 it('member removal waits for an authorized in-flight copy and then detaches it', async () => {
   const gm = await register();

@@ -36,7 +36,9 @@ export async function captureLibraryMechanics(
         .for('share')
     : [];
   if (!source)
-    throw new HTTPException(403, { message: 'Library reference is unavailable in this character campaign' });
+    throw new HTTPException(403, {
+      message: 'Library reference is unavailable in this character campaign',
+    });
   return libraryMechanics.parse({
     sourceId,
     campaignId: parent?.campaignId ?? null,

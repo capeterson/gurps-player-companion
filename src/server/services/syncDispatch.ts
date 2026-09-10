@@ -190,6 +190,14 @@ export async function dispatchOperation(
     }
     return outcome;
   } catch (err) {
+    // The first create may have committed before its response was lost. A
+    // retry can now fail source validation (deleted source, moved campaign,
+    // removed membership) before reaching the unique constraint. Resolve the
+    // saved, still-writable entity after rollback before classifying the error.
+    if (op.command === 'create') {
+      const replayed = await resolveReplayedCreate(ctx.userId, op);
+      if (replayed) return replayed;
+    }
     if (err instanceof HTTPException) {
       // 403 / 404 → unauthorized (the client doesn't get to see the
       // distinction; "you can't touch this" is the only useful signal).
@@ -208,17 +216,7 @@ export async function dispatchOperation(
       };
     }
     if (isUniqueViolation(err)) {
-      // A `create` hitting a unique violation is very often the client
-      // replaying an op whose ack got lost (crash / network drop after
-      // the server applied it).  Treating that as a conflict makes the
-      // client roll back — deleting its perfectly good local row.  If
-      // the row with the client's id already exists and the user may
-      // write it, the create already happened: report `applied` with
-      // the current revision so the replay settles idempotently.
-      if (op.command === 'create') {
-        const replayed = await resolveReplayedCreate(ctx.userId, op);
-        if (replayed) return replayed;
-      }
+      // Authorized replays were resolved above; this is a genuine collision.
       return { clientOpId: op.clientOpId, status: 'conflict', reason: 'unique constraint' };
     }
     // Network / serialization / unexpected: tell the client to retry.
@@ -288,7 +286,7 @@ async function publishSyncInvalidation(actorId: string, op: OperationEnvelope): 
 }
 
 /**
- * Check whether a unique-violating `create` is a replay of an op the
+ * Check whether a failed `create` is a replay of an op the
  * server already applied.  Returns an `applied` outcome carrying the
  * existing row's revision when the entity with the client-supplied id
  * exists and the user is allowed to write it; null otherwise (genuine

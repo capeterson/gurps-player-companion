@@ -561,6 +561,11 @@ sync reconciliation; they may already belong to the destination campaign.
 Resubmitting an already-null source reference does
 not erase a retained declaration; new links to missing sources are rejected.
 
+A lost-response create replay resolves the already-saved entity under current
+write authorization even if its source or campaign membership has since gone
+away. Concurrent campaign changes during source-scope locking produce a
+transient retry, preserving the queued edit until its new scope can be checked.
+
 The orchestrator recovers from partial/interrupted states rather than assuming
 a clean world (see `orchestrator.recovery.test.ts`,
 `orchestrator.selfheal.test.ts`, `orchestrator.prune.test.ts`,
