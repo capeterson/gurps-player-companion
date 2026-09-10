@@ -565,6 +565,8 @@ A lost-response create replay resolves the already-saved entity under current
 write authorization even if its source or campaign membership has since gone
 away. Concurrent campaign changes during source-scope locking produce a
 transient retry, preserving the queued edit until its new scope can be checked.
+The twelve REST child create/patch contracts declare the corresponding HTTP 503
+JSON error response so API clients can retry the same edit.
 
 The orchestrator recovers from partial/interrupted states rather than assuming
 a clean world (see `orchestrator.recovery.test.ts`,

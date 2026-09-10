@@ -116,6 +116,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -165,6 +166,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -244,6 +246,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -296,6 +299,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -378,6 +382,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -441,6 +446,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -533,6 +539,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -585,6 +592,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -682,6 +690,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -732,6 +741,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -880,6 +890,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
@@ -961,6 +972,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      503: errorResponse('Character campaign changed; retry this edit'),
     },
   }),
   async (c) => {
