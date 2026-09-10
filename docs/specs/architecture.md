@@ -158,7 +158,12 @@ see `0026_languages.sql` for the current template.
 Tables (grouped):
 
 - **Identity/auth**: `users`, `passkey_credentials`, `passkey_challenges`,
-  `refresh_tokens`, `password_reset_tokens`, `api_keys`.
+  `refresh_tokens`, `password_reset_tokens`, `api_keys`, and durable
+  `auth_rate_limits` counters. Public login, registration, password-reset, and
+  passkey-login challenge requests consume bounded source and normalized-account
+  buckets before expensive hashing, email, or challenge work. The counters are
+  shared through Postgres and expire automatically; `TRUST_PROXY` must be set
+  only behind a proxy that overwrites `X-Forwarded-For`.
 - **Campaigns**: `campaigns`, `campaign_memberships`, `campaign_invitations`,
   `notifications`.
 - **Characters (sync-backed)**: `characters`, `character_traits`,

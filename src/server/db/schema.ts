@@ -208,6 +208,22 @@ export const passwordResetTokens = pgTable(
   }),
 );
 
+/** Durable, multi-instance fixed-window counters for public auth work. */
+export const authRateLimits = pgTable(
+  'auth_rate_limits',
+  {
+    scope: varchar('scope', { length: 32 }).notNull(),
+    key: varchar('key', { length: 128 }).notNull(),
+    windowStartedAt: timestamp('window_started_at', { withTimezone: true }).notNull(),
+    attempts: integer('attempts').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => ({
+    primary: primaryKey({ columns: [t.scope, t.key] }),
+    expiresAtIdx: index('auth_rate_limits_expires_at_idx').on(t.expiresAt),
+  }),
+);
+
 export const apiKeys = pgTable(
   'api_keys',
   {
