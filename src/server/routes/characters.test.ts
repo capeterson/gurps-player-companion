@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   type CharacterDetailInputCharacter,
   type CharacterDetailInputSkill,
@@ -16,11 +16,15 @@ import {
   buildCharacterDetail,
 } from '../../shared/domain/characterDetail.ts';
 import type { CharacterDetail } from '../../shared/schemas/character.ts';
+import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
+import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
+import { characterSkills, characterTraits } from '../db/schema.ts';
+import { captureLibraryMechanics } from '../services/ownedLibraryMechanics.ts';
 import { subscribe } from '../services/wsBus.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
@@ -109,7 +113,7 @@ describe('library changes propagate through incremental character cursors', () =
           ? { kind: 'advantage', basePoints: 10 }
           : { attribute: 'DX', difficulty: 'A' }),
       };
-      const effects = (value: number) => [{ target: 'dx', value, scaling: 'flat' }];
+      const effects = (value: number): TraitEffect[] => [{ target: 'dx', value, scaling: 'flat' }];
       const sourceResponse = await request(
         gm.accessToken,
         `/campaigns/${campaign.id}/library/${kind}`,
@@ -250,7 +254,7 @@ describe('library changes propagate through incremental character cursors', () =
         expect(
           libraryMechanics.parse((deleted?.data as Record<string, unknown>)?.libraryMechanics)
             .effects,
-        ).toBeNull();
+        ).toEqual(effects(6));
       } finally {
         stop();
         stopOutsider();
@@ -261,7 +265,7 @@ describe('library changes propagate through incremental character cursors', () =
 
 describe('character-owned library declarations in the cursor', () => {
   it.each(['traits', 'skills'] as const)(
-    'syncs versioned %s effects and exposes missing entries as unresolved',
+    'syncs versioned %s effects and preserves known-empty copies on deletion',
     async (kind) => {
       const owner = await registerUser(`mechanics-${kind}`);
       const campaign = await createCampaign(owner.accessToken);
@@ -341,8 +345,9 @@ describe('character-owned library declarations in the cursor', () => {
       expect([200, 204]).toContain(deleted.status);
       expect(libraryMechanics.parse(await pull())).toMatchObject({
         sourceId: source.id,
-        effects: null,
-        sourceRevision: null,
+        effects: [],
+        sourceRevision: empty.sourceRevision,
+        detached: true,
       });
     },
   );
@@ -406,6 +411,353 @@ describe('character-owned library declarations in the cursor', () => {
 function bearer(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
+
+describe('owned mechanics survive source lifecycle changes', () => {
+  it.each(['transfer', 'campaign-delete'] as const)(
+    'serializes %s with a captured copy that has not been inserted yet',
+    async (action) => {
+      const owner = await registerUser(`concurrent-${action}`);
+      const campaign = await createCampaign(owner.accessToken);
+      const destination = await createCampaign(owner.accessToken);
+      const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+      const sourceResponse = await app.request(`/api/v1/campaigns/${campaign.id}/library/traits`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name: 'Concurrent rules',
+          kind: 'advantage',
+          effects: [{ target: 'dx', value: 2 }],
+        }),
+      });
+      expect(sourceResponse.status).toBe(201);
+      const source = (await sourceResponse.json()) as { id: string };
+      const captured = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const copying = withAudit(decodeUserId(owner.accessToken), null, async (tx) => {
+        const snapshot = await captureLibraryMechanics(
+          tx,
+          String(character.id),
+          'traits',
+          source.id,
+        );
+        captured.resolve();
+        await release.promise;
+        await tx.insert(characterTraits).values({
+          characterId: String(character.id),
+          name: 'Concurrent rules',
+          kind: 'advantage',
+          libraryTraitId: source.id,
+          libraryMechanics: snapshot,
+        });
+      });
+      await captured.promise;
+      let settled = false;
+      const changing = Promise.resolve(
+        app.request(
+          action === 'transfer'
+            ? `/api/v1/characters/${character.id}`
+            : `/api/v1/campaigns/${campaign.id}`,
+          {
+            method: action === 'transfer' ? 'PATCH' : 'DELETE',
+            headers: jsonHeaders(owner.accessToken),
+            ...(action === 'transfer'
+              ? { body: JSON.stringify({ campaignId: destination.id }) }
+              : {}),
+          },
+        ),
+      ).then((response) => {
+        settled = true;
+        return response;
+      });
+      try {
+        if (action === 'campaign-delete') {
+          // The deletion must lock the campaign before waiting for our character.
+          // This lock also excludes incoming FK assignments from creates/transfers.
+          let locked = false;
+          for (let attempt = 0; attempt < 100 && !locked; attempt++) {
+            try {
+              await getDb().execute(
+                sql`SELECT id FROM campaigns WHERE id = ${campaign.id} FOR KEY SHARE NOWAIT`,
+              );
+              await Bun.sleep(10);
+            } catch (error) {
+              const cause = error as { cause?: { code?: string }; code?: string };
+              if ((cause.cause?.code ?? cause.code) !== '55P03') throw error;
+              locked = true;
+            }
+          }
+          expect(locked).toBe(true);
+        } else await Bun.sleep(50);
+        expect(settled).toBe(false);
+      } finally {
+        release.resolve();
+        await copying;
+      }
+      expect((await changing).status).toBe(action === 'transfer' ? 200 : 204);
+      const detail = (await (
+        await app.request(`/api/v1/characters/${character.id}`, {
+          headers: bearer(owner.accessToken),
+        })
+      ).json()) as CharacterDetail;
+      expect(detail.libraryEffectsKnown).toBe(true);
+      expect(detail.derived.effectiveDx).toBe(12);
+      expect(detail.traits[0]?.libraryTraitId).toBeNull();
+      expect(detail.traits[0]?.libraryMechanics?.detached).toBe(true);
+    },
+  );
+  it.each(['traits', 'skills'] as const)(
+    'backfills authorized %s copies while leaving legacy dangling references visibly unresolved',
+    async (kind) => {
+      const owner = await registerUser(`backfill-${kind}`);
+      const campaign = await createCampaign(owner.accessToken);
+      const request = (path: string, body: unknown) =>
+        app.request(`/api/v1${path}`, {
+          method: 'POST',
+          headers: jsonHeaders(owner.accessToken),
+          body: JSON.stringify(body),
+        });
+      const source = (await (
+        await request(`/campaigns/${campaign.id}/library/${kind}`, {
+          name: 'Backfill',
+          ...(kind === 'traits' ? { kind: 'advantage' } : { attribute: 'DX', difficulty: 'A' }),
+          effects: [{ target: 'dx', value: 2 }],
+        })
+      ).json()) as { id: string };
+      const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+      const field = kind === 'traits' ? 'libraryTraitId' : 'librarySkillId';
+      const childIds: string[] = [];
+      for (const id of [source.id, crypto.randomUUID()]) {
+        const response = await request(`/characters/${character.id}/${kind}`, {
+          name: id === source.id ? 'Present' : 'Dangling',
+          [field]: id,
+          ...(kind === 'traits' ? { kind: 'advantage' } : { attribute: 'DX', difficulty: 'A' }),
+        });
+        expect(response.status).toBe(201);
+        const value = (await response.json()) as { trait?: { id: string }; skill?: { id: string } };
+        const childId = value.trait?.id ?? value.skill?.id;
+        if (!childId) throw new Error('Missing fixture');
+        childIds.push(childId);
+        await getDb()
+          .update(kind === 'traits' ? characterTraits : characterSkills)
+          .set({ libraryMechanics: null })
+          .where(eq((kind === 'traits' ? characterTraits : characterSkills).id, childId));
+      }
+      const migration = await Bun.file(
+        new URL('../db/migrations/0036_owned_library_mechanics.sql', import.meta.url),
+      ).text();
+      for (const statement of migration.split('--> statement-breakpoint'))
+        await getDb().execute(sql.raw(statement));
+      const table = kind === 'traits' ? characterTraits : characterSkills;
+      const rows = await getDb()
+        .select()
+        .from(table)
+        .where(eq(table.characterId, String(character.id)));
+      expect(rows.find((row) => row.id === childIds[0])?.libraryMechanics?.effects).toEqual([
+        { target: 'dx', value: 2, scaling: 'flat' },
+      ]);
+      expect(rows.find((row) => row.id === childIds[1])?.libraryMechanics).toBeNull();
+      const detail = (await (
+        await app.request(`/api/v1/characters/${character.id}`, {
+          headers: bearer(owner.accessToken),
+        })
+      ).json()) as CharacterDetail;
+      expect(detail.libraryEffectsKnown).toBe(false);
+    },
+  );
+  for (const kind of ['traits', 'skills'] as const) {
+    it.each([
+      'delete',
+      'replace-rename',
+      'transfer-rest',
+      'transfer-sync-field',
+      'transfer-sync-body',
+      'campaign-delete',
+    ])(
+      `${kind}: preserves declarations, paid choices and provenance through %s`,
+      async (action) => {
+        const owner = await registerUser(`preserve-${kind}-${action}`);
+        const campaign = await createCampaign(owner.accessToken);
+        const request = (path: string, body?: unknown, method = 'POST') =>
+          app.request(`/api/v1${path}`, {
+            method,
+            headers: jsonHeaders(owner.accessToken),
+            ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          });
+        const effects: TraitEffect[] = [
+          {
+            target: 'dx',
+            value: kind === 'traits' ? 2 : 4,
+            scaling: kind === 'traits' ? 'per_level' : 'flat',
+          },
+        ];
+        const template = {
+          name: 'Durable',
+          effects,
+          ...(kind === 'traits'
+            ? {
+                kind: 'advantage',
+                basePoints: 10,
+                variants: [{ name: 'Chosen', pointCostDelta: 2 }],
+              }
+            : { attribute: 'DX', difficulty: 'A' }),
+        };
+        const sourceResponse = await request(`/campaigns/${campaign.id}/library/${kind}`, template);
+        expect(sourceResponse.status).toBe(201);
+        const source = (await sourceResponse.json()) as { id: string };
+        const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+        const referenceField = kind === 'traits' ? 'libraryTraitId' : 'librarySkillId';
+        const modifiers = [
+          {
+            name: 'Selected limitation',
+            category: 'limitation',
+            costType: 'percent',
+            costValue: -20,
+          },
+        ];
+        const body = {
+          name: template.name,
+          points: 20,
+          [referenceField]: source.id,
+          ...(kind === 'traits'
+            ? { kind: 'advantage', level: 2, variantName: 'Chosen', modifiers }
+            : { attribute: 'DX', difficulty: 'A', specialization: 'Chosen' }),
+        };
+        const entityId = crypto.randomUUID();
+        const sync = async (
+          entityClass: string,
+          command: string,
+          id: string,
+          attemptedValue: unknown,
+          fieldPath?: string,
+        ) => {
+          const response = await request('/sync/operations', {
+            operations: [
+              {
+                clientOpId: crypto.randomUUID(),
+                entityClass,
+                command,
+                entityId: id,
+                parentId: character.id,
+                attemptedValue,
+                ...(fieldPath ? { fieldPath } : {}),
+                validationVersion: 1,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          });
+          expect(response.status).toBe(200);
+          expect(
+            ((await response.json()) as { outcomes: { status: string }[] }).outcomes[0]?.status,
+          ).toBe('applied');
+        };
+        // Exercise snapshot capture through sync create, field patch, and whole-body patch.
+        const entityClass = kind === 'traits' ? 'character_trait' : 'character_skill';
+        await sync(entityClass, 'create', entityId, body);
+        await sync(entityClass, 'patch', entityId, source.id, referenceField);
+        await sync(entityClass, 'patch', entityId, { [referenceField]: source.id });
+        const detail = async () =>
+          (await (
+            await request(`/characters/${character.id}`, undefined, 'GET')
+          ).json()) as CharacterDetail;
+        const before = await detail();
+        expect(before.derived.effectiveDx).toBe(14);
+        const beforeCopy = before[kind][0]?.libraryMechanics;
+        if (!beforeCopy) throw new Error('Missing owned declarations');
+        expect(beforeCopy?.effects).toEqual(effects);
+        if (action === 'delete') {
+          expect(
+            (
+              await request(
+                `/campaigns/${campaign.id}/library/${kind}/${source.id}`,
+                undefined,
+                'DELETE',
+              )
+            ).status,
+          ).toBe(204);
+          const recreated = await request(`/campaigns/${campaign.id}/library/${kind}`, {
+            ...template,
+            effects: [{ target: 'dx', value: 9 }],
+          });
+          expect(((await recreated.json()) as { id: string }).id).not.toBe(source.id);
+        } else if (action === 'campaign-delete') {
+          expect((await request(`/campaigns/${campaign.id}`, undefined, 'DELETE')).status).toBe(
+            204,
+          );
+        } else if (action === 'replace-rename') {
+          const yaml = JSON.stringify({
+            version: 6,
+            library: {
+              traits:
+                kind === 'traits'
+                  ? [{ ...template, name: 'Renamed', effects: [{ target: 'dx', value: 9 }] }]
+                  : [],
+              skills:
+                kind === 'skills'
+                  ? [{ ...template, name: 'Renamed', effects: [{ target: 'dx', value: 9 }] }]
+                  : [],
+              items: [],
+            },
+          });
+          expect(
+            (await request(`/campaigns/${campaign.id}/library/import`, { yaml, mode: 'replace' }))
+              .status,
+          ).toBe(200);
+        } else {
+          const destination = await createCampaign(owner.accessToken);
+          if (action === 'transfer-rest')
+            expect(
+              (
+                await request(
+                  `/characters/${character.id}`,
+                  { campaignId: destination.id },
+                  'PATCH',
+                )
+              ).status,
+            ).toBe(200);
+          else
+            await sync(
+              'character',
+              'patch',
+              String(character.id),
+              action === 'transfer-sync-field' ? destination.id : { campaignId: destination.id },
+              action === 'transfer-sync-field' ? 'campaignId' : undefined,
+            );
+          expect(
+            (
+              await request(
+                `/campaigns/${campaign.id}/library/${kind}/${source.id}`,
+                { effects: [{ target: 'dx', value: 9 }] },
+                'PATCH',
+              )
+            ).status,
+          ).toBe(200);
+        }
+        const after = await detail();
+        expect(after.libraryEffectsKnown).toBe(true);
+        expect(after.derived).toEqual(before.derived);
+        expect(after.points).toEqual(before.points);
+        const copy = after[kind][0];
+        expect(copy?.name).toBe('Durable');
+        expect(copy?.points).toBe(20);
+        expect((copy as unknown as Record<string, unknown>)[referenceField]).toBeNull();
+        expect(copy?.libraryMechanics).toEqual({ ...beforeCopy, detached: true });
+        expect(ownedLibraryEffects(null, after.campaignId ?? null, copy?.libraryMechanics)).toEqual(
+          effects,
+        );
+        if (kind === 'traits')
+          expect(after.traits[0]).toMatchObject({ level: 2, variantName: 'Chosen', modifiers });
+        else expect(after.skills[0]?.specialization).toBe('Chosen');
+        const history = (await (
+          await request(`/characters/${character.id}/history`, undefined, 'GET')
+        ).json()) as { summary: string; actorUserId: string }[];
+        const change = history.find((event) =>
+          event.summary.includes('saved library rules retained after detaching'),
+        );
+        expect(change?.actorUserId).toBe(decodeUserId(owner.accessToken));
+      },
+    );
+  }
+});
 
 function jsonHeaders(token: string) {
   return { ...bearer(token), 'content-type': 'application/json' };

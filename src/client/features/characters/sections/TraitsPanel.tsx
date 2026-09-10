@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
@@ -13,6 +14,7 @@ import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.t
 import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
+import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
   useEntityNameField,
@@ -105,7 +107,11 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const [variantName, setVariantName] = useState<string | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibraryTraitOut>('traits', campaignId);
-  const { creating, submit: submitEntity } = useAddEntityForm({
+  const {
+    creating,
+    submit: submitEntity,
+    flashProps,
+  } = useAddEntityForm({
     entityClass: 'character_trait',
     characterId,
     label: 'trait',
@@ -171,6 +177,14 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         setLevelDraft('');
         setVariantName(null);
       },
+      snap.pickedTrait && snap.libraryTraitId
+        ? libraryMechanics.parse({
+            sourceId: snap.libraryTraitId,
+            campaignId,
+            sourceRevision: null,
+            effects: snap.pickedTrait.effects ?? null,
+          })
+        : null,
     );
   }
 
@@ -178,7 +192,8 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
 
   return (
     <form
-      className="flex flex-col gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      {...flashProps}
+      className="field-rollback-flash flex flex-col gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -453,6 +468,7 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
             )}
           </span>
         )}
+        <LibraryMechanicsNote mechanics={trait.libraryMechanics} />
         <p className="text-xs text-base-content/60 capitalize">
           {trait.kind.replace('_', ' ')}
           {trait.level != null && trait.level > 0 && canWrite && (

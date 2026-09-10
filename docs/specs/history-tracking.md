@@ -9,11 +9,14 @@ The **append-only history/audit log**:
 - Surfaces a **History tab** on the character sheet (one-line summaries; foldable detail for batched changes) and a **History view** on the campaign page (campaign-level changes only).
 - Provides **local filtering & search** over loaded history.
 
-Library trait/skill updates and deletions also advance referencing character-child
-revisions in the same audited transaction (migration 0035). Existing child history
-triggers record these refreshes with the library writer as actor; the campaign
-library event retains the definition change itself.
 - Becomes a **required baseline**: every new syncable table must participate in history capture, enforced by an automated test.
+
+Library trait/skill updates and deletions also update owned `library_mechanics`
+and child revisions in the same audited transaction (`ownedLibraryMechanics.ts`,
+migration 0036). Existing child history triggers record the old/new declarations
+with the library writer as actor. Summaries distinguish a new source version,
+retained rules after detachment, cleared rules, and unresolved copies. The campaign
+library event records the definition edit too; transfers retain the source version.
 
 Chosen approach: **Postgres triggers** for capture, **paginated REST endpoints** for delivery, **indefinite retention**.
 

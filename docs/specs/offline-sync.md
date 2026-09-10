@@ -26,12 +26,26 @@ Everything else is either read-only in the local store or fully online:
   library, adventure log, invitations, notifications, settings, admin.
 
 Library editing remains online-only, but calculation no longer depends on its
-React Query cache. The trait/skill cursor projects `libraryMechanics` onto each
-character child: source ID, current campaign, source revision and raw effect
-declarations. `effects: []` is known empty; `effects: null` is unresolved. Source
-lookups are restricted to the character's campaign and the viewer's accessible
-campaigns, after the character share gate. No names or other source metadata are
-copied. The projection is read-only and never accepted as an outbox field.
+React Query cache. Trait/skill rows persist `libraryMechanics` in Postgres and
+Dexie: source ID, source campaign, source revision, raw effect declarations, and
+an optional `detached` flag. `effects: []` is known empty; `effects: null` is
+unresolved. Server and client derive from the same owned copy; the cursor reads
+it after the character share gate without fetching live source data. The field
+is read-only and never accepted as an outbox patch or caller-supplied snapshot.
+
+Selecting an already loaded definition also seeds validated local-only declarations
+into the speculative create row, in the same Dexie transaction as its outbox entry.
+They survive offline reloads and are excluded from the operation envelope; the server
+captures its own authoritative source version. A rejected create removes that copy,
+persists the rejection notice, and flashes the corresponding add form. Invalid local
+metadata aborts the transaction without leaving a row or queued operation.
+
+Selecting an already loaded definition also seeds validated local-only declarations
+into the speculative create row, in the same Dexie transaction as its outbox entry.
+They survive offline reloads and are excluded from the operation envelope; the server
+captures its own authoritative source version. A rejected create removes that copy,
+persists the rejection notice, and flashes the corresponding add form. Invalid local
+metadata aborts the transaction without leaving a row or queued operation.
 
 The declarations live in existing character stores, so normal logout/account
 switch purge and minimal-view cleanup remove them with their owning rows. Cursor
@@ -40,9 +54,12 @@ readers also verify the source ID/campaign against current local intent. Dexie v
 clears only trait/skill cursors once so existing installations backfill on their
 next online pull. Until then unresolved linked calculations show an unavailable
 state. A failed pull retains the last valid declarations. Library definitions use
-a live-link policy: migration `0035_library_revision_fanout.sql` advances linked
-trait/skill revisions in the library writer's transaction, scoped to characters
-in that source campaign. UPDATE and DELETE include CRUD and YAML merge/replace.
+a live-link policy: `services/ownedLibraryMechanics.ts` validates and updates owned
+declarations in the audited library writer's transaction, scoped to characters in
+that source campaign. This also advances child revisions and records actual old/new
+mechanics in history. CRUD and YAML merge/replace share the same helper. Migration
+0036 replaces 0035's revision-only triggers and backfills owned copies while sources
+still exist; already dangling/foreign references stay visibly unresolved.
 Normal incremental HTTP pulls therefore detect definition changes without WS,
 including when a client reconnects after multiple edits. Source revisions travel
 with declarations; array length is never used as a freshness signal.
@@ -64,8 +81,15 @@ audit rows remain stored but are filtered out of the user-facing history feed.
 Failed nudges do not fail committed
 writes. The cursor retains its existing membership/share gates. Existing history
 triggers record affected child refreshes under the library writer's audit context;
-the campaign library event records the actual definition edit. Deleted definitions
-currently become unresolved; preserving their owned declarations is a separate change.
+the campaign library event records the definition edit too. Before a definition is
+deleted, owned copies retain its last validated declarations/version and detach the
+live ID. Campaign deletion also detaches surviving characters before source rows
+cascade away. A renamed replacement or recreation gets a new ID and never rewrites those
+copies. Campaign transfers through REST or sync detach all six library reference
+types; traits/skills retain their authorized saved declarations and provenance.
+Missing snapshots remain explicitly unresolved after transfer. Variant, modifier,
+level, skill specialty, and paid-point selections are unchanged. Sheet rows label
+live versus retained rules and their version; history names updates and detachment.
 
 The authoritative list of pulled classes is `ALL_ENTITY_CLASSES` in
 `src/client/sync/orchestrator.ts`. The `entityClass` enum in
