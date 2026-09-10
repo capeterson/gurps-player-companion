@@ -187,6 +187,46 @@ export async function detachLibraryReferencesForTransfer(
 }
 
 /** Called after patch validation/stale checks, in the write transaction. */
+export async function reconcileOwnedTraitKind(
+  tx: AuditTx,
+  characterId: string,
+  updates: Record<string, unknown>,
+  existingId: string,
+) {
+  if (updates.kind === undefined || updates.libraryTraitId !== undefined) return;
+  // Caller holds the parent lock. Lock the source before the child, matching
+  // source refresh, so a concurrent library edit cannot replace our snapshot.
+  const [observed] = await tx
+    .select()
+    .from(characterTraits)
+    .where(and(eq(characterTraits.id, existingId), eq(characterTraits.characterId, characterId)));
+  if (!observed?.libraryTraitId) return;
+  const [source] = await tx
+    .select()
+    .from(campaignLibraryTraits)
+    .where(eq(campaignLibraryTraits.id, observed.libraryTraitId))
+    .for('share');
+  if (source?.kind === updates.kind) return;
+  const [existing] = await tx
+    .select()
+    .from(characterTraits)
+    .where(and(eq(characterTraits.id, existingId), eq(characterTraits.characterId, characterId)))
+    .for('update');
+  if (!existing?.libraryTraitId || existing.libraryTraitId !== observed.libraryTraitId) return;
+  const saved = libraryMechanics.safeParse(existing.libraryMechanics);
+  const retained =
+    saved.success && saved.data.sourceId === existing.libraryTraitId
+      ? saved.data
+      : {
+          sourceId: existing.libraryTraitId,
+          campaignId: source?.campaignId ?? null,
+          sourceRevision: null,
+          effects: null,
+        };
+  updates.libraryTraitId = null;
+  updates.libraryMechanics = libraryMechanics.parse({ ...retained, detached: true });
+}
+
 export async function prepareOwnedMechanicsPatch(
   tx: AuditTx,
   kind: 'traits' | 'skills',
@@ -195,6 +235,15 @@ export async function prepareOwnedMechanicsPatch(
   existingId: string,
 ) {
   const field = kind === 'traits' ? 'libraryTraitId' : 'librarySkillId';
+  if (kind === 'traits' && updates.kind !== undefined && updates[field] === undefined) {
+    await tx
+      .select({ id: characters.id })
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .for('update');
+    await reconcileOwnedTraitKind(tx, characterId, updates, existingId);
+    return;
+  }
   if (updates[field] !== undefined) {
     // Match transfer's parent-before-child ordering before inspecting the link.
     await tx

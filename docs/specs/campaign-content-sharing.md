@@ -276,7 +276,12 @@ gates still apply to every emitted child row; nudges carry no definitions.
 
 Changing a source trait's kind detaches owned traits that retain
 the previous kind; their last saved rules and paid choices remain unchanged by
-that edit or later source updates. Deletion detaches owned copies and retains
+that edit or later source updates. Changing an owned trait's kind through REST
+or sync also detaches an incompatible existing link while retaining its saved
+rules. Trait/skill add forms reject picks from a previous campaign with a toast
+and form flash, preserving the draft until the user chooses a current definition.
+Provisional mechanics retain the picked definition's actual campaign provenance.
+Deletion detaches owned copies and retains
 their last effects and source
 version. YAML replacement with a renamed natural key follows the same path;
 recreating the old name cannot reconnect a different UUID. Campaign transfers

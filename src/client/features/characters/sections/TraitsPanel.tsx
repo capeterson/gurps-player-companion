@@ -105,11 +105,20 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const [levelDraft, setLevelDraft] = useState<string>('');
   /** Selected variant name; null = base form. */
   const [variantName, setVariantName] = useState<string | null>(null);
+  const editName = (value: string) => {
+    setName(value);
+    setPickedLibraryId(null);
+    setPickedTrait(null);
+    setSelectedModifiers([]);
+    setLevelDraft('');
+    setVariantName(null);
+  };
 
   const { fetchOptions } = useLibraryFetcher<LibraryTraitOut>('traits', campaignId);
   const {
     creating,
     submit: submitEntity,
+    reject,
     flashProps,
   } = useAddEntityForm({
     entityClass: 'character_trait',
@@ -143,6 +152,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
       : null;
 
   async function submit(snap: TraitSnapshot) {
+    if (snap.pickedTrait && snap.pickedTrait.campaignId !== campaignId) {
+      reject('Campaign changed — select a trait from the current campaign library');
+      return;
+    }
     const modifiers =
       snap.pickedTrait !== null
         ? snap.pickedTrait.availableModifiers.filter((m) =>
@@ -180,7 +193,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
       snap.pickedTrait && snap.libraryTraitId
         ? libraryMechanics.parse({
             sourceId: snap.libraryTraitId,
-            campaignId,
+            campaignId: snap.pickedTrait.campaignId,
             sourceRevision: null,
             effects: snap.pickedTrait.effects ?? null,
           })
@@ -237,16 +250,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
           {campaignId ? (
             <LibraryAutocomplete<LibraryTraitOut>
               value={name}
-              onChange={(v) => {
-                setName(v);
-                // Picking a library entry sets `pickedLibraryId`; if the
-                // user then edits the name, drop the link AND the
-                // captured catalogue entry so we don't claim the create
-                // came from the library when it didn't.
-                setPickedLibraryId(null);
-                setPickedTrait(null);
-                setSelectedModifiers([]);
-              }}
+              onChange={editName}
               onPick={(opt) => {
                 setName(opt.name);
                 setKind(opt.kind);
@@ -280,7 +284,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
               aria-labelledby="add-trait-name-label"
               className="input input-bordered input-sm"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => editName(e.target.value)}
               placeholder="e.g. Combat Reflexes"
             />
           )}
