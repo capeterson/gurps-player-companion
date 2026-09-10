@@ -11,10 +11,11 @@ CREATE INDEX IF NOT EXISTS character_skills_library_idx ON character_skills (lib
 UPDATE character_traits AS child SET library_mechanics = jsonb_build_object(
   'sourceId', source.id, 'campaignId', source.campaign_id,
   'sourceRevision', source.revision, 'effects', source.effects)
+  || CASE WHEN child.kind <> source.kind THEN '{"detached":true}'::jsonb ELSE '{}'::jsonb END,
+  library_trait_id = CASE WHEN child.kind <> source.kind THEN NULL ELSE child.library_trait_id END
 FROM campaign_library_traits AS source, characters AS parent
 WHERE child.library_mechanics IS NULL AND child.library_trait_id = source.id
-  AND child.character_id = parent.id AND parent.campaign_id = source.campaign_id
-  AND child.kind = source.kind;
+  AND child.character_id = parent.id AND parent.campaign_id = source.campaign_id;
 --> statement-breakpoint
 UPDATE character_skills AS child SET library_mechanics = jsonb_build_object(
   'sourceId', source.id, 'campaignId', source.campaign_id,

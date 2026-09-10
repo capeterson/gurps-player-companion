@@ -74,10 +74,13 @@ describe('library changes propagate through incremental character cursors', () =
     // Simulate an installation before the one-time repair marker was written.
     await getDb().execute(sql`COMMENT ON FUNCTION invalidate_owned_library_mechanics() IS NULL`);
     // Do not restore the historical triggers replaced by migration 0036.
-    const repairStatements = migration.split('--> statement-breakpoint').filter((statement) =>
-      statement.includes('DO $repair$') || statement.includes('CREATE INDEX IF NOT EXISTS'));
-    for (const statement of repairStatements)
-      await getDb().execute(sql.raw(statement));
+    const repairStatements = migration
+      .split('--> statement-breakpoint')
+      .filter(
+        (statement) =>
+          statement.includes('DO $repair$') || statement.includes('CREATE INDEX IF NOT EXISTS'),
+      );
+    for (const statement of repairStatements) await getDb().execute(sql.raw(statement));
     const repaired = (await (
       await request('/sync/cursor', {
         cursors: [{ entityClass, sinceRevision: initial.nextCursor[entityClass] }],
@@ -87,8 +90,7 @@ describe('library changes propagate through incremental character cursors', () =
       repaired.changes.find((row) => row.entityId === before.entityId)?.revision,
     ).toBeGreaterThan(before.revision);
     // Reapplying migration SQL must not advance the repaired row again.
-    for (const statement of repairStatements)
-      await getDb().execute(sql.raw(statement));
+    for (const statement of repairStatements) await getDb().execute(sql.raw(statement));
     const replay = (await (
       await request('/sync/cursor', {
         cursors: [{ entityClass, sinceRevision: repaired.nextCursor[entityClass] }],
@@ -416,6 +418,70 @@ function bearer(token: string) {
 }
 
 describe('owned mechanics survive source lifecycle changes', () => {
+  it('backfills and detaches same-campaign legacy traits whose source kind changed', async () => {
+    const owner = await registerUser('legacy-kind-change');
+    const campaign = await createCampaign(owner.accessToken);
+    const request = (path: string, body?: unknown, method = 'POST') =>
+      app.request(`/api/v1${path}`, {
+        method,
+        headers: jsonHeaders(owner.accessToken),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const source = (await (
+      await request(`/campaigns/${campaign.id}/library/traits`, {
+        name: 'Legacy rules',
+        kind: 'advantage',
+        effects: [{ target: 'dx', value: 2 }],
+      })
+    ).json()) as { id: string };
+    const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+    // Seed historical data directly: the next stacked change rejects new mismatched links.
+    const [child] = await getDb()
+      .insert(characterTraits)
+      .values({
+        characterId: String(character.id),
+        name: 'Owned rules',
+        kind: 'disadvantage',
+        points: -5,
+        libraryTraitId: source.id,
+        libraryMechanics: null,
+      })
+      .returning();
+    if (!child) throw new Error('Missing legacy fixture');
+    const migration = await Bun.file(
+      new URL('../db/migrations/0036_owned_library_mechanics.sql', import.meta.url),
+    ).text();
+    const replay = async () => {
+      for (const statement of migration.split('--> statement-breakpoint'))
+        await getDb().execute(sql.raw(statement));
+    };
+    await replay();
+    const detail = (await (
+      await request(`/characters/${character.id}`, undefined, 'GET')
+    ).json()) as CharacterDetail;
+    expect(detail.libraryEffectsKnown).toBe(true);
+    expect(detail.derived.effectiveDx).toBe(12);
+    expect(detail.traits[0]).toMatchObject({
+      kind: 'disadvantage',
+      points: -5,
+      libraryTraitId: null,
+      libraryMechanics: {
+        sourceId: source.id,
+        detached: true,
+        effects: [{ target: 'dx', value: 2, scaling: 'flat' }],
+      },
+    });
+    const [saved] = await getDb()
+      .select()
+      .from(characterTraits)
+      .where(eq(characterTraits.id, child.id));
+    await replay();
+    const [unchanged] = await getDb()
+      .select()
+      .from(characterTraits)
+      .where(eq(characterTraits.id, child.id));
+    expect(unchanged?.revision).toBe(saved?.revision);
+  });
   it.each(['transfer', 'campaign-delete'] as const)(
     'serializes %s with a captured copy that has not been inserted yet',
     async (action) => {

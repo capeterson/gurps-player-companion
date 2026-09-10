@@ -283,8 +283,9 @@ IDs/campaigns are provenance only. Missing legacy copies remain visibly unresolv
 Copy capture holds a parent character lock until the write commits, so a concurrent
 transfer includes that copy when detaching references. Campaign deletion locks the
 campaign before enumerating characters, excluding incoming assignments during cleanup.
-Migration 0036 backfills only sources matching the character's campaign (and trait
-kind); no foreign library lookup is used for server or offline calculations.
+Migration 0036 backfills only sources matching the character's campaign. Legacy
+traits whose mutable kind no longer matches their source retain those declarations
+as detached copies; no foreign library lookup is used for calculations.
 
 ### YAML import/export (cross-campaign sharing)
 
