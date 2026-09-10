@@ -23,6 +23,15 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
   APP_BASE_URL: z.string().url().optional(),
+  TRUST_PROXY: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(600),
+  AUTH_RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
+  AUTH_RATE_LIMIT_REGISTER_MAX: z.coerce.number().int().positive().default(5),
+  AUTH_RATE_LIMIT_RESET_MAX: z.coerce.number().int().positive().default(3),
+  AUTH_RATE_LIMIT_CHALLENGE_MAX: z.coerce.number().int().positive().default(10),
   CORS_ORIGINS: z
     .string()
     .default('[]')
@@ -63,6 +72,12 @@ export type AppConfig = {
   resendApiKey: string | undefined;
   resendFromEmail: string | undefined;
   appBaseUrl: string | undefined;
+  trustProxy: boolean;
+  authRateLimitWindowSeconds: number;
+  authRateLimitLoginMax: number;
+  authRateLimitRegisterMax: number;
+  authRateLimitResetMax: number;
+  authRateLimitChallengeMax: number;
 };
 
 let cached: AppConfig | undefined;
@@ -82,6 +97,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     RESEND_API_KEY: env.RESEND_API_KEY,
     RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL,
     APP_BASE_URL: env.APP_BASE_URL,
+    TRUST_PROXY: env.TRUST_PROXY,
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    AUTH_RATE_LIMIT_LOGIN_MAX: env.AUTH_RATE_LIMIT_LOGIN_MAX,
+    AUTH_RATE_LIMIT_REGISTER_MAX: env.AUTH_RATE_LIMIT_REGISTER_MAX,
+    AUTH_RATE_LIMIT_RESET_MAX: env.AUTH_RATE_LIMIT_RESET_MAX,
+    AUTH_RATE_LIMIT_CHALLENGE_MAX: env.AUTH_RATE_LIMIT_CHALLENGE_MAX,
   });
 
   cached = {
@@ -97,6 +118,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     resendApiKey: parsed.RESEND_API_KEY,
     resendFromEmail: parsed.RESEND_FROM_EMAIL,
     appBaseUrl: parsed.APP_BASE_URL,
+    trustProxy: parsed.TRUST_PROXY,
+    authRateLimitWindowSeconds: parsed.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    authRateLimitLoginMax: parsed.AUTH_RATE_LIMIT_LOGIN_MAX,
+    authRateLimitRegisterMax: parsed.AUTH_RATE_LIMIT_REGISTER_MAX,
+    authRateLimitResetMax: parsed.AUTH_RATE_LIMIT_RESET_MAX,
+    authRateLimitChallengeMax: parsed.AUTH_RATE_LIMIT_CHALLENGE_MAX,
   };
   return cached;
 }

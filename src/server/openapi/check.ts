@@ -22,6 +22,12 @@ const config: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   appBaseUrl: undefined,
+  trustProxy: false,
+  authRateLimitWindowSeconds: 600,
+  authRateLimitLoginMax: 10,
+  authRateLimitRegisterMax: 5,
+  authRateLimitResetMax: 3,
+  authRateLimitChallengeMax: 10,
 };
 
 const SNAPSHOT_PATH = 'docs/openapi.json';

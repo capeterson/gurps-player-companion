@@ -23,6 +23,7 @@ import {
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
 import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
+import { enforceAuthRateLimit } from '../auth/rateLimit.ts';
 import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
 import {
   consumeChallenge,
@@ -97,11 +98,13 @@ router.openapi(
         content: { 'application/json': { schema: tokenPair } },
       },
       409: errorResponse('Email already in use'),
+      429: errorResponse('Too many requests'),
       422: errorResponse('Validation error'),
     },
   }),
   async (c) => {
     const body = c.req.valid('json');
+    await enforceAuthRateLimit(c, loadConfig(), 'register', body.email);
     const db = getDb();
     // Fast-path pre-check so we don't burn argon2id work on a duplicate
     // email.  The unique index on users.email is the authoritative
@@ -151,11 +154,13 @@ router.openapi(
         content: { 'application/json': { schema: tokenPair } },
       },
       401: errorResponse('Invalid credentials'),
+      429: errorResponse('Too many requests'),
       422: errorResponse('Validation error'),
     },
   }),
   async (c) => {
     const body = c.req.valid('json');
+    await enforceAuthRateLimit(c, loadConfig(), 'login', body.email);
     const db = getDb();
     const rows = await db.select().from(users).where(eq(users.email, body.email));
     const user = rows[0];
@@ -353,9 +358,12 @@ router.openapi(
         description: 'Login options',
         content: { 'application/json': { schema: passkeyLoginOptions } },
       },
+      429: errorResponse('Too many requests'),
     },
   }),
   async (c) => {
+    const body = c.req.valid('json');
+    await enforceAuthRateLimit(c, loadConfig(), 'challenge', body.email);
     const { rpId } = webauthnRp();
     const challenge = await createChallenge(null, 'authentication');
     // Credentials are enrolled as discoverable (residentKey: 'required') so the
@@ -389,10 +397,12 @@ router.openapi(
         content: { 'application/json': { schema: tokenPair } },
       },
       401: errorResponse('Invalid passkey'),
+      429: errorResponse('Too many requests'),
     },
   }),
   async (c) => {
     const body = c.req.valid('json');
+    await enforceAuthRateLimit(c, loadConfig(), 'challenge');
     let clientData: { challenge?: string };
     try {
       clientData = JSON.parse(
@@ -590,12 +600,14 @@ router.openapi(
     },
     responses: {
       200: { description: 'Request received' },
+      429: errorResponse('Too many requests'),
       422: errorResponse('Validation error'),
     },
   }),
   async (c) => {
     const body = c.req.valid('json');
     const config = loadConfig();
+    await enforceAuthRateLimit(c, config, 'reset', body.email);
     const resend = getResend(config);
 
     // Only attempt to send if we have everything needed to produce a usable link.
@@ -646,11 +658,13 @@ router.openapi(
     responses: {
       204: { description: 'Password reset successfully' },
       400: errorResponse('Invalid or expired token'),
+      429: errorResponse('Too many requests'),
       422: errorResponse('Validation error'),
     },
   }),
   async (c) => {
     const body = c.req.valid('json');
+    await enforceAuthRateLimit(c, loadConfig(), 'reset', body.token);
     const tokenHash = createHash('sha256').update(body.token).digest('hex');
     const db = getDb();
     const now = new Date();
