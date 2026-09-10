@@ -105,6 +105,8 @@ on any sheet the viewer can edit — their own — it always shows).
   rounds against the character (B102), then flat modifiers add.
   Per-level mechanical effects scale by the purchased level, including zero;
   legacy null levels count as one. Flat effects apply independently of level.
+  ST-based damage roll buttons wait for linked library definitions when
+  those effects are unavailable; explicit fixed-dice modes remain usable.
   `damage_thrust` and `damage_swing` are signed flat adds to the final
   ST-based dice, after temporary ST adjustments; active sources add together.
   The sheet and attack roller share these adjusted results, then weapon adds

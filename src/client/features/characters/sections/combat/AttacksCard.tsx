@@ -15,8 +15,8 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
-import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
+import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
 
@@ -117,8 +117,9 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
   const weapons = character.inventory.filter((i) => i.equipped && i.weaponData != null);
   // Consume the shared derived result, which already includes damage effects.
   // Rebuilding from ST here would silently drop those flat adds.
-  const thrust = parseDerivedDamage(character.derived.thrust);
-  const swing = parseDerivedDamage(character.derived.swing);
+  const effectsKnown = character.libraryEffectsKnown !== false;
+  const thrust = effectsKnown ? parseDerivedDamage(character.derived.thrust) : null;
+  const swing = effectsKnown ? parseDerivedDamage(character.derived.swing) : null;
   // effectiveLevel folds in trait/skill effect bonuses (skillBonusFor) —
   // the same value SkillsPanel rolls against, so attack rolls agree.
   const skillCandidates = character.skills.map((s) => ({
@@ -140,6 +141,11 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
   return (
     <section className="card space-y-3 p-5">
       <p className="label-eyebrow">Attacks</p>
+      {!effectsKnown && (
+        <p className="text-xs text-warning">
+          ST-based damage is unavailable until linked library effects load.
+        </p>
+      )}
       <div className="space-y-3">
         {weapons.map((w) => {
           const wd = w.weaponData;

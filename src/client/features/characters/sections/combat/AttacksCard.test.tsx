@@ -50,6 +50,25 @@ function makeCharacter(damage: string, overrides: WeaponOverrides = {}): Charact
 }
 
 describe('AttacksCard', () => {
+  it('withholds ST-based damage while effects are unknown, keeping fixed dice usable', () => {
+    const character = {
+      ...makeCharacter('thr+1 imp / sw+1 cut / 2d pi'),
+      libraryEffectsKnown: false,
+    };
+    const openRoll = vi.fn();
+    const view = render(<AttacksCard character={character} openRoll={openRoll} />);
+    expect(screen.getByText(/ST-based damage is unavailable/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '1d-1 imp' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '1d+1 cut' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '2d pi' }));
+    expect(openRoll.mock.calls[0]?.[0].damage.dice).toEqual({ dice: 2, adds: 0 });
+    view.rerender(
+      <AttacksCard character={{ ...character, libraryEffectsKnown: true }} openRoll={openRoll} />,
+    );
+    expect(screen.getByRole('button', { name: '1d-1 imp' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '1d+1 cut' })).toBeEnabled();
+  });
+
   it('retains high-ST damage and fixed weapon modes independently', () => {
     const character = makeCharacter('2d+1 pi / sw+1 cut');
     character.derived = {
