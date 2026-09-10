@@ -115,7 +115,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         });
       }}
     >
-      <div className="form-control flex-1 min-w-[10rem]">
+      <div className="form-control flex-1 basis-40 min-w-0">
         <span className="label-text text-xs" id="add-skill-name-label">
           Skill
         </span>
@@ -160,7 +160,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           />
         )}
         {picked && (
-          <span className="text-xs text-base-content/70">
+          <span className="min-w-0 break-words text-xs text-base-content/70">
             {skillDisplayName(picked.name, picked.defaultSpecialization)}
             {picked.techLevel != null ? ` / TL${picked.techLevel}` : ''}
           </span>

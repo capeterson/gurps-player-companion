@@ -112,7 +112,8 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Skills** with attribute/difficulty relative levels. A skill
   copied from the library retains its specialization, learned tech level,
   description, source, and prerequisites (the latter three in notes).
-  Specialized skills have distinct sheet and roll labels; learned TL is
+  Specialized skills have distinct sheet and roll labels; long selected-library
+  captions wrap inside the add form without displacing its controls. Learned TL is
   independent of later campaign TL changes. A 0-point skill
   shows its **attribute default** (attr-4/-5/-6 for E/A/H per B173);
   0-point Very Hard skills have no default, so their level renders as
