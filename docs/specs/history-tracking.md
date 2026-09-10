@@ -17,6 +17,10 @@ library event retains the definition change itself.
 
 Chosen approach: **Postgres triggers** for capture, **paginated REST endpoints** for delivery, **indefinite retention**.
 
+Campaign updates that change only `updated_at`/`revision` (library cursor bookkeeping)
+remain in the append-only audit table but are excluded before pagination from the
+campaign history feed. Actual campaign and library changes remain visible.
+
 ### Why triggers (the key architectural decision)
 All *character* writes funnel through one server chokepoint — `dispatchOperation()` in `src/server/services/syncDispatch.ts`. But *campaign* writes (settings, membership, library, adventure log) go through separate REST routes (`campaigns.ts`, `invitations.ts`, `campaignLibrary.ts`, `adventureLog.ts`) and do **not** pass through sync. A database-trigger capture sits *below* both paths, so it records every write uniformly with no per-route bookkeeping. It also reuses machinery the codebase already trusts: the `bump_revision()` BEFORE-UPDATE trigger (migration `0002`/`0004`) and the `record_*_tombstone()` AFTER-DELETE triggers (migration `0003`/`0004`) on the same set of syncable tables.
 

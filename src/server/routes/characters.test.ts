@@ -67,6 +67,8 @@ describe('library changes propagate through incremental character cursors', () =
     const migration = await Bun.file(
       new URL('../db/migrations/0035_library_revision_fanout.sql', import.meta.url),
     ).text();
+    // Simulate an installation before the one-time repair marker was written.
+    await getDb().execute(sql`COMMENT ON FUNCTION invalidate_owned_library_mechanics() IS NULL`);
     for (const statement of migration.split('--> statement-breakpoint'))
       await getDb().execute(sql.raw(statement));
     const repaired = (await (
@@ -77,6 +79,15 @@ describe('library changes propagate through incremental character cursors', () =
     expect(
       repaired.changes.find((row) => row.entityId === before.entityId)?.revision,
     ).toBeGreaterThan(before.revision);
+    // Reapplying migration SQL must not advance the repaired row again.
+    for (const statement of migration.split('--> statement-breakpoint'))
+      await getDb().execute(sql.raw(statement));
+    const replay = (await (
+      await request('/sync/cursor', {
+        cursors: [{ entityClass, sinceRevision: repaired.nextCursor[entityClass] }],
+      })
+    ).json()) as SyncCursorResponse;
+    expect(replay.changes.some((row) => row.entityId === before.entityId)).toBe(false);
   });
   it.each(['traits', 'skills'] as const)(
     'updates two %s clients after CRUD and YAML replace, without relying on WS',

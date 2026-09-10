@@ -4,11 +4,6 @@ CREATE INDEX IF NOT EXISTS character_traits_library_idx ON character_traits (lib
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS character_skills_library_idx ON character_skills (library_skill_id);
 --> statement-breakpoint
--- Repair clients that advanced their child cursors before fan-out was installed.
-UPDATE character_traits SET updated_at = clock_timestamp() WHERE library_trait_id IS NOT NULL;
---> statement-breakpoint
-UPDATE character_skills SET updated_at = clock_timestamp() WHERE library_skill_id IS NOT NULL;
---> statement-breakpoint
 CREATE OR REPLACE FUNCTION invalidate_owned_library_mechanics() RETURNS trigger AS $$
 BEGIN
   IF TG_TABLE_NAME = 'campaign_library_traits' THEN
@@ -35,3 +30,17 @@ DROP TRIGGER IF EXISTS invalidate_owned_mechanics_trg ON campaign_library_skills
 --> statement-breakpoint
 CREATE TRIGGER invalidate_owned_mechanics_trg AFTER UPDATE OR DELETE ON campaign_library_skills
 FOR EACH ROW EXECUTE FUNCTION invalidate_owned_library_mechanics();
+--> statement-breakpoint
+-- A function comment is the durable marker for this one-time data repair.
+-- CREATE OR REPLACE above preserves the comment when the SQL is reapplied.
+DO $repair$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended('gpc-30-linked-cursor-repair', 0));
+  IF obj_description('invalidate_owned_library_mechanics()'::regprocedure, 'pg_proc')
+      IS DISTINCT FROM 'GPC-30 linked cursor repair applied' THEN
+    UPDATE character_traits SET updated_at = clock_timestamp() WHERE library_trait_id IS NOT NULL;
+    UPDATE character_skills SET updated_at = clock_timestamp() WHERE library_skill_id IS NOT NULL;
+    COMMENT ON FUNCTION invalidate_owned_library_mechanics() IS 'GPC-30 linked cursor repair applied';
+  END IF;
+END;
+$repair$;

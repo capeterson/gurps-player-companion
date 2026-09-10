@@ -209,6 +209,13 @@ router.openapi(
 
     // Determine scope filter: default to campaign-scope rows only.
     const scopeFilter = scope ?? 'campaign';
+    // Preserve the append-only audit record, but keep cursor bookkeeping out of
+    // the user-facing change feed. Actual campaign/library edits remain visible.
+    const meaningfulChange = sql`NOT (
+      ${entityHistory.entityClass} = 'campaign' AND ${entityHistory.op} = 'update'
+      AND (${entityHistory.oldRow} - 'updated_at' - 'revision')
+        IS NOT DISTINCT FROM (${entityHistory.newRow} - 'updated_at' - 'revision')
+    )`;
 
     const batchSize = sql<number>`CASE WHEN ${entityHistory.batchId} IS NULL THEN 0 ELSE (
       SELECT count(*) FROM entity_history AS batch_members
@@ -219,13 +226,16 @@ router.openapi(
     const selectBatch = (beforeRev: number | undefined) =>
       baseHistorySelect(batchSize)
         .where(
-          beforeRev
-            ? and(
-                eq(entityHistory.campaignId, campaignId),
-                eq(entityHistory.scope, scopeFilter),
-                lt(entityHistory.revision, beforeRev),
-              )
-            : and(eq(entityHistory.campaignId, campaignId), eq(entityHistory.scope, scopeFilter)),
+          and(
+            meaningfulChange,
+            beforeRev
+              ? and(
+                  eq(entityHistory.campaignId, campaignId),
+                  eq(entityHistory.scope, scopeFilter),
+                  lt(entityHistory.revision, beforeRev),
+                )
+              : and(eq(entityHistory.campaignId, campaignId), eq(entityHistory.scope, scopeFilter)),
+          ),
         )
         .orderBy(desc(entityHistory.revision))
         .limit(limit);

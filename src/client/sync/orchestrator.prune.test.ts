@@ -12,6 +12,7 @@
  */
 
 import { QueryClient } from '@tanstack/react-query';
+import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { mountLibraryInvalidations } from '../features/campaigns/libraryInvalidation.ts';
@@ -61,6 +62,9 @@ const SPECULATIVE_CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000d003';
 describe('accessible-set prune', () => {
   it('refreshes the changed campaign library after HTTP commit even without a WS frame', async () => {
     const client = new QueryClient();
+    const otherTab = new QueryClient();
+    otherTab.setQueryData(['campaigns', STALE_CAMPAIGN_ID, 'library'], { traits: [] });
+    const unmountOther = mountLibraryInvalidations(otherTab);
     client.setQueryData(['campaigns', STALE_CAMPAIGN_ID, 'library'], { traits: [] });
     client.setQueryData(['campaigns', 'other', 'library'], { traits: [] });
     const unmount = mountLibraryInvalidations(client);
@@ -87,13 +91,20 @@ describe('accessible-set prune', () => {
     );
     try {
       await getSyncOrchestrator().triggerCursorPull();
-      expect(committed).toEqual([9]);
+      await waitFor(() => expect(committed).toEqual([9]));
+      await waitFor(() =>
+        expect(
+          otherTab.getQueryState(['campaigns', STALE_CAMPAIGN_ID, 'library'])?.isInvalidated,
+        ).toBe(true),
+      );
       expect(client.getQueryState(['campaigns', STALE_CAMPAIGN_ID, 'library'])?.isInvalidated).toBe(
         true,
       );
       expect(client.getQueryState(['campaigns', 'other', 'library'])?.isInvalidated).toBe(false);
     } finally {
       unmount();
+      unmountOther();
+      otherTab.clear();
       client.clear();
     }
   });

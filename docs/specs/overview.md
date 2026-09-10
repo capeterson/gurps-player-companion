@@ -100,7 +100,8 @@ on any sheet the viewer can edit — their own — it always shows).
   Library edits and YAML imports advance linked child revisions transactionally,
   so incremental HTTP pulls refresh definitions even after missed WS nudges or
   offline sessions. Library writes also advance the campaign cursor; its committed
-  HTTP changes invalidate the library editor cache. WS only accelerates that cycle.
+  HTTP changes invalidate each tab's library editor cache through Dexie observation.
+  WS only accelerates that cycle. Cursor-only campaign touches do not clutter history.
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
