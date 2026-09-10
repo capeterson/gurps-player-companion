@@ -14,7 +14,7 @@ export interface WsBroadcast {
   /** Tagged union for forward compatibility. */
   readonly kind: 'sync_invalidate' | 'encounter_invalidate';
   readonly entityClasses?: readonly string[];
-  /** Present only for the online-only encounter tracker invalidation. */
+  /** Scopes encounter or library query invalidation; never contains row data. */
   readonly campaignId?: string;
   readonly encounterId?: string;
   /** Server timestamp for client-side debug / dedup. */

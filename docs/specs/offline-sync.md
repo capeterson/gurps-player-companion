@@ -39,8 +39,22 @@ application validates them transactionally while preserving pending local fields
 readers also verify the source ID/campaign against current local intent. Dexie v9
 clears only trait/skill cursors once so existing installations backfill on their
 next online pull. Until then unresolved linked calculations show an unavailable
-state. A failed pull retains the last valid declarations. Current refresh policy
-is tied to child-row pulls; a full resync picks up library-only changes as well.
+state. A failed pull retains the last valid declarations. Library definitions use
+a live-link policy: migration `0035_library_revision_fanout.sql` advances linked
+trait/skill revisions in the library writer's transaction, scoped to characters
+in that source campaign. UPDATE and DELETE include CRUD and YAML merge/replace.
+Normal incremental HTTP pulls therefore detect definition changes without WS,
+including when a client reconnects after multiple edits. Source revisions travel
+with declarations; array length is never used as a freshness signal.
+
+After commit, `services/libraryInvalidation.ts` sends a row-free `sync_invalidate`
+nudge to the campaign owner and members. `wsSubscriber.ts` triggers the ordinary
+sync cycle and invalidates only that campaign's React Query library prefix via
+`features/campaigns/libraryInvalidation.ts`. Failed nudges do not fail committed
+writes. The cursor retains its existing membership/share gates. Existing history
+triggers record affected child refreshes under the library writer's audit context;
+the campaign library event records the actual definition edit. Deleted definitions
+currently become unresolved; preserving their owned declarations is a separate change.
 
 The authoritative list of pulled classes is `ALL_ENTITY_CLASSES` in
 `src/client/sync/orchestrator.ts`. The `entityClass` enum in

@@ -97,8 +97,9 @@ on any sheet the viewer can edit — their own — it always shows).
   retains bonuses. Unresolved legacy/deleted definitions pause calculated panels
   and rolls with an explanation; identity, trait, inventory and notes editing remain
   available (inventory hides its unavailable Basic Lift/encumbrance classification).
-  Definitions are refreshed when their character child is pulled; library-only
-  changes currently require a full resync until revision propagation is added.
+  Library edits and YAML imports advance linked child revisions transactionally,
+  so incremental HTTP pulls refresh definitions even after missed WS nudges or
+  offline sessions. Campaign-scoped nudges also invalidate the library editor cache.
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer

@@ -30,6 +30,7 @@ import { withAudit } from '../db/auditContext.ts';
 import type { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import { type createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { publishLibraryInvalidation } from '../services/libraryInvalidation.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import type { LibraryEntityConfig, LibraryTable } from './campaignLibraryEntities.ts';
 
@@ -156,6 +157,7 @@ export function registerLibraryCrud<
         }
         throw err;
       }
+      await publishLibraryInvalidation(id);
       return c.json(cfg.toOut(row), 201);
     },
   );
@@ -208,6 +210,7 @@ export function registerLibraryCrud<
         }
         throw err;
       }
+      await publishLibraryInvalidation(id);
       return c.json(cfg.toOut(row), 200);
     },
   );
@@ -240,6 +243,7 @@ export function registerLibraryCrud<
       });
       if (result.length === 0)
         throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+      await publishLibraryInvalidation(id);
       return c.body(null, 204);
     },
   );

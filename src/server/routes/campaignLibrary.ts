@@ -44,6 +44,7 @@ import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { campaigns } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { publishLibraryInvalidation } from '../services/libraryInvalidation.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import { registerLibraryCrud, selectLibrarySection, upsertByKey } from './campaignLibraryCrud.ts';
 import {
@@ -326,6 +327,7 @@ router.openapi(
         campaignSettingsApplied,
       };
     });
+    await publishLibraryInvalidation(id);
     return c.json(result, 200);
   },
 );

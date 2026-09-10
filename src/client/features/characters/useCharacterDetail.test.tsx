@@ -104,6 +104,60 @@ afterEach(() => {
 });
 
 describe('durable character mechanics', () => {
+  it('updates open player and GM readers after a same-length library edit and a dropped-WS reconnect', async () => {
+    await seed();
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 0,
+    });
+    const player = renderHook(() => useCharacterDetail(CID));
+    const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
+    await waitFor(() => expect(player.result.current?.derived.effectiveDx).toBe(12));
+    await waitFor(() => expect(gm.result.current?.[0]?.derived.effectiveDx).toBe(12));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    await expect(getSyncOrchestrator().triggerCursorPull(true)).rejects.toThrow();
+    expect(player.result.current?.derived.effectiveDx).toBe(12);
+    const row = await getLocalDb().characterTraits.get(TRAIT);
+    const next = {
+      ...snapshot,
+      sourceRevision: 10,
+      effects: snapshot.effects?.map((effect) =>
+        effect.target === 'dx' ? { ...effect, value: 5 } : effect,
+      ),
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              changes: [
+                {
+                  entityClass: 'character_trait',
+                  entityId: TRAIT,
+                  command: 'patch',
+                  revision: 11,
+                  data: { ...row, libraryMechanics: next, revision: 11 },
+                },
+              ],
+              nextCursor: { character_trait: 11 },
+              hasMore: {},
+            }),
+            { headers: { 'content-type': 'application/json' } },
+          ),
+        ),
+      ),
+    );
+    // No WebSocket is present: reconnect/periodic HTTP pull alone must refresh both views.
+    await act(async () => {
+      await getSyncOrchestrator().triggerCursorPull(true);
+    });
+    await waitFor(() => expect(player.result.current?.derived.effectiveDx).toBe(15));
+    await waitFor(() => expect(gm.result.current?.[0]?.derived.effectiveDx).toBe(15));
+    expect(player.result.current?.skills[0]?.effectiveLevel).toBe(16);
+    expect(gm.result.current?.[0]?.derived).toEqual(player.result.current?.derived);
+  });
   it.each(['player', 'gm'])(
     'keeps the %s page available offline and hides unresolved calculations',
     async (view) => {
