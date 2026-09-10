@@ -84,6 +84,7 @@ persists JSON of its own:
 |---|---|
 | `characterTraits.libraryMechanics`, `characterSkills.libraryMechanics` | `libraryMechanics` (libraryMechanics.ts): mirrors the owned Postgres declarations and optional detached flag. Null effects mean unavailable, an empty array means known empty. Validated during cursor emission/application, local derivation, and speculative creation from a selected definition. Speculative metadata is stored atomically with the outbox but excluded from its wire payload. Typed as `LibraryMechanics` in Dexie. |
 | `outbox.attemptedValue` / `prevValue` | The **bare field value** for `patch` ops (rule S2), the full create payload for `create`, the deleted row snapshot for `delete`. Never a wrapper object. |
+| `outbox.localCampaignTransferUndo` | Client-only child reference preimages and detached postimages for campaign assignment rollback; typed as `LocalCampaignTransferUndo[]`. Any new declaration postimage is validated with `libraryMechanics`. Stored atomically with the parent edit; excluded from the sync wire envelope. |
 | `syncMeta.value` | Per-key blobs (e.g. `bootstrap:<userId>` → `{ bootstrappedAt }`). Owned by the orchestrator. |
 | `rejectionToasts` rows | `RejectionRecord` interface in dexie.ts. |
 

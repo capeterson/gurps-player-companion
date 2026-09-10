@@ -539,7 +539,8 @@ async function dispatchTrait(
     entityClass: 'character_trait',
     tx,
     table: characterTraits,
-    prepareUpdates: (updates) => prepareOwnedMechanicsPatch(tx, 'traits', characterId, updates),
+    prepareUpdates: (updates) =>
+      prepareOwnedMechanicsPatch(tx, 'traits', characterId, updates, op.entityId),
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -605,7 +606,8 @@ async function dispatchSkill(
     entityClass: 'character_skill',
     tx,
     table: characterSkills,
-    prepareUpdates: (updates) => prepareOwnedMechanicsPatch(tx, 'skills', characterId, updates),
+    prepareUpdates: (updates) =>
+      prepareOwnedMechanicsPatch(tx, 'skills', characterId, updates, op.entityId),
     parentLookup: async () => {
       const [row] = await getDb()
         .select()

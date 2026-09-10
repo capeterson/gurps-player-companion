@@ -283,7 +283,17 @@ export type OutboxStatus =
   | 'failed_permanent'
   | 'transient_retry';
 
+/** Local-only undo for the child changes caused by a campaign assignment. */
+export interface LocalCampaignTransferUndo {
+  store: string;
+  entityId: string;
+  campaignId: string | null;
+  before: Record<string, unknown>;
+  after: Record<string, unknown>;
+}
+
 export interface OutboxEntry {
+  localCampaignTransferUndo?: LocalCampaignTransferUndo[] | undefined;
   clientOpId: string;
   entityClass: EntityClass;
   entityId: string;

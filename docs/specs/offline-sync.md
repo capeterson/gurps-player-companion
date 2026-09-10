@@ -527,6 +527,16 @@ rule that has been broken at least once.
 
 ## Self-healing & pruning
 
+Campaign assignment patches detach all six child library references in the same
+IndexedDB transaction as the parent edit and outbox operation. Trait and skill
+declarations remain available as retained copies while offline, after reload,
+and if an acknowledged transfer is followed by a failed cursor pull. Local-only
+undo data on the operation restores links when the transfer is rejected or
+explicitly discarded, preserves unrelated child edits, and follows coalesced
+or queued campaign changes. Cursor pulls protect these child fields while the
+parent transfer is pending. Resubmitting an already-null source reference does
+not erase a retained declaration; new links to missing sources are rejected.
+
 The orchestrator recovers from partial/interrupted states rather than assuming
 a clean world (see `orchestrator.recovery.test.ts`,
 `orchestrator.selfheal.test.ts`, `orchestrator.prune.test.ts`,

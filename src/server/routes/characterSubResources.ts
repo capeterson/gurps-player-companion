@@ -170,7 +170,7 @@ router.openapi(
     assertWrite(access);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) => {
-      await prepareOwnedMechanicsPatch(tx, 'traits', id, updates);
+      await prepareOwnedMechanicsPatch(tx, 'traits', id, updates, traitId);
       return tx
         .update(characterTraits)
         .set(updates)
@@ -296,7 +296,7 @@ router.openapi(
     assertWrite(access);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) => {
-      await prepareOwnedMechanicsPatch(tx, 'skills', id, updates);
+      await prepareOwnedMechanicsPatch(tx, 'skills', id, updates, skillId);
       return tx
         .update(characterSkills)
         .set(updates)
