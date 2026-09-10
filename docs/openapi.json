@@ -17165,7 +17165,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -18794,7 +18794,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -20681,7 +20681,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -22379,7 +22379,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -23549,7 +23549,7 @@
                   "level": {
                     "type": "integer",
                     "nullable": true,
-                    "minimum": 1,
+                    "minimum": 0,
                     "maximum": 99
                   },
                   "variantName": {
@@ -23667,7 +23667,7 @@
                         "level": {
                           "type": "integer",
                           "nullable": true,
-                          "minimum": 1,
+                          "minimum": 0,
                           "maximum": 99
                         },
                         "variantName": {
@@ -24241,7 +24241,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -25426,7 +25426,7 @@
                   "level": {
                     "type": "integer",
                     "nullable": true,
-                    "minimum": 1,
+                    "minimum": 0,
                     "maximum": 99
                   },
                   "variantName": {
@@ -25540,7 +25540,7 @@
                         "level": {
                           "type": "integer",
                           "nullable": true,
-                          "minimum": 1,
+                          "minimum": 0,
                           "maximum": 99
                         },
                         "variantName": {
@@ -26114,7 +26114,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -27755,7 +27755,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -29553,7 +29553,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -31361,7 +31361,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -33002,7 +33002,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -34819,7 +34819,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -36648,7 +36648,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -38289,7 +38289,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -40051,7 +40051,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -41825,7 +41825,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -43466,7 +43466,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -45247,7 +45247,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -47039,7 +47039,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -48680,7 +48680,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -51198,7 +51198,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -53728,7 +53728,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -55369,7 +55369,7 @@
                           "level": {
                             "type": "integer",
                             "nullable": true,
-                            "minimum": 1,
+                            "minimum": 0,
                             "maximum": 99
                           },
                           "variantName": {
@@ -57111,7 +57111,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -58765,7 +58765,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {
@@ -60417,7 +60417,7 @@
                               "level": {
                                 "type": "integer",
                                 "nullable": true,
-                                "minimum": 1,
+                                "minimum": 0,
                                 "maximum": 99
                               },
                               "variantName": {

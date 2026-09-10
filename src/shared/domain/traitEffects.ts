@@ -86,7 +86,9 @@ const ATTR_TARGETS: ReadonlySet<EffectTarget> = new Set<EffectTarget>([
 
 function scaledValue(effect: TraitEffect, traitLevel: number | null): number {
   if (effect.scaling === 'per_level') {
-    return effect.value * Math.max(1, traitLevel ?? 1);
+    // Legacy non-leveled records use null; an explicitly purchased level 0
+    // contributes no per-level bonus (flat effects still apply).
+    return effect.value * (traitLevel ?? 1);
   }
   return effect.value;
 }
