@@ -141,15 +141,15 @@ describe('effective armor and innate DR', () => {
     expect(map.get('torso')?.dr).toBe(5);
     expect(map.get('skull')?.dr).toBe(11); // global 5 + scoped 4 + natural 2
     expect(resolveDr('cr', map.get('eye'))).toBe(0);
-    expect(applyDamage(6, 'cr', 'torso', map, null).injury).toBe(1);
-    expect(applyDamage(12, 'cr', 'skull', map, '2').injury).toBe(28);
+    expect(applyDamage(6, 'cr', 'torso', map, null, 10).injury).toBe(1);
+    expect(applyDamage(12, 'cr', 'skull', map, '2', 10).injury).toBe(28);
   });
   it('layers innate DR with per-type armor overrides before a divisor', () => {
     const armor = [item(2, ['torso'], { typedDr: { cut: 4 }, drCrushing: 1 }), item(3, ['torso'])];
     const map = effectiveDrByLocation(armor, effects);
     expect(resolveDr('cut', map.get('torso'))).toBe(12);
     expect(resolveDr('cr', map.get('torso'))).toBe(9);
-    expect(applyDamage(14, 'cut', 'torso', map, '2').injury).toBe(12);
+    expect(applyDamage(14, 'cut', 'torso', map, '2', 10).injury).toBe(12);
     expect(effectiveDrByLocation([...armor].reverse(), effects)).toEqual(map);
   });
   it('supports explicit eye/custom locations and ignores inactive effects', () => {

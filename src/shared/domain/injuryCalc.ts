@@ -100,7 +100,12 @@ export interface DamageApplication {
   readonly effectiveDr: number;
   readonly penetrating: number;
   readonly multiplier: number;
-  /** floor(penetrating × multiplier), min 1 when anything penetrated (B379). */
+  /** Injury before limb/extremity caps; retain for crippling/destruction (B421). */
+  readonly preCapInjury: number;
+  readonly cripplingThreshold: number | null;
+  readonly crippled: boolean;
+  readonly destroyed: boolean;
+  /** Applied HP loss, capped at the minimum limb/extremity crippling injury. */
   readonly injury: number;
 }
 
@@ -115,6 +120,7 @@ export function applyDamage(
   location: string,
   drMap: DrByLocationMap,
   armorDivisor: string | null | undefined,
+  maxHp: number,
 ): DamageApplication {
   const entry = drMap.get(location);
   const drAtLocation = resolveDr(type, entry);
@@ -124,7 +130,29 @@ export function applyDamage(
 
   const penetrating = Math.max(0, basic - effectiveDr);
   const multiplier = woundingMultiplier(type, location);
-  const injury = penetrating > 0 ? Math.max(1, Math.floor(penetrating * multiplier)) : 0;
+  const preCapInjury = penetrating > 0 ? Math.max(1, Math.floor(penetrating * multiplier)) : 0;
+  const cripplingThreshold =
+    maxHp > 0
+      ? LIMB_LOCATIONS.has(location)
+        ? Math.floor(maxHp / 2) + 1
+        : EXTREMITY_LOCATIONS.has(location)
+          ? Math.floor(maxHp / 3) + 1
+          : null
+      : null;
+  const injury =
+    cripplingThreshold == null ? preCapInjury : Math.min(preCapInjury, cripplingThreshold);
+  const crippled = cripplingThreshold != null && preCapInjury >= cripplingThreshold;
+  const destroyed = cripplingThreshold != null && preCapInjury >= 2 * cripplingThreshold;
 
-  return { drAtLocation, effectiveDr, penetrating, multiplier, injury };
+  return {
+    drAtLocation,
+    effectiveDr,
+    penetrating,
+    multiplier,
+    preCapInjury,
+    injury,
+    cripplingThreshold,
+    crippled,
+    destroyed,
+  };
 }

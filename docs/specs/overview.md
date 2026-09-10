@@ -264,7 +264,11 @@ on any sheet the viewer can edit — their own — it always shows).
     DR) by an armor divisor → penetrating × wounding multiplier (B379/B398-400) =
     injury (`src/shared/domain/injuryCalc.ts`), applied to HP through
     the same shared `usePoolBumpers` instance as the rest of the tab.
-    Crippling is surfaced as a hint only, never auto-applied.
+    Limb/extremity HP loss is capped at the minimum crippling injury using
+    maximum HP (B421): HP10 arms/legs cap at 6, hands/feet at 4. The full
+    pre-cap injury remains visible and drives crippling/destruction hints;
+    destruction requires at least twice the crippling amount. Conditions
+    remain manual. Torso, skull, and eye-to-brain injuries are uncapped.
   - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
     chip shows its blurb; tapping it again clears to no maneuver), plus
     a "Custom…" free-text fallback using the same `useDraftField`
