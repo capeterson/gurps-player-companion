@@ -193,3 +193,53 @@ describe('learned default dependencies', () => {
     ]).toEqual([null, null]);
   });
 });
+
+describe('Rule of 20 (B173)', () => {
+  it('caps only the basic attribute source, before its declared default penalty', () => {
+    for (const attribute of ['ST', 'DX', 'IQ', 'HT'] as const) {
+      for (const level of [19, 20, 21, 25]) {
+        const derived = computeDerived({
+          ...baseAttrs,
+          st: level,
+          dx: level,
+          iq: level,
+          ht: level,
+        });
+        const defaults = [{ kind: 'attribute' as const, attribute, modifier: -5 }];
+        expect(computeSkillLevel(attribute, 'A', 0, derived, defaults)).toBe(
+          Math.min(level, 20) - 5,
+        );
+        expect(computeSkillLevel(attribute, 'A', 1, derived, defaults)).toBe(level - 1);
+      }
+    }
+  });
+
+  it('does not cap learned-skill defaults or secondary characteristics', () => {
+    const derived = computeDerived({ ...baseAttrs, iq: 25, willMod: 0, perMod: 0 });
+    for (const attribute of ['Will', 'Per'] as const) {
+      expect(
+        computeSkillLevel(attribute, 'A', 0, derived, [
+          { kind: 'attribute', attribute, modifier: -5 },
+        ]),
+      ).toBe(20);
+    }
+    expect(
+      computeSkillLevel('Other', 'A', 0, derived, [
+        { kind: 'attribute', attribute: 'Other', modifier: -5 },
+      ]),
+    ).toBe(5);
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [
+          { kind: 'attribute', attribute: 'IQ', modifier: -5 },
+          { kind: 'skill', name: 'Source', modifier: -2 },
+        ],
+        [{ name: 'Source', specialization: null, level: 25 }],
+      ),
+    ).toBe(23);
+  });
+});
