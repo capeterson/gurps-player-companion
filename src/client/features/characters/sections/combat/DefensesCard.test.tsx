@@ -167,6 +167,8 @@ describe('DefensesCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Block/ }));
     expect(targetFor(openRoll, 1)).toBe(13);
     fireEvent.click(screen.getByRole('button', { name: 'Double defense' }));
+    expect(screen.getByRole('button', { name: 'Double defense' })).toHaveClass('on');
+    expect(screen.getByRole('button', { name: '+2 dodge' })).not.toHaveClass('on');
     fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
     expect(targetFor(openRoll, 2)).toBe(10);
     c.combat = { ...c.combat, maneuver: 'Move and Attack' } as CharacterDetail['combat'];

@@ -35,6 +35,15 @@ describe('live combat adjustments', () => {
     expect(state.defense('dodge', 9)).toBe(9);
     expect(state.movement(5)).toBe(5);
   });
+  it('does not invent a minimum Dodge under pool reductions', () => {
+    const state = combatAdjustments({ ...base, hp: 3 });
+    expect(state.defense('dodge', 0)).toBe(0);
+    expect(state.defense('dodge', -4)).toBe(-2);
+  });
+  it('allows a step for Evaluate but no movement before a Wait triggers (B364, B366)', () => {
+    expect(combatAdjustments({ ...base, maneuver: 'evaluate' }).movement(6)).toBe(1);
+    expect(combatAdjustments({ ...base, maneuver: 'wait' }).movement(6)).toBe(0);
+  });
   it('applies stun and prone penalties to every defense and prevents movement', () => {
     const state = combatAdjustments({ ...base, posture: 'prone', conditions: ['Stunned'] });
     for (const kind of ['dodge', 'parry', 'block'] as const)
@@ -67,6 +76,8 @@ describe('live combat adjustments', () => {
     expect(state.defense('parry', 10, 'double')).toBe(10);
     expect(state.movement(6, 'dodge')).toBe(3);
     expect(state.movement(6, 'double')).toBe(1);
+    expect(state.movement(6, 'parry')).toBe(1);
+    expect(state.movement(6, 'block')).toBe(1);
   });
   it.each(['all_out_attack', 'all_out_defense'])(
     'rounds half movement up for %s (B386)',

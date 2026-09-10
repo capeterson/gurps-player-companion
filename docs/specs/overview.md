@@ -305,7 +305,10 @@ on any sheet the viewer can edit — their own — it always shows).
     movement to their full/half/step/none allowance. All-Out Attack, unconsciousness,
     sleeping, and the negative-FP floor disable defense actions; Move and Attack
     disables parry. All-Out Defense offers a local roll option: +2 to the chosen
-    defense or Double Defense (no numerical bonus). Changing character/maneuver
+    defense or Double Defense (no numerical bonus), with the selected chip highlighted.
+    Only Increased Dodge permits half Move; the other options permit a step (B366).
+    Evaluate permits a step; Wait permits no movement until its trigger (B364/B366).
+    Dodge has no minimum introduced by pool reductions. Changing character/maneuver
     clears that selection. Breakdowns name pool/posture/stun/maneuver adjustments;
     unmodeled tactical situations and custom maneuvers remain player-supplied.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
