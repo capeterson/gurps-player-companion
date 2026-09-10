@@ -73,7 +73,10 @@ describe('library changes propagate through incremental character cursors', () =
     ).text();
     // Simulate an installation before the one-time repair marker was written.
     await getDb().execute(sql`COMMENT ON FUNCTION invalidate_owned_library_mechanics() IS NULL`);
-    for (const statement of migration.split('--> statement-breakpoint'))
+    // Do not restore the historical triggers replaced by migration 0036.
+    const repairStatements = migration.split('--> statement-breakpoint').filter((statement) =>
+      statement.includes('DO $repair$') || statement.includes('CREATE INDEX IF NOT EXISTS'));
+    for (const statement of repairStatements)
       await getDb().execute(sql.raw(statement));
     const repaired = (await (
       await request('/sync/cursor', {
@@ -84,7 +87,7 @@ describe('library changes propagate through incremental character cursors', () =
       repaired.changes.find((row) => row.entityId === before.entityId)?.revision,
     ).toBeGreaterThan(before.revision);
     // Reapplying migration SQL must not advance the repaired row again.
-    for (const statement of migration.split('--> statement-breakpoint'))
+    for (const statement of repairStatements)
       await getDb().execute(sql.raw(statement));
     const replay = (await (
       await request('/sync/cursor', {

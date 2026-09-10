@@ -40,13 +40,6 @@ captures its own authoritative source version. A rejected create removes that co
 persists the rejection notice, and flashes the corresponding add form. Invalid local
 metadata aborts the transaction without leaving a row or queued operation.
 
-Selecting an already loaded definition also seeds validated local-only declarations
-into the speculative create row, in the same Dexie transaction as its outbox entry.
-They survive offline reloads and are excluded from the operation envelope; the server
-captures its own authoritative source version. A rejected create removes that copy,
-persists the rejection notice, and flashes the corresponding add form. Invalid local
-metadata aborts the transaction without leaving a row or queued operation.
-
 The declarations live in existing character stores, so normal logout/account
 switch purge and minimal-view cleanup remove them with their owning rows. Cursor
 application validates them transactionally while preserving pending local fields;
