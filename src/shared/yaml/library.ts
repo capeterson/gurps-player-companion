@@ -24,10 +24,10 @@ import {
  * `effects` arrays to traits/skills (see schemas/effects.ts).  v3 added
  * container/powerstone/magic-item fields on items and `manaLevel` in the
  * campaign block.  v4 added the `languages`, `techniques`, and `styles`
- * library sections.  v5 added the `enchantments` list on items.  The
- * parser still accepts v1-v4 docs (new fields default/absent).
+ * library sections. v5 added item `enchantments`; v6 adds explicit skill
+ * `defaults`. The parser still accepts v1-v5 docs (new fields default/absent).
  */
-export const LIBRARY_YAML_VERSION = 5 as const;
+export const LIBRARY_YAML_VERSION = 6 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -150,7 +150,11 @@ function compact<T extends Record<string, unknown>>(input: T): Record<string, un
 
 export function emitLibraryYaml(input: LibraryYamlExportInput): string {
   const traits = sortedTraits(input.traits).map((t) => compact(t));
-  const skills = sortedByName(input.skills).map((s) => compact(s));
+  // An empty defaults list means explicitly no default, unlike missing/unknown.
+  const skills = sortedByName(input.skills).map((s) => ({
+    ...compact(s),
+    ...(s.defaults != null ? { defaults: s.defaults } : {}),
+  }));
   const spells = sortedByName(input.spells).map((s) => compact(s));
   const items = sortedByName(input.items).map((i) => compact(i));
   const languages = sortedByName(input.languages).map((l) => compact(l));

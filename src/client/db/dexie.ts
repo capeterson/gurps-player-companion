@@ -111,6 +111,7 @@ export interface LocalCharacterSkill {
   specialization: string | null;
   notes: string | null;
   librarySkillId: string | null;
+  defaults?: import('../../shared/schemas/skill.ts').SkillDefaults;
   createdAt: string;
   updatedAt: string;
   revision: number;

@@ -3,8 +3,8 @@
  *
  * A computed level opens the shared roll sheet at that target
  * (rolls mutate nothing, so this works identically for read-only
- * viewers); a null level (0-point Very Hard skill, which has no
- * attribute default per B173) stays plain, non-interactive text.
+ * viewers); a null level (untrained without an available declared default)
+ * stays plain, non-interactive text.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -35,6 +35,7 @@ const picks = vi.hoisted(() =>
     description: `${specialty} training`,
     source: 'B198',
     prerequisites: 'Training',
+    defaults: [{ kind: 'attribute' as const, attribute: 'DX' as const, modifier: -4 }],
   })),
 );
 vi.mock('./useLibraryFetcher.ts', () => ({
@@ -154,7 +155,12 @@ describe('SkillsPanel', () => {
       const [row] = await db.characterSkills.toArray();
       const [op] = await db.outbox.toArray();
       expect(row).toMatchObject({ name: 'Guns', specialization: 'Pistol', techLevel: 8 });
-      expect(op?.attemptedValue).toMatchObject({ specialization: 'Pistol', techLevel: 8 });
+      expect(row?.defaults).toEqual(picks[0]?.defaults);
+      expect(op?.attemptedValue).toMatchObject({
+        specialization: 'Pistol',
+        techLevel: 8,
+        defaults: picks[0]?.defaults,
+      });
       expect(op?.status).toBe('pending');
     } finally {
       await resetLocalDb();
@@ -190,6 +196,7 @@ describe('SkillsPanel', () => {
       specialization: 'Pistol',
       techLevel: 8,
       librarySkillId: picks[0]?.id,
+      defaults: picks[0]?.defaults,
       notes: 'Pistol training\n\nSource: B198\n\nPrerequisites: Training',
     });
     expect(enqueueCreate.mock.calls[0]?.[0].humanName).toBe('skill "Guns (Pistol)"');

@@ -105,5 +105,21 @@ describe('character skill effect specialization', () => {
     }));
     expect(resolveWeaponSkill('Pistol', 'Guns (Pistol)', candidates)).toMatchObject({ level: 14 });
     expect(resolveWeaponSkill('Rifle', 'Guns (Rifle)', candidates)).toMatchObject({ level: 12 });
+    const defaulted = buildCharacterDetail({
+      ...input,
+      skills: input.skills.map((skill) =>
+        skill.specialization === 'Rifle'
+          ? {
+              ...skill,
+              points: 0,
+              defaults: [
+                { kind: 'skill' as const, name: 'Guns', specialization: 'Pistol', modifier: -2 },
+              ],
+            }
+          : skill,
+      ),
+    });
+    // FAQ: Talent is applied after defaults and only to its listed skills.
+    expect(defaulted.skills.map((skill) => skill.effectiveLevel)).toEqual([14, 10]);
   });
 });

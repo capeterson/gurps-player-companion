@@ -459,6 +459,8 @@ export const characterSkills = pgTable(
     specialization: varchar('specialization', { length: 160 }),
     notes: text('notes'),
     librarySkillId: uuid('library_skill_id'),
+    /** skillDefaults in shared/schemas/skill.ts. */
+    defaults: jsonb('defaults').$type<import('../../shared/schemas/skill.ts').SkillDefaults>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -830,6 +832,8 @@ export const campaignLibrarySkills = pgTable(
     description: text('description'),
     source: varchar('source', { length: 40 }),
     defaultSpecialization: varchar('default_specialization', { length: 160 }),
+    /** skillDefaults in shared/schemas/skill.ts. */
+    defaults: jsonb('defaults').$type<import('../../shared/schemas/skill.ts').SkillDefaults>(),
     prerequisites: text('prerequisites'),
     /** Validated by `situationalModifier` (src/shared/schemas/skill.ts). */
     situationalModifiers: jsonb('situational_modifiers')

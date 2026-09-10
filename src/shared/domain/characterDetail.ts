@@ -20,7 +20,7 @@ import type { CombatStateOut } from '../schemas/combat.ts';
 import type { TraitEffect } from '../schemas/effects.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
 import type { LanguageOut } from '../schemas/language.ts';
-import type { SkillOut } from '../schemas/skill.ts';
+import type { SkillDefaults, SkillOut } from '../schemas/skill.ts';
 import type { SpellOut } from '../schemas/spell.ts';
 import type { TechniqueDifficulty, TechniqueOut } from '../schemas/technique.ts';
 import type { TraitModifier, TraitOut } from '../schemas/trait.ts';
@@ -35,7 +35,7 @@ import {
   computePointBreakdown,
 } from './characterCalc.ts';
 import { type InventoryItemRow, computeEncumbrance, computeWeights } from './encumbrance.ts';
-import { computeSkillLevel } from './skillCalc.ts';
+import { computeSkillLevel, resolveSkillLevels } from './skillCalc.ts';
 import {
   computeSpellLevel,
   effectiveCastingCost,
@@ -119,6 +119,7 @@ export interface CharacterDetailInputSkill {
   specialization: string | null;
   notes: string | null;
   librarySkillId: string | null;
+  defaults?: SkillDefaults;
   /** Library skill effects, joined by librarySkillId.  Defaults to []. */
   libraryEffects?: TraitEffect[];
   createdAt: Date | string;
@@ -357,8 +358,14 @@ export function buildSkillOut(
   skill: CharacterDetailInputSkill,
   derived: ReturnType<typeof computeDerived>,
   skillBonus = 0,
+  level = computeSkillLevel(
+    skill.attribute,
+    skill.difficulty,
+    skill.points,
+    derived,
+    skill.defaults,
+  ),
 ): SkillOut {
-  const level = computeSkillLevel(skill.attribute, skill.difficulty, skill.points, derived);
   return {
     id: skill.id,
     characterId: skill.characterId,
@@ -370,9 +377,9 @@ export function buildSkillOut(
     specialization: skill.specialization,
     notes: skill.notes,
     librarySkillId: skill.librarySkillId,
+    defaults: skill.defaults ?? null,
     level,
-    // level is null for a 0-point Very Hard skill (no attribute default);
-    // effectiveLevel mirrors that — no bonus target to apply against.
+    // No usable declared default means there is no bonus target to apply against.
     effectiveLevel: level === null ? null : level + skillBonus,
     createdAt: toIso(skill.createdAt),
     updatedAt: toIso(skill.updatedAt),
@@ -512,8 +519,14 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const encumbrance = computeEncumbrance(weights.playerWeightLbs, derived.basicLift);
   const inventoryOut = inventory.map((i) => buildInventoryItemOut(i, weights.perItem));
   const traitsOut = traits.map(buildTraitOut);
+  const skillLevels = resolveSkillLevels(skills, derived);
   const skillsOut = skills.map((s) =>
-    buildSkillOut(s, derived, skillBonusFor(s.name, resolved, s.specialization).total),
+    buildSkillOut(
+      s,
+      derived,
+      skillBonusFor(s.name, resolved, s.specialization).total,
+      skillLevels.get(s.id) ?? null,
+    ),
   );
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';

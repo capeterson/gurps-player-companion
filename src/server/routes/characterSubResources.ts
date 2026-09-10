@@ -246,11 +246,10 @@ router.openapi(
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    const derived = computeDerived(characterAttrsFromRow(access.character));
-    return c.json(
-      { skill: buildSkillOut(created, derived), character: await loadCharacterDetail(id) },
-      201,
-    );
+    const character = await loadCharacterDetail(id);
+    const skill = character.skills.find((skill) => skill.id === created.id);
+    if (!skill) throw new HTTPException(500, { message: 'created skill missing from detail' });
+    return c.json({ skill, character }, 201);
   },
 );
 
@@ -293,11 +292,10 @@ router.openapi(
         .returning(),
     );
     if (!updated) throw new HTTPException(404, { message: 'skill not found' });
-    const derived = computeDerived(characterAttrsFromRow(access.character));
-    return c.json(
-      { skill: buildSkillOut(updated, derived), character: await loadCharacterDetail(id) },
-      200,
-    );
+    const character = await loadCharacterDetail(id);
+    const skill = character.skills.find((skill) => skill.id === updated.id);
+    if (!skill) throw new HTTPException(500, { message: 'updated skill missing from detail' });
+    return c.json({ skill, character }, 200);
   },
 );
 
