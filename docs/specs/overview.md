@@ -245,7 +245,11 @@ on any sheet the viewer can edit — their own — it always shows).
     crushing overrides. Unscoped innate DR excludes eyes (B46); an explicit
     eye effect can protect them. Scoped effects, including custom locations,
     never inflate the global `derived.traitDr` total; inactive effects do not
-    protect. An **"Incoming damage…"** button opens a dialog
+    protect. The global trait-DR breakdown lists only unscoped effects. While
+    linked trait/skill definitions are unavailable (including a cold offline
+    load), DR is marked unavailable and the damage dialog cannot apply HP loss.
+    Known empty effect definitions remain distinguishable from missing entries.
+    An **"Incoming damage…"** button opens a dialog
     (`IncomingDamageDialog.tsx`) that resolves a hit against the
     character's own DR: basic damage − DR(location) with the resolver
     honoring the incoming type's typed override first, falling back to

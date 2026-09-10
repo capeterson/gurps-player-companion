@@ -15,8 +15,8 @@ import { type FormEvent, useMemo, useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import { effectiveDrByLocation } from '../../../../../shared/domain/armorDr.ts';
 import { applyDamage } from '../../../../../shared/domain/injuryCalc.ts';
-import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { useDialogState } from '../../../../hooks/useDialogState.ts';
+import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 
 /** Damage types offered in the select; free text also accepted via the "other" row. */
 const DAMAGE_TYPES = [
@@ -70,6 +70,7 @@ export function IncomingDamageDialog({
   const [type, setType] = useState<string>('cr');
   const [location, setLocation] = useState('torso');
   const [divisorRaw, setDivisorRaw] = useState('');
+  const effectsKnown = character.libraryEffectsKnown !== false;
 
   const drMap = useMemo(
     () => effectiveDrByLocation(character.inventory, character.effects),
@@ -96,14 +97,15 @@ export function IncomingDamageDialog({
 
   function handleApply(e: FormEvent) {
     e.preventDefault();
-    if (!canWrite || result.injury <= 0) return;
+    if (!canWrite || !effectsKnown || result.injury <= 0) return;
     bumpHp(-result.injury);
     onClose();
   }
 
   const divisorText = result.effectiveDr !== result.drAtLocation ? `/${divisorRaw.trim()}` : '';
-  const breakdown =
-    basic > 0
+  const breakdown = !effectsKnown
+    ? 'Linked library effects are unavailable. Reconnect and load them before applying damage.'
+    : basic > 0
       ? `${basic} ${type} − DR ${result.drAtLocation}${divisorText}${
           divisorText ? `=${result.effectiveDr}` : ''
         } → ${result.penetrating} × ${result.multiplier} = ${result.injury} injury`
@@ -190,7 +192,9 @@ export function IncomingDamageDialog({
           <p className="num rounded-lg border border-base-300/60 bg-base-200/40 px-3 py-2 text-xs text-base-content/80">
             {breakdown}
           </p>
-          {cripplingHint && <p className="text-[11px] text-warning">{cripplingHint}</p>}
+          {effectsKnown && cripplingHint && (
+            <p className="text-[11px] text-warning">{cripplingHint}</p>
+          )}
 
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
@@ -199,9 +203,9 @@ export function IncomingDamageDialog({
             <button
               type="submit"
               className="btn btn-sm btn-error"
-              disabled={!canWrite || result.injury <= 0}
+              disabled={!canWrite || !effectsKnown || result.injury <= 0}
             >
-              Apply −{result.injury} HP
+              {effectsKnown ? `Apply −${result.injury} HP` : 'Damage unavailable'}
             </button>
           </div>
         </form>
