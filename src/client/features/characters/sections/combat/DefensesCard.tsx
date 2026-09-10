@@ -27,6 +27,10 @@ interface ParryRow {
   readonly raw: string;
 }
 
+function modifierCaption(value: number): string {
+  return value ? ` ${value > 0 ? '+' : '−'} ${Math.abs(value)} defense modifiers` : '';
+}
+
 export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   const equippedItems = character.inventory.filter((i) => i.equipped);
   const weapons = equippedItems.filter((i) => i.weaponData != null);
@@ -99,8 +103,8 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         return {
           key: i.id,
           name: i.name,
-          value: parryFromSkill(adjusted, parsed.mod) + db,
-          caption: `via ${resolution.name}–${adjusted}${dbCaption}`,
+          value: parryFromSkill(adjusted, parsed.mod, character.derived.parryMod) + db,
+          caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}${dbCaption}`,
           raw,
         };
       }
@@ -181,11 +185,12 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       {shield && blockResolution && blockResolution.kind === 'matched' && (
         <RollableRow
           label={`Block (${shield.name})`}
-          baseTarget={blockFromSkill(blockResolution.level) + db}
+          baseTarget={blockFromSkill(blockResolution.level, character.derived.blockMod) + db}
           openRoll={openRoll}
           sublabel={
             <span className="block text-[11px] text-base-content/60">
               via {blockResolution.name}–{blockResolution.level}
+              {modifierCaption(character.derived.blockMod)}
               {dbCaption}
             </span>
           }
@@ -207,8 +212,7 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       )}
 
       <p className="text-[11px] text-base-content/50">
-        Trait bonuses (Combat Reflexes, Enhanced Defenses) are not included — add them as a modifier
-        when rolling.
+        Active trait bonuses are included. Add any situational modifiers when rolling.
       </p>
     </section>
   );
