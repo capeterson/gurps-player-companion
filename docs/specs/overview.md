@@ -90,6 +90,15 @@ on any sheet the viewer can edit — their own — it always shows).
   GURPS math is pure and shared (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
   disadvantage / quirk cap warnings.
+- **Offline mechanical definitions.** Trait/skill cursor rows carry validated
+  `libraryMechanics` declarations with source ID, campaign, revision and explicit
+  availability. Both player and GM readers derive from these durable rows, with
+  no library HTTP request on their calculation path. Closing and reopening offline
+  retains bonuses. Unresolved legacy/deleted definitions pause calculated panels
+  and rolls with an explanation; identity, trait, inventory and notes editing remain
+  available (inventory hides its unavailable Basic Lift/encumbrance classification).
+  Definitions are refreshed when their character child is pulled; library-only
+  changes currently require a full resync until revision propagation is added.
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -105,8 +114,8 @@ on any sheet the viewer can edit — their own — it always shows).
   rounds against the character (B102), then flat modifiers add.
   Per-level mechanical effects scale by the purchased level, including zero;
   legacy null levels count as one. Flat effects apply independently of level.
-  ST-based damage roll buttons wait for linked library definitions when
-  those effects are unavailable; explicit fixed-dice modes remain usable.
+  ST-based damage depends on linked library definitions; unresolved declarations
+  pause the sheet's calculated panels and rolls as described above.
   `damage_thrust` and `damage_swing` are signed flat adds to the final
   ST-based dice, after temporary ST adjustments; active sources add together.
   The sheet and attack roller share these adjusted results, then weapon adds
@@ -527,7 +536,8 @@ src/
                  editor used by the adventure log)
     admin/       Separate admin SPA entry
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
-    schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol)
+    schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol;
+                 libraryMechanics.ts validates synced character-owned declarations)
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text

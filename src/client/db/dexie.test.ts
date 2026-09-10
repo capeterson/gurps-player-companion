@@ -19,6 +19,37 @@ import { getLocalDb, migrateLegacyTempScalarsRow, resetLocalDb } from './dexie.t
 
 const DB_NAME = 'gurps-pc-local';
 
+it('v9 backfills only trait/skill declarations while retaining rows, pending edits and other cursors', async () => {
+  await resetLocalDb();
+  const legacy = new Dexie(DB_NAME);
+  legacy.version(8).stores({
+    characterTraits: 'id, characterId, [characterId+kind], updatedAt, revision',
+    outbox: 'clientOpId',
+    syncCursors: 'entityClass',
+  });
+  await legacy
+    .table('characterTraits')
+    .put({ id: 'trait', characterId: 'character', kind: 'advantage', name: 'Owned' });
+  await legacy
+    .table('outbox')
+    .put({ clientOpId: 'pending', fieldPath: 'name', attemptedValue: 'My edit' });
+  await legacy.table('syncCursors').bulkPut(
+    ['character', 'character_trait', 'character_skill'].map((entityClass) => ({
+      entityClass,
+      revision: 20,
+    })),
+  );
+  legacy.close();
+  const db = getLocalDb();
+  await db.open();
+  expect(await db.syncCursors.toArray()).toEqual([{ entityClass: 'character', revision: 20 }]);
+  expect((await db.characterTraits.get('trait'))?.name).toBe('Owned');
+  expect((await db.outbox.get('pending'))?.attemptedValue).toBe('My edit');
+  expect(
+    await db.characterTraits.where('[characterId+kind]').equals(['character', 'advantage']).count(),
+  ).toBe(1);
+});
+
 afterEach(async () => {
   await resetLocalDb();
 });

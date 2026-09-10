@@ -1,5 +1,6 @@
 import { effectiveDodge } from '../../../shared/domain/defenseCalc.ts';
-import type { CharacterDetail } from '../../../shared/schemas/character.ts';
+import { MechanicsUnavailable } from '../characters/MechanicsUnavailable.tsx';
+import type { EffectAwareCharacterDetail as CharacterDetail } from '../characters/useCharacterDetail.ts';
 import { resolveSkillLookup } from './skillLookup.ts';
 
 interface Props {
@@ -10,6 +11,16 @@ interface Props {
 }
 
 export function GmCharacterCard({ character, dense, lookup }: Props) {
+  if (character.libraryEffectsKnown === false)
+    return (
+      <article className="card p-4 gap-3">
+        <h2 className="font-display text-xl">{character.name}</h2>
+        <MechanicsUnavailable />
+        <a href={`/characters/${character.id}`} className="link">
+          Open sheet
+        </a>
+      </article>
+    );
   const { derived, combat, encumbrance } = character;
   const currentHp = combat?.currentHp ?? derived.hp;
   const currentFp = combat?.currentFp ?? derived.fp;

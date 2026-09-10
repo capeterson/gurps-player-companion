@@ -75,7 +75,7 @@ export function useLibraryFetcher<T extends LibraryEntry>(
     // Single cache entry per campaign — all kinds share the aggregate
     // response so picking traits then skills doesn't refetch. The key
     // matches LibraryPage's query so its CRUD mutations invalidate this
-    // cache too (and useLibraryEffectMaps', which shares it).
+    // cache too. Character derivation uses synced declarations instead.
     queryKey: ['campaigns', campaignId, 'library'],
     queryFn: async (): Promise<LibraryPayload> => {
       if (!campaignId) return EMPTY_LIBRARY;
