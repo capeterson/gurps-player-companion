@@ -888,6 +888,9 @@ async function dispatchInventory(
         // to lowercase. Compare canonical strings so a crafted case variant
         // cannot bypass the self/descendant checks before the write.
         const itemId = op.entityId.toLowerCase();
+        if (value !== null && value !== undefined && typeof value !== 'string') {
+          throw new HTTPException(400, { message: 'parentId must be a UUID' });
+        }
         const parentId = typeof value === 'string' ? value.toLowerCase() : value;
         if (parentId === itemId) {
           throw new HTTPException(400, { message: 'an item cannot be its own parent' });
