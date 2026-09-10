@@ -155,8 +155,9 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     const outcome = evaluateRoll(effectiveTarget, total);
     const veryHighFailure = request.spellManaLevel === 'very_high' && !outcome.success;
     const crit = veryHighFailure ? 'failure' : outcome.crit;
+    const manaDisaster = veryHighFailure && outcome.crit === 'failure';
     setResult({
-      manaDisaster: veryHighFailure && outcome.crit === 'failure',
+      manaDisaster,
       dice,
       total,
       margin: outcome.margin,
@@ -175,6 +176,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
       total,
       margin: outcome.margin,
       crit,
+      manaDisaster,
     });
   }
 
