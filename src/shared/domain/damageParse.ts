@@ -126,13 +126,15 @@ export function parseDamageSpec(raw: string): DamageMode[] {
  */
 export function resolveDamage(
   mode: DamageMode,
-  thrust: DamageDice,
-  swing: DamageDice,
+  thrust: DamageDice | null,
+  swing: DamageDice | null,
 ): { dice: DamageDice; type: string | null; armorDivisor: string | null } | null {
   let dice: DamageDice;
   if (mode.base === 'thr') {
+    if (!thrust) return null;
     dice = { dice: thrust.dice, adds: thrust.adds + mode.adds };
   } else if (mode.base === 'sw') {
+    if (!swing) return null;
     dice = { dice: swing.dice, adds: swing.adds + mode.adds };
   } else if (typeof mode.base === 'object' && mode.base !== null) {
     dice = mode.base;

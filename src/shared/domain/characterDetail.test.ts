@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { libraryTraitCreate } from '../schemas/campaignLibrary.ts';
+import { characterCreate } from '../schemas/character.ts';
 import { emitLibraryYaml, parseLibraryYaml } from '../yaml/library.ts';
 import {
   type CharacterDetailInput,
@@ -7,6 +8,76 @@ import {
   buildSpellOut,
 } from './characterDetail.ts';
 import { resolveWeaponSkill, skillDisplayName } from './defenseCalc.ts';
+
+it('carries YAML damage declarations through the full character builder', () => {
+  const library = parseLibraryYaml(
+    emitLibraryYaml({
+      traits: [
+        libraryTraitCreate.parse({
+          name: 'Striking',
+          kind: 'advantage',
+          effects: [
+            { target: 'damage_thrust', value: 1 },
+            { target: 'damage_swing', value: 2 },
+          ],
+        }),
+      ],
+      skills: [],
+      spells: [],
+      items: [],
+      languages: [],
+      techniques: [],
+      styles: [],
+    }),
+  ).library;
+  const timestamp = '2026-09-10T00:00:00.000Z';
+  const detail = buildCharacterDetail({
+    character: {
+      ...characterCreate.parse({
+        name: 'Warrior',
+        tempEffects: [{ id: 'might', name: 'Might', mods: { st: 5 } }],
+      }),
+      id: 'character',
+      ownerId: 'owner',
+      campaignId: null,
+      height: null,
+      weight: null,
+      age: null,
+      birthdate: null,
+      appearance: null,
+      dismissedWarnings: [],
+      revision: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    traits: [
+      {
+        id: 'trait',
+        characterId: 'character',
+        name: 'Striking',
+        kind: 'advantage',
+        points: 0,
+        level: 1,
+        notes: null,
+        modifiers: [],
+        libraryTraitId: 'library',
+        libraryEffects: library.traits[0]?.effects ?? [],
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ],
+    skills: [],
+    spells: [],
+    languages: [],
+    techniques: [],
+    inventory: [],
+    combat: null,
+    campaign: null,
+  });
+  expect(detail.derived.effectiveSt).toBe(15);
+  expect(detail.derived.thrust).toBe('1d+2');
+  expect(detail.derived.swing).toBe('2d+3');
+});
 
 describe('very high mana up-front spell costs', () => {
   const spell = {
