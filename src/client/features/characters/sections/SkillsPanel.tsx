@@ -252,7 +252,7 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
             {...nameField.inputProps}
           />
           {(skill.specialization || skill.techLevel != null) && (
-            <span className="text-xs text-base-content/70">
+            <span className="block break-words text-xs text-base-content/70">
               {skill.specialization ? `(${skill.specialization})` : ''}
               {skill.techLevel != null ? ` TL${skill.techLevel}` : ''}
             </span>
