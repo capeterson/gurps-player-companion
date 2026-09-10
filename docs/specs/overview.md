@@ -114,10 +114,20 @@ on any sheet the viewer can edit — their own — it always shows).
   description, source, and prerequisites (the latter three in notes).
   Specialized skills have distinct sheet and roll labels; long selected-library
   captions wrap inside the add form without displacing its controls. Learned TL is
-  independent of later campaign TL changes. A 0-point skill
-  shows its **attribute default** (attr-4/-5/-6 for E/A/H per B173);
-  0-point Very Hard skills have no default, so their level renders as
-  an em dash (`level` is null in the API). A computed level is a
+  independent of later campaign TL changes. Skill **defaults** are copied
+  declarations: attribute plus offset or another trained skill plus offset.
+  An empty list means no default; absent/null legacy definitions mean unknown,
+  shown with an explanatory tooltip and no invented roll target at zero points.
+  Defaults are authored through library YAML/API and character REST/sync fields.
+  Difficulty never decides whether a default exists, including Very Hard skills.
+  The best available candidate wins; learned sources include purchased buy-ups,
+  while zero-point bridges are excluded. The shared resolver keeps an acyclic
+  source dependency graph, accepts only level improvements and uses stable ID
+  ordering for reciprocal ties. Reversing a bought-up pair requires redistributing
+  actual points, as in B173. Purchased improvements use the
+  difference in point cost above a skill default (B173 / official FAQ 3.3.1);
+  only actual points count in the ledger. Talent is added after defaults, to
+  its listed target skills only. A computed level is a
   tappable roll target: it opens the same roll sheet used everywhere
   else on the character (dispatch only, so read-only viewers can roll
   too); null-level rows stay plain text.

@@ -5385,6 +5385,81 @@
                             "nullable": true,
                             "maxLength": 160
                           },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
+                          },
                           "prerequisites": {
                             "type": "string",
                             "nullable": true,
@@ -7503,6 +7578,81 @@
                     "nullable": true,
                     "maxLength": 160
                   },
+                  "defaults": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "attribute"
+                              ]
+                            },
+                            "attribute": {
+                              "type": "string",
+                              "enum": [
+                                "ST",
+                                "DX",
+                                "IQ",
+                                "HT",
+                                "Will",
+                                "Per",
+                                "Other"
+                              ]
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "attribute",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "skill"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "specialization": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "maxItems": 20
+                  },
                   "prerequisites": {
                     "type": "string",
                     "nullable": true,
@@ -7682,6 +7832,81 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 160
+                    },
+                    "defaults": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "attribute"
+                                ]
+                              },
+                              "attribute": {
+                                "type": "string",
+                                "enum": [
+                                  "ST",
+                                  "DX",
+                                  "IQ",
+                                  "HT",
+                                  "Will",
+                                  "Per",
+                                  "Other"
+                                ]
+                              },
+                              "modifier": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 0
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "attribute",
+                              "modifier"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "skill"
+                                ]
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "specialization": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "modifier": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 0
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "name",
+                              "modifier"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "maxItems": 20
                     },
                     "prerequisites": {
                       "type": "string",
@@ -7925,6 +8150,81 @@
                     "nullable": true,
                     "maxLength": 160
                   },
+                  "defaults": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "attribute"
+                              ]
+                            },
+                            "attribute": {
+                              "type": "string",
+                              "enum": [
+                                "ST",
+                                "DX",
+                                "IQ",
+                                "HT",
+                                "Will",
+                                "Per",
+                                "Other"
+                              ]
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "attribute",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "skill"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "specialization": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "maxItems": 20
+                  },
                   "prerequisites": {
                     "type": "string",
                     "nullable": true,
@@ -8099,6 +8399,81 @@
                       "type": "string",
                       "nullable": true,
                       "maxLength": 160
+                    },
+                    "defaults": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "attribute"
+                                ]
+                              },
+                              "attribute": {
+                                "type": "string",
+                                "enum": [
+                                  "ST",
+                                  "DX",
+                                  "IQ",
+                                  "HT",
+                                  "Will",
+                                  "Per",
+                                  "Other"
+                                ]
+                              },
+                              "modifier": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 0
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "attribute",
+                              "modifier"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "skill"
+                                ]
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "specialization": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "modifier": {
+                                "type": "integer",
+                                "minimum": -50,
+                                "maximum": 0
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "name",
+                              "modifier"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "maxItems": 20
                     },
                     "prerequisites": {
                       "type": "string",
@@ -17320,6 +17695,81 @@
                             "nullable": true,
                             "format": "uuid"
                           },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
+                          },
                           "level": {
                             "type": "integer",
                             "nullable": true
@@ -18948,6 +19398,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -20836,6 +21361,81 @@
                             "nullable": true,
                             "format": "uuid"
                           },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
+                          },
                           "level": {
                             "type": "integer",
                             "nullable": true
@@ -22533,6 +23133,81 @@
                             "type": "string",
                             "nullable": true,
                             "format": "uuid"
+                          },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
                           },
                           "level": {
                             "type": "integer",
@@ -24395,6 +25070,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -26269,6 +27019,81 @@
                                 "nullable": true,
                                 "format": "uuid"
                               },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
+                              },
                               "level": {
                                 "type": "integer",
                                 "nullable": true
@@ -27910,6 +28735,81 @@
                             "nullable": true,
                             "format": "uuid"
                           },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
+                          },
                           "level": {
                             "type": "integer",
                             "nullable": true
@@ -28952,6 +29852,81 @@
                     "type": "string",
                     "nullable": true,
                     "format": "uuid"
+                  },
+                  "defaults": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "attribute"
+                              ]
+                            },
+                            "attribute": {
+                              "type": "string",
+                              "enum": [
+                                "ST",
+                                "DX",
+                                "IQ",
+                                "HT",
+                                "Will",
+                                "Per",
+                                "Other"
+                              ]
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "attribute",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "skill"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "specialization": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "maxItems": 20
                   }
                 },
                 "required": [
@@ -29033,6 +30008,81 @@
                           "type": "string",
                           "nullable": true,
                           "format": "uuid"
+                        },
+                        "defaults": {
+                          "type": "array",
+                          "nullable": true,
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "attribute"
+                                    ]
+                                  },
+                                  "attribute": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ST",
+                                      "DX",
+                                      "IQ",
+                                      "HT",
+                                      "Will",
+                                      "Per",
+                                      "Other"
+                                    ]
+                                  },
+                                  "modifier": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 0
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "attribute",
+                                  "modifier"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "skill"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "specialization": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "modifier": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 0
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "name",
+                                  "modifier"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "maxItems": 20
                         },
                         "level": {
                           "type": "integer",
@@ -29707,6 +30757,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -30765,6 +31890,81 @@
                     "type": "string",
                     "nullable": true,
                     "format": "uuid"
+                  },
+                  "defaults": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "attribute"
+                              ]
+                            },
+                            "attribute": {
+                              "type": "string",
+                              "enum": [
+                                "ST",
+                                "DX",
+                                "IQ",
+                                "HT",
+                                "Will",
+                                "Per",
+                                "Other"
+                              ]
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "attribute",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "skill"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "specialization": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "modifier": {
+                              "type": "integer",
+                              "minimum": -50,
+                              "maximum": 0
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "modifier"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "maxItems": 20
                   }
                 }
               }
@@ -30841,6 +32041,81 @@
                           "type": "string",
                           "nullable": true,
                           "format": "uuid"
+                        },
+                        "defaults": {
+                          "type": "array",
+                          "nullable": true,
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "attribute"
+                                    ]
+                                  },
+                                  "attribute": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ST",
+                                      "DX",
+                                      "IQ",
+                                      "HT",
+                                      "Will",
+                                      "Per",
+                                      "Other"
+                                    ]
+                                  },
+                                  "modifier": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 0
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "attribute",
+                                  "modifier"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "skill"
+                                    ]
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "specialization": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "modifier": {
+                                    "type": "integer",
+                                    "minimum": -50,
+                                    "maximum": 0
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "name",
+                                  "modifier"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "maxItems": 20
                         },
                         "level": {
                           "type": "integer",
@@ -31515,6 +32790,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -33156,6 +34506,81 @@
                             "type": "string",
                             "nullable": true,
                             "format": "uuid"
+                          },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
                           },
                           "level": {
                             "type": "integer",
@@ -34973,6 +36398,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -36803,6 +38303,81 @@
                                 "nullable": true,
                                 "format": "uuid"
                               },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
+                              },
                               "level": {
                                 "type": "integer",
                                 "nullable": true
@@ -38443,6 +40018,81 @@
                             "type": "string",
                             "nullable": true,
                             "format": "uuid"
+                          },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
                           },
                           "level": {
                             "type": "integer",
@@ -40205,6 +41855,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -41980,6 +43705,81 @@
                                 "nullable": true,
                                 "format": "uuid"
                               },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
+                              },
                               "level": {
                                 "type": "integer",
                                 "nullable": true
@@ -43620,6 +45420,81 @@
                             "type": "string",
                             "nullable": true,
                             "format": "uuid"
+                          },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
                           },
                           "level": {
                             "type": "integer",
@@ -45401,6 +47276,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -47194,6 +49144,81 @@
                                 "nullable": true,
                                 "format": "uuid"
                               },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
+                              },
                               "level": {
                                 "type": "integer",
                                 "nullable": true
@@ -48834,6 +50859,81 @@
                             "type": "string",
                             "nullable": true,
                             "format": "uuid"
+                          },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
                           },
                           "level": {
                             "type": "integer",
@@ -51352,6 +53452,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",
@@ -53883,6 +56058,81 @@
                                 "nullable": true,
                                 "format": "uuid"
                               },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
+                              },
                               "level": {
                                 "type": "integer",
                                 "nullable": true
@@ -55523,6 +57773,81 @@
                             "type": "string",
                             "nullable": true,
                             "format": "uuid"
+                          },
+                          "defaults": {
+                            "type": "array",
+                            "nullable": true,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "attribute"
+                                      ]
+                                    },
+                                    "attribute": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ST",
+                                        "DX",
+                                        "IQ",
+                                        "HT",
+                                        "Will",
+                                        "Per",
+                                        "Other"
+                                      ]
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "attribute",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "skill"
+                                      ]
+                                    },
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "specialization": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 160
+                                    },
+                                    "modifier": {
+                                      "type": "integer",
+                                      "minimum": -50,
+                                      "maximum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "name",
+                                    "modifier"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "maxItems": 20
                           },
                           "level": {
                             "type": "integer",
@@ -57266,6 +59591,81 @@
                                 "nullable": true,
                                 "format": "uuid"
                               },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
+                              },
                               "level": {
                                 "type": "integer",
                                 "nullable": true
@@ -58920,6 +61320,81 @@
                                 "nullable": true,
                                 "format": "uuid"
                               },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
+                              },
                               "level": {
                                 "type": "integer",
                                 "nullable": true
@@ -60571,6 +63046,81 @@
                                 "type": "string",
                                 "nullable": true,
                                 "format": "uuid"
+                              },
+                              "defaults": {
+                                "type": "array",
+                                "nullable": true,
+                                "items": {
+                                  "oneOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "attribute"
+                                          ]
+                                        },
+                                        "attribute": {
+                                          "type": "string",
+                                          "enum": [
+                                            "ST",
+                                            "DX",
+                                            "IQ",
+                                            "HT",
+                                            "Will",
+                                            "Per",
+                                            "Other"
+                                          ]
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "attribute",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "skill"
+                                          ]
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "specialization": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        },
+                                        "modifier": {
+                                          "type": "integer",
+                                          "minimum": -50,
+                                          "maximum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "name",
+                                        "modifier"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                },
+                                "maxItems": 20
                               },
                               "level": {
                                 "type": "integer",

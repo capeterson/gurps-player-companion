@@ -128,22 +128,29 @@ describe('library skill CRUD', () => {
     const createRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/skills`, {
       method: 'POST',
       headers: jsonHeaders(owner.accessToken),
-      body: JSON.stringify({ name: 'Fencing', attribute: 'DX', difficulty: 'A' }),
+      body: JSON.stringify({
+        name: 'Fencing',
+        attribute: 'DX',
+        difficulty: 'A',
+        defaults: [{ kind: 'attribute', attribute: 'DX', modifier: -5 }],
+      }),
     });
     expect(createRes.status).toBe(201);
     const created = (await createRes.json()) as Record<string, unknown>;
     expect(created.attribute).toBe('DX');
+    expect(created.defaults).toEqual([{ kind: 'attribute', attribute: 'DX', modifier: -5 }]);
 
     const patchRes = await app.request(
       `/api/v1/campaigns/${campaign.id}/library/skills/${created.id}`,
       {
         method: 'PATCH',
         headers: jsonHeaders(owner.accessToken),
-        body: JSON.stringify({ difficulty: 'H' }),
+        body: JSON.stringify({ difficulty: 'H', defaults: [] }),
       },
     );
     const patched = (await patchRes.json()) as Record<string, unknown>;
     expect(patched.difficulty).toBe('H');
+    expect(patched.defaults).toEqual([]);
 
     const delRes = await app.request(
       `/api/v1/campaigns/${campaign.id}/library/skills/${created.id}`,
@@ -337,7 +344,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 5');
+    expect(yaml).toContain('version: 6');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
@@ -739,6 +746,47 @@ library:
     expect(secondYaml).toBe(firstYaml);
   });
 
+  it('skill defaults preserve unknown, none and declared sources through DB YAML import/export', async () => {
+    const owner = await registerUser('skill-default-roundtrip');
+    const source = await createCampaign(owner.accessToken);
+    const target = await createCampaign(owner.accessToken);
+    for (const [name, defaults] of [
+      ['Unknown', null],
+      ['Karate', []],
+      [
+        'Broadsword',
+        [
+          { kind: 'skill', name: 'Shortsword', modifier: -2 },
+          { kind: 'attribute', attribute: 'DX', modifier: -5 },
+        ],
+      ],
+    ] as const) {
+      const res = await app.request(`/api/v1/campaigns/${source.id}/library/skills`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ name, attribute: 'DX', difficulty: 'A', defaults }),
+      });
+      expect(res.status).toBe(201);
+    }
+    const yaml = await exportYaml(owner.accessToken, source.id as string);
+    const imported = await app.request(`/api/v1/campaigns/${target.id}/library/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml }),
+    });
+    expect(imported.status).toBe(200);
+    const listed = await app.request(`/api/v1/campaigns/${target.id}/library`, {
+      headers: bearer(owner.accessToken),
+    });
+    const rows = (await listed.json()) as { skills: Array<{ name: string; defaults: unknown }> };
+    expect(rows.skills.find((s) => s.name === 'Unknown')?.defaults).toBeNull();
+    expect(rows.skills.find((s) => s.name === 'Karate')?.defaults).toEqual([]);
+    expect(rows.skills.find((s) => s.name === 'Broadsword')?.defaults).toEqual([
+      { kind: 'skill', name: 'Shortsword', modifier: -2 },
+      { kind: 'attribute', attribute: 'DX', modifier: -5 },
+    ]);
+  });
+
   it('enchantments survive POST -> GET list -> export -> import -> export (v5 doc)', async () => {
     const owner = await registerUser('item-enchant-roundtrip');
     const campaign = await createCampaign(owner.accessToken);
@@ -765,7 +813,7 @@ library:
     expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
 
     const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(firstYaml).toContain('version: 5');
+    expect(firstYaml).toContain('version: 6');
     expect(firstYaml).toContain('enchantments:');
 
     const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {

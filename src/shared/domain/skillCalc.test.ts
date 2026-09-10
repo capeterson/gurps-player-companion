@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
+import { skillCreate, skillDefaults, skillUpdate } from '../schemas/skill.ts';
 import { type CharacterAttrs, computeDerived } from './characterCalc.ts';
 import {
   attributeLevelFor,
   computeSkillLevel,
-  skillDefaultOffset,
+  resolveSkillLevels,
   skillOffset,
 } from './skillCalc.ts';
 
@@ -26,15 +27,20 @@ const baseAttrs: CharacterAttrs = {
   frightCheckMod: 0,
 };
 
-describe('skillDefaultOffset', () => {
-  it('attribute defaults are -4 / -5 / -6 for E / A / H (B173)', () => {
-    expect(skillDefaultOffset('E')).toBe(-4);
-    expect(skillDefaultOffset('A')).toBe(-5);
-    expect(skillDefaultOffset('H')).toBe(-6);
-  });
-  it('Very Hard skills have no attribute default', () => {
-    expect(skillDefaultOffset('VH')).toBeNull();
-  });
+it('validates declarations identically for create and sync/REST patch', () => {
+  for (const defaults of [
+    [{ kind: 'attribute', attribute: 'DX', modifier: 1 }],
+    [{ kind: 'skill', name: '', modifier: -2 }],
+    [{ kind: 'skill', name: 'Guns', modifier: -2, unexpected: true }],
+    [{ kind: 'attribute', attribute: 'invalid', modifier: -5 }],
+    Array.from({ length: 21 }, () => ({ kind: 'skill', name: 'X', modifier: 0 })),
+  ]) {
+    expect(skillDefaults.safeParse(defaults).success).toBe(false);
+    expect(
+      skillCreate.safeParse({ name: 'X', attribute: 'DX', difficulty: 'A', defaults }).success,
+    ).toBe(false);
+    expect(skillUpdate.safeParse({ defaults }).success).toBe(false);
+  }
 });
 
 describe('skillOffset', () => {
@@ -84,6 +90,39 @@ describe('attributeLevelFor', () => {
 
 describe('computeSkillLevel', () => {
   const derived = computeDerived(baseAttrs);
+  it('uses the FAQ Shortsword/Broadsword default and point-difference buy-up', () => {
+    const defaults = [{ kind: 'skill' as const, name: 'Shortsword', modifier: -2 }];
+    const source = (level: number) => [{ name: 'Shortsword', specialization: null, level }];
+    // Basic Set B173: a one-point buy-up sticks at 12 when Shortsword rises.
+    expect(computeSkillLevel('DX', 'A', 0, derived, defaults, source(13))).toBe(11);
+    expect(computeSkillLevel('DX', 'A', 1, derived, defaults, source(13))).toBe(12);
+    expect(computeSkillLevel('DX', 'A', 1, derived, defaults, source(14))).toBe(12);
+    expect(computeSkillLevel('DX', 'A', 0, derived, defaults, source(14))).toBe(12);
+    expect(computeSkillLevel('DX', 'A', 2, derived, defaults, source(14))).toBe(13);
+    expect(computeSkillLevel('DX', 'A', 2, derived, defaults, source(15))).toBe(13);
+    expect(computeSkillLevel('DX', 'A', 4, derived, defaults, source(15))).toBe(14);
+    expect(computeSkillLevel('DX', 'A', 20, derived, defaults, source(15))).toBe(18);
+  });
+  it('chooses the best available candidate and skips missing or mismatched specialties', () => {
+    const defaults = [
+      { kind: 'attribute' as const, attribute: 'DX' as const, modifier: -5 },
+      { kind: 'skill' as const, name: 'Guns', specialization: 'Pistol', modifier: -2 },
+      { kind: 'skill' as const, name: 'Missing', modifier: 0 },
+    ];
+    expect(
+      computeSkillLevel('DX', 'VH', 0, derived, defaults, [
+        { name: 'Guns', specialization: 'Rifle', level: 20 },
+      ]),
+    ).toBe(7);
+    expect(
+      computeSkillLevel('DX', 'VH', 0, derived, defaults, [
+        { name: ' guns ', specialization: ' pistol ', level: 14 },
+      ]),
+    ).toBe(12);
+    expect(
+      computeSkillLevel('DX', 'A', 0, derived, [{ kind: 'skill', name: 'Missing', modifier: -2 }]),
+    ).toBeNull();
+  });
   it('IQ/Average/4 pts for an IQ 14 character is 15', () => {
     expect(computeSkillLevel('IQ', 'A', 4, derived)).toBe(15);
   });
@@ -93,12 +132,64 @@ describe('computeSkillLevel', () => {
   it('Will/Average/2 pts for Will 15 is 15', () => {
     expect(computeSkillLevel('Will', 'A', 2, derived)).toBe(15);
   });
-  it('0 points rolls the attribute default: DX/E at DX 12 is 8', () => {
-    expect(computeSkillLevel('DX', 'E', 0, derived)).toBe(8);
-    expect(computeSkillLevel('DX', 'A', 0, derived)).toBe(7);
-    expect(computeSkillLevel('DX', 'H', 0, derived)).toBe(6);
+  it('0 points uses the declared attribute default independently of difficulty', () => {
+    const defaults = [{ kind: 'attribute' as const, attribute: 'DX' as const, modifier: -4 }];
+    expect(computeSkillLevel('DX', 'E', 0, derived, defaults)).toBe(8);
+    expect(computeSkillLevel('DX', 'VH', 0, derived, defaults)).toBe(8);
+    expect(computeSkillLevel('DX', 'H', 0, derived, [])).toBeNull(); // Karate
+    expect(computeSkillLevel('DX', 'A', 0, derived)).toBeNull(); // legacy unknown
   });
   it('0 points on a Very Hard skill has no level at all', () => {
     expect(computeSkillLevel('IQ', 'VH', 0, derived)).toBeNull();
+  });
+});
+
+describe('learned default dependencies', () => {
+  const derived = computeDerived(baseAttrs);
+  const skill = (id: string, points: number, source?: string) => ({
+    id,
+    name: id,
+    specialization: null,
+    attribute: 'DX' as const,
+    difficulty: 'A' as const,
+    points,
+    defaults: source ? [{ kind: 'skill' as const, name: source, modifier: -2 }] : [],
+  });
+
+  it('propagates learned buy-ups but excludes untrained bridges', () => {
+    const skills = [
+      skill('Shortsword', 8),
+      skill('Broadsword', 2, 'Shortsword'),
+      skill('Third', 0, 'Broadsword'),
+    ] as const;
+    expect(Object.fromEntries(resolveSkillLevels(skills, derived))).toEqual({
+      Shortsword: 14,
+      Broadsword: 13,
+      Third: 11,
+    });
+    expect(
+      resolveSkillLevels([skills[0], skill('Broadsword', 0, 'Shortsword'), skills[2]], derived).get(
+        'Third',
+      ),
+    ).toBeNull();
+    expect(
+      resolveSkillLevels([skill('Shortsword', 16), skills[1], skills[2]], derived).get('Third'),
+    ).toBe(12);
+  });
+
+  it('does not claim both directions of a reciprocal discount or depend on input ordering', () => {
+    const skills = [skill('A', 1, 'B'), skill('B', 1, 'A')].map((s) => ({
+      ...s,
+      defaults: s.defaults.map((d) => ({ ...d, modifier: 0 })),
+    }));
+    const levels = resolveSkillLevels(skills, derived);
+    expect(Object.fromEntries(levels)).toEqual({ A: 12, B: 11 });
+    expect(resolveSkillLevels([...skills].reverse(), derived)).toEqual(levels);
+    expect([
+      ...resolveSkillLevels(
+        skills.map((s) => ({ ...s, points: 0 })),
+        derived,
+      ).values(),
+    ]).toEqual([null, null]);
   });
 });

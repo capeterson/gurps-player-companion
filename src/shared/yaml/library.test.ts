@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { librarySkillCreate } from '../schemas/campaignLibrary.ts';
 import {
   LIBRARY_YAML_MAX_BYTES,
   LibraryYamlError,
@@ -57,6 +58,37 @@ library:
       weightLbs: 3
       cost: 60
 `;
+
+it('round-trips known, absent and explicit no-default skill declarations', () => {
+  const skills = [
+    librarySkillCreate.parse({ name: 'Karate', attribute: 'DX', difficulty: 'H', defaults: [] }),
+    librarySkillCreate.parse({ name: 'Unknown', attribute: 'IQ', difficulty: 'A' }),
+    librarySkillCreate.parse({
+      name: 'Broadsword',
+      attribute: 'DX',
+      difficulty: 'A',
+      defaults: [
+        { kind: 'attribute', attribute: 'DX', modifier: -5 },
+        { kind: 'skill', name: 'Shortsword', modifier: -2 },
+      ],
+    }),
+  ];
+  const yaml = emitLibraryYaml({
+    traits: [],
+    skills,
+    spells: [],
+    items: [],
+    languages: [],
+    techniques: [],
+    styles: [],
+  });
+  const parsed = parseLibraryYaml(yaml).library.skills;
+  expect(parsed.find((skill) => skill.name === 'Karate')?.defaults).toEqual([]);
+  expect(parsed.find((skill) => skill.name === 'Unknown')?.defaults).toBeUndefined();
+  expect(parsed.find((skill) => skill.name === 'Broadsword')?.defaults).toEqual(
+    skills[2]?.defaults,
+  );
+});
 
 // v3: a fully-loaded item (weapon w/ skill/db/ranged, container fields,
 // powerstone, magic item), a leveled trait with variants + effects, and a
@@ -365,7 +397,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 5');
+    expect(first).toContain('version: 6');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

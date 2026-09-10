@@ -113,6 +113,7 @@ export function skillInsertValues(
     specialization: body.specialization ?? null,
     notes: body.notes ?? null,
     librarySkillId: body.librarySkillId ?? null,
+    defaults: body.defaults ?? null,
   };
 }
 
