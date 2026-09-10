@@ -53,6 +53,9 @@ sync cycle. All library CRUD/import transactions also advance the campaign revis
 after HTTP cursor changes commit locally, a Dexie live query in each tab invalidates
 that campaign's React Query library prefix via `features/campaigns/libraryInvalidation.ts`.
 This also
+retains invalidation when an initial library request is still pending: after that
+request settles, active queries refetch and inactive prefetches remain stale.
+The observer also
 refreshes unowned definitions and works when WS is unavailable. Migration 0035 indexes
 library references and advances existing linked children to repair pre-fan-out cursors.
 A durable function-comment marker makes this repair idempotent on SQL replay; an
