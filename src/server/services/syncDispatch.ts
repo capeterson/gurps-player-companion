@@ -851,6 +851,14 @@ async function dispatchInventory(
   const characterId = requireParentId(op);
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
+  // Serialize inventory-tree checks with REST mutations for this character.
+  // Validation and the write must share this transaction; otherwise two
+  // concurrent reparent operations can both approve a cycle.
+  await tx
+    .select({ id: characters.id })
+    .from(characters)
+    .where(eq(characters.id, characterId))
+    .for('update');
   return await patchEntity({
     op,
     userId: ctx.userId,
@@ -858,7 +866,7 @@ async function dispatchInventory(
     tx,
     table: inventoryItems,
     parentLookup: async () => {
-      const [row] = await getDb()
+      const [row] = await tx
         .select()
         .from(inventoryItems)
         .where(
@@ -876,39 +884,45 @@ async function dispatchInventory(
     },
     extraValidate: async (field, value) => {
       if (field === 'parentId') {
-        if (value === op.entityId) {
+        // PostgreSQL accepts uppercase UUID literals but normalizes stored UUIDs
+        // to lowercase. Compare canonical strings so a crafted case variant
+        // cannot bypass the self/descendant checks before the write.
+        const itemId = op.entityId.toLowerCase();
+        const parentId = typeof value === 'string' ? value.toLowerCase() : value;
+        if (parentId === itemId) {
           throw new HTTPException(400, { message: 'an item cannot be its own parent' });
         }
-        if (value !== null && value !== undefined) {
+        if (parentId !== null && parentId !== undefined) {
           // The parent must be an item on the SAME character.  The
           // cycle walk below scopes its lookups to this character, so
           // a foreign parent id would simply "not be found" and pass —
           // silently creating a cross-character containment link (the
           // REST patch route checks this via
           // assertParentBelongsToCharacter; mirror it here).
-          const [parent] = await getDb()
+          const [parent] = await tx
             .select({ id: inventoryItems.id })
             .from(inventoryItems)
             .where(
-              and(
-                eq(inventoryItems.id, value as string),
-                eq(inventoryItems.characterId, characterId),
-              ),
+              and(eq(inventoryItems.id, parentId), eq(inventoryItems.characterId, characterId)),
             );
           if (!parent) {
             throw new HTTPException(400, {
               message: 'parentId must reference an item on this character',
             });
           }
-          await assertNoCycle(op.entityId, value as string, characterId);
+          await assertNoCycle(tx, itemId, parentId, characterId);
         }
       }
     },
   });
 }
 
-async function assertNoCycle(itemId: string, proposedParent: string, characterId: string) {
-  const db = getDb();
+async function assertNoCycle(
+  tx: AuditTx,
+  itemId: string,
+  proposedParent: string,
+  characterId: string,
+) {
   const seen = new Set<string>();
   let current: string | null = proposedParent;
   while (current !== null) {
@@ -919,7 +933,7 @@ async function assertNoCycle(itemId: string, proposedParent: string, characterId
       throw new HTTPException(400, { message: 'detected existing inventory cycle' });
     }
     seen.add(current);
-    const [row] = await db
+    const [row] = await tx
       .select({ parentId: inventoryItems.parentId })
       .from(inventoryItems)
       .where(and(eq(inventoryItems.id, current), eq(inventoryItems.characterId, characterId)));
@@ -1033,6 +1047,10 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     for (const [k, v] of Object.entries(body)) {
       if (v === undefined) continue;
+      // Whole-body patches are not exempt from cross-field/entity
+      // validation.  In particular, inventory parent changes need the same
+      // ownership and cycle checks as field-path patches.
+      if (extraValidate) await extraValidate(k, v);
       const transformed = valueTransform ? await valueTransform(k, v) : v;
       updates[k] = transformed;
     }
