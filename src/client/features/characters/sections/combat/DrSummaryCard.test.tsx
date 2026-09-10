@@ -36,6 +36,48 @@ function makeCharacter(
 }
 
 describe('DrSummaryCard', () => {
+  it('blocks damage while linked effects are unavailable, then uses the loaded DR', () => {
+    const bumpHp = vi.fn();
+    const character = { ...makeCharacter([]), libraryEffectsKnown: false };
+    const { rerender } = render(
+      <DrSummaryCard character={character} canWrite hpMax={10} bumpHp={bumpHp} />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('DR unavailable');
+    expect(within(screen.getByRole('list')).queryByText('Skull')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '12' } });
+    expect(screen.getByRole('button', { name: 'Damage unavailable' })).toBeDisabled();
+    fireEvent.submit(
+      screen.getByRole('button', { name: 'Damage unavailable' }).closest('form') as HTMLFormElement,
+    );
+    expect(bumpHp).not.toHaveBeenCalled();
+    rerender(
+      <DrSummaryCard
+        character={{
+          ...character,
+          libraryEffectsKnown: true,
+          effects: resolveEffects(
+            [
+              {
+                id: 'skin',
+                name: 'Skin',
+                level: 1,
+                libraryEffects: [{ target: 'dr', value: 5, scaling: 'flat' }],
+              },
+            ],
+            [],
+            new Set(),
+          ),
+        }}
+        canWrite
+        hpMax={10}
+        bumpHp={bumpHp}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Apply −7 HP' }));
+    expect(bumpHp).toHaveBeenCalledWith(-7);
+  });
+
   it.each([
     ['torso', false, 'cr', '', 5, 1],
     ['skull', false, 'cr', '', 9, 0],

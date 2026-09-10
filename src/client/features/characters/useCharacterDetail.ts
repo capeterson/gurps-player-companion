@@ -27,7 +27,9 @@ import { useLibraryEffectMaps } from './useLibraryEffectMaps.ts';
  * the two to avoid showing a "not found" page during the initial
  * Dexie open.
  */
-export type CharacterDetailResult = CharacterDetail | null | undefined;
+/** Server-built details are authoritative; local details explicitly flag missing definitions. */
+export type EffectAwareCharacterDetail = CharacterDetail & { libraryEffectsKnown?: boolean };
+export type CharacterDetailResult = EffectAwareCharacterDetail | null | undefined;
 
 export interface UseCharacterDetailOptions {
   /**
@@ -72,7 +74,20 @@ export function useCharacterDetail(
         db.characterCombat.get(id),
         character.campaignId ? db.campaigns.get(character.campaignId) : Promise.resolve(undefined),
       ]);
-    return buildCharacterDetail({
+    const libraryEffectsKnown =
+      traits.every(
+        (t) =>
+          !t.libraryTraitId ||
+          ((options.libraryTraitEffects !== undefined || campaignId === character.campaignId) &&
+            traitEffects.has(t.libraryTraitId)),
+      ) &&
+      skills.every(
+        (s) =>
+          !s.librarySkillId ||
+          ((options.librarySkillEffects !== undefined || campaignId === character.campaignId) &&
+            skillEffects.has(s.librarySkillId)),
+      );
+    const detail = buildCharacterDetail({
       character,
       traits: traits.map((t) => ({
         ...t,
@@ -103,11 +118,19 @@ export function useCharacterDetail(
           }
         : null,
     });
+    return { ...detail, libraryEffectsKnown };
     // The maps are memoized on the library query's data (see
     // useLibraryEffectMaps), so their identity changes exactly when the
     // library payload does — including value-only edits a size-based
     // key would miss.
-  }, [id, traitEffects, skillEffects]);
+  }, [
+    id,
+    campaignId,
+    traitEffects,
+    skillEffects,
+    options.libraryTraitEffects,
+    options.librarySkillEffects,
+  ]);
 }
 
 export type CharacterListResult = CharacterListItem[] | undefined;

@@ -15,7 +15,7 @@ import {
   type DrByLocationMap,
   effectiveDrByLocation,
 } from '../../../../../shared/domain/armorDr.ts';
-import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
 
 interface DrEntry extends DrByLocation {
@@ -68,7 +68,10 @@ export interface DrSummaryCardProps {
 }
 
 export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryCardProps) {
-  const map: DrByLocationMap = effectiveDrByLocation(character.inventory, character.effects);
+  const effectsKnown = character.libraryEffectsKnown !== false;
+  const map: DrByLocationMap = effectsKnown
+    ? effectiveDrByLocation(character.inventory, character.effects)
+    : new Map();
   const [damageOpen, setDamageOpen] = useState(false);
 
   // The incoming-damage helper only makes sense when it can actually
@@ -110,6 +113,11 @@ export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryC
         Armor + active innate DR; skull includes natural DR 2. Unscoped innate DR excludes eyes
         (B46).
       </p>
+      {!effectsKnown && (
+        <output className="text-xs text-warning">
+          DR unavailable: linked library effects have not loaded.
+        </output>
+      )}
       <ul className="space-y-0.5 text-sm">
         {wellKnown.map((entry) => (
           <li key={entry.loc} className="flex items-baseline justify-between gap-2">

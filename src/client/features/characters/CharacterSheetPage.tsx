@@ -12,7 +12,6 @@ import {
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
 import { formatScaled } from '../../../shared/format/number.ts';
 import {
-  type CharacterDetail,
   MANUAL_TEMP_EFFECT_ID,
   TEMP_STAT_AXES,
   type TempStatAxis,
@@ -53,7 +52,10 @@ import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { useCombatPatch } from './sections/useCombatPatch.ts';
 import { type TempEffectsApi, useTempEffects } from './sections/useTempEffects.ts';
 import { type CampaignSummary, useCharacterAccessLocal } from './useCharacterAccess.ts';
-import { useCharacterDetail } from './useCharacterDetail.ts';
+import {
+  type EffectAwareCharacterDetail as CharacterDetail,
+  useCharacterDetail,
+} from './useCharacterDetail.ts';
 import { useMirrorCampaigns } from './useMirrorCampaigns.ts';
 
 type SheetTab =
@@ -999,16 +1001,20 @@ function StatusPanel({
             <InfoTooltip
               content={
                 <span>
-                  <strong>Trait DR</strong> stacks with armor DR. Per-location DR is not yet modeled
-                  — this is a global value.
-                  <EffectSourcesList effects={effects} targets="dr" introLabel="Trait sources" />
+                  <strong>Trait DR</strong> shows unscoped innate protection. The Combat tab's
+                  Effective DR readout combines it with armor and location-specific effects.
+                  <EffectSourcesList
+                    effects={effects.filter((effect) => !effect.hitLocation)}
+                    targets="dr"
+                    introLabel="Trait sources"
+                  />
                 </span>
               }
             >
               <span>DR (trait)</span>
             </InfoTooltip>
           }
-          value={d.traitDr}
+          value={character.libraryEffectsKnown === false ? '—' : d.traitDr}
         />
         <Stat
           label={
