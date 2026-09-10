@@ -7,6 +7,8 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { computeDerived } from '../../../../../shared/domain/characterCalc.ts';
+import { applyEffectsToAttrs, resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { AttacksCard } from './AttacksCard.tsx';
@@ -27,7 +29,7 @@ interface WeaponOverrides {
 function makeCharacter(damage: string, overrides: WeaponOverrides = {}): CharacterDetail {
   return {
     id: 'char-1',
-    derived: { effectiveSt: 10 },
+    derived: { effectiveSt: 10, thrust: '1d-2', swing: '1d' },
     skills: [{ id: 's1', name: 'Broadsword', level: 14 }],
     inventory: [
       {
@@ -48,6 +50,87 @@ function makeCharacter(damage: string, overrides: WeaponOverrides = {}): Charact
 }
 
 describe('AttacksCard', () => {
+  it('retains high-ST damage and fixed weapon modes independently', () => {
+    const character = makeCharacter('2d+1 pi / sw+1 cut');
+    character.derived = {
+      ...character.derived,
+      effectiveSt: 1000,
+      thrust: '101d',
+      swing: '103d+2',
+    };
+    const openRoll = vi.fn();
+    const view = render(<AttacksCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: '2d+1 pi' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].damage.dice).toEqual({ dice: 2, adds: 1 });
+    fireEvent.click(screen.getByRole('button', { name: '103d+3 cut' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].damage.dice).toEqual({ dice: 103, adds: 3 });
+    // An unavailable unrelated derived mode cannot block valid fixed/swing modes.
+    view.rerender(
+      <AttacksCard
+        character={{ ...character, derived: { ...character.derived, thrust: 'unknown' } }}
+        openRoll={openRoll}
+      />,
+    );
+    expect(screen.getByRole('button', { name: '2d+1 pi' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '103d+3 cut' })).toBeEnabled();
+  });
+
+  it.each([
+    ['thr+1 imp', '1d+3 imp', { dice: 1, adds: 3 }],
+    ['sw-1 cut', '2d+2 cut', { dice: 2, adds: 2 }],
+    ['2d+1 pi', '2d+1 pi', { dice: 2, adds: 1 }],
+  ] as const)(
+    'dispatches the shared adjusted dice for %s with weapon adds applied once',
+    (damage, label, dice) => {
+      const character = makeCharacter(damage);
+      const effects = resolveEffects(
+        [
+          {
+            id: 'power',
+            name: 'Power',
+            level: 1,
+            libraryEffects: [
+              { target: 'damage_thrust', value: 1, scaling: 'flat' },
+              { target: 'damage_swing', value: 2, scaling: 'flat' },
+            ],
+          },
+        ],
+        [],
+        new Set(),
+      );
+      character.derived = computeDerived(
+        applyEffectsToAttrs(
+          {
+            st: 10,
+            dx: 10,
+            iq: 10,
+            ht: 10,
+            hpMod: 0,
+            fpMod: 0,
+            perMod: 0,
+            willMod: 0,
+            speedQuarterMod: 0,
+            moveMod: 0,
+            dodgeMod: 0,
+            parryMod: 0,
+            blockMod: 0,
+            drMod: 0,
+            frightCheckMod: 0,
+            tempEffects: [{ id: 'might', name: 'Might', mods: { st: 5 } }],
+          },
+          effects,
+        ),
+      );
+      expect(character.derived.thrust).toBe('1d+2');
+      expect(character.derived.swing).toBe('2d+3');
+      const openRoll = vi.fn();
+      render(<AttacksCard character={character} openRoll={openRoll} />);
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      expect(openRoll).toHaveBeenCalledTimes(1);
+      expect(openRoll.mock.calls[0]?.[0].damage.dice).toEqual(dice);
+    },
+  );
+
   it('excludes Vitals/Eye presets for a cutting-only weapon (B399)', () => {
     const openRoll = vi.fn();
     render(<AttacksCard character={makeCharacter('sw+1 cut')} openRoll={openRoll} />);
@@ -115,7 +198,7 @@ describe('AttacksCard', () => {
     // bind to its own (lower-level) row, not the higher-level pistol row.
     const character = {
       id: 'char-1',
-      derived: { effectiveSt: 10 },
+      derived: { effectiveSt: 10, thrust: '1d-2', swing: '1d' },
       skills: [
         { id: 's1', name: 'Guns', specialization: 'Pistol', level: 15 },
         { id: 's2', name: 'Guns', specialization: 'Rifle', level: 12 },
@@ -195,7 +278,7 @@ describe('AttacksCard', () => {
     // => inherited from the weapon's "1").
     const character = {
       id: 'char-1',
-      derived: { effectiveSt: 10 },
+      derived: { effectiveSt: 10, thrust: '1d-2', swing: '1d' },
       skills: [{ id: 's1', name: 'Broadsword', level: 14 }],
       inventory: [
         {
@@ -244,7 +327,7 @@ describe('AttacksCard', () => {
     const openRoll = vi.fn();
     const character = {
       id: 'char-1',
-      derived: { effectiveSt: 10 },
+      derived: { effectiveSt: 10, thrust: '1d-2', swing: '1d' },
       skills: [{ id: 's1', name: 'Broadsword', level: 14 }],
       inventory: [
         {

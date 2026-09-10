@@ -1,4 +1,4 @@
-import { damageForSt, formatDamageDice } from '../../../../../shared/constants/damage.ts';
+import { formatDamageDice, parseDerivedDamage } from '../../../../../shared/constants/damage.ts';
 import {
   HIT_LOCATIONS,
   HIT_LOCATION_AIM_PENALTY,
@@ -115,10 +115,10 @@ export interface AttacksCardProps {
 
 export function AttacksCard({ character, openRoll }: AttacksCardProps) {
   const weapons = character.inventory.filter((i) => i.equipped && i.weaponData != null);
-  // Recomputed from effective ST rather than re-parsing character.derived's
-  // already-formatted thrust/swing strings (e.g. "1d-2") — same table
-  // (constants/damage.ts), one fewer round-trip through string parsing.
-  const { thrust, swing } = damageForSt(character.derived.effectiveSt);
+  // Consume the shared derived result, which already includes damage effects.
+  // Rebuilding from ST here would silently drop those flat adds.
+  const thrust = parseDerivedDamage(character.derived.thrust);
+  const swing = parseDerivedDamage(character.derived.swing);
   // effectiveLevel folds in trait/skill effect bonuses (skillBonusFor) —
   // the same value SkillsPanel rolls against, so attack rolls agree.
   const skillCandidates = character.skills.map((s) => ({

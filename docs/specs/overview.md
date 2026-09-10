@@ -105,6 +105,11 @@ on any sheet the viewer can edit — their own — it always shows).
   rounds against the character (B102), then flat modifiers add.
   Per-level mechanical effects scale by the purchased level, including zero;
   legacy null levels count as one. Flat effects apply independently of level.
+  `damage_thrust` and `damage_swing` are signed flat adds to the final
+  ST-based dice, after temporary ST adjustments; active sources add together.
+  The sheet and attack roller share these adjusted results, then weapon adds
+  apply once. Fixed weapon dice (e.g. `2d+1 pi`) are unaffected; adds are not
+  automatically converted into extra dice.
   Skill-target effects respect explicit specializations (case/whitespace
   normalized). Unqualified names cover every specialty; `*` matches any name
   or specialty in its own field. Legacy `Name (Specialty)` effects retain

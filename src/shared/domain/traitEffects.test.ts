@@ -52,6 +52,54 @@ function trait(
 }
 
 describe('resolveEffects', () => {
+  it.each([
+    ['damage_thrust', 1, '1d', '1d+2'],
+    ['damage_swing', 2, '1d-1', '1d+4'],
+    ['damage_thrust', -2, '1d-3', '1d+2'],
+  ] as const)(
+    'applies %s flat adds (%s) to its own damage mode',
+    (target, value, thrust, swing) => {
+      const resolved = resolveEffects(
+        [trait('damage', 'Damage', 1, [{ target, value, scaling: 'flat' }])],
+        [],
+        new Set(),
+      );
+      const derived = computeDerived(applyEffectsToAttrs(baseAttrs, resolved)); // ST12
+      expect(derived.thrust).toBe(thrust);
+      expect(derived.swing).toBe(swing);
+    },
+  );
+
+  it('stacks active scaled trait/skill damage adds after temporary ST without converting adds to dice', () => {
+    const resolved = resolveEffects(
+      [
+        trait('damage', 'Damage', 2, [{ target: 'damage_thrust', value: 2, scaling: 'per_level' }]),
+        trait('conditional', 'Conditional', 1, [
+          { target: 'damage_thrust', value: -1, scaling: 'flat', conditionGroup: 'focus' },
+        ]),
+        trait('inactive', 'Inactive', 1, [
+          { target: 'damage_swing', value: 10, scaling: 'flat', conditionGroup: 'rage' },
+        ]),
+      ],
+      [
+        {
+          id: 'skill',
+          name: 'Power',
+          libraryEffects: [{ target: 'damage_thrust', value: 1, scaling: 'flat' }],
+        },
+      ],
+      new Set(['focus']),
+    );
+    const derived = computeDerived(
+      applyEffectsToAttrs(
+        { ...baseAttrs, tempEffects: [{ id: 'buff', name: 'Might', mods: { st: 3 } }] },
+        resolved,
+      ),
+    );
+    expect(derived.effectiveSt).toBe(15);
+    expect(derived.thrust).toBe('1d+5'); // ST15 1d+1 +4 -1 +1
+    expect(derived.swing).toBe('2d+1');
+  });
   it('keeps location-only DR out of the global derived total', () => {
     const effects = resolveEffects(
       [

@@ -53,6 +53,9 @@ export interface CharacterAttrs {
   readonly blockMod: number;
   readonly drMod: number;
   readonly frightCheckMod: number;
+  /** Flat adds to final ST-based damage, after temporary ST is applied. */
+  readonly damageThrustMod?: number;
+  readonly damageSwingMod?: number;
 }
 
 /**
@@ -181,8 +184,14 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
     dodge,
     dodgeBase,
     basicLift,
-    thrust: formatDamageDice(damage.thrust),
-    swing: formatDamageDice(damage.swing),
+    thrust: formatDamageDice({
+      ...damage.thrust,
+      adds: damage.thrust.adds + (attrs.damageThrustMod ?? 0),
+    }),
+    swing: formatDamageDice({
+      ...damage.swing,
+      adds: damage.swing.adds + (attrs.damageSwingMod ?? 0),
+    }),
     parryMod: attrs.parryMod,
     blockMod: attrs.blockMod,
     traitDr: attrs.drMod,
