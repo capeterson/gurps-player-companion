@@ -14,7 +14,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('a library WS nudge refreshes only the named campaign query and triggers the standard sync cycle', () => {
+it('a library WS nudge only triggers the standard sync cycle without touching query caches', () => {
   const sockets: EventTarget[] = [];
   class Socket extends EventTarget {
     constructor() {
@@ -36,7 +36,7 @@ it('a library WS nudge refreshes only the named campaign query and triggers the 
         data: JSON.stringify({ kind: 'sync_invalidate', campaignId: 'a' }),
       }),
     );
-    expect(client.getQueryState(['campaigns', 'a', 'library'])?.isInvalidated).toBe(true);
+    expect(client.getQueryState(['campaigns', 'a', 'library'])?.isInvalidated).toBe(false);
     expect(client.getQueryState(['campaigns', 'b', 'library'])?.isInvalidated).toBe(false);
     expect(drain).toHaveBeenCalledTimes(1);
   } finally {

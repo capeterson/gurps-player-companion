@@ -30,7 +30,10 @@ import { withAudit } from '../db/auditContext.ts';
 import type { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import { type createOpenApiApp, errorResponse } from '../openapi/app.ts';
-import { publishLibraryInvalidation } from '../services/libraryInvalidation.ts';
+import {
+  advanceLibraryCampaignRevision,
+  publishLibraryInvalidation,
+} from '../services/libraryInvalidation.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import type { LibraryEntityConfig, LibraryTable } from './campaignLibraryEntities.ts';
 
@@ -142,6 +145,7 @@ export function registerLibraryCrud<
       let row: TTable['$inferSelect'];
       try {
         row = await withAudit(user.id, undefined, async (tx) => {
+          await advanceLibraryCampaignRevision(tx, id);
           const [inserted] = (await tx
             .insert(asTable(cfg.table))
             .values(cfg.toInsertValues(id, body))
@@ -194,6 +198,7 @@ export function registerLibraryCrud<
       let row: TTable['$inferSelect'];
       try {
         row = await withAudit(user.id, undefined, async (tx) => {
+          await advanceLibraryCampaignRevision(tx, id);
           const [updated] = (await tx
             .update(asTable(cfg.table))
             .set(updates)
@@ -236,10 +241,14 @@ export function registerLibraryCrud<
       const itemId = params[cfg.paramName];
       await requireCampaignOwner(id, user.id);
       const result = await withAudit(user.id, undefined, async (tx) => {
-        return (await tx
+        await advanceLibraryCampaignRevision(tx, id);
+        const deleted = (await tx
           .delete(asTable(cfg.table))
           .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
           .returning({ id: cfg.table.id })) as { id: string }[];
+        if (deleted.length === 0)
+          throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+        return deleted;
       });
       if (result.length === 0)
         throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });

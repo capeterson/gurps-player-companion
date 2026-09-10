@@ -268,8 +268,9 @@ each specialty selectable and reports its effective level.
 Trait/skill effect declarations remain live-linked and versioned. Library CRUD
 and YAML import advance referencing child revisions in the same transaction, so
 other devices refresh calculations through their normal HTTP cursor even if a WS
-nudge is dropped. Post-commit campaign-scoped nudges accelerate the pull and
-invalidate the corresponding library editor/autocomplete query. Character share
+nudge is dropped. Library writes also advance the campaign revision so committed
+HTTP pulls invalidate its library editor/autocomplete query, including definitions
+with no owned copies. Post-commit campaign-scoped nudges only accelerate the pull. Character share
 gates still apply to every emitted child row; nudges carry no definitions.
 
 ### YAML import/export (cross-campaign sharing)
