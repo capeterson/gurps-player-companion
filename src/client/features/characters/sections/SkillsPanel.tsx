@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
@@ -36,7 +37,8 @@ interface SkillSnapshot {
   difficulty: SkillDifficulty;
   points: number;
   pointsRaw: string;
-  librarySkillId: string | null;
+  picked: LibrarySkillOut | null;
+  nameVersion: number;
 }
 
 function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) {
@@ -44,13 +46,14 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   const [attribute, setAttribute] = useState<SkillAttribute>('DX');
   const [difficulty, setDifficulty] = useState<SkillDifficulty>('A');
   const [points, setPoints] = useState('1');
-  const [pickedLibraryId, setPickedLibraryId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<LibrarySkillOut | null>(null);
+  const nameVersion = useRef(0);
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
   const { creating, submit: submitEntity } = useAddEntityForm({
     entityClass: 'character_skill',
     characterId,
-    label: 'skill',
+    label: `skill "${skillDisplayName(name, picked?.defaultSpecialization)}"`,
   });
 
   async function submit(snap: SkillSnapshot) {
@@ -61,7 +64,17 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         difficulty: snap.difficulty,
         points: snap.points,
         characterId,
-        ...(snap.librarySkillId ? { librarySkillId: snap.librarySkillId } : {}),
+        librarySkillId: snap.picked?.id ?? null,
+        specialization: snap.picked?.defaultSpecialization ?? null,
+        techLevel: snap.picked?.techLevel ?? null,
+        notes:
+          [
+            snap.picked?.description,
+            snap.picked?.source ? `Source: ${snap.picked.source}` : null,
+            snap.picked?.prerequisites ? `Prerequisites: ${snap.picked.prerequisites}` : null,
+          ]
+            .filter(Boolean)
+            .join('\n\n') || null,
       },
       () => {
         // Per AGENTS.md (rule 1: never silently discard user edits): only
@@ -72,9 +85,11 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         // way a field the user has typed into during the await isn't
         // wiped, which is exactly the quick-edit loss this guard exists
         // to prevent.
-        setName((cur) => (cur === snap.nameRaw ? '' : cur));
+        if (nameVersion.current === snap.nameVersion) {
+          setName((cur) => (cur === snap.nameRaw ? '' : cur));
+          setPicked((cur) => (cur === snap.picked ? null : cur));
+        }
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
-        setPickedLibraryId(null);
       },
     );
   }
@@ -95,7 +110,8 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           difficulty,
           points: Number.isFinite(pParsed) && pParsed >= 0 ? pParsed : 1,
           pointsRaw: points,
-          librarySkillId: pickedLibraryId,
+          picked,
+          nameVersion: nameVersion.current,
         });
       }}
     >
@@ -108,19 +124,24 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
             value={name}
             onChange={(v) => {
               setName(v);
-              setPickedLibraryId(null);
+              nameVersion.current++;
+              setPicked(null);
             }}
             onPick={(opt) => {
               setName(opt.name);
               setAttribute(opt.attribute as SkillAttribute);
               setDifficulty(opt.difficulty as SkillDifficulty);
-              setPickedLibraryId(opt.id);
+              nameVersion.current++;
+              setPicked(opt);
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">
-                <span className="truncate">{o.name}</span>
+                <span className="truncate">
+                  {skillDisplayName(o.name, o.defaultSpecialization)}
+                  {o.techLevel != null ? ` / TL${o.techLevel}` : ''}
+                </span>
                 <span className="num text-xs text-base-content/70">
                   {o.attribute}/{o.difficulty}
                 </span>
@@ -137,6 +158,12 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Broadsword"
           />
+        )}
+        {picked && (
+          <span className="text-xs text-base-content/70">
+            {skillDisplayName(picked.name, picked.defaultSpecialization)}
+            {picked.techLevel != null ? ` / TL${picked.techLevel}` : ''}
+          </span>
         )}
       </div>
       <label className="form-control">
@@ -189,10 +216,11 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, skill.name);
+  const displayName = skillDisplayName(skill.name, skill.specialization);
+  const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, displayName);
 
   const nameField = useEntityNameField(rowPatch, skill.name);
-  const pointsField = useEntityPointsField(rowPatch, skill.name, skill.points, (s) => {
+  const pointsField = useEntityPointsField(rowPatch, displayName, skill.points, (s) => {
     const n = Number(s);
     if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
       throw new Error('non-negative integer only');
@@ -205,7 +233,7 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
       await enqueueDelete({
         entityClass: 'character_skill',
         entityId: skill.id,
-        humanName: `skill "${skill.name}"`,
+        humanName: `skill "${displayName}"`,
         characterId,
         prevValue: skill,
       });
@@ -217,20 +245,31 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_minmax(3.5rem,4rem)_minmax(3rem,4rem)_minmax(3rem,4rem)_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 items-center py-2 border-b border-base-300 last:border-0">
       {canWrite ? (
-        <input
-          aria-label={`${skill.name} name`}
-          className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 font-medium`}
-          {...nameField.inputProps}
-        />
+        <div className="min-w-0">
+          <input
+            aria-label={`${displayName} name`}
+            className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 font-medium`}
+            {...nameField.inputProps}
+          />
+          {(skill.specialization || skill.techLevel != null) && (
+            <span className="text-xs text-base-content/70">
+              {skill.specialization ? `(${skill.specialization})` : ''}
+              {skill.techLevel != null ? ` TL${skill.techLevel}` : ''}
+            </span>
+          )}
+        </div>
       ) : (
-        <span className="min-w-0 break-words font-medium">{skill.name}</span>
+        <span className="min-w-0 break-words font-medium">
+          {displayName}
+          {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+        </span>
       )}
       <span className="text-xs text-base-content/70 num text-center">
         {skill.attribute}/{skill.difficulty}
       </span>
       {canWrite ? (
         <input
-          aria-label={`${skill.name} points`}
+          aria-label={`${displayName} points`}
           className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right`}
           {...pointsField.inputProps}
         />
@@ -239,7 +278,7 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
       )}
       <RollLevelChip
         level={skill.effectiveLevel ?? skill.level}
-        name={skill.name}
+        name={displayName}
         title={
           skill.points <= 0
             ? 'No points invested — attribute default (B173)'
@@ -249,21 +288,21 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
               ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
               : undefined
         }
-        onRoll={(level) => onRoll({ label: skill.name, baseTarget: level })}
+        onRoll={(level) => onRoll({ label: displayName, baseTarget: level })}
       />
       {canWrite && (
         <button
           type="button"
           className="btn btn-ghost btn-xs"
           onClick={() => setConfirmDelete(true)}
-          aria-label={`Delete skill ${skill.name}`}
+          aria-label={`Delete skill ${displayName}`}
         >
           ✕
         </button>
       )}
       <ConfirmDialog
         open={confirmDelete}
-        title={`Delete skill "${skill.name}"?`}
+        title={`Delete skill "${displayName}"?`}
         confirmLabel="Delete"
         tone="error"
         onConfirm={() => {

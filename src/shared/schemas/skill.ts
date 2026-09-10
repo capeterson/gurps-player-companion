@@ -20,7 +20,8 @@ export const skillOut = z.object({
   points: z.number().int().min(0).max(1000),
   techLevel: z.number().int().min(0).max(12).nullable(),
   specialization: z.string().max(160).nullable(),
-  notes: z.string().max(20_000).nullable(),
+  // A library copy can contain both 20k description/prerequisites plus source labels.
+  notes: z.string().max(40_100).nullable(),
   librarySkillId: uuid.nullable(),
   /** Server-computed convenience field.  At 0 points this is the
    * attribute default (attr-4/-5/-6 per B173); null for a 0-point
@@ -43,7 +44,7 @@ export const skillCreate = z.object({
   points: z.number().int().min(0).max(1000).default(1),
   techLevel: z.number().int().min(0).max(12).nullable().optional(),
   specialization: z.string().max(160).trim().nullable().optional(),
-  notes: z.string().max(20_000).nullable().optional(),
+  notes: z.string().max(40_100).nullable().optional(),
   librarySkillId: uuid.nullable().optional(),
 });
 
