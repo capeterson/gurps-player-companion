@@ -948,9 +948,10 @@ describe('owned mechanics survive source lifecycle changes', () => {
           const table = kind === 'traits' ? characterTraits : characterSkills;
           expect(await getDb().select().from(table).where(eq(table.id, failedId))).toHaveLength(0);
         } else if (action === 'campaign-delete') {
-          expect((await request(`/campaigns/${campaign.id}`, undefined, 'DELETE')).status).toBe(
-            204,
-          );
+          expect(
+            (await request(`/campaigns/${String(campaign.id).toUpperCase()}`, undefined, 'DELETE'))
+              .status,
+          ).toBe(204);
         } else if (action === 'replace-rename') {
           const yaml = JSON.stringify({
             version: 6,

@@ -54,7 +54,11 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
     pointsOverride === null || pointsOverride === '' ? String(suggestedPoints) : pointsOverride;
 
   const { fetchOptions } = useLibraryFetcher<LibraryLanguageOut>('languages', campaignId);
-  const { creating, submit: submitEntity } = useAddEntityForm({
+  const {
+    creating,
+    flashProps,
+    submit: submitEntity,
+  } = useAddEntityForm({
     entityClass: 'character_language',
     characterId,
     label: 'language',
@@ -88,7 +92,8 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
 
   return (
     <form
-      className="flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      {...flashProps}
+      className="field-rollback-flash flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;

@@ -36,9 +36,7 @@ export async function captureLibraryMechanics(
         .for('share')
     : [];
   if (!source)
-    throw new HTTPException(403, {
-      message: 'Library reference is unavailable in this character campaign',
-    });
+    throw new HTTPException(403, { message: 'Library reference is unavailable in this character campaign' });
   return libraryMechanics.parse({
     sourceId,
     campaignId: parent?.campaignId ?? null,
@@ -135,6 +133,7 @@ export async function detachLibraryReferencesForTransfer(
   tx: AuditTx,
   characterId: string,
   updates: Record<string, unknown>,
+  expectedCampaignId?: string,
 ) {
   if (updates.campaignId === undefined) return;
   const [parent] = await tx
@@ -145,6 +144,9 @@ export async function detachLibraryReferencesForTransfer(
   const proposedCampaignId =
     typeof updates.campaignId === 'string' ? updates.campaignId.toLowerCase() : updates.campaignId;
   if (!parent || parent.campaignId === proposedCampaignId) return;
+  // Campaign deletion/member removal may have enumerated this row before it moved.
+  if (expectedCampaignId !== undefined && parent.campaignId !== expectedCampaignId.toLowerCase())
+    return;
   const configs = [
     { table: characterTraits, field: 'libraryTraitId' },
     { table: characterSkills, field: 'librarySkillId' },
@@ -186,6 +188,7 @@ export async function detachLibraryReferencesForTransfer(
   }
 }
 
+
 /** Called after patch validation/stale checks, in the write transaction. */
 export async function reconcileOwnedTraitKind(
   tx: AuditTx,
@@ -225,46 +228,4 @@ export async function reconcileOwnedTraitKind(
         };
   updates.libraryTraitId = null;
   updates.libraryMechanics = libraryMechanics.parse({ ...retained, detached: true });
-}
-
-export async function prepareOwnedMechanicsPatch(
-  tx: AuditTx,
-  kind: 'traits' | 'skills',
-  characterId: string,
-  updates: Record<string, unknown>,
-  existingId: string,
-) {
-  const field = kind === 'traits' ? 'libraryTraitId' : 'librarySkillId';
-  if (kind === 'traits' && updates.kind !== undefined && updates[field] === undefined) {
-    await tx
-      .select({ id: characters.id })
-      .from(characters)
-      .where(eq(characters.id, characterId))
-      .for('update');
-    await reconcileOwnedTraitKind(tx, characterId, updates, existingId);
-    return;
-  }
-  if (updates[field] !== undefined) {
-    // Match transfer's parent-before-child ordering before inspecting the link.
-    await tx
-      .select({ id: characters.id })
-      .from(characters)
-      .where(eq(characters.id, characterId))
-      .for('share');
-    if (updates[field] === null) {
-      const table = kind === 'traits' ? characterTraits : characterSkills;
-      const [existing] = await tx
-        .select()
-        .from(table)
-        .where(and(eq(table.id, existingId), eq(table.characterId, characterId)))
-        .for('update');
-      if (existing && (existing as unknown as Record<string, unknown>)[field] === null) return;
-    }
-    updates.libraryMechanics = await captureLibraryMechanics(
-      tx,
-      characterId,
-      kind,
-      updates[field] as string | null,
-    );
-  }
 }

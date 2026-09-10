@@ -109,6 +109,11 @@ on any sheet the viewer can edit — their own — it always shows).
   WS only accelerates that cycle. Cursor-only campaign touches do not clutter history.
   Already selected definitions are saved with speculative adds as local-only metadata,
   keeping those new copies usable offline; the server resolves its own version on replay.
+  All six library reference types require an existing definition of the right kind
+  in the character's campaign and current actor membership. REST and every sync
+  write path share `services/libraryReferences.ts`. Removing a member detaches
+  live references while preserving owned rules; unavailable sources produce visible
+  rejections, including a toast and add-form flash for each character entry type.
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -508,6 +513,9 @@ src/
                  middleware, permissions (the authz helpers, incl.
                  tryLoadCampaignRole)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
+                 libraryReferences (transactional source authorization for all
+                 six character reference types), ownedLibraryMechanics (saved
+                 declarations, live updates and detachment),
                  (incl. loadCharacterDetail, the shared character-detail
                  loader), characterAccess (resolveCharacterView, the
                  shared full/minimal/forbidden decision), patchSet

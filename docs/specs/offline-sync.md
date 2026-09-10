@@ -39,6 +39,11 @@ They survive offline reloads and are excluded from the operation envelope; the s
 captures its own authoritative source version. A rejected create removes that copy,
 persists the rejection notice, and flashes the corresponding add form. Invalid local
 metadata aborts the transaction without leaving a row or queued operation.
+All six source reference types are authorized through the same transactional
+resolver for REST and sync creates and patches (including whole-body patches).
+Missing, foreign, wrong-kind or no-longer-authorized definitions are rejected;
+create rollbacks flash the actual trait/skill/spell/language/technique/inventory
+add form as well as persisting the toast. Member removal retains detached copies.
 
 The declarations live in existing character stores, so normal logout/account
 switch purge and minimal-view cleanup remove them with their owning rows. Cursor
