@@ -10,8 +10,12 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { applyFatigueLoss } from '../../../../shared/domain/fatigue.ts';
 import { bumpPool } from '../../../../shared/domain/poolBump.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { useToasts } from '../../../lib/toast.tsx';
+import { flashBus, makeFlashKey } from '../../../sync/flashBus.ts';
+import type { CombatPatch } from './useCombatPatch.ts';
 
 export interface PoolBumpers {
   readonly hp: number;
@@ -28,8 +32,9 @@ export interface PoolBumpers {
 export function usePoolBumpers(
   character: CharacterDetail,
   canWrite: boolean,
-  patchCombat: (field: string, value: unknown) => Promise<void>,
+  patchCombat: CombatPatch,
 ): PoolBumpers {
+  const toasts = useToasts();
   const combat = character.combat;
   const hp = combat?.currentHp ?? character.derived.hp;
   const fp = combat?.currentFp ?? character.derived.fp;
@@ -43,12 +48,44 @@ export function usePoolBumpers(
   // resync from the prop whenever Dexie surfaces a new value.
   const hpRef = useRef(hp);
   const fpRef = useRef(fp);
+  const pending = useRef({ currentHp: 0, currentFp: 0 });
+  const versions = useRef({ currentHp: 0, currentFp: 0 });
+  const observed = useRef({ currentHp: hp, currentFp: fp });
+  observed.current = { currentHp: hp, currentFp: fp };
   useEffect(() => {
-    hpRef.current = hp;
+    if (pending.current.currentHp === 0) hpRef.current = hp;
   }, [hp]);
   useEffect(() => {
-    fpRef.current = fp;
+    if (pending.current.currentFp === 0) fpRef.current = fp;
   }, [fp]);
+
+  function commit(fields: Partial<Record<'currentHp' | 'currentFp', number>>) {
+    const keys = Object.keys(fields) as Array<'currentHp' | 'currentFp'>;
+    const stamps = keys.map((key) => {
+      pending.current[key]++;
+      return ++versions.current[key];
+    });
+    const only = keys.length === 1 ? keys[0] : undefined;
+    const save = only ? patchCombat(only, fields[only]) : patchCombat(fields);
+    void save
+      .catch((err) => {
+        const reason = err instanceof Error ? err.message : String(err);
+        toasts.push(
+          `Couldn't save ${keys.map((key) => (key === 'currentHp' ? 'HP' : 'FP')).join(' and ')} — ${reason}`,
+          { kind: 'error' },
+        );
+        keys.forEach((key, index) => {
+          if (versions.current[key] === stamps[index]) {
+            if (key === 'currentHp') hpRef.current = observed.current.currentHp;
+            else fpRef.current = observed.current.currentFp;
+          }
+          flashBus.emit({ key: makeFlashKey('character_combat', character.id, key), reason });
+        });
+      })
+      .finally(() => {
+        for (const key of keys) pending.current[key]--;
+      });
+  }
 
   // Soft-cap "double-press to override" state for HP and FP. The
   // helper returns `lastBlockedAt` we feed back on the next call —
@@ -86,44 +123,43 @@ export function usePoolBumpers(
     hpBlockedAtRef.current = result.lastBlockedAt;
     if (next === hpRef.current) return; // pure block, no patch needed
     hpRef.current = next;
-    void patchCombat('currentHp', next);
+    commit({ currentHp: next });
     if (d < 0) flashHpDamage();
   }
 
   function bumpFp(d: number) {
     if (!canWrite || fpMax <= 0) return;
     const result = bumpPool(fpRef.current, d, fpMax, fpBlockedAtRef.current);
-    const next = Math.max(-fpMax, result.next);
-    const hpCost = Math.max(0, next - result.next);
+    const fatigue = applyFatigueLoss(fpRef.current, -d, fpMax);
+    const next = d < 0 ? fatigue.fp : result.next;
+    const hpCost = d < 0 ? fatigue.hpCost : 0;
     fpBlockedAtRef.current = result.lastBlockedAt;
-    if (next !== fpRef.current) {
-      fpRef.current = next;
-      void patchCombat('currentFp', next);
-    }
+    const fields: Partial<Record<'currentHp' | 'currentFp', number>> = {};
+    if (next !== fpRef.current) fields.currentFp = next;
+    fpRef.current = next;
 
-    // Once FP reaches -FP, further fatigue costs HP one-for-one (B426).
-    // Apply overflow from a decrement that crosses the floor as well as
-    // subsequent decrements made while already at the floor.
+    // Below zero, fatigue costs HP as well as FP, including a crossing loss.
     if (hpCost > 0) {
       const nextHp = Math.max(-hpMax * 5, hpRef.current - hpCost);
       if (nextHp !== hpRef.current) {
         hpRef.current = nextHp;
-        void patchCombat('currentHp', nextHp);
+        fields.currentHp = nextHp;
         flashHpDamage();
       }
     }
+    if (Object.keys(fields).length > 0) commit(fields);
   }
 
   // Resets update the ref *first* (same as the bumpers) so a bump that
   // races the reset composes against the reset value, not a stale one.
   function resetHp() {
     hpRef.current = hpMax;
-    void patchCombat('currentHp', hpMax);
+    commit({ currentHp: hpMax });
   }
 
   function resetFp() {
     fpRef.current = fpMax;
-    void patchCombat('currentFp', fpMax);
+    commit({ currentFp: fpMax });
   }
 
   return { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp, flashHp };

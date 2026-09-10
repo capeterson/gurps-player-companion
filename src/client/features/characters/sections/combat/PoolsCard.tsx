@@ -15,6 +15,8 @@ import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../../../components/ui/InfoTooltip.tsx';
 import { OverflowBadge } from '../../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../../components/ui/PoolMeter.tsx';
+import { useFlashState } from '../../../../hooks/useFlashState.ts';
+import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import { hpVarFor } from '../hpColor.ts';
 import type { RollRequest } from '../rollTypes.ts';
@@ -34,6 +36,8 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
   const posture = combat?.posture ?? 'standing';
   const { conditions, toggle } = useConditionsToggle(character, canWrite, patchCombat);
   const { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp, flashHp } = bumpers;
+  const hpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentHp'));
+  const fpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentFp'));
 
   const hpColor = hpVarFor(hpMax > 0 ? hp / hpMax : 0);
   const fpColor = hpVarFor(fpMax > 0 ? fp / fpMax : 0);
@@ -54,7 +58,11 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
     <section className="card space-y-4 p-5">
       <p className="label-eyebrow">Pools</p>
 
-      <div className={`rounded-2xl border border-base-300/60 p-4 ${flashHp ? 'flash' : ''}`}>
+      <fieldset
+        aria-label="Hit points"
+        {...hpFlash.flashProps}
+        className={`field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4 ${flashHp ? 'flash' : ''}`}
+      >
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <span className="flex items-center gap-2">
             <span className="label-eyebrow">Hit Points</span>
@@ -112,9 +120,13 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
             </button>
           </>
         )}
-      </div>
+      </fieldset>
 
-      <div className="rounded-2xl border border-base-300/60 p-4">
+      <fieldset
+        aria-label="Fatigue points"
+        {...fpFlash.flashProps}
+        className="field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4"
+      >
         <div className="mb-2 flex items-center justify-between">
           <span className="flex items-center gap-2">
             <span className="label-eyebrow">Fatigue</span>
@@ -132,7 +144,7 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
         </div>
         <PoolMeter current={fp} max={fpMax} tone="fp" height="md" ariaLabel="Fatigue points" />
         <p className="num mt-2 text-[11px] text-dim">
-          at −{fpMax} further FP costs come off HP instead (B426)
+          below 0, each FP lost also costs 1 HP; at −{fpMax}, loss is HP-only (B426)
         </p>
         {fp === -fpMax && (
           <p className="mt-1 text-[11px] text-warning">
@@ -166,7 +178,7 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
             )}
           </>
         )}
-      </div>
+      </fieldset>
 
       <div>
         <p className="label-eyebrow mb-1.5">Posture</p>

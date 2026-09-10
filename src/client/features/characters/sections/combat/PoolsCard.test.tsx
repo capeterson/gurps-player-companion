@@ -2,9 +2,10 @@
  * PoolsCard — the reeling suggestion and legacy-condition round-trip.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { flashBus } from '../../../../sync/flashBus.ts';
 import type { PoolBumpers } from '../usePoolBumpers.ts';
 import { PoolsCard } from './PoolsCard.tsx';
 
@@ -31,6 +32,26 @@ function makeBumpers(hp: number, hpMax: number): PoolBumpers {
 }
 
 describe('PoolsCard', () => {
+  it('visibly flashes both pools when their queued fatigue edits are rejected', () => {
+    render(
+      <PoolsCard
+        character={makeCharacter(10)}
+        canWrite
+        patchCombat={vi.fn()}
+        bumpers={makeBumpers(10, 10)}
+        openRoll={vi.fn()}
+      />,
+    );
+    act(() => {
+      for (const field of ['currentHp', 'currentFp'])
+        flashBus.emit({ key: `character_combat:char-1:${field}`, reason: 'Rejected' });
+    });
+    for (const name of ['Hit points', 'Fatigue points']) {
+      expect(screen.getByRole('group', { name })).toHaveAttribute('data-flashing', 'true');
+      expect(screen.getByRole('group', { name })).toHaveClass('field-rollback-flash');
+    }
+  });
+
   it('shows the reeling suggestion when hp drops below 1/3 max and reeling is not set', () => {
     // hpMax=10 -> ceil(10/3)=4; hp=2 is below it.
     const patchCombat = vi.fn().mockResolvedValue(undefined);

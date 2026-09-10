@@ -71,6 +71,10 @@ works offline.**
    writes the local row and the outbox entry in a single Dexie transaction —
    the edit is either fully applied locally *and* queued, or neither. The UI,
    reading via `useLiveQuery`, re-renders immediately.
+   `enqueueFieldPatches` queues a gesture's related field edits in a single
+   transaction across their stores and the outbox. HP/FP fatigue updates use
+   this path and share a history `batchId`; each op still carries its bare field
+   value and settles independently under the existing server protocol.
 2. **Drain.** The orchestrator batches pending outbox ops (up to
    `DRAIN_BATCH_SIZE`) into `POST /sync/operations`. A `navigator.locks` lease
    serializes the drain across tabs (lock order is always DRAIN → CURSOR).
@@ -103,6 +107,11 @@ works offline.**
 4. **Apply outcome.** The orchestrator stamps the new revision on `applied`,
    reverts + toasts + flashes on rejection, and adopts `latestEntity` on
    conflict/stale (then flashes).
+   A rejected field patch cannot overwrite a newer queued edit. Reconciliation
+   preserves that edit, repairs its rollback anchor to the last confirmed value,
+   and keeps other pending fields when adopting a returned server row. The
+   earlier failure still produces its persistent toast and flash; the local
+   journal records an unchanged value when the newer intent is preserved.
 5. **Pull.** `POST /sync/cursor` returns rows + tombstones since each class's
    cursor position, plus the authoritative `accessible` id sets. The
    orchestrator merges rows into Dexie — but **never overwrites a field with a
@@ -435,7 +444,10 @@ rule that has been broken at least once.
   re-sync a whole draft from a server cache on refetch.
 - **Rollbacks are visible** (S5, rule 2). A rejection persists a
   `RejectionRecord` (survives reload) *and* emits a `flashBus` event so the
-  input pulses. **Toast + flash are both required.**
+  input pulses. Reconciliation, rejection persistence, and outbox removal
+  commit atomically; if storage fails, the optimistic row and operation
+  remain recoverable. Notification and flash follow the commit.
+  **Toast + flash are both required.**
 - **Speculative creates** (S7) use a client-generated UUID and `revision: -1`;
   the same id is posted to `/sync/operations` and the server adopts it. The UI
   renders the new row immediately; the sentinel revision is overwritten on
