@@ -46,6 +46,10 @@ import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { clearActiveUser } from './activeUser.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
+import {
+  mergeCampaignTransferUndo,
+  restoreLocalCampaignReferences,
+} from './localCampaignTransfer.ts';
 import { characterIdsToMinimize } from './minimalViewSweep.ts';
 import {
   backoffMs,
@@ -528,29 +532,12 @@ class SyncOrchestrator {
       // the user's newer value instead.
       let restoredValue: unknown = op.prevValue;
       if (op.command === 'patch' && op.fieldPath !== undefined) {
-        const superseding = await db.outbox
-          .where('coalesceKey')
-          .equals(op.coalesceKey)
-          .filter(
-            (candidate) =>
-              candidate.clientOpId !== op.clientOpId &&
-              (candidate.status === 'pending' ||
-                candidate.status === 'in_flight' ||
-                candidate.status === 'transient_retry'),
-          )
-          .toArray();
-        const latest = superseding.sort((a, b) => b.enqueuedAt.localeCompare(a.enqueuedAt))[0];
-        if (latest) {
-          preservedNewerEdit = true;
-          restoredValue = latest.attemptedValue;
-          await this.revertField(op.entityClass, op.entityId, op.fieldPath, latest.attemptedValue);
-          await db.outbox.update(latest.clientOpId, {
-            prevValue: op.prevValue,
-            baseRevision: op.baseRevision,
-          });
-        } else {
-          await this.revertField(op.entityClass, op.entityId, op.fieldPath, op.prevValue);
-        }
+        const preserved = await this.revertLocal(op, {
+          clientOpId: op.clientOpId,
+          status: 'rejected',
+        });
+        preservedNewerEdit = preserved !== undefined;
+        restoredValue = preserved ? preserved.preservedValue : op.prevValue;
       } else if (op.command === 'create') {
         await this.discardSpeculativeCreate(op);
       } else if (op.command === 'delete') {
@@ -842,52 +829,67 @@ class SyncOrchestrator {
             // for DECIMAL columns without false-equating text fields like "6"/"06".
             const fieldUnchanged = fieldValuesEqual(entity[op.fieldPath], op.prevValue);
             if (newRevision !== undefined && fieldUnchanged) {
-              await this.stampRevision(op.entityClass, op.entityId, newRevision);
-              await db.outbox.delete(op.clientOpId);
-              await appendSyncLog({
-                direction: 'push',
-                result: 'requeued',
-                entityClass: op.entityClass,
-                entityId: op.entityId,
-                parentId: op.parentId,
-                command: op.command,
-                fieldPath: op.fieldPath,
-                humanName: op.humanName,
-                details: { serverReason: outcome.reason, newRevision },
-              });
-              // Guard 2: no newer pending op for this field already queued.
-              const ckey = coalesceKey(op.entityId, op.fieldPath);
-              const newerPending = await db.outbox
-                .where('coalesceKey')
-                .equals(ckey)
-                .filter((row) => row.status === 'pending' || row.status === 'transient_retry')
-                .first();
-              if (!newerPending) {
-                await enqueueFieldPatch({
+              const fieldPath = op.fieldPath;
+              await db.transaction('rw', ALL_STORE_NAMES, async () => {
+                await this.stampRevision(op.entityClass, op.entityId, newRevision);
+                await db.outbox.delete(op.clientOpId);
+                await appendSyncLog({
+                  direction: 'push',
+                  result: 'requeued',
                   entityClass: op.entityClass,
                   entityId: op.entityId,
-                  fieldPath: op.fieldPath,
-                  attemptedValue: op.attemptedValue,
-                  prevValue: entity[op.fieldPath],
-                  baseRevision: newRevision,
+                  parentId: op.parentId,
+                  command: op.command,
+                  fieldPath: fieldPath,
                   humanName: op.humanName,
-                  flashKey: op.flashKey,
-                  characterId: op.parentId ?? undefined,
-                  // Preserve the original gesture's batch id so a stale_base
-                  // retry of one patch in a bulk action (e.g. "Revert all
-                  // temporary buffs") stays in the same history fold instead
-                  // of falling back to a fresh clientOpId batch.
-                  batchId: op.batchId,
+                  details: { serverReason: outcome.reason, newRevision },
                 });
-              } else {
-                // Refresh the superseding op so Guard 1 passes on its next
-                // drain: its prevValue was captured against an intermediate
-                // optimistic Dexie state, not the server's current value.
-                await db.outbox.update(newerPending.clientOpId, {
-                  baseRevision: newRevision,
-                  prevValue: entity[op.fieldPath],
-                });
-              }
+                // Guard 2: no newer pending op for this field already queued.
+                const ckey = coalesceKey(op.entityId, fieldPath);
+                const newerPending = await db.outbox
+                  .where('coalesceKey')
+                  .equals(ckey)
+                  .filter((row) => row.status === 'pending' || row.status === 'transient_retry')
+                  .first();
+                if (!newerPending) {
+                  await enqueueFieldPatch({
+                    entityClass: op.entityClass,
+                    entityId: op.entityId,
+                    fieldPath: fieldPath,
+                    attemptedValue: op.attemptedValue,
+                    prevValue: entity[fieldPath],
+                    baseRevision: newRevision,
+                    humanName: op.humanName,
+                    flashKey: op.flashKey,
+                    characterId: op.parentId ?? undefined,
+                    // Preserve the original gesture's batch id so a stale_base
+                    // retry of one patch in a bulk action (e.g. "Revert all
+                    // temporary buffs") stays in the same history fold instead
+                    // of falling back to a fresh clientOpId batch.
+                    batchId: op.batchId,
+                    localCampaignTransferUndo: op.localCampaignTransferUndo,
+                  });
+                } else {
+                  // Refresh the superseding op so Guard 1 passes on its next
+                  // drain: its prevValue was captured against an intermediate
+                  // optimistic Dexie state, not the server's current value.
+                  await db.outbox.update(newerPending.clientOpId, {
+                    baseRevision: newRevision,
+                    prevValue: entity[fieldPath],
+                    localCampaignTransferUndo: mergeCampaignTransferUndo(
+                      op.localCampaignTransferUndo,
+                      newerPending.localCampaignTransferUndo,
+                    ),
+                  });
+                  await restoreLocalCampaignReferences(
+                    mergeCampaignTransferUndo(
+                      op.localCampaignTransferUndo,
+                      newerPending.localCampaignTransferUndo,
+                    ),
+                    newerPending.attemptedValue,
+                  );
+                }
+              });
               break;
             }
           }
@@ -973,6 +975,10 @@ class SyncOrchestrator {
         if (newer) {
           await db.outbox.update(newer.clientOpId, {
             prevValue: restored,
+            localCampaignTransferUndo: mergeCampaignTransferUndo(
+              op.localCampaignTransferUndo,
+              newer.localCampaignTransferUndo,
+            ),
             ...(typeof latest?.revision === 'number' ? { baseRevision: latest.revision } : {}),
           });
         }
@@ -980,6 +986,11 @@ class SyncOrchestrator {
           await this.applyServerRow(op.entityClass, latest, { ignoreOutboxConflict: false });
         else if (!newer && restored !== undefined)
           await this.revertField(op.entityClass, op.entityId, fieldPath, restored);
+        if (op.localCampaignTransferUndo)
+          await restoreLocalCampaignReferences(
+            op.localCampaignTransferUndo,
+            newer ? newer.attemptedValue : restored,
+          );
         return newer ? { preservedValue: newer.attemptedValue } : undefined;
       });
     }
@@ -1416,6 +1427,25 @@ class SyncOrchestrator {
         : (row.id as string | undefined);
     if (!id) return;
     const merged: Record<string, unknown> = { ...row };
+    // Campaign moves also change child links locally. Cursor rows must not
+    // overwrite those side effects while the parent mutation is unconfirmed.
+    if (!opts.ignoreOutboxConflict && typeof row.characterId === 'string') {
+      const transfers = await db.outbox
+        .where('entityId')
+        .equals(row.characterId)
+        .filter(
+          (op) =>
+            op.entityClass === 'character' &&
+            op.fieldPath === 'campaignId' &&
+            ['pending', 'in_flight', 'transient_retry'].includes(op.status),
+        )
+        .toArray();
+      for (const op of transfers)
+        for (const entry of op.localCampaignTransferUndo ?? []) {
+          if (entry.entityId === id)
+            for (const field of Object.keys(entry.after)) delete merged[field];
+        }
+    }
     if (!opts.ignoreOutboxConflict) {
       // `entityId` is indexed on the outbox (Dexie v3).  Do NOT wrap
       // this in a swallowing catch: if the query ever breaks again the

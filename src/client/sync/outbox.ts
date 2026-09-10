@@ -27,6 +27,12 @@ import {
   coalesceKey,
   getLocalDb,
 } from '../db/dexie.ts';
+import {
+  campaignTransferStores,
+  detachLocalCampaignReferences,
+  mergeCampaignTransferUndo,
+  restoreLocalCampaignReferences,
+} from './localCampaignTransfer.ts';
 
 /**
  * Generate a uuidv7-shaped string client-side.  We don't need
@@ -45,6 +51,8 @@ export function newClientId(): string {
 }
 
 export interface EnqueueFieldPatchArgs {
+  /** Internal retry metadata; never part of the wire value. */
+  readonly localCampaignTransferUndo?: OutboxEntry['localCampaignTransferUndo'];
   readonly entityClass: EntityClass;
   readonly entityId: string;
   readonly fieldPath: string;
@@ -92,7 +100,18 @@ export async function enqueueFieldPatches(
   });
 }
 
-async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Promise<void> {
+async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Promise<void> {
+  let args = input;
+  if (args.entityClass === 'character' && args.fieldPath === 'campaignId') {
+    args = {
+      ...args,
+      attemptedValue:
+        typeof args.attemptedValue === 'string'
+          ? args.attemptedValue.toLowerCase()
+          : args.attemptedValue,
+      prevValue: typeof args.prevValue === 'string' ? args.prevValue.toLowerCase() : args.prevValue,
+    };
+  }
   const db = getLocalDb();
   const ckey = coalesceKey(args.entityId, args.fieldPath);
   const now = new Date().toISOString();
@@ -116,6 +135,7 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
   const dupes = await db.outbox.where('coalesceKey').equals(ckey).toArray();
   const coalescable = dupes.filter((d) => d.status === 'pending' || d.status === 'transient_retry');
   let carriedPrev: { value: unknown } | undefined;
+  let localCampaignTransferUndo = args.localCampaignTransferUndo;
   if (coalescable.length > 0) {
     // enqueueFieldPatch runs inside a Dexie transaction, so in
     // practice at most one coalescable dupe exists at a time; sort
@@ -123,6 +143,10 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
     // violated, so we always carry forward the OLDEST value.
     const oldest = coalescable.reduce((a, b) => (a.enqueuedAt <= b.enqueuedAt ? a : b));
     carriedPrev = { value: oldest.prevValue };
+    localCampaignTransferUndo = mergeCampaignTransferUndo(
+      localCampaignTransferUndo,
+      oldest.localCampaignTransferUndo,
+    );
   }
   for (const d of coalescable) {
     await db.outbox.delete(d.clientOpId);
@@ -138,7 +162,13 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
   //    do we fall back to reading the local row fresh -- there's
   //    nothing to coalesce, so the local row's current value IS the
   //    last-synced value.
-  const prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
+  let prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
+  if (
+    args.entityClass === 'character' &&
+    args.fieldPath === 'campaignId' &&
+    typeof prev === 'string'
+  )
+    prev = prev.toLowerCase();
   // baseRevision does NOT need the same carry-forward treatment:
   // applyLocalPatch (step 3 below) only ever touches `fieldPath` and
   // `updatedAt` on the local row, never `revision` -- local writes
@@ -148,6 +178,21 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
   // in which case picking up the fresher revision is correct, not a
   // bug.
   const baseRev = args.baseRevision ?? (await readEntityRevision(args));
+  if (args.entityClass === 'character' && args.fieldPath === 'campaignId') {
+    const current = await db.characters.get(args.entityId);
+    if (current && (current.campaignId?.toLowerCase() ?? null) !== args.attemptedValue) {
+      localCampaignTransferUndo = mergeCampaignTransferUndo(
+        localCampaignTransferUndo,
+        await detachLocalCampaignReferences(
+          args.entityId,
+          current.campaignId?.toLowerCase() ?? null,
+        ),
+      );
+    }
+    // A coalesced return to the unchanged server campaign cancels the detach.
+    if (args.attemptedValue === prev && !dupes.some((op) => op.status === 'in_flight'))
+      await restoreLocalCampaignReferences(localCampaignTransferUndo ?? [], prev);
+  }
 
   // 3. Apply the local row mutation immediately so `useLiveQuery`
   //    sees the user's typed value before the server even hears
@@ -179,6 +224,7 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
     humanName: args.humanName,
     flashKey: args.flashKey,
     batchId: args.batchId,
+    localCampaignTransferUndo,
   };
   await db.outbox.add(op);
 }
@@ -376,7 +422,7 @@ function storesForOp(entityClass: EntityClass) {
   const db = getLocalDb();
   switch (entityClass) {
     case 'character':
-      return [db.characters];
+      return [db.characters, ...campaignTransferStores()];
     case 'character_trait':
       return [db.characterTraits];
     case 'character_skill':

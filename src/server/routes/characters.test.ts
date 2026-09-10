@@ -374,7 +374,7 @@ describe('character-owned library declarations in the cursor', () => {
     });
     const source = (await created.json()) as { id: string };
     const character = await createCharacter(member.accessToken, { campaignId: sharedCampaign.id });
-    // Legacy unscoped references exist before GPC31's write validation; the cursor must never expose their source.
+    // Seed a legacy invalid reference directly; new writes now reject it.
     const attached = await app.request(`/api/v1/characters/${character.id}/traits`, {
       method: 'POST',
       headers: jsonHeaders(member.accessToken),
@@ -382,11 +382,14 @@ describe('character-owned library declarations in the cursor', () => {
         name: 'Owned',
         kind: 'advantage',
         points: 5,
-        libraryTraitId: source.id,
       }),
     });
     expect(attached.status).toBe(201);
     const foreignChild = ((await attached.json()) as { trait: { id: string } }).trait.id;
+    await getDb()
+      .update(characterTraits)
+      .set({ libraryTraitId: source.id, libraryMechanics: null })
+      .where(eq(characterTraits.id, foreignChild));
     const otherCharacter = await createCharacter(owner.accessToken, {
       campaignId: sharedCampaign.id,
     });
@@ -408,7 +411,9 @@ describe('character-owned library declarations in the cursor', () => {
       string,
       unknown
     >;
-    expect(libraryMechanics.parse(row.libraryMechanics).effects).toBeNull();
+    expect(
+      ownedLibraryEffects(source.id, String(sharedCampaign.id), row.libraryMechanics),
+    ).toBeNull();
     expect(JSON.stringify(body)).not.toContain('Private secret');
   });
 });
@@ -598,7 +603,7 @@ describe('owned mechanics survive source lifecycle changes', () => {
       for (const id of [source.id, crypto.randomUUID()]) {
         const response = await request(`/characters/${character.id}/${kind}`, {
           name: id === source.id ? 'Present' : 'Dangling',
-          [field]: id,
+          ...(id === source.id ? { [field]: id } : {}),
           ...(kind === 'traits' ? { kind: 'advantage' } : { attribute: 'DX', difficulty: 'A' }),
         });
         expect(response.status).toBe(201);
@@ -608,7 +613,7 @@ describe('owned mechanics survive source lifecycle changes', () => {
         childIds.push(childId);
         await getDb()
           .update(kind === 'traits' ? characterTraits : characterSkills)
-          .set({ libraryMechanics: null })
+          .set({ libraryMechanics: null, [field]: id })
           .where(eq((kind === 'traits' ? characterTraits : characterSkills).id, childId));
       }
       const migration = await Bun.file(
@@ -748,6 +753,28 @@ describe('owned mechanics survive source lifecycle changes', () => {
             effects: [{ target: 'dx', value: 9 }],
           });
           expect(((await recreated.json()) as { id: string }).id).not.toBe(source.id);
+          // A new offline copy replayed after source deletion must be rejected,
+          // invoking the client create rollback instead of losing its local rules.
+          expect((await request(`/characters/${character.id}/${kind}`, body)).status).toBe(403);
+          const failedId = crypto.randomUUID();
+          const response = await request('/sync/operations', {
+            operations: [
+              {
+                clientOpId: crypto.randomUUID(),
+                entityClass,
+                entityId: failedId,
+                parentId: character.id,
+                command: 'create',
+                attemptedValue: body,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          });
+          expect(
+            ((await response.json()) as { outcomes: { status: string }[] }).outcomes[0]?.status,
+          ).toBe('unauthorized');
+          const table = kind === 'traits' ? characterTraits : characterSkills;
+          expect(await getDb().select().from(table).where(eq(table.id, failedId))).toHaveLength(0);
         } else if (action === 'campaign-delete') {
           expect((await request(`/campaigns/${campaign.id}`, undefined, 'DELETE')).status).toBe(
             204,
@@ -801,6 +828,22 @@ describe('owned mechanics survive source lifecycle changes', () => {
             ).status,
           ).toBe(200);
         }
+        // REST and legacy whole-body/field sync clients can echo a null link
+        // during unrelated edits. That must not erase the retained declarations.
+        expect(
+          (
+            await request(
+              `/characters/${character.id}/${kind}/${entityId}`,
+              { [referenceField]: null, notes: 'Retained REST edit' },
+              'PATCH',
+            )
+          ).status,
+        ).toBe(200);
+        await sync(entityClass, 'patch', entityId, {
+          [referenceField]: null,
+          notes: 'Retained sync edit',
+        });
+        await sync(entityClass, 'patch', entityId, null, referenceField);
         const after = await detail();
         expect(after.libraryEffectsKnown).toBe(true);
         expect(after.derived).toEqual(before.derived);

@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { HTTPException } from 'hono/http-exception';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
@@ -33,6 +34,10 @@ export async function captureLibraryMechanics(
         .where(and(eq(table.id, sourceId), eq(table.campaignId, parent.campaignId)))
         .for('share')
     : [];
+  if (!source)
+    throw new HTTPException(403, {
+      message: 'Library reference is unavailable in this character campaign',
+    });
   return libraryMechanics.parse({
     sourceId,
     campaignId: parent?.campaignId ?? null,
@@ -103,7 +108,9 @@ export async function detachLibraryReferencesForTransfer(
     .from(characters)
     .where(eq(characters.id, characterId))
     .for('update');
-  if (!parent || parent.campaignId === updates.campaignId) return;
+  const proposedCampaignId =
+    typeof updates.campaignId === 'string' ? updates.campaignId.toLowerCase() : updates.campaignId;
+  if (!parent || parent.campaignId === proposedCampaignId) return;
   const configs = [
     { table: characterTraits, field: 'libraryTraitId' },
     { table: characterSkills, field: 'librarySkillId' },
@@ -151,13 +158,30 @@ export async function prepareOwnedMechanicsPatch(
   kind: 'traits' | 'skills',
   characterId: string,
   updates: Record<string, unknown>,
+  existingId: string,
 ) {
   const field = kind === 'traits' ? 'libraryTraitId' : 'librarySkillId';
-  if (updates[field] !== undefined)
+  if (updates[field] !== undefined) {
+    // Match transfer's parent-before-child ordering before inspecting the link.
+    await tx
+      .select({ id: characters.id })
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .for('share');
+    if (updates[field] === null) {
+      const table = kind === 'traits' ? characterTraits : characterSkills;
+      const [existing] = await tx
+        .select()
+        .from(table)
+        .where(and(eq(table.id, existingId), eq(table.characterId, characterId)))
+        .for('update');
+      if (existing && (existing as unknown as Record<string, unknown>)[field] === null) return;
+    }
     updates.libraryMechanics = await captureLibraryMechanics(
       tx,
       characterId,
       kind,
       updates[field] as string | null,
     );
+  }
 }
