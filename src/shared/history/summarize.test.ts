@@ -4,6 +4,26 @@ import { diffRows, groupIntoBatches, summarizeEvent } from './summarize.ts';
 
 // ---------- diffRows ----------
 
+it.each(['character_trait', 'character_skill'])(
+  'summarizes %s owned rule updates and detachment',
+  (entityClass) => {
+    const copy = { sourceRevision: 4, effects: [{ target: 'dx', value: 2 }] };
+    const event = { entityClass, op: 'update', oldRow: { name: 'Owned', library_mechanics: copy } };
+    expect(
+      summarizeEvent({
+        ...event,
+        newRow: { name: 'Owned', library_mechanics: { ...copy, sourceRevision: 8 } },
+      }).summary,
+    ).toBe('Owned: library rules updated to version 8');
+    expect(
+      summarizeEvent({
+        ...event,
+        newRow: { name: 'Owned', library_mechanics: { ...copy, detached: true } },
+      }).summary,
+    ).toBe('Owned: saved library rules retained after detaching');
+  },
+);
+
 describe('diffRows', () => {
   it('returns empty when rows are identical', () => {
     expect(diffRows({ a: 1, b: 'x' }, { a: 1, b: 'x' })).toEqual([]);

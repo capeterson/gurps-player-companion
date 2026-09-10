@@ -28,6 +28,7 @@ The two deliberate exceptions (`notifications.payload`,
 
 | Table.column | Shape schema (`src/shared/schemas/`) | Validated at |
 |---|---|---|
+| `character_traits.library_mechanics`, `character_skills.library_mechanics` | `libraryMechanics` (libraryMechanics.ts), nullable: source UUID, campaign UUID/null, source revision/null, effect declarations/null, optional detached flag | Read-only owned copy; `captureLibraryMechanics`, `refreshOwnedLibraryMechanics`, and transfer helper validate every application write through Zod in the audited transaction. REST and sync use the same helpers; caller-supplied snapshots are not writable. Migration 0036 backfills from existing validated source fields only within the character campaign/kind. |
 | `characters.dismissed_warnings` | `dismissedWarningsField` (character.ts) — `string[]` of warning codes | REST `/characters/{id}/warnings/dismiss` (`dismissWarningRequest`, one code at a time); sync patch `fieldPath: 'dismissedWarnings'` via `characterSyncPatch` |
 | `characters.temp_effects` | `tempEffectsField` (character.ts) — `TempEffect[]`, max 40, `{ id, name, mods }` with `mods` a strict per-axis object (`TEMP_STAT_AXES`); `superRefine` enforces unique ids and a per-axis SUM across all effects within [-50, 50]. The `id: 'manual'` sentinel (`MANUAL_TEMP_EFFECT_ID`) is the entry the ✦ modifier popovers write to; other ids are client uuids for named effects. | REST character create/update (`characterCreate` / `characterUpdate`, via `characterAttributesShape`); sync patch `fieldPath: 'tempEffects'` (whole-array replace) via `characterSyncPatch`. Share-gate masked to `[]` for minimal-view characters (`projectCharacterRow` in `routes/sync.ts`). |
 | `character_traits.modifiers` | `traitModifier[]` (trait.ts) | REST trait create/update (`traitCreate` / `traitUpdate`); sync per-field validator |
@@ -81,7 +82,7 @@ persists JSON of its own:
 
 | Store.field | Shape |
 |---|---|
-| `characterTraits.libraryMechanics`, `characterSkills.libraryMechanics` | `libraryMechanics` (libraryMechanics.ts): nullable `{ sourceId, campaignId, sourceRevision, effects }` read-only cursor projection. Null effects mean unavailable, an empty array means known empty. Validated during server projection, client cursor application and local derivation. Typed as `LibraryMechanics` in Dexie; there is no corresponding Postgres column. |
+| `characterTraits.libraryMechanics`, `characterSkills.libraryMechanics` | `libraryMechanics` (libraryMechanics.ts): mirrors the owned Postgres declarations and optional detached flag. Null effects mean unavailable, an empty array means known empty. Validated during cursor emission/application, local derivation, and speculative creation from a selected definition. Speculative metadata is stored atomically with the outbox but excluded from its wire payload. Typed as `LibraryMechanics` in Dexie. |
 | `outbox.attemptedValue` / `prevValue` | The **bare field value** for `patch` ops (rule S2), the full create payload for `create`, the deleted row snapshot for `delete`. Never a wrapper object. |
 | `syncMeta.value` | Per-key blobs (e.g. `bootstrap:<userId>` → `{ bootstrappedAt }`). Owned by the orchestrator. |
 | `rejectionToasts` rows | `RejectionRecord` interface in dexie.ts. |

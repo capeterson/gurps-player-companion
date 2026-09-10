@@ -302,6 +302,8 @@ export const characterDetail = z.object({
    * fallback and casting should be held rather than trusted. Always
    * true on server-built details (the server joins the campaign). */
   manaLevelKnown: z.boolean().default(true),
+  /** False when linked owned declarations are missing or unresolved. */
+  libraryEffectsKnown: z.boolean().optional(),
   /** Campaign's tech level (Basic Set p. 513); null when campaignless or
    * unset. Sourced from the campaign, not the character. */
   techLevel: z.number().int().nullable().default(null),

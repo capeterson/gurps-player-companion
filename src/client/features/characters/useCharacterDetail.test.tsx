@@ -11,6 +11,7 @@ import { GmCampaignDashboardPage } from '../campaigns/GmCampaignDashboardPage.ts
 import { GmCharacterCard } from '../campaigns/GmCharacterCard.tsx';
 import { useCampaignCharacterDetails } from '../campaigns/useCampaignCharacterDetails.ts';
 import { CharacterSheetPage } from './CharacterSheetPage.tsx';
+import { LibraryMechanicsNote } from './sections/LibraryMechanicsNote.tsx';
 import { DefensesCard } from './sections/combat/DefensesCard.tsx';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
@@ -104,6 +105,28 @@ afterEach(() => {
 });
 
 describe('durable character mechanics', () => {
+  it.each([true, false])('retains a detached owned copy offline, known=%s', async (known) => {
+    await seed();
+    const mechanics = { ...snapshot, detached: true, effects: known ? snapshot.effects : null };
+    await getLocalDb().characterTraits.update(TRAIT, {
+      libraryTraitId: null,
+      libraryMechanics: mechanics,
+    });
+    getLocalDb().close();
+    await getLocalDb().open();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    const player = renderHook(() => useCharacterDetail(CID));
+    const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
+    await waitFor(() => expect(player.result.current?.libraryEffectsKnown).toBe(known));
+    await waitFor(() => expect(gm.result.current?.[0]?.libraryEffectsKnown).toBe(known));
+    expect(player.result.current?.derived).toEqual(gm.result.current?.[0]?.derived);
+    if (known) expect(player.result.current?.derived.effectiveDx).toBe(12);
+    render(<LibraryMechanicsNote mechanics={mechanics} />);
+    expect(
+      screen.getByText(known ? /Saved rules retained/ : /Library rules unresolved/),
+    ).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('updates open player and GM readers after a same-length library edit and a dropped-WS reconnect', async () => {
     await seed();
     tokenStore.write({

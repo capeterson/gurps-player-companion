@@ -1016,6 +1016,11 @@ class SyncOrchestrator {
         key: makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
         reason: outcome.reason ?? 'sync rejected',
       });
+    } else if (op.command === 'create' && op.parentId) {
+      flashBus.emit({
+        key: makeFlashKey(op.entityClass, op.parentId, 'create'),
+        reason: outcome.reason ?? 'sync rejected',
+      });
     }
     await appendSyncLog({
       direction: 'push',
@@ -1079,6 +1084,11 @@ class SyncOrchestrator {
     if (op.fieldPath) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
+        reason: outcome.reason ?? 'sync failed',
+      });
+    } else if (op.command === 'create' && op.parentId) {
+      flashBus.emit({
+        key: makeFlashKey(op.entityClass, op.parentId, 'create'),
         reason: outcome.reason ?? 'sync failed',
       });
     }

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
@@ -9,6 +10,7 @@ import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
+import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
@@ -50,7 +52,11 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   const nameVersion = useRef(0);
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
-  const { creating, submit: submitEntity } = useAddEntityForm({
+  const {
+    creating,
+    submit: submitEntity,
+    flashProps,
+  } = useAddEntityForm({
     entityClass: 'character_skill',
     characterId,
     label: `skill "${skillDisplayName(name, picked?.defaultSpecialization)}"`,
@@ -92,6 +98,14 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         }
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
       },
+      snap.picked
+        ? libraryMechanics.parse({
+            sourceId: snap.picked.id,
+            campaignId,
+            sourceRevision: null,
+            effects: snap.picked.effects ?? null,
+          })
+        : null,
     );
   }
 
@@ -99,7 +113,8 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
 
   return (
     <form
-      className="flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      {...flashProps}
+      className="field-rollback-flash flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -305,6 +320,9 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
           ✕
         </button>
       )}
+      <div className="col-span-full">
+        <LibraryMechanicsNote mechanics={skill.libraryMechanics} />
+      </div>
       <ConfirmDialog
         open={confirmDelete}
         title={`Delete skill "${displayName}"?`}

@@ -63,6 +63,11 @@ import {
   techniqueInsertValues,
   traitInsertValues,
 } from './entityWrites.ts';
+import {
+  captureLibraryMechanics,
+  detachLibraryReferencesForTransfer,
+  prepareOwnedMechanicsPatch,
+} from './ownedLibraryMechanics.ts';
 import { buildPatchSet } from './patchSet.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
@@ -467,6 +472,7 @@ async function dispatchCharacter(
     entityClass: 'character',
     tx,
     table: characters,
+    prepareUpdates: (updates) => detachLibraryReferencesForTransfer(tx, op.entityId, updates),
     parentLookup: () => loadCharacterOr403(op.entityId, ctx.userId).then((a) => a.character),
     childWhere: () => eq(characters.id, op.entityId),
     valueTransform: (field, value) => {
@@ -492,7 +498,15 @@ async function dispatchTrait(
     assertWrite(access);
     const [created] = await tx
       .insert(characterTraits)
-      .values(traitInsertValues(body, { characterId, id: op.entityId }))
+      .values({
+        ...traitInsertValues(body, { characterId, id: op.entityId }),
+        libraryMechanics: await captureLibraryMechanics(
+          tx,
+          characterId,
+          'traits',
+          body.libraryTraitId,
+        ),
+      })
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -525,6 +539,7 @@ async function dispatchTrait(
     entityClass: 'character_trait',
     tx,
     table: characterTraits,
+    prepareUpdates: (updates) => prepareOwnedMechanicsPatch(tx, 'traits', characterId, updates),
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -554,7 +569,15 @@ async function dispatchSkill(
     assertWrite(access);
     const [created] = await tx
       .insert(characterSkills)
-      .values(skillInsertValues(body, { characterId, id: op.entityId }))
+      .values({
+        ...skillInsertValues(body, { characterId, id: op.entityId }),
+        libraryMechanics: await captureLibraryMechanics(
+          tx,
+          characterId,
+          'skills',
+          body.librarySkillId,
+        ),
+      })
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -582,6 +605,7 @@ async function dispatchSkill(
     entityClass: 'character_skill',
     tx,
     table: characterSkills,
+    prepareUpdates: (updates) => prepareOwnedMechanicsPatch(tx, 'skills', characterId, updates),
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -1024,6 +1048,7 @@ interface PatchEntityArgs {
   readonly childWhere: () => any;
   readonly valueTransform?: (field: string, value: unknown) => unknown | Promise<unknown>;
   readonly extraValidate?: (field: string, value: unknown) => Promise<void> | void;
+  readonly prepareUpdates?: (updates: Record<string, unknown>) => Promise<void>;
 }
 
 async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
@@ -1066,6 +1091,7 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
         latestEntity: current,
       };
     }
+    await args.prepareUpdates?.(updates);
     const result = await tx.update(table).set(updates).where(childWhere()).returning();
     const updated = result[0];
     if (!updated) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };
@@ -1107,6 +1133,7 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
     [fieldPath]: transformed,
     updatedAt: new Date(),
   };
+  await args.prepareUpdates?.(updates);
   const result = await tx.update(table).set(updates).where(childWhere()).returning();
   const updated = result[0];
   if (!updated) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };

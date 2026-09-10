@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../constants/skills.ts';
 import { timestamps, uuid } from './common.ts';
+import { libraryMechanics } from './libraryMechanics.ts';
 
 export const skillAttributeEnum = z.enum(SKILL_ATTRIBUTES);
 export const skillDifficultyEnum = z.enum(SKILL_DIFFICULTIES);
@@ -44,6 +45,7 @@ export const skillOut = z.object({
   // A library copy can contain both 20k description/prerequisites plus source labels.
   notes: z.string().max(40_100).nullable(),
   librarySkillId: uuid.nullable(),
+  libraryMechanics: libraryMechanics.nullable().optional(),
   defaults: skillDefaults.optional(),
   /** Best purchased or declared default level (B173). Null when untrained
    * and no declared default has an available source, including legacy unknowns. */

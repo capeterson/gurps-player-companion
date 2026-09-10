@@ -24,9 +24,11 @@ import {
   type DbCampaignMembership,
   campaignMemberships,
   campaigns,
+  characters,
   users,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
@@ -277,6 +279,18 @@ router.openapi(
     const { id } = c.req.valid('param');
     await requireCampaignOwner(id, user.id);
     await withAudit(user.id, undefined, async (tx) => {
+      // Block new FK assignments before enumerating copies to preserve.
+      await tx
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .for('update');
+      const ownedCharacters = await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(eq(characters.campaignId, id));
+      for (const character of ownedCharacters)
+        await detachLibraryReferencesForTransfer(tx, character.id, { campaignId: null });
       await tx.delete(campaigns).where(eq(campaigns.id, id));
     });
     return c.body(null, 204);

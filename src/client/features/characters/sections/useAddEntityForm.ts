@@ -21,7 +21,9 @@
  */
 
 import { useCallback, useState } from 'react';
+import type { LibraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass } from '../../../../shared/schemas/sync.ts';
+import { type FlashDataProps, useFlashState } from '../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueCreate, newClientId } from '../../../sync/outbox.ts';
 
@@ -34,6 +36,7 @@ export interface UseAddEntityFormOptions {
 
 export interface UseAddEntityFormReturn {
   readonly creating: boolean;
+  readonly flashProps: FlashDataProps;
   /**
    * Create the entity from `attemptedValue`. On success, `onCreated`
    * runs before `creating` is cleared — callers use it to reset their
@@ -42,6 +45,7 @@ export interface UseAddEntityFormReturn {
   readonly submit: (
     attemptedValue: Record<string, unknown>,
     onCreated: () => void,
+    localLibraryMechanics?: LibraryMechanics | null,
   ) => Promise<void>;
 }
 
@@ -52,9 +56,14 @@ export function useAddEntityForm({
 }: UseAddEntityFormOptions): UseAddEntityFormReturn {
   const toasts = useToasts();
   const [creating, setCreating] = useState(false);
+  const flash = useFlashState(`${entityClass}:${characterId}:create`);
 
   const submit = useCallback(
-    async (attemptedValue: Record<string, unknown>, onCreated: () => void) => {
+    async (
+      attemptedValue: Record<string, unknown>,
+      onCreated: () => void,
+      localLibraryMechanics?: LibraryMechanics | null,
+    ) => {
       setCreating(true);
       try {
         await enqueueCreate({
@@ -63,16 +72,18 @@ export function useAddEntityForm({
           humanName: label,
           characterId,
           attemptedValue,
+          localLibraryMechanics,
         });
         onCreated();
       } catch (err) {
+        flash.trigger();
         toasts.push(`Couldn't add ${label} — ${(err as Error).message}`, { kind: 'error' });
       } finally {
         setCreating(false);
       }
     },
-    [entityClass, characterId, label, toasts],
+    [entityClass, characterId, label, toasts, flash.trigger],
   );
 
-  return { creating, submit };
+  return { creating, submit, flashProps: flash.flashProps };
 }

@@ -11,6 +11,7 @@
  * wins)".  `create` and `delete` are never coalesced.
  */
 
+import { type LibraryMechanics, libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
 import {
   type LocalCharacter,
@@ -282,6 +283,8 @@ export interface EnqueueCreateArgs<T> {
   readonly entityId: string;
   /** Full entity payload to insert into the local store and POST to /sync. */
   readonly attemptedValue: T;
+  /** Local-only selected declarations; never included in the operation envelope. */
+  readonly localLibraryMechanics?: LibraryMechanics | null | undefined;
   readonly humanName?: string | undefined;
   readonly characterId?: string | undefined;
   readonly batchId?: string | undefined;
@@ -458,6 +461,16 @@ async function applyLocalCreate<T extends Record<string, unknown>>(
     revision: -1,
     ...args.attemptedValue,
   } as Record<string, unknown>;
+  if (args.entityClass === 'character_trait' || args.entityClass === 'character_skill') {
+    const snapshot =
+      args.localLibraryMechanics == null
+        ? null
+        : libraryMechanics.parse(args.localLibraryMechanics);
+    const field = args.entityClass === 'character_trait' ? 'libraryTraitId' : 'librarySkillId';
+    if (snapshot && (snapshot.sourceId !== base[field] || snapshot.detached))
+      throw new Error('Selected library rules do not match the new copy');
+    base.libraryMechanics = snapshot;
+  }
   switch (args.entityClass) {
     case 'character':
       await db.characters.put(base as unknown as LocalCharacter);

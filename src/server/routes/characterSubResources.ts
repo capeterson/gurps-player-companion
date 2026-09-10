@@ -63,6 +63,10 @@ import {
   techniqueInsertValues,
   traitInsertValues,
 } from '../services/entityWrites.ts';
+import {
+  captureLibraryMechanics,
+  prepareOwnedMechanicsPatch,
+} from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
@@ -120,10 +124,13 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const [created] = await withAudit(user.id, undefined, (tx) =>
+    const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterTraits)
-        .values(traitInsertValues(body, { characterId: id }))
+        .values({
+          ...traitInsertValues(body, { characterId: id }),
+          libraryMechanics: await captureLibraryMechanics(tx, id, 'traits', body.libraryTraitId),
+        })
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -162,13 +169,14 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, (tx) =>
-      tx
+    const [updated] = await withAudit(user.id, undefined, async (tx) => {
+      await prepareOwnedMechanicsPatch(tx, 'traits', id, updates);
+      return tx
         .update(characterTraits)
         .set(updates)
         .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
-        .returning(),
-    );
+        .returning();
+    });
     if (!updated) throw new HTTPException(404, { message: 'trait not found' });
     return c.json({ trait: buildTraitOut(updated), character: await loadCharacterDetail(id) }, 200);
   },
@@ -239,10 +247,13 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const [created] = await withAudit(user.id, undefined, (tx) =>
+    const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterSkills)
-        .values(skillInsertValues(body, { characterId: id }))
+        .values({
+          ...skillInsertValues(body, { characterId: id }),
+          libraryMechanics: await captureLibraryMechanics(tx, id, 'skills', body.librarySkillId),
+        })
         .returning(),
     );
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -284,13 +295,14 @@ router.openapi(
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, (tx) =>
-      tx
+    const [updated] = await withAudit(user.id, undefined, async (tx) => {
+      await prepareOwnedMechanicsPatch(tx, 'skills', id, updates);
+      return tx
         .update(characterSkills)
         .set(updates)
         .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
-        .returning(),
-    );
+        .returning();
+    });
     if (!updated) throw new HTTPException(404, { message: 'skill not found' });
     const character = await loadCharacterDetail(id);
     const skill = character.skills.find((skill) => skill.id === updated.id);

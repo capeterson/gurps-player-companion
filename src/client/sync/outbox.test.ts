@@ -5,6 +5,7 @@
 
 import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { type OutboxEntry, getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { flashBus } from './flashBus.ts';
@@ -68,6 +69,136 @@ async function seedCharacter() {
 }
 
 describe('enqueueFieldPatch', () => {
+  it('rejects mismatched local create declarations atomically', async () => {
+    await seedCharacter();
+    const entityId = '0193b3c0-f1f0-7000-8000-00000000d003';
+    await expect(
+      enqueueCreate({
+        entityClass: 'character_trait',
+        entityId,
+        characterId: CHAR_ID,
+        attemptedValue: { name: 'Wrong copy', libraryTraitId: CHAR_ID },
+        localLibraryMechanics: {
+          sourceId: entityId,
+          campaignId: null,
+          sourceRevision: null,
+          effects: [],
+        },
+      }),
+    ).rejects.toThrow('do not match');
+    expect(await getLocalDb().characterTraits.get(entityId)).toBeUndefined();
+    expect(await getLocalDb().outbox.count()).toBe(0);
+  });
+  for (const entityClass of ['character_trait', 'character_skill'] as const) {
+    it.each(['applied', 'rejected', 'suspended'])(
+      `${entityClass}: keeps local-only declarations durably and handles %s sync`,
+      async (status) => {
+        await seedCharacter();
+        const sourceId = '0193b3c0-f1f0-7000-8000-00000000d002';
+        const childId = '0193b3c0-f1f0-7000-8000-00000000d003';
+        const campaignId = '0193b3c0-f1f0-7000-8000-00000000d004';
+        const db = getLocalDb();
+        await db.characters.update(CHAR_ID, { campaignId });
+        const table = entityClass === 'character_trait' ? db.characterTraits : db.characterSkills;
+        const metadata: LibraryMechanics = {
+          sourceId,
+          campaignId,
+          sourceRevision: null,
+          effects: [{ target: 'dx', value: 2, scaling: 'flat' }],
+        };
+        await enqueueCreate({
+          entityClass,
+          entityId: childId,
+          characterId: CHAR_ID,
+          humanName: 'Owned rules',
+          attemptedValue: {
+            characterId: CHAR_ID,
+            name: 'Owned',
+            points: 2,
+            ...(entityClass === 'character_trait'
+              ? { kind: 'advantage', libraryTraitId: sourceId }
+              : { attribute: 'DX', difficulty: 'A', librarySkillId: sourceId }),
+          },
+          localLibraryMechanics: metadata,
+        });
+        const provisional = await table.get(childId);
+        expect(provisional?.libraryMechanics).toEqual(metadata);
+        db.close();
+        await db.open();
+        expect((await table.get(childId))?.libraryMechanics).toEqual(metadata);
+        expect((await db.outbox.toArray())[0]?.attemptedValue).not.toHaveProperty(
+          'libraryMechanics',
+        );
+        tokenStore.write({
+          accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+          refreshToken: 'r',
+          accessTokenExpiresIn: 0,
+        });
+        const flash = vi.fn();
+        const off = flashBus.subscribe(`${entityClass}:${CHAR_ID}:create`, flash);
+        const authoritative = { ...metadata, sourceRevision: 7 };
+        vi.stubGlobal(
+          'fetch',
+          vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+            if (url.includes('/sync/operations')) {
+              const body = JSON.parse(String(init?.body)) as {
+                operations: { clientOpId: string; attemptedValue: unknown }[];
+              };
+              for (const op of body.operations)
+                expect(op.attemptedValue).not.toHaveProperty('libraryMechanics');
+              return new Response(
+                JSON.stringify({
+                  outcomes: body.operations.map((op) => ({
+                    clientOpId: op.clientOpId,
+                    status,
+                    ...(status === 'applied'
+                      ? { newRevision: 8 }
+                      : { reason: 'Library link rejected' }),
+                  })),
+                }),
+              );
+            }
+            return new Response(
+              JSON.stringify({
+                changes:
+                  status === 'applied'
+                    ? [
+                        {
+                          entityClass,
+                          entityId: childId,
+                          command: 'patch',
+                          revision: 8,
+                          data: { ...provisional, revision: 8, libraryMechanics: authoritative },
+                        },
+                      ]
+                    : [],
+                nextCursor: {},
+                hasMore: {},
+              }),
+            );
+          }),
+        );
+        getSyncOrchestrator().start();
+        try {
+          await waitFor(async () => expect(await db.outbox.count()).toBe(0));
+          if (status === 'applied')
+            await waitFor(async () =>
+              expect((await table.get(childId))?.libraryMechanics).toEqual(authoritative),
+            );
+          else {
+            expect(await table.get(childId)).toBeUndefined();
+            expect((await db.rejectionToasts.toArray())[0]?.reason).toContain(
+              'Library link rejected',
+            );
+            await waitFor(() => expect(flash).toHaveBeenCalled());
+          }
+        } finally {
+          getSyncOrchestrator().stop();
+          off();
+        }
+      },
+    );
+  }
   it('coalesces sequential pending patches on the same field', async () => {
     await seedCharacter();
     await enqueueFieldPatch({

@@ -265,13 +265,26 @@ newer selection, even one with the same base name. Sheet rows, rolls, roll histo
 GM lookup identify specialized skills by `skillDisplayName`; the GM lookup keeps
 each specialty selectable and reports its effective level.
 
-Trait/skill effect declarations remain live-linked and versioned. Library CRUD
+Trait/skill effect declarations are materialized on the owned character rows,
+live-linked and versioned while their source exists. Library CRUD
 and YAML import advance referencing child revisions in the same transaction, so
 other devices refresh calculations through their normal HTTP cursor even if a WS
 nudge is dropped. Library writes also advance the campaign revision so committed
 HTTP pulls invalidate its library editor/autocomplete query, including definitions
 with no owned copies. Post-commit campaign-scoped nudges only accelerate the pull. Character share
 gates still apply to every emitted child row; nudges carry no definitions.
+
+Deletion first detaches owned copies and retains their last effects and source
+version. YAML replacement with a renamed natural key follows the same path;
+recreating the old name cannot reconnect a different UUID. Campaign transfers
+detach all six live library reference types and preserve owned trait/skill rules,
+paid points, levels, variants, modifiers and skill specialties. Retained source
+IDs/campaigns are provenance only. Missing legacy copies remain visibly unresolved.
+Copy capture holds a parent character lock until the write commits, so a concurrent
+transfer includes that copy when detaching references. Campaign deletion locks the
+campaign before enumerating characters, excluding incoming assignments during cleanup.
+Migration 0036 backfills only sources matching the character's campaign (and trait
+kind); no foreign library lookup is used for server or offline calculations.
 
 ### YAML import/export (cross-campaign sharing)
 
