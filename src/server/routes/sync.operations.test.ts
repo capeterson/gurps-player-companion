@@ -1265,4 +1265,113 @@ describe('POST /api/v1/sync/operations -- inventory enchantments', () => {
     ]);
     expect(rejected.outcomes[0]?.status).toBe('rejected');
   });
+
+  it('applies parent authorization and cycle checks to whole-body inventory patches (S04)', async () => {
+    const { accessToken } = await registerUser('sync-inventory-whole-body');
+    const character = await createCharacter(accessToken);
+    const otherCharacter = await createCharacter(accessToken);
+    const rootId = crypto.randomUUID();
+    const childId = crypto.randomUUID();
+    const otherParentId = crypto.randomUUID();
+    const validParentId = crypto.randomUUID();
+
+    const create = (entityId: string, parentId: string, attemptedValue: unknown) =>
+      postOperations(accessToken, [
+        {
+          clientOpId: crypto.randomUUID(),
+          entityClass: 'character_inventory' as const,
+          entityId,
+          command: 'create' as const,
+          attemptedValue,
+          parentId,
+          validationVersion: 1,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+    const root = await create(rootId, character.id, { name: 'Root' });
+    const child = await create(childId, character.id, { name: 'Child', parentId: rootId });
+    await create(otherParentId, otherCharacter.id, { name: 'Foreign parent' });
+    await create(validParentId, character.id, { name: 'Valid parent' });
+    const childRevision = child.outcomes[0]?.newRevision as number;
+    const rootRevision = root.outcomes[0]?.newRevision as number;
+
+    const patch = (
+      entityId: string,
+      baseRevision: number,
+      attemptedValue: unknown,
+      fieldPath?: string,
+    ) =>
+      postOperations(accessToken, [
+        {
+          clientOpId: crypto.randomUUID(),
+          entityClass: 'character_inventory' as const,
+          entityId,
+          command: 'patch' as const,
+          ...(fieldPath ? { fieldPath } : {}),
+          attemptedValue,
+          baseRevision,
+          parentId: character.id,
+          validationVersion: 1,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+    for (const [entityId, baseRevision, value, fieldPath] of [
+      [childId, childRevision, childId, 'parentId'],
+      [childId, childRevision, childId, undefined],
+      [childId, childRevision, childId.toUpperCase(), 'parentId'],
+      [childId, childRevision, childId.toUpperCase(), undefined],
+      [childId, childRevision, otherParentId, 'parentId'],
+      [childId, childRevision, otherParentId, undefined],
+      [rootId, rootRevision, childId, 'parentId'],
+      [rootId, rootRevision, childId, undefined],
+      [rootId, rootRevision, childId.toUpperCase(), 'parentId'],
+      [rootId, rootRevision, childId.toUpperCase(), undefined],
+      [childId, childRevision, crypto.randomUUID(), 'parentId'],
+      [childId, childRevision, crypto.randomUUID(), undefined],
+    ] as const) {
+      const outcome = await patch(
+        entityId,
+        baseRevision,
+        fieldPath ? value : { parentId: value },
+        fieldPath,
+      );
+      expect(outcome.outcomes[0]?.status).toBe('rejected');
+    }
+
+    // A combined whole-body patch must not leave its otherwise-valid field
+    // behind when parent validation rejects the envelope.
+    const combined = await patch(childId, childRevision, {
+      name: 'Must not persist',
+      parentId: otherParentId,
+    });
+    expect(combined.outcomes[0]?.status).toBe('rejected');
+
+    const rejectedDetail = (await getCharacter(accessToken, character.id)) as unknown as {
+      inventory: Array<{ id: string; name: string; parentId: string | null }>;
+    };
+    expect(rejectedDetail.inventory.find((item) => item.id === childId)).toMatchObject({
+      name: 'Child',
+      parentId: rootId,
+    });
+    const historyBeforeValid = await app.request(`/api/v1/characters/${character.id}/history`, {
+      headers: bearer(accessToken),
+    });
+    const rejectedHistory = (await historyBeforeValid.json()) as Array<{ entityId: string }>;
+    expect(rejectedHistory.filter((event) => event.entityId === childId)).toHaveLength(1);
+
+    // Paired field-path and whole-body valid reparent operations still work.
+    const validField = await patch(childId, childRevision, validParentId, 'parentId');
+    expect(validField.outcomes[0]?.status).toBe('applied');
+    const validBody = await patch(childId, validField.outcomes[0]?.newRevision as number, {
+      parentId: rootId,
+    });
+    expect(validBody.outcomes[0]?.status).toBe('applied');
+    const detail = (await getCharacter(accessToken, character.id)) as unknown as {
+      inventory: Array<{ id: string; parentId: string | null }>;
+    };
+    expect(detail.inventory.find((item) => item.id === childId)?.parentId).toBe(rootId);
+    expect(root.outcomes[0]?.status).toBe('applied');
+  });
 });

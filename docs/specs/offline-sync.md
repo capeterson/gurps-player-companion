@@ -130,6 +130,12 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 - **Outcome statuses** — `applied` | `rejected` | `conflict` | `unauthorized` |
   `suspended` | `stale_base` | `transient`.
 
+Whole-body patches validate every supplied field through the same per-field
+authorization and cross-entity checks as `fieldPath` patches. Inventory parent
+changes additionally share a transaction and character-row lock with the REST
+tree mutations, so a crafted envelope or concurrent reparent cannot create a
+foreign link or containment cycle.
+
 ### Outcome → local effect
 
 | Outcome | Local effect |
