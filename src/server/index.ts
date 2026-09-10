@@ -1,23 +1,22 @@
 import { websocket } from 'hono/bun';
 import { createApp } from './app.ts';
-import { loadConfig } from './config.ts';
+import { type AppConfig, loadConfig } from './config.ts';
 
-const config = loadConfig();
-const app = createApp(config);
+export function startServer(config: AppConfig) {
+  const app = createApp(config);
+  return Bun.serve({
+    port: config.port,
+    hostname: config.host,
+    // Preserve Bun's server binding and original request for peer IP lookup
+    // and WebSocket upgrades. Never carry trusted metadata in client headers.
+    fetch: app.fetch,
+    websocket,
+  });
+}
 
-const server = Bun.serve({
-  port: config.port,
-  hostname: config.host,
-  fetch: (request, server) => {
-    // Bun owns the socket and can supply a non-forgeable peer address. Route
-    // handlers only receive Fetch Requests, so carry it in a private header.
-    const address = server.requestIP(request)?.address;
-    if (!address) return app.fetch(request);
-    const headers = new Headers(request.headers);
-    headers.set('x-gpc-client-ip', address);
-    return app.fetch(new Request(request, { headers }));
-  },
-  websocket,
-});
-
-console.log(`gurps-player-companion server listening on http://${server.hostname}:${server.port}`);
+if (import.meta.main) {
+  const server = startServer(loadConfig());
+  console.log(
+    `gurps-player-companion server listening on http://${server.hostname}:${server.port}`,
+  );
+}

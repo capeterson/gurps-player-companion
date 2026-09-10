@@ -45,6 +45,9 @@ checklists for extending sync/history) live in
 - **Passkeys / WebAuthn** as an optional second credential — register, list,
   and sign in with a passkey (`/auth/passkeys/*`).
 - **Password reset** by emailed token (`/forgot-password` → `/reset-password`).
+- **Public-auth rate limits**: durable Postgres counters bound login,
+  registration, recovery, and passkey requests by source and (when supplied)
+  normalized account. Throttled requests return JSON `429` with `Retry-After`.
 - **API keys** for programmatic access, created and revoked from Settings.
 - JWT access tokens + rotating refresh tokens; logout revokes the refresh token
   server-side.

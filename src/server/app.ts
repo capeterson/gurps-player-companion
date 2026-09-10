@@ -84,11 +84,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
-      return c.json(
-        { error: err.message || 'http_error' },
-        err.status,
-        Object.fromEntries(err.getResponse().headers),
-      );
+      return c.json({ error: err.message || 'http_error' }, err.status);
     }
     console.error('unhandled error', err);
     return c.json({ error: 'internal_error' }, 500);

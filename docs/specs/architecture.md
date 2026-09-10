@@ -8,7 +8,8 @@ not break live in [`AGENTS.md`](../../AGENTS.md).
 
 ## Process & deployment model
 
-**One process, one origin.** A single Bun process (`src/server/index.ts`)
+**One process, one origin.** A single Bun process (`src/server/index.ts`,
+whose `startServer` factory is also used by real HTTP/WebSocket tests)
 serves everything:
 
 - the HTTP JSON API under `/api/v1/*`,
@@ -161,9 +162,17 @@ Tables (grouped):
   `refresh_tokens`, `password_reset_tokens`, `api_keys`, and durable
   `auth_rate_limits` counters. Public login, registration, password-reset, and
   passkey-login challenge requests consume bounded source and normalized-account
-  buckets before expensive hashing, email, or challenge work. The counters are
-  shared through Postgres and expire automatically; `TRUST_PROXY` must be set
-  only behind a proxy that overwrites `X-Forwarded-For`.
+  buckets before expensive hashing, email, or challenge work. Source checks
+  run first; a blocked source never allocates or consumes account buckets.
+  The counters are shared through Postgres, reset after their fixed window,
+  and expired rows are deleted during subsequent limiter requests. Throttling
+  returns JSON `429` with a `Retry-After` header. Source addresses come from
+  Bun's server binding or Vite's incoming socket, with an `unknown` bucket
+  when no peer is available; client-supplied `X-Gpc-Client-Ip` is ignored.
+  `TRUST_PROXY` must be set only behind a proxy that overwrites
+  `X-Forwarded-For`; missing forwarding headers fall back to the socket peer.
+  The Bun fetch handler preserves its original Request and server binding so
+  WebSocket upgrades continue to work.
 - **Campaigns**: `campaigns`, `campaign_memberships`, `campaign_invitations`,
   `notifications`.
 - **Characters (sync-backed)**: `characters`, `character_traits`,
