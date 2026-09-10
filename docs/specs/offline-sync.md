@@ -48,9 +48,13 @@ including when a client reconnects after multiple edits. Source revisions travel
 with declarations; array length is never used as a freshness signal.
 
 After commit, `services/libraryInvalidation.ts` sends a row-free `sync_invalidate`
-nudge to the campaign owner and members. `wsSubscriber.ts` triggers the ordinary
-sync cycle and invalidates only that campaign's React Query library prefix via
-`features/campaigns/libraryInvalidation.ts`. Failed nudges do not fail committed
+nudge to the campaign owner and members. `wsSubscriber.ts` only triggers the ordinary
+sync cycle. All library CRUD/import transactions also advance the campaign revision;
+after HTTP cursor changes commit locally, the orchestrator invalidates that campaign's
+React Query library prefix via `features/campaigns/libraryInvalidation.ts`. This also
+refreshes unowned definitions and works when WS is unavailable. Migration 0035 indexes
+library references and advances existing linked children to repair pre-fan-out cursors.
+Failed nudges do not fail committed
 writes. The cursor retains its existing membership/share gates. Existing history
 triggers record affected child refreshes under the library writer's audit context;
 the campaign library event records the actual definition edit. Deleted definitions

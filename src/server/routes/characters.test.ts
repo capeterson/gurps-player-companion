@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { sql } from 'drizzle-orm';
 import {
   type CharacterDetailInputCharacter,
   type CharacterDetailInputSkill,
@@ -19,6 +20,7 @@ import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
+import { getDb } from '../db/client.ts';
 import { subscribe } from '../services/wsBus.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
@@ -27,6 +29,55 @@ configureIntegrationTestEnvironment();
 const app = createApp(integrationTestConfig);
 
 describe('library changes propagate through incremental character cursors', () => {
+  it.each(['traits', 'skills'] as const)('repairs pre-migration %s cursors', async (kind) => {
+    const owner = await registerUser(`fanout-migration-${kind}`);
+    const campaign = await createCampaign(owner.accessToken);
+    const request = (path: string, body: unknown) =>
+      app.request(`/api/v1${path}`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify(body),
+      });
+    const source = (await (
+      await request(`/campaigns/${campaign.id}/library/${kind}`, {
+        name: 'Migration source',
+        ...(kind === 'traits' ? { kind: 'advantage' } : { attribute: 'DX', difficulty: 'A' }),
+        effects: [{ target: 'dx', value: 3 }],
+      })
+    ).json()) as { id: string };
+    const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+    expect(
+      (
+        await request(`/characters/${character.id}/${kind}`, {
+          name: 'Migration copy',
+          ...(kind === 'traits'
+            ? { kind: 'advantage', libraryTraitId: source.id }
+            : { attribute: 'DX', difficulty: 'A', librarySkillId: source.id }),
+        })
+      ).status,
+    ).toBe(201);
+    const entityClass = kind === 'traits' ? 'character_trait' : 'character_skill';
+    const initial = (await (
+      await request('/sync/cursor', { cursors: [{ entityClass, sinceRevision: 0 }] })
+    ).json()) as SyncCursorResponse;
+    const before = initial.changes.find(
+      (row) => (row.data as { characterId?: string }).characterId === character.id,
+    );
+    if (!before) throw new Error('Missing initial copy');
+    const migration = await Bun.file(
+      new URL('../db/migrations/0035_library_revision_fanout.sql', import.meta.url),
+    ).text();
+    for (const statement of migration.split('--> statement-breakpoint'))
+      await getDb().execute(sql.raw(statement));
+    const repaired = (await (
+      await request('/sync/cursor', {
+        cursors: [{ entityClass, sinceRevision: initial.nextCursor[entityClass] }],
+      })
+    ).json()) as SyncCursorResponse;
+    expect(
+      repaired.changes.find((row) => row.entityId === before.entityId)?.revision,
+    ).toBeGreaterThan(before.revision);
+  });
   it.each(['traits', 'skills'] as const)(
     'updates two %s clients after CRUD and YAML replace, without relying on WS',
     async (kind) => {

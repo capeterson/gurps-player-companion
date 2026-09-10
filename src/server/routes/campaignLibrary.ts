@@ -44,7 +44,10 @@ import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { campaigns } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
-import { publishLibraryInvalidation } from '../services/libraryInvalidation.ts';
+import {
+  advanceLibraryCampaignRevision,
+  publishLibraryInvalidation,
+} from '../services/libraryInvalidation.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import { registerLibraryCrud, selectLibrarySection, upsertByKey } from './campaignLibraryCrud.ts';
 import {
@@ -283,6 +286,7 @@ router.openapi(
     }
 
     const result = await withAudit(user.id, undefined, async (tx) => {
+      await advanceLibraryCampaignRevision(tx, id);
       const traits = await upsertByKey(tx, traitEntity, id, doc.library.traits, mode);
       const skills = await upsertByKey(tx, skillEntity, id, doc.library.skills, mode);
       // Only prune spells when the document actually carried a spells

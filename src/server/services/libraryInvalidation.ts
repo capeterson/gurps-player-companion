@@ -1,7 +1,16 @@
 import { eq } from 'drizzle-orm';
+import type { AuditTx } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { campaignMemberships, campaigns } from '../db/schema.ts';
 import { publish } from './wsBus.ts';
+
+/** The campaign cursor also versions online library queries, including unowned definitions. */
+export async function advanceLibraryCampaignRevision(
+  tx: AuditTx,
+  campaignId: string,
+): Promise<void> {
+  await tx.update(campaigns).set({ updatedAt: new Date() }).where(eq(campaigns.id, campaignId));
+}
 
 /** Post-commit acceleration only; revision fan-out is the durable HTTP path. */
 export async function publishLibraryInvalidation(campaignId: string): Promise<void> {
