@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MANA_LEVEL_LABELS } from '../../../../shared/constants/magic.ts';
+import { applyFatigueLoss } from '../../../../shared/domain/fatigue.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
-import { getLocalDb } from '../../../db/dexie.ts';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../../sync/outbox.ts';
+import { useCombatPatch } from './useCombatPatch.ts';
 
 interface CastSpellDialogProps {
   character: CharacterDetail;
@@ -89,6 +90,7 @@ export function CastSpellDialog({
 }: CastSpellDialogProps) {
   const ref = useDialogState(true);
   const toasts = useToasts();
+  const patchCombat = useCombatPatch(character);
 
   const maintaining = mode === 'maintain';
   const seedCost = maintaining ? (spell.effectiveMaintenanceCost ?? 0) : spell.effectiveCost;
@@ -158,48 +160,14 @@ export function CastSpellDialog({
     }
     setCasting(true);
     try {
-      // FP / HP go through the combat-state field patch path.  We need
-      // a local combat row to patch, so materialize one if missing
-      // (mirrors CombatPanel's first-edit upsert).
+      // Share the B426 calculation and atomically queue the pool fields.
       if (alloc.fromFp > 0 || alloc.fromHp > 0) {
-        const db = getLocalDb();
-        const existing = await db.characterCombat.get(character.id);
-        if (!existing) {
-          await db.characterCombat.put({
-            id: character.id,
-            characterId: character.id,
-            currentHp: character.derived.hp,
-            currentFp: character.derived.fp,
-            conditions: [],
-            maneuver: null,
-            posture: 'standing',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            revision: -1,
-          });
-        }
-        if (alloc.fromFp > 0) {
-          await enqueueFieldPatch({
-            entityClass: 'character_combat',
-            entityId: character.id,
-            fieldPath: 'currentFp',
-            attemptedValue: fpAvailable - alloc.fromFp,
-            humanName: 'FP',
-            flashKey: makeFlashKey('character_combat', character.id, 'currentFp'),
-            characterId: character.id,
-          });
-        }
-        if (alloc.fromHp > 0) {
-          await enqueueFieldPatch({
-            entityClass: 'character_combat',
-            entityId: character.id,
-            fieldPath: 'currentHp',
-            attemptedValue: hpAvailable - alloc.fromHp,
-            humanName: 'HP',
-            flashKey: makeFlashKey('character_combat', character.id, 'currentHp'),
-            characterId: character.id,
-          });
-        }
+        const fatigue = applyFatigueLoss(fpAvailable, alloc.fromFp, character.derived.fp);
+        const pools: Record<string, number> = {};
+        if (alloc.fromFp > 0) pools.currentFp = fatigue.fp;
+        if (alloc.fromHp > 0 || fatigue.hpCost > 0)
+          pools.currentHp = hpAvailable - alloc.fromHp - fatigue.hpCost;
+        await patchCombat(pools);
       }
       // Each stone we drew from gets its own patch.  Whole-jsonb so the
       // field validator accepts the full PowerstoneData shape.

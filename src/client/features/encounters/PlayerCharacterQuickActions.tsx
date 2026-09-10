@@ -1,5 +1,6 @@
 import { COMMON_CONDITIONS } from '../../../shared/constants/combat.ts';
 import { conditionLabel, conditionsInclude } from '../../../shared/domain/conditions.ts';
+import { useFlashState } from '../../hooks/useFlashState.ts';
 import { useCombatPatch } from '../characters/sections/useCombatPatch.ts';
 import { useConditionsToggle } from '../characters/sections/useConditionsToggle.ts';
 import { usePoolBumpers } from '../characters/sections/usePoolBumpers.ts';
@@ -32,8 +33,12 @@ function OwnCharacterQuickActions({
   const patchCombat = useCombatPatch(character);
   const bumpers = usePoolBumpers(character, true, patchCombat);
   const { conditions, toggle } = useConditionsToggle(character, true, patchCombat);
+  const flash = useFlashState(undefined, undefined, `character_combat:${character.id}:`);
   return (
-    <div className="mt-2 space-y-2 border-t border-base-300 pt-2">
+    <div
+      {...flash.flashProps}
+      className="field-rollback-flash mt-2 space-y-2 border-t border-base-300 pt-2"
+    >
       <p className="label-eyebrow">Your sheet</p>
       <div className="flex flex-wrap gap-1">
         <button type="button" className="btn btn-xs" onClick={() => bumpers.bumpHp(-1)}>

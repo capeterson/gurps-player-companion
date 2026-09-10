@@ -940,13 +940,52 @@ class SyncOrchestrator {
    * one.  The server may also have returned a `latestEntity` (for
    * stale_base / conflict); prefer that since it's more recent.
    */
-  private async revertLocal(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
+  private async revertLocal(
+    op: OutboxEntry,
+    outcome: OperationOutcome,
+  ): Promise<{ preservedValue: unknown } | undefined> {
+    if (op.command === 'patch' && op.fieldPath !== undefined) {
+      const fieldPath = op.fieldPath;
+      const db = getLocalDb();
+      // Serialize reconciliation with local enqueues: a newer edit must never
+      // slip between the lookup and rollback. Exclude only the rejected op
+      // when merging a returned server row, preserving every other dirty field.
+      return db.transaction('rw', ALL_STORE_NAMES, async () => {
+        const newer = await db.outbox
+          .where('coalesceKey')
+          .equals(coalesceKey(op.entityId, fieldPath))
+          .filter(
+            (candidate) =>
+              candidate.clientOpId !== op.clientOpId &&
+              candidate.entityClass === op.entityClass &&
+              (candidate.status === 'pending' ||
+                candidate.status === 'transient_retry' ||
+                candidate.status === 'in_flight'),
+          )
+          .first();
+        const latest =
+          outcome.latestEntity && typeof outcome.latestEntity === 'object'
+            ? (outcome.latestEntity as Record<string, unknown>)
+            : undefined;
+        const restored = latest && fieldPath in latest ? latest[fieldPath] : op.prevValue;
+        await db.outbox.delete(op.clientOpId);
+        if (newer) {
+          await db.outbox.update(newer.clientOpId, {
+            prevValue: restored,
+            ...(typeof latest?.revision === 'number' ? { baseRevision: latest.revision } : {}),
+          });
+        }
+        if (latest)
+          await this.applyServerRow(op.entityClass, latest, { ignoreOutboxConflict: false });
+        else if (!newer && restored !== undefined)
+          await this.revertField(op.entityClass, op.entityId, fieldPath, restored);
+        return newer ? { preservedValue: newer.attemptedValue } : undefined;
+      });
+    }
     if (outcome.latestEntity && typeof outcome.latestEntity === 'object') {
       await this.applyServerRow(op.entityClass, outcome.latestEntity as Record<string, unknown>, {
         ignoreOutboxConflict: true,
       });
-    } else if (op.command === 'patch' && op.fieldPath !== undefined && op.prevValue !== undefined) {
-      await this.revertField(op.entityClass, op.entityId, op.fieldPath, op.prevValue);
     } else if (op.command === 'create') {
       // Local row was speculative; remove it.
       await this.deleteLocal(op.entityClass, op.entityId);
@@ -954,13 +993,20 @@ class SyncOrchestrator {
       // Re-insert the row we deleted locally.
       await this.reinsertLocal(op.entityClass, op.prevValue);
     }
+    return undefined;
   }
 
   private async rollbackLocally(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
     const db = getLocalDb();
-    await this.revertLocal(op, outcome);
-    // Persistent toast + flash event so the input animates.
-    await this.recordRejection(op, outcome);
+    // Reconciliation and the durable notice commit together. A storage failure
+    // leaves the optimistic row and operation intact for recovery/replay.
+    const { preserved, rec } = await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      const preserved = await this.revertLocal(op, outcome);
+      const rec = await this.recordRejection(op, outcome);
+      await db.outbox.delete(op.clientOpId);
+      return { preserved, rec };
+    });
+    notifyRejection(rec);
     syncStateStore.setError(
       `Couldn't sync ${op.humanName ?? op.entityClass} — ${outcome.reason ?? 'sync rejected'}`,
     );
@@ -985,7 +1031,12 @@ class SyncOrchestrator {
       // back to whatever was restored. Recording the refused value as
       // "After" would show the user the rejected edit as their final
       // state and the restored one as discarded -- backwards.
-      ...rollbackSnapshot(op, outcome),
+      ...(preserved
+        ? {
+            previousValue: snapshotValue(preserved.preservedValue),
+            newValue: snapshotValue(preserved.preservedValue),
+          }
+        : rollbackSnapshot(op, outcome)),
       details: snapshotValue(outcome),
     });
     await db.outbox.delete(op.clientOpId);
@@ -1003,7 +1054,6 @@ class SyncOrchestrator {
    */
   private async failPermanently(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
     const db = getLocalDb();
-    await this.revertLocal(op, outcome);
     const rec: RejectionRecord = {
       id: op.clientOpId,
       clientOpId: op.clientOpId,
@@ -1017,7 +1067,12 @@ class SyncOrchestrator {
       status: 'failed_permanent',
       createdAt: new Date().toISOString(),
     };
-    await db.rejectionToasts.put(rec);
+    const preserved = await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      const preserved = await this.revertLocal(op, outcome);
+      await db.rejectionToasts.put(rec);
+      await db.outbox.delete(op.clientOpId);
+      return preserved;
+    });
     notifyRejection(rec);
     syncStateStore.setError(`Couldn't sync ${rec.humanName ?? op.entityClass} — ${rec.reason}`);
     if (op.fieldPath) {
@@ -1036,13 +1091,21 @@ class SyncOrchestrator {
       parentId: op.parentId,
       humanName: op.humanName,
       reason: rec.reason,
-      ...rollbackSnapshot(op, outcome),
+      ...(preserved
+        ? {
+            previousValue: snapshotValue(preserved.preservedValue),
+            newValue: snapshotValue(preserved.preservedValue),
+          }
+        : rollbackSnapshot(op, outcome)),
       details: snapshotValue(outcome),
     });
     await db.outbox.delete(op.clientOpId);
   }
 
-  private async recordRejection(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
+  private async recordRejection(
+    op: OutboxEntry,
+    outcome: OperationOutcome,
+  ): Promise<RejectionRecord> {
     const db = getLocalDb();
     const status: RejectionRecord['status'] =
       outcome.status === 'rejected' ||
@@ -1064,7 +1127,7 @@ class SyncOrchestrator {
       createdAt: new Date().toISOString(),
     };
     await db.rejectionToasts.put(rec);
-    notifyRejection(rec);
+    return rec;
   }
 
   private async applyCursorResponse(res: SyncCursorResponse): Promise<void> {

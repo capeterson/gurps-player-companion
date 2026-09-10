@@ -8,7 +8,12 @@ import { useCallback } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { getLocalDb } from '../../../db/dexie.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueFieldPatch } from '../../../sync/outbox.ts';
+import { enqueueFieldPatches } from '../../../sync/outbox.ts';
+
+export type CombatPatch = (
+  field: string | Readonly<Record<string, unknown>>,
+  value?: unknown,
+) => Promise<void>;
 
 /**
  * Combat is 1:1 keyed by characterId.  If a local row doesn't exist
@@ -28,19 +33,17 @@ import { enqueueFieldPatch } from '../../../sync/outbox.ts';
  * makes the two checks serialize, and `add` throws a `ConstraintError`
  * (caught and ignored below) if a pathological double-create still
  * slips through, so the ensure-row step can never clobber an existing
- * row. This transaction MUST complete before `enqueueFieldPatch` is
+ * row. This transaction MUST complete before `enqueueFieldPatches` is
  * called -- not wrap it -- because Dexie transactions don't nest
  * safely across overlapping stores; the two stay sequential.
  */
-export function useCombatPatch(
-  character: CharacterDetail,
-): (field: string, value: unknown) => Promise<void> {
+export function useCombatPatch(character: CharacterDetail): CombatPatch {
   const characterId = character.id;
   const defaultHp = character.derived.hp;
   const defaultFp = character.derived.fp;
 
   return useCallback(
-    async (field: string, value: unknown) => {
+    async (field: string | Readonly<Record<string, unknown>>, value?: unknown) => {
       const db = getLocalDb();
       await db.transaction('rw', db.characterCombat, async () => {
         const existing = await db.characterCombat.get(characterId);
@@ -69,15 +72,18 @@ export function useCombatPatch(
           }
         }
       });
-      await enqueueFieldPatch({
-        entityClass: 'character_combat',
-        entityId: characterId,
-        fieldPath: field,
-        attemptedValue: value,
-        humanName: field,
-        flashKey: makeFlashKey('character_combat', characterId, field),
-        characterId,
-      });
+      const fields = typeof field === 'string' ? { [field]: value } : field;
+      await enqueueFieldPatches(
+        Object.entries(fields).map(([key, attemptedValue]) => ({
+          entityClass: 'character_combat',
+          entityId: characterId,
+          fieldPath: key,
+          attemptedValue,
+          humanName: key === 'currentHp' ? 'HP' : key === 'currentFp' ? 'FP' : key,
+          flashKey: makeFlashKey('character_combat', characterId, key),
+          characterId,
+        })),
+      );
     },
     [characterId, defaultHp, defaultFp],
   );

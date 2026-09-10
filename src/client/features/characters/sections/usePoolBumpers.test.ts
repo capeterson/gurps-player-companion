@@ -12,9 +12,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { flashBus } from '../../../sync/flashBus.ts';
 import { usePoolBumpers } from './usePoolBumpers.ts';
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000b0b1';
+const toastPush = vi.fn();
+vi.mock('../../../lib/toast.tsx', () => ({ useToasts: () => ({ push: toastPush }) }));
 
 /**
  * The hook only reads `combat`, `derived.hp`, `derived.fp`; a focused
@@ -29,6 +32,58 @@ function makeCharacter(hp = 10, fp = 12): CharacterDetail {
 }
 
 describe('usePoolBumpers', () => {
+  it('preserves later combined and different-field edits when an earlier local save returns', async () => {
+    const pending: Array<() => void> = [];
+    const patchCombat = vi
+      .fn()
+      .mockImplementation(() => new Promise<void>((resolve) => pending.push(resolve)));
+    const character = makeCharacter(10, 10);
+    character.combat = { currentHp: 10, currentFp: 0 } as CharacterDetail['combat'];
+    const { result, rerender } = renderHook(
+      ({ current }) => usePoolBumpers(current, true, patchCombat),
+      { initialProps: { current: character } },
+    );
+    act(() => {
+      result.current.bumpFp(-1);
+      result.current.bumpFp(-1);
+      result.current.bumpHp(-1);
+    });
+    await act(async () => pending[0]?.());
+    rerender({
+      current: {
+        ...character,
+        combat: { ...character.combat, currentHp: 9, currentFp: -1 } as CharacterDetail['combat'],
+      },
+    });
+    act(() => result.current.bumpFp(-1));
+    expect(patchCombat).toHaveBeenLastCalledWith({ currentHp: 6, currentFp: -3 });
+    await act(async () => {
+      for (const resolve of pending) resolve();
+    });
+  });
+
+  it('reports a failed local pool transaction, flashes both fields and restores bumper intent', async () => {
+    const patchCombat = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Disk full'))
+      .mockResolvedValue(undefined);
+    const flash = vi.spyOn(flashBus, 'emit');
+    const character = makeCharacter(10, 10);
+    character.combat = { currentHp: 10, currentFp: 0 } as CharacterDetail['combat'];
+    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
+    await act(async () => result.current.bumpFp(-1));
+    expect(toastPush).toHaveBeenCalledWith(expect.stringMatching(/FP and HP.*Disk full/), {
+      kind: 'error',
+    });
+    expect(flash.mock.calls.map((call) => call[0].key)).toEqual([
+      `character_combat:${CHAR_ID}:currentFp`,
+      `character_combat:${CHAR_ID}:currentHp`,
+    ]);
+    act(() => result.current.bumpFp(-1));
+    expect(patchCombat).toHaveBeenLastCalledWith({ currentFp: -1, currentHp: 9 });
+    flash.mockRestore();
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -130,7 +185,7 @@ describe('usePoolBumpers', () => {
     expect(patchCombat).toHaveBeenLastCalledWith('currentFp', -12);
   });
 
-  it('charges FP loss that crosses the FP floor to HP one-for-one', () => {
+  it('charges all FP lost below zero and queues both pool changes together', () => {
     const patchCombat = vi.fn().mockResolvedValue(undefined);
     const character = makeCharacter(10, 12);
     character.combat = { currentHp: 7, currentFp: -10 } as CharacterDetail['combat'];
@@ -140,8 +195,8 @@ describe('usePoolBumpers', () => {
       result.current.bumpFp(-5);
     });
 
-    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentFp', -12);
-    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 4);
+    expect(patchCombat).toHaveBeenCalledTimes(1);
+    expect(patchCombat).toHaveBeenCalledWith({ currentFp: -12, currentHp: 2 });
     expect(result.current.flashHp).toBe(true);
   });
 

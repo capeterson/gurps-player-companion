@@ -213,8 +213,12 @@ on any sheet the viewer can edit — their own — it always shows).
     *and* death-check thresholds (B419/B423) in one caption, pulses a
     "suggested" highlight on the Reeling chip when HP drops below ⅓ max
     and it isn't set yet — never auto-applied — and tracks HP down to
-    the certain-death floor at −5×HP; FP floors at −FP, with further
-    fatigue charged against HP one-for-one (B426). One shared
+    the certain-death floor at −5×HP. Each FP lost below zero also costs
+    one HP, including a decrement crossing zero (B426); FP stops at −FP,
+    after which loss is HP-only. Bumpers and spell spending reuse
+    `applyFatigueLoss`. Combined HP/FP edits enter one local transaction
+    with a shared history batch; each field retains ordinary outbox coalescing,
+    server settlement and rollback toast/flash behavior. One shared
     `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
     sticky mobile bottom bar so a fast tap on both UIs never races;
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
