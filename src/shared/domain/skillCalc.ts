@@ -67,6 +67,16 @@ export function attributeLevelFor(attribute: SkillAttribute, derived: DerivedSta
   }
 }
 
+/** B173 caps basic attributes only when used as a skill default source.
+ * Will/Per are secondary characteristics; Other is the explicit placeholder.
+ */
+function defaultAttributeLevel(attribute: SkillAttribute, derived: DerivedStats): number {
+  const level = attributeLevelFor(attribute, derived);
+  return attribute === 'ST' || attribute === 'DX' || attribute === 'IQ' || attribute === 'HT'
+    ? Math.min(20, level)
+    : level;
+}
+
 export interface TrainedSkillDefaultSource {
   name: string;
   specialization: string | null;
@@ -102,7 +112,7 @@ export function computeSkillLevel(
   for (const candidate of defaults ?? []) {
     const levels =
       candidate.kind === 'attribute'
-        ? [attributeLevelFor(candidate.attribute, derived) + candidate.modifier]
+        ? [defaultAttributeLevel(candidate.attribute, derived) + candidate.modifier]
         : trainedSkills
             .filter((source) => {
               const wanted = normalize(skillDisplayName(candidate.name, candidate.specialization));

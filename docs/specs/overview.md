@@ -120,6 +120,10 @@ on any sheet the viewer can edit — their own — it always shows).
   shown with an explanatory tooltip and no invented roll target at zero points.
   Defaults are authored through library YAML/API and character REST/sync fields.
   Difficulty never decides whether a default exists, including Very Hard skills.
+  Basic-attribute defaults cap their source ST/DX/IQ/HT at 20 before applying
+  the listed penalty (B173). Purchased levels and learned-skill defaults remain
+  uncapped. This schema treats Will/Per as secondary characteristics, so they
+  retain their full value; Other retains its existing fixed value of 10.
   The best available candidate wins; learned sources include purchased buy-ups,
   while zero-point bridges are excluded. The shared resolver keeps an acyclic
   source dependency graph, accepts only level improvements and uses stable ID
