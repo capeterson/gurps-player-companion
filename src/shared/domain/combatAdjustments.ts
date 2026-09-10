@@ -72,7 +72,7 @@ export function combatAdjustments(input: CombatAdjustmentInput) {
     ): number | null {
       if (kind === 'parry' ? parryUnavailable : unavailable) return null;
       const poolScore =
-        kind === 'dodge' && poolDivisor > 1 ? Math.max(1, Math.ceil(score / poolDivisor)) : score;
+        kind === 'dodge' && poolDivisor > 1 ? Math.ceil(score / poolDivisor) : score;
       return poolScore + rollBonus + defensePenalty + (allOutDefense && option === kind ? 2 : 0);
     },
     reason(kind: DefenseKind) {
@@ -89,12 +89,12 @@ export function combatAdjustments(input: CombatAdjustmentInput) {
         move = move > 0 ? Math.max(1, Math.floor(move / 3)) : 0;
       if (input.posture === 'crouching')
         move = move > 0 ? Math.max(1, Math.floor((move * 2) / 3)) : 0;
-      if (maneuver === 'do_nothing' || maneuver === 'change_posture') return 0;
+      if (['do_nothing', 'change_posture', 'wait'].includes(maneuver)) return 0;
       if (maneuver === 'all_out_attack' || (allOutDefense && option === 'dodge'))
         return Math.ceil(move / 2);
       if (
         allOutDefense ||
-        ['aim', 'evaluate', 'attack', 'feint', 'concentrate', 'ready', 'wait'].includes(maneuver)
+        ['aim', 'evaluate', 'attack', 'feint', 'concentrate', 'ready'].includes(maneuver)
       )
         return Math.min(move, Math.max(1, Math.ceil(move / 10)));
       return move;

@@ -169,7 +169,7 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
             <button
               key={option}
               type="button"
-              className="chip"
+              className={`chip${defenseOption === option ? ' on' : ''}`}
               aria-pressed={defenseOption === option}
               onClick={() => setDefenseOption(option)}
             >
