@@ -211,6 +211,93 @@ describe('trait sub-resource CRUD', () => {
 // ===================== SKILLS =====================
 
 describe('skill sub-resource CRUD', () => {
+  it('persists declared defaults through REST/sync and propagates learned buy-ups', async () => {
+    const { accessToken } = await registerUser('skill-defaults');
+    const character = await createCharacter(accessToken, { dx: 12 });
+    async function add(body: Record<string, unknown>) {
+      const response = await app.request(`/api/v1/characters/${character.id}/skills`, {
+        method: 'POST',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({ attribute: 'DX', difficulty: 'A', points: 0, ...body }),
+      });
+      expect(response.status).toBe(201);
+      return (await response.json()) as {
+        skill: { id: string; level: number | null; defaults: unknown };
+        character: {
+          skills: Array<{ name: string; level: number | null }>;
+          points: { skills: number };
+        };
+      };
+    }
+    await add({ name: 'Shortsword', points: 8 });
+    const defaults = [{ kind: 'skill', name: 'Shortsword', modifier: -2 }];
+    const sword = await add({ name: 'Broadsword', defaults });
+    expect(sword.skill.level).toBe(12);
+    expect(sword.skill.defaults).toEqual(defaults);
+    const patch = await app.request(`/api/v1/characters/${character.id}/skills/${sword.skill.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ points: 2 }),
+    });
+    expect(patch.status).toBe(200);
+    const bought = (await patch.json()) as typeof sword;
+    expect(bought.skill.level).toBe(13);
+    expect(bought.character.points.skills).toBe(10); // only actual points, no default credit
+    // Broadsword is learned after buying it up, so its full level supplies defaults.
+    expect(
+      (
+        await add({
+          name: 'Chained',
+          defaults: [{ kind: 'skill', name: 'Broadsword', modifier: -2 }],
+        })
+      ).skill.level,
+    ).toBe(11);
+    expect((await add({ name: 'Karate', difficulty: 'H', defaults: [] })).skill.level).toBeNull();
+    expect((await add({ name: 'Unknown legacy' })).skill.level).toBeNull();
+    await add({ name: 'Cycle A', defaults: [{ kind: 'skill', name: 'Cycle B', modifier: 0 }] });
+    const cycle = await add({
+      name: 'Cycle B',
+      defaults: [{ kind: 'skill', name: 'Cycle A', modifier: 0 }],
+    });
+    expect(
+      cycle.character.skills
+        .filter((skill) => skill.name.startsWith('Cycle'))
+        .map((skill) => skill.level),
+    ).toEqual([null, null]);
+    const sync = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: crypto.randomUUID(),
+            entityClass: 'character_skill',
+            entityId: sword.skill.id,
+            parentId: character.id,
+            command: 'patch',
+            fieldPath: 'defaults',
+            attemptedValue: [],
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(
+      ((await sync.json()) as { outcomes: Array<{ status: string }> }).outcomes[0]?.status,
+    ).toBe('applied');
+    const reload = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    const detail = (await reload.json()) as {
+      skills: Array<{ id: string; level: number; defaults: unknown }>;
+    };
+    expect(detail.skills.find((skill) => skill.id === sword.skill.id)).toMatchObject({
+      defaults: [],
+      level: 12,
+    });
+  });
+
   it('POST creates a skill with points defaulting to 1, and a computed level', async () => {
     const { accessToken } = await registerUser('skill-create');
     const character = await createCharacter(accessToken, { dx: 12 });

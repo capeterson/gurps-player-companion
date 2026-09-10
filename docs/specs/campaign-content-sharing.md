@@ -265,7 +265,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   validates against the `campaignLibrary` Zod schemas and rejects duplicate
   keys; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 5`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 6`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
@@ -297,6 +297,12 @@ mechanism for sharing content between campaigns or seeding a new one.
 - **Item enchantments (v5):** `library.items` entries carry an optional
   `enchantments: []` list (`enchantmentRef[]`: spellName, spellLevel?, category?,
   notes?) which copies onto character inventory items upon add.
+- **Skill defaults (v6):** `library.skills[].defaults` stores attribute/skill
+  plus offset candidates, including an optional skill specialization. `[]`
+  explicitly means no default and is retained on export; null/absent means
+  unknown and is the migration policy for older rows. Picks copy declarations
+  onto the character; later library changes do not silently rewrite that copy.
+  Older YAML versions still parse; omitted defaults remain unknown.
 - **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
   campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set
   p. 513) alongside `description`/`pointTarget`/`disadvantageCap`/`quirkCap`.

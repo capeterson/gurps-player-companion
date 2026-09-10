@@ -65,6 +65,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         points: snap.points,
         characterId,
         librarySkillId: snap.picked?.id ?? null,
+        defaults: snap.picked?.defaults ?? null,
         specialization: snap.picked?.defaultSpecialization ?? null,
         techLevel: snap.picked?.techLevel ?? null,
         notes:
@@ -281,7 +282,11 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
         name={displayName}
         title={
           skill.points <= 0
-            ? 'No points invested — attribute default (B173)'
+            ? skill.defaults == null
+              ? 'Defaults unknown — add the skill definition'
+              : skill.defaults.length === 0
+                ? 'This skill has no default'
+                : 'Best available declared default (B173)'
             : skill.effectiveLevel != null &&
                 skill.level != null &&
                 skill.effectiveLevel !== skill.level

@@ -9,7 +9,12 @@ import {
   powerstoneData,
   weaponData,
 } from './inventory.ts';
-import { situationalModifier, skillAttributeEnum, skillDifficultyEnum } from './skill.ts';
+import {
+  situationalModifier,
+  skillAttributeEnum,
+  skillDefaults,
+  skillDifficultyEnum,
+} from './skill.ts';
 import { spellDifficulty } from './spell.ts';
 import { techniqueDifficulty } from './technique.ts';
 import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
@@ -73,6 +78,7 @@ export const librarySkillOut = z.object({
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
   defaultSpecialization: z.string().max(160).nullable(),
+  defaults: skillDefaults.optional(),
   prerequisites: z.string().max(20_000).nullable(),
   situationalModifiers: z.array(situationalModifier).default([]),
   effects: z.array(traitEffect).default([]),
@@ -87,6 +93,7 @@ export const librarySkillCreate = z.object({
   description: z.string().max(20_000).nullable().optional(),
   source: z.string().max(40).nullable().optional(),
   defaultSpecialization: z.string().max(160).nullable().optional(),
+  defaults: skillDefaults.optional(),
   prerequisites: z.string().max(20_000).nullable().optional(),
   situationalModifiers: z.array(situationalModifier).default([]),
   effects: z.array(traitEffect).default([]),
@@ -321,8 +328,8 @@ export const importResult = z.object({
 /**
  * v1 docs (pre-effects), v2 docs (effects on traits/skills), v3 docs
  * (container/powerstone/magic-item item fields + campaign.manaLevel), v4
- * docs (languages + techniques + styles sections), and v5 docs
- * (enchantments on items) all parse.  Schema unions on a literal version
+ * docs (languages + techniques + styles sections), v5 docs (item enchantments),
+ * and v6 docs (explicit skill defaults) all parse. Schema unions on a literal version
  * field so older library files keep round-tripping without mutation.
  * Older docs that omit the newer fields get their defaults (empty
  * array / false / null) via the library*Create schemas.
@@ -333,6 +340,7 @@ export const libraryYamlVersion = z.union([
   z.literal(3),
   z.literal(4),
   z.literal(5),
+  z.literal(6),
 ]);
 
 export const libraryYamlDoc = z.object({

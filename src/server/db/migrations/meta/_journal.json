@@ -239,6 +239,13 @@
       "when": 1785701000000,
       "tag": "0033_auth_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785702000000,
+      "tag": "0034_skill_defaults",
+      "breakpoints": true
     }
   ]
 }
