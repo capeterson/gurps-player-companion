@@ -63,7 +63,7 @@ describe('useCombatPatch', () => {
     });
     try {
       await expect(result.current({ currentHp: 9, currentFp: -1 })).rejects.toThrow('Disk full');
-      expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({ currentHp: 10, currentFp: 0 });
+      expect(await db.characterCombat.get(CHAR_ID)).toBeUndefined();
       expect(await db.outbox.count()).toBe(0);
     } finally {
       spy.mockRestore();

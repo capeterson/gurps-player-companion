@@ -262,7 +262,8 @@ on any sheet the viewer can edit — their own — it always shows).
     the certain-death floor at −5×HP. Each FP lost below zero also costs
     one HP, including a decrement crossing zero (B426); FP stops at −FP,
     after which loss is HP-only. Bumpers and spell spending reuse
-    `applyFatigueLoss`. Combined HP/FP edits enter one local transaction
+    `applyFatigueLoss`. Bumpers compose with the latest local draft saves across
+    inputs. Combined HP/FP edits enter one local transaction
     with a shared history batch; each field retains ordinary outbox coalescing,
     server settlement and rollback toast/flash behavior. One shared
     `usePoolBumpers` instance feeds both the in-grid PoolsCard and the

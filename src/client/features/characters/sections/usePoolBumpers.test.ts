@@ -1,218 +1,160 @@
-/**
- * usePoolBumpers — the HP/FP bumper state machine shared by combat
- * trackers.  The load-bearing semantics:
- *
- *   1. Rapid taps that land before React re-renders compound against
- *      the latest-intended ref, not the render snapshot — two -1 taps
- *      yield hp-2, never a duplicated hp-1.
- *   2. The soft cap blocks the first +1 at max; a second press within
- *      the 2 s window overrides and lands (bumpPool semantics).
- */
-
-import { act, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { getLocalDb } from '../../../db/dexie.ts';
 import { flashBus } from '../../../sync/flashBus.ts';
+import { useCombatPatch } from './useCombatPatch.ts';
 import { usePoolBumpers } from './usePoolBumpers.ts';
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000b0b1';
 const toastPush = vi.fn();
 vi.mock('../../../lib/toast.tsx', () => ({ useToasts: () => ({ push: toastPush }) }));
 
-/**
- * The hook only reads `combat`, `derived.hp`, `derived.fp`; a focused
- * partial cast keeps the fixture honest about those dependencies.
- */
-function makeCharacter(hp = 10, fp = 12): CharacterDetail {
-  return {
+async function setup(hp = 10, fp = 12, canWrite = true) {
+  const character = {
     id: CHAR_ID,
-    derived: { hp, fp },
-    combat: null,
+    derived: { hp: 10, fp: 12 },
+    combat: { currentHp: hp, currentFp: fp },
   } as unknown as CharacterDetail;
+  const db = getLocalDb();
+  await db.characterCombat.add({
+    id: CHAR_ID,
+    characterId: CHAR_ID,
+    currentHp: hp,
+    currentFp: fp,
+    conditions: [],
+    maneuver: null,
+    posture: 'standing',
+    createdAt: '',
+    updatedAt: '',
+    revision: 1,
+  });
+  const hook = renderHook(() => usePoolBumpers(character, canWrite, useCombatPatch(character)));
+  return { ...hook, db };
+}
+async function expectPools(hp: number, fp: number) {
+  await waitFor(async () =>
+    expect(await getLocalDb().characterCombat.get(CHAR_ID)).toMatchObject({
+      currentHp: hp,
+      currentFp: fp,
+    }),
+  );
 }
 
 describe('usePoolBumpers', () => {
-  it('preserves later combined and different-field edits when an earlier local save returns', async () => {
-    const pending: Array<() => void> = [];
-    const patchCombat = vi
-      .fn()
-      .mockImplementation(() => new Promise<void>((resolve) => pending.push(resolve)));
-    const character = makeCharacter(10, 10);
-    character.combat = { currentHp: 10, currentFp: 0 } as CharacterDetail['combat'];
-    const { result, rerender } = renderHook(
-      ({ current }) => usePoolBumpers(current, true, patchCombat),
-      { initialProps: { current: character } },
-    );
-    act(() => {
-      result.current.bumpFp(-1);
-      result.current.bumpFp(-1);
-      result.current.bumpHp(-1);
-    });
-    await act(async () => pending[0]?.());
-    rerender({
-      current: {
-        ...character,
-        combat: { ...character.combat, currentHp: 9, currentFp: -1 } as CharacterDetail['combat'],
-      },
-    });
-    act(() => result.current.bumpFp(-1));
-    expect(patchCombat).toHaveBeenLastCalledWith({ currentHp: 6, currentFp: -3 });
-    await act(async () => {
-      for (const resolve of pending) resolve();
-    });
-  });
-
-  it('reports a failed local pool transaction, flashes both fields and restores bumper intent', async () => {
-    const patchCombat = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('Disk full'))
-      .mockResolvedValue(undefined);
-    const flash = vi.spyOn(flashBus, 'emit');
-    const character = makeCharacter(10, 10);
-    character.combat = { currentHp: 10, currentFp: 0 } as CharacterDetail['combat'];
-    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
-    await act(async () => result.current.bumpFp(-1));
-    expect(toastPush).toHaveBeenCalledWith(expect.stringMatching(/FP and HP.*Disk full/), {
-      kind: 'error',
-    });
-    expect(flash.mock.calls.map((call) => call[0].key)).toEqual([
-      `character_combat:${CHAR_ID}:currentFp`,
-      `character_combat:${CHAR_ID}:currentHp`,
-    ]);
-    act(() => result.current.bumpFp(-1));
-    expect(patchCombat).toHaveBeenLastCalledWith({ currentFp: -1, currentHp: 9 });
-    flash.mockRestore();
-  });
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('compounds rapid same-frame -1 taps instead of overwriting (hp-2, not hp-1)', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => usePoolBumpers(makeCharacter(10, 12), true, patchCombat));
-
-    // Two taps before any re-render: without the latest-intended ref
-    // both would read the render-time hp (10) and enqueue 9 twice,
-    // silently dropping the second tap.
+  it('compounds rapid taps and reset gestures before React receives a new row', async () => {
+    const { result } = await setup();
     act(() => {
       result.current.bumpHp(-1);
       result.current.bumpHp(-1);
-    });
-
-    expect(patchCombat).toHaveBeenCalledTimes(2);
-    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentHp', 9);
-    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 8);
-  });
-
-  it('soft cap: +1 at max is blocked on first press, lands on a second press within 2 s', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    // combat: null → hp starts at derived.hp, i.e. already at max.
-    const { result } = renderHook(() => usePoolBumpers(makeCharacter(10, 12), true, patchCombat));
-
-    // First press at max: blocked, no patch fires.
-    act(() => {
-      result.current.bumpHp(+1);
-    });
-    expect(patchCombat).not.toHaveBeenCalled();
-
-    // Second press 1 s later, inside the 2 s override window: the
-    // overflow lands.
-    act(() => {
-      vi.advanceTimersByTime(1000);
-      result.current.bumpHp(+1);
-    });
-    expect(patchCombat).toHaveBeenCalledTimes(1);
-    expect(patchCombat).toHaveBeenCalledWith('currentHp', 11);
-  });
-
-  it('soft cap: a second press after the 2 s window has expired is blocked again', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => usePoolBumpers(makeCharacter(10, 12), true, patchCombat));
-
-    act(() => {
-      result.current.bumpHp(+1); // blocked at t=0
-      vi.advanceTimersByTime(2500); // window (2000 ms) has lapsed
-      result.current.bumpHp(+1); // treated as a fresh first press → blocked
-    });
-    expect(patchCombat).not.toHaveBeenCalled();
-  });
-
-  it('resets update the latest-intended ref first so a racing bump composes on top', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => usePoolBumpers(makeCharacter(10, 12), true, patchCombat));
-
-    act(() => {
-      result.current.bumpHp(-5);
       result.current.resetHp();
-      result.current.bumpHp(-1); // must compose against the reset value (10), not 5
+      result.current.bumpHp(-1);
+      result.current.bumpFp(-1);
+      result.current.resetFp();
+      result.current.bumpFp(-1);
     });
-
-    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentHp', 5);
-    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 10);
-    expect(patchCombat).toHaveBeenNthCalledWith(3, 'currentHp', 9);
+    await expectPools(9, 11);
   });
 
-  it('ignores bumps when canWrite is false', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => usePoolBumpers(makeCharacter(10, 12), false, patchCombat));
-
+  it('composes combined fatigue and independent HP changes through stale render snapshots', async () => {
+    const { result, db } = await setup(10, 0);
     act(() => {
+      result.current.bumpFp(-1);
+      result.current.bumpFp(-1);
       result.current.bumpHp(-1);
       result.current.bumpFp(-1);
     });
-    expect(patchCombat).not.toHaveBeenCalled();
+    await expectPools(6, -3);
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(2);
+    expect(new Set(ops.map((op) => op.batchId)).size).toBe(1);
   });
 
-  it('clamps HP damage at the -5×max automatic-death floor (B419) and FP at -1×max', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() => usePoolBumpers(makeCharacter(10, 12), true, patchCombat));
+  it('soft cap blocks once, then overrides within two seconds using gesture timestamps', async () => {
+    const { result, db } = await setup();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(10000);
+    act(() => result.current.bumpHp(1));
+    // Wait until the blocked gesture has actually evaluated.
+    await db.transaction('rw', db.characterCombat, db.outbox, () => undefined);
+    expect(await db.outbox.count()).toBe(0);
+    now.mockReturnValue(11000);
+    act(() => result.current.bumpHp(1));
+    await expectPools(11, 12);
+    now.mockRestore();
+  });
 
+  it('blocks again after the override window expires', async () => {
+    const { result, db } = await setup();
+    const now = vi.spyOn(Date, 'now').mockReturnValue(10000);
+    act(() => result.current.bumpHp(1));
+    now.mockReturnValue(12500);
+    act(() => result.current.bumpHp(1));
+    await db.transaction('rw', db.characterCombat, db.outbox, () => undefined);
+    expect(await db.outbox.count()).toBe(0);
+    await expectPools(10, 12);
+    now.mockRestore();
+  });
+
+  it('ignores bumps and resets without write access', async () => {
+    const { result, db } = await setup(8, 3, false);
     act(() => {
-      // 13 × -5 from hp=10 would reach -55 raw, but the floor is -50 (=-5×10).
-      for (let i = 0; i < 13; i++) result.current.bumpHp(-5);
+      result.current.bumpHp(-1);
+      result.current.bumpFp(-1);
+      result.current.resetHp();
+      result.current.resetFp();
     });
-    expect(patchCombat).toHaveBeenLastCalledWith('currentHp', -50);
+    await expectPools(8, 3);
+    expect(await db.outbox.count()).toBe(0);
+  });
 
-    patchCombat.mockClear();
+  it('clamps HP at automatic death and FP at negative maximum', async () => {
+    const { result } = await setup();
     act(() => {
-      // 5 × -5 = -13 raw from 12, floor is -12 (=-1×12).
+      for (let i = 0; i < 13; i++) result.current.bumpHp(-5);
       for (let i = 0; i < 5; i++) result.current.bumpFp(-5);
     });
-    expect(patchCombat).toHaveBeenLastCalledWith('currentFp', -12);
+    await expectPools(-50, -12);
   });
 
-  it('charges all FP lost below zero and queues both pool changes together', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    const character = makeCharacter(10, 12);
-    character.combat = { currentHp: 7, currentFp: -10 } as CharacterDetail['combat'];
-    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
-
-    act(() => {
-      result.current.bumpFp(-5);
-    });
-
-    expect(patchCombat).toHaveBeenCalledTimes(1);
-    expect(patchCombat).toHaveBeenCalledWith({ currentFp: -12, currentHp: 2 });
-    expect(result.current.flashHp).toBe(true);
+  it('charges the whole loss below zero even across the FP floor', async () => {
+    const { result, db } = await setup(7, -10);
+    act(() => result.current.bumpFp(-5));
+    await expectPools(2, -12);
+    expect(await db.outbox.count()).toBe(2);
+    await waitFor(() => expect(result.current.flashHp).toBe(true));
   });
 
-  it('charges further FP loss at the FP floor to HP without emitting a redundant FP patch', () => {
-    const patchCombat = vi.fn().mockResolvedValue(undefined);
-    const character = makeCharacter(10, 12);
-    character.combat = { currentHp: 7, currentFp: -12 } as CharacterDetail['combat'];
-    const { result } = renderHook(() => usePoolBumpers(character, true, patchCombat));
-
+  it('continues charging HP at the FP floor without redundant FP writes', async () => {
+    const { result, db } = await setup(7, -12);
     act(() => {
       result.current.bumpFp(-1);
       result.current.bumpFp(-5);
     });
+    await expectPools(1, -12);
+    expect(await db.outbox.toArray()).toMatchObject([
+      { fieldPath: 'currentHp', attemptedValue: 1, prevValue: 7 },
+    ]);
+  });
 
-    expect(patchCombat).toHaveBeenNthCalledWith(1, 'currentHp', 6);
-    expect(patchCombat).toHaveBeenNthCalledWith(2, 'currentHp', 1);
-    expect(patchCombat).toHaveBeenCalledTimes(2);
+  it('retains both pools after a local failure and applies the next gesture to durable values', async () => {
+    const { result, db } = await setup(10, 0);
+    const add = vi.spyOn(db.outbox, 'add').mockRejectedValueOnce(new Error('Disk full'));
+    const flash = vi.spyOn(flashBus, 'emit');
+    act(() => result.current.bumpFp(-1));
+    await waitFor(() =>
+      expect(toastPush).toHaveBeenCalledWith(expect.stringMatching(/FP and HP.*Disk full/), {
+        kind: 'error',
+      }),
+    );
+    await expectPools(10, 0);
+    expect(await db.outbox.count()).toBe(0);
+    expect(flash.mock.calls.map((call) => call[0])).toEqual([
+      { key: `character_combat:${CHAR_ID}:currentFp`, reason: 'Disk full', visualOnly: true },
+      { key: `character_combat:${CHAR_ID}:currentHp`, reason: 'Disk full', visualOnly: true },
+    ]);
+    add.mockRestore();
+    act(() => result.current.bumpFp(-1));
+    await expectPools(9, -1);
+    flash.mockRestore();
   });
 });

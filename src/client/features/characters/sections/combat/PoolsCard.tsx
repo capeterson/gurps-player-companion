@@ -3,8 +3,8 @@
  *
  * Shares ONE `usePoolBumpers` instance with the Combat tab's sticky mobile
  * bottom bar (lifted to CombatTab) so rapid taps across both UIs
- * compound against the same latest-intended ref instead of a second
- * instance racing the first and dropping a tap.
+ * share soft-cap override state instead of a second
+ * instance tracking its own override window. Pool writes compose in Dexie.
  */
 
 import { COMMON_CONDITIONS, POSTURES } from '../../../../../shared/constants/combat.ts';
