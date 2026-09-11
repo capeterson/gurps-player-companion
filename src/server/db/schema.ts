@@ -441,6 +441,7 @@ export const characterTraits = pgTable(
   },
   (t) => ({
     characterIdx: index('character_traits_character_idx').on(t.characterId),
+    libraryIdx: index('character_traits_library_idx').on(t.libraryTraitId),
   }),
 );
 
@@ -467,6 +468,7 @@ export const characterSkills = pgTable(
   },
   (t) => ({
     characterIdx: index('character_skills_character_idx').on(t.characterId),
+    libraryIdx: index('character_skills_library_idx').on(t.librarySkillId),
   }),
 );
 

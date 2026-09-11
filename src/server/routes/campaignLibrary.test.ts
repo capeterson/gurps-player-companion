@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
@@ -88,6 +89,76 @@ async function createTrait(
 }
 
 // ===================== CRUD =====================
+
+it.each(['traits', 'skills', 'spells', 'items', 'languages', 'techniques', 'styles'])(
+  '%s CRUD and YAML import advance the campaign HTTP cursor without any owned copies',
+  async (kind) => {
+    const owner = await registerUser(`cursor-${kind}`);
+    const campaign = await createCampaign(owner.accessToken);
+    const path = `/api/v1/campaigns/${campaign.id}/library`;
+    const request = (url: string, body?: unknown, method = 'POST') =>
+      app.request(url, {
+        method,
+        headers: jsonHeaders(owner.accessToken),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    let revision = 0;
+    const assertAdvanced = async () => {
+      const result = (await (
+        await request('/api/v1/sync/cursor', {
+          cursors: [{ entityClass: 'campaign', sinceRevision: revision }],
+        })
+      ).json()) as SyncCursorResponse;
+      const row = result.changes.find((change) => change.entityId === campaign.id);
+      if (!row) throw new Error('Library change did not advance campaign cursor');
+      expect(row.revision).toBeGreaterThan(revision);
+      revision = result.nextCursor.campaign ?? row.revision;
+    };
+    await assertAdvanced();
+    expect(
+      (await request(`/api/v1/campaigns/${campaign.id}`, { name: 'Real campaign edit' }, 'PATCH'))
+        .status,
+    ).toBe(200);
+    const createdResponse = await request(`${path}/${kind}`, {
+      name: 'Cursor source',
+      ...(kind === 'traits' ? { kind: 'advantage' } : {}),
+      ...(kind === 'skills' ? { attribute: 'DX', difficulty: 'A' } : {}),
+      ...(kind === 'techniques' ? { defaultSkillName: 'Fencing' } : {}),
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as { id: string };
+    await assertAdvanced();
+    expect(
+      (await request(`${path}/${kind}/${created.id}`, { name: 'Updated source' }, 'PATCH')).status,
+    ).toBe(200);
+    await assertAdvanced();
+    expect((await request(`${path}/${kind}/${created.id}`, undefined, 'DELETE')).status).toBe(204);
+    await assertAdvanced();
+    expect(
+      (
+        await request(`${path}/import`, {
+          yaml: JSON.stringify({ version: 6, library: { traits: [], skills: [], items: [] } }),
+          mode: 'merge',
+        })
+      ).status,
+    ).toBe(200);
+    await assertAdvanced();
+    const history = (await (
+      await request(`/api/v1/campaigns/${campaign.id}/history`, undefined, 'GET')
+    ).json()) as { entityClass: string; op: string }[];
+    expect(
+      history.filter((event) => event.entityClass === 'campaign' && event.op === 'update'),
+    ).toHaveLength(1);
+    expect(
+      history.filter((event) => event.entityClass.startsWith('campaign_library_')),
+    ).toHaveLength(3);
+    const firstPage = (await (
+      await request(`/api/v1/campaigns/${campaign.id}/history?limit=1`, undefined, 'GET')
+    ).json()) as { entityClass: string; op: string }[];
+    expect(firstPage[0]?.entityClass).toMatch(/^campaign_library_/);
+    expect(firstPage[0]?.op).toBe('delete');
+  },
+);
 
 describe('library trait CRUD', () => {
   it('POST creates with basePoints defaulting to 0; PATCH updates; DELETE removes', async () => {

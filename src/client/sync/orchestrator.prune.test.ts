@@ -11,8 +11,11 @@
  * it.  See `pruneInaccessibleLocally` in orchestrator.ts.
  */
 
+import { QueryClient } from '@tanstack/react-query';
+import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
+import { mountLibraryInvalidations } from '../features/campaigns/libraryInvalidation.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
 import { syncStateStore } from './state.ts';
@@ -57,6 +60,54 @@ const STALE_CAMPAIGN_ID = '0193b3c0-f1f0-7000-8000-00000000dc01';
 const SPECULATIVE_CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000d003';
 
 describe('accessible-set prune', () => {
+  it('refreshes the changed campaign library after HTTP commit even without a WS frame', async () => {
+    const client = new QueryClient();
+    const otherTab = new QueryClient();
+    otherTab.setQueryData(['campaigns', STALE_CAMPAIGN_ID, 'library'], { traits: [] });
+    const unmountOther = mountLibraryInvalidations(otherTab);
+    client.setQueryData(['campaigns', STALE_CAMPAIGN_ID, 'library'], { traits: [] });
+    client.setQueryData(['campaigns', 'other', 'library'], { traits: [] });
+    const unmount = mountLibraryInvalidations(client);
+    const original = client.invalidateQueries.bind(client);
+    const committed: number[] = [];
+    vi.spyOn(client, 'invalidateQueries').mockImplementation(async (...args) => {
+      committed.push((await getLocalDb().campaigns.get(STALE_CAMPAIGN_ID))?.revision ?? 0);
+      return original(...args);
+    });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'campaign',
+            entityId: STALE_CAMPAIGN_ID,
+            command: 'patch',
+            revision: 9,
+            data: { id: STALE_CAMPAIGN_ID, ownerId: 'user-1', name: 'Campaign', revision: 9 },
+          },
+        ]),
+      ),
+    );
+    try {
+      await getSyncOrchestrator().triggerCursorPull();
+      await waitFor(() => expect(committed).toEqual([9]));
+      await waitFor(() =>
+        expect(
+          otherTab.getQueryState(['campaigns', STALE_CAMPAIGN_ID, 'library'])?.isInvalidated,
+        ).toBe(true),
+      );
+      expect(client.getQueryState(['campaigns', STALE_CAMPAIGN_ID, 'library'])?.isInvalidated).toBe(
+        true,
+      );
+      expect(client.getQueryState(['campaigns', 'other', 'library'])?.isInvalidated).toBe(false);
+    } finally {
+      unmount();
+      unmountOther();
+      otherTab.clear();
+      client.clear();
+    }
+  });
   it('prunes a stale foreign character + all child rows + a stale campaign', async () => {
     const db = getLocalDb();
     await db.characters.bulkPut([

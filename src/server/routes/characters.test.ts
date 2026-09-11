@@ -8,14 +8,256 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { sql } from 'drizzle-orm';
+import {
+  type CharacterDetailInputCharacter,
+  type CharacterDetailInputSkill,
+  type CharacterDetailInputTrait,
+  buildCharacterDetail,
+} from '../../shared/domain/characterDetail.ts';
+import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
+import { getDb } from '../db/client.ts';
+import { subscribe } from '../services/wsBus.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
 configureIntegrationTestEnvironment();
 
 const app = createApp(integrationTestConfig);
+
+describe('library changes propagate through incremental character cursors', () => {
+  it.each(['traits', 'skills'] as const)('repairs pre-migration %s cursors', async (kind) => {
+    const owner = await registerUser(`fanout-migration-${kind}`);
+    const campaign = await createCampaign(owner.accessToken);
+    const request = (path: string, body: unknown) =>
+      app.request(`/api/v1${path}`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify(body),
+      });
+    const source = (await (
+      await request(`/campaigns/${campaign.id}/library/${kind}`, {
+        name: 'Migration source',
+        ...(kind === 'traits' ? { kind: 'advantage' } : { attribute: 'DX', difficulty: 'A' }),
+        effects: [{ target: 'dx', value: 3 }],
+      })
+    ).json()) as { id: string };
+    const character = await createCharacter(owner.accessToken, { campaignId: campaign.id });
+    expect(
+      (
+        await request(`/characters/${character.id}/${kind}`, {
+          name: 'Migration copy',
+          ...(kind === 'traits'
+            ? { kind: 'advantage', libraryTraitId: source.id }
+            : { attribute: 'DX', difficulty: 'A', librarySkillId: source.id }),
+        })
+      ).status,
+    ).toBe(201);
+    const entityClass = kind === 'traits' ? 'character_trait' : 'character_skill';
+    const initial = (await (
+      await request('/sync/cursor', { cursors: [{ entityClass, sinceRevision: 0 }] })
+    ).json()) as SyncCursorResponse;
+    const before = initial.changes.find(
+      (row) => (row.data as { characterId?: string }).characterId === character.id,
+    );
+    if (!before) throw new Error('Missing initial copy');
+    const migration = await Bun.file(
+      new URL('../db/migrations/0035_library_revision_fanout.sql', import.meta.url),
+    ).text();
+    // Simulate an installation before the one-time repair marker was written.
+    await getDb().execute(sql`COMMENT ON FUNCTION invalidate_owned_library_mechanics() IS NULL`);
+    for (const statement of migration.split('--> statement-breakpoint'))
+      await getDb().execute(sql.raw(statement));
+    const repaired = (await (
+      await request('/sync/cursor', {
+        cursors: [{ entityClass, sinceRevision: initial.nextCursor[entityClass] }],
+      })
+    ).json()) as SyncCursorResponse;
+    expect(
+      repaired.changes.find((row) => row.entityId === before.entityId)?.revision,
+    ).toBeGreaterThan(before.revision);
+    // Reapplying migration SQL must not advance the repaired row again.
+    for (const statement of migration.split('--> statement-breakpoint'))
+      await getDb().execute(sql.raw(statement));
+    const replay = (await (
+      await request('/sync/cursor', {
+        cursors: [{ entityClass, sinceRevision: repaired.nextCursor[entityClass] }],
+      })
+    ).json()) as SyncCursorResponse;
+    expect(replay.changes.some((row) => row.entityId === before.entityId)).toBe(false);
+  });
+  it.each(['traits', 'skills'] as const)(
+    'updates two %s clients after CRUD and YAML replace, without relying on WS',
+    async (kind) => {
+      const gm = await registerUser(`fanout-gm-${kind}`);
+      const player = await registerUser(`fanout-player-${kind}`);
+      const outsider = await registerUser(`fanout-outsider-${kind}`);
+      const campaign = await createCampaign(gm.accessToken);
+      await addMember(gm.accessToken, String(campaign.id), player.email);
+      const request = (token: string, path: string, body?: unknown, method = 'POST') =>
+        app.request(`/api/v1${path}`, {
+          method,
+          headers: jsonHeaders(token),
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        });
+      const template = {
+        name: 'Augmented',
+        ...(kind === 'traits'
+          ? { kind: 'advantage', basePoints: 10 }
+          : { attribute: 'DX', difficulty: 'A' }),
+      };
+      const effects = (value: number) => [{ target: 'dx', value, scaling: 'flat' }];
+      const sourceResponse = await request(
+        gm.accessToken,
+        `/campaigns/${campaign.id}/library/${kind}`,
+        { ...template, effects: effects(2) },
+      );
+      expect(sourceResponse.status).toBe(201);
+      const source = (await sourceResponse.json()) as { id: string };
+      const character = await createCharacter(player.accessToken, { campaignId: campaign.id });
+      const attached = await request(player.accessToken, `/characters/${character.id}/${kind}`, {
+        name: template.name,
+        points: 10,
+        ...(kind === 'traits'
+          ? { kind: 'advantage', libraryTraitId: source.id }
+          : { attribute: 'DX', difficulty: 'A', librarySkillId: source.id }),
+      });
+      expect(attached.status).toBe(201);
+      const entityClass = kind === 'traits' ? 'character_trait' : 'character_skill';
+      const pull = async (token: string, sinceRevision: number) => {
+        const response = await request(token, '/sync/cursor', {
+          cursors: [{ entityClass, sinceRevision }],
+        });
+        expect(response.status).toBe(200);
+        return (await response.json()) as SyncCursorResponse;
+      };
+      const initial = await pull(player.accessToken, 0);
+      const first = initial.changes.find(
+        (change) => (change.data as { characterId?: string }).characterId === character.id,
+      );
+      if (!first) throw new Error('Missing initial child');
+      const baseline = initial.nextCursor[entityClass] ?? 0;
+      const messages: string[] = [];
+      const outsiderMessages: string[] = [];
+      const stop = subscribe(decodeUserId(player.accessToken), {
+        send: (text) => messages.push(text),
+      });
+      const stopOutsider = subscribe(decodeUserId(outsider.accessToken), {
+        send: (text) => outsiderMessages.push(text),
+      });
+      try {
+        const patch = await request(
+          gm.accessToken,
+          `/campaigns/${campaign.id}/library/${kind}/${source.id}`,
+          { effects: effects(4) },
+          'PATCH',
+        );
+        expect(patch.status).toBe(200);
+        expect(messages.map((message) => JSON.parse(message))).toEqual([
+          {
+            kind: 'sync_invalidate',
+            campaignId: campaign.id,
+            entityClasses: ['character_trait', 'character_skill'],
+            emittedAt: expect.any(String),
+          },
+        ]);
+        expect(outsiderMessages).toEqual([]);
+        const assertClient = async (cursor: number, expectedDx: number) => {
+          const response = await pull(player.accessToken, cursor);
+          const change = response.changes.find((row) => row.entityId === first.entityId);
+          if (!change) throw new Error('Library-only change was missed by incremental cursor');
+          expect(change.revision).toBeGreaterThan(cursor);
+          const data = change.data as Record<string, unknown>;
+          const declarations = ownedLibraryEffects(
+            source.id,
+            String(campaign.id),
+            data.libraryMechanics,
+          );
+          expect(declarations).not.toBeNull();
+          const detailResponse = await request(
+            player.accessToken,
+            `/characters/${character.id}`,
+            undefined,
+            'GET',
+          );
+          const api = (await detailResponse.json()) as CharacterDetail;
+          const rootResponse = await request(player.accessToken, '/sync/cursor', {
+            cursors: [{ entityClass: 'character', sinceRevision: 0 }],
+          });
+          const root = ((await rootResponse.json()) as SyncCursorResponse).changes.find(
+            (row) => row.entityId === character.id,
+          )?.data as CharacterDetailInputCharacter;
+          const local = buildCharacterDetail({
+            character: root,
+            traits:
+              kind === 'traits'
+                ? [{ ...data, libraryEffects: declarations } as CharacterDetailInputTrait]
+                : [],
+            skills:
+              kind === 'skills'
+                ? [{ ...data, libraryEffects: declarations } as CharacterDetailInputSkill]
+                : [],
+            spells: [],
+            languages: [],
+            techniques: [],
+            inventory: [],
+            combat: null,
+            campaign: null,
+          });
+          expect(local.derived.effectiveDx).toBe(expectedDx);
+          expect(local.derived).toEqual(api.derived);
+          return response.nextCursor[entityClass] ?? 0;
+        };
+        const onlineCursor = await assertClient(baseline, 14);
+        // The other device remains offline at baseline, missing both WS nudges.
+        const yaml = JSON.stringify({
+          version: 6,
+          library: {
+            traits: kind === 'traits' ? [{ ...template, effects: effects(6) }] : [],
+            skills: kind === 'skills' ? [{ ...template, effects: effects(6) }] : [],
+            items: [],
+          },
+        });
+        expect(
+          (
+            await request(gm.accessToken, `/campaigns/${campaign.id}/library/import`, {
+              yaml,
+              mode: 'replace',
+            })
+          ).status,
+        ).toBe(200);
+        const latest = await assertClient(onlineCursor, 16);
+        await assertClient(baseline, 16); // offline client reconnects by HTTP only
+        expect(messages).toHaveLength(2);
+        const denied = await pull(outsider.accessToken, 0);
+        expect(denied.changes.some((row) => row.entityId === first.entityId)).toBe(false);
+        expect(
+          (
+            await request(
+              gm.accessToken,
+              `/campaigns/${campaign.id}/library/${kind}/${source.id}`,
+              undefined,
+              'DELETE',
+            )
+          ).status,
+        ).toBe(204);
+        const deleted = (await pull(player.accessToken, latest)).changes.find(
+          (row) => row.entityId === first.entityId,
+        );
+        expect(
+          libraryMechanics.parse((deleted?.data as Record<string, unknown>)?.libraryMechanics)
+            .effects,
+        ).toBeNull();
+      } finally {
+        stop();
+        stopOutsider();
+      }
+    },
+  );
+});
 
 describe('character-owned library declarations in the cursor', () => {
   it.each(['traits', 'skills'] as const)(

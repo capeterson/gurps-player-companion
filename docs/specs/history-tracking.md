@@ -2,15 +2,24 @@
 
 ## Context
 
-GURPS Player Companion is a local-first PWA (React 19 + Dexie/IndexedDB) backed by a Bun/Hono/Postgres/Drizzle server. Today the app records *current* state and a `revision` per row, plus `entity_tombstones` for deletes — but there is **no human-readable history** of what changed, when, and by whom. Players cannot review past edits to their sheet, and a GM has no way to audit changes across the characters in their campaign.
+GURPS Player Companion is a local-first PWA (React 19 + Dexie/IndexedDB) backed by a Bun/Hono/Postgres/Drizzle server. Alongside current rows, revisions, and deletion tombstones, the app records an append-only audit log. Players can review sheet edits and campaign owners can inspect campaign history.
 
-This spec adds an **append-only history/audit log** that:
+The **append-only history/audit log**:
 - Captures every mutation to characters (attributes incl. **temporary stat boosts**, traits, skills, spells, inventory, combat) and to campaign-level data (settings, membership, library, adventure log).
 - Surfaces a **History tab** on the character sheet (one-line summaries; foldable detail for batched changes) and a **History view** on the campaign page (campaign-level changes only).
 - Provides **local filtering & search** over loaded history.
+
+Library trait/skill updates and deletions also advance referencing character-child
+revisions in the same audited transaction (migration 0035). Existing child history
+triggers record these refreshes with the library writer as actor; the campaign
+library event retains the definition change itself.
 - Becomes a **required baseline**: every new syncable table must participate in history capture, enforced by an automated test.
 
 Chosen approach: **Postgres triggers** for capture, **paginated REST endpoints** for delivery, **indefinite retention**.
+
+Campaign updates that change only `updated_at`/`revision` (library cursor bookkeeping)
+remain in the append-only audit table but are excluded before pagination from the
+campaign history feed. Actual campaign and library changes remain visible.
 
 ### Why triggers (the key architectural decision)
 All *character* writes funnel through one server chokepoint — `dispatchOperation()` in `src/server/services/syncDispatch.ts`. But *campaign* writes (settings, membership, library, adventure log) go through separate REST routes (`campaigns.ts`, `invitations.ts`, `campaignLibrary.ts`, `adventureLog.ts`) and do **not** pass through sync. A database-trigger capture sits *below* both paths, so it records every write uniformly with no per-route bookkeeping. It also reuses machinery the codebase already trusts: the `bump_revision()` BEFORE-UPDATE trigger (migration `0002`/`0004`) and the `record_*_tombstone()` AFTER-DELETE triggers (migration `0003`/`0004`) on the same set of syncable tables.
