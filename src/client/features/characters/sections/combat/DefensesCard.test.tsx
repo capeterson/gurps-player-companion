@@ -12,6 +12,7 @@ import type { CharacterAttrs } from '../../../../../shared/domain/characterCalc.
 import { applyEffectsToAttrs, resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { RollRequest } from '../rollTypes.ts';
+import { AttacksCard } from './AttacksCard.tsx';
 import { DefensesCard } from './DefensesCard.tsx';
 
 interface WeaponItem {
@@ -90,6 +91,75 @@ function targetFor(openRoll: ReturnType<typeof vi.fn>, index: number): number {
 }
 
 describe('DefensesCard', () => {
+  it.each(['All-Out Attack', 'Move and Attack'])(
+    'preserves permanent parry diagnostics during %s',
+    (maneuver) => {
+      const character = makeCharacter(
+        [
+          { id: 'no', name: 'No blade', parry: 'No', skill: 'Sword' },
+          { id: 'custom', name: 'Custom blade', parry: 'homebrew', skill: 'Sword' },
+          { id: 'missing', name: 'Missing skill blade', parry: '0', skill: 'Absent' },
+          { id: 'valid', name: 'Valid blade', parry: '0', skill: 'Sword' },
+        ],
+        [{ name: 'Sword', level: 14 }],
+      );
+      character.combat = { maneuver } as CharacterDetail['combat'];
+      render(<DefensesCard character={character} openRoll={vi.fn()} />);
+      expect(screen.getByText('No')).toBeInTheDocument();
+      expect(screen.getByText('homebrew')).toBeInTheDocument();
+      expect(screen.getByText("skill 'Absent' not on sheet")).toBeInTheDocument();
+      expect(screen.getByText('Parry (Valid blade) — unavailable')).toBeInTheDocument();
+      for (const name of ['No blade', 'Custom blade', 'Missing skill blade']) {
+        expect(screen.queryByText(`Parry (${name}) — unavailable`)).not.toBeInTheDocument();
+      }
+      expect(screen.queryByRole('button', { name: /^Parry/ })).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    [10, 3, 9, 7],
+    [11, 3, 10, 8],
+    [10, 4, 14, 10],
+  ])('uses the same usable ST for attacks and parries (ST%s, FP%s)', (st, fp, attack, parry) => {
+    const character = makeCharacter(
+      [{ id: 'sword', name: 'Sword', parry: '0', skill: 'Sword', stRequired: 10 }],
+      [{ name: 'Sword', level: 14 }],
+    );
+    character.derived = {
+      ...character.derived,
+      effectiveSt: st,
+      hp: 12,
+      fp: 12,
+      thrust: '1d-2',
+      swing: '1d',
+    };
+    character.combat = { currentHp: 12, currentFp: fp } as CharacterDetail['combat'];
+    const weapon = character.inventory[0];
+    if (!weapon?.weaponData) throw new Error('Missing test weapon');
+    weapon.weaponData = { ...weapon.weaponData, damage: 'sw+1 cut' };
+    const openRoll = vi.fn();
+    const sheet = () => (
+      <>
+        <AttacksCard character={character} openRoll={openRoll} />
+        <DefensesCard character={character} openRoll={openRoll} />
+      </>
+    );
+    const view = render(sheet());
+    fireEvent.click(screen.getByRole('button', { name: /^Sword/ }));
+    expect(targetFor(openRoll, 0)).toBe(attack);
+    fireEvent.click(screen.getByRole('button', { name: /^Parry/ }));
+    expect(targetFor(openRoll, 1)).toBe(parry);
+    // B426 leaves ST-based damage intact even when usable ST is halved.
+    fireEvent.click(screen.getByRole('button', { name: '1d+1 cut' }));
+    expect(openRoll.mock.calls[2]?.[0].damage.dice).toEqual({ dice: 1, adds: 1 });
+    character.combat = { ...character.combat, currentFp: 12 } as CharacterDetail['combat'];
+    view.rerender(sheet());
+    fireEvent.click(screen.getByRole('button', { name: /^Sword/ }));
+    expect(targetFor(openRoll, 3)).toBe(14);
+    fireEvent.click(screen.getByRole('button', { name: /^Parry/ }));
+    expect(targetFor(openRoll, 4)).toBe(10);
+  });
+
   function liveCharacter() {
     const c = makeCharacter(
       [

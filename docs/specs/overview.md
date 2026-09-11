@@ -329,13 +329,16 @@ on any sheet the viewer can edit — their own — it always shows).
     one-third HP and below one-third FP, cumulatively with rounding up
     (B419/B426; [official FAQ 3.4.5.7](https://www.sjgames.com/gurps/faq/FAQ4-3.html)).
     Encumbrance precedes these reductions; DB and situational defense modifiers
-    follow them (B374). Low FP also halves usable ST for weapon parry shortfall,
+    follow them (B374). Low FP also halves usable ST for minimum-ST penalties
+    on both weapon attacks and parries,
     without changing ST-based damage. Manual Reeling and Shock chips do not
     trigger a second numerical penalty. Recorded stun adds −4, posture adds
     the B551 defense penalty and limits movement, and known maneuvers limit
     movement to their full/half/step/none allowance. All-Out Attack, unconsciousness,
     sleeping, and the negative-FP floor disable defense actions; Move and Attack
-    disables parry. All-Out Defense offers a local roll option: +2 to the chosen
+    disables parry. Permanent non-rollable parries retain their raw notation and
+    missing-skill diagnostics during these restrictions. All-Out Defense offers
+    a local roll option: +2 to the chosen
     defense or Double Defense (no numerical bonus), with the selected chip highlighted.
     Only Increased Dodge permits half Move; the other options permit a step (B366).
     Evaluate permits a step; Wait permits no movement until its trigger (B364/B366).
