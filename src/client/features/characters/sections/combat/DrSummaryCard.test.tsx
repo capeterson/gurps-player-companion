@@ -42,7 +42,10 @@ describe('DrSummaryCard', () => {
       render(<DrSummaryCard character={makeCharacter([])} canWrite hpMax={10} bumpHp={vi.fn()} />);
       fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
       fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
-      fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: 'arm_left' } });
+      fireEvent.change(
+        within(screen.getByRole('dialog', { hidden: true })).getByLabelText('Hit location'),
+        { target: { value: 'arm_left' } },
+      );
       fireEvent.change(screen.getByLabelText('Type'), {
         target: { value: type === ' CUT ' ? '__other' : type },
       });
