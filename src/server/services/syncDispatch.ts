@@ -1,3 +1,4 @@
+import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
 /**
  * Per-operation dispatcher for /api/v1/sync/operations.
  *
@@ -63,6 +64,7 @@ import {
   techniqueInsertValues,
   traitInsertValues,
 } from './entityWrites.ts';
+import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 import { buildPatchSet } from './patchSet.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
@@ -188,6 +190,14 @@ export async function dispatchOperation(
     }
     return outcome;
   } catch (err) {
+    // The first create may have committed before its response was lost. A
+    // retry can now fail source validation (deleted source, moved campaign,
+    // removed membership) before reaching the unique constraint. Resolve the
+    // saved, still-writable entity after rollback before classifying the error.
+    if (op.command === 'create') {
+      const replayed = await resolveReplayedCreate(ctx.userId, op);
+      if (replayed) return replayed;
+    }
     if (err instanceof HTTPException) {
       // 403 / 404 → unauthorized (the client doesn't get to see the
       // distinction; "you can't touch this" is the only useful signal).
@@ -206,17 +216,7 @@ export async function dispatchOperation(
       };
     }
     if (isUniqueViolation(err)) {
-      // A `create` hitting a unique violation is very often the client
-      // replaying an op whose ack got lost (crash / network drop after
-      // the server applied it).  Treating that as a conflict makes the
-      // client roll back — deleting its perfectly good local row.  If
-      // the row with the client's id already exists and the user may
-      // write it, the create already happened: report `applied` with
-      // the current revision so the replay settles idempotently.
-      if (op.command === 'create') {
-        const replayed = await resolveReplayedCreate(ctx.userId, op);
-        if (replayed) return replayed;
-      }
+      // Authorized replays were resolved above; this is a genuine collision.
       return { clientOpId: op.clientOpId, status: 'conflict', reason: 'unique constraint' };
     }
     // Network / serialization / unexpected: tell the client to retry.
@@ -286,7 +286,7 @@ async function publishSyncInvalidation(actorId: string, op: OperationEnvelope): 
 }
 
 /**
- * Check whether a unique-violating `create` is a replay of an op the
+ * Check whether a failed `create` is a replay of an op the
  * server already applied.  Returns an `applied` outcome carrying the
  * existing row's revision when the entity with the client-supplied id
  * exists and the user is allowed to write it; null otherwise (genuine
@@ -467,6 +467,7 @@ async function dispatchCharacter(
     entityClass: 'character',
     tx,
     table: characters,
+    prepareUpdates: (updates) => detachLibraryReferencesForTransfer(tx, op.entityId, updates),
     parentLookup: () => loadCharacterOr403(op.entityId, ctx.userId).then((a) => a.character),
     childWhere: () => eq(characters.id, op.entityId),
     valueTransform: (field, value) => {
@@ -492,7 +493,15 @@ async function dispatchTrait(
     assertWrite(access);
     const [created] = await tx
       .insert(characterTraits)
-      .values(traitInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'traits',
+          traitInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -525,6 +534,9 @@ async function dispatchTrait(
     entityClass: 'character_trait',
     tx,
     table: characterTraits,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'traits', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -554,7 +566,15 @@ async function dispatchSkill(
     assertWrite(access);
     const [created] = await tx
       .insert(characterSkills)
-      .values(skillInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'skills',
+          skillInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -582,6 +602,9 @@ async function dispatchSkill(
     entityClass: 'character_skill',
     tx,
     table: characterSkills,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'skills', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -611,7 +634,15 @@ async function dispatchSpell(
     assertWrite(access);
     const [created] = await tx
       .insert(characterSpells)
-      .values(spellInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'spells',
+          spellInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -639,6 +670,9 @@ async function dispatchSpell(
     entityClass: 'character_spell',
     tx,
     table: characterSpells,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'spells', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -668,7 +702,15 @@ async function dispatchLanguage(
     assertWrite(access);
     const [created] = await tx
       .insert(characterLanguages)
-      .values(languageInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'languages',
+          languageInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -699,6 +741,9 @@ async function dispatchLanguage(
     entityClass: 'character_language',
     tx,
     table: characterLanguages,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'languages', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -731,7 +776,15 @@ async function dispatchTechnique(
     assertWrite(access);
     const [created] = await tx
       .insert(characterTechniques)
-      .values(techniqueInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'techniques',
+          techniqueInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -762,6 +815,16 @@ async function dispatchTechnique(
     entityClass: 'character_technique',
     tx,
     table: characterTechniques,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(
+        tx,
+        ctx.userId,
+        characterId,
+        'techniques',
+        updates,
+        op.entityId,
+      );
+    },
     parentLookup: async () => {
       const [row] = await getDb()
         .select()
@@ -797,11 +860,7 @@ async function dispatchInventory(
     assertWrite(access);
     // Lock the character row to prevent race conditions on inventory parent
     // validation, then validate the parent item if specified.
-    await tx
-      .select({ id: characters.id })
-      .from(characters)
-      .where(eq(characters.id, characterId))
-      .for('update');
+    await lockLibraryReferenceScope(tx, characterId, ctx.userId);
     if (body.parentId) {
       const [parent] = await tx
         .select({ id: inventoryItems.id })
@@ -817,7 +876,15 @@ async function dispatchInventory(
     }
     const [created] = await tx
       .insert(inventoryItems)
-      .values(inventoryInsertValues(body, { characterId, id: op.entityId }))
+      .values(
+        await prepareLibraryReference(
+          tx,
+          ctx.userId,
+          characterId,
+          'items',
+          inventoryInsertValues(body, { characterId, id: op.entityId }),
+        ),
+      )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return appliedOutcome(op, Number(created.revision));
@@ -854,17 +921,16 @@ async function dispatchInventory(
   // Serialize inventory-tree checks with REST mutations for this character.
   // Validation and the write must share this transaction; otherwise two
   // concurrent reparent operations can both approve a cycle.
-  await tx
-    .select({ id: characters.id })
-    .from(characters)
-    .where(eq(characters.id, characterId))
-    .for('update');
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return await patchEntity({
     op,
     userId: ctx.userId,
     entityClass: 'character_inventory',
     tx,
     table: inventoryItems,
+    prepareUpdates: async (updates) => {
+      await prepareLibraryReference(tx, ctx.userId, characterId, 'items', updates, op.entityId);
+    },
     parentLookup: async () => {
       const [row] = await tx
         .select()
@@ -1024,6 +1090,7 @@ interface PatchEntityArgs {
   readonly childWhere: () => any;
   readonly valueTransform?: (field: string, value: unknown) => unknown | Promise<unknown>;
   readonly extraValidate?: (field: string, value: unknown) => Promise<void> | void;
+  readonly prepareUpdates?: (updates: Record<string, unknown>) => Promise<void>;
 }
 
 async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
@@ -1066,6 +1133,7 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
         latestEntity: current,
       };
     }
+    await args.prepareUpdates?.(updates);
     const result = await tx.update(table).set(updates).where(childWhere()).returning();
     const updated = result[0];
     if (!updated) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };
@@ -1107,6 +1175,7 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
     [fieldPath]: transformed,
     updatedAt: new Date(),
   };
+  await args.prepareUpdates?.(updates);
   const result = await tx.update(table).set(updates).where(childWhere()).returning();
   const updated = result[0];
   if (!updated) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };

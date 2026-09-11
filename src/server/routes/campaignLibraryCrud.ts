@@ -34,6 +34,7 @@ import {
   advanceLibraryCampaignRevision,
   publishLibraryInvalidation,
 } from '../services/libraryInvalidation.ts';
+import { refreshOwnedLibraryMechanics } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import type { LibraryEntityConfig, LibraryTable } from './campaignLibraryEntities.ts';
 
@@ -205,6 +206,7 @@ export function registerLibraryCrud<
             .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
             .returning()) as TTable['$inferSelect'][];
           if (!updated) throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+          await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, id, itemId);
           return updated;
         });
       } catch (err) {
@@ -242,6 +244,7 @@ export function registerLibraryCrud<
       await requireCampaignOwner(id, user.id);
       const result = await withAudit(user.id, undefined, async (tx) => {
         await advanceLibraryCampaignRevision(tx, id);
+        await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, id, itemId, true);
         const deleted = (await tx
           .delete(asTable(cfg.table))
           .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
@@ -301,6 +304,7 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
         .update(asTable(cfg.table))
         .set({ ...cfg.toUpdateValues(entry), updatedAt: new Date() })
         .where(eq(cfg.table.id, existingRow.id));
+      await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, String(existingRow.id));
       updated++;
     } else {
       await tx.insert(asTable(cfg.table)).values(cfg.toInsertValues(campaignId, entry));
@@ -311,6 +315,7 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
   if (mode === 'replace' && incoming !== undefined) {
     for (const row of existing) {
       if (!incomingKeys.has(cfg.keyOf(row as { name: string; kind?: string }))) {
+        await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, String(row.id), true);
         await tx.delete(asTable(cfg.table)).where(eq(cfg.table.id, row.id));
         deleted++;
       }

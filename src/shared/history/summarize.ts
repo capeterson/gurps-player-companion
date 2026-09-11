@@ -259,6 +259,23 @@ function summarizeCharacter(
   return describeFieldChanges('Character', changes);
 }
 
+function summarizeOwnedMechanics(
+  name: unknown,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string | null {
+  if (JSON.stringify(old?.libraryMechanics) === JSON.stringify(next?.libraryMechanics)) return null;
+  const copy = next?.libraryMechanics as {
+    detached?: boolean;
+    sourceRevision?: number;
+    effects?: unknown;
+  } | null;
+  if (!copy) return `${name}: library rules cleared`;
+  if (copy.effects === null) return `${name}: library rules unresolved`;
+  if (copy.detached) return `${name}: saved library rules retained after detaching`;
+  return `${name}: library rules updated to version ${copy.sourceRevision}`;
+}
+
 function summarizeCharacterTrait(
   op: string,
   old: Record<string, unknown> | null,
@@ -267,6 +284,8 @@ function summarizeCharacterTrait(
   const name = next?.name ?? old?.name ?? 'trait';
   if (op === 'insert') return `Added ${old?.kind ?? next?.kind ?? 'trait'} ${name}`;
   if (op === 'delete') return `Removed ${old?.kind ?? 'trait'} ${old?.name ?? ''}`;
+  const mechanics = summarizeOwnedMechanics(name, old, next);
+  if (mechanics) return mechanics;
   const changes = diffRows(old, next);
   if (changes.length === 0) return `Trait ${name} updated`;
   const c = changes[0] as FieldChange;
@@ -288,6 +307,8 @@ function summarizeCharacterSkill(
   const fullName = spec ? `${name} (${spec})` : name;
   if (op === 'insert') return `Added skill ${fullName} (${attr}/${diff})`;
   if (op === 'delete') return `Removed skill ${old?.name ?? ''}`;
+  const mechanics = summarizeOwnedMechanics(fullName, old, next);
+  if (mechanics) return mechanics;
   const changes = diffRows(old, next);
   if (changes.length === 0) return `Skill ${name} updated`;
   const c = changes[0] as FieldChange;

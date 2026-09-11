@@ -53,7 +53,11 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
   const [picked, setPicked] = useState<LibrarySpellOut | null>(null);
 
   const { fetchOptions } = useLibraryFetcher<LibrarySpellOut>('spells', campaignId);
-  const { creating, submit: submitEntity } = useAddEntityForm({
+  const {
+    creating,
+    submit: submitEntity,
+    flashProps,
+  } = useAddEntityForm({
     entityClass: 'character_spell',
     characterId,
     label: 'spell',
@@ -101,7 +105,8 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
 
   return (
     <form
-      className="flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      {...flashProps}
+      className="field-rollback-flash flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;

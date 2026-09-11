@@ -32,6 +32,10 @@ Authorization is centralized in `src/server/auth/permissions.ts`:
 (owner **or** manager), `requireCampaignMember`. The owner short-circuits every
 check — an owner is treated as having every role.
 
+Removing a member detaches the live library references on that member's characters
+in the campaign while retaining their saved rules and campaign association. Later
+library edits no longer change those copies. New links require current library access.
+
 Endpoints (`src/server/routes/campaigns.ts`):
 `POST/GET /campaigns`, `GET/PATCH/DELETE /campaigns/{id}`,
 `POST /campaigns/{id}/members`, `PATCH/DELETE /campaigns/{id}/members/{userId}`,
@@ -265,13 +269,48 @@ newer selection, even one with the same base name. Sheet rows, rolls, roll histo
 GM lookup identify specialized skills by `skillDisplayName`; the GM lookup keeps
 each specialty selectable and reports its effective level.
 
-Trait/skill effect declarations remain live-linked and versioned. Library CRUD
+Trait/skill effect declarations are materialized on the owned character rows,
+live-linked and versioned while their source exists. Library CRUD
 and YAML import advance referencing child revisions in the same transaction, so
 other devices refresh calculations through their normal HTTP cursor even if a WS
 nudge is dropped. Library writes also advance the campaign revision so committed
 HTTP pulls invalidate its library editor/autocomplete query, including definitions
 with no owned copies. Post-commit campaign-scoped nudges only accelerate the pull. Character share
 gates still apply to every emitted child row; nudges carry no definitions.
+
+Changing a source trait's kind detaches owned traits that retain
+the previous kind; their last saved rules and paid choices remain unchanged by
+that edit or later source updates. Changing an owned trait's kind through REST
+or sync also detaches an incompatible existing link while retaining its saved
+rules. Trait/skill add forms reject picks from a previous campaign with a toast
+and form flash, preserving the draft until the user chooses a current definition.
+Provisional mechanics retain the picked definition's actual campaign provenance.
+Deletion detaches owned copies and retains
+their last effects and source
+version. YAML replacement with a renamed natural key follows the same path;
+recreating the old name cannot reconnect a different UUID. Campaign transfers
+detach all six live library reference types and preserve owned trait/skill rules,
+paid points, levels, variants, modifiers and skill specialties. Retained source
+IDs/campaigns are provenance only. Missing legacy copies remain visibly unresolved.
+Copy capture holds a parent character lock until the write commits, so a concurrent
+transfer includes that copy when detaching references. Campaign deletion locks the
+campaign before enumerating characters, excluding incoming assignments during cleanup.
+Migration 0036 backfills only sources matching the character's campaign. Legacy
+traits whose mutable kind no longer matches their source retain those declarations
+as detached copies; no foreign library lookup is used for calculations.
+
+Character links to all six library definition types pass through
+`services/libraryReferences.ts` on REST create/patch and sync create/field/whole-body
+patch. The definition must exist in the character's current campaign, the actor
+must still be a member or owner, and a trait's kind must match. Foreign, missing,
+wrong-kind and campaignless references return the same generic forbidden error;
+no private definition is looked up for calculations. Campaign and character locks
+serialize reference assignment with transfers and membership removal. Cleanup
+rechecks the original campaign under the character lock before detaching a copy.
+Every child create/patch rechecks write access under the campaign, character and
+membership locks, including edits without a source reference. The locked decision
+uses the same owner/staff rules as ordinary authorization: revoking staff editing
+or demoting a manager while a write waits prevents that write from committing.
 
 ### YAML import/export (cross-campaign sharing)
 

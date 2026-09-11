@@ -21,6 +21,7 @@ import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { resolveCharacterView } from '../services/characterAccess.ts';
 import { loadCharacterDetail } from '../services/characterSummary.ts';
 import { characterInsertValues } from '../services/entityWrites.ts';
+import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import { decideCharacterAccess } from './sync.ts';
 
@@ -241,9 +242,10 @@ router.openapi(
       await loadCampaignOr403(body.campaignId, user.id);
     }
     const updates = buildPatchSet(body);
-    await withAudit(user.id, undefined, (tx) =>
-      tx.update(characters).set(updates).where(eq(characters.id, id)),
-    );
+    await withAudit(user.id, undefined, async (tx) => {
+      await detachLibraryReferencesForTransfer(tx, id, updates);
+      await tx.update(characters).set(updates).where(eq(characters.id, id));
+    });
     return c.json(await loadCharacterDetail(id), 200);
   },
 );

@@ -26,12 +26,24 @@ Everything else is either read-only in the local store or fully online:
   library, adventure log, invitations, notifications, settings, admin.
 
 Library editing remains online-only, but calculation no longer depends on its
-React Query cache. The trait/skill cursor projects `libraryMechanics` onto each
-character child: source ID, current campaign, source revision and raw effect
-declarations. `effects: []` is known empty; `effects: null` is unresolved. Source
-lookups are restricted to the character's campaign and the viewer's accessible
-campaigns, after the character share gate. No names or other source metadata are
-copied. The projection is read-only and never accepted as an outbox field.
+React Query cache. Trait/skill rows persist `libraryMechanics` in Postgres and
+Dexie: source ID, source campaign, source revision, raw effect declarations, and
+an optional `detached` flag. `effects: []` is known empty; `effects: null` is
+unresolved. Server and client derive from the same owned copy; the cursor reads
+it after the character share gate without fetching live source data. The field
+is read-only and never accepted as an outbox patch or caller-supplied snapshot.
+
+Selecting an already loaded definition also seeds validated local-only declarations
+into the speculative create row, in the same Dexie transaction as its outbox entry.
+They survive offline reloads and are excluded from the operation envelope; the server
+captures its own authoritative source version. A rejected create removes that copy,
+persists the rejection notice, and flashes the corresponding add form. Invalid local
+metadata aborts the transaction without leaving a row or queued operation.
+All six source reference types are authorized through the same transactional
+resolver for REST and sync creates and patches (including whole-body patches).
+Missing, foreign, wrong-kind or no-longer-authorized definitions are rejected;
+create rollbacks flash the actual trait/skill/spell/language/technique/inventory
+add form as well as persisting the toast. Member removal retains detached copies.
 
 The declarations live in existing character stores, so normal logout/account
 switch purge and minimal-view cleanup remove them with their owning rows. Cursor
@@ -40,9 +52,12 @@ readers also verify the source ID/campaign against current local intent. Dexie v
 clears only trait/skill cursors once so existing installations backfill on their
 next online pull. Until then unresolved linked calculations show an unavailable
 state. A failed pull retains the last valid declarations. Library definitions use
-a live-link policy: migration `0035_library_revision_fanout.sql` advances linked
-trait/skill revisions in the library writer's transaction, scoped to characters
-in that source campaign. UPDATE and DELETE include CRUD and YAML merge/replace.
+a live-link policy: `services/ownedLibraryMechanics.ts` validates and updates owned
+declarations in the audited library writer's transaction, scoped to characters in
+that source campaign. This also advances child revisions and records actual old/new
+mechanics in history. CRUD and YAML merge/replace share the same helper. Migration
+0036 replaces 0035's revision-only triggers and backfills owned copies while sources
+still exist; already dangling/foreign references stay visibly unresolved.
 Normal incremental HTTP pulls therefore detect definition changes without WS,
 including when a client reconnects after multiple edits. Source revisions travel
 with declarations; array length is never used as a freshness signal.
@@ -64,8 +79,15 @@ audit rows remain stored but are filtered out of the user-facing history feed.
 Failed nudges do not fail committed
 writes. The cursor retains its existing membership/share gates. Existing history
 triggers record affected child refreshes under the library writer's audit context;
-the campaign library event records the actual definition edit. Deleted definitions
-currently become unresolved; preserving their owned declarations is a separate change.
+the campaign library event records the definition edit too. Before a definition is
+deleted, owned copies retain its last validated declarations/version and detach the
+live ID. Campaign deletion also detaches surviving characters before source rows
+cascade away. A renamed replacement or recreation gets a new ID and never rewrites those
+copies. Campaign transfers through REST or sync detach all six library reference
+types; traits/skills retain their authorized saved declarations and provenance.
+Missing snapshots remain explicitly unresolved after transfer. Variant, modifier,
+level, skill specialty, and paid-point selections are unchanged. Sheet rows label
+live versus retained rules and their version; history names updates and detachment.
 
 The authoritative list of pulled classes is `ALL_ENTITY_CLASSES` in
 `src/client/sync/orchestrator.ts`. The `entityClass` enum in
@@ -509,6 +531,58 @@ rule that has been broken at least once.
   tables and new `syncMeta` keys **must** be added to the purge.
 
 ## Self-healing & pruning
+
+Campaign assignment patches detach all six child library references in the same
+IndexedDB transaction as the parent edit and outbox operation. Trait and skill
+declarations remain available as retained copies while offline, after reload,
+and if an acknowledged transfer is followed by a failed cursor pull. Local-only
+undo data on the operation restores links when the transfer is rejected or
+explicitly discarded, preserves unrelated child edits, and follows coalesced
+or queued campaign changes. Cursor pulls protect these child fields while the
+parent transfer is pending. The same applies to trait/skill rows first downloaded
+during that transfer when their provenance identifies the original campaign: their saved rules
+are detached locally and their rollback data joins the durable operation. This
+also survives an outcome received from a request sent before the child arrived.
+Newer source declarations received from the original campaign update the durable
+rollback state without replacing the visible retained copy. Rejection or an unsent
+return therefore restores the latest received rules even after the cursor advances.
+Child creates queued during an optimistic campaign assignment carry a local-only
+`localWaitForCampaignAssignment` flag. They and their dependent patches/deletes wait
+until that character's assignment settles, including backoff, reload and coalesced
+assignments. They are never sent in the assignment's batch; an earlier operation
+in the same batch can fail. Independent field edits continue draining normally.
+Conversely, the assignment waits for child creates queued before it to settle,
+so a delayed original-campaign create cannot be replayed into the destination.
+Starting a fresh assignment atomically reclassifies surviving creates from the
+previous assignment as earlier work. Automatic stale-base retries preserve the
+existing dependency generation.
+Dexie v10 backfills missing dependency flags in pre-upgrade outboxes before
+draining. Explicit flags, validated source-campaign snapshots, and matching
+transfer undo records take precedence over enqueue times. A create strictly
+after the active assignments waits for acknowledgement. Earlier/equal timestamps
+without provenance are ambiguous because retries/coalescing replace assignment
+times: those additions and their assignment remain durable and paused. The sync
+indicator names the hold; the sync log lets the user confirm the original or
+destination campaign. Confirmation changes only queue ordering, never the saved
+addition. Holds and confirmed ordering survive reload.
+Proven campaign IDs also sequence intermediate additions between successive
+assignments: a B-linked addition waits for A→B acknowledgement and precedes B→C.
+If its prerequisite is rejected or superseded, the addition stays held with
+recovery guidance until that campaign is reachable again.
+New references without source-campaign evidence stay intact until authoritative
+sync reconciliation; they may already belong to the destination campaign.
+Resubmitting an already-null source reference does
+not erase a retained declaration; new links to missing sources are rejected.
+
+A lost-response create replay resolves the already-saved entity under current
+write authorization even if its source or campaign membership has since gone
+away. Concurrent campaign changes during source-scope locking produce a
+transient retry, preserving the queued edit until its new scope can be checked.
+The twelve REST child create/patch contracts declare the corresponding HTTP 503
+JSON error response so API clients can retry the same edit.
+Child creates and patches also recheck current write permission under these locks.
+A staff-editing revocation or manager demotion yields an unauthorized outcome,
+including for source-free edits, so normal rejection toast/flash and rollback apply.
 
 The orchestrator recovers from partial/interrupted states rather than assuming
 a clean world (see `orchestrator.recovery.test.ts`,

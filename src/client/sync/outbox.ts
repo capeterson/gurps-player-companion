@@ -11,6 +11,7 @@
  * wins)".  `create` and `delete` are never coalesced.
  */
 
+import { type LibraryMechanics, libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
 import {
   type LocalCharacter,
@@ -26,6 +27,12 @@ import {
   coalesceKey,
   getLocalDb,
 } from '../db/dexie.ts';
+import {
+  campaignTransferStores,
+  detachLocalCampaignReferences,
+  mergeCampaignTransferUndo,
+  restoreLocalCampaignReferences,
+} from './localCampaignTransfer.ts';
 
 /**
  * Generate a uuidv7-shaped string client-side.  We don't need
@@ -44,6 +51,10 @@ export function newClientId(): string {
 }
 
 export interface EnqueueFieldPatchArgs {
+  /** Internal retry metadata; never part of the wire value. */
+  readonly localCampaignTransferUndo?: OutboxEntry['localCampaignTransferUndo'];
+  /** Internal stale-base replay retains the current assignment generation. */
+  readonly preserveCampaignCreateDependencies?: boolean;
   readonly entityClass: EntityClass;
   readonly entityId: string;
   readonly fieldPath: string;
@@ -91,7 +102,18 @@ export async function enqueueFieldPatches(
   });
 }
 
-async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Promise<void> {
+async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Promise<void> {
+  let args = input;
+  if (args.entityClass === 'character' && args.fieldPath === 'campaignId') {
+    args = {
+      ...args,
+      attemptedValue:
+        typeof args.attemptedValue === 'string'
+          ? args.attemptedValue.toLowerCase()
+          : args.attemptedValue,
+      prevValue: typeof args.prevValue === 'string' ? args.prevValue.toLowerCase() : args.prevValue,
+    };
+  }
   const db = getLocalDb();
   const ckey = coalesceKey(args.entityId, args.fieldPath);
   const now = new Date().toISOString();
@@ -113,8 +135,28 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
   //    once in quick succession (conditions toggles, pool bumpers,
   //    temp-effect steppers).
   const dupes = await db.outbox.where('coalesceKey').equals(ckey).toArray();
+  if (
+    args.entityClass === 'character' &&
+    args.fieldPath === 'campaignId' &&
+    !args.preserveCampaignCreateDependencies &&
+    !dupes.some((op) => ['pending', 'in_flight', 'transient_retry'].includes(op.status))
+  ) {
+    // A new assignment generation starts only after the previous one settled.
+    // Existing creates now belong before this move, even if they originally
+    // waited for the previous assignment. Reclassify in the enqueue transaction
+    // so a drain can never observe the new move with stale dependency flags.
+    await db.outbox
+      .filter(
+        (op) =>
+          op.command === 'create' &&
+          op.parentId === args.entityId &&
+          op.localWaitForCampaignAssignment === true,
+      )
+      .modify({ localWaitForCampaignAssignment: false });
+  }
   const coalescable = dupes.filter((d) => d.status === 'pending' || d.status === 'transient_retry');
   let carriedPrev: { value: unknown } | undefined;
+  let localCampaignTransferUndo = args.localCampaignTransferUndo;
   if (coalescable.length > 0) {
     // enqueueFieldPatch runs inside a Dexie transaction, so in
     // practice at most one coalescable dupe exists at a time; sort
@@ -122,6 +164,10 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
     // violated, so we always carry forward the OLDEST value.
     const oldest = coalescable.reduce((a, b) => (a.enqueuedAt <= b.enqueuedAt ? a : b));
     carriedPrev = { value: oldest.prevValue };
+    localCampaignTransferUndo = mergeCampaignTransferUndo(
+      localCampaignTransferUndo,
+      oldest.localCampaignTransferUndo,
+    );
   }
   for (const d of coalescable) {
     await db.outbox.delete(d.clientOpId);
@@ -137,7 +183,13 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
   //    do we fall back to reading the local row fresh -- there's
   //    nothing to coalesce, so the local row's current value IS the
   //    last-synced value.
-  const prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
+  let prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
+  if (
+    args.entityClass === 'character' &&
+    args.fieldPath === 'campaignId' &&
+    typeof prev === 'string'
+  )
+    prev = prev.toLowerCase();
   // baseRevision does NOT need the same carry-forward treatment:
   // applyLocalPatch (step 3 below) only ever touches `fieldPath` and
   // `updatedAt` on the local row, never `revision` -- local writes
@@ -147,6 +199,21 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
   // in which case picking up the fresher revision is correct, not a
   // bug.
   const baseRev = args.baseRevision ?? (await readEntityRevision(args));
+  if (args.entityClass === 'character' && args.fieldPath === 'campaignId') {
+    const current = await db.characters.get(args.entityId);
+    if (current && (current.campaignId?.toLowerCase() ?? null) !== args.attemptedValue) {
+      localCampaignTransferUndo = mergeCampaignTransferUndo(
+        localCampaignTransferUndo,
+        await detachLocalCampaignReferences(
+          args.entityId,
+          current.campaignId?.toLowerCase() ?? null,
+        ),
+      );
+    }
+    // A coalesced return to the unchanged server campaign cancels the detach.
+    if (args.attemptedValue === prev && !dupes.some((op) => op.status === 'in_flight'))
+      await restoreLocalCampaignReferences(localCampaignTransferUndo ?? [], prev);
+  }
 
   // 3. Apply the local row mutation immediately so `useLiveQuery`
   //    sees the user's typed value before the server even hears
@@ -178,6 +245,7 @@ async function enqueueFieldPatchInTransaction(args: EnqueueFieldPatchArgs): Prom
     humanName: args.humanName,
     flashKey: args.flashKey,
     batchId: args.batchId,
+    localCampaignTransferUndo,
   };
   await db.outbox.add(op);
 }
@@ -282,6 +350,8 @@ export interface EnqueueCreateArgs<T> {
   readonly entityId: string;
   /** Full entity payload to insert into the local store and POST to /sync. */
   readonly attemptedValue: T;
+  /** Local-only selected declarations; never included in the operation envelope. */
+  readonly localLibraryMechanics?: LibraryMechanics | null | undefined;
   readonly humanName?: string | undefined;
   readonly characterId?: string | undefined;
   readonly batchId?: string | undefined;
@@ -314,6 +384,21 @@ export async function enqueueCreate<T extends Record<string, unknown>>(
     batchId: args.batchId,
   };
   await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
+    if (op.parentId) {
+      op.localWaitForCampaignAssignment = Boolean(
+        await db.outbox
+          .where('entityId')
+          .equals(op.parentId)
+          .filter(
+            (entry) =>
+              entry.entityClass === 'character' &&
+              entry.command === 'patch' &&
+              entry.fieldPath === 'campaignId' &&
+              ['pending', 'in_flight', 'transient_retry'].includes(entry.status),
+          )
+          .first(),
+      );
+    }
     await applyLocalCreate(args);
     await db.outbox.add(op);
   });
@@ -373,7 +458,7 @@ function storesForOp(entityClass: EntityClass) {
   const db = getLocalDb();
   switch (entityClass) {
     case 'character':
-      return [db.characters];
+      return [db.characters, ...campaignTransferStores()];
     case 'character_trait':
       return [db.characterTraits];
     case 'character_skill':
@@ -458,6 +543,16 @@ async function applyLocalCreate<T extends Record<string, unknown>>(
     revision: -1,
     ...args.attemptedValue,
   } as Record<string, unknown>;
+  if (args.entityClass === 'character_trait' || args.entityClass === 'character_skill') {
+    const snapshot =
+      args.localLibraryMechanics == null
+        ? null
+        : libraryMechanics.parse(args.localLibraryMechanics);
+    const field = args.entityClass === 'character_trait' ? 'libraryTraitId' : 'librarySkillId';
+    if (snapshot && (snapshot.sourceId !== base[field] || snapshot.detached))
+      throw new Error('Selected library rules do not match the new copy');
+    base.libraryMechanics = snapshot;
+  }
   switch (args.entityClass) {
     case 'character':
       await db.characters.put(base as unknown as LocalCharacter);
@@ -544,14 +639,110 @@ async function applyLocalDelete(entityClass: EntityClass, entityId: string): Pro
  * and the orchestrator rolls the user's queued edit back (data loss)
  * even though the create would have succeeded seconds later.
  *
- * Patches never gate other patches: same-field commits coalesce into a
- * single op (rule S3) and different fields are order-independent
- * ("different fields save in parallel").
+ * Campaign assignments wait for older creates and gate destination creates until
+ * acknowledged: even a parent
+ * patch included earlier in the same batch can fail transiently, so its children
+ * must wait for a later drain. Ordinary independent field patches stay parallel.
  */
+export async function resolveLegacyCampaignDependency(
+  clientOpId: string,
+  wait: boolean,
+): Promise<void> {
+  const db = getLocalDb();
+  await db.transaction('rw', [db.outbox, db.characters], async () => {
+    const op = await db.outbox.get(clientOpId);
+    if (!op?.localCampaignDependencyUnknown) return;
+    const assignments = (
+      await db.outbox
+        .where('entityId')
+        .equals(op.parentId ?? '')
+        .toArray()
+    )
+      .filter(
+        (entry) =>
+          entry.entityClass === 'character' &&
+          entry.command === 'patch' &&
+          entry.fieldPath === 'campaignId' &&
+          ['pending', 'in_flight', 'transient_retry'].includes(entry.status),
+      )
+      .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
+    const current = (await db.characters.get(op.parentId ?? ''))?.campaignId;
+    const chosen =
+      assignments.length > 0
+        ? wait
+          ? assignments.at(-1)?.attemptedValue
+          : assignments[0]?.prevValue
+        : current;
+    if (op.localRequiredCampaignId !== undefined && chosen !== op.localRequiredCampaignId)
+      throw new Error(
+        'Move the character to the library addition’s campaign before confirming its order.',
+      );
+    await db.outbox.update(clientOpId, {
+      localWaitForCampaignAssignment: wait,
+      localCampaignDependencyUnknown: false,
+      ...(typeof chosen === 'string' || chosen === null ? { localRequiredCampaignId: chosen } : {}),
+    });
+  });
+}
+
 export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   const db = getLocalDb();
   const now = new Date().toISOString();
-  const all = await db.outbox.where('status').anyOf(['pending', 'transient_retry']).toArray();
+  const unsettled = await db.outbox
+    .where('status')
+    .anyOf(['pending', 'transient_retry', 'in_flight'])
+    .toArray();
+  const assignmentOps = unsettled
+    .filter(
+      (op) =>
+        op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
+    )
+    .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
+  const assignmentsFor = (parentId: string | undefined) =>
+    assignmentOps.filter((op) => op.entityId === parentId);
+  const campaignCreateReady = new Set<string>();
+  for (const op of unsettled) {
+    if (op.command !== 'create' || op.localRequiredCampaignId === undefined) continue;
+    const moves = assignmentsFor(op.parentId);
+    const current =
+      moves.length > 0
+        ? moves[0]?.prevValue
+        : (await db.characters.get(op.parentId ?? ''))?.campaignId;
+    if (
+      current === op.localRequiredCampaignId &&
+      !moves.some((move) => move.status === 'in_flight')
+    )
+      campaignCreateReady.add(op.clientOpId);
+    else if (
+      current !== op.localRequiredCampaignId &&
+      !moves.some((move) => move.attemptedValue === op.localRequiredCampaignId)
+    ) {
+      // A rejected/coalesced prerequisite must not release a linked create
+      // against the wrong campaign or strand it without recovery guidance.
+      op.localCampaignDependencyUnknown = true;
+      await db.outbox.update(op.clientOpId, { localCampaignDependencyUnknown: true });
+    }
+  }
+  const all = unsettled.filter((op) => op.status !== 'in_flight');
+  const campaignAssignments = new Set(
+    unsettled
+      .filter(
+        (op) =>
+          op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
+      )
+      .map((op) => op.entityId),
+  );
+  const parentsWithEarlierCreates = new Set(
+    unsettled
+      .filter(
+        (op) =>
+          op.command === 'create' &&
+          (op.localCampaignDependencyUnknown ||
+            (op.localRequiredCampaignId === undefined && !op.localWaitForCampaignAssignment)) &&
+          op.parentId !== undefined,
+      )
+      .map((op) => op.parentId),
+  );
   // Deterministic replay order: enqueue time, then create < patch <
   // delete so a create+patch enqueued in the same millisecond can never
   // invert (the server applies the batch in array order).
@@ -566,8 +757,27 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   for (const op of all) {
     const backingOff = op.nextEarliestAttemptAt !== undefined && op.nextEarliestAttemptAt > now;
     const dependencyHeld =
+      op.localCampaignDependencyUnknown === true ||
+      (op.entityClass === 'character' &&
+        op.fieldPath === 'campaignId' &&
+        (parentsWithEarlierCreates.has(op.entityId) ||
+          unsettled.some(
+            (child) =>
+              child.command === 'create' &&
+              child.parentId === op.entityId &&
+              child.localRequiredCampaignId !== undefined &&
+              child.localRequiredCampaignId === op.prevValue,
+          ))) ||
       heldBackCreates.has(op.entityId) ||
-      (op.parentId !== undefined && heldBackCreates.has(op.parentId));
+      (op.parentId !== undefined && heldBackCreates.has(op.parentId)) ||
+      (op.command === 'create' &&
+        op.localRequiredCampaignId !== undefined &&
+        !campaignCreateReady.has(op.clientOpId)) ||
+      (op.command === 'create' &&
+        op.localRequiredCampaignId === undefined &&
+        op.localWaitForCampaignAssignment === true &&
+        op.parentId !== undefined &&
+        campaignAssignments.has(op.parentId));
     if (!backingOff && !dependencyHeld && ready.length < limit) {
       ready.push(op);
     } else if (op.command === 'create') {

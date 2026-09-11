@@ -5,7 +5,10 @@
  * tear: every component sees the same value at every commit.
  */
 
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useSyncExternalStore } from 'react';
+import { getLocalDb } from '../db/dexie.ts';
+import { LEGACY_CAMPAIGN_HOLD_REASON } from '../db/legacyCampaignDependencies.ts';
 import { type SyncIndicatorState, type SyncStatus, syncStateStore } from './state.ts';
 
 function getSnapshot(): SyncIndicatorState {
@@ -26,5 +29,15 @@ export function useSyncIndicatorState(): SyncIndicatorState {
 
 /** State plus the reason for an `error`, for the badge tooltip + sync log. */
 export function useSyncStatus(): SyncStatus {
-  return useSyncExternalStore(subscribe, getStatusSnapshot, getStatusSnapshot);
+  const status = useSyncExternalStore(subscribe, getStatusSnapshot, getStatusSnapshot);
+  const held = useLiveQuery(
+    () =>
+      getLocalDb()
+        .outbox.filter((op) => op.localCampaignDependencyUnknown === true)
+        .first(),
+    [],
+  );
+  return held
+    ? { state: 'error', error: { reason: LEGACY_CAMPAIGN_HOLD_REASON, at: held.enqueuedAt } }
+    : status;
 }

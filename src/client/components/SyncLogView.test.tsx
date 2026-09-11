@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { ToastProvider } from '../lib/toast.tsx';
+import { readDrainableOps } from '../sync/outbox.ts';
 import { syncStateStore } from '../sync/state.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 
@@ -26,6 +27,66 @@ afterEach(async () => {
   syncStateStore.reset('synced');
   await resetLocalDb();
 });
+
+it.each(['Original campaign', 'Destination campaign'])(
+  'retains an ambiguous legacy addition until the user selects %s',
+  async (choice) => {
+    const db = getLocalDb();
+    const common = {
+      validationVersion: 1,
+      status: 'pending',
+      attemptCount: 0,
+      enqueuedAt: '2026-09-10T00:00:01Z',
+    } as const;
+    await db.outbox.bulkPut([
+      {
+        ...common,
+        clientOpId: 'assignment',
+        coalesceKey: 'character|campaignId',
+        entityClass: 'character',
+        entityId: 'character',
+        command: 'patch',
+        fieldPath: 'campaignId',
+        prevValue: 'A',
+        attemptedValue: 'B',
+      },
+      {
+        ...common,
+        clientOpId: 'create',
+        coalesceKey: 'trait|create',
+        entityClass: 'character_trait',
+        entityId: 'trait',
+        parentId: 'character',
+        command: 'create',
+        attemptedValue: { name: 'Unsaved', libraryTraitId: 'source' },
+        localCampaignDependencyUnknown: true,
+      },
+    ]);
+    await db.characterTraits.put({ id: 'trait', name: 'Unsaved', revision: -1 } as never);
+    renderView();
+    expect(
+      await screen.findByRole('region', { name: 'Confirm campaign order' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/older unsaved library addition needs its campaign order confirmed/),
+    ).toBeInTheDocument();
+    expect(await readDrainableOps(50)).toEqual([]);
+    await userEvent.setup().click(screen.getByRole('button', { name: choice }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('region', { name: 'Confirm campaign order' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect((await db.characterTraits.get('trait'))?.name).toBe('Unsaved');
+    expect((await db.outbox.get('create'))?.attemptedValue).toEqual({
+      name: 'Unsaved',
+      libraryTraitId: 'source',
+    });
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      choice === 'Original campaign' ? 'create' : 'assignment',
+    ]);
+  },
+);
 
 describe('SyncLogView download debug log', () => {
   it('downloads a well-formed JSON dump when clicked', async () => {

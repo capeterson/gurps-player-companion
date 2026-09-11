@@ -19,6 +19,10 @@ anything touches the network, so a player can keep editing a stale tab with no
 connectivity indefinitely and converge later. See
 [offline-sync.md](offline-sync.md).
 
+When an older unsaved library addition lacks enough evidence to recover its
+campaign-change order during an app upgrade, sync retains it and asks the user
+to confirm the original or destination campaign in the sync log before replay.
+
 ## Document map
 
 | Doc | Covers |
@@ -94,7 +98,12 @@ on any sheet the viewer can edit — their own — it always shows).
   `libraryMechanics` declarations with source ID, campaign, revision and explicit
   availability. Both player and GM readers derive from these durable rows, with
   no library HTTP request on their calculation path. Closing and reopening offline
-  retains bonuses. Unresolved legacy/deleted definitions pause calculated panels
+  retains bonuses. Definitions are saved on owned Postgres rows as well as in Dexie.
+  Deletion, renamed replacement and campaign transfer detach live links while
+  preserving paid mechanics, selections and source/version provenance. Recreating
+  the same name never reattaches old copies. Sheet rows show whether rules follow
+  library updates or are retained; history records mechanics updates/detachment.
+  Already unresolved legacy definitions pause calculated panels
   and rolls with an explanation; identity, trait, inventory and notes editing remain
   available (inventory hides its unavailable Basic Lift/encumbrance classification).
   Library edits and YAML imports advance linked child revisions transactionally,
@@ -102,6 +111,13 @@ on any sheet the viewer can edit — their own — it always shows).
   offline sessions. Library writes also advance the campaign cursor; its committed
   HTTP changes invalidate each tab's library editor cache through Dexie observation.
   WS only accelerates that cycle. Cursor-only campaign touches do not clutter history.
+  Already selected definitions are saved with speculative adds as local-only metadata,
+  keeping those new copies usable offline; the server resolves its own version on replay.
+  All six library reference types require an existing definition of the right kind
+  in the character's campaign and current actor membership. REST and every sync
+  write path share `services/libraryReferences.ts`. Removing a member detaches
+  live references while preserving owned rules; unavailable sources produce visible
+  rejections, including a toast and add-form flash for each character entry type.
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -502,6 +518,9 @@ src/
                  middleware, permissions (the authz helpers, incl.
                  tryLoadCampaignRole)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
+                 libraryReferences (transactional source authorization for all
+                 six character reference types), ownedLibraryMechanics (saved
+                 declarations, live updates and detachment),
                  (incl. loadCharacterDetail, the shared character-detail
                  loader), characterAccess (resolveCharacterView, the
                  shared full/minimal/forbidden decision), patchSet

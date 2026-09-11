@@ -41,6 +41,7 @@ import type {
   WeaponData,
 } from '../../shared/schemas/inventory.ts';
 import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
+import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
 import { TECHNIQUE_DIFFICULTIES } from '../../shared/schemas/technique.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
@@ -435,6 +436,7 @@ export const characterTraits = pgTable(
     /** Validated by `traitModifier` (src/shared/schemas/trait.ts). */
     modifiers: jsonb('modifiers').$type<TraitModifier[]>().notNull().default([]),
     libraryTraitId: uuid('library_trait_id'),
+    libraryMechanics: jsonb('library_mechanics').$type<LibraryMechanics>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -460,6 +462,7 @@ export const characterSkills = pgTable(
     specialization: varchar('specialization', { length: 160 }),
     notes: text('notes'),
     librarySkillId: uuid('library_skill_id'),
+    libraryMechanics: jsonb('library_mechanics').$type<LibraryMechanics>(),
     /** skillDefaults in shared/schemas/skill.ts. */
     defaults: jsonb('defaults').$type<import('../../shared/schemas/skill.ts').SkillDefaults>(),
     createdAt: createdAt(),

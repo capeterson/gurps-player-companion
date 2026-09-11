@@ -20,6 +20,7 @@ import type { CombatStateOut } from '../schemas/combat.ts';
 import type { TraitEffect } from '../schemas/effects.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
 import type { LanguageOut } from '../schemas/language.ts';
+import type { LibraryMechanics } from '../schemas/libraryMechanics.ts';
 import type { SkillDefaults, SkillOut } from '../schemas/skill.ts';
 import type { SpellOut } from '../schemas/spell.ts';
 import type { TechniqueDifficulty, TechniqueOut } from '../schemas/technique.ts';
@@ -97,6 +98,7 @@ export interface CharacterDetailInputTrait {
   notes: string | null;
   modifiers: unknown[] | null;
   libraryTraitId: string | null;
+  libraryMechanics?: LibraryMechanics | null;
   /**
    * Effect declarations from the matching library_trait row, joined by
    * libraryTraitId at fetch time.  Empty array if the trait has no
@@ -118,6 +120,7 @@ export interface CharacterDetailInputSkill {
   specialization: string | null;
   notes: string | null;
   librarySkillId: string | null;
+  libraryMechanics?: LibraryMechanics | null;
   defaults?: SkillDefaults;
   /** Library skill effects, joined by librarySkillId.  Defaults to []. */
   libraryEffects?: TraitEffect[];
@@ -285,6 +288,7 @@ export function buildTraitOut(trait: CharacterDetailInputTrait): TraitOut {
     notes: trait.notes,
     modifiers: (trait.modifiers ?? []) as TraitModifier[],
     libraryTraitId: trait.libraryTraitId,
+    libraryMechanics: trait.libraryMechanics ?? null,
     createdAt: toIso(trait.createdAt),
     updatedAt: toIso(trait.updatedAt),
   };
@@ -376,6 +380,7 @@ export function buildSkillOut(
     specialization: skill.specialization,
     notes: skill.notes,
     librarySkillId: skill.librarySkillId,
+    libraryMechanics: skill.libraryMechanics ?? null,
     defaults: skill.defaults ?? null,
     level,
     // No usable declared default means there is no bonus target to apply against.

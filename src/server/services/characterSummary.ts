@@ -14,7 +14,7 @@
  * routes/characterSubResources.ts; both now call this instead.
  */
 
-import { asc, eq, inArray } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { CharacterAttrs } from '../../shared/domain/characterCalc.ts';
 import {
@@ -28,7 +28,7 @@ import {
   buildTechniqueOut as buildTechniqueOutShared,
   buildTraitOut as buildTraitOutShared,
 } from '../../shared/domain/characterDetail.ts';
-import type { TraitEffect } from '../../shared/schemas/effects.ts';
+import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import { getDb } from '../db/client.ts';
 import {
   type DbCampaign,
@@ -40,8 +40,6 @@ import {
   type DbCharacterTrait,
   type DbCombatState,
   type DbInventoryItem,
-  campaignLibrarySkills,
-  campaignLibraryTraits,
   campaigns,
   characterLanguages,
   characterSkills,
@@ -86,83 +84,24 @@ export interface SummaryInput {
   readonly inventory: readonly DbInventoryItem[];
   readonly combat: DbCombatState | null;
   readonly campaign: DbCampaign | null;
-  /**
-   * Per-library-trait effect arrays, keyed by libraryTraitId.  Built by
-   * the route handler from a single batched query against
-   * campaign_library_traits.  Traits without a library reference (or
-   * with libraryTraitId pointing at a deleted/missing entry) get an
-   * empty effect list.
-   */
-  readonly libraryTraitEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
-  readonly librarySkillEffects?: ReadonlyMap<string, ReadonlyArray<TraitEffect>>;
-}
-
-/**
- * Batch-fetch library trait/skill effect arrays for the trait/skill ids
- * referenced by a character's traits/skills.  Returns Maps keyed by
- * library row id.  Empty maps when no character record references a
- * library row (or when the referenced library rows have no effects).
- */
-export async function fetchLibraryEffects(
-  characterTraits: ReadonlyArray<DbCharacterTrait>,
-  characterSkills: ReadonlyArray<DbCharacterSkill>,
-): Promise<{
-  libraryTraitEffects: Map<string, ReadonlyArray<TraitEffect>>;
-  librarySkillEffects: Map<string, ReadonlyArray<TraitEffect>>;
-}> {
-  const db = getDb();
-  const traitIds = Array.from(
-    new Set(characterTraits.map((t) => t.libraryTraitId).filter((x): x is string => !!x)),
-  );
-  const skillIds = Array.from(
-    new Set(characterSkills.map((s) => s.librarySkillId).filter((x): x is string => !!x)),
-  );
-
-  const [traitRows, skillRows] = await Promise.all([
-    traitIds.length === 0
-      ? Promise.resolve([] as { id: string; effects: unknown[] }[])
-      : db
-          .select({ id: campaignLibraryTraits.id, effects: campaignLibraryTraits.effects })
-          .from(campaignLibraryTraits)
-          .where(inArray(campaignLibraryTraits.id, traitIds)),
-    skillIds.length === 0
-      ? Promise.resolve([] as { id: string; effects: unknown[] }[])
-      : db
-          .select({ id: campaignLibrarySkills.id, effects: campaignLibrarySkills.effects })
-          .from(campaignLibrarySkills)
-          .where(inArray(campaignLibrarySkills.id, skillIds)),
-  ]);
-
-  const libraryTraitEffects = new Map<string, ReadonlyArray<TraitEffect>>();
-  for (const r of traitRows) {
-    libraryTraitEffects.set(r.id, (r.effects ?? []) as TraitEffect[]);
-  }
-  const librarySkillEffects = new Map<string, ReadonlyArray<TraitEffect>>();
-  for (const r of skillRows) {
-    librarySkillEffects.set(r.id, (r.effects ?? []) as TraitEffect[]);
-  }
-
-  return { libraryTraitEffects, librarySkillEffects };
 }
 
 export function buildCharacterDetail(input: SummaryInput) {
-  const traitEffects = input.libraryTraitEffects;
-  const skillEffects = input.librarySkillEffects;
+  let libraryEffectsKnown = true;
+  const effects = (id: string | null, snapshot: unknown) => {
+    const value = ownedLibraryEffects(id, input.character.campaignId, snapshot);
+    if (value === null) libraryEffectsKnown = false;
+    return value ?? [];
+  };
   const adapted: CharacterDetailInput = {
     character: input.character,
     traits: input.traits.map((t) => ({
       ...t,
-      libraryEffects:
-        t.libraryTraitId && traitEffects?.has(t.libraryTraitId)
-          ? [...(traitEffects.get(t.libraryTraitId) ?? [])]
-          : [],
+      libraryEffects: effects(t.libraryTraitId, t.libraryMechanics),
     })),
     skills: input.skills.map((s) => ({
       ...s,
-      libraryEffects:
-        s.librarySkillId && skillEffects?.has(s.librarySkillId)
-          ? [...(skillEffects.get(s.librarySkillId) ?? [])]
-          : [],
+      libraryEffects: effects(s.librarySkillId, s.libraryMechanics),
     })),
     spells: input.spells,
     languages: input.languages,
@@ -171,7 +110,7 @@ export function buildCharacterDetail(input: SummaryInput) {
     combat: input.combat,
     campaign: input.campaign,
   };
-  return buildCharacterDetailShared(adapted);
+  return { ...buildCharacterDetailShared(adapted), libraryEffectsKnown };
 }
 
 /**
@@ -231,7 +170,6 @@ export async function loadCharacterDetail(id: string) {
             .then((r) => r[0] ?? null)
         : Promise.resolve(null),
     ]);
-  const { libraryTraitEffects, librarySkillEffects } = await fetchLibraryEffects(traits, skills);
   return buildCharacterDetail({
     character: c,
     traits,
@@ -242,8 +180,6 @@ export async function loadCharacterDetail(id: string) {
     inventory,
     combat,
     campaign,
-    libraryTraitEffects,
-    librarySkillEffects,
   });
 }
 

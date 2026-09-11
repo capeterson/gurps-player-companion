@@ -17,6 +17,7 @@ import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { skillCreate } from '../../../../shared/schemas/skill.ts';
 import { getLocalDb, resetLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
+import { flashBus } from '../../../sync/flashBus.ts';
 import { SkillsPanel } from './SkillsPanel.tsx';
 
 const enqueueCreate = vi.hoisted(() => vi.fn());
@@ -28,6 +29,7 @@ const picks = vi.hoisted(() =>
   ['Pistol', 'Rifle'].map((specialty, index) => ({
     id: `0193b3c0-f1f0-7000-8000-00000000f00${index}`,
     name: 'Guns',
+    campaignId: '0193b3c0-f1f0-7000-8000-00000000c002',
     attribute: 'DX',
     difficulty: 'E',
     defaultSpecialization: specialty,
@@ -35,6 +37,7 @@ const picks = vi.hoisted(() =>
     description: `${specialty} training`,
     source: 'B198',
     prerequisites: 'Training',
+    effects: [{ target: 'dx' as const, value: 1, scaling: 'flat' as const }],
     defaults: [{ kind: 'attribute' as const, attribute: 'DX' as const, modifier: -4 }],
   })),
 );
@@ -114,6 +117,55 @@ function renderPanel(character: CharacterDetail, canWrite = false) {
 }
 
 describe('SkillsPanel', () => {
+  it('allows a custom skill after a picked character becomes campaignless', async () => {
+    const view = renderPanel(
+      { ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' },
+      true,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    view.rerender(<SkillsPanel character={makeCharacter([])} canWrite />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/Couldn't add skill.*Campaign changed/);
+    fireEvent.change(screen.getByLabelText('Skill'), { target: { value: 'Custom' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0]).toMatchObject({
+      attemptedValue: {
+        name: 'Custom',
+        librarySkillId: null,
+        defaults: null,
+        specialization: null,
+        notes: null,
+      },
+      localLibraryMechanics: null,
+    });
+  });
+  it('rejects a previous campaign pick without discarding the draft', async () => {
+    const view = renderPanel(
+      { ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' },
+      true,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    view.rerender(
+      <SkillsPanel character={{ ...makeCharacter([]), campaignId: 'other-campaign' }} canWrite />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await screen.findByText(/Couldn't add skill.*Campaign changed/);
+    expect(enqueueCreate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Skill')).toHaveValue('Guns');
+    expect(screen.getByLabelText('Skill').closest('form')).toHaveAttribute('data-flashing', 'true');
+    view.rerender(
+      <SkillsPanel
+        character={{ ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' }}
+        canWrite
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0].localLibraryMechanics.campaignId).toBe(
+      '0193b3c0-f1f0-7000-8000-00000000c002',
+    );
+  });
   it('accepts the combined maximum-length library descriptions without truncation', async () => {
     const original = picks[0];
     if (!original) throw new Error('Missing fixture');
@@ -125,7 +177,10 @@ describe('SkillsPanel', () => {
     };
     picks[0] = long;
     try {
-      renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+      renderPanel(
+        { ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' },
+        true,
+      );
       fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
       await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
@@ -143,7 +198,10 @@ describe('SkillsPanel', () => {
     const actual =
       await vi.importActual<typeof import('../../../sync/outbox.ts')>('../../../sync/outbox.ts');
     enqueueCreate.mockImplementation(actual.enqueueCreate);
-    const view = renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    const view = renderPanel(
+      { ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' },
+      true,
+    );
     try {
       fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
       fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -169,7 +227,7 @@ describe('SkillsPanel', () => {
 
   it('retains the picked definition on failure and retries with the same metadata', async () => {
     enqueueCreate.mockRejectedValueOnce(new Error('Disk full'));
-    renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    renderPanel({ ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' }, true);
     fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await screen.findByText(/Couldn't add skill.*Disk full/);
@@ -182,7 +240,11 @@ describe('SkillsPanel', () => {
   });
 
   it('copies specialty, learned TL and explicit descriptive fields from a picked definition', async () => {
-    const character = { ...makeCharacter([]), campaignId: 'campaign', techLevel: 3 };
+    const character = {
+      ...makeCharacter([]),
+      campaignId: '0193b3c0-f1f0-7000-8000-00000000c002',
+      techLevel: 3,
+    };
     renderPanel(character, true);
     fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -200,11 +262,21 @@ describe('SkillsPanel', () => {
       notes: 'Pistol training\n\nSource: B198\n\nPrerequisites: Training',
     });
     expect(enqueueCreate.mock.calls[0]?.[0].humanName).toBe('skill "Guns (Pistol)"');
+    expect(enqueueCreate.mock.calls[0]?.[0].localLibraryMechanics).toMatchObject({
+      sourceId: picks[0]?.id,
+      effects: picks[0]?.effects,
+      sourceRevision: null,
+    });
+    expect(enqueueCreate.mock.calls[0]?.[0].attemptedValue).not.toHaveProperty('libraryMechanics');
     await waitFor(() => expect(screen.getByLabelText('Skill')).toHaveValue(''));
+    act(() =>
+      flashBus.emit({ key: 'character_skill:char-1:create', reason: 'Library link rejected' }),
+    );
+    expect(screen.getByLabelText('Skill').closest('form')).toHaveAttribute('data-flashing', 'true');
   });
 
   it('detaches picked metadata after a manual name change', async () => {
-    renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    renderPanel({ ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' }, true);
     fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
     fireEvent.change(screen.getByLabelText('Skill'), { target: { value: 'Custom' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
@@ -226,7 +298,7 @@ describe('SkillsPanel', () => {
           finish = resolve;
         }),
     );
-    renderPanel({ ...makeCharacter([]), campaignId: 'campaign' }, true);
+    renderPanel({ ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' }, true);
     fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     fireEvent.click(screen.getByRole('button', { name: 'Pick Rifle' }));

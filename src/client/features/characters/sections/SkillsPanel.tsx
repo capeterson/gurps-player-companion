@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
@@ -9,6 +10,7 @@ import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
+import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
@@ -48,15 +50,29 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   const [points, setPoints] = useState('1');
   const [picked, setPicked] = useState<LibrarySkillOut | null>(null);
   const nameVersion = useRef(0);
+  const editName = (value: string) => {
+    setName(value);
+    nameVersion.current++;
+    setPicked(null);
+  };
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
-  const { creating, submit: submitEntity } = useAddEntityForm({
+  const {
+    creating,
+    submit: submitEntity,
+    reject,
+    flashProps,
+  } = useAddEntityForm({
     entityClass: 'character_skill',
     characterId,
     label: `skill "${skillDisplayName(name, picked?.defaultSpecialization)}"`,
   });
 
   async function submit(snap: SkillSnapshot) {
+    if (snap.picked && snap.picked.campaignId !== campaignId) {
+      reject('Campaign changed — select a skill from the current campaign library');
+      return;
+    }
     await submitEntity(
       {
         name: snap.name,
@@ -92,6 +108,14 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         }
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
       },
+      snap.picked
+        ? libraryMechanics.parse({
+            sourceId: snap.picked.id,
+            campaignId: snap.picked.campaignId,
+            sourceRevision: null,
+            effects: snap.picked.effects ?? null,
+          })
+        : null,
     );
   }
 
@@ -99,7 +123,8 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
 
   return (
     <form
-      className="flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      {...flashProps}
+      className="field-rollback-flash flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -123,11 +148,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         {campaignId ? (
           <LibraryAutocomplete<LibrarySkillOut>
             value={name}
-            onChange={(v) => {
-              setName(v);
-              nameVersion.current++;
-              setPicked(null);
-            }}
+            onChange={editName}
             onPick={(opt) => {
               setName(opt.name);
               setAttribute(opt.attribute as SkillAttribute);
@@ -156,7 +177,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
             aria-labelledby="add-skill-name-label"
             className="input input-bordered input-sm"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => editName(e.target.value)}
             placeholder="e.g. Broadsword"
           />
         )}
@@ -305,6 +326,9 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
           ✕
         </button>
       )}
+      <div className="col-span-full">
+        <LibraryMechanicsNote mechanics={skill.libraryMechanics} />
+      </div>
       <ConfirmDialog
         open={confirmDelete}
         title={`Delete skill "${displayName}"?`}
