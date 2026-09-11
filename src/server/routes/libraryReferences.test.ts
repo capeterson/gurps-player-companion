@@ -80,6 +80,132 @@ const configs = [
 const doors = ['rest-create', 'rest-patch', 'sync-create', 'sync-field', 'sync-body'] as const;
 
 for (const change of ['editing-disabled', 'manager-demoted'] as const) {
+  for (const wholeBody of [false, true]) {
+    it.each([...configs])(
+      `reauthorizes stale-base $kind patches after ${change} (wholeBody=${wholeBody})`,
+      async (config) => {
+        const gm = await register();
+        const manager = await register();
+        const player = await register();
+        const campaign = await create(gm.token, '/campaigns', { name: 'Stale-base access race' });
+        for (const person of [manager, player])
+          expect(
+            (await request(gm.token, `/campaigns/${campaign.id}/members`, { email: person.email }))
+              .status,
+          ).toBe(200);
+        expect(
+          (
+            await request(
+              gm.token,
+              `/campaigns/${campaign.id}/members/${manager.userId}`,
+              { role: 'manager' },
+              'PATCH',
+            )
+          ).status,
+        ).toBe(200);
+        expect(
+          (
+            await request(
+              gm.token,
+              `/campaigns/${campaign.id}`,
+              { allowGmCharacterEditing: true, shareCharacterSheets: false },
+              'PATCH',
+            )
+          ).status,
+        ).toBe(200);
+        const character = await create(player.token, '/characters', {
+          name: 'Private character',
+          campaignId: campaign.id,
+        });
+        const created = await request(player.token, `/characters/${character.id}/${config.kind}`, {
+          name: 'Private child',
+          notes: 'Private notes',
+          ...config.body,
+        });
+        expect(created.status).toBe(201);
+        const payload = (await created.json()) as Record<string, { id: string }>;
+        const childId = payload[config.output]?.id;
+        if (!childId) throw new Error('Missing child fixture');
+        const operation = {
+          clientOpId: crypto.randomUUID(),
+          entityClass: config.entity,
+          parentId: character.id,
+          entityId: childId,
+          command: 'patch',
+          baseRevision: 0,
+          ...(wholeBody ? {} : { fieldPath: 'notes' }),
+          attemptedValue: wholeBody ? { notes: 'Forbidden edit' } : 'Forbidden edit',
+          createdAt: new Date().toISOString(),
+        };
+        const ready = Promise.withResolvers<number>();
+        const release = Promise.withResolvers<void>();
+        const holding = withAudit(gm.userId, null, async (tx) => {
+          if (change === 'editing-disabled')
+            await tx
+              .update(campaigns)
+              .set({ allowGmCharacterEditing: false })
+              .where(eq(campaigns.id, campaign.id));
+          else
+            await tx
+              .update(campaignMemberships)
+              .set({ role: 'member' })
+              .where(
+                sql`${campaignMemberships.campaignId} = ${campaign.id} AND ${campaignMemberships.userId} = ${manager.userId}`,
+              );
+          const pid = await tx.execute(sql`SELECT pg_backend_pid() AS pid`);
+          ready.resolve(Number(pid.rows[0]?.pid));
+          await release.promise;
+        });
+        const pid = await ready.promise;
+        let settled = false;
+        const racing = request(manager.token, '/sync/operations', {
+          operations: [operation],
+        }).finally(() => {
+          settled = true;
+        });
+        try {
+          let blocked = false;
+          for (let attempt = 0; attempt < 200; attempt++) {
+            const result = await getDb().execute(
+              sql`SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))) AS blocked`,
+            );
+            if (result.rows[0]?.blocked) {
+              blocked = true;
+              break;
+            }
+            if (settled) break;
+            await Bun.sleep(10);
+          }
+          expect(blocked).toBe(true);
+        } finally {
+          release.resolve();
+          await holding;
+        }
+        const response = await racing;
+        expect(response.status).toBe(200);
+        const result = (await response.json()) as { outcomes: Record<string, unknown>[] };
+        expect(result.outcomes[0]?.status).toBe('unauthorized');
+        expect(result.outcomes[0]).not.toHaveProperty('latestEntity');
+        expect(JSON.stringify(result)).not.toContain('Private notes');
+        const detailResponse = await request(
+          player.token,
+          `/characters/${character.id}`,
+          undefined,
+          'GET',
+        );
+        expect(detailResponse.status).toBe(200);
+        const detail = (await detailResponse.json()) as Record<
+          string,
+          { id: string; notes: string }[]
+        >;
+        expect(detail[config.kind]?.find((row) => row.id === childId)?.notes).toBe('Private notes');
+      },
+      15000,
+    );
+  }
+}
+
+for (const change of ['editing-disabled', 'manager-demoted'] as const) {
   for (const linked of [false, true]) {
     it.each([...doors])(
       `rejects %s after ${change} commits while waiting (linked=${linked})`,

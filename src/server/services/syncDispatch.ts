@@ -528,6 +528,8 @@ async function dispatchTrait(
   const characterId = requireParentId(op);
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
+  // Recheck permissions under locks before stale-base can return private row data.
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return await patchEntity({
     op,
     userId: ctx.userId,
@@ -596,6 +598,8 @@ async function dispatchSkill(
   const characterId = requireParentId(op);
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
+  // Recheck permissions under locks before stale-base can return private row data.
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return await patchEntity({
     op,
     userId: ctx.userId,
@@ -664,6 +668,8 @@ async function dispatchSpell(
   const characterId = requireParentId(op);
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
+  // Recheck permissions under locks before stale-base can return private row data.
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return await patchEntity({
     op,
     userId: ctx.userId,
@@ -735,6 +741,8 @@ async function dispatchLanguage(
   const characterId = requireParentId(op);
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
+  // Recheck permissions under locks before stale-base can return private row data.
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return await patchEntity({
     op,
     userId: ctx.userId,
@@ -809,6 +817,8 @@ async function dispatchTechnique(
   const characterId = requireParentId(op);
   const access = await loadCharacterOr403(characterId, ctx.userId);
   assertWrite(access);
+  // Recheck permissions under locks before stale-base can return private row data.
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return await patchEntity({
     op,
     userId: ctx.userId,

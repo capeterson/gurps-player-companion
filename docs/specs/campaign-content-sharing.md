@@ -311,6 +311,8 @@ Every child create/patch rechecks write access under the campaign, character and
 membership locks, including edits without a source reference. The locked decision
 uses the same owner/staff rules as ordinary authorization: revoking staff editing
 or demoting a manager while a write waits prevents that write from committing.
+Sync child patches perform this locked check before evaluating stale revisions,
+so a revoked writer receives an unauthorized outcome without a latest-row payload.
 
 ### YAML import/export (cross-campaign sharing)
 
