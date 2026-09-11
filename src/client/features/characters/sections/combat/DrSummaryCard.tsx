@@ -1,64 +1,18 @@
-/**
- * DrSummaryCard — shows effective armor + innate DR per hit location for the
- * combat tab's left column. Complements the AttacksCard's hit-location
- * aim presets: the player can see what DR protects each location while
- * choosing where to aim.
- *
- * When armor has typed DR overrides (cut/imp/pi/burn/etc.), the summary
- * shows the base DR and annotates any types that differ from it.
- */
-
+/** Armor inspection and incoming damage share the same typed DR and divisor math. */
 import { useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import {
-  type DrByLocation,
-  type DrByLocationMap,
+  aggregateDrByLocation,
+  armorCoversLocation,
   effectiveDrByLocation,
+  resolveDr,
 } from '../../../../../shared/domain/armorDr.ts';
+import { drAfterDivisor, woundingMultiplier } from '../../../../../shared/domain/injuryCalc.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
+import { ArmorLocationMap } from './ArmorLocationMap.tsx';
 import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
-
-interface DrEntry extends DrByLocation {
-  readonly loc: string;
-}
-
-/** Short labels for typed DR overrides that differ from base DR. */
-const TYPED_DR_LABELS: Record<string, string> = {
-  cut: 'cut',
-  imp: 'imp',
-  pi: 'pi',
-  pi_minus: 'pi−',
-  pi_plus: 'pi+',
-  pi_pp: 'pi++',
-  burn: 'burn',
-  corr: 'cor',
-  fat: 'fat',
-  tox: 'tox',
-};
-
-function typedDrAnnotations(entry: DrEntry): string[] {
-  const annotations: string[] = [];
-  for (const [key, label] of Object.entries(TYPED_DR_LABELS)) {
-    const val = entry.typedDr[key as keyof typeof entry.typedDr];
-    if (val != null && val !== entry.dr) {
-      annotations.push(`${val} vs ${label}`);
-    }
-  }
-  return annotations;
-}
-
-function capitalize(s: string): string {
-  return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
-}
-
-function locationLabel(loc: string): string {
-  const parts = loc.split('_');
-  const words =
-    parts.length === 2 && (parts[1] === 'left' || parts[1] === 'right')
-      ? [capitalize(parts[1] as string), capitalize(parts[0] as string)]
-      : parts.map(capitalize);
-  return words.join(' ');
-}
+import { ARMOR_DIVISORS, DAMAGE_TYPES, locationLabel } from './armorViewOptions.ts';
+import './armor.css';
 
 export interface DrSummaryCardProps {
   character: CharacterDetail;
@@ -67,92 +21,209 @@ export interface DrSummaryCardProps {
   bumpHp?: (delta: number) => void;
 }
 
-export function DrSummaryCard({ character, canWrite, hpMax, bumpHp }: DrSummaryCardProps) {
-  const effectsKnown = character.libraryEffectsKnown !== false;
-  const map: DrByLocationMap = effectsKnown
-    ? effectiveDrByLocation(character.inventory, character.effects)
-    : new Map();
+export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: DrSummaryCardProps) {
+  const [location, setLocation] = useState('torso');
+  const [type, setType] = useState('cr');
+  const [divisor, setDivisor] = useState('');
   const [damageOpen, setDamageOpen] = useState(false);
-
-  // The incoming-damage helper only makes sense when it can actually
-  // mutate HP — no bumper (e.g. a read-only viewer), no button.
-  const damageButton =
-    canWrite && bumpHp && hpMax != null ? (
-      <button type="button" className="btn btn-ghost btn-xs" onClick={() => setDamageOpen(true)}>
-        Incoming damage…
-      </button>
-    ) : null;
-
-  const damageDialog =
-    canWrite && bumpHp && hpMax != null ? (
-      <IncomingDamageDialog
-        open={damageOpen}
-        character={character}
-        canWrite={canWrite}
-        hpMax={hpMax}
-        bumpHp={bumpHp}
-        onClose={() => setDamageOpen(false)}
-      />
-    ) : null;
-
-  const wellKnown: DrEntry[] = HIT_LOCATIONS.flatMap((loc) => {
-    const entry = map.get(loc);
-    return entry ? [{ loc, ...entry }] : [];
-  });
-  const custom: DrEntry[] = [...map.entries()]
-    .filter(([loc]) => !HIT_LOCATIONS.includes(loc as never))
-    .map(([loc, entry]) => ({ loc, ...entry }));
+  const known = character.libraryEffectsKnown !== false;
+  const map = known ? effectiveDrByLocation(character.inventory, character.effects) : new Map();
+  const custom = [...map.keys()].filter((loc) => !HIT_LOCATIONS.includes(loc as never));
+  const dr = resolveDr(type, map.get(location));
+  const effective = drAfterDivisor(dr, divisor);
+  const multiplier = woundingMultiplier(type, location);
+  const layers = known
+    ? character.inventory.filter(
+        (item) =>
+          item.equipped && item.isArmor && item.armor && armorCoversLocation(item.armor, location),
+      )
+    : [];
+  const innate = known
+    ? (character.effects ?? [])
+        .filter(
+          (effect) =>
+            effect.active &&
+            effect.target === 'dr' &&
+            (effect.hitLocation ? effect.hitLocation === location : location !== 'eye'),
+        )
+        .reduce((sum, effect) => sum + effect.value, 0)
+    : 0;
 
   return (
-    <section className="card space-y-2 p-5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="label-eyebrow">Effective DR</p>
-        {damageButton}
+    <section className="card p-4 sm:p-5 space-y-4" aria-label="Armor coverage">
+      <div>
+        <h2 className="label-eyebrow">Effective DR</h2>
+        <p className="text-xs text-muted mt-1">
+          Select a location to inspect armor, innate protection, and incoming damage.
+        </p>
       </div>
-      <p className="text-xs text-base-content/60">
-        Armor + active innate DR; skull includes natural DR 2. Unscoped innate DR excludes eyes
-        (B46).
-      </p>
-      {!effectsKnown && (
-        <output className="text-xs text-warning">
+      {!known && (
+        <output className="text-sm text-warning">
           DR unavailable: linked library effects have not loaded.
         </output>
       )}
-      <ul className="space-y-0.5 text-sm">
-        {wellKnown.map((entry) => (
-          <li key={entry.loc} className="flex items-baseline justify-between gap-2">
-            <span className="text-base-content/80">{locationLabel(entry.loc)}</span>
-            <span className="num text-base-content">
-              {entry.dr}
-              {entry.drCrushing != null && entry.drCrushing !== entry.dr && (
-                <span className="text-base-content/50 text-xs ml-1">{entry.drCrushing} vs cr</span>
-              )}
-              {typedDrAnnotations(entry).map((a) => (
-                <span key={a} className="text-base-content/50 text-xs ml-1">
-                  {a}
-                </span>
+      <div className="armor-workspace">
+        <ArmorLocationMap
+          map={map}
+          type={type}
+          divisor={divisor}
+          known={known}
+          selected={location}
+          onSelect={setLocation}
+        />
+        <div className="space-y-4 min-w-0">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1 min-w-0">
+              <span className="label-eyebrow">Hit location</span>
+              <select
+                className="select select-sm select-bordered w-full"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              >
+                {[...HIT_LOCATIONS, ...custom].map((loc) => (
+                  <option key={loc} value={loc}>
+                    {locationLabel(loc)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 min-w-0">
+              <span className="label-eyebrow">Damage type</span>
+              <select
+                className="select select-sm select-bordered w-full"
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+              >
+                {DAMAGE_TYPES.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="label-eyebrow">Armor penetration</span>
+            <select
+              className="select select-sm select-bordered w-full"
+              value={divisor}
+              onChange={(e) => setDivisor(e.target.value)}
+            >
+              {ARMOR_DIVISORS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
-            </span>
-          </li>
-        ))}
-        {custom.map((entry) => (
-          <li key={entry.loc} className="flex items-baseline justify-between gap-2">
-            <span className="text-base-content/80">{locationLabel(entry.loc)}</span>
-            <span className="num text-base-content">
-              {entry.dr}
-              {entry.drCrushing != null && entry.drCrushing !== entry.dr && (
-                <span className="text-base-content/50 text-xs ml-1">{entry.drCrushing} vs cr</span>
+            </select>
+          </label>
+          <div className="rounded-xl border border-base-300 bg-base-200/50 p-4" aria-live="polite">
+            <p className="font-display text-lg">{locationLabel(location)}</p>
+            <div className="flex items-baseline gap-3 mt-1">
+              <strong className="num text-4xl text-primary" aria-label="Selected effective DR">
+                {known ? effective : '—'}
+              </strong>
+              <span className="text-sm text-muted">
+                DR against {DAMAGE_TYPES.find(([value]) => value === type)?.[1]}
+              </span>
+            </div>
+            {known && divisor && (
+              <p className="text-xs text-muted mt-2">
+                {divisor === 'ignore' ? `${dr} DR bypassed` : `${dr} DR ÷ ${divisor}, rounded down`}{' '}
+                → {effective} effective DR
+              </p>
+            )}
+            <p className="text-sm mt-3">
+              Penetrating damage × <strong className="num">{multiplier}</strong> injury
+            </p>
+            <p className="text-xs text-muted">
+              The location modifier replaces the damage-type modifier; it does not multiply it
+              again.
+            </p>
+          </div>
+          {known && (
+            <div>
+              <h3 className="label-eyebrow mb-2">Protection before penetration</h3>
+              <ul className="divide-y divide-base-300 text-sm" aria-label="Protection layers">
+                {layers.map((item) => (
+                  <li className="flex justify-between gap-3 py-2" key={item.id}>
+                    <span>{item.name}</span>
+                    <span className="num shrink-0">
+                      {resolveDr(type, aggregateDrByLocation([item]).get(location))} DR
+                    </span>
+                  </li>
+                ))}
+                {innate !== 0 && (
+                  <li className="flex justify-between gap-3 py-2">
+                    <span>Active innate DR</span>
+                    <span className="num">{innate} DR</span>
+                  </li>
+                )}
+                {location === 'skull' && (
+                  <li className="flex justify-between gap-3 py-2">
+                    <span>Natural skull protection</span>
+                    <span className="num">2 DR</span>
+                  </li>
+                )}
+              </ul>
+              {layers.length === 0 && innate === 0 && location !== 'skull' && (
+                <p className="text-sm text-muted">No protection at this location.</p>
               )}
-              {typedDrAnnotations(entry).map((a) => (
-                <span key={a} className="text-base-content/50 text-xs ml-1">
-                  {a}
-                </span>
-              ))}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {damageDialog}
+            </div>
+          )}
+          <p className="text-xs text-muted">
+            Use the attack’s effective divisor after Hardened DR or other special defenses.
+            Front-only and back-only armor are currently combined.
+          </p>
+          {bumpHp && hpMax != null && canWrite && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm w-full"
+              onClick={() => setDamageOpen(true)}
+            >
+              Incoming damage…
+            </button>
+          )}
+        </div>
+      </div>
+      <details className="border-t border-base-300 pt-3">
+        <summary className="cursor-pointer text-sm text-muted">All locations and DR types</summary>
+        <ul
+          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-sm"
+          aria-label="All location DR"
+        >
+          {known &&
+            [...HIT_LOCATIONS, ...custom].map((loc) => {
+              const entry = map.get(loc);
+              const base = entry?.dr ?? 0;
+              const variants = DAMAGE_TYPES.filter(([key]) => key !== 'burn_tight').flatMap(
+                ([key]) =>
+                  resolveDr(key, entry) !== base ? [`${resolveDr(key, entry)} vs ${key}`] : [],
+              );
+              return (
+                <li key={loc}>
+                  <span>{locationLabel(loc)}</span>
+                  <span className="num float-right ml-2">{base}</span>
+                  {variants.length > 0 && (
+                    <small className="block text-muted">{variants.join(' · ')}</small>
+                  )}
+                </li>
+              );
+            })}
+        </ul>
+      </details>
+      {damageOpen && bumpHp && hpMax != null && (
+        <IncomingDamageDialog
+          open
+          character={character}
+          canWrite={canWrite}
+          hpMax={hpMax}
+          bumpHp={bumpHp}
+          onClose={() => setDamageOpen(false)}
+          initialLocation={location}
+          initialType={type}
+          initialDivisor={divisor}
+        />
+      )}
     </section>
   );
 }

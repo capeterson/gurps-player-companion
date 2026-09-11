@@ -183,7 +183,15 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
   //    do we fall back to reading the local row fresh -- there's
   //    nothing to coalesce, so the local row's current value IS the
   //    last-synced value.
-  let prev = args.prevValue ?? (carriedPrev ? carriedPrev.value : await readFieldValue(args));
+  // null is a confirmed empty field (e.g. armor before its first edit),
+  // not a missing override. Losing it makes a second stale-base retry
+  // compare the server against our optimistic value and falsely roll back.
+  let prev =
+    args.prevValue !== undefined
+      ? args.prevValue
+      : carriedPrev
+        ? carriedPrev.value
+        : await readFieldValue(args);
   if (
     args.entityClass === 'character' &&
     args.fieldPath === 'campaignId' &&

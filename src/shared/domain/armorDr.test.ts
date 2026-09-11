@@ -28,6 +28,16 @@ function item(
 }
 
 describe('aggregateDrByLocation', () => {
+  it('includes torso layers at the vitals without double counting explicit coverage', () => {
+    const map = aggregateDrByLocation([
+      item(4, ['torso'], { typedDr: { imp: 7 } }),
+      item(2, ['torso', 'vitals', 'torso']),
+      item(1, ['vitals']),
+    ]);
+    expect(resolveDr('imp', map.get('vitals'))).toBe(10);
+    expect(resolveDr('imp', map.get('torso'))).toBe(9);
+    expect(applyDamage(12, 'imp', 'vitals', map, '2', 10).injury).toBe(21);
+  });
   it('sums DR across equipped armor covering the same location', () => {
     const result = aggregateDrByLocation([item(2, ['torso']), item(3, ['torso', 'arm_left'])]);
     expect(result.get('torso')?.dr).toBe(5);

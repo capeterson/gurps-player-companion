@@ -114,6 +114,55 @@ describe('parseArmorDivisor', () => {
 });
 
 describe('applyDamage', () => {
+  it.each(['imp', 'pi-', 'pi', 'pi+', 'pi++'])(
+    'applies the vitals multiplier once, after typed DR and penetration, for %s',
+    (type) => {
+      const map = drMap({
+        vitals: { dr: 9, typedDr: { imp: 7, pi: 7, pi_minus: 7, pi_plus: 7, pi_pp: 7 } },
+      });
+      const result = applyDamage(10, type, 'vitals', map, '2', 10);
+      expect(result).toMatchObject({
+        drAtLocation: 7,
+        effectiveDr: 3,
+        penetrating: 7,
+        multiplier: 3,
+        injury: 21,
+      });
+    },
+  );
+
+  it('bypasses armor, innate DR, and natural skull DR only when explicitly requested', () => {
+    const map = effectiveDrByLocation([], [{ target: 'dr', value: 5, active: true }]);
+    const result = applyDamage(10, 'imp', 'skull', map, 'ignore', 10);
+    expect(result).toMatchObject({
+      drAtLocation: 7,
+      effectiveDr: 0,
+      penetrating: 10,
+      multiplier: 4,
+      injury: 40,
+    });
+    expect(applyDamage(10, 'imp', 'skull', map, '2', 10).effectiveDr).toBe(3);
+  });
+
+  it('uses burning armor DR for tight beams and doubles vitals injury, not ordinary burning', () => {
+    const map = drMap({ vitals: { dr: 9, typedDr: { burn: 4 } } });
+    expect(applyDamage(10, 'burn_tight', 'vitals', map, null, 10)).toMatchObject({
+      drAtLocation: 4,
+      multiplier: 2,
+      injury: 12,
+    });
+    expect(applyDamage(10, 'burn', 'vitals', map, null, 10).injury).toBe(6);
+  });
+
+  it('does not treat custom types that start with pi as piercing', () => {
+    expect(woundingMultiplier('pixie', 'vitals')).toBe(1);
+  });
+
+  it('recognizes explicit DR bypass but rejects overflowing numeric divisors', () => {
+    expect(parseArmorDivisor('ignore')).toBe(Number.POSITIVE_INFINITY);
+    expect(parseArmorDivisor('(∞)')).toBe(Number.POSITIVE_INFINITY);
+    expect(parseArmorDivisor('9'.repeat(400))).toBeNull();
+  });
   it.each([
     [10, 'arm_left', 5, 5, false],
     [10, 'arm_left', 6, 6, false],

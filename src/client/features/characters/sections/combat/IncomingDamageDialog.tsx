@@ -13,36 +13,10 @@
 import { type FormEvent, useMemo, useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import { effectiveDrByLocation } from '../../../../../shared/domain/armorDr.ts';
-import { applyDamage } from '../../../../../shared/domain/injuryCalc.ts';
+import { applyDamage, parseArmorDivisor } from '../../../../../shared/domain/injuryCalc.ts';
 import { useDialogState } from '../../../../hooks/useDialogState.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
-
-/** Damage types offered in the select; free text also accepted via the "other" row. */
-const DAMAGE_TYPES = [
-  'cr',
-  'cut',
-  'imp',
-  'pi-',
-  'pi',
-  'pi+',
-  'pi++',
-  'burn',
-  'cor',
-  'tox',
-] as const;
-
-function capitalize(s: string): string {
-  return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
-}
-
-function locationLabel(loc: string): string {
-  const parts = loc.split('_');
-  const words =
-    parts.length === 2 && (parts[1] === 'left' || parts[1] === 'right')
-      ? [capitalize(parts[1] as string), capitalize(parts[0] as string)]
-      : parts.map(capitalize);
-  return words.join(' ');
-}
+import { ARMOR_DIVISORS, DAMAGE_TYPES, locationLabel } from './armorViewOptions.ts';
 
 export interface IncomingDamageDialogProps {
   open: boolean;
@@ -51,6 +25,9 @@ export interface IncomingDamageDialogProps {
   hpMax: number;
   bumpHp: (delta: number) => void;
   onClose: () => void;
+  initialLocation?: string;
+  initialType?: string;
+  initialDivisor?: string;
 }
 
 export function IncomingDamageDialog({
@@ -60,12 +37,18 @@ export function IncomingDamageDialog({
   hpMax,
   bumpHp,
   onClose,
+  initialLocation = 'torso',
+  initialType = 'cr',
+  initialDivisor = '',
 }: IncomingDamageDialogProps) {
   const ref = useDialogState(open);
   const [basicRaw, setBasicRaw] = useState('');
-  const [type, setType] = useState<string>('cr');
-  const [location, setLocation] = useState('torso');
-  const [divisorRaw, setDivisorRaw] = useState('');
+  const [type, setType] = useState(initialType);
+  const [location, setLocation] = useState(initialLocation);
+  const [divisorRaw, setDivisorRaw] = useState(initialDivisor);
+  const [customDivisor, setCustomDivisor] = useState(
+    !ARMOR_DIVISORS.some(([value]) => value === initialDivisor),
+  );
   const effectsKnown = character.libraryEffectsKnown !== false;
 
   const drMap = useMemo(
@@ -80,7 +63,11 @@ export function IncomingDamageDialog({
     [drMap],
   );
 
-  const basic = Math.max(0, Math.floor(Number(basicRaw)) || 0);
+  const validBasic = /^\d+$/.test(basicRaw.trim()) && Number.isSafeInteger(Number(basicRaw));
+  const basic = validBasic ? Number(basicRaw) : 0;
+  const validDivisor = !divisorRaw.trim() || parseArmorDivisor(divisorRaw) != null;
+  const fatigueType = type.trim().toLowerCase() === 'fat';
+  const valid = validBasic && validDivisor && !fatigueType;
   const result = applyDamage(basic, type, location, drMap, divisorRaw.trim() || null, hpMax);
   const cripplingHint = result.destroyed
     ? `Pre-cap injury is at least twice the crippling threshold: the body part is destroyed${type.trim().toLowerCase() === 'cut' ? ' (severed by cutting damage)' : ''}. Apply the condition manually (B421).`
@@ -90,12 +77,17 @@ export function IncomingDamageDialog({
 
   function handleApply(e: FormEvent) {
     e.preventDefault();
-    if (!canWrite || !effectsKnown || result.injury <= 0) return;
+    if (!canWrite || !effectsKnown || !valid || result.injury <= 0) return;
     bumpHp(-result.injury);
     onClose();
   }
 
-  const divisorText = result.effectiveDr !== result.drAtLocation ? `/${divisorRaw.trim()}` : '';
+  const divisorText =
+    divisorRaw === 'ignore'
+      ? ' (bypassed)'
+      : result.effectiveDr !== result.drAtLocation
+        ? `/${divisorRaw.trim()}`
+        : '';
   const breakdown = !effectsKnown
     ? 'Linked library effects are unavailable. Reconnect and load them before applying damage.'
     : basic > 0
@@ -107,7 +99,13 @@ export function IncomingDamageDialog({
       : 'Enter incoming basic damage.';
 
   return (
-    <dialog ref={ref} className="modal" onClose={onClose} onCancel={onClose}>
+    <dialog
+      ref={ref}
+      className="modal"
+      aria-label="Incoming damage"
+      onClose={onClose}
+      onCancel={onClose}
+    >
       <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-md">
         <h3 className="font-display text-xl font-semibold">Incoming damage</h3>
         <form onSubmit={handleApply} className="mt-3 space-y-3 text-sm">
@@ -127,13 +125,13 @@ export function IncomingDamageDialog({
             <label className="flex flex-col gap-1">
               <span className="label-eyebrow">Type</span>
               <select
-                value={DAMAGE_TYPES.includes(type as never) ? type : '__other'}
+                value={DAMAGE_TYPES.some(([value]) => value === type) ? type : '__other'}
                 onChange={(e) => setType(e.target.value === '__other' ? '' : e.target.value)}
                 className="select select-sm select-bordered"
               >
-                {DAMAGE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {DAMAGE_TYPES.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
                   </option>
                 ))}
                 <option value="__other">other…</option>
@@ -141,7 +139,7 @@ export function IncomingDamageDialog({
             </label>
           </div>
 
-          {!DAMAGE_TYPES.includes(type as never) && (
+          {!DAMAGE_TYPES.some(([value]) => value === type) && (
             <label className="flex flex-col gap-1">
               <span className="label-eyebrow">Custom type</span>
               <input
@@ -175,14 +173,52 @@ export function IncomingDamageDialog({
             </label>
             <label className="flex flex-col gap-1">
               <span className="label-eyebrow">Armor divisor</span>
-              <input
-                value={divisorRaw}
-                onChange={(e) => setDivisorRaw(e.target.value)}
-                className="input input-sm input-bordered"
-                placeholder="none"
-              />
+              <select
+                value={customDivisor ? '__custom' : divisorRaw}
+                onChange={(event) => {
+                  const custom = event.target.value === '__custom';
+                  setCustomDivisor(custom);
+                  setDivisorRaw(custom ? '' : event.target.value);
+                }}
+                className="select select-sm select-bordered"
+              >
+                {ARMOR_DIVISORS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+                <option value="__custom">Custom divisor…</option>
+              </select>
             </label>
           </div>
+          {customDivisor && (
+            <label className="flex flex-col gap-1">
+              <span className="label-eyebrow">Custom armor divisor</span>
+              <input
+                value={divisorRaw}
+                onChange={(event) => setDivisorRaw(event.target.value)}
+                className="input input-sm input-bordered"
+                placeholder="e.g. (2) or 0.5"
+                aria-invalid={!validDivisor}
+              />
+            </label>
+          )}
+          {!validDivisor && (
+            <p role="alert" className="text-xs text-error">
+              Enter a positive armor divisor, such as 2 or (0.5).
+            </p>
+          )}
+          {basicRaw.trim() && !validBasic && (
+            <p role="alert" className="text-xs text-error">
+              Basic damage must be a non-negative whole number.
+            </p>
+          )}
+          {fatigueType && (
+            <p role="alert" className="text-xs text-warning">
+              Fatigue damage affects FP. Use the Fatigue pool controls instead of applying HP
+              injury.
+            </p>
+          )}
 
           <p className="num rounded-lg border border-base-300/60 bg-base-200/40 px-3 py-2 text-xs text-base-content/80">
             {breakdown}
@@ -198,7 +234,7 @@ export function IncomingDamageDialog({
             <button
               type="submit"
               className="btn btn-sm btn-error"
-              disabled={!canWrite || !effectsKnown || result.injury <= 0}
+              disabled={!canWrite || !effectsKnown || !valid || result.injury <= 0}
             >
               {effectsKnown ? `Apply −${result.injury} HP` : 'Damage unavailable'}
             </button>
