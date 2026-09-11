@@ -5,6 +5,7 @@ import {
   type HitLocation,
 } from '../../../../../shared/constants/hitLocations.ts';
 import { RANGE_PENALTY_STEPS } from '../../../../../shared/constants/rangePenalty.ts';
+import { combatAdjustments } from '../../../../../shared/domain/combatAdjustments.ts';
 import {
   canTargetVitals,
   parseDamageSpec,
@@ -114,6 +115,15 @@ export interface AttacksCardProps {
 }
 
 export function AttacksCard({ character, openRoll }: AttacksCardProps) {
+  const state = combatAdjustments({
+    hp: character.combat?.currentHp ?? character.derived.hp,
+    maxHp: character.derived.hp,
+    fp: character.combat?.currentFp ?? character.derived.fp,
+    maxFp: character.derived.fp,
+    posture: character.combat?.posture ?? 'standing',
+    conditions: character.combat?.conditions ?? [],
+    maneuver: character.combat?.maneuver ?? null,
+  });
   const weapons = character.inventory.filter((i) => i.equipped && i.weaponData != null);
   // Consume the shared derived result, which already includes damage effects.
   // Rebuilding from ST here would silently drop those flat adds.
@@ -156,7 +166,10 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
             modes: line.damage ? parseDamageSpec(line.damage) : [],
           }));
           const allModes = parsedByLine.flatMap((p) => p.modes);
-          const stPenalty = stShortfallPenalty(wd.stRequired, character.derived.effectiveSt);
+          const stPenalty = stShortfallPenalty(
+            wd.stRequired,
+            state.strength(character.derived.effectiveSt),
+          );
           const resolution = resolveWeaponSkill(w.name, wd.skill, skillCandidates);
           // Only offer the vitals/eye presets when at least one of the
           // weapon's parsed damage modes -- across EVERY attack mode --

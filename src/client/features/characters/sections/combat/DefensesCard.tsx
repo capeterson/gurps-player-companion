@@ -129,12 +129,7 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         return {
           key: i.id,
           name: i.name,
-          value: state.defense(
-            'parry',
-            parryFromSkill(adjusted, parsed.mod, character.derived.parryMod),
-            defenseOption,
-            db,
-          ),
+          value: parryFromSkill(adjusted, parsed.mod, character.derived.parryMod),
           caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}${dbCaption}`,
           raw,
         };
@@ -217,11 +212,11 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       />
 
       {parryRows.map((row) =>
-        row.value != null || state.reason('parry') ? (
+        row.value != null ? (
           <RollableRow
             key={row.key}
             label={`Parry (${row.name})`}
-            baseTarget={row.value ?? 0}
+            baseTarget={state.defense('parry', row.value, defenseOption, db) ?? 0}
             unavailableReason={state.reason('parry')}
             openRoll={openRoll}
             sublabel={<span className="block text-[11px] text-base-content/60">{row.caption}</span>}
