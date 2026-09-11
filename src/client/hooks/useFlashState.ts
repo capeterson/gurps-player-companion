@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { flashBus } from '../sync/flashBus.ts';
+import { type FlashEvent, flashBus } from '../sync/flashBus.ts';
 
 export const FLASH_MS = 1400;
 
@@ -73,11 +73,14 @@ export function useFlashState(
     }, FLASH_MS);
   }, []);
 
-  const handleBusEvent = useCallback(() => {
-    if (!mountedRef.current) return;
-    onBusEventRef.current?.();
-    trigger();
-  }, [trigger]);
+  const handleBusEvent = useCallback(
+    (event: FlashEvent) => {
+      if (!mountedRef.current) return;
+      if (!event.visualOnly) onBusEventRef.current?.();
+      trigger();
+    },
+    [trigger],
+  );
 
   useEffect(() => {
     if (flashPrefix) return flashBus.subscribePrefix(flashPrefix, handleBusEvent);

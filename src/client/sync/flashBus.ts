@@ -17,6 +17,8 @@
 export interface FlashEvent {
   key: string;
   reason: string;
+  /** Animate a local gesture failure without reverting another input’s draft. */
+  visualOnly?: boolean;
 }
 
 type Listener = (e: FlashEvent) => void;

@@ -139,6 +139,18 @@ works offline.**
    transaction across their stores and the outbox. HP/FP fatigue updates use
    this path and share a history `batchId`; each op still carries its bare field
    value and settles independently under the existing server protocol.
+   Absolute combat draft saves and relative HP/FP bumper gestures also read
+   and write through this transaction scope. HP/FP draft inputs opt into
+   commit-time local enqueue in `useDraftField`: storage serializes their
+   writes immediately, while the hook processes every result in order so a
+   successful intermediate value remains the rollback baseline. On failure,
+   the input reads its durable value to include successful edits from other controls.
+   This includes
+   same-field edits committed while an earlier save is still pending.
+   Bumpers use the latest local
+   values, including another input’s edit before React renders it. A local
+   gesture failure emits a visual-only flash plus a field-specific toast
+   without reverting another input’s newer unsaved draft.
 2. **Drain.** The orchestrator batches pending outbox ops (up to
    `DRAIN_BATCH_SIZE`) into `POST /sync/operations`. A `navigator.locks` lease
    serializes the drain across tabs (lock order is always DRAIN → CURSOR).

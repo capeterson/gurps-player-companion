@@ -38,6 +38,16 @@ export interface UseDraftFieldOptions<V> {
   readonly validate?: ((v: V) => string | null) | undefined;
   /** Persist the value.  Resolve on success, reject on failure (rollback fires). */
   readonly onSave: (v: V) => Promise<unknown>;
+  /**
+   * Local writers that already serialize in storage can enqueue at commit time.
+   * Every settlement is still processed in order to retain rollback baselines.
+   * This lets relative gestures observe even a second queued input edit.
+   * Never enable for an HTTP save that does not itself serialize writes.
+   */
+  readonly enqueueOnCommit?: {
+    /** Read the durable rollback value, including other inputs' successful edits. */
+    readCommitted: () => Promise<V>;
+  };
   /** Map an unknown rejection into a user-facing message.  Defaults to the Error message. */
   readonly onError?: (err: unknown) => string;
   /**
@@ -107,6 +117,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     onSave,
     onError = defaultOnError,
     flashKey,
+    enqueueOnCommit,
   } = opts;
 
   const toasts = useToasts();
@@ -127,6 +138,12 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   // null can never confuse `null` with a legitimate null payload.
   const inflightRef = useRef<{ value: V } | null>(null);
   const queuedRef = useRef<{ value: V } | null>(null);
+  type SaveOutcome = { ok: true } | { ok: false; error: unknown; committed?: { value: V } };
+  type PreparedSave = { outcome: Promise<SaveOutcome>; editVersion: number };
+  const localQueueRef = useRef<Array<{ value: V; prepared: PreparedSave }>>([]);
+  const editVersionRef = useRef(0);
+  const enqueueOnCommitRef = useRef(enqueueOnCommit);
+  enqueueOnCommitRef.current = enqueueOnCommit;
   // The most recently CONFIRMED authoritative value, updated by either
   // an incoming server prop change or the success branch of a save.
   // We compare against this for the commit() no-op short-circuit
@@ -220,12 +237,20 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   );
 
   const performSave = useCallback(
-    async (value: V): Promise<void> => {
+    async (value: V, prepared?: PreparedSave): Promise<void> => {
       inflightRef.current = { value };
       setIsSaving(true);
       let succeeded = false;
       try {
-        await onSaveRef.current(value);
+        if (prepared) {
+          const outcome = await prepared.outcome;
+          if (!outcome.ok) {
+            if (outcome.committed) lastCommittedRef.current = outcome.committed.value;
+            throw outcome.error;
+          }
+        } else {
+          await onSaveRef.current(value);
+        }
         succeeded = true;
       } catch (err) {
         const msg = onErrorRef.current(err);
@@ -253,10 +278,11 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       // AGENTS.md ("fire when the in-flight save settles") it must run
       // regardless of whether THIS save succeeded or failed.  Dropping the
       // queue on failure would silently lose that newer edit.
-      const queued = queuedRef.current;
+      const localQueued = localQueueRef.current.shift();
+      const queued = localQueued ?? queuedRef.current;
       if (queued !== null) {
         queuedRef.current = null;
-        if (!succeeded) {
+        if (!succeeded && !prepared) {
           // The failed save left draft on the rejected value.  Move it
           // to the queued value so the input shows the user's later
           // edit while the replay save runs.  The flash already fired
@@ -265,7 +291,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
           setDraft(formatted);
           draftRef.current = formatted;
         }
-        await performSave(queued.value);
+        await performSave(queued.value, localQueued?.prepared);
         return;
       }
 
@@ -282,7 +308,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
         } catch {
           /* user is mid-edit with an unparsable draft — keep dirty */
         }
-      } else {
+      } else if (!prepared || prepared.editVersion === editVersionRef.current) {
         // No queue, save failed: revert draft to the last authoritative
         // committed value.  Using the `serverValue` prop here would
         // erase a prior successful save whose refetch hasn't landed yet
@@ -300,6 +326,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   );
 
   const setValue = useCallback((raw: string) => {
+    editVersionRef.current++;
     setDraft(raw);
     draftRef.current = raw;
     dirtyRef.current = true;
@@ -326,7 +353,11 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       }
     }
 
-    if (equalsRef.current(parsed, lastCommittedRef.current) && inflightRef.current === null) {
+    if (
+      !enqueueOnCommitRef.current &&
+      equalsRef.current(parsed, lastCommittedRef.current) &&
+      inflightRef.current === null
+    ) {
       // No-op: the typed value already matches the last value we
       // committed (either confirmed by a prior save or arrived via
       // the server prop).  Comparing against the prop directly would
@@ -336,6 +367,32 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       return;
     }
 
+    if (enqueueOnCommitRef.current) {
+      const readCommitted = enqueueOnCommitRef.current.readCommitted;
+      const failed = async (error: unknown): Promise<SaveOutcome> => {
+        try {
+          return { ok: false, error, committed: { value: await readCommitted() } };
+        } catch {
+          // If storage itself is unreadable, retain our last confirmed value.
+          return { ok: false, error };
+        }
+      };
+      let outcome: Promise<SaveOutcome>;
+      try {
+        // Start the local transaction now, before a subsequent bumper gesture.
+        // Convert rejection immediately so a queued promise cannot go unhandled.
+        outcome = Promise.resolve(onSaveRef.current(parsed)).then(
+          () => ({ ok: true as const }),
+          failed,
+        );
+      } catch (error) {
+        outcome = failed(error);
+      }
+      const prepared = { outcome, editVersion: editVersionRef.current };
+      if (inflightRef.current !== null) localQueueRef.current.push({ value: parsed, prepared });
+      else void performSave(parsed, prepared);
+      return;
+    }
     if (inflightRef.current !== null) {
       // Queue the latest value for after the current save settles.
       // Wrapping in `{ value }` keeps the null-vs-not-null check on

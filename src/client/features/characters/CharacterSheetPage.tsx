@@ -24,6 +24,7 @@ import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
 import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
+import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
@@ -898,6 +899,10 @@ function StatusPanel({
     serverValue: currentHp,
     parse: intParser(-1000, 1000),
     onSave: (v) => patchCombat('currentHp', v),
+    enqueueOnCommit: {
+      readCommitted: async () =>
+        (await getLocalDb().characterCombat.get(character.id))?.currentHp ?? d.hp,
+    },
     flashKey: makeFlashKey('character_combat', character.id, 'currentHp'),
   });
   const fpField = useDraftField<number>({
@@ -905,6 +910,10 @@ function StatusPanel({
     serverValue: currentFp,
     parse: intParser(-1000, 1000),
     onSave: (v) => patchCombat('currentFp', v),
+    enqueueOnCommit: {
+      readCommitted: async () =>
+        (await getLocalDb().characterCombat.get(character.id))?.currentFp ?? d.fp,
+    },
     flashKey: makeFlashKey('character_combat', character.id, 'currentFp'),
   });
 

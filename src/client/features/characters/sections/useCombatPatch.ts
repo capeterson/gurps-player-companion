@@ -1,42 +1,25 @@
-/**
- * Per-field patch helper for the `character_combat` entity, backed by
- * the local Dexie outbox. Shared by the in-sheet StatusPanel and the
- * Combat tab so the ensure-row + enqueue logic stays single-sourced.
- */
-
+/** Shared local-first combat patch helper for the status panel and Combat tab. */
 import { useCallback } from 'react';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import { getLocalDb } from '../../../db/dexie.ts';
+import { type LocalCharacterCombat, getLocalDb } from '../../../db/dexie.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueFieldPatches } from '../../../sync/outbox.ts';
 
+export type CombatFields = Readonly<Record<string, unknown>>;
+/** Evaluated once against the latest local row inside the write transaction. */
+export type CombatUpdate = (current: Readonly<LocalCharacterCombat>) => CombatFields;
 export type CombatPatch = (
-  field: string | Readonly<Record<string, unknown>>,
+  field: string | CombatFields | CombatUpdate,
   value?: unknown,
   batchId?: string,
 ) => Promise<void>;
 
 /**
- * Combat is 1:1 keyed by characterId.  If a local row doesn't exist
- * yet (first edit on this device) we materialize a default row in
- * Dexie so the per-field patch has something to update; the
- * orchestrator's whole-body upsert handles the server side.
- *
- * Atomicity guarantee: the missing-row check and the default-row
- * creation happen inside one Dexie `rw` transaction on
- * `characterCombat`, and use `add` (never `put`) so a second,
- * interleaved call can't recreate the row out from under the first.
- * Without this, two rapid edits to different fields on a
- * not-yet-materialized row could both pass the "does it exist" check
- * before either write lands; the second `put` would then overwrite
- * the whole row back to defaults, silently reverting the first edit's
- * field even though its outbox op is still pending. The transaction
- * makes the two checks serialize, and `add` throws a `ConstraintError`
- * (caught and ignored below) if a pathological double-create still
- * slips through, so the ensure-row step can never clobber an existing
- * row. This transaction MUST complete before `enqueueFieldPatches` is
- * called -- not wrap it -- because Dexie transactions don't nest
- * safely across overlapping stores; the two stay sequential.
+ * Materialize, read and enqueue inside one transaction covering both stores.
+ * The outbox's nested transaction uses this same scope. Absolute draft saves
+ * and relative bumper changes serialize across all hook instances, so a bumper
+ * reads the preceding local edit even before React renders it. Failure aborts
+ * the entire gesture, including a newly materialized row.
  */
 export function useCombatPatch(character: CharacterDetail): CombatPatch {
   const characterId = character.id;
@@ -44,52 +27,44 @@ export function useCombatPatch(character: CharacterDetail): CombatPatch {
   const defaultFp = character.derived.fp;
 
   return useCallback(
-    async (
-      field: string | Readonly<Record<string, unknown>>,
-      value?: unknown,
-      batchId?: string,
-    ) => {
+    async (field: string | CombatFields | CombatUpdate, value?: unknown, batchId?: string) => {
       const db = getLocalDb();
-      await db.transaction('rw', db.characterCombat, async () => {
-        const existing = await db.characterCombat.get(characterId);
-        if (!existing) {
-          try {
-            await db.characterCombat.add({
-              id: characterId,
-              characterId,
-              currentHp: defaultHp,
-              currentFp: defaultFp,
-              conditions: [],
-              maneuver: null,
-              posture: 'standing',
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              revision: -1,
-            });
-          } catch (err) {
-            // Belt-and-braces: if two interleaved calls both observed a
-            // missing row, only one `add` can win -- the loser hits a
-            // ConstraintError on the duplicate primary key. That's fine;
-            // the winner's row is already in place. Anything else rethrows.
-            if (!(err instanceof Error) || err.name !== 'ConstraintError') {
-              throw err;
-            }
-          }
+      await db.transaction('rw', db.characterCombat, db.outbox, async () => {
+        let current = await db.characterCombat.get(characterId);
+        if (!current) {
+          current = {
+            id: characterId,
+            characterId,
+            currentHp: defaultHp,
+            currentFp: defaultFp,
+            conditions: [],
+            maneuver: null,
+            posture: 'standing',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            revision: -1,
+          };
+          await db.characterCombat.add(current);
         }
+        const fields =
+          typeof field === 'function'
+            ? field(current)
+            : typeof field === 'string'
+              ? { [field]: value }
+              : field;
+        await enqueueFieldPatches(
+          Object.entries(fields).map(([key, attemptedValue]) => ({
+            entityClass: 'character_combat',
+            entityId: characterId,
+            fieldPath: key,
+            attemptedValue,
+            humanName: key === 'currentHp' ? 'HP' : key === 'currentFp' ? 'FP' : key,
+            flashKey: makeFlashKey('character_combat', characterId, key),
+            characterId,
+            batchId,
+          })),
+        );
       });
-      const fields = typeof field === 'string' ? { [field]: value } : field;
-      await enqueueFieldPatches(
-        Object.entries(fields).map(([key, attemptedValue]) => ({
-          entityClass: 'character_combat',
-          entityId: characterId,
-          fieldPath: key,
-          attemptedValue,
-          humanName: key === 'currentHp' ? 'HP' : key === 'currentFp' ? 'FP' : key,
-          flashKey: makeFlashKey('character_combat', characterId, key),
-          characterId,
-          batchId,
-        })),
-      );
     },
     [characterId, defaultHp, defaultFp],
   );
