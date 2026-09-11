@@ -57,176 +57,179 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
   return (
     <section className="card space-y-4 p-5">
       <p className="label-eyebrow">Pools</p>
-
-      <fieldset
-        aria-label="Hit points"
-        {...hpFlash.flashProps}
-        className={`field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4 ${flashHp ? 'flash' : ''}`}
-      >
-        <div className="mb-2 flex items-baseline justify-between gap-2">
-          <span className="flex items-center gap-2">
-            <span className="label-eyebrow">Hit Points</span>
-            {hp > hpMax && <OverflowBadge amount={hp - hpMax} />}
-          </span>
-        </div>
-        <div className="mb-2 flex items-baseline gap-1.5">
-          <span
-            className={`num font-bold leading-none ${flashHp ? 'num-tween' : ''}`}
-            style={{ fontSize: '3.5rem', color: hpColor, letterSpacing: '-0.03em' }}
-          >
-            {hp}
-          </span>
-          <span className="num text-xl text-dim">/ {hpMax}</span>
-        </div>
-        <PoolMeter current={hp} max={hpMax} tone="hp" height="lg" ariaLabel="Hit points" />
-        <p className="num mt-2 text-[11px] text-dim">
-          reeling at {reelingThreshold} · death checks from −{hpMax} · certain death at −{5 * hpMax}{' '}
-          (B419/B423)
-        </p>
-        {deathCheckRequired && (
-          <div className="mt-2">
-            <RollableRow
-              label="Death check"
-              baseTarget={character.derived.effectiveHt}
-              openRoll={openRoll}
-              sublabel={
-                <span className="block text-[11px] text-base-content/60">HT roll — B419</span>
-              }
-            />
-          </div>
-        )}
-        {canWrite && (
-          <>
-            <div className="mt-3 flex gap-1.5">
-              <Bumper tone="dmg" onClick={() => bumpHp(-5)} ariaLabel="HP -5">
-                −5
-              </Bumper>
-              <Bumper tone="dmg" onClick={() => bumpHp(-1)} ariaLabel="HP -1">
-                −1
-              </Bumper>
-              <Bumper tone="heal" onClick={() => bumpHp(+1)} ariaLabel="HP +1">
-                +1
-              </Bumper>
-              <Bumper tone="heal" onClick={() => bumpHp(+5)} ariaLabel="HP +5">
-                +5
-              </Bumper>
-            </div>
-            <button
-              type="button"
-              className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-              onClick={resetHp}
-            >
-              Reset to {hpMax}
-            </button>
-          </>
-        )}
-      </fieldset>
-
-      <fieldset
-        aria-label="Fatigue points"
-        {...fpFlash.flashProps}
-        className="field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4"
-      >
-        <div className="mb-2 flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <span className="label-eyebrow">Fatigue</span>
-            {fp > fpMax && <OverflowBadge amount={fp - fpMax} />}
-          </span>
-          <div className="flex items-baseline gap-1">
-            <span
-              className="num font-bold leading-none"
-              style={{ fontSize: '1.75rem', color: fpColor }}
-            >
-              {fp}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
+        <fieldset
+          aria-label="Hit points"
+          {...hpFlash.flashProps}
+          className={`field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4 ${flashHp ? 'flash' : ''}`}
+        >
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <span className="flex items-center gap-2">
+              <span className="label-eyebrow">Hit Points</span>
+              {hp > hpMax && <OverflowBadge amount={hp - hpMax} />}
             </span>
-            <span className="num text-sm text-dim">/ {fpMax}</span>
           </div>
-        </div>
-        <PoolMeter current={fp} max={fpMax} tone="fp" height="md" ariaLabel="Fatigue points" />
-        <p className="num mt-2 text-[11px] text-dim">
-          below 0, each FP lost also costs 1 HP; at −{fpMax}, loss is HP-only (B426)
-        </p>
-        {fp === -fpMax && (
-          <p className="mt-1 text-[11px] text-warning">
-            FP floor reached — further fatigue costs 1 HP per FP (B426)
+          <div className="mb-2 flex items-baseline gap-1.5">
+            <span
+              className={`num font-bold leading-none ${flashHp ? 'num-tween' : ''}`}
+              style={{ fontSize: '3.5rem', color: hpColor, letterSpacing: '-0.03em' }}
+            >
+              {hp}
+            </span>
+            <span className="num text-xl text-dim">/ {hpMax}</span>
+          </div>
+          <PoolMeter current={hp} max={hpMax} tone="hp" height="lg" ariaLabel="Hit points" />
+          <p className="num mt-2 text-[11px] text-dim">
+            reeling at {reelingThreshold} · death checks from −{hpMax} · certain death at −
+            {5 * hpMax} (B419/B423)
           </p>
-        )}
-        {canWrite && (
-          <>
-            <div className="mt-2.5 flex gap-1.5">
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-5)}>
-                −5
-              </button>
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-1)}>
-                −1
-              </button>
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+1)}>
-                +1
-              </button>
-              <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+5)}>
-                +5
-              </button>
+          {deathCheckRequired && (
+            <div className="mt-2">
+              <RollableRow
+                label="Death check"
+                baseTarget={character.derived.effectiveHt}
+                openRoll={openRoll}
+                sublabel={
+                  <span className="block text-[11px] text-base-content/60">HT roll — B419</span>
+                }
+              />
             </div>
-            {fp !== fpMax && (
+          )}
+          {canWrite && (
+            <>
+              <div className="mt-3 flex gap-1.5">
+                <Bumper tone="dmg" onClick={() => bumpHp(-5)} ariaLabel="HP -5">
+                  −5
+                </Bumper>
+                <Bumper tone="dmg" onClick={() => bumpHp(-1)} ariaLabel="HP -1">
+                  −1
+                </Bumper>
+                <Bumper tone="heal" onClick={() => bumpHp(+1)} ariaLabel="HP +1">
+                  +1
+                </Bumper>
+                <Bumper tone="heal" onClick={() => bumpHp(+5)} ariaLabel="HP +5">
+                  +5
+                </Bumper>
+              </div>
               <button
                 type="button"
                 className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                onClick={resetFp}
+                onClick={resetHp}
               >
-                Reset to {fpMax}
+                Reset to {hpMax}
               </button>
-            )}
-          </>
-        )}
-      </fieldset>
+            </>
+          )}
+        </fieldset>
 
-      <div>
-        <p className="label-eyebrow mb-1.5">Posture</p>
-        <div className="flex flex-wrap gap-1">
-          {POSTURES.map((p) => (
-            <ConditionChip
-              key={p}
-              label={p}
-              active={posture === p}
-              onClick={() => setPosture(p)}
-              disabled={!canWrite}
-              className="capitalize"
-            />
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <span className="label-eyebrow">Conditions</span>
-          <span className="num text-[10px] text-dim">{conditions.length} active</span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {COMMON_CONDITIONS.map((id) => {
-            const active = conditionsInclude(conditions, id);
-            const suggest = id === 'reeling' && reelingSuggested && !active;
-            return (
-              <ConditionChip
-                key={id}
-                label={conditionLabel(id)}
-                active={active}
-                onClick={() => toggle(id)}
-                disabled={!canWrite}
-                className={suggest ? 'animate-pulse ring-2 ring-warning/70' : ''}
-              />
-            );
-          })}
-        </div>
-        {reelingSuggested && (
-          <p className="mt-1.5 text-[11px] text-warning">
-            <InfoTooltip
-              content={`HP (${hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; the Reeling chip is a manual reminder and adds no extra penalty. The reduction ends when HP reaches at least one-third of maximum.`}
-            >
-              Reeling suggested
-            </InfoTooltip>{' '}
-            — B419
+        <fieldset
+          aria-label="Fatigue points"
+          {...fpFlash.flashProps}
+          className="field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4"
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span className="label-eyebrow">Fatigue</span>
+              {fp > fpMax && <OverflowBadge amount={fp - fpMax} />}
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span
+                className="num font-bold leading-none"
+                style={{ fontSize: '1.75rem', color: fpColor }}
+              >
+                {fp}
+              </span>
+              <span className="num text-sm text-dim">/ {fpMax}</span>
+            </div>
+          </div>
+          <PoolMeter current={fp} max={fpMax} tone="fp" height="md" ariaLabel="Fatigue points" />
+          <p className="num mt-2 text-[11px] text-dim">
+            below 0, each FP lost also costs 1 HP; at −{fpMax}, loss is HP-only (B426)
           </p>
-        )}
+          {fp === -fpMax && (
+            <p className="mt-1 text-[11px] text-warning">
+              FP floor reached — further fatigue costs 1 HP per FP (B426)
+            </p>
+          )}
+          {canWrite && (
+            <>
+              <div className="mt-2.5 flex gap-1.5">
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-5)}>
+                  −5
+                </button>
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-1)}>
+                  −1
+                </button>
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+1)}>
+                  +1
+                </button>
+                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+5)}>
+                  +5
+                </button>
+              </div>
+              {fp !== fpMax && (
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
+                  onClick={resetFp}
+                >
+                  Reset to {fpMax}
+                </button>
+              )}
+            </>
+          )}
+        </fieldset>
+
+        <div className="space-y-4 sm:col-span-2 xl:col-span-1">
+          <div>
+            <p className="label-eyebrow mb-1.5">Posture</p>
+            <div className="flex flex-wrap gap-1">
+              {POSTURES.map((p) => (
+                <ConditionChip
+                  key={p}
+                  label={p}
+                  active={posture === p}
+                  onClick={() => setPosture(p)}
+                  disabled={!canWrite}
+                  className="capitalize"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="label-eyebrow">Conditions</span>
+              <span className="num text-[10px] text-dim">{conditions.length} active</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {COMMON_CONDITIONS.map((id) => {
+                const active = conditionsInclude(conditions, id);
+                const suggest = id === 'reeling' && reelingSuggested && !active;
+                return (
+                  <ConditionChip
+                    key={id}
+                    label={conditionLabel(id)}
+                    active={active}
+                    onClick={() => toggle(id)}
+                    disabled={!canWrite}
+                    className={suggest ? 'animate-pulse ring-2 ring-warning/70' : ''}
+                  />
+                );
+              })}
+            </div>
+            {reelingSuggested && (
+              <p className="mt-1.5 text-[11px] text-warning">
+                <InfoTooltip
+                  content={`HP (${hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; the Reeling chip is a manual reminder and adds no extra penalty. The reduction ends when HP reaches at least one-third of maximum.`}
+                >
+                  Reeling suggested
+                </InfoTooltip>{' '}
+                — B419
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </section>
   );

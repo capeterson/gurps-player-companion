@@ -4,11 +4,8 @@
  * and a roll log, all inline on `/characters/:id` so the player taps
  * between live combat and the editable sheet without a route hop.
  *
- * Two-column "state vs. action" layout: the left column holds
- * state-only cards (Pools, DR summary); the right column stacks the
- * action cards (Maneuver, Defenses, Attacks). The roll history strip
- * spans full width below. On mobile it collapses to a single column in
- * the same order.
+ * Full-width status, attacks, armor and tracker sections avoid independent
+ * columns growing lopsided. Maneuver and defenses share one responsive row.
  *
  * `usePoolBumpers` is lifted here so the in-grid PoolsCard and the
  * sticky mobile bottom bar share one instance — a second instance would
@@ -53,29 +50,26 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
 
   return (
     <div className="space-y-4 pb-4">
+      <PoolsCard
+        character={character}
+        canWrite={canWrite}
+        patchCombat={patchCombat}
+        bumpers={bumpers}
+        openRoll={openRoll}
+      />
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-4">
-          <PoolsCard
-            character={character}
-            canWrite={canWrite}
-            patchCombat={patchCombat}
-            bumpers={bumpers}
-            openRoll={openRoll}
-          />
-          <DrSummaryCard
-            character={character}
-            canWrite={canWrite}
-            hpMax={bumpers.hpMax}
-            bumpHp={bumpers.bumpHp}
-          />
-          <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
-        </div>
-        <div className="space-y-4">
-          <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
-          <DefensesCard character={character} openRoll={openRoll} />
-          <AttacksCard character={character} openRoll={openRoll} />
-        </div>
+        <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
+        <DefensesCard character={character} openRoll={openRoll} />
       </div>
+      <AttacksCard character={character} openRoll={openRoll} />
+      <DrSummaryCard
+        key={character.id}
+        character={character}
+        canWrite={canWrite}
+        hpMax={bumpers.hpMax}
+        bumpHp={bumpers.bumpHp}
+      />
+      <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
 
       <RollHistoryStrip characterId={character.id} />
 

@@ -1,0 +1,126 @@
+.armor-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.armor-map-container {
+  container-type: inline-size;
+  min-width: 0;
+}
+.armor-orientation {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.armor-map {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 8px auto;
+  aspect-ratio: 560 / 610;
+}
+.armor-map svg {
+  width: 100%;
+  height: 100%;
+}
+.armor-leaders {
+  fill: none;
+  stroke: var(--color-base-300);
+  stroke-width: 1;
+  pointer-events: none;
+}
+.armor-zone {
+  fill: var(--color-base-300);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: fill .12s, stroke .12s;
+}
+.armor-zone[data-location="vitals"] {
+  stroke-dasharray: 4 4;
+}
+.armor-zone:hover,
+.armor-zone.is-hovered,
+.armor-zone.is-selected {
+  fill: var(--accent-soft) !important;
+  stroke: var(--color-primary);
+  stroke-width: 2.8;
+}
+.armor-zone:focus-visible {
+  outline: none;
+  stroke: var(--color-primary);
+  stroke-width: 5;
+  stroke-dasharray: 4 2;
+}
+.armor-callout {
+  position: absolute;
+  width: 23%;
+  min-height: 34px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  padding: 5px 7px;
+  border: 1px solid var(--color-base-300);
+  border-radius: 8px;
+  background: var(--color-base-100);
+  color: var(--color-base-content);
+  font-size: 11px;
+  cursor: pointer;
+}
+.armor-callout.left {
+  left: 0;
+}
+.armor-callout.right {
+  right: 0;
+}
+.armor-callout b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+.armor-callout[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--accent-soft);
+}
+.armor-callout:hover,
+.armor-callout.is-hovered {
+  border-color: var(--color-primary);
+}
+@container (max-width: 390px) {
+  .armor-callout,
+  .armor-leaders {
+    display: none;
+  }
+  .armor-map {
+    max-width: 280px;
+  }
+}
+@media (max-width: 767px) {
+  .armor-workspace {
+    grid-template-columns: 1fr;
+  }
+  .armor-map {
+    max-width: 420px;
+  }
+}
+@media (pointer: coarse) {
+  .armor-callout {
+    min-height: 44px;
+  }
+  @container (max-width: 480px) {
+    .armor-callout,
+    .armor-leaders {
+      display: none;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .armor-zone {
+    transition: none;
+  }
+}

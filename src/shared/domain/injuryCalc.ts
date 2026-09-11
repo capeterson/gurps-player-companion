@@ -6,9 +6,9 @@
  * Deliberately partial, matching `damageParse.ts`'s lenient-by-contract
  * stance: the B379 core table plus the high-traffic location overrides
  * (skull/eye ×4, vitals ×3 for imp/pi, neck cr/cut, limb & extremity
- * caps). The supplied effective DR map includes innate and natural skull DR
- * (B46/B400). Not modeled: tight-beam burning ×2 vs vitals/eye
- * (can't be told apart from area burn in free text), huge-piercing vs
+ * caps), with an explicit tight-beam burning selection (vitals ×2).
+ * The supplied effective DR map includes innate and natural skull DR
+ * (B46/B400). Not modeled: huge-piercing vs
  * homebrew hybrids, diffuse/homogenous injury tolerance, and blunt
  * trauma. Unknown/homebrew damage types get ×1; unknown/custom
  * locations get the type's base multiplier.
@@ -50,17 +50,18 @@ function baseMultiplier(type: string): number {
  */
 export function woundingMultiplier(type: string | null, location: string): number {
   const t = normalizeType(type);
-  const isPiercing = t.startsWith('pi');
+  const isPiercing = ['pi-', 'pi', 'pi+', 'pi++'].includes(t);
 
   // Skull and eye: ×4 for every type except toxic (B399-400).
   if (location === 'skull' || location === 'eye') {
     return t === 'tox' ? 1 : 4;
   }
   // Vitals: ×3 for impaling and all piercing (B399). Other types keep
-  // their base multiplier (tight-beam burn ×3 not inferable, see module doc).
+  // their base multiplier; tight-beam burning is selected explicitly.
   if (location === 'vitals' && (t === 'imp' || isPiercing)) {
     return 3;
   }
+  if (location === 'vitals' && t === 'burn_tight') return 2;
   // Neck: crushing ×1.5, cutting ×2 (B399).
   if (location === 'neck') {
     if (t === 'cr') return 1.5;
@@ -78,7 +79,8 @@ export function woundingMultiplier(type: string | null, location: string): numbe
  * missing/garbage. Accepts both the bare form stored by
  * `damageParse.ts` ("2", "0.5", "10") and the parenthesized book
  * notation players naturally type/copy into the incoming-damage
- * dialog ("(2)", "(0.5)").
+ * dialog ("(2)", "(0.5)"). Explicit "ignore" / "∞" return Infinity to
+ * represent DR bypass; numeric overflow is rejected.
  */
 export function parseArmorDivisor(raw: string | null | undefined): number | null {
   if (raw == null) return null;
@@ -86,9 +88,16 @@ export function parseArmorDivisor(raw: string | null | undefined): number | null
     .trim()
     .replace(/^\((.+)\)$/, '$1')
     .trim();
+  if (trimmed.toLowerCase() === 'ignore' || trimmed === '∞') return Number.POSITIVE_INFINITY;
   if (!/^\d+(\.\d+)?$/.test(trimmed)) return null;
   const value = Number.parseFloat(trimmed);
-  return value > 0 ? value : null;
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** One DR adjustment for the armor map and incoming damage. Infinity bypasses DR. */
+export function drAfterDivisor(dr: number, armorDivisor: string | null | undefined): number {
+  const divisor = parseArmorDivisor(armorDivisor);
+  return divisor != null ? Math.floor(dr / divisor) : dr;
 }
 
 export interface DamageApplication {
@@ -125,8 +134,7 @@ export function applyDamage(
   const entry = drMap.get(location);
   const drAtLocation = resolveDr(type, entry);
 
-  const divisor = parseArmorDivisor(armorDivisor);
-  const effectiveDr = divisor != null ? Math.floor(drAtLocation / divisor) : drAtLocation;
+  const effectiveDr = drAfterDivisor(drAtLocation, armorDivisor);
 
   const penetrating = Math.max(0, basic - effectiveDr);
   const multiplier = woundingMultiplier(type, location);

@@ -250,9 +250,10 @@ on any sheet the viewer can edit — their own — it always shows).
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
-  hop. Two-column "state vs. action" layout: the left column holds
-  Pools and Effective DR; the right column stacks Maneuver, Defenses (with
-  Move), and Attacks; the roll history strip spans full width below.
+  hop. Full-width Pools put HP, FP, and posture/conditions side by side on wide
+  screens. Maneuver and Defenses share a row; Attacks, armor coverage, the Solo
+  tracker, and roll history each use the full width below. Sections stack on
+  mobile instead of accumulating into two independent, uneven columns.
   - **Pools** — HP/FP with bumpers/reset, posture chips, and all 12
     common-condition chips (normalized against legacy Capitalized entries
     so old data still lights the right chip). Surfaces reeling
@@ -274,7 +275,13 @@ on any sheet the viewer can edit — their own — it always shows).
   - **Effective DR** — combines equipped armor, active global/location
     innate DR, and natural skull DR 2 into one map per hit location
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
-    hit-location aim presets. Per-damage-type DR overrides
+    hit-location aim presets. A rounded, generic SVG silhouette exposes all 15
+    standard locations with clickable zones, keyboard selection, and linked
+    DR labels. The location picker also includes custom armor/innate locations.
+    Damage-type and penetration controls update the whole map and the selected
+    location's layer breakdown. Unprotected locations remain selectable; unknown
+    protection is shown as unavailable, not zero. Torso armor also protects vitals;
+    explicitly listing both never counts a layer twice. Per-damage-type DR overrides
     (`armorData.typedDr` — e.g. a hauberk with 6 vs cut, 4 vs imp) and
     the legacy crushing-specific DR are shown where they differ from the
     default. Every layer contributes its override or base DR, including
@@ -285,8 +292,16 @@ on any sheet the viewer can edit — their own — it always shows).
     linked trait/skill definitions are unavailable (including a cold offline
     load), DR is marked unavailable and the damage dialog cannot apply HP loss.
     Known empty effect definitions remain distinguishable from missing entries.
-    An **"Incoming damage…"** button opens a dialog
-    (`IncomingDamageDialog.tsx`) that resolves a hit against the
+    An **"Incoming damage…"** button carries the selected location, damage type,
+    and penetration into a dialog. Presets include armor divisors and Ignore DR;
+    custom divisors are supported in the dialog. Vitals use ×3 for impaling and
+    piercing, or ×2 for tight-beam burning (using burning DR), replacing the
+    damage type's multiplier rather than multiplying it twice. Invalid damage
+    and divisor inputs cannot be applied; fatigue damage is directed to FP.
+    Hardened must be accounted for in the chosen effective divisor, and
+    directional armor remains combined rather than selecting front/back.
+    The dialog
+    (`IncomingDamageDialog.tsx`) resolves a hit against the
     character's own DR: basic damage − DR(location) with the resolver
     honoring the incoming type's typed override first, falling back to
     the crushing override (`drCrushing`, for `cr`) then the default `dr`
@@ -549,7 +564,8 @@ src/
                   backing the Attributes panel's modifier popovers), shared
                   RollSheet/RollableRow/rollHistory (per-character
                   localStorage roll log) primitives, and combat/
-                  (CombatTab + Pools/Maneuver/Defenses/Attacks/DrSummary cards)
+                  (CombatTab + Pools/Maneuver/Defenses/Attacks/DrSummary cards,
+                   ArmorLocationMap + IncomingDamageDialog)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth),
@@ -598,6 +614,8 @@ src/
                  page orchestrator, see src/sw/registerSW.ts.
 docs/
   specs/         These design specs
+  prototypes/    Standalone design studies, outside the app build:
+                 armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked)
 bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign
@@ -636,6 +654,18 @@ Full detail: [architecture.md](architecture.md).
 ---
 
 ## Orientation notes for future sessions
+
+The armor-location design study at [prototypes/armor-preview.html](../prototypes/armor-preview.html)
+opens directly in a browser without dependencies or a build. It previews all 15
+standard hit locations, character-relative left/right, linked silhouette/label
+selection, sample DR breakdowns, keyboard controls, and Arcane dark/light palettes.
+Three live head-shape alternatives (Rounded, Angular, Inset face) preserve the
+separate skull, face, and eye targets; upper arms have clear shoulder gaps even
+with their selection strokes visible.
+Both eyes share the existing `eye` location. It uses a generic humanoid base;
+custom body plans are not represented in its silhouette. The rounded design is
+now integrated in the Combat tab with real armor data and incoming damage;
+this standalone study retains illustrative data and alternative head designs.
 
 Things that repeatedly surprise people working in this repo:
 

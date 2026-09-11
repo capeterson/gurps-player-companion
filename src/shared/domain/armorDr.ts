@@ -10,7 +10,8 @@
  * 5 (the override replaces the affected layer's contribution, never the
  * whole stack). Returns a Map keyed by location string — well-known
  * locations are from `HIT_LOCATIONS`, but custom homebrew location
- * strings pass through unchanged.
+ * strings pass through unchanged. Torso armor also covers the vitals;
+ * repeated locations count once per piece, including explicit vitals coverage.
  *
  * `frontOnly` / `backOnly` items are included as-is; the combat tab
  * doesn't model facing, so both front and back coverage contribute to
@@ -76,6 +77,14 @@ export interface DrByLocation {
 /** Map of hit-location string → aggregated DR. */
 export type DrByLocationMap = Map<string, DrByLocation>;
 
+/** Torso armor protects the vitals within it; a vitals-only plate stays scoped. */
+export function armorCoversLocation(armor: ArmorData, location: string): boolean {
+  return (
+    armor.locations.includes(location) ||
+    (location === 'vitals' && armor.locations.includes('torso'))
+  );
+}
+
 function mergeTypedDr(
   prev: TypedDrTotals | undefined,
   armor: ArmorData | undefined,
@@ -99,7 +108,9 @@ export function aggregateDrByLocation(items: readonly ArmorItemRow[]): DrByLocat
   for (const item of items) {
     if (!item.equipped || !item.isArmor || item.armor == null) continue;
     const armor = item.armor;
-    for (const loc of armor.locations) {
+    const locations = new Set(armor.locations);
+    if (locations.has('torso')) locations.add('vitals');
+    for (const loc of locations) {
       const prev = map.get(loc);
       const dr = (prev?.dr ?? 0) + armor.dr;
       const drCrushing =
@@ -184,7 +195,9 @@ const TYPE_MAP: Record<string, DamageTypeKey> = {
   'pi++': 'pi_pp',
   pi_pp: 'pi_pp',
   burn: 'burn',
+  burn_tight: 'burn',
   cor: 'corr',
+  corr: 'corr',
   tox: 'tox',
   fat: 'fat',
 };

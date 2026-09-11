@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Armor preview · GURPS Companion</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: oklch(.17 .022 300); --panel: oklch(.21 .02 300);
+      --raised: oklch(.25 .022 300); --line: oklch(.34 .04 300);
+      --ink: oklch(.88 .01 300); --muted: oklch(.68 .018 300);
+      --accent: oklch(.7 .13 305); --soft: oklch(.36 .1 305 / .5);
+      --body: oklch(.32 .026 300); --edge: oklch(.51 .04 300);
+      --teal: oklch(.72 .1 195); --gap: oklch(.76 .12 90);
+    }
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --page: oklch(.97 .005 90); --panel: white; --raised: oklch(.97 .006 90);
+      --line: oklch(.9 .008 300); --ink: oklch(.24 .008 300); --muted: oklch(.46 .01 300);
+      --accent: oklch(.48 .16 305); --soft: oklch(.9 .05 305 / .6);
+      --body: oklch(.84 .023 300); --edge: oklch(.6 .035 300);
+      --teal: oklch(.48 .1 195); --gap: oklch(.48 .1 80);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.5 "Work Sans", "Segoe UI", sans-serif; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    button:focus-visible, .zone:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+    .topbar { border-bottom: 1px solid var(--line); background: var(--panel); }
+    .topbar-inner { max-width: 1140px; margin: auto; padding: 17px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand { font: 17px Georgia, serif; letter-spacing: .035em; }
+    .brand span { color: var(--accent); margin-right: 10px; }
+    .top-actions { display: flex; gap: 16px; align-items: center; }
+    .prototype { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+    .theme-button { border: 1px solid var(--line); border-radius: 9px; background: var(--raised); padding: 7px 12px; }
+    main { max-width: 1140px; padding: 30px 28px 34px; margin: auto; }
+    .eyebrow { color: var(--muted); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 6px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font: 30px/1.2 Georgia, serif; margin-bottom: 10px; }
+    .intro { color: var(--muted); margin-bottom: 24px; }
+    .head-options { border: 0; padding: 0; margin: 0 0 24px; min-width: 0; }
+    .head-options legend { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 10px; }
+    .head-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .head-choice { display: flex; align-items: center; gap: 14px; text-align: left; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .head-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--soft); }
+    .head-choice svg { width: 44px; height: 48px; flex: none; }
+    .head-choice strong { display: block; font-size: 13px; font-weight: 500; }
+    .head-choice small { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .head-mini { fill: var(--body); stroke: var(--edge); stroke-width: 1.5; stroke-linejoin: round; }
+    .head-mini-face { fill: var(--raised); }
+    .head-mini-eye { fill: var(--gap); stroke: none; }
+    .armor-card { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--panel); box-shadow: 0 8px 32px #0000000d; }
+    .card-top { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--line); gap: 12px; }
+    .card-title { font-size: 13px; font-weight: 600; }
+    .sample-badge { font-size: 11px; color: var(--muted); background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr); }
+    .map-panel { padding: 19px 18px 18px; border-right: 1px solid var(--line); }
+    .orientation { display: flex; justify-content: space-between; color: var(--muted); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; padding: 0 10px; }
+    .body-map { width: 100%; max-width: 560px; aspect-ratio: 560/650; margin: 8px auto 0; position: relative; }
+    .body-map svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    .guide { fill: none; stroke: var(--line); stroke-width: 1; pointer-events: none; }
+    .axis { stroke-dasharray: 3 8; opacity: .55; }
+    .zone { fill: var(--body); stroke: var(--edge); stroke-width: 1.5; stroke-linejoin: round; cursor: pointer; transition: fill .14s, stroke .14s; }
+    .zone.unprotected { fill: url(#unprotected); stroke: var(--gap); }
+    .zone[data-zone="vitals"] { stroke-dasharray: 4 4; }
+    .zone:hover, .zone.hovered { fill: var(--soft); stroke: var(--accent); stroke-width: 2.5; }
+    .zone.selected { fill: var(--soft); stroke: var(--accent); stroke-width: 2.8; }
+    .zone[data-zone="vitals"].selected { stroke-dasharray: none; }
+    .seam { fill: none; stroke: var(--edge); stroke-width: 1; opacity: .5; pointer-events: none; }
+    .callout { position: absolute; width: 22%; min-height: 36px; transform: translateY(-50%); display: flex; align-items: center; justify-content: space-between; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 12px; white-space: nowrap; transition: background .14s, border-color .14s; }
+    .callout.left { left: 0; } .callout.right { right: 0; }
+    .callout b { font-size: 11px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .callout:hover, .callout.hovered { border-color: var(--accent); }
+    .callout[aria-pressed="true"] { border-color: var(--accent); background: var(--soft); color: var(--ink); }
+    .callout[aria-pressed="true"] b { color: var(--accent); }
+    .callout.unprotected b { color: var(--gap); }
+    .legend { display: flex; justify-content: center; flex-wrap: wrap; gap: 18px; color: var(--muted); font-size: 11px; }
+    .legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .swatch { width: 10px; height: 10px; border: 1px solid var(--edge); background: var(--body); border-radius: 3px; }
+    .swatch.selected { background: var(--soft); border-color: var(--accent); }
+    .swatch.open { border-color: var(--gap); background: repeating-linear-gradient(135deg, transparent 0 3px, var(--line) 3px 4px); }
+    .details { padding: 29px 28px 24px; }
+    .selection-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+    h2 { font: 28px/1.2 Georgia, serif; margin-bottom: 18px; }
+    .location-index { color: var(--muted); font: 12px/1.6 monospace; padding-top: 3px; }
+    .dr-summary { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; align-items: center; gap: 18px; margin-bottom: 25px; }
+    .dr-number { color: var(--accent); font-size: 48px; line-height: 1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+    .dr-summary.unprotected .dr-number { color: var(--gap); }
+    .dr-label { font-weight: 500; }
+    .dr-source { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+    h3 { font-size: 11px; text-transform: uppercase; font-weight: 500; letter-spacing: .12em; color: var(--muted); margin-bottom: 12px; }
+    .layer { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); gap: 10px; }
+    .layer:first-child { padding-top: 0; }
+    .layer small { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .layer b { font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .layer .dot { display: inline-block; width: 5px; height: 5px; background: var(--teal); border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+    .empty { color: var(--muted); font-size: 13px; padding: 12px 0 20px; border-bottom: 1px solid var(--line); }
+    .location-note { margin: 22px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; min-height: 61px; }
+    .detail-footer { border-top: 1px solid var(--line); margin-top: 25px; padding-top: 17px; display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+    .detail-footer b { color: var(--ink); font-weight: 500; }
+    .card-bottom { border-top: 1px solid var(--line); padding: 13px 24px; color: var(--muted); font-size: 11px; display: flex; gap: 15px; justify-content: space-between; }
+    .review-note { color: var(--muted); font-size: 12px; margin: 17px 3px 0; }
+    @media (max-width: 900px) {
+      main { padding: 22px 16px; } .topbar-inner { padding: 15px 16px; }
+      .workspace { grid-template-columns: 1fr; } .map-panel { border-right: 0; border-bottom: 1px solid var(--line); }
+      .body-map { max-width: 490px; } .details { padding: 24px; }
+      .prototype { display: none; } .card-bottom { flex-wrap: wrap; gap: 4px; }
+      .location-note { min-height: 0; }
+    }
+    @media (max-width: 520px) {
+      .head-choice { flex-direction: column; align-items: flex-start; gap: 7px; padding: 10px; }
+      .head-choice small { display: none; }
+      .body-map { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; aspect-ratio: auto; margin-bottom: 20px; }
+      .body-map svg { grid-column: 1 / -1; height: auto; aspect-ratio: 560 / 650; }
+      #leaders { display: none; }
+      .body-map .callout { position: static; transform: none; width: auto; min-height: 44px; padding: 8px 12px; font-size: 12px; }
+      .orientation { font-size: 9px; padding: 0; }
+    }
+    @media (max-width: 400px) {
+      .brand { font-size: 15px; } .top-actions { gap: 5px; }
+      .map-panel { padding-left: 10px; padding-right: 10px; }
+      .callout { width: 25%; font-size: 11px; padding: 7px 5px; }
+      .callout b { font-size: 10px; } .orientation { font-size: 9px; padding: 0; }
+      .details { padding: 22px 18px; } .card-top { padding: 15px 18px; }
+      .legend { gap: 12px; }
+    }
+    @media (pointer: coarse) { .callout, .theme-button { min-height: 44px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner">
+    <div class="brand"><span aria-hidden="true">✦</span>GURPS Companion</div>
+    <div class="top-actions"><span class="prototype">Design study · 01</span><button class="theme-button" id="theme" type="button" aria-pressed="false">Light theme</button></div>
+  </div></header>
+  <main>
+    <p class="eyebrow">Combat / Effective DR</p>
+    <h1>Armor coverage</h1>
+    <p class="intro">Select a body zone to inspect its protection.</p>
+    <fieldset class="head-options">
+      <legend>Compare head shapes</legend>
+      <div class="head-choices" id="head-choices">
+        <button type="button" class="head-choice" data-head="rounded" aria-pressed="true"><svg viewBox="238 48 84 82" aria-hidden="true"></svg><span><strong>Rounded</strong><small>Compact, soft silhouette</small></span></button>
+        <button type="button" class="head-choice" data-head="angular" aria-pressed="false"><svg viewBox="238 48 84 82" aria-hidden="true"></svg><span><strong>Angular</strong><small>Faceted armor-like outline</small></span></button>
+        <button type="button" class="head-choice" data-head="inset" aria-pressed="false"><svg viewBox="238 48 84 82" aria-hidden="true"></svg><span><strong>Inset face</strong><small>Face within a rounded head</small></span></button>
+      </div>
+    </fieldset>
+    <section class="armor-card" aria-label="Interactive armor preview">
+      <div class="card-top"><span class="card-title">Protection by location</span><span class="sample-badge">Sample equipment</span></div>
+      <div class="workspace">
+        <div class="map-panel">
+          <div class="orientation"><span>Character’s right</span><span>Front view</span><span>Character’s left</span></div>
+          <div class="body-map" id="body-map">
+            <svg viewBox="0 0 560 650" role="group" aria-labelledby="map-title map-desc">
+              <title id="map-title">Armor locations on a generic humanoid silhouette</title>
+              <desc id="map-desc">Select any of 15 zones, or its matching label. Left and right are from the character’s perspective. Both eyes select Eyes. Vitals are an inset zone on the torso.</desc>
+              <defs><pattern id="unprotected" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(40)"><rect width="7" height="7" fill="var(--raised)"/><path d="M0 0V7" stroke="var(--gap)" stroke-opacity=".35" stroke-width="2"/></pattern></defs>
+              <g class="guide" aria-hidden="true"><path class="axis" d="M280 12V622"/><ellipse cx="280" cy="619" rx="98" ry="9"/><path d="M194 23h172M194 630h172"/></g>
+              <g id="leaders" class="guide" aria-hidden="true"></g>
+              <g id="zones">
+                <path class="zone" data-zone="skull" fill-rule="evenodd" d="M246 84C246 66 257 54 280 54C303 54 314 66 314 84Z"/>
+                <path class="zone unprotected" data-zone="face" d="M246 89H314C314 110 300 124 280 124C260 124 246 110 246 89Z"/>
+                <path class="zone unprotected" data-zone="eye" d="M252 88H273V96H252ZM287 88H308V96H287Z"/>
+                <path class="zone" data-zone="neck" d="M264 129H296L300 150L280 161L260 150Z"/>
+                <path class="zone" data-zone="torso" d="M256 154L280 168L304 154L330 167L335 211L323 246L322 309Q280 321 238 309L237 246L225 211L230 167Z"/>
+                <path class="zone" data-zone="arm_right" d="M218 169L204 175Q192 181 188 198L172 246L166 289L158 333L183 341L196 298L201 254L215 212Z"/>
+                <path class="zone" data-zone="arm_left" d="M342 169L356 175Q368 181 372 198L388 246L394 289L402 333L377 341L364 298L359 254L345 212Z"/>
+                <path class="zone" data-zone="hand_right" d="M156 339L182 348L179 369L168 386Q164 390 161 384L157 391Q153 394 150 390L141 380Q138 376 142 366Z"/>
+                <path class="zone" data-zone="hand_left" d="M404 339L378 348L381 369L392 386Q396 390 399 384L403 391Q407 394 410 390L419 380Q422 376 418 366Z"/>
+                <path class="zone" data-zone="groin" d="M238 316Q280 328 322 316L326 355L307 378L280 359L253 378L234 355Z"/>
+                <path class="zone" data-zone="leg_right" d="M234 364L251 386L276 369L273 441L264 497L258 556H227L222 507L220 459L223 410Z"/>
+                <path class="zone" data-zone="leg_left" d="M326 364L309 386L284 369L287 441L296 497L302 556H333L338 507L340 459L337 410Z"/>
+                <path class="zone" data-zone="foot_right" d="M226 563H257L259 590Q259 599 250 601H214Q208 599 211 591Z"/>
+                <path class="zone" data-zone="foot_left" d="M303 563H334L349 591Q352 599 346 601H310Q301 599 301 590Z"/>
+                <path class="zone" data-zone="vitals" d="M265 217Q280 207 295 217V245L280 258L265 245Z"/>
+              </g>
+              <g class="seam" aria-hidden="true"><path d="M280 176V200M244 275Q280 282 316 275M177 250L196 257M364 257L383 250M225 464L269 465M291 465L335 464"/></g>
+            </svg>
+          </div>
+          <div class="legend" aria-label="Map legend"><span><i class="swatch"></i>Protected</span><span><i class="swatch selected"></i>Selected</span><span><i class="swatch open"></i>Unprotected</span></div>
+        </div>
+        <section class="details" aria-live="polite" aria-atomic="true" aria-label="Selected location details">
+          <p class="eyebrow">Selected location</p>
+          <div class="selection-heading"><h2 id="location-name">Torso</h2><span class="location-index" id="location-index">04 / 15</span></div>
+          <div class="dr-summary" id="dr-summary"><span class="dr-number" id="dr-number">5</span><div><span class="dr-label">Effective DR</span><span class="dr-source" id="dr-source">2 protective layers</span></div></div>
+          <h3>Protection breakdown</h3>
+          <div id="layers"></div>
+          <p class="location-note" id="location-note"></p>
+          <div class="detail-footer"><span>Coverage</span><b id="coverage-label">Torso</b></div>
+        </section>
+      </div>
+      <div class="card-bottom"><span>15 locations · Select the silhouette or a label</span><span>Tab to navigate · Enter or Space to select</span></div>
+    </section>
+    <p class="review-note">Interactive design preview. All equipment and DR values are illustrative; no character data is changed.</p>
+  </main>
+  <script>
+    // Standalone design fixture. IDs mirror src/shared/constants/hitLocations.ts.
+    // No persistence, network, character mutations, or game-rule calculations.
+    const locations = [
+      { id: 'skull', name: 'Skull', side: 'left', y: 56, point: [254, 57], layers: [['Iron cap', 4, 'Equipped armor'], ['Natural skull protection', 2, 'Natural DR']], note: 'The skull is separate from the face and eyes. Its sample total includes natural skull protection.' },
+      { id: 'face', name: 'Face', side: 'right', y: 93, point: [307, 105], layers: [], note: 'This open-faced sample loadout leaves the face exposed. The eyes remain a separate selectable location.' },
+      { id: 'neck', name: 'Neck', side: 'left', y: 159, point: [264, 143], layers: [['Mail collar', 4, 'Equipped armor']], note: 'Neck coverage is inspected independently of the skull and torso.' },
+      { id: 'torso', name: 'Torso', side: 'right', y: 223, point: [331, 205], layers: [['Mail shirt', 4, 'Equipped armor'], ['Padded underlayer', 1, 'Equipped armor']], note: 'Select the dashed inset on the chest to inspect the vitals separately. The sample equipment covers both locations.' },
+      { id: 'vitals', name: 'Vitals', side: 'right', y: 282, point: [295, 236], layers: [['Mail shirt', 4, 'Equipped armor'], ['Padded underlayer', 1, 'Equipped armor']], note: 'An inset target keeps the vitals selectable without dividing the torso into artificial armor panels.' },
+      { id: 'groin', name: 'Groin', side: 'right', y: 412, point: [306, 359], layers: [['Padded leggings', 1, 'Equipped armor']], note: 'A neutral pelvic panel marks this location without gendered anatomy.' },
+      { id: 'arm_left', name: 'Left arm', side: 'right', y: 163, point: [359, 207], layers: [['Mail sleeves', 4, 'Equipped armor']], note: 'Left is the character’s left. The entire arm selects as one location; the hand is separate.' },
+      { id: 'arm_right', name: 'Right arm', side: 'left', y: 240, point: [188, 231], layers: [['Mail sleeves', 4, 'Equipped armor']], note: 'Right is the character’s right. The entire arm selects as one location; the hand is separate.' },
+      { id: 'hand_left', name: 'Left hand', side: 'right', y: 352, point: [407, 366], layers: [['Leather gloves', 2, 'Equipped armor']], note: 'Hand coverage is independent of the arm, so gloves can be inspected on either side.' },
+      { id: 'hand_right', name: 'Right hand', side: 'left', y: 352, point: [153, 366], layers: [['Leather gloves', 2, 'Equipped armor']], note: 'Hand coverage is independent of the arm, so gloves can be inspected on either side.' },
+      { id: 'leg_left', name: 'Left leg', side: 'right', y: 487, point: [335, 482], layers: [['Padded leggings', 1, 'Equipped armor']], note: 'Thigh and lower leg share a single selectable leg zone in this standard location map.' },
+      { id: 'leg_right', name: 'Right leg', side: 'left', y: 487, point: [225, 482], layers: [['Padded leggings', 1, 'Equipped armor']], note: 'Thigh and lower leg share a single selectable leg zone in this standard location map.' },
+      { id: 'foot_left', name: 'Left foot', side: 'right', y: 583, point: [340, 585], layers: [['Leather boots', 2, 'Equipped armor']], note: 'Foot coverage is separate from the leg. Each boot can be inspected independently.' },
+      { id: 'foot_right', name: 'Right foot', side: 'left', y: 583, point: [220, 585], layers: [['Leather boots', 2, 'Equipped armor']], note: 'Foot coverage is separate from the leg. Each boot can be inspected independently.' },
+      { id: 'eye', name: 'Eyes', side: 'left', y: 107, point: [254, 84], layers: [], note: 'Both eye shapes select the same Eyes location, matching the app’s existing coverage model. The larger label provides an easier touch target.' },
+    ];
+    const map = document.getElementById('body-map');
+    const leaders = document.getElementById('leaders');
+    const headStyles = {
+      rounded: {
+        skull: 'M246 84C246 66 257 54 280 54C303 54 314 66 314 84Z',
+        face: 'M246 89H314C314 110 300 124 280 124C260 124 246 110 246 89Z',
+        eye: 'M252 88H273V96H252ZM287 88H308V96H287Z',
+        anchors: { skull: [249, 73], face: [311, 103], eye: [252, 92] },
+      },
+      angular: {
+        skull: 'M244 83L249 67L263 56H297L311 67L316 83Z',
+        face: 'M244 89H316L311 109L294 124H266L249 109Z',
+        eye: 'M251 88H273V96H254ZM287 88H309L306 96H287Z',
+        anchors: { skull: [251, 68], face: [311, 107], eye: [251, 92] },
+      },
+      inset: {
+        skull: 'M280 52C256 52 243 68 243 88C243 110 258 125 280 125C302 125 317 110 317 88C317 68 304 52 280 52Z M251 82H309L306 104Q300 119 280 120Q260 119 254 104Z',
+        face: 'M257 87H303L301 102Q297 113 280 114Q263 113 259 102Z',
+        eye: 'M261 89H274V97H261ZM286 89H299V97H286Z',
+        anchors: { skull: [248, 72], face: [301, 103], eye: [261, 93] },
+      },
+    };
+    function leaderPath(location, point = location.point) {
+      const start = location.side === 'left' ? 120 : 440;
+      const elbow = location.side === 'left' ? Math.min(point[0] - 15, 206) : Math.max(point[0] + 15, 354);
+      return `M${start} ${location.y}H${elbow}L${point[0]} ${point[1]}`;
+    }
+    function setHeadStyle(id) {
+      const style = headStyles[id];
+      if (!style) return;
+      for (const zone of ['skull', 'face', 'eye']) {
+        map.querySelector(`.zone[data-zone="${zone}"]`).setAttribute('d', style[zone]);
+        const location = locations.find((entry) => entry.id === zone);
+        leaders.querySelector(`[data-leader="${zone}"]`).setAttribute('d', leaderPath(location, style.anchors[zone]));
+      }
+      document.querySelectorAll('[data-head]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.head === id)));
+    }
+    document.querySelectorAll('[data-head]').forEach((button) => {
+      const style = headStyles[button.dataset.head];
+      button.querySelector('svg').innerHTML = `<path class="head-mini" fill-rule="evenodd" d="${style.skull}"/><path class="head-mini head-mini-face" d="${style.face}"/><path class="head-mini-eye" d="${style.eye}"/>`;
+      button.addEventListener('click', () => setHeadStyle(button.dataset.head));
+    });
+    const total = (location) => location.layers.reduce((sum, layer) => sum + layer[1], 0);
+    for (const location of locations) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `callout ${location.side}${total(location) === 0 ? ' unprotected' : ''}`;
+      button.dataset.zone = location.id;
+      button.style.top = `${location.y / 650 * 100}%`;
+      button.setAttribute('aria-label', `${location.name}, DR ${total(location)}`);
+      button.setAttribute('aria-pressed', 'false');
+      button.innerHTML = `<span>${location.name}</span><b>${total(location)}</b>`;
+      map.append(button);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.dataset.leader = location.id;
+      path.setAttribute('d', leaderPath(location));
+      leaders.append(path);
+      const shape = map.querySelector(`.zone[data-zone="${location.id}"]`);
+      shape.setAttribute('role', 'button');
+      shape.setAttribute('tabindex', '0');
+      shape.setAttribute('aria-label', `${location.name}, DR ${total(location)}`);
+      shape.setAttribute('aria-pressed', 'false');
+    }
+    function selectLocation(id) {
+      const location = locations.find((entry) => entry.id === id);
+      if (!location) return;
+      for (const element of map.querySelectorAll('[data-zone]')) {
+        const selected = element.dataset.zone === id;
+        element.classList.toggle('selected', selected);
+        element.setAttribute('aria-pressed', String(selected));
+      }
+      document.getElementById('location-name').textContent = location.name;
+      document.getElementById('location-index').textContent = `${String(locations.indexOf(location) + 1).padStart(2, '0')} / 15`;
+      document.getElementById('dr-number').textContent = total(location);
+      document.getElementById('dr-summary').classList.toggle('unprotected', total(location) === 0);
+      document.getElementById('dr-source').textContent = location.layers.length === 0 ? 'Unprotected in this loadout' : `${location.layers.length} protective ${location.layers.length === 1 ? 'layer' : 'layers'}`;
+      document.getElementById('layers').innerHTML = location.layers.length ? location.layers.map(([name, dr, source]) => `<div class="layer"><div>${name}<small><span class="dot" aria-hidden="true"></span>${source}</small></div><b>+${dr} DR</b></div>`).join('') : '<p class="empty">No protective layers cover this location.</p>';
+      document.getElementById('location-note').textContent = location.note;
+      document.getElementById('coverage-label').textContent = location.name;
+    }
+    map.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-zone]');
+      if (target) selectLocation(target.dataset.zone);
+    });
+    map.addEventListener('keydown', (event) => {
+      if (event.target.matches('.zone') && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault(); selectLocation(event.target.dataset.zone);
+      }
+    });
+    function clearHover() { map.querySelectorAll('.hovered').forEach((element) => element.classList.remove('hovered')); }
+    map.addEventListener('pointerover', (event) => {
+      clearHover();
+      const target = event.target.closest('[data-zone]');
+      if (target) map.querySelectorAll(`[data-zone="${target.dataset.zone}"]`).forEach((element) => element.classList.add('hovered'));
+    });
+    map.addEventListener('pointerleave', clearHover);
+    document.getElementById('theme').addEventListener('click', (event) => {
+      const light = document.documentElement.dataset.theme !== 'light';
+      document.documentElement.dataset.theme = light ? 'light' : 'dark';
+      event.currentTarget.textContent = light ? 'Dark theme' : 'Light theme';
+      event.currentTarget.setAttribute('aria-pressed', String(light));
+    });
+    setHeadStyle('rounded');
+    selectLocation('torso');
+  </script>
+</body>
+</html>

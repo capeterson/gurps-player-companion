@@ -105,6 +105,77 @@ afterEach(async () => {
 });
 
 describe('applyOutcomes sync-log diagnostics', () => {
+  it.each([false, true])(
+    'keeps an empty armor rollback anchor through two retries (foreign change: %s)',
+    async (foreignChange) => {
+      await seedCharacter();
+      login();
+      const db = getLocalDb();
+      const itemId = '0193b3c0-f1f0-7000-8000-00000000d001';
+      const armor = { dr: 3, locations: ['skull', 'face'] };
+      await db.characterInventory.put({
+        id: itemId,
+        characterId: CHAR_ID,
+        armor: null,
+        revision: 1,
+      } as never);
+      await enqueueFieldPatch({
+        entityClass: 'character_inventory',
+        entityId: itemId,
+        characterId: CHAR_ID,
+        fieldPath: 'armor',
+        attemptedValue: armor,
+      });
+      let attempts = 0;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, init?: RequestInit) => {
+          if (!url.includes('/sync/operations')) return cursorResponse();
+          const { operations } = JSON.parse(String(init?.body));
+          attempts++;
+          const queued = await db.outbox.toArray();
+          expect(queued[0]?.prevValue).toBeNull();
+          const outcomes = operations.map((op: { clientOpId: string }) =>
+            attempts <= 2
+              ? {
+                  clientOpId: op.clientOpId,
+                  status: 'stale_base',
+                  reason: 'newer server revision',
+                  latestEntity: {
+                    id: itemId,
+                    characterId: CHAR_ID,
+                    armor: foreignChange && attempts === 2 ? { dr: 7, locations: ['skull'] } : null,
+                    revision: attempts + 1,
+                  },
+                }
+              : { clientOpId: op.clientOpId, status: 'applied', newRevision: 4 },
+          );
+          return new Response(JSON.stringify({ outcomes }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }),
+      );
+      getSyncOrchestrator().start();
+      try {
+        // A requeue can occur before runLoop begins its five-second wait.
+        await waitFor(async () => expect(await db.outbox.count()).toBe(0), { timeout: 15000 });
+        expect(attempts).toBe(foreignChange ? 2 : 3);
+        expect((await db.characterInventory.get(itemId))?.armor).toEqual(
+          foreignChange ? { dr: 7, locations: ['skull'] } : armor,
+        );
+        const logs = await db.syncLog.toArray();
+        expect(logs.filter((entry) => entry.result === 'requeued')).toHaveLength(
+          foreignChange ? 1 : 2,
+        );
+        expect(logs.some((entry) => entry.result === 'rolled_back')).toBe(foreignChange);
+      } finally {
+        getSyncOrchestrator().stop();
+      }
+    },
+    20000,
+  );
+
   it('logs a "requeued" entry when the stale_base self-heal re-enqueues an unchanged field', async () => {
     await seedCharacter();
     login();

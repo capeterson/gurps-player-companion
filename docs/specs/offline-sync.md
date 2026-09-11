@@ -157,7 +157,11 @@ works offline.**
 3. **Dispatch.** The server processes each op **independently** — one bad op
    never poisons the batch. HTTP status is always 200; per-op outcomes live in
    `outcomes[].status`. Optimistic concurrency uses `baseRevision`; a mismatch
-   returns `stale_base` plus the latest entity.
+   returns `stale_base` plus the latest entity. Retrying a field patch preserves
+   an explicit `null` previous value as the server-confirmed empty field; it must
+   not fall back to the optimistic local value. This allows repeated revision
+   retries when adding armor or another previously empty optional field, while
+   still rejecting a conflicting change to that field from another writer.
 
    Rapid same-entity edits (e.g. add an item, then mark it as a weapon, then
    tweak its stats) get enqueued client-side with the **same** `baseRevision`,

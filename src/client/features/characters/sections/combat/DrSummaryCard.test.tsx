@@ -63,7 +63,11 @@ describe('DrSummaryCard', () => {
       <DrSummaryCard character={character} canWrite hpMax={10} bumpHp={bumpHp} />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('DR unavailable');
-    expect(within(screen.getByRole('list')).queryByText('Skull')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'All location DR', hidden: true })).queryByText(
+        'Skull',
+      ),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '12' } });
     expect(screen.getByRole('button', { name: 'Damage unavailable' })).toBeDisabled();
@@ -114,7 +118,9 @@ describe('DrSummaryCard', () => {
     render(<Sheet />);
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
-    fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: location } });
+    fireEvent.change(screen.getAllByLabelText('Hit location').at(-1) as HTMLElement, {
+      target: { value: location },
+    });
     expect(screen.getByText(/20 injury; capped/)).toBeInTheDocument();
     expect(screen.getByText(/body part is destroyed/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: `Apply −${cap} HP` }));
@@ -162,14 +168,18 @@ describe('DrSummaryCard', () => {
       render(<Sheet />);
       const label = location === 'torso' ? 'Torso' : location === 'skull' ? 'Skull' : 'Eye';
       if (dr > 0) {
-        const row = within(screen.getByRole('list')).getByText(label).closest('li');
+        const row = within(screen.getByRole('list', { name: 'All location DR', hidden: true }))
+          .getByText(label)
+          .closest('li');
         expect(row).not.toBeNull();
         expect(within(row as HTMLElement).getByText(String(dr))).toBeInTheDocument();
       }
       fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
       fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '6' } });
       fireEvent.change(screen.getByLabelText('Type'), { target: { value: type } });
-      fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: location } });
+      fireEvent.change(screen.getAllByLabelText('Hit location').at(-1) as HTMLElement, {
+        target: { value: location },
+      });
       if (divisor)
         fireEvent.change(screen.getByLabelText('Armor divisor'), { target: { value: divisor } });
       const apply = screen.getByRole('button', { name: `Apply −${injury} HP` });
@@ -193,8 +203,8 @@ describe('DrSummaryCard', () => {
 
   it('shows natural skull protection when no equipped armor exists', () => {
     render(<DrSummaryCard character={{ id: 'c', inventory: [] } as unknown as CharacterDetail} />);
-    expect(screen.getByText('Skull')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Skull, DR 2' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Skull, DR 2' })).toHaveLength(2);
   });
 
   it('aggregates and displays DR per hit location', () => {
@@ -206,10 +216,10 @@ describe('DrSummaryCard', () => {
         ])}
       />,
     );
-    expect(screen.getByText('Torso')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
-    expect(screen.getByText('Left Arm')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Torso, DR/ })).toHaveLength(2);
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('5');
+    expect(screen.getAllByRole('button', { name: 'Left Arm, DR 3' })).toHaveLength(2);
+    expect(screen.getByRole('list', { name: 'Protection layers' })).toHaveTextContent('3 DR');
   });
 
   it('resolves incoming damage through DR and applies injury to HP', () => {
@@ -227,7 +237,7 @@ describe('DrSummaryCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '12' } });
     // Type defaults to 'cr'; switch to cut for the ×1.5 multiplier.
-    const [typeSelect] = screen.getAllByRole('combobox');
+    const typeSelect = screen.getByLabelText('Type');
     fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
 
     const apply = screen.getByRole('button', { name: /Apply −12 HP/ });
@@ -265,8 +275,8 @@ describe('DrSummaryCard', () => {
       ],
     } as unknown as CharacterDetail;
     render(<DrSummaryCard character={character} />);
-    expect(screen.queryByText('Torso')).not.toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('0');
+    expect(screen.getAllByRole('button', { name: 'Skull, DR 2' })).toHaveLength(2);
   });
 
   it('annotates typed DR overrides that differ from the base DR', () => {
@@ -275,9 +285,10 @@ describe('DrSummaryCard', () => {
         character={makeCharacter([{ dr: 4, locations: ['torso'], typedDr: { cut: 7, imp: 10 } }])}
       />,
     );
-    expect(screen.getByText('Torso')).toBeInTheDocument();
-    expect(screen.getByText('7 vs cut')).toBeInTheDocument();
-    expect(screen.getByText('10 vs imp')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Torso, DR/ })).toHaveLength(2);
+    // Torso armor also protects the vitals, so both rows show the typed DR.
+    expect(screen.getAllByText(/7 vs cut/)).toHaveLength(2);
+    expect(screen.getAllByText(/10 vs imp/)).toHaveLength(2);
   });
 
   it('resolves typed DR through the incoming-damage dialog', () => {
@@ -293,7 +304,7 @@ describe('DrSummaryCard', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '12' } });
-    const [typeSelect] = screen.getAllByRole('combobox');
+    const typeSelect = screen.getByLabelText('Type');
     fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
     // Base DR is 4 but the cut override stops 6 — the breakdown shows DR 6.
     expect(screen.getByText(/− DR 6 →/)).toBeInTheDocument();
