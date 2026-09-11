@@ -83,7 +83,7 @@ export function IncomingDamageDialog({
   const basic = Math.max(0, Math.floor(Number(basicRaw)) || 0);
   const result = applyDamage(basic, type, location, drMap, divisorRaw.trim() || null, hpMax);
   const cripplingHint = result.destroyed
-    ? 'Pre-cap injury is at least twice the crippling threshold: the body part is destroyed (severed by cutting damage). Apply the condition manually (B421).'
+    ? `Pre-cap injury is at least twice the crippling threshold: the body part is destroyed${type.trim().toLowerCase() === 'cut' ? ' (severed by cutting damage)' : ''}. Apply the condition manually (B421).`
     : result.crippled
       ? 'This injury cripples the body part. Apply the condition manually (B421).'
       : null;
