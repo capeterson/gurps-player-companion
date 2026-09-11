@@ -126,6 +126,17 @@ describe('accessible-set prune', () => {
       name: 'Campaign I got removed from',
       revision: 1,
     } as never);
+    await db.syncLog.put({
+      id: 'campaign-download',
+      direction: 'pull',
+      result: 'synced',
+      entityClass: 'campaign',
+      entityId: STALE_CAMPAIGN_ID,
+      command: 'patch',
+      previousValue: { name: 'Old private campaign name' },
+      newValue: { name: 'Campaign I got removed from' },
+      occurredAt: new Date().toISOString(),
+    });
     await db.characterTraits.put({ id: 't-1', characterId: STALE_CHAR_ID, revision: 1 } as never);
     await db.characterSkills.put({ id: 's-1', characterId: STALE_CHAR_ID, revision: 1 } as never);
     await db.characterSpells.put({ id: 'sp-1', characterId: STALE_CHAR_ID, revision: 1 } as never);
@@ -158,6 +169,7 @@ describe('accessible-set prune', () => {
     expect(await db.characterSpells.where('characterId').equals(STALE_CHAR_ID).count()).toBe(0);
     expect(await db.characterInventory.where('characterId').equals(STALE_CHAR_ID).count()).toBe(0);
     expect(await db.characterCombat.get(STALE_CHAR_ID)).toBeUndefined();
+    expect(await db.syncLog.get('campaign-download')).toMatchObject({ redacted: true });
     // Still-accessible character is untouched.
     expect(await db.characters.get(OWNED_CHAR_ID)).toBeTruthy();
   });

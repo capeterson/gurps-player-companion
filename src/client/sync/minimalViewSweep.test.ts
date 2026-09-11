@@ -227,6 +227,16 @@ describe('isRecordAccessRestricted', () => {
   it('ignores cycle-failure entries that carry no entity', () => {
     expect(isRecordAccessRestricted({}, access([]))).toBe(false);
   });
+
+  it('hides a downloaded campaign snapshot after campaign access is revoked', () => {
+    const revoked = characterAccessFrom([], [], ['camp-revoked']);
+    expect(
+      isRecordAccessRestricted(
+        { entityClass: 'campaign', entityId: 'camp-revoked', command: 'patch' },
+        revoked,
+      ),
+    ).toBe(true);
+  });
 });
 
 describe('characterAccessFrom', () => {

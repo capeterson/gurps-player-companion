@@ -85,6 +85,8 @@ export interface LocalCharacterAccess {
    * that should have scrubbed it never ran.
    */
   readonly revoked: ReadonlySet<string>;
+  /** Campaign ids whose downloaded journal snapshots must stay hidden after access loss. */
+  readonly revokedCampaigns: ReadonlySet<string>;
 }
 
 /** The character-row fields the access snapshot needs. */
@@ -102,6 +104,7 @@ export interface AccessInputCharacter {
 export function characterAccessFrom(
   characters: readonly AccessInputCharacter[],
   revokedIds: Iterable<string> = [],
+  revokedCampaignIds: Iterable<string> = [],
 ): LocalCharacterAccess {
   return {
     known: new Set(characters.map((c) => c.id)),
@@ -109,6 +112,7 @@ export function characterAccessFrom(
       characters.filter((c) => c.minimalViewMasked || c.accessRevoked).map((c) => c.id),
     ),
     revoked: new Set(revokedIds),
+    revokedCampaigns: new Set(revokedCampaignIds),
   };
 }
 
@@ -171,6 +175,12 @@ export function isRecordAccessRestricted(
   access: LocalCharacterAccess,
 ): boolean {
   if (record.redacted) return true;
+  if (
+    record.entityClass === 'campaign' &&
+    record.entityId !== undefined &&
+    access.revokedCampaigns.has(record.entityId)
+  )
+    return true;
   const characterId =
     record.parentId ?? (record.entityClass === 'character' ? record.entityId : undefined);
   if (!characterId) return false;

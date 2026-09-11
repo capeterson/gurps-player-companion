@@ -10,8 +10,11 @@ import {
   appendSyncLog,
   markRejectionDismissed,
   pruneRejectionToasts,
+  readRevokedCampaigns,
   readRevokedCharacters,
+  redactSyncLogForCampaigns,
   redactSyncLogForCharacters,
+  rememberRevokedCampaigns,
   rememberRevokedCharacters,
   snapshotValue,
 } from './syncLog.ts';
@@ -167,9 +170,9 @@ describe('redactSyncLogForCharacters', () => {
 
 describe('revoked-character ledger', () => {
   it('outlives the character row so a failed redaction fails closed', async () => {
-    // pruneInaccessibleLocally deletes the row BEFORE calling the
-    // best-effort redaction. If that redaction throws, the ledger is
-    // the only thing left that can keep those records restricted.
+    // pruneInaccessibleLocally records this before deleting the row.
+    // If the later best-effort redaction throws, the ledger is the
+    // durable evidence that keeps those records restricted.
     await rememberRevokedCharacters(['char-gone']);
     expect(await readRevokedCharacters()).toContain('char-gone');
   });
@@ -193,6 +196,28 @@ describe('revoked-character ledger', () => {
 
   it('reads as empty when nothing was recorded', async () => {
     expect(await readRevokedCharacters()).toEqual([]);
+  });
+});
+
+describe('downloaded campaign snapshot redaction', () => {
+  it('scrubs values and leaves a fail-closed revocation marker', async () => {
+    await getLocalDb().syncLog.put({
+      id: 'campaign-log',
+      direction: 'pull',
+      result: 'synced',
+      entityClass: 'campaign',
+      entityId: 'campaign-gone',
+      command: 'patch',
+      occurredAt: new Date().toISOString(),
+      previousValue: { description: 'private before' },
+      newValue: { description: 'private after' },
+    });
+
+    await rememberRevokedCampaigns(['campaign-gone']);
+    expect(await readRevokedCampaigns()).toContain('campaign-gone');
+    expect(await redactSyncLogForCampaigns(['campaign-gone'])).toBe(1);
+    expect(await getLocalDb().syncLog.get('campaign-log')).toMatchObject({ redacted: true });
+    expect((await getLocalDb().syncLog.get('campaign-log'))?.newValue).toBeUndefined();
   });
 });
 
