@@ -36,6 +36,26 @@ function makeCharacter(
 }
 
 describe('DrSummaryCard', () => {
+  it.each(['cr', 'imp', 'burn', 'cut', ' CUT '])(
+    'only describes severing when destruction uses cutting damage (%s)',
+    (type) => {
+      render(<DrSummaryCard character={makeCharacter([])} canWrite hpMax={10} bumpHp={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+      fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
+      fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: 'arm_left' } });
+      fireEvent.change(screen.getByLabelText('Type'), {
+        target: { value: type === ' CUT ' ? '__other' : type },
+      });
+      if (type === ' CUT ')
+        fireEvent.change(screen.getByLabelText('Custom type'), { target: { value: type } });
+      const hint = screen.getByText(/body part is destroyed/);
+      if (type.trim().toLowerCase() === 'cut')
+        expect(hint).toHaveTextContent('severed by cutting damage');
+      else expect(hint).not.toHaveTextContent('severed');
+      expect(screen.getByRole('button', { name: 'Apply −6 HP' })).toBeEnabled();
+    },
+  );
+
   it('blocks damage while linked effects are unavailable, then uses the loaded DR', () => {
     const bumpHp = vi.fn();
     const character = { ...makeCharacter([]), libraryEffectsKnown: false };
