@@ -147,8 +147,44 @@ export async function redactSyncLogForCharacters(characterIds: Iterable<string>)
   }
 }
 
+/** Strip downloaded campaign snapshots when the viewer loses that campaign. */
+export async function redactSyncLogForCampaigns(campaignIds: Iterable<string>): Promise<number> {
+  const ids = new Set(campaignIds);
+  if (ids.size === 0) return 0;
+  try {
+    const db = getLocalDb();
+    const affected = await db.syncLog
+      .filter(
+        (entry) =>
+          !entry.redacted &&
+          entry.entityClass === 'campaign' &&
+          entry.entityId !== undefined &&
+          ids.has(entry.entityId),
+      )
+      .toArray();
+    if (affected.length > 0) {
+      await db.syncLog.bulkPut(
+        affected.map((entry) => ({
+          ...entry,
+          previousValue: undefined,
+          newValue: undefined,
+          details: undefined,
+          humanName: undefined,
+          fieldPath: undefined,
+          redacted: true,
+        })),
+      );
+    }
+    return affected.length;
+  } catch {
+    return 0;
+  }
+}
+
 /** `syncMeta` key holding the ids whose access has been revoked locally. */
 export const REVOKED_CHARACTERS_KEY = 'revokedCharacters';
+/** Same fail-closed ledger for downloaded campaign journal snapshots. */
+export const REVOKED_CAMPAIGNS_KEY = 'revokedCampaigns';
 /** Bound on that ledger; ids only, so this is generous. */
 export const REVOKED_CHARACTERS_RETENTION = 1_000;
 
@@ -182,6 +218,31 @@ export async function rememberRevokedCharacters(ids: Iterable<string>): Promise<
 export async function readRevokedCharacters(): Promise<string[]> {
   try {
     const row = await getLocalDb().syncMeta.get(REVOKED_CHARACTERS_KEY);
+    return Array.isArray(row?.value) ? (row.value as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function rememberRevokedCampaigns(ids: Iterable<string>): Promise<void> {
+  const incoming = [...ids];
+  if (incoming.length === 0) return;
+  try {
+    const db = getLocalDb();
+    const existing = await readRevokedCampaigns();
+    const merged = [...existing, ...incoming.filter((id) => !existing.includes(id))];
+    await db.syncMeta.put({
+      key: REVOKED_CAMPAIGNS_KEY,
+      value: merged.slice(-REVOKED_CHARACTERS_RETENTION),
+    });
+  } catch {
+    // Best-effort; at-rest redaction still covers the common path.
+  }
+}
+
+export async function readRevokedCampaigns(): Promise<string[]> {
+  try {
+    const row = await getLocalDb().syncMeta.get(REVOKED_CAMPAIGNS_KEY);
     return Array.isArray(row?.value) ? (row.value as string[]) : [];
   } catch {
     return [];

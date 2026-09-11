@@ -28,7 +28,7 @@ import {
 } from './minimalViewSweep.ts';
 import type { SyncIndicatorState } from './state.ts';
 import { syncStateStore } from './state.ts';
-import { readRevokedCharacters } from './syncLog.ts';
+import { readRevokedCampaigns, readRevokedCharacters } from './syncLog.ts';
 
 export interface SyncDebugDump {
   meta: {
@@ -159,7 +159,11 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
         }),
       ),
     ]);
-  const access = characterAccessFrom(characterRows, await readRevokedCharacters());
+  const access = characterAccessFrom(
+    characterRows,
+    await readRevokedCharacters(),
+    await readRevokedCampaigns(),
+  );
   const outbox = maskRestrictedOps(rawOutbox, access);
   const syncLog = maskRestrictedLog(rawSyncLog, access);
   const rejectionToasts = maskRestrictedRejections(rawRejections, access);

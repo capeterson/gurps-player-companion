@@ -27,6 +27,7 @@ function jwtForUser(userId: string): string {
 
 const USER_ID = '0193b3c0-f1f0-7000-8000-00000000aaaa';
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000c001';
+const SKILL_ID = '0193b3c0-f1f0-7000-8000-00000000d001';
 
 async function seedCharacter() {
   const db = getLocalDb();
@@ -55,6 +56,26 @@ async function seedCharacter() {
     activeConditionGroups: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    revision: 1,
+  });
+}
+
+async function seedSkill() {
+  await getLocalDb().characterSkills.put({
+    id: SKILL_ID,
+    characterId: CHAR_ID,
+    name: 'Stealth',
+    attribute: 'DX',
+    difficulty: 'A',
+    points: 2,
+    techLevel: null,
+    specialization: null,
+    notes: 'Quietly.',
+    librarySkillId: null,
+    libraryMechanics: null,
+    defaults: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     revision: 1,
   });
 }
@@ -298,6 +319,53 @@ describe('applyOutcomes sync-log diagnostics', () => {
     }
   });
 
+  it('logs when the server omits an operation outcome and the op starts retrying', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      humanName: 'ST',
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/sync/operations')) {
+          return new Response(JSON.stringify({ outcomes: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (url.includes('/sync/cursor')) return cursorResponse();
+        return new Response('{}', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }),
+    );
+
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.start();
+    try {
+      await waitFor(async () => {
+        const entry = (await getLocalDb().syncLog.toArray()).find(
+          (candidate) => candidate.result === 'retrying',
+        );
+        expect(entry).toMatchObject({
+          direction: 'push',
+          entityId: CHAR_ID,
+          fieldPath: 'st',
+          details: { serverReason: 'no outcome returned', attemptCount: 1 },
+        });
+      });
+    } finally {
+      orchestrator.stop();
+    }
+  });
+
   it('logs exactly one "retrying" entry across repeated transient failures of the same op', async () => {
     await seedCharacter();
     login();
@@ -412,6 +480,112 @@ describe('applyOutcomes sync-log diagnostics', () => {
     } finally {
       getSyncOrchestrator().stop();
     }
+  });
+});
+
+describe('cursor pull sync-log values', () => {
+  it('records the field and before/after values actually applied by a downloaded skill patch', async () => {
+    await seedCharacter();
+    await seedSkill();
+    login();
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            changes: [
+              {
+                entityClass: 'character_skill',
+                entityId: SKILL_ID,
+                command: 'patch',
+                revision: 2,
+                data: {
+                  ...(await getLocalDb().characterSkills.get(SKILL_ID)),
+                  points: 4,
+                  updatedAt: '2026-01-02T00:00:00.000Z',
+                  revision: 2,
+                },
+              },
+            ],
+            nextCursor: { character_skill: 2 },
+            hasMore: {},
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
+
+    await getSyncOrchestrator().triggerCursorPull();
+
+    const pulled = (await getLocalDb().syncLog.toArray()).find(
+      (entry) => entry.direction === 'pull' && entry.entityId === SKILL_ID,
+    );
+    expect(pulled).toMatchObject({
+      parentId: CHAR_ID,
+      fieldPath: 'points',
+      previousValue: 2,
+      newValue: 4,
+      details: { revision: 2, appliedFields: ['points'] },
+    });
+  });
+
+  it('does not claim a pending local field was changed by a downloaded row', async () => {
+    await seedCharacter();
+    await seedSkill();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character_skill',
+      entityId: SKILL_ID,
+      characterId: CHAR_ID,
+      fieldPath: 'points',
+      attemptedValue: 5,
+    });
+
+    const serverRow = {
+      ...(await getLocalDb().characterSkills.get(SKILL_ID)),
+      points: 3,
+      notes: 'Changed elsewhere.',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      revision: 2,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            changes: [
+              {
+                entityClass: 'character_skill',
+                entityId: SKILL_ID,
+                command: 'patch',
+                revision: 2,
+                data: serverRow,
+              },
+            ],
+            nextCursor: { character_skill: 2 },
+            hasMore: {},
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
+
+    await getSyncOrchestrator().triggerCursorPull();
+
+    expect(await getLocalDb().characterSkills.get(SKILL_ID)).toMatchObject({
+      points: 5,
+      notes: 'Changed elsewhere.',
+    });
+    const pulled = (await getLocalDb().syncLog.toArray()).find(
+      (entry) => entry.direction === 'pull' && entry.entityId === SKILL_ID,
+    );
+    expect(pulled).toMatchObject({
+      fieldPath: 'notes',
+      previousValue: 'Quietly.',
+      newValue: 'Changed elsewhere.',
+      details: { revision: 2, appliedFields: ['notes'] },
+    });
   });
 });
 

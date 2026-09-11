@@ -391,11 +391,12 @@ export interface SyncLogEntry {
   /**
    * The value this event moved `fieldPath` away from / to, so the sync
    * log can show what actually changed instead of just "character
-   * inventory patch".  Recorded for `push` and `local` entries only:
-   * those are always this user's OWN outgoing edits, the same values
-   * the outbox already holds.  Pull entries deliberately carry no row
-   * payload (see `appendSyncLog`).  Large values are truncated by
-   * `snapshotValue` so the bounded journal stays bounded.
+   * inventory patch". Push/local entries snapshot the outbox values.
+   * Pull entries snapshot the fields that actually changed in Dexie,
+   * after pending local fields have been protected; creates and deletes
+   * snapshot the bounded whole row. Large values are truncated by
+   * `snapshotValue` so the bounded journal stays bounded. Character
+   * snapshots are scrubbed when the share gate or access changes.
    */
   previousValue?: unknown;
   newValue?: unknown;

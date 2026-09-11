@@ -13,7 +13,7 @@ import {
 } from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { resolveLegacyCampaignDependency } from '../sync/outbox.ts';
-import { readRevokedCharacters } from '../sync/syncLog.ts';
+import { readRevokedCampaigns, readRevokedCharacters } from '../sync/syncLog.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
 
@@ -42,10 +42,21 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   // value, so this view has to apply the share gate itself rather than
   // print whatever the row happens to carry.
   const access = useLiveQuery(
-    async () =>
-      characterAccessFrom(await getLocalDb().characters.toArray(), await readRevokedCharacters()),
+    async () => {
+      const [characters, revokedCharacters, revokedCampaigns] = await Promise.all([
+        getLocalDb().characters.toArray(),
+        readRevokedCharacters(),
+        readRevokedCampaigns(),
+      ]);
+      return characterAccessFrom(characters, revokedCharacters, revokedCampaigns);
+    },
     [],
-    { known: new Set<string>(), masked: new Set<string>(), revoked: new Set<string>() },
+    {
+      known: new Set<string>(),
+      masked: new Set<string>(),
+      revoked: new Set<string>(),
+      revokedCampaigns: new Set<string>(),
+    },
   );
   const [revertTarget, setRevertTarget] = useState<OutboxEntry | null>(null);
   const [resyncOpen, setResyncOpen] = useState(false);
@@ -446,18 +457,30 @@ function LogDetails({ entry, restricted }: { entry: SyncLogEntry; restricted: bo
   if (entry.fieldPath) rows.push(textRow('Field', entry.fieldPath));
   if (restricted) {
     // Either scrubbed at rest by the sweep, or still holding values for
-    // a character the viewer can no longer see -- an offline revert can
-    // write a fresh snapshot after the last sweep ran, with no later
-    // pull to clean it up.
-    rows.push(textRow('Values', 'removed — you no longer have access to this character'));
+    // an entity the viewer can no longer see -- an offline revert can
+    // write a fresh character snapshot after the last sweep ran, with
+    // no later pull to clean it up.
+    const subject = entry.entityClass === 'campaign' ? 'campaign' : 'character';
+    rows.push(textRow('Values', `removed — you no longer have access to this ${subject}`));
   } else if (hasValueSnapshot(entry)) {
     rows.push(valueRow('Before', entry.previousValue));
     rows.push(valueRow('After', entry.newValue));
   } else if (entry.direction === 'pull') {
-    // Deliberate: pull entries never store row payloads, so a later
-    // access downgrade can't leave another player's sheet data sitting
-    // in this journal. See docs/specs/offline-sync.md.
-    rows.push(textRow('Values', 'not recorded for downloads'));
+    // New entries always carry `appliedFields`, including an empty
+    // list for revision-only/protected-field pulls. Older entries lack
+    // that marker because their values truly were never captured.
+    const appliedFields =
+      entry.details !== null && typeof entry.details === 'object'
+        ? (entry.details as { appliedFields?: unknown }).appliedFields
+        : undefined;
+    rows.push(
+      textRow(
+        'Values',
+        Array.isArray(appliedFields)
+          ? 'no data fields changed locally'
+          : 'not recorded by the app version that downloaded this change',
+      ),
+    );
   }
   if (entry.entityClass) rows.push(textRow('Entity', entry.entityClass.replaceAll('_', ' ')));
   if (entry.entityId) rows.push(textRow('Entity id', entry.entityId));
@@ -532,7 +555,7 @@ function isTruncated(value: object): value is { truncated: true; length?: number
   return 'truncated' in value && (value as { truncated?: unknown }).truncated === true;
 }
 
-/** Only push/local entries carry value snapshots; pull entries never do. */
+/** Undefined is a valid one side of a create/delete, so either side is sufficient. */
 function hasValueSnapshot(entry: SyncLogEntry): boolean {
   return entry.previousValue !== undefined || entry.newValue !== undefined;
 }

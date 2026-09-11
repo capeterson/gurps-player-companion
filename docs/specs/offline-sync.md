@@ -297,11 +297,12 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   this is the trace of "burst of edits kept stale-basing" for a debug dump).
 - `rolled_back` — a `rejected`/`unauthorized`/`conflict`/`suspended` outcome
   reverted the local row; `details` carries the raw server outcome.
-- `retrying` — an op transitioned into `transient_retry`. Logged **once per
-  failure streak** (on the transition into retry, not on every subsequent
-  retry attempt) so a stubbornly-failing op can't flush the 1,000-row journal;
-  the live retry state (attempt count, backoff timing) is always visible via
-  the outbox rows themselves.
+- `retrying` — an op transitioned into `transient_retry`, either because the
+  server returned a transient outcome or anomalously omitted that operation
+  from its outcomes. Logged **once per failure streak** (on the transition into
+  retry, not on every subsequent retry attempt) so a stubbornly-failing op
+  can't flush the 1,000-row journal; the live retry state (attempt count,
+  backoff timing) is always visible via the outbox rows themselves.
 - `failed` — a **whole-cycle** failure: the drain POST or the cursor pull
   itself errored (dropped connection, 5xx, reverse-proxy/tunnel error), so no
   individual operation has an outcome to report. These carry no `entityClass` /
@@ -310,13 +311,22 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   logged nothing anywhere** — no outbox row, no rejection record, no toast —
   which left the red badge with nothing to point at during a server outage.
 
-It is pruned to the newest 1,000 records. Pull entries retain metadata and
-revision only, never cursor row payloads. `push` and `local` entries
-additionally carry `previousValue` / `newValue` snapshots (via `snapshotValue`,
+It is pruned to the newest 1,000 records. `push` and `local` entries snapshot
+the outbox's `previousValue` / `newValue`. Pull entries compare the row in
+Dexie immediately before and after applying the cursor change and snapshot only
+the data fields that actually moved; this means a pending local field protected
+by S4 is not falsely reported as overwritten. A single changed field is stored
+as a normal field/value pair, multiple changed fields as small before/after
+objects, and cursor creates/deletes as bounded whole-row snapshots. Revision and
+timestamp bookkeeping remains in `details`, not in the user-data diff. If only
+that bookkeeping moved (or every incoming data field was protected), the UI says
+that no data fields changed locally. All snapshots pass through `snapshotValue`,
 which caps **strings as well as objects** at `SYNC_LOG_VALUE_MAX_CHARS` — `notes`
 / `appearance` / trait descriptions accept 20,000 characters, so exempting
-strings would let a few edits retain tens of MB) so the log UI can show *what
-changed* instead of just "character inventory patch".
+strings would let a few edits retain tens of MB. This lets the log show *what
+changed* instead of just "character inventory patch". Legacy pull entries lack
+the `appliedFields` marker and are labeled as values not recorded by the app
+version that downloaded them; their old values cannot be reconstructed.
 
 **Rollback entries record the direction the local row actually moved.** A
 rejected patch moves the row *away* from the refused `attemptedValue` and back
@@ -339,6 +349,10 @@ matches a character being minimized or pruned; both
 `enforceMinimalViewLocally` and `pruneInaccessibleLocally` call it. `parentId`
 is stored on child-class entries precisely so this match can find them. The row
 survives with its metadata, and the UI says the values were removed.
+Downloaded campaign snapshots follow the same rule through
+`redactSyncLogForCampaigns()` and a durable revoked-campaign ledger. Campaign
+access pruning records the id before deleting the local row, so the dialog and
+debug dump still fail closed if the best-effort snapshot scrub fails.
 
 **The outbox needs the same gate applied at read time.** Queued ops are
 deliberately *not* swept on a downgrade — the op is the user's own unsent intent

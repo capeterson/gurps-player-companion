@@ -64,9 +64,12 @@ import {
 } from './outbox.ts';
 import { syncStateStore } from './state.ts';
 import {
+  type NewSyncLogEntry,
   appendSyncLog,
   pruneRejectionToasts,
+  redactSyncLogForCampaigns,
   redactSyncLogForCharacters,
+  rememberRevokedCampaigns,
   rememberRevokedCharacters,
   snapshotValue,
 } from './syncLog.ts';
@@ -91,6 +94,15 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
 const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
 const BOOTSTRAP_RETRY_MS = 5_000;
+
+/** Cursor bookkeeping is useful in `details`, but it is not a user-data patch. */
+const PULL_LOG_METADATA_FIELDS = new Set([
+  'id',
+  'characterId',
+  'createdAt',
+  'updatedAt',
+  'revision',
+]);
 
 /**
  * Cross-tab lock names.  Lock order is always DRAIN → CURSOR (the
@@ -152,6 +164,63 @@ export function fieldValuesEqual(serverVal: unknown, storedVal: unknown): boolea
     return true;
   }
   return false;
+}
+
+/**
+ * Describe what a cursor row actually changed in Dexie.
+ *
+ * Cursor upserts are whole current rows and call every upsert a `patch`, so
+ * the protocol cannot tell the journal which field changed. Comparing the
+ * local row on either side of the merge is more accurate anyway: it excludes
+ * server fields deliberately skipped because a pending outbox edit owns them.
+ */
+function pullLogEntry(
+  change: SyncCursorChange,
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown> | undefined,
+): NewSyncLogEntry {
+  const characterRow = after ?? before;
+  const parentId =
+    typeof characterRow?.characterId === 'string' ? characterRow.characterId : undefined;
+  const changedFields =
+    before && after
+      ? [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+          (field) =>
+            !PULL_LOG_METADATA_FIELDS.has(field) && !fieldValuesEqual(before[field], after[field]),
+        )
+      : Object.keys(after ?? before ?? {}).filter((field) => !PULL_LOG_METADATA_FIELDS.has(field));
+
+  const entry: NewSyncLogEntry = {
+    direction: 'pull',
+    result: 'synced',
+    entityClass: change.entityClass,
+    entityId: change.entityId,
+    parentId,
+    command: change.command,
+    details: { revision: change.revision, appliedFields: changedFields },
+  };
+
+  if (!before && after) {
+    entry.newValue = snapshotValue(after);
+  } else if (before && !after) {
+    entry.previousValue = snapshotValue(before);
+  } else if (before && after && changedFields.length === 1) {
+    const field = changedFields[0];
+    if (field !== undefined) {
+      entry.fieldPath = field;
+      entry.previousValue = snapshotValue(before[field]);
+      entry.newValue = snapshotValue(after[field]);
+    }
+  } else if (before && after && changedFields.length > 1) {
+    entry.previousValue = snapshotValue(
+      Object.fromEntries(changedFields.map((field) => [field, before[field]])),
+    );
+    entry.newValue = snapshotValue(
+      Object.fromEntries(changedFields.map((field) => [field, after[field]])),
+    );
+  }
+
+  return entry;
 }
 
 interface OrchestratorEvents {
@@ -762,6 +831,23 @@ class SyncOrchestrator {
         // Server didn't return an outcome for this op.  Treat as
         // transient -- the ack got lost; we'll retry the same op.
         const next = op.attemptCount + 1;
+        if (op.status !== 'transient_retry') {
+          await appendSyncLog({
+            direction: 'push',
+            result: 'retrying',
+            entityClass: op.entityClass,
+            entityId: op.entityId,
+            parentId: op.parentId,
+            command: op.command,
+            fieldPath: op.fieldPath,
+            humanName: op.humanName,
+            details: snapshotValue({
+              serverReason: 'no outcome returned',
+              attemptCount: next,
+              response: outcomes,
+            }),
+          });
+        }
         await setOutboxStatus(op.clientOpId, 'transient_retry', {
           attemptCount: next,
           nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
@@ -1185,8 +1271,10 @@ class SyncOrchestrator {
       db.syncCursors,
       db.outbox,
     ];
+    const pullLogEntries: NewSyncLogEntry[] = [];
     await db.transaction('rw', stores, async () => {
       for (const change of res.changes) {
+        const before = await this.readLocalEntity(change.entityClass, change.entityId);
         if (change.command === 'delete') {
           await this.deleteLocal(change.entityClass, change.entityId);
           await db.tombstones.put({
@@ -1198,18 +1286,13 @@ class SyncOrchestrator {
         } else if (change.data && typeof change.data === 'object') {
           await this.applyServerRow(change.entityClass, change.data as Record<string, unknown>, {});
         }
+        const after = await this.readLocalEntity(change.entityClass, change.entityId);
+        pullLogEntries.push(pullLogEntry(change, before, after));
       }
       await this.persistCursors(res.nextCursor);
     });
-    for (const change of res.changes) {
-      await appendSyncLog({
-        direction: 'pull',
-        result: 'synced',
-        entityClass: change.entityClass,
-        entityId: change.entityId,
-        command: change.command,
-        details: { revision: change.revision },
-      });
+    for (const entry of pullLogEntries) {
+      await appendSyncLog(entry);
     }
   }
 
@@ -1340,6 +1423,36 @@ class SyncOrchestrator {
         return;
       default:
         return;
+    }
+  }
+
+  /** Read the row that a cursor change is about, for an applied before/after journal snapshot. */
+  private async readLocalEntity(
+    entityClass: EntityClass,
+    entityId: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const db = getLocalDb();
+    switch (entityClass) {
+      case 'character':
+        return (await db.characters.get(entityId)) as Record<string, unknown> | undefined;
+      case 'character_trait':
+        return (await db.characterTraits.get(entityId)) as Record<string, unknown> | undefined;
+      case 'character_skill':
+        return (await db.characterSkills.get(entityId)) as Record<string, unknown> | undefined;
+      case 'character_spell':
+        return (await db.characterSpells.get(entityId)) as Record<string, unknown> | undefined;
+      case 'character_language':
+        return (await db.characterLanguages.get(entityId)) as Record<string, unknown> | undefined;
+      case 'character_technique':
+        return (await db.characterTechniques.get(entityId)) as Record<string, unknown> | undefined;
+      case 'character_inventory':
+        return (await db.characterInventory.get(entityId)) as Record<string, unknown> | undefined;
+      case 'character_combat':
+        return (await db.characterCombat.get(entityId)) as Record<string, unknown> | undefined;
+      case 'campaign':
+        return (await db.campaigns.get(entityId)) as Record<string, unknown> | undefined;
+      default:
+        return undefined;
     }
   }
 
@@ -1863,6 +1976,13 @@ class SyncOrchestrator {
 
     if (charIdsToDelete.length === 0 && campaignIdsToDelete.length === 0) return;
 
+    // Record revocation before deleting the rows. If the best-effort
+    // journal scrub later fails, read-time masking still fails closed.
+    await Promise.all([
+      rememberRevokedCharacters(charIdsToDelete),
+      rememberRevokedCampaigns(campaignIdsToDelete),
+    ]);
+
     // Single transaction across every affected store so observers see
     // one atomic update.
     await db.transaction(
@@ -1896,14 +2016,13 @@ class SyncOrchestrator {
         }
       },
     );
-    // Record the revocation BEFORE the best-effort redaction: the rows
-    // are already gone, so if that redaction fails this ledger is the
-    // only thing left that can keep those records closed.
-    await rememberRevokedCharacters(charIdsToDelete);
     // The journal holds before/after character values too; deleting the
     // rows while leaving those readable in the sync dialog and the
     // debug dump would defeat the purge.
-    await redactSyncLogForCharacters(charIdsToDelete);
+    await Promise.all([
+      redactSyncLogForCharacters(charIdsToDelete),
+      redactSyncLogForCampaigns(campaignIdsToDelete),
+    ]);
   }
 
   private fireCycleDone(): void {

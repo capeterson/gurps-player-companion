@@ -168,7 +168,7 @@ describe('SyncLogView event details', () => {
     expect(detail.getByText('quantity')).toBeInTheDocument();
   });
 
-  it('says values are not recorded for pulled rows', async () => {
+  it('says when a pulled row changed no local data fields', async () => {
     await getLocalDb().syncLog.put({
       id: 'log-2',
       direction: 'pull',
@@ -176,7 +176,7 @@ describe('SyncLogView event details', () => {
       entityClass: 'character_combat',
       entityId: 'combat-1',
       command: 'patch',
-      details: { revision: 42 },
+      details: { revision: 42, appliedFields: [] },
       occurredAt: new Date().toISOString(),
     });
 
@@ -184,7 +184,49 @@ describe('SyncLogView event details', () => {
 
     const title = await screen.findByText('character combat patch');
     const detail = within(title.closest('details') as HTMLDetailsElement);
-    expect(detail.getByText('not recorded for downloads')).toBeInTheDocument();
+    expect(detail.getByText('no data fields changed locally')).toBeInTheDocument();
+  });
+
+  it('identifies legacy pulled rows whose values cannot be reconstructed', async () => {
+    await getLocalDb().syncLog.put({
+      id: 'log-legacy-pull',
+      direction: 'pull',
+      result: 'synced',
+      entityClass: 'character_skill',
+      entityId: 'skill-legacy',
+      command: 'patch',
+      details: { revision: 17 },
+      occurredAt: new Date().toISOString(),
+    });
+
+    renderView();
+
+    const title = await screen.findByText('character skill patch');
+    const detail = within(title.closest('details') as HTMLDetailsElement);
+    expect(
+      detail.getByText('not recorded by the app version that downloaded this change'),
+    ).toBeInTheDocument();
+  });
+
+  it('names campaign access loss on a redacted campaign snapshot', async () => {
+    await getLocalDb().syncLog.put({
+      id: 'log-campaign-redacted',
+      direction: 'pull',
+      result: 'synced',
+      entityClass: 'campaign',
+      entityId: 'campaign-1',
+      command: 'patch',
+      redacted: true,
+      occurredAt: new Date().toISOString(),
+    });
+
+    renderView();
+
+    const title = await screen.findByText('campaign patch');
+    const detail = within(title.closest('details') as HTMLDetailsElement);
+    expect(
+      detail.getByText('removed — you no longer have access to this campaign'),
+    ).toBeInTheDocument();
   });
 
   it('hides queued values for a character the viewer can no longer see', async () => {
