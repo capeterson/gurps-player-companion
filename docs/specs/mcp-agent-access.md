@@ -64,7 +64,7 @@ Implemented modules:
 | AUTH-1 | Authorization-code flow with PKCE S256 for public clients. Login and consent happen on GPC using existing password/passkey authentication; agents never receive player passwords, app refresh tokens, or newly minted API keys. Require recent primary authentication when approving a new grant. |
 | AUTH-2 | Publish `/.well-known/oauth-protected-resource/mcp` with the canonical `/mcp` resource and authorization server, and `/.well-known/oauth-authorization-server` with issuer, authorization/token endpoints, scopes, and PKCE support. Unauthenticated MCP requests return 401 with a discoverable `WWW-Authenticate` challenge. Canonical URLs come from trusted deployment configuration, never arbitrary Host/forwarded headers. |
 | AUTH-3 | Provide `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, and `/oauth/register`. Bind one-time, short-lived codes to player, client, exact redirect URI, PKCE challenge, granted scopes, and resource. Validate the requested resource at authorization and token exchange; reject a mismatched audience on MCP calls. Protect browser consent against CSRF, preserve client state, and reject unregistered redirects before redirecting anywhere. No implicit or password grant. |
-| AUTH-4 | Support Client ID Metadata Documents (CIMD), Dynamic Client Registration (DCR), and optional operator-configured clients. Advertise CIMD and DCR in authorization-server metadata so standards-compatible public clients need no per-client server configuration. Resolve CIMD only from public HTTPS port 443 with pinned public DNS, no redirects, bounded/time-limited JSON responses, exact client-ID and redirect validation, and a capped cache. DCR accepts only public clients using authorization code + PKCE and safe HTTPS or loopback callbacks; it is body/rate limited and returns no client secret. |
+| AUTH-4 | Support Client ID Metadata Documents (CIMD), Dynamic Client Registration (DCR), and optional operator-configured clients. Advertise CIMD and DCR in authorization-server metadata so standards-compatible public clients need no per-client server configuration. Resolve CIMD only from public HTTPS port 443 with pinned public DNS, no redirects, bounded/time-limited JSON responses, exact client-ID and safe redirect validation, and a capped cache. DCR accepts only public clients using authorization code + PKCE and safe HTTPS or loopback callbacks; it is body/rate limited and returns no client secret. |
 | AUTH-5 | Issue separate short-lived, audience-bound OAuth access tokens and rotating refresh tokens. Persist grants and token-family state in Postgres; store opaque token/code secrets only as hashes. Check revocation, user suspension/deletion, authentication version, and current permissions on every call. Password change/recovery invalidates delegated sessions too. Refresh cannot widen scope or change resource/client; replay revokes the family. |
 | AUTH-6 | Settings lists connected clients, scopes, creation/last-use time, and a revoke action. Revocation invalidates the entire grant, including outstanding access and refresh tokens, on the next request. Ordinary app logout clears local account state but leaves explicitly approved grants; show this distinction to players. Account recovery revokes all grants. |
 | AUTH-7 | Effective authority is the intersection of the user's current GPC permissions and granted scopes. No client-selected actor ID, impersonation, superuser elevation, or scope bypass through REST/sync. OAuth tokens for `/mcp` are rejected by existing app-session/API-key endpoints; shared handlers receive a trusted actor context rather than a forwarded token. |
@@ -239,11 +239,15 @@ not a setup requirement. Its JSON shape is `{clientId, name, redirectUris,
 scopes}`. Configuration is authoritative only for entries registered by that
 mechanism: removing one disables it and its tokens on the next OAuth/token/MCP
 check, and narrowing its scopes invalidates older broader tokens. It never
-disables CIMD or DCR registrations. All redirect URIs match exactly, use HTTPS
-or HTTP on a loopback host, and reject credentials or fragments. Public clients
-use authorization code with PKCE S256 and no secret. Direct browser clients must
-also list their origin in `CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth
-requests do not require a CORS entry.
+disables CIMD or DCR registrations. Redirect URIs use HTTPS or HTTP on a
+loopback host and reject credentials or fragments. They match exactly except
+that a portless registered loopback callback accepts the native client's
+ephemeral local-listener port, as required for installed-app OAuth. The exact
+requested callback is still bound into the authorization code and must be
+repeated at token exchange. Public clients use authorization code with PKCE S256
+and no secret. Direct browser clients must also list their origin in
+`CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth requests do not require a
+CORS entry.
 
 Client setup uses the `/mcp` resource URL. Discovery supplies the authorization
 server and endpoints. The client sends its registered ID, exact callback,
@@ -254,9 +258,13 @@ callback. The client exchanges it with the original verifier and resource at
 
 `APP_BASE_URL` is the canonical origin used by discovery and audience checks.
 Production requires a pathless HTTPS origin. Proxies route `/mcp`, `/oauth/*`,
-and `/.well-known/*` without caching. Access tokens live for 15 minutes, refresh
-tokens 30 days, authorization codes five minutes, and idempotency results 24
-hours. Backups include OAuth and idempotency tables with the rest of Postgres;
+and `/.well-known/*` without caching. The PWA navigation fallback excludes
+these protocol paths. The mutable service-worker entrypoints and HTML shells
+also carry `no-store` origin/CDN headers so an edge-cached old worker cannot
+shadow a newly added protocol route with the React SPA. Access tokens live for
+15 minutes, refresh tokens 30 days, authorization codes five minutes, and
+idempotency results 24 hours. Backups include OAuth and idempotency tables with
+the rest of Postgres;
 token plaintext cannot be recovered. Expired secret rows are pruned while
 revoked grants remain available for Settings/history provenance. Opaque secrets
 are stored only as hashes. A lost refresh response retries

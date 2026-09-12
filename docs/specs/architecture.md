@@ -28,6 +28,13 @@ doesn't reject the token-in-query handshake) → raw bounded MCP transport →
 OpenAPI doc → error handler →
 static/SPA fallback (last, so it never shadows `/api/*`).
 
+The static handler marks `sw.js`, its registration bootstrap, the manifest, and
+both HTML entrypoints `no-store` for browsers and CDNs; content-hashed assets
+remain cacheable. The service worker's navigation fallback excludes `/api/*`,
+`/admin/*`, `/mcp`, `/.well-known/*`, and the OAuth protocol endpoints. This is
+a routing boundary as well as an offline policy: a stale app shell must never
+turn an OAuth authorization request or MCP discovery request into a React route.
+
 Deployment is Docker Compose (`docker-compose.yml` for prod; `.dev.yml` for
 dev; unraid variants included). Three services: `db` (Postgres 18), a one-shot
 `migrate`, and `app`. `app` waits for `migrate` to exit 0. In dev, Vite (via

@@ -3,6 +3,7 @@ import {
   ClientRegistrationError,
   fetchClientMetadataDocument,
   isSafeOAuthRedirectUri,
+  oauthRedirectUriMatches,
   readPublicClientMetadata,
 } from './clientRegistration.ts';
 
@@ -14,6 +15,44 @@ describe('OAuth client registration', () => {
     expect(isSafeOAuthRedirectUri('http://claude.example/callback')).toBe(false);
     expect(isSafeOAuthRedirectUri('https://user:pass@example.com/callback')).toBe(false);
     expect(isSafeOAuthRedirectUri('https://example.com/callback#fragment')).toBe(false);
+  });
+
+  it('allows a native client to choose an ephemeral loopback port', () => {
+    expect(
+      oauthRedirectUriMatches(
+        'http://127.0.0.1/callback/Bkk2oK50Ykvw',
+        'http://127.0.0.1:53873/callback/Bkk2oK50Ykvw',
+      ),
+    ).toBe(true);
+    expect(
+      oauthRedirectUriMatches(
+        'http://localhost/callback/Bkk2oK50Ykvw',
+        'http://localhost:53873/callback/Bkk2oK50Ykvw',
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps every non-port component and non-loopback redirect exact', () => {
+    const registered = 'http://127.0.0.1/callback/client';
+    expect(oauthRedirectUriMatches(registered, 'http://127.0.0.1:53873/callback/other')).toBe(
+      false,
+    );
+    expect(oauthRedirectUriMatches(registered, 'http://localhost:53873/callback/client')).toBe(
+      false,
+    );
+    expect(oauthRedirectUriMatches(`${registered}?mode=one`, `${registered}?mode=two`)).toBe(false);
+    expect(
+      oauthRedirectUriMatches(
+        'https://client.example/callback',
+        'https://client.example:8443/callback',
+      ),
+    ).toBe(false);
+    expect(
+      oauthRedirectUriMatches(
+        'http://127.0.0.1:4100/callback/client',
+        'http://127.0.0.1:53873/callback/client',
+      ),
+    ).toBe(false);
   });
 
   it('validates a public-client metadata document and caps its cache lifetime', async () => {

@@ -695,9 +695,11 @@ src/
     yaml/        library.ts — round-trippable campaign-library YAML codec
     history/     summarize.ts — shared history one-liner formatter
   sw/            Service worker registration and app-shell precache. It never
-                 caches authenticated API responses and does not replay the
-                 outbox — that lives in the page orchestrator, see
-                 src/sw/registerSW.ts.
+                 caches authenticated API responses, does not replay the
+                 outbox, and excludes API/MCP/OAuth/discovery routes from its
+                 navigation fallback. Mutable worker/bootstrap/HTML entrypoints
+                 are served no-store; hashed assets remain cacheable. Outbox
+                 replay lives in the page orchestrator; see src/sw/registerSW.ts.
 docs/
   specs/         These design specs
   prototypes/    Standalone design studies, outside the app build:

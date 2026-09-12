@@ -36,6 +36,35 @@ export function isSafeOAuthRedirectUri(value: string): boolean {
   }
 }
 
+/**
+ * Match a requested redirect against a registered redirect URI.
+ *
+ * Native applications bind a temporary local listener to an ephemeral port.
+ * RFC 8252 therefore requires authorization servers to allow any port on an
+ * otherwise exact IP-loopback redirect. Codex also publishes a portless
+ * localhost fallback, so we apply the same narrow rule to localhost. All
+ * non-loopback redirects, and every component except the port, remain exact.
+ */
+export function oauthRedirectUriMatches(registeredValue: string, requestedValue: string): boolean {
+  if (registeredValue === requestedValue) return true;
+  if (!isSafeOAuthRedirectUri(registeredValue) || !isSafeOAuthRedirectUri(requestedValue)) {
+    return false;
+  }
+
+  const registered = new URL(registeredValue);
+  const requested = new URL(requestedValue);
+  const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
+  return (
+    registered.protocol === 'http:' &&
+    requested.protocol === 'http:' &&
+    loopbackHosts.has(registered.hostname) &&
+    registered.hostname === requested.hostname &&
+    registered.port === '' &&
+    registered.pathname === requested.pathname &&
+    registered.search === requested.search
+  );
+}
+
 function isPublicIpv4(address: string): boolean {
   const parts = address.split('.').map(Number);
   if (
