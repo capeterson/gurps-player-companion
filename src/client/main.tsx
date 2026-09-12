@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { polyfill as mobileDragDropPolyfill } from 'mobile-drag-drop';
 import 'mobile-drag-drop/default.css';
 import { StrictMode } from 'react';
@@ -24,6 +24,7 @@ import { HomePage } from './features/home/HomePage.tsx';
 import { LibraryPage } from './features/library/LibraryPage.tsx';
 import { LogPage } from './features/log/LogPage.tsx';
 import { SettingsPage } from './features/settings/SettingsPage.tsx';
+import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessionQueryCache.tsx';
 import { applyTheme, readStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
@@ -46,15 +47,7 @@ window.addEventListener('contextmenu', (e) => {
   }
 });
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
+const queryClient = createSessionQueryClient();
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -92,6 +85,7 @@ if (!rootEl) throw new Error('root element missing');
 createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <SessionQueryCacheBoundary />
       <ToastProvider>
         {/* Inside ToastProvider: it announces SW updates through the
             toast API. Outside the router so the prompt survives

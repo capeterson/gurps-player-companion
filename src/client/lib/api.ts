@@ -155,8 +155,14 @@ export interface ApiOptions {
 }
 
 export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  const originatingSession =
+    options.authenticated === false ? null : (tokenStore.read()?.sessionId ?? null);
   const res = await apiFetch(path, options);
-  return parse<T>(res);
+  const body = await parse<T>(res);
+  if (originatingSession !== null && tokenStore.read()?.sessionId !== originatingSession) {
+    throw new ApiError(401, 'session changed while request was in flight');
+  }
+  return body;
 }
 
 /**
@@ -185,6 +191,16 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   if (options.signal) init.signal = options.signal;
   if (options.body !== undefined) init.body = JSON.stringify(options.body);
   const res = await fetch(`${API_ROOT}${path}`, init);
+  if (
+    options.authenticated !== false &&
+    tokens &&
+    tokenStore.read()?.sessionId !== tokens.sessionId
+  ) {
+    return new Response(JSON.stringify({ error: 'session changed while request was in flight' }), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
   if (res.status === 401 && options.authenticated !== false) {
     // The request may have crossed a logout/login boundary while it was in
     // flight. Never refresh or retry an old account's request as the new one.

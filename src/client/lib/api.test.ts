@@ -172,6 +172,33 @@ describe('api refresh-on-401', () => {
     });
   });
 
+  it('rejects a successful response that arrives after the originating session changed', async () => {
+    seedTokens();
+    let release!: (response: Response) => void;
+    const held = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => held),
+    );
+
+    const oldRequest = api('/campaigns');
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    tokenStore.clear();
+    tokenStore.write({
+      accessToken: 'new-account-access',
+      refreshToken: 'new-account-refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    release(jsonResponse(200, [{ id: 'private-old-account', name: 'Must not escape' }]));
+
+    await expect(oldRequest).rejects.toMatchObject({
+      status: 401,
+      message: 'session changed while request was in flight',
+    });
+  });
+
   it('coordinates rotation across isolated module contexts and reuses the winning pair', async () => {
     seedTokens();
     let lockTail = Promise.resolve();

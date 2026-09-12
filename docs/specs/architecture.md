@@ -215,7 +215,12 @@ Key PG18 / trigger machinery, layered by migration:
   This is the heart of the app — see [offline-sync.md](offline-sync.md).
 - **Online-only surfaces** (campaign library, adventure log, invitations,
   notifications, settings, admin, and campaign encounters) use TanStack Query directly against the HTTP
-  API. Default query options: `staleTime: 30s`, no refetch-on-focus, one retry.
+  API. Query hashes include the current token-session id. Both the PWA and admin
+  entry mount `SessionQueryCacheBoundary`, which cancels and clears all query and
+  mutation state whenever login identity changes locally or in another tab.
+  Authenticated HTTP responses are also session-fenced before parsing, so a late
+  old-account response cannot repopulate the new session's cache. Default query
+  options: `staleTime: 30s`, no refetch-on-focus, one retry.
 - **Encounters** use query keys scoped by campaign/encounter. The existing WS
   subscriber dispatches `encounter_invalidate` frames to that query cache; the
    frame contains no combat data. A Dexie v6 `soloEncounters` store, keyed by

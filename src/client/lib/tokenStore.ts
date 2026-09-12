@@ -21,6 +21,24 @@ export interface TokenSnapshot extends Tokens {
   readonly version: number;
 }
 
+type TokenStoreListener = (snapshot: TokenSnapshot | null) => void;
+const listeners = new Set<TokenStoreListener>();
+let storageListenerInstalled = false;
+
+function notify(snapshot: TokenSnapshot | null): void {
+  for (const listener of listeners) listener(snapshot);
+}
+
+function installStorageListener(): void {
+  if (storageListenerInstalled || typeof window === 'undefined') return;
+  storageListenerInstalled = true;
+  window.addEventListener('storage', (event) => {
+    if (event.key !== TOKEN_PAIR_KEY && event.key !== ACCESS_KEY && event.key !== REFRESH_KEY)
+      return;
+    notify(parseStoredPair(window.localStorage.getItem(TOKEN_PAIR_KEY)));
+  });
+}
+
 function newSessionId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 }
@@ -49,6 +67,7 @@ function persist(pair: TokenSnapshot): void {
   // Remove the pre-session-fence representation once it has been migrated.
   window.localStorage.removeItem(ACCESS_KEY);
   window.localStorage.removeItem(REFRESH_KEY);
+  notify(pair);
 }
 
 export const tokenStore = {
@@ -111,9 +130,15 @@ export const tokenStore = {
     window.localStorage.removeItem(TOKEN_PAIR_KEY);
     window.localStorage.removeItem(ACCESS_KEY);
     window.localStorage.removeItem(REFRESH_KEY);
+    notify(null);
   },
   hasToken(): boolean {
     return this.read() !== null;
+  },
+  subscribe(listener: TokenStoreListener): () => void {
+    installStorageListener();
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   },
 };
 
