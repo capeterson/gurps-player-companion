@@ -45,6 +45,10 @@ export function subscribe(userId: string, ws: WsLike): () => void {
 }
 
 export function publish(userId: string, message: WsBroadcast): void {
+  afterDbCommit(() => deliver(userId, message));
+}
+
+function deliver(userId: string, message: WsBroadcast): void {
   const bucket = subscribers.get(userId);
   if (!bucket || bucket.size === 0) return;
   const text = JSON.stringify(message);
@@ -68,3 +72,4 @@ export function subscriberCount(userId: string): number {
 export function _resetForTests(): void {
   subscribers.clear();
 }
+import { afterDbCommit } from '../db/client.ts';

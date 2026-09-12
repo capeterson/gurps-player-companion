@@ -15,6 +15,7 @@ const testConfig: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   appBaseUrl: undefined,
+  oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,
   authRateLimitLoginMax: 10,
@@ -58,4 +59,31 @@ describe('/sync/ws routing', () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('missing token');
   });
+});
+
+describe('configured browser OAuth CORS', () => {
+  const origin = 'https://agent.example';
+  const app = createApp({ ...testConfig, corsOrigins: [origin] });
+
+  for (const [method, path] of [
+    ['GET', '/.well-known/oauth-protected-resource/mcp'],
+    ['GET', '/.well-known/oauth-authorization-server'],
+    ['POST', '/oauth/token'],
+    ['POST', '/oauth/revoke'],
+    ['POST', '/mcp'],
+  ] as const) {
+    it(`answers ${path} preflight for an allowed browser client`, async () => {
+      const response = await app.request(path, {
+        method: 'OPTIONS',
+        headers: {
+          origin,
+          'access-control-request-method': method,
+          'access-control-request-headers': 'content-type',
+        },
+      });
+      expect(response.status).toBe(204);
+      expect(response.headers.get('access-control-allow-origin')).toBe(origin);
+      expect(response.headers.get('access-control-allow-credentials')).toBeNull();
+    });
+  }
 });

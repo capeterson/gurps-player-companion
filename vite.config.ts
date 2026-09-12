@@ -114,7 +114,9 @@ export default defineConfig({
     devServer({
       adapter: bunAdapter,
       entry: 'src/server/dev-entry.ts',
-      exclude: [/^\/(?!api(\/|$)).*/],
+      exclude: [
+        /^\/(?!api(?:[/?]|$)|mcp(?:[/?]|$)|\.well-known(?:[/?]|$)|oauth\/(?:authorize|token|revoke)(?:[/?]|$)).*/,
+      ],
     }),
     stripPwaFromAdmin(),
     adminEntryRewriteDev(),
@@ -151,7 +153,13 @@ export default defineConfig({
         // `src/sw/registerSW.ts` for the offline-replay strategy.
         // /admin/* is denied so the SW doesn't intercept those
         // navigations and serve the player shell.
-        navigateFallbackDenylist: [/^\/api\//, /^\/admin(\/|$)/],
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/admin(\/|$)/,
+          /^\/mcp(?:[/?]|$)/,
+          /^\/\.well-known\//,
+          /^\/oauth\/(authorize|token|revoke)(?:[/?]|$)/,
+        ],
       },
     }),
   ],

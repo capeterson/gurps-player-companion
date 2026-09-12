@@ -93,6 +93,11 @@ The remaining sync bookkeeping rows are client-internal (never sent verbatim to 
 entries are re-validated server-side per field) so TypeScript interfaces in
 `dexie.ts` are their schema documents.
 
+Migration 0042 adds OAuth and mutation-idempotency tables using PostgreSQL
+arrays and scalar/text columns. It adds no JSON/JSONB field: idempotent response
+bodies are serialized text and returned only after the current actor/grant is
+validated.
+
 For both library effect arrays, `damage_thrust` / `damage_swing` values are
 signed flat adds to the corresponding final ST-based damage dice. Scaling
 and active conditions apply before summation; temporary ST changes the base

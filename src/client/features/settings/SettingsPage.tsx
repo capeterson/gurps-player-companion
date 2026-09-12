@@ -7,6 +7,7 @@ import { useToasts } from '../../lib/toast.tsx';
 import { tokenStore } from '../../lib/tokenStore.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 import { ApiKeysSection } from './ApiKeysSection.tsx';
+import { ConnectedAppsSection } from './ConnectedAppsSection.tsx';
 
 export function SettingsPage() {
   const toasts = useToasts();
@@ -197,6 +198,7 @@ export function SettingsPage() {
       </section>
 
       <ApiKeysSection />
+      <ConnectedAppsSection />
     </div>
   );
 }

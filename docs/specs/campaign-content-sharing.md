@@ -16,6 +16,12 @@ none of it flows through the offline outbox (campaigns are pulled read-only
 into Dexie for the share gate, campaign names, mana, and house rules). See
 [offline-sync.md](offline-sync.md) S0.
 
+The same player-domain operations are available to delegated MCP clients.
+OAuth scope is an additional ceiling; it never replaces current campaign role,
+membership, private-log, hidden-encounter, GM-edit, or character-share checks.
+MCP results pass through the same list/detail/history projections. Membership
+revocation takes effect on the next tool call.
+
 ## House rules
 
 Campaign settings include a House rule set selector, editable by the owner and

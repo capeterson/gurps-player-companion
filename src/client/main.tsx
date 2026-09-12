@@ -10,6 +10,7 @@ import { SwUpdatePrompt } from './components/SwUpdatePrompt.tsx';
 import { AboutPage } from './features/about/AboutPage.tsx';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
+import { OAuthConsentPage } from './features/auth/OAuthConsentPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
@@ -28,6 +29,7 @@ import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessi
 import { applyTheme, readStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
+import { RequireSessionOnly } from './routes/RequireSessionOnly.tsx';
 import './styles/theme.css';
 
 applyTheme(readStoredTheme());
@@ -55,6 +57,10 @@ const router = createBrowserRouter([
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
   { path: '/suspended', element: <SuspendedPage /> },
+  {
+    element: <RequireSessionOnly />,
+    children: [{ path: '/oauth/consent', element: <OAuthConsentPage /> }],
+  },
   {
     element: <RequireAuth />,
     children: [

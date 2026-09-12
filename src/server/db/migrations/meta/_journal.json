@@ -295,6 +295,13 @@
       "when": 1790000000000,
       "tag": "0041_campaign_attribute_caps",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790001000000,
+      "tag": "0042_delegated_oauth",
+      "breakpoints": true
     }
   ]
 }

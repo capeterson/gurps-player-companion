@@ -13,15 +13,19 @@ whose `startServer` factory is also used by real HTTP/WebSocket tests)
 serves everything:
 
 - the HTTP JSON API under `/api/v1/*`,
+- OAuth metadata, authorization, token, and revocation under `/.well-known/*`
+  and `/oauth/*`,
+- MCP 2025-11-25 Streamable HTTP at `/mcp`,
 - the WebSocket push channel at `/api/v1/sync/ws`,
 - the OpenAPI document at `/api/v1/openapi.json` (non-production only),
 - and, in production, the built React client + SPA fallback (`static.ts`).
 
 Do **not** split this into separate API/web services (`AGENTS.md` — "One
 process"). `createApp()` in `src/server/app.ts` composes it: CORS (if
-configured) → the per-resource sub-routers mounted under `/api/v1` → the WS
+configured) → OAuth and the per-resource sub-routers → the WS
 handler (registered *before* `syncRouter` so its `requireActiveUser` guard
-doesn't reject the token-in-query handshake) → OpenAPI doc → error handler →
+doesn't reject the token-in-query handshake) → raw bounded MCP transport →
+OpenAPI doc → error handler →
 static/SPA fallback (last, so it never shadows `/api/*`).
 
 Deployment is Docker Compose (`docker-compose.yml` for prod; `.dev.yml` for
@@ -29,6 +33,23 @@ dev; unraid variants included). Three services: `db` (Postgres 18), a one-shot
 `migrate`, and `app`. `app` waits for `migrate` to exit 0. In dev, Vite (via
 `@hono/vite-dev-server`) owns the SPA and HMR; the same Bun process serves the
 Hono API on the same port — see `dev-entry.ts` and `vite.config.ts`.
+
+## MCP and delegated authorization
+
+[MCP agent access](mcp-agent-access.md) defines the `/mcp` Streamable HTTP
+adapter and OAuth authorization server in this same Bun process. The SDK's
+web-standard stateless transport negotiates MCP 2025-11-25. An in-process
+executor sends a Request through the same OpenAPI handler graph; a private
+object-identity capability supplies the trusted OAuth actor, so no token is
+forwarded and external requests cannot inject one. App JWTs/API keys remain
+distinct from audience-bound, scoped, revocable OAuth credentials.
+
+Migration 0042 stores clients, grants, one-time codes, hashed access/refresh
+tokens, and mutation idempotency outcomes. The outer idempotency transaction
+and nested `withAudit` savepoints commit writes, cached outcomes, history, and
+post-commit effects together. Audit context includes actor, OAuth client, and
+grant. `docs/mcp-tools.json` and `mcp:check` guard exact route coverage and live
+tool schema/catalog drift.
 
 ## Stack
 
@@ -127,7 +148,8 @@ newer one still gets through.
    bearer token — either a JWT access token or a `gpc_`-prefixed API key — into
    `c.get('user')`, and rejects suspended users. The WS channel authenticates
    via `?token=` query string because the browser WebSocket API can't set
-   headers.
+   headers. `/mcp` resolves a scoped, audience-bound OAuth access token and
+   supplies the same actor through a private Request identity capability.
 3. **Authorization.** Centralized helpers in `auth/permissions.ts`
    (`loadCampaignOr403`, `requireCampaignOwner/Admin/Member`,
    `loadCharacterOr403`, `assertWrite`, `requireSuperuser`) are the single
@@ -136,11 +158,14 @@ newer one still gets through.
 4. **Write path + audit.** All DB writes run inside
    `withAudit(actorId, batchId, fn)` (`db/auditContext.ts`), which opens a
    transaction and sets transaction-local `app.actor_id` / `app.batch_id` GUCs
-   so DB triggers can attribute the change. Character writes funnel through the
-   single chokepoint `dispatchOperation()` in `services/syncDispatch.ts`;
-   campaign writes go through their REST routes. Both wrap in `withAudit`.
-5. **Response / propagation.** Sync writes emit WebSocket `sync_invalidate`
-   nudges via `services/wsBus.ts` so other viewers pull sooner.
+   so DB triggers can attribute the change. Sync writes use `dispatchOperation()` in `services/syncDispatch.ts`;
+   character and campaign REST routes also write using shared services and
+   their own handlers. Both paths wrap in `withAudit`.
+   Delegated mutations add a durable idempotency reservation and response in
+   the same outer transaction and set OAuth client/grant audit provenance.
+5. **Response / propagation.** Shared mutation middleware takes pre/post access
+   snapshots and emits post-commit WebSocket `sync_invalidate` nudges for REST
+   and delegated writes so every affected viewer pulls sooner.
 
 ## Data model (Postgres 18)
 

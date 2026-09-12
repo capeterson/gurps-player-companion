@@ -9,9 +9,10 @@
 ## What this is
 
 GURPS Player Companion is a **local-first Progressive Web App** for running
-GURPS 4e player characters, campaigns, and shared campaign content. It is a
-single Bun process that serves the HTTP API, a WebSocket push channel, the
-OpenAPI document, and the React PWA client — all on one origin, one port.
+GURPS 4e player characters, campaigns, shared campaign content, and delegated
+agent access. It is a single Bun process that serves the HTTP API, OAuth and
+MCP, a WebSocket push channel, the OpenAPI document, and the React PWA client —
+all on one origin, one port.
 
 The defining product promise is **edits never disappear**. Every character
 mutation is written to IndexedDB and journaled to a durable outbox *before*
@@ -32,6 +33,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
 | [campaign-content-sharing.md](campaign-content-sharing.md) | Campaigns, roles, invitations, the share gate / minimal view, and the YAML library. |
 | [history-tracking.md](history-tracking.md) | The append-only audit-log subsystem (character + campaign history). |
+| [mcp-agent-access.md](mcp-agent-access.md) | Same-process MCP/OAuth delegation, player API coverage, and parity gates. |
 | [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
 
 The **rules of engagement** (invariants you must not break, and the multi-site
@@ -41,6 +43,16 @@ checklists for extending sync/history) live in
 "Maintaining these docs" below.
 
 ---
+
+## Delegated agent access
+
+[MCP agent access](mcp-agent-access.md) provides remote Streamable HTTP at `/mcp`
+and OAuth delegation on the same app server. Settings lists and revokes connected
+clients, while `/oauth/consent` grants plain-language read/write/manage scopes.
+Every player-domain raw API operation has a stable tool; security, administration,
+replication, and transport endpoints have exact checked-in exclusions. MCP commits
+use the same route graph, validation, authorization, audit, revisions, and
+invalidation behavior as REST.
 
 ## User-facing features
 
@@ -569,7 +581,7 @@ player client.
 
 ```
 src/
-  server/        Bun process — Hono routes, auth, Drizzle, OpenAPI, WS
+  server/        Bun process — Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,
@@ -582,6 +594,10 @@ src/
     auth/        jwt, password, webauthn (passkeys), apiKey, session,
                  middleware, permissions (the authz helpers, incl.
                  tryLoadCampaignRole)
+    oauth/       client configuration sync, PKCE authorization/grants,
+                 opaque token rotation/revocation, discovery + consent routes
+    mcp/         exact operation manifest/catalog, SDK transport, checked
+                 snapshot, and same-process shared-handler executor
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
                  libraryReferences (transactional source authorization for all
                  six character reference types), ownedLibraryMechanics (saved
@@ -678,8 +694,8 @@ contract and the bugs they exist to prevent.
 
 ## Architecture at a glance
 
-- **One process, one origin.** The Bun server hosts HTTP + WebSocket + OpenAPI
-  + static client. Do not split it.
+- **One process, one origin.** The Bun server hosts HTTP + OAuth + MCP +
+  WebSocket + OpenAPI + static client. Do not split it.
 - **Postgres 18 only.** No SQLite, no cross-DB shims. IDs are `uuidv7()`
   server-defaults (the concrete PG18 dependency); the schema also uses
   `GENERATED ALWAYS AS … STORED` columns. `AGENTS.md` frames PG18 as headroom
@@ -744,9 +760,9 @@ Things that repeatedly surprise people working in this repo:
    follow the `AGENTS.md` S6 and H1–H5 checklists end-to-end or you get silent
    data loss.
 
-5. **Two write paths, one audit chokepoint.** Character writes funnel through
-   `dispatchOperation()` in `syncDispatch.ts`; campaign writes go through
-   separate REST routes. Both must run inside `withAudit(...)` so DB triggers
+5. **REST and sync share primitives, not every handler.** Sync writes use
+   `dispatchOperation()` in `syncDispatch.ts`; REST routes also perform writes
+   directly using shared services. Both must run inside `withAudit(...)` so DB triggers
    can attribute the change. History capture sits *below* both via Postgres
    triggers.
 

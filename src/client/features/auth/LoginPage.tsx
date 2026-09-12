@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
 import { getPasskey, passkeysSupported } from '../../lib/passkeys.ts';
 import { type Tokens, tokenStore } from '../../lib/tokenStore.ts';
@@ -10,6 +10,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const candidate = (location.state as { returnTo?: unknown } | null)?.returnTo;
+  const returnTo =
+    typeof candidate === 'string' &&
+    (candidate === '/oauth/consent' || candidate.startsWith('/oauth/consent?'))
+      ? candidate
+      : '/';
 
   const passkeyLogin = useMutation({
     mutationFn: async () => {
@@ -28,7 +35,7 @@ export function LoginPage() {
     },
     onSuccess: (tokens) => {
       tokenStore.write(tokens);
-      navigate('/');
+      navigate(returnTo, { replace: true });
     },
     onError: (err) => {
       setError(
@@ -46,7 +53,7 @@ export function LoginPage() {
       }),
     onSuccess: (tokens) => {
       tokenStore.write(tokens);
-      navigate('/');
+      navigate(returnTo, { replace: true });
     },
     onError: (err) => {
       setError(err instanceof ApiError ? err.message : 'login failed');

@@ -15,6 +15,8 @@ requirement — not optional documentation.**
   LLM) should read it before scanning the tree. The set is:
   - `overview.md` — product surface + codebase map + orientation notes.
   - `architecture.md` — stack, process model, request lifecycle, data model.
+  - `mcp-agent-access.md` — same-process MCP/OAuth subsystem and mandatory
+    raw-API parity acceptance criteria.
   - `offline-sync.md` — the local-first / outbox / cursor / WS system.
   - `campaign-content-sharing.md` — roles, invitations, the share gate /
     minimal view, and the YAML library.
@@ -25,6 +27,10 @@ requirement — not optional documentation.**
 - **These docs describe *what exists*; this file (`AGENTS.md`) prescribes
   *what you must keep true*.** When they disagree with the code, the code is
   the truth and the spec is a bug — fix it.
+- When extending agent access, `mcp-agent-access.md`'s shared-handler,
+  exact API coverage/exclusion, schema, authorization, audit, sync, and CI parity
+  requirements are mandatory. Update mappings, tools, tests and specs together;
+  do not mark MCP complete until its release gates pass.
 - **Update the relevant spec in the same change** whenever you alter:
   user-facing features, the offline-sync architecture, campaign
   content-sharing behaviour, the history subsystem, the codebase layout, or
