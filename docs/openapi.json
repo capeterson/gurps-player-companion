@@ -1541,6 +1541,17 @@
                       "allowGmCharacterEditing": {
                         "type": "boolean"
                       },
+                      "houseRules": {
+                        "type": "object",
+                        "properties": {
+                          "protectNaturalDr": {
+                            "type": "boolean",
+                            "default": true
+                          }
+                        },
+                        "default": {},
+                        "additionalProperties": false
+                      },
                       "members": {
                         "type": "array",
                         "items": {
@@ -1642,6 +1653,16 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 120
+                  },
+                  "houseRules": {
+                    "type": "object",
+                    "properties": {
+                      "protectNaturalDr": {
+                        "type": "boolean",
+                        "default": true
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "description": {
                     "type": "string",
@@ -1756,6 +1777,17 @@
                     },
                     "allowGmCharacterEditing": {
                       "type": "boolean"
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
                     },
                     "members": {
                       "type": "array",
@@ -1930,6 +1962,17 @@
                     "allowGmCharacterEditing": {
                       "type": "boolean"
                     },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -2052,6 +2095,16 @@
                     "minLength": 1,
                     "maxLength": 120
                   },
+                  "houseRules": {
+                    "type": "object",
+                    "properties": {
+                      "protectNaturalDr": {
+                        "type": "boolean",
+                        "default": true
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "description": {
                     "type": "string",
                     "nullable": true,
@@ -2162,6 +2215,17 @@
                     },
                     "allowGmCharacterEditing": {
                       "type": "boolean"
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
                     },
                     "members": {
                       "type": "array",
@@ -2403,6 +2467,17 @@
                     "allowGmCharacterEditing": {
                       "type": "boolean"
                     },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
                     "members": {
                       "type": "array",
                       "items": {
@@ -2616,6 +2691,17 @@
                     },
                     "allowGmCharacterEditing": {
                       "type": "boolean"
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
                     },
                     "members": {
                       "type": "array",
@@ -2884,6 +2970,17 @@
                     },
                     "allowGmCharacterEditing": {
                       "type": "boolean"
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
                     },
                     "members": {
                       "type": "array",
@@ -17498,6 +17595,21 @@
                       "type": "boolean",
                       "default": true
                     },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
                     "libraryEffectsKnown": {
                       "type": "boolean"
                     },
@@ -19410,6 +19522,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },
@@ -21586,6 +21713,21 @@
                       "type": "boolean",
                       "default": true
                     },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
                     "libraryEffectsKnown": {
                       "type": "boolean"
                     },
@@ -23567,6 +23709,21 @@
                       "default": "normal"
                     },
                     "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
                       "type": "boolean",
                       "default": true
                     },
@@ -25819,6 +25976,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },
@@ -28095,6 +28267,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -30029,6 +30216,21 @@
                       "default": "normal"
                     },
                     "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
                       "type": "boolean",
                       "default": true
                     },
@@ -32367,6 +32569,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },
@@ -34728,6 +34945,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -36662,6 +36894,21 @@
                       "default": "normal"
                     },
                     "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
                       "type": "boolean",
                       "default": true
                     },
@@ -38765,6 +39012,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },
@@ -40893,6 +41155,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -42827,6 +43104,21 @@
                       "default": "normal"
                     },
                     "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
                       "type": "boolean",
                       "default": true
                     },
@@ -44875,6 +45167,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },
@@ -46948,6 +47255,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -48882,6 +49204,21 @@
                       "default": "normal"
                     },
                     "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
                       "type": "boolean",
                       "default": true
                     },
@@ -50949,6 +51286,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },
@@ -53040,6 +53392,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -54974,6 +55341,21 @@
                       "default": "normal"
                     },
                     "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
                       "type": "boolean",
                       "default": true
                     },
@@ -57778,6 +58160,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },
@@ -60607,6 +61004,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -62541,6 +62953,21 @@
                       "default": "normal"
                     },
                     "manaLevelKnown": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "houseRules": {
+                      "type": "object",
+                      "properties": {
+                        "protectNaturalDr": {
+                          "type": "boolean",
+                          "default": true
+                        }
+                      },
+                      "default": {},
+                      "additionalProperties": false
+                    },
+                    "houseRulesKnown": {
                       "type": "boolean",
                       "default": true
                     },
@@ -64572,6 +64999,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -66512,6 +66954,21 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
                         "libraryEffectsKnown": {
                           "type": "boolean"
                         },
@@ -68447,6 +68904,21 @@
                           "default": "normal"
                         },
                         "manaLevelKnown": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "houseRules": {
+                          "type": "object",
+                          "properties": {
+                            "protectNaturalDr": {
+                              "type": "boolean",
+                              "default": true
+                            }
+                          },
+                          "default": {},
+                          "additionalProperties": false
+                        },
+                        "houseRulesKnown": {
                           "type": "boolean",
                           "default": true
                         },

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
+import { campaignHouseRules } from './campaign.ts';
 import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 import { effectTarget } from './effects.ts';
@@ -302,6 +303,8 @@ export const characterDetail = z.object({
    * fallback and casting should be held rather than trusted. Always
    * true on server-built details (the server joins the campaign). */
   manaLevelKnown: z.boolean().default(true),
+  houseRules: campaignHouseRules.default({}),
+  houseRulesKnown: z.boolean().default(true),
   /** False when linked owned declarations are missing or unresolved. */
   libraryEffectsKnown: z.boolean().optional(),
   /** Campaign's tech level (Basic Set p. 513); null when campaignless or

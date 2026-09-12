@@ -69,6 +69,7 @@ export function useCharacterDetail(
             disadvantageCap: campaign.disadvantageCap,
             quirkCap: campaign.quirkCap,
             manaLevel: campaign.manaLevel ?? 'normal',
+            ...(campaign.houseRules ? { houseRules: campaign.houseRules } : {}),
             techLevel: campaign.techLevel ?? null,
           }
         : null,

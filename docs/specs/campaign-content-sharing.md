@@ -13,8 +13,28 @@ describes the three sharing mechanisms as they exist today:
 Plus the **adventure log** (per-entry visibility) and **invitations**
 (how people join). Sharing is an **online-only, REST + React-Query** surface —
 none of it flows through the offline outbox (campaigns are pulled read-only
-into Dexie only so the share gate can be evaluated offline). See
+into Dexie for the share gate, campaign names, mana, and house rules). See
 [offline-sync.md](offline-sync.md) S0.
+
+## House rules
+
+Campaign settings include a House rules section, editable by the owner and
+readable by managers. `houseRules.protectNaturalDr` defaults to true for both
+existing and new campaigns. It exempts innate DR (all active `dr` effects,
+including tough skin) and natural skull DR from armor-piercing divisors and
+Ignore DR. Worn armor still divides, rounded down. Turning it off restores
+standard B378/M63 penetration of the full DR total. Fractional divisors below
+1 still increase all protection, with final DR 1 for unprotected targets.
+
+This is an explicit house rule, not an inferred trait-name mechanic. The
+setting saves with the rest of the settings form through owner-only REST,
+with the ordinary campaign audit trigger and cursor revision. A background
+campaign refetch does not overwrite an open settings draft; failed saves
+retain it for retry. Migration 0037 advances existing campaign revisions once
+so pre-upgrade offline mirrors receive the new settings. Character details
+expose the policy and whether it is known; offline combat pauses damage
+application when the campaign or its house rules have not yet been received.
+Campaignless characters use the default-on policy.
 
 ## Membership & roles
 
@@ -364,6 +384,9 @@ mechanism for sharing content between campaigns or seeding a new one.
 - **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
   campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set
   p. 513) alongside `description`/`pointTarget`/`disadvantageCap`/`quirkCap`.
+- **House rules:** optional `campaign.houseRules` shares the campaign schema.
+  Export includes it; opt-in settings import applies it when present. Older
+  files that omit it leave the destination rules unchanged.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. Two modes:
@@ -377,8 +400,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   - Returns per-section `{ created, updated, deleted }` counts.
   - **`applyCampaignSettings`** (boolean, default `false`): opt-in. When
     true and the document carries a `campaign` block, `description`,
-    `pointTarget`, `disadvantageCap`, `quirkCap`, `manaLevel`, and
-    `techLevel` are copied onto the campaigns row — only the fields
+    `pointTarget`, `disadvantageCap`, `quirkCap`, `manaLevel`,
+    `techLevel`, and optional `houseRules` are copied onto the campaigns row —
+    only the fields
     actually present in the
     document (an omitted field leaves the current value alone); `name` is
     never touched by import. The response's `campaignSettingsApplied`

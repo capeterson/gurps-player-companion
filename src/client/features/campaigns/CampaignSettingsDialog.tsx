@@ -10,7 +10,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MANA_LEVELS, MANA_LEVEL_LABELS, type ManaLevel } from '../../../shared/constants/magic.ts';
 import type {
   CampaignMemberOut,
@@ -63,15 +63,25 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   );
   const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets);
   const [allowGmEditing, setAllowGmEditing] = useState(campaign.allowGmCharacterEditing);
+  const [protectNaturalDr, setProtectNaturalDr] = useState(
+    campaign.houseRules?.protectNaturalDr ?? true,
+  );
   const [error, setError] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<CampaignMemberOut | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const editingCampaign = useRef<string | null>(null);
 
   // Each time the dialog opens with a (potentially) new campaign,
   // hydrate the local form state.  Without this, reopening for
   // campaign B would still show campaign A's draft values.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      editingCampaign.current = null;
+      return;
+    }
+    if (editingCampaign.current === campaign.id) return;
+    editingCampaign.current = campaign.id;
     setPointTarget(campaign.pointTarget == null ? '' : String(campaign.pointTarget));
     setDisadCap(campaign.disadvantageCap == null ? '' : String(campaign.disadvantageCap));
     setQuirkCap(campaign.quirkCap == null ? '' : String(campaign.quirkCap));
@@ -79,6 +89,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     setTechLevel(campaign.techLevel == null ? '' : String(campaign.techLevel));
     setShareSheets(campaign.shareCharacterSheets);
     setAllowGmEditing(campaign.allowGmCharacterEditing);
+    setProtectNaturalDr(campaign.houseRules?.protectNaturalDr ?? true);
     setError(null);
   }, [open, campaign]);
 
@@ -147,6 +158,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       techLevel: tl,
       shareCharacterSheets: shareSheets,
       allowGmCharacterEditing: allowGmEditing,
+      houseRules: { protectNaturalDr },
     });
   };
 
@@ -282,6 +294,31 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
               </span>
             </label>
           )}
+
+          <fieldset
+            className="border-t border-base-300 pt-3"
+            disabled={viewerRole !== 'owner' || update.isPending}
+          >
+            <legend className="label-eyebrow">House rules</legend>
+            <label className="cursor-pointer flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm mt-0.5"
+                checked={protectNaturalDr}
+                onChange={(e) => setProtectNaturalDr(e.target.checked)}
+              />
+              <span>
+                <span className="block text-sm font-medium">
+                  Armor penetration leaves natural DR intact
+                </span>
+                <span className="block text-xs text-base-content/60">
+                  On by default. Armor-piercing divisors and Ignore DR reduce worn armor only;
+                  innate DR (including tough skin) and skull DR remain intact. Turn off for standard
+                  GURPS rules. Fractional divisors below 1 still increase all DR.
+                </span>
+              </span>
+            </label>
+          </fieldset>
 
           {error && <p className="alert alert-error text-sm">{error}</p>}
 

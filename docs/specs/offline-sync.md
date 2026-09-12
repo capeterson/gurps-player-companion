@@ -640,3 +640,14 @@ checklist **H1–H5** (`AGENTS.md`), then add the S11 test suite (success,
 rejection, slow same-field follow-up, slow different-field follow-up,
 stale-field cursor preservation). The `useDraftField`, `outbox`, and
 orchestrator test files are the working references.
+
+
+### Campaign house rules
+
+The read-only campaign mirror also carries `houseRules` for combat resolution.
+No new outbox class or store is involved. Migration 0037 advances each existing
+campaign revision once so clients with an old cursor receive the default-on
+natural-DR policy. `buildCharacterDetail` marks missing campaign settings as
+`houseRulesKnown: false`; the armor map and damage dialog hold calculations
+until settings are available. Known settings survive reopening offline and
+update reactively in player and GM views when the campaign cursor changes.

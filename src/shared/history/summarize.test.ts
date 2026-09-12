@@ -881,3 +881,14 @@ describe('groupIntoBatches', () => {
     expect(groups).toHaveLength(2);
   });
 });
+
+it('summarizes a campaign house rule change from DB history', () => {
+  expect(
+    summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { house_rules: { protectNaturalDr: true } },
+      newRow: { house_rules: { protectNaturalDr: false } },
+    }).summary,
+  ).toBe('Natural DR penetration immunity disabled (house rule)');
+});

@@ -5,7 +5,7 @@
  *
  * Deliberately partial, matching `damageParse.ts`'s lenient-by-contract
  * stance: the B379 core table plus the high-traffic location overrides
- * (skull/eye ×4, vitals ×3 for imp/pi, neck cr/cut, limb & extremity
+ * (skull/eye ×4, vitals ×3 for imp/pi, neck cr/cut/cor, face cor, limb & extremity
  * caps), with an explicit tight-beam burning selection (vitals ×2).
  * The supplied effective DR map includes innate and natural skull DR
  * (B46/B400). Not modeled: huge-piercing vs
@@ -16,14 +16,19 @@
  * Pure TS (shared domain) — runs in Bun, browser, and service worker.
  */
 
-import type { DrByLocationMap } from './armorDr.ts';
+import type { DrByLocation, DrByLocationMap } from './armorDr.ts';
 import { resolveDr } from './armorDr.ts';
 
 const LIMB_LOCATIONS = new Set(['arm_left', 'arm_right', 'leg_left', 'leg_right']);
 const EXTREMITY_LOCATIONS = new Set(['hand_left', 'hand_right', 'foot_left', 'foot_right']);
 
 function normalizeType(type: string | null): string {
-  return type?.trim().toLowerCase() ?? '';
+  const normalized = type?.trim().toLowerCase() ?? '';
+  return (
+    ({ pi_minus: 'pi-', pi_plus: 'pi+', pi_pp: 'pi++', corr: 'cor' } as Record<string, string>)[
+      normalized
+    ] ?? normalized
+  );
 }
 
 /** Base wounding multiplier by damage type (B379). Unknown types → 1. */
@@ -62,11 +67,12 @@ export function woundingMultiplier(type: string | null, location: string): numbe
     return 3;
   }
   if (location === 'vitals' && t === 'burn_tight') return 2;
-  // Neck: crushing ×1.5, cutting ×2 (B399).
+  // Neck: crushing/corrosion ×1.5, cutting ×2 (B399).
   if (location === 'neck') {
-    if (t === 'cr') return 1.5;
+    if (t === 'cr' || t === 'cor') return 1.5;
     if (t === 'cut') return 2;
   }
+  if (location === 'face' && t === 'cor') return 1.5;
   // Limbs and extremities: imp / pi+ / pi++ capped at ×1 (B399).
   if (LIMB_LOCATIONS.has(location) || EXTREMITY_LOCATIONS.has(location)) {
     if (t === 'imp' || t === 'pi+' || t === 'pi++') return 1;
@@ -97,7 +103,32 @@ export function parseArmorDivisor(raw: string | null | undefined): number | null
 /** One DR adjustment for the armor map and incoming damage. Infinity bypasses DR. */
 export function drAfterDivisor(dr: number, armorDivisor: string | null | undefined): number {
   const divisor = parseArmorDivisor(armorDivisor);
+  // B110/B379: a target with DR 0 gets DR 1 against a fractional
+  // divisor. This is the final protection, not DR 1 multiplied again.
+  if (divisor != null && divisor < 1 && dr === 0) return 1;
   return divisor != null ? Math.floor(dr / divisor) : dr;
+}
+
+/** Natural DR is exempt from penetration only when the campaign house rule is on.
+ * Apply the divisor once to the affected subtotal, then restore exempt protection.
+ * Fractional divisors below 1 still increase the complete protection (B379).
+ */
+export function effectiveDrAgainstAttack(
+  type: string | null,
+  entry: DrByLocation | undefined,
+  armorDivisor: string | null | undefined,
+  protectNaturalDr = false,
+): number {
+  const total = resolveDr(type, entry);
+  const divisor = parseArmorDivisor(armorDivisor);
+  if (!protectNaturalDr || divisor == null || divisor <= 1) {
+    return drAfterDivisor(total, armorDivisor);
+  }
+  const natural = Math.min(
+    total,
+    normalizeType(type) === 'tox' ? (entry?.naturalDr?.tox ?? 0) : (entry?.naturalDr?.dr ?? 0),
+  );
+  return drAfterDivisor(total - natural, armorDivisor) + natural;
 }
 
 export interface DamageApplication {
@@ -105,7 +136,8 @@ export interface DamageApplication {
    *  plus the skull's natural DR 2 (B400) when the location is 'skull'. */
   readonly drAtLocation: number;
   /** DR after the armor divisor: floor(dr / divisor). A fractional
-   *  divisor like (0.5) *increases* effective DR (B102). */
+   *  divisor like (0.5) *increases* effective DR (B110/B379).
+   *  The campaign house rule may exempt natural DR from penetration. */
   readonly effectiveDr: number;
   readonly penetrating: number;
   readonly multiplier: number;
@@ -130,11 +162,12 @@ export function applyDamage(
   drMap: DrByLocationMap,
   armorDivisor: string | null | undefined,
   maxHp: number,
+  protectNaturalDr = false,
 ): DamageApplication {
   const entry = drMap.get(location);
   const drAtLocation = resolveDr(type, entry);
 
-  const effectiveDr = drAfterDivisor(drAtLocation, armorDivisor);
+  const effectiveDr = effectiveDrAgainstAttack(type, entry, armorDivisor, protectNaturalDr);
 
   const penetrating = Math.max(0, basic - effectiveDr);
   const multiplier = woundingMultiplier(type, location);

@@ -187,6 +187,7 @@ router.openapi(
         disadvantageCap: campaign.disadvantageCap ?? undefined,
         quirkCap: campaign.quirkCap ?? undefined,
         manaLevel: campaign.manaLevel,
+        houseRules: campaign.houseRules,
         techLevel: campaign.techLevel ?? undefined,
       },
       traits: traits.map(traitEntity.rowToCreate),
@@ -264,8 +265,15 @@ router.openapi(
     // the whole import, matching the "invalid document" contract.
     let campaignSettings: Record<string, unknown> | null = null;
     if (applyCampaignSettings && doc.campaign) {
-      const { description, pointTarget, disadvantageCap, quirkCap, manaLevel, techLevel } =
-        doc.campaign;
+      const {
+        description,
+        pointTarget,
+        disadvantageCap,
+        quirkCap,
+        manaLevel,
+        techLevel,
+        houseRules,
+      } = doc.campaign;
       const checked = campaignUpdate.safeParse({
         description,
         pointTarget,
@@ -273,6 +281,7 @@ router.openapi(
         quirkCap,
         manaLevel,
         techLevel,
+        houseRules,
       });
       if (!checked.success) {
         throw new HTTPException(400, {

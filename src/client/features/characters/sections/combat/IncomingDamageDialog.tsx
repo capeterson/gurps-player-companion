@@ -49,7 +49,9 @@ export function IncomingDamageDialog({
   const [customDivisor, setCustomDivisor] = useState(
     !ARMOR_DIVISORS.some(([value]) => value === initialDivisor),
   );
-  const effectsKnown = character.libraryEffectsKnown !== false;
+  const effectsKnown =
+    character.libraryEffectsKnown !== false && character.houseRulesKnown !== false;
+  const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
 
   const drMap = useMemo(
     () => effectiveDrByLocation(character.inventory, character.effects),
@@ -68,7 +70,15 @@ export function IncomingDamageDialog({
   const validDivisor = !divisorRaw.trim() || parseArmorDivisor(divisorRaw) != null;
   const fatigueType = type.trim().toLowerCase() === 'fat';
   const valid = validBasic && validDivisor && !fatigueType;
-  const result = applyDamage(basic, type, location, drMap, divisorRaw.trim() || null, hpMax);
+  const result = applyDamage(
+    basic,
+    type,
+    location,
+    drMap,
+    divisorRaw.trim() || null,
+    hpMax,
+    protectNaturalDr,
+  );
   const cripplingHint = result.destroyed
     ? `Pre-cap injury is at least twice the crippling threshold: the body part is destroyed${type.trim().toLowerCase() === 'cut' ? ' (severed by cutting damage)' : ''}. Apply the condition manually (B421).`
     : result.crippled
@@ -83,13 +93,17 @@ export function IncomingDamageDialog({
   }
 
   const divisorText =
-    divisorRaw === 'ignore'
-      ? ' (bypassed)'
-      : result.effectiveDr !== result.drAtLocation
-        ? `/${divisorRaw.trim()}`
-        : '';
+    protectNaturalDr && (parseArmorDivisor(divisorRaw) ?? 1) > 1
+      ? ' (armor penetration; natural DR unchanged)'
+      : result.drAtLocation === 0 && result.effectiveDr === 1
+        ? ' (unprotected target: DR 1, B379)'
+        : parseArmorDivisor(divisorRaw) === Number.POSITIVE_INFINITY
+          ? ' (bypassed)'
+          : result.effectiveDr !== result.drAtLocation
+            ? `/${divisorRaw.trim()}`
+            : '';
   const breakdown = !effectsKnown
-    ? 'Linked library effects are unavailable. Reconnect and load them before applying damage.'
+    ? 'Linked library effects or campaign house rules are unavailable. Reconnect and load them before applying damage.'
     : basic > 0
       ? `${basic} ${type} − DR ${result.drAtLocation}${divisorText}${
           divisorText ? `=${result.effectiveDr}` : ''

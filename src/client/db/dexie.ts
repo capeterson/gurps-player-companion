@@ -223,6 +223,7 @@ export interface LocalCampaign {
   quirkCap: number | null;
   /** Optional: rows synced before the mana column existed lack it;
    * readers default missing values to 'normal'. */
+  houseRules?: import('../../shared/schemas/campaign.ts').CampaignHouseRules;
   manaLevel?: 'none' | 'low' | 'normal' | 'high' | 'very_high';
   /** Optional: rows synced before the tech-level column existed lack it;
    * readers default missing values to `null`. */

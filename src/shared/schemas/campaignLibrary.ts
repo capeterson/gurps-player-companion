@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
+import { campaignHouseRules } from './campaign.ts';
 import { timestamps, uuid } from './common.ts';
 import { traitEffect } from './effects.ts';
 import {
@@ -354,6 +355,7 @@ export const libraryYamlDoc = z.object({
       quirkCap: z.number().int().nullable().optional(),
       /** Ambient mana level (Basic Set p. 235); reuses the campaign schema's enum. */
       manaLevel: z.enum(MANA_LEVELS).optional(),
+      houseRules: campaignHouseRules.optional(),
       /** Campaign-wide tech level (Basic Set p. 513). */
       techLevel: z.number().int().min(0).max(12).nullable().optional(),
     })

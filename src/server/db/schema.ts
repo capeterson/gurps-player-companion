@@ -29,6 +29,7 @@ import {
 // and the wire contract can't drift apart.  The catalog of jsonb
 // columns and their owning schemas lives in docs/specs/json-fields.md.
 import type { XpAward } from '../../shared/schemas/adventureLog.ts';
+import type { CampaignHouseRules } from '../../shared/schemas/campaign.ts';
 import type { StyleTechniqueRef } from '../../shared/schemas/campaignLibrary.ts';
 import type { TempEffect } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
@@ -258,6 +259,10 @@ export const campaigns = pgTable('campaigns', {
   pointTarget: integer('point_target'),
   disadvantageCap: integer('disadvantage_cap'),
   quirkCap: integer('quirk_cap').default(5),
+  houseRules: jsonb('house_rules')
+    .$type<CampaignHouseRules>()
+    .notNull()
+    .default(sql`'{"protectNaturalDr":true}'::jsonb`),
   /** Ambient mana level (Basic Set p. 235); folded into spell math. */
   manaLevel: varchar('mana_level', {
     length: 12,

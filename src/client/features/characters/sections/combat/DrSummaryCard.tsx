@@ -5,9 +5,14 @@ import {
   aggregateDrByLocation,
   armorCoversLocation,
   effectiveDrByLocation,
+  innateDrCoversLocation,
+  naturalSkullDr,
   resolveDr,
 } from '../../../../../shared/domain/armorDr.ts';
-import { drAfterDivisor, woundingMultiplier } from '../../../../../shared/domain/injuryCalc.ts';
+import {
+  effectiveDrAgainstAttack,
+  woundingMultiplier,
+} from '../../../../../shared/domain/injuryCalc.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
 import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
@@ -26,11 +31,12 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
   const [type, setType] = useState('cr');
   const [divisor, setDivisor] = useState('');
   const [damageOpen, setDamageOpen] = useState(false);
-  const known = character.libraryEffectsKnown !== false;
+  const known = character.libraryEffectsKnown !== false && character.houseRulesKnown !== false;
+  const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
   const map = known ? effectiveDrByLocation(character.inventory, character.effects) : new Map();
   const custom = [...map.keys()].filter((loc) => !HIT_LOCATIONS.includes(loc as never));
   const dr = resolveDr(type, map.get(location));
-  const effective = drAfterDivisor(dr, divisor);
+  const effective = effectiveDrAgainstAttack(type, map.get(location), divisor, protectNaturalDr);
   const multiplier = woundingMultiplier(type, location);
   const layers = known
     ? character.inventory.filter(
@@ -44,7 +50,7 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
           (effect) =>
             effect.active &&
             effect.target === 'dr' &&
-            (effect.hitLocation ? effect.hitLocation === location : location !== 'eye'),
+            innateDrCoversLocation(effect.hitLocation, location),
         )
         .reduce((sum, effect) => sum + effect.value, 0)
     : 0;
@@ -59,7 +65,7 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
       </div>
       {!known && (
         <output className="text-sm text-warning">
-          DR unavailable: linked library effects have not loaded.
+          DR unavailable: linked library effects or campaign house rules have not loaded.
         </output>
       )}
       <div className="armor-workspace">
@@ -68,6 +74,7 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
           type={type}
           divisor={divisor}
           known={known}
+          protectNaturalDr={protectNaturalDr}
           selected={location}
           onSelect={setLocation}
         />
@@ -128,10 +135,16 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
             </div>
             {known && divisor && (
               <p className="text-xs text-muted mt-2">
-                {divisor === 'ignore' ? `${dr} DR bypassed` : `${dr} DR ÷ ${divisor}, rounded down`}{' '}
-                → {effective} effective DR
+                {dr === 0 && effective === 1
+                  ? 'Unprotected target: DR 1 against a fractional divisor (B379).'
+                  : `Before penetration: ${dr} DR. After penetration: ${effective} DR.`}
               </p>
             )}
+            <p className="text-xs text-muted mt-2">
+              {protectNaturalDr
+                ? 'House rule: armor penetration leaves innate and skull DR intact.'
+                : 'Standard rules: armor penetration also reduces innate and skull DR.'}
+            </p>
             <p className="text-sm mt-3">
               Penetrating damage × <strong className="num">{multiplier}</strong> injury
             </p>
@@ -158,16 +171,18 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
                     <span className="num">{innate} DR</span>
                   </li>
                 )}
-                {location === 'skull' && (
+                {location === 'skull' && naturalSkullDr(type) > 0 && (
                   <li className="flex justify-between gap-3 py-2">
                     <span>Natural skull protection</span>
                     <span className="num">2 DR</span>
                   </li>
                 )}
               </ul>
-              {layers.length === 0 && innate === 0 && location !== 'skull' && (
-                <p className="text-sm text-muted">No protection at this location.</p>
-              )}
+              {layers.length === 0 &&
+                innate === 0 &&
+                (location !== 'skull' || naturalSkullDr(type) === 0) && (
+                  <p className="text-sm text-muted">No protection at this location.</p>
+                )}
             </div>
           )}
           <p className="text-xs text-muted">

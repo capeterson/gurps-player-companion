@@ -66,6 +66,8 @@ const EMPTY_TYPED_DR: TypedDrTotals = {
 };
 
 export interface DrByLocation {
+  /** Innate and skull contribution retained separately for campaign penetration rules. */
+  readonly naturalDr?: { readonly dr: number; readonly tox: number };
   /** Total DR for this location across all equipped armor. */
   readonly dr: number;
   /** Total crushing-specific DR, or null when no item overrides it for this location. */
@@ -124,6 +126,18 @@ export function aggregateDrByLocation(items: readonly ArmorItemRow[]): DrByLocat
   return map;
 }
 
+/** Partial torso DR includes the vital organs (B47), just as torso armor does. */
+export function innateDrCoversLocation(hitLocation: string | undefined, location: string): boolean {
+  return hitLocation
+    ? hitLocation === location || (hitLocation === 'torso' && location === 'vitals')
+    : location !== 'eye';
+}
+
+/** The skull's extra DR and injury effects do not apply to toxic damage (B399). */
+export function naturalSkullDr(type: string | null | undefined): number {
+  return type?.trim().toLowerCase() === 'tox' ? 0 : 2;
+}
+
 /** Complete protection for the readout and damage resolver (B46/B400).
  * Unscoped innate DR excludes eyes; an explicit eye declaration can cover them.
  * Location declarations retain their exact schema keys, including custom locations.
@@ -143,10 +157,7 @@ export function effectiveDrByLocation(
   for (const location of locations) {
     const innate = drEffects.reduce(
       (sum, effect) =>
-        sum +
-        ((effect.hitLocation ? effect.hitLocation === location : location !== 'eye')
-          ? effect.value
-          : 0),
+        sum + (innateDrCoversLocation(effect.hitLocation, location) ? effect.value : 0),
       0,
     );
     const extra = innate + (location === 'skull' ? 2 : 0);
@@ -154,9 +165,11 @@ export function effectiveDrByLocation(
     if (!armor && extra === 0) continue;
     const typedDr = { ...EMPTY_TYPED_DR };
     for (const key of Object.keys(typedDr) as (keyof TypedDrTotals)[]) {
-      typedDr[key] = Math.max(0, (armor?.typedDr[key] ?? 0) + extra);
+      const natural = location === 'skull' ? naturalSkullDr(key) : 0;
+      typedDr[key] = Math.max(0, (armor?.typedDr[key] ?? 0) + innate + natural);
     }
     map.set(location, {
+      naturalDr: { dr: Math.max(0, extra), tox: Math.max(0, innate) },
       dr: Math.max(0, (armor?.dr ?? 0) + extra),
       drCrushing: armor?.drCrushing == null ? null : Math.max(0, armor.drCrushing + extra),
       typedDr,
