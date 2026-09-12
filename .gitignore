@@ -115,6 +115,9 @@ dist
 # Claude Code local config (preview launch configs, worktrees, etc.)
 .claude/
 
+# Hermes local agent state
+.hermes/
+
 # Playwright artifacts
 /test-results/
 /playwright-report/
