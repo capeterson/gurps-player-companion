@@ -135,6 +135,37 @@ describe('api refresh-on-401', () => {
     expect(tokenStore.read()).toMatchObject({ accessToken: 'access-2' });
   });
 
+  it('reuses the same rotation request id after a lost refresh response', async () => {
+    seedTokens();
+    const requestIds: string[] = [];
+    let refreshAttempts = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (String(url).includes('/auth/refresh')) {
+          refreshAttempts += 1;
+          const body = JSON.parse(String(init?.body)) as { requestId: string };
+          requestIds.push(body.requestId);
+          if (refreshAttempts === 1) throw new TypeError('response connection dropped');
+          return jsonResponse(200, {
+            accessToken: 'access-2',
+            refreshToken: 'refresh-2',
+            accessTokenExpiresIn: 3600,
+          });
+        }
+        const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
+        return auth === 'Bearer access-2'
+          ? jsonResponse(200, { ok: true })
+          : jsonResponse(401, { error: 'token expired' });
+      }),
+    );
+
+    await expect(api('/characters')).rejects.toThrow('response connection dropped');
+    await expect(api('/characters')).resolves.toEqual({ ok: true });
+    expect(requestIds).toHaveLength(2);
+    expect(requestIds[1]).toBe(requestIds[0]);
+  });
+
   it('does not restore an old session when its refresh completes after account switching', async () => {
     seedTokens();
     let releaseRefresh!: (response: Response) => void;

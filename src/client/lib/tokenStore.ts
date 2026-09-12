@@ -19,6 +19,8 @@ export interface TokenSnapshot extends Tokens {
   readonly sessionId: string;
   /** Increments when that session rotates its token pair. */
   readonly version: number;
+  /** Reused for every attempt to rotate the current refresh token. */
+  readonly refreshRequestId: string;
 }
 
 type TokenStoreListener = (snapshot: TokenSnapshot | null) => void;
@@ -56,6 +58,11 @@ function parseStoredPair(raw: string | null): TokenSnapshot | null {
     ) {
       return null;
     }
+    if (typeof value.refreshRequestId !== 'string') {
+      const upgraded = { ...value, refreshRequestId: newSessionId() } as TokenSnapshot;
+      window.localStorage.setItem(TOKEN_PAIR_KEY, JSON.stringify(upgraded));
+      return upgraded;
+    }
     return value as TokenSnapshot;
   } catch {
     return null;
@@ -88,13 +95,19 @@ export const tokenStore = {
       accessTokenExpiresIn: 0,
       sessionId: newSessionId(),
       version: 0,
+      refreshRequestId: newSessionId(),
     };
     persist(migrated);
     return migrated;
   },
   write(tokens: Tokens): void {
     if (typeof window === 'undefined') return;
-    persist({ ...tokens, sessionId: newSessionId(), version: 0 });
+    persist({
+      ...tokens,
+      sessionId: newSessionId(),
+      version: 0,
+      refreshRequestId: newSessionId(),
+    });
   },
   /** Replace a rotated pair only if the session that requested it still owns storage. */
   replaceIfCurrent(expected: TokenSnapshot, tokens: Tokens): boolean {
@@ -108,7 +121,12 @@ export const tokenStore = {
     ) {
       return false;
     }
-    persist({ ...tokens, sessionId: current.sessionId, version: current.version + 1 });
+    persist({
+      ...tokens,
+      sessionId: current.sessionId,
+      version: current.version + 1,
+      refreshRequestId: newSessionId(),
+    });
     return true;
   },
   isCurrent(expected: Pick<TokenSnapshot, 'sessionId' | 'version'>): boolean {

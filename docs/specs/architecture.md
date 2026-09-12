@@ -178,7 +178,10 @@ Tables (grouped):
   JWT. Refresh rotation preserves the original primary-authentication time;
   passkey and API-key creation require that time to be no more than ten minutes
   old. Recovery revokes API keys and removes passkeys, leaving the new password
-  as the account's sole credential.
+  as the account's sole credential. Refresh rows form token families. Rotation
+  consumes the parent and inserts one descendant atomically; the same client
+  request id can recover a lost response for 30 seconds, while conflicting or
+  late reuse revokes every still-active token in the family.
 - **Campaigns**: `campaigns`, `campaign_memberships`, `campaign_invitations`,
   `notifications`.
 - **Characters (sync-backed)**: `characters`, `character_traits`,

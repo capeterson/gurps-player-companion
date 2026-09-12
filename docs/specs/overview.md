@@ -56,7 +56,9 @@ checklists for extending sync/history) live in
 - JWT access tokens + rotating refresh tokens. Password changes and recovery
   advance a server-checked authentication version so every older JWT is rejected;
   recovery also revokes API keys and removes passkeys. Creating a new passkey or
-  API key requires a primary sign-in within the last ten minutes.
+  API key requires a primary sign-in within the last ten minutes. Refresh
+  replacement is transactional and supports a bounded idempotent retry after a
+  lost response.
 - **Account suspension**: a suspended user is bounced to `/suspended`; admins
   can suspend / unsuspend / schedule purge.
 

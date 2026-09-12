@@ -248,6 +248,11 @@ new account's credentials. Refresh rotation is serialized across tabs with the
 Web Locks API. A waiter re-reads storage after acquiring the lock and reuses a
 newer pair already written by the winner instead of replaying the consumed
 refresh token; browsers without Web Locks still serialize callers in one tab.
+Each stored refresh token also owns a stable rotation request id. The server
+locks the parent, inserts its sole live descendant, and records consumption in
+one transaction. A lost response may recover that exact descendant with the
+same request id for 30 seconds; any different or later reuse revokes the whole
+token family. A failed replacement insert rolls the consume back with it.
 
 `refreshTokens()` in `src/client/lib/api.ts` clears the token store **only** on
 a `401`/`403` from `/auth/refresh` — a definitive rejection of the refresh

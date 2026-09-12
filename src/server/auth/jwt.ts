@@ -44,14 +44,17 @@ export async function signRefreshToken(
   jti: string,
   authVersion = 0,
   authTime = Math.floor(Date.now() / 1000),
+  issuedAt = Math.floor(Date.now() / 1000),
+  fixedExpiresAt?: Date,
 ): Promise<{ token: string; expiresAt: Date }> {
   const { jwtRefreshTtlDays } = loadConfig();
-  const expiresAt = new Date(Date.now() + jwtRefreshTtlDays * 24 * 60 * 60 * 1000);
+  const expiresAt =
+    fixedExpiresAt ?? new Date(issuedAt * 1000 + jwtRefreshTtlDays * 24 * 60 * 60 * 1000);
   const token = await new SignJWT({ type: 'refresh', jti, av: authVersion, auth_time: authTime })
     .setProtectedHeader({ alg: ALGORITHM })
     .setSubject(userId)
-    .setIssuedAt()
-    .setExpirationTime(`${jwtRefreshTtlDays}d`)
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
     .sign(secretKey());
   return { token, expiresAt };
 }

@@ -80,7 +80,10 @@ async function refreshTokens(origin: TokenSnapshot): Promise<RefreshResult> {
           res = await fetch(`${API_ROOT}/auth/refresh`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ refreshToken: current.refreshToken }),
+            body: JSON.stringify({
+              refreshToken: current.refreshToken,
+              requestId: current.refreshRequestId,
+            }),
           });
         } catch (cause) {
           // Transport failure (offline, DNS, dropped connection).  The

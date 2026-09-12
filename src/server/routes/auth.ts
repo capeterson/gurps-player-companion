@@ -28,7 +28,7 @@ import {
   AuthError,
   hasRecentAuthentication,
   resolveAuthHeader,
-  verifyAndConsumeRefreshToken,
+  rotateRefreshToken,
 } from '../auth/session.ts';
 import {
   consumeChallenge,
@@ -65,6 +65,7 @@ async function issueTokenPair(userId: string, authenticatedAt = Math.floor(Date.
   await getDb().insert(refreshTokens).values({
     userId,
     jti,
+    familyId: randomUUID(),
     expiresAt: refresh.expiresAt,
   });
   return {
@@ -497,9 +498,20 @@ router.openapi(
   async (c) => {
     const body = c.req.valid('json');
     try {
-      const { user } = await verifyAndConsumeRefreshToken(body.refreshToken);
-      const tokens = await issueTokenPair(user.id, user.authenticatedAt ?? undefined);
-      return c.json(tokens, 200);
+      const rotation = await rotateRefreshToken(body.refreshToken, body.requestId ?? randomUUID());
+      const access = await signAccessToken(
+        rotation.user.id,
+        rotation.user.authVersion,
+        rotation.user.authenticatedAt ?? undefined,
+      );
+      return c.json(
+        {
+          accessToken: access.token,
+          accessTokenExpiresIn: access.expiresInSeconds,
+          refreshToken: rotation.refreshToken,
+        },
+        200,
+      );
     } catch (err) {
       if (err instanceof AuthError) {
         throw new HTTPException(401, { message: err.code });
