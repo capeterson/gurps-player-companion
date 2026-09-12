@@ -63,8 +63,8 @@ Implemented modules:
 |---|---|
 | AUTH-1 | Authorization-code flow with PKCE S256 for public clients. Login and consent happen on GPC using existing password/passkey authentication; agents never receive player passwords, app refresh tokens, or newly minted API keys. Require recent primary authentication when approving a new grant. |
 | AUTH-2 | Publish `/.well-known/oauth-protected-resource/mcp` with the canonical `/mcp` resource and authorization server, and `/.well-known/oauth-authorization-server` with issuer, authorization/token endpoints, scopes, and PKCE support. Unauthenticated MCP requests return 401 with a discoverable `WWW-Authenticate` challenge. Canonical URLs come from trusted deployment configuration, never arbitrary Host/forwarded headers. |
-| AUTH-3 | Provide `/oauth/authorize`, `/oauth/token`, and `/oauth/revoke`. Bind one-time, short-lived codes to player, client, exact redirect URI, PKCE challenge, granted scopes, and resource. Validate the requested resource at authorization and token exchange; reject a mismatched audience on MCP calls. Protect browser consent against CSRF, preserve client state, and reject unregistered redirects before redirecting anywhere. No implicit or password grant. |
-| AUTH-4 | Support pre-registered clients initially; document registration/setup for supported clients. Client ID Metadata Documents are the intended extension for clients without prior registration; enabling them requires SSRF-safe fetches, redirect/DNS/private-network defenses, bounded responses, and metadata validation tests. Dynamic registration is optional and must not be advertised until implemented. |
+| AUTH-3 | Provide `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, and `/oauth/register`. Bind one-time, short-lived codes to player, client, exact redirect URI, PKCE challenge, granted scopes, and resource. Validate the requested resource at authorization and token exchange; reject a mismatched audience on MCP calls. Protect browser consent against CSRF, preserve client state, and reject unregistered redirects before redirecting anywhere. No implicit or password grant. |
+| AUTH-4 | Support Client ID Metadata Documents (CIMD), Dynamic Client Registration (DCR), and optional operator-configured clients. Advertise CIMD and DCR in authorization-server metadata so standards-compatible public clients need no per-client server configuration. Resolve CIMD only from public HTTPS port 443 with pinned public DNS, no redirects, bounded/time-limited JSON responses, exact client-ID and redirect validation, and a capped cache. DCR accepts only public clients using authorization code + PKCE and safe HTTPS or loopback callbacks; it is body/rate limited and returns no client secret. |
 | AUTH-5 | Issue separate short-lived, audience-bound OAuth access tokens and rotating refresh tokens. Persist grants and token-family state in Postgres; store opaque token/code secrets only as hashes. Check revocation, user suspension/deletion, authentication version, and current permissions on every call. Password change/recovery invalidates delegated sessions too. Refresh cannot widen scope or change resource/client; replay revokes the family. |
 | AUTH-6 | Settings lists connected clients, scopes, creation/last-use time, and a revoke action. Revocation invalidates the entire grant, including outstanding access and refresh tokens, on the next request. Ordinary app logout clears local account state but leaves explicitly approved grants; show this distinction to players. Account recovery revokes all grants. |
 | AUTH-7 | Effective authority is the intersection of the user's current GPC permissions and granted scopes. No client-selected actor ID, impersonation, superuser elevation, or scope bypass through REST/sync. OAuth tokens for `/mcp` are rejected by existing app-session/API-key endpoints; shared handlers receive a trusted actor context rather than a forwarded token. |
@@ -81,8 +81,10 @@ instance administration are outside the agent surface even for superusers.
 
 Clients, grants, authorization codes, and refresh families persist with expiry,
 revocation and cleanup rules. Expired request, code, access, and refresh rows are
-pruned opportunistically at most once per minute; grants remain for explicit
-revocation and history provenance. New tables use PG18 migrations and server-default
+pruned opportunistically at most once per minute; unused DCR registrations older
+than 24 hours are also pruned, while granted clients remain for explicit revocation
+and history provenance. CIMD registrations refresh after their bounded metadata
+cache expires. New tables use PG18 migrations and server-default
 UUIDs. Every persisted JSON field needs its shared Zod schema, Drizzle `$type`,
 write-boundary validation, and a row in [json-fields.md](json-fields.md).
 Never store credentials in entity history, tool results, or diagnostic logs.
@@ -221,16 +223,27 @@ OAuth audit provenance, ownership/privacy and field-refinement errors.
 ## Client registration and operations
 
 Standards-compatible MCP clients that support Streamable HTTP, OAuth discovery,
-authorization code, PKCE S256, and bearer protected resources are supported when
-pre-registered through `OAUTH_CLIENTS`, a JSON array of `{clientId,
-name, redirectUris, scopes}`. Configuration is authoritative: removing a client
-disables it and its tokens on the next OAuth/token/MCP check, and narrowing its
-allowed scopes invalidates older broader tokens. Redirect URIs match exactly,
-use HTTPS or HTTP on a loopback host, and reject credentials or fragments.
-Public clients use authorization code with PKCE S256 and no secret. Browser
-clients also list their origin in `CORS_ORIGINS`; discovery, token, revoke, and
-MCP preflights are served without credentials.
-Dynamic registration and Client ID Metadata Documents are not advertised.
+authorization code, PKCE S256, and bearer protected resources need only the
+`/mcp` URL. Authorization-server discovery advertises both
+`client_id_metadata_document_supported: true` and `/oauth/register`:
+
+- ChatGPT can identify itself with its HTTPS Client ID Metadata Document. GPC
+  fetches and validates that document on first authorization and caches the
+  resulting public-client registration for at most one hour.
+- Claude and other DCR clients can register their callback automatically at
+  `/oauth/register`. GPC creates an opaque public client ID and never issues a
+  client secret.
+
+`OAUTH_CLIENTS` remains an optional compatibility and operator-control mechanism,
+not a setup requirement. Its JSON shape is `{clientId, name, redirectUris,
+scopes}`. Configuration is authoritative only for entries registered by that
+mechanism: removing one disables it and its tokens on the next OAuth/token/MCP
+check, and narrowing its scopes invalidates older broader tokens. It never
+disables CIMD or DCR registrations. All redirect URIs match exactly, use HTTPS
+or HTTP on a loopback host, and reject credentials or fragments. Public clients
+use authorization code with PKCE S256 and no secret. Direct browser clients must
+also list their origin in `CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth
+requests do not require a CORS entry.
 
 Client setup uses the `/mcp` resource URL. Discovery supplies the authorization
 server and endpoints. The client sends its registered ID, exact callback,
@@ -255,8 +268,9 @@ The implementation is released only with evidence for these gates:
 
 1. Extract shared operations, define exact coverage/exclusions and scopes, and
    establish parity CI against the current raw API.
-2. Add OAuth migrations, metadata, browser consent/connected-app UI and token
-   validation. Exercise code expiry/reuse, PKCE, wrong redirect/client/resource,
+2. Add OAuth migrations, metadata, CIMD/DCR registration, browser
+   consent/connected-app UI and token validation. Exercise metadata SSRF bounds,
+   DCR-to-token flow, code expiry/reuse, PKCE, wrong redirect/client/resource,
    consent denial, insufficient scope, refresh replay and immediate revocation.
 3. Mount the MCP transport and cover every included operation. Validate production
    and development paths, proxy headers, non-HTML discovery/error responses,

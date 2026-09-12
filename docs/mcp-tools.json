@@ -27,6 +27,12 @@
     },
     {
       "kind": "excluded",
+      "method": "POST",
+      "path": "/oauth/register",
+      "reason": "OAuth client-registration infrastructure"
+    },
+    {
+      "kind": "excluded",
       "method": "GET",
       "path": "/oauth/authorize",
       "reason": "OAuth consent infrastructure"

@@ -396,6 +396,13 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   isolated from the other workspace.
 - Frontend HMR runs through the same Bun process via Vite middleware.
 
+## Pull requests
+
+- Before opening a PR, fetch the remote and update the branch against its
+  current merge target (normally `origin/main`). Resolve conflicts and rerun
+  the appropriate validation before pushing and creating the PR; do not rely
+  on a stale local target branch.
+
 ## Database backend
 
 - **Postgres 18 only.** Do not introduce any other backend. SQLite

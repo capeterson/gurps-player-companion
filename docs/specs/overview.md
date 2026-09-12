@@ -49,6 +49,9 @@ checklists for extending sync/history) live in
 [MCP agent access](mcp-agent-access.md) provides remote Streamable HTTP at `/mcp`
 and OAuth delegation on the same app server. Settings lists and revokes connected
 clients, while `/oauth/consent` grants plain-language read/write/manage scopes.
+Authorization discovery supports ChatGPT-style Client ID Metadata Documents and
+Claude-compatible Dynamic Client Registration, so supported public clients need
+no per-client server configuration or shared secret.
 Every player-domain raw API operation has a stable tool; security, administration,
 replication, and transport endpoints have exact checked-in exclusions. MCP commits
 use the same route graph, validation, authorization, audit, revisions, and
