@@ -23,6 +23,7 @@ import {
   ClientRegistrationError,
   fetchClientMetadataDocument,
   isSafeOAuthRedirectUri,
+  oauthRedirectUriMatches,
 } from './clientRegistration.ts';
 
 const ACCESS_TTL_MS = 15 * 60_000;
@@ -271,7 +272,9 @@ async function validatedClientAndScopes(config: AppConfig, query: OAuthAuthoriza
   }
   const client = await resolveOAuthClient(config, query.client_id);
   if (client.disabledAt) throw new OAuthError('invalid_client', 'client is not registered');
-  if (!client.redirectUris.includes(query.redirect_uri)) {
+  if (
+    !client.redirectUris.some((redirect) => oauthRedirectUriMatches(redirect, query.redirect_uri))
+  ) {
     throw new OAuthError('invalid_request', 'redirect_uri is not registered');
   }
   let scopes: OAuthScope[];

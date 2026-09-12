@@ -115,7 +115,7 @@ export default defineConfig({
       adapter: bunAdapter,
       entry: 'src/server/dev-entry.ts',
       exclude: [
-        /^\/(?!api(?:[/?]|$)|mcp(?:[/?]|$)|\.well-known(?:[/?]|$)|oauth\/(?:authorize|token|revoke)(?:[/?]|$)).*/,
+        /^\/(?!api(?:[/?]|$)|mcp(?:[/?]|$)|\.well-known(?:[/?]|$)|oauth\/(?:authorize|token|revoke|register)(?:[/?]|$)).*/,
       ],
     }),
     stripPwaFromAdmin(),
@@ -158,7 +158,7 @@ export default defineConfig({
           /^\/admin(\/|$)/,
           /^\/mcp(?:[/?]|$)/,
           /^\/\.well-known\//,
-          /^\/oauth\/(authorize|token|revoke)(?:[/?]|$)/,
+          /^\/oauth\/(authorize|token|revoke|register)(?:[/?]|$)/,
         ],
       },
     }),
