@@ -60,6 +60,11 @@ Endpoints (`src/server/routes/campaigns.ts`):
 `POST/GET /campaigns`, `GET/PATCH/DELETE /campaigns/{id}`,
 `POST /campaigns/{id}/members`, `PATCH/DELETE /campaigns/{id}/members/{userId}`,
 `POST /campaigns/{id}/transfer` (transfer ownership).
+Direct adds, invitation acceptance, role changes, removals, and ownership
+transfer all advance the parent campaign revision in the same transaction.
+Because campaign rows are the read-only sync projection, that revision bump is
+what invalidates cached membership-derived permissions even when no campaign
+setting changed.
 
 Campaign settings that shape shared play: `pointTarget`, `disadvantageCap`,
 `quirkCap`, `manaLevel` (the campaign's ambient mana, which shapes
@@ -155,7 +160,10 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
      player's private rows at all.
    - The response also carries authoritative `accessible.characterIds` /
      `campaignIds` so the client can prune rows that fell out of access
-     (tombstones can't reach ex-members).
+     (tombstones can't reach ex-members). The client persists the last set per
+     user; when either set expands it clears all class cursors and performs one
+     from-zero pull, so newly granted access back old rows that predate the
+     viewer's high-water marks.
    - `GET /characters/{id}` and `GET /characters/{id}/history` apply the
      same gate via `resolveCharacterView()` in
      `src/server/services/characterAccess.ts`, which owns the membership
@@ -340,8 +348,9 @@ The library is portable as a **versioned, round-trippable YAML document** — th
 mechanism for sharing content between campaigns or seeding a new one.
 
 - **Codec:** `src/shared/yaml/library.ts` (pure, shared). `parseLibraryYaml`
-  validates against the `campaignLibrary` Zod schemas and rejects duplicate
-  keys; `emitLibraryYaml` produces **byte-stable** output via canonical
+  validates against strict `campaignLibrary` Zod schemas and rejects duplicate
+  or unknown keys at the document, library, entity, and nested JSON-object
+  levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
   the same bytes. `LIBRARY_YAML_VERSION = 6`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
@@ -384,11 +393,16 @@ mechanism for sharing content between campaigns or seeding a new one.
 - **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
   campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set
   p. 513) alongside `description`/`pointTarget`/`disadvantageCap`/`quirkCap`.
+  Explicit `null` means “clear this setting” and survives emission/import;
+  only `undefined` means omitted/leave unchanged.
 - **House rules:** optional `campaign.houseRules` shares the campaign schema.
   Export includes it; opt-in settings import applies it when present. Older
   files that omit it leave the destination rules unchanged.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
-  attachment (`<slug>-library.yaml`) including campaign settings.
+  attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
+  campaign settings, and all seven library sections are read on one read-only
+  `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
+  document assembled from different database moments.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. Two modes:
   - `merge` (default) — upsert incoming rows by name/kind key, leave others.
   - `replace` — additionally delete existing rows not present in the document.
@@ -419,7 +433,9 @@ unique indexes on all seven `campaign_library_*` tables are
 lower(name))`, traits additionally scoped by `kind`; see migration 0021), so
 `POST`/`PATCH` reject a case-insensitive duplicate with `409` and an import's
 name match can never be shadowed by a differently-cased row created through
-the CRUD editor.
+the CRUD editor. A case-insensitive import match updates the existing row in
+place (preserving its id) and adopts the incoming `name` spelling/casing along
+with its other fields.
 
 ## Adventure log
 

@@ -12,6 +12,9 @@ export async function advanceLibraryCampaignRevision(
   await tx.update(campaigns).set({ updatedAt: new Date() }).where(eq(campaigns.id, campaignId));
 }
 
+/** Version the viewer-specific campaign projection after membership/role changes. */
+export const advanceCampaignProjectionRevision = advanceLibraryCampaignRevision;
+
 /** Post-commit acceleration only; revision fan-out is the durable HTTP path. */
 export async function publishLibraryInvalidation(campaignId: string): Promise<void> {
   try {

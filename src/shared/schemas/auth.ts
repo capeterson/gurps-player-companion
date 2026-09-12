@@ -107,6 +107,8 @@ export const passkeyRegistrationRequest = z.object({
   id: z.string().min(1),
   rawId: z.string().min(1),
   type: z.literal('public-key'),
+  authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
+  clientExtensionResults: z.record(z.unknown()).default({}),
   response: z.object({
     clientDataJSON: z.string().min(1),
     attestationObject: z.string().min(1),
@@ -127,6 +129,8 @@ export const passkeyLoginRequest = z.object({
   id: z.string().min(1),
   rawId: z.string().min(1),
   type: z.literal('public-key'),
+  authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
+  clientExtensionResults: z.record(z.unknown()).default({}),
   response: z.object({
     clientDataJSON: z.string().min(1),
     authenticatorData: z.string().min(1),

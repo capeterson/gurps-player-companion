@@ -151,9 +151,17 @@ works offline.**
    values, including another input’s edit before React renders it. A local
    gesture failure emits a visual-only flash plus a field-specific toast
    without reverting another input’s newer unsaved draft.
-2. **Drain.** The orchestrator batches pending outbox ops (up to
-   `DRAIN_BATCH_SIZE`) into `POST /sync/operations`. A `navigator.locks` lease
-   serializes the drain across tabs (lock order is always DRAIN → CURSOR).
+   Inventory multi-select equip/wear/move actions and bulk deletes use the same
+   all-or-nothing helpers with one history `batchId`. A storage failure rolls
+   back every local row and queued op; the panel reports the error and retains
+   its selection or open edit dialog so the gesture can be retried.
+2. **Drain.** The orchestrator selects and marks pending outbox ops `in_flight`
+   in one short Dexie transaction (`claimDrainableOps`), then sends only those
+   claimed rows (up to `DRAIN_BATCH_SIZE`) to `POST /sync/operations`. A
+   `navigator.locks` lease serializes the normal drain across tabs (lock order
+   is always DRAIN → CURSOR); the atomic claim is the storage-level guard that
+   prevents duplicate sends even when a lock is unavailable or two callers
+   race.
 3. **Dispatch.** The server processes each op **independently** — one bad op
    never poisons the batch. HTTP status is always 200; per-op outcomes live in
    `outcomes[].status`. Optimistic concurrency uses `baseRevision`; a mismatch
@@ -184,6 +192,15 @@ works offline.**
    `latest`, so the rewritten base is still stale and `stale_base` fires
    normally — the client's `stale_base` self-heal (below) remains the
    fallback for that case and for bursts spanning more than one 50-op batch.
+
+   Database revisions are also commit-safe across requests. Migration `0040`
+   routes every sync-visible INSERT default, UPDATE trigger, DELETE tombstone,
+   and history revision through `next_sync_revision()`. Its transaction-scoped
+   advisory fence is acquired before sequence allocation, so a cursor can never
+   observe revision N+1, persist that high-water mark, and miss an older
+   transaction that commits revision N afterward. Child stale-base checks read
+   and lock the target row on the same transaction as the update; two requests
+   presenting one base revision therefore produce one apply and one stale result.
 4. **Apply outcome.** The orchestrator stamps the new revision on `applied`,
    reverts + toasts + flashes on rejection, and adopts `latestEntity` on
    conflict/stale (then flashes).
@@ -224,6 +241,13 @@ authorization and cross-entity checks as `fieldPath` patches. Inventory parent
 changes additionally share a transaction and character-row lock with the REST
 tree mutations, so a crafted envelope or concurrent reparent cannot create a
 foreign link or containment cycle.
+
+Inventory containment also has an explicit client replay dependency. A child
+create whose body names a speculative container, or a `parentId` patch naming
+one, stays out of the drain while that container has an unsettled create. The
+container must be acknowledged and removed first; a transient parent outcome
+therefore cannot turn its dependent into a permanent not-found rejection in
+the same request.
 
 ### Outcome → local effect
 
@@ -642,6 +666,11 @@ a clean world (see `orchestrator.recovery.test.ts`,
   ex-members (they're scoped to campaigns the viewer currently belongs to), so
   the explicit id sets close that gap. Revoking access fans out WS
   invalidations to all viewers.
+- **Access-gain backfill** — the last authoritative access set is persisted per
+  user. If character or campaign ids are added, the client first saves the new
+  set, clears every entity cursor, and performs one from-zero pull. This makes
+  old parent and child rows visible immediately and cannot loop on the same
+  expansion.
 - **Minimal-view sweep** — runs after every cursor pull and on bootstrap to
   purge private child rows for characters that dropped to `minimal` access
   (campaign-content-sharing.md).

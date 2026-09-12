@@ -468,7 +468,6 @@ async function dispatchCharacter(
     tx,
     table: characters,
     prepareUpdates: (updates) => detachLibraryReferencesForTransfer(tx, op.entityId, updates),
-    parentLookup: () => loadCharacterOr403(op.entityId, ctx.userId).then((a) => a.character),
     childWhere: () => eq(characters.id, op.entityId),
     valueTransform: (field, value) => {
       if (field === 'campaignId' && value !== null && value !== undefined) {
@@ -539,16 +538,6 @@ async function dispatchTrait(
     prepareUpdates: async (updates) => {
       await prepareLibraryReference(tx, ctx.userId, characterId, 'traits', updates, op.entityId);
     },
-    parentLookup: async () => {
-      const [row] = await getDb()
-        .select()
-        .from(characterTraits)
-        .where(
-          and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
-        );
-      if (!row) throw new HTTPException(404, { message: 'trait not found' });
-      return row;
-    },
     childWhere: () =>
       and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
   });
@@ -609,16 +598,6 @@ async function dispatchSkill(
     prepareUpdates: async (updates) => {
       await prepareLibraryReference(tx, ctx.userId, characterId, 'skills', updates, op.entityId);
     },
-    parentLookup: async () => {
-      const [row] = await getDb()
-        .select()
-        .from(characterSkills)
-        .where(
-          and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
-        );
-      if (!row) throw new HTTPException(404, { message: 'skill not found' });
-      return row;
-    },
     childWhere: () =>
       and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
   });
@@ -678,16 +657,6 @@ async function dispatchSpell(
     table: characterSpells,
     prepareUpdates: async (updates) => {
       await prepareLibraryReference(tx, ctx.userId, characterId, 'spells', updates, op.entityId);
-    },
-    parentLookup: async () => {
-      const [row] = await getDb()
-        .select()
-        .from(characterSpells)
-        .where(
-          and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
-        );
-      if (!row) throw new HTTPException(404, { message: 'spell not found' });
-      return row;
     },
     childWhere: () =>
       and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
@@ -751,19 +720,6 @@ async function dispatchLanguage(
     table: characterLanguages,
     prepareUpdates: async (updates) => {
       await prepareLibraryReference(tx, ctx.userId, characterId, 'languages', updates, op.entityId);
-    },
-    parentLookup: async () => {
-      const [row] = await getDb()
-        .select()
-        .from(characterLanguages)
-        .where(
-          and(
-            eq(characterLanguages.id, op.entityId),
-            eq(characterLanguages.characterId, characterId),
-          ),
-        );
-      if (!row) throw new HTTPException(404, { message: 'language not found' });
-      return row;
     },
     childWhere: () =>
       and(eq(characterLanguages.id, op.entityId), eq(characterLanguages.characterId, characterId)),
@@ -835,19 +791,6 @@ async function dispatchTechnique(
         op.entityId,
       );
     },
-    parentLookup: async () => {
-      const [row] = await getDb()
-        .select()
-        .from(characterTechniques)
-        .where(
-          and(
-            eq(characterTechniques.id, op.entityId),
-            eq(characterTechniques.characterId, characterId),
-          ),
-        );
-      if (!row) throw new HTTPException(404, { message: 'technique not found' });
-      return row;
-    },
     childWhere: () =>
       and(
         eq(characterTechniques.id, op.entityId),
@@ -904,7 +847,12 @@ async function dispatchInventory(
     const characterId = requireParentId(op);
     const access = await loadCharacterOr403(characterId, ctx.userId);
     assertWrite(access);
-    const [doomed] = await getDb()
+    // Use the same character-scoped tree lock as REST create/patch/delete
+    // and the sync create/patch paths. The lock is held through reparenting
+    // and deletion, so a move cannot validate against a tree that is being
+    // changed underneath it.
+    await lockLibraryReferenceScope(tx, characterId, ctx.userId);
+    const [doomed] = await tx
       .select()
       .from(inventoryItems)
       .where(and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)));
@@ -940,16 +888,6 @@ async function dispatchInventory(
     table: inventoryItems,
     prepareUpdates: async (updates) => {
       await prepareLibraryReference(tx, ctx.userId, characterId, 'items', updates, op.entityId);
-    },
-    parentLookup: async () => {
-      const [row] = await tx
-        .select()
-        .from(inventoryItems)
-        .where(
-          and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)),
-        );
-      if (!row) throw new HTTPException(404, { message: 'item not found' });
-      return row;
     },
     childWhere: () =>
       and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)),
@@ -1095,7 +1033,6 @@ interface PatchEntityArgs {
   readonly tx: AuditTx;
   // biome-ignore lint/suspicious/noExplicitAny: drizzle table object
   readonly table: any;
-  readonly parentLookup: () => Promise<{ revision: number | bigint } | undefined>;
   // biome-ignore lint/suspicious/noExplicitAny: drizzle expression
   readonly childWhere: () => any;
   readonly valueTransform?: (field: string, value: unknown) => unknown | Promise<unknown>;
@@ -1104,8 +1041,7 @@ interface PatchEntityArgs {
 }
 
 async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
-  const { op, entityClass, tx, table, parentLookup, childWhere, valueTransform, extraValidate } =
-    args;
+  const { op, entityClass, tx, table, childWhere, valueTransform, extraValidate } = args;
   const writableFields = WRITABLE_FOR_PATCH[entityClass];
   if (!writableFields) {
     return { clientOpId: op.clientOpId, status: 'rejected', reason: 'entity class not writable' };
@@ -1134,7 +1070,11 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
       const transformed = valueTransform ? await valueTransform(k, v) : v;
       updates[k] = transformed;
     }
-    const current = await parentLookup();
+    // Lock the target row on the same transaction used for the update.
+    // A pooled read followed by an unqualified UPDATE lets two devices
+    // both accept the same base revision and silently overwrite each other.
+    const [current] = await tx.select().from(table).where(childWhere()).for('update');
+    if (!current) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };
     if (current && op.baseRevision !== undefined && Number(current.revision) > op.baseRevision) {
       return {
         clientOpId: op.clientOpId,
@@ -1170,7 +1110,8 @@ async function patchEntity(args: PatchEntityArgs): Promise<OperationOutcome> {
   const parsed = fieldShape.parse(op.attemptedValue);
   if (extraValidate) await extraValidate(fieldPath, parsed);
 
-  const current = await parentLookup();
+  const [current] = await tx.select().from(table).where(childWhere()).for('update');
+  if (!current) return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };
   if (current && op.baseRevision !== undefined && Number(current.revision) > op.baseRevision) {
     return {
       clientOpId: op.clientOpId,

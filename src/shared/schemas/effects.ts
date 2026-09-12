@@ -64,6 +64,7 @@ export const traitEffect = z
       .optional(),
     conditionLabel: z.string().min(1).max(120).optional(),
   })
+  .strict()
   .superRefine((eff, ctx) => {
     if (eff.target === 'skill' && !eff.skillName) {
       ctx.addIssue({

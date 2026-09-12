@@ -1,11 +1,41 @@
 import { describe, expect, it } from 'bun:test';
-import { librarySkillCreate } from '../schemas/campaignLibrary.ts';
+import {
+  libraryItemCreate,
+  libraryLanguageCreate,
+  libraryPortableFieldManifest,
+  librarySkillCreate,
+  librarySpellCreate,
+  libraryStyleCreate,
+  libraryTechniqueCreate,
+  libraryTraitCreate,
+  libraryYamlDoc,
+} from '../schemas/campaignLibrary.ts';
 import {
   LIBRARY_YAML_MAX_BYTES,
   LibraryYamlError,
   emitLibraryYaml,
   parseLibraryYaml,
 } from './library.ts';
+
+describe('library portability field manifest', () => {
+  it('exhaustively matches every portable schema shape', () => {
+    const shapes = {
+      campaign: libraryYamlDoc.shape.campaign.unwrap().shape,
+      traits: libraryTraitCreate.shape,
+      skills: librarySkillCreate.shape,
+      spells: librarySpellCreate.shape,
+      items: libraryItemCreate.shape,
+      languages: libraryLanguageCreate.shape,
+      techniques: libraryTechniqueCreate.shape,
+      styles: libraryStyleCreate.shape,
+    };
+    for (const key of Object.keys(shapes) as (keyof typeof shapes)[]) {
+      expect(Object.keys(libraryPortableFieldManifest[key]).sort()).toEqual(
+        Object.keys(shapes[key]).sort(),
+      );
+    }
+  });
+});
 
 const SAMPLE = `version: 1
 campaign:
@@ -441,6 +471,45 @@ describe('emitLibraryYaml', () => {
     });
     expect(out).not.toMatch(/tags:/);
     expect(out).toMatch(/Hard to Kill/);
+  });
+
+  it('preserves explicit null campaign settings while omitting undefined ones', () => {
+    const out = emitLibraryYaml({
+      campaign: {
+        name: 'Portable',
+        description: null,
+        pointTarget: null,
+        disadvantageCap: null,
+        quirkCap: null,
+        manaLevel: 'normal',
+        techLevel: null,
+      },
+      traits: [],
+      skills: [],
+      spells: [],
+      items: [],
+      languages: [],
+      techniques: [],
+      styles: [],
+    });
+    const parsed = parseLibraryYaml(out);
+    expect(parsed.campaign).toMatchObject({
+      description: null,
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      techLevel: null,
+    });
+  });
+
+  it.each([
+    'version: 6\nfutureRoot: true\nlibrary: { traits: [], skills: [], items: [] }',
+    'version: 6\nlibrary: { traits: [], skils: [], items: [] }',
+    'version: 6\nlibrary: { traits: [{ name: X, kind: advantage, basePoints: 1, basPoints: 2 }], skills: [], items: [] }',
+    'version: 6\nlibrary: { traits: [], skills: [], items: [{ name: Coat, armor: { locations: [torso], dr: 2, dbr: 4 } }] }',
+    'version: 6\nlibrary: { traits: [{ name: X, kind: advantage, effects: [{ target: st, value: 1, valu: 2 }] }], skills: [], items: [] }',
+  ])('rejects unknown YAML keys instead of stripping them before replace (%s)', (raw) => {
+    expect(() => parseLibraryYaml(raw)).toThrow(LibraryYamlError);
   });
 });
 

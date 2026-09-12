@@ -56,9 +56,9 @@ async function addMember(ownerToken: string, campaignId: string, email: string, 
   });
   expect(res.status).toBe(200);
   const body = (await res.json()) as { members: { userId: string; email: string }[] };
+  const member = body.members.find((candidate) => candidate.email === email);
+  if (!member) throw new Error('member not found after add');
   if (role) {
-    const member = body.members.find((m) => m.email === email);
-    if (!member) throw new Error('member not found after add');
     const promoteRes = await app.request(
       `/api/v1/campaigns/${campaignId}/members/${member.userId}`,
       {
@@ -69,6 +69,7 @@ async function addMember(ownerToken: string, campaignId: string, email: string, 
     );
     expect(promoteRes.status).toBe(200);
   }
+  return member.userId;
 }
 
 async function createTrait(
@@ -89,6 +90,42 @@ async function createTrait(
 }
 
 // ===================== CRUD =====================
+
+it('membership and role changes advance the campaign projection cursor', async () => {
+  const owner = await registerUser('membership-cursor-owner');
+  const member = await registerUser('membership-cursor-member');
+  const campaign = await createCampaign(owner.accessToken);
+  let revision = Number(campaign.revision);
+  const assertAdvanced = async () => {
+    const response = await app.request('/api/v1/sync/cursor', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        cursors: [{ entityClass: 'campaign', sinceRevision: revision }],
+      }),
+    });
+    const body = (await response.json()) as SyncCursorResponse;
+    const changed = body.changes.find((change) => change.entityId === campaign.id);
+    expect(changed).toBeTruthy();
+    revision = changed?.revision ?? revision;
+  };
+
+  const memberId = await addMember(owner.accessToken, String(campaign.id), member.email);
+  await assertAdvanced();
+  const promoted = await app.request(`/api/v1/campaigns/${campaign.id}/members/${memberId}`, {
+    method: 'PATCH',
+    headers: jsonHeaders(owner.accessToken),
+    body: JSON.stringify({ role: 'manager' }),
+  });
+  expect(promoted.status).toBe(200);
+  await assertAdvanced();
+  const removed = await app.request(`/api/v1/campaigns/${campaign.id}/members/${memberId}`, {
+    method: 'DELETE',
+    headers: bearer(owner.accessToken),
+  });
+  expect(removed.status).toBe(204);
+  await assertAdvanced();
+});
 
 it.each(['traits', 'skills', 'spells', 'items', 'languages', 'techniques', 'styles'])(
   '%s CRUD and YAML import advance the campaign HTTP cursor without any owned copies',
@@ -951,6 +988,7 @@ describe('case-insensitive natural keys (migration 0021)', () => {
       body: JSON.stringify({ name: 'Sword', cost: 50 }),
     });
     expect(created.status).toBe(201);
+    const original = (await created.json()) as { id: string };
 
     const yaml = `version: 3
 library:
@@ -974,10 +1012,11 @@ library:
     const listRes = await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
       headers: bearer(owner.accessToken),
     });
-    const list = (await listRes.json()) as { items: { name: string; cost: number }[] };
+    const list = (await listRes.json()) as { items: { id: string; name: string; cost: number }[] };
     expect(list.items.length).toBe(1);
-    expect(list.items[0]?.name).toBe('Sword'); // existing row's name kept, not renamed
-    expect(list.items[0]?.cost).toBe(75); // fields still updated in place
+    expect(list.items[0]?.id).toBe(original.id); // row identity survives the import update
+    expect(list.items[0]?.name).toBe('SWORD'); // imported spelling/casing is authoritative
+    expect(list.items[0]?.cost).toBe(75);
   });
 });
 

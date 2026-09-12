@@ -40,7 +40,7 @@ Created in a new migration `src/server/db/migrations/0013_entity_history.sql`, m
 
 Columns:
 - `id` uuid PK default `gen_random_uuid()`
-- `revision` bigint NOT NULL default `nextval('revisions_seq')` — reuses the shared global sequence so history is totally ordered against all other changes and paginates cleanly.
+- `revision` bigint NOT NULL default `next_sync_revision()` (migration `0040`; originally `nextval('revisions_seq')`) — reuses the shared global sequence behind a transaction advisory fence so history is commit-ordered against other changes and paginates without late-commit gaps.
 - `scope` text NOT NULL — `'character'` or `'campaign'` (the discriminator that keeps the two views separate).
 - `entity_class` text NOT NULL — `character` | `character_trait` | `character_skill` | `character_spell` | `character_inventory` | `character_combat` | `campaign` | `campaign_membership` | `campaign_library_trait` | `campaign_library_skill` | `campaign_library_item` | `adventure_log` (the existing `entityClass` enum from `src/shared/schemas/sync.ts`).
 - `entity_id` uuid NOT NULL.

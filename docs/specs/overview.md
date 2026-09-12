@@ -47,7 +47,9 @@ checklists for extending sync/history) live in
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
 - **Passkeys / WebAuthn** as an optional second credential — register, list,
-  and sign in with a passkey (`/auth/passkeys/*`).
+  and sign in with a passkey (`/auth/passkeys/*`). Ceremonies are verified by
+  `@simplewebauthn/server` (origin/RP, challenge, type, flags, COSE algorithm,
+  signature, and counter), not by an application-owned binary parser.
 - **Password reset** by emailed token (`/forgot-password` → `/reset-password`).
 - **Public-auth rate limits**: durable Postgres counters bound login,
   registration, recovery, and passkey requests by source and (when supplied)
@@ -352,9 +354,11 @@ on any sheet the viewer can edit — their own — it always shows).
     equipped shield — an item whose `weaponData.db` (Defense Bonus) is
     set, picked by `pickShield` — not merely the presence of a
     "Shield"-named skill; that shield's DB then adds to Dodge, every
-    Parry, and Block (B287), along with any **armor DB** from Deflect
-    enchantments (`armorData.db`, summed across all equipped armor by
-    `sumArmorDb`) — the captions break down both sources. Every numeric
+    Parry, and Block (B287), along with the single highest **armor DB** from
+    equipped armor that covers the selected hit location and facing
+    (`armorData.db`, resolved by `resolveArmorDb`) — the captions identify the
+    winning source. Armor DB is defense-only; the incoming-damage dialog shows
+    it for context but never subtracts it as DR. Every numeric
     defense opens the roll sheet. Active derived Parry/Block modifiers are
     added once after halving skill, through the shared defense helpers;
     Dodge already includes its derived modifier. Captions show these totals,
@@ -623,8 +627,8 @@ src/
                    Effective DR card's damage dialog), armorDr (armor + innate DR
                    aggregation per hit location + per-damage-type DR
                    resolution via `resolveDr` with typed → crushing →
-                   default fallback, and armor DB summation via
-                   `sumArmorDb`), conditions (snake_case
+                   default fallback, and location/facing-aware maximum armor
+                   DB via `resolveArmorDb`), conditions (snake_case
                    condition normalization, tolerant of legacy Capitalized
                    entries))
     constants/   attributes, skills, traits, combat (postures, common
@@ -632,9 +636,10 @@ src/
                  rangePenalty (B550 speed/range roll presets), magic
     yaml/        library.ts — round-trippable campaign-library YAML codec
     history/     summarize.ts — shared history one-liner formatter
-  sw/            Service worker registration (app-shell precache + a few
-                 read-only GET caches). NOT outbox replay — that lives in the
-                 page orchestrator, see src/sw/registerSW.ts.
+  sw/            Service worker registration and app-shell precache. It never
+                 caches authenticated API responses and does not replay the
+                 outbox — that lives in the page orchestrator, see
+                 src/sw/registerSW.ts.
 docs/
   specs/         These design specs
   prototypes/    Standalone design studies, outside the app build:

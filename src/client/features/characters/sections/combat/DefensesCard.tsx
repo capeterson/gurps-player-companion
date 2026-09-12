@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { sumArmorDb } from '../../../../../shared/domain/armorDr.ts';
+import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
+import { type ArmorFacing, resolveArmorDb } from '../../../../../shared/domain/armorDr.ts';
 import {
   type AllOutDefenseOption,
   combatAdjustments,
@@ -17,6 +18,7 @@ import {
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollRequest } from '../rollTypes.ts';
+import { locationLabel } from './armorViewOptions.ts';
 
 export interface DefensesCardProps {
   character: CharacterDetail;
@@ -38,6 +40,8 @@ function modifierCaption(value: number): string {
 
 export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   const [defenseOption, setDefenseOption] = useState<AllOutDefenseOption>(null);
+  const [hitLocation, setHitLocation] = useState('torso');
+  const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changing character or maneuver ends this local turn option.
   useEffect(() => {
     setDefenseOption(null);
@@ -53,16 +57,28 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   });
   const equippedItems = character.inventory.filter((i) => i.equipped);
   const weapons = equippedItems.filter((i) => i.weaponData != null);
+  const customArmorLocations = [
+    ...new Set(
+      character.inventory.flatMap(
+        (item) =>
+          item.armor?.locations.filter((location) => !HIT_LOCATIONS.includes(location as never)) ??
+          [],
+      ),
+    ),
+  ].sort();
 
-  // Shield DB (from weaponData.db) and armor DB (from armor.db) stack
-  // and add to Dodge, every Parry, and Block (B287).
+  // Shield DB is its own source. Armor contributes only the highest
+  // equipped layer covering this incoming hit; armor DB never stacks.
   const shield = pickShield(equippedItems);
   const shieldDb = shield?.db ?? 0;
-  const armorDb = sumArmorDb(character.inventory);
+  const armorDbSource = resolveArmorDb(character.inventory, hitLocation, facing);
+  const armorDb = armorDbSource?.db ?? 0;
   const db = shieldDb + armorDb;
 
   const shieldDbCaption = shield && shieldDb > 0 ? `+ ${shieldDb} DB (${shield.name})` : '';
-  const armorDbCaption = armorDb > 0 ? `+ ${armorDb} armor DB` : '';
+  const armorDbCaption = armorDbSource
+    ? `+ ${armorDbSource.db} armor DB (${armorDbSource.itemName})`
+    : '';
   const dbCaption =
     shieldDbCaption && armorDbCaption
       ? ` ${shieldDbCaption} + ${armorDbCaption}`
@@ -83,7 +99,7 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
     );
   }
   if (shield && shieldDb > 0) dodgeParts.push(`+ ${shieldDb} DB (${shield.name})`);
-  if (armorDb > 0) dodgeParts.push(`+ ${armorDb} armor DB`);
+  if (armorDbSource) dodgeParts.push(`+ ${armorDbSource.db} armor DB (${armorDbSource.itemName})`);
   const dodgeCaption = dodgeParts.length > 0 ? dodgeParts.join(' ') : undefined;
 
   const e = character.encumbrance;
@@ -177,6 +193,39 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
           </p>
         </div>
       )}
+
+      <div className="grid grid-cols-2 gap-2" aria-label="Incoming hit for defense rolls">
+        <label className="flex flex-col gap-1">
+          <span className="label-eyebrow">Hit location</span>
+          <select
+            aria-label="Defense hit location"
+            className="select select-sm select-bordered"
+            value={hitLocation}
+            onChange={(event) => setHitLocation(event.target.value)}
+          >
+            {[...HIT_LOCATIONS, ...customArmorLocations].map((location) => (
+              <option key={location} value={location}>
+                {locationLabel(location)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="label-eyebrow">Facing</span>
+          <select
+            aria-label="Defense facing"
+            className="select select-sm select-bordered"
+            value={facing ?? ''}
+            onChange={(event) =>
+              setFacing(event.target.value === '' ? undefined : (event.target.value as ArmorFacing))
+            }
+          >
+            <option value="">Unknown</option>
+            <option value="front">Front</option>
+            <option value="back">Back</option>
+          </select>
+        </label>
+      </div>
 
       {/* GURPS defenses share the 3d6-vs-target shape with skill rolls but
           use a different "critical" table (auto success on 3-4, auto

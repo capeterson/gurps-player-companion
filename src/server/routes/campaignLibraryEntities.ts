@@ -140,7 +140,7 @@ function traitEditableFields(body: LibraryTraitCreate) {
     variants: body.variants ?? [],
     effects: body.effects ?? [],
     tags: body.tags ?? [],
-  };
+  } satisfies Record<Exclude<keyof LibraryTraitCreate, 'name' | 'kind'>, unknown>;
 }
 
 export const traitEntity: LibraryEntityConfig<
@@ -220,7 +220,7 @@ function skillEditableFields(body: LibrarySkillCreate) {
     prerequisites: body.prerequisites ?? null,
     situationalModifiers: body.situationalModifiers ?? [],
     effects: body.effects ?? [],
-  };
+  } satisfies Record<Exclude<keyof LibrarySkillCreate, 'name'>, unknown>;
 }
 
 export const skillEntity: LibraryEntityConfig<
@@ -298,7 +298,7 @@ function spellEditableFields(body: LibrarySpellCreate) {
     prerequisites: body.prerequisites ?? null,
     description: body.description ?? null,
     source: body.source ?? null,
-  };
+  } satisfies Record<Exclude<keyof LibrarySpellCreate, 'name'>, unknown>;
 }
 
 export const spellEntity: LibraryEntityConfig<
@@ -380,7 +380,7 @@ function itemEditableFields(body: LibraryItemCreate) {
     powerstoneData: body.powerstoneData ?? null,
     magicItemData: body.magicItemData ?? null,
     enchantments: body.enchantments ?? [],
-  };
+  } satisfies Record<Exclude<keyof LibraryItemCreate, 'name'>, unknown>;
 }
 
 export const itemEntity: LibraryEntityConfig<
@@ -463,7 +463,7 @@ function languageEditableFields(body: LibraryLanguageCreate) {
     description: body.description ?? null,
     source: body.source ?? null,
     isSignLanguage: body.isSignLanguage ?? false,
-  };
+  } satisfies Record<Exclude<keyof LibraryLanguageCreate, 'name'>, unknown>;
 }
 
 export const languageEntity: LibraryEntityConfig<
@@ -525,7 +525,7 @@ function techniqueEditableFields(body: LibraryTechniqueCreate) {
     description: body.description ?? null,
     source: body.source ?? null,
     prereq: body.prereq ?? null,
-  };
+  } satisfies Record<Exclude<keyof LibraryTechniqueCreate, 'name'>, unknown>;
 }
 
 export const techniqueEntity: LibraryEntityConfig<
@@ -593,7 +593,7 @@ function styleEditableFields(body: LibraryStyleCreate) {
     techniques: body.techniques ?? [],
     perks: body.perks ?? [],
     skills: body.skills ?? [],
-  };
+  } satisfies Record<Exclude<keyof LibraryStyleCreate, 'name'>, unknown>;
 }
 
 export const styleEntity: LibraryEntityConfig<

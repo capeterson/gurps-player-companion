@@ -28,6 +28,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { advanceCampaignProjectionRevision } from '../services/libraryInvalidation.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 
@@ -347,6 +348,7 @@ router.openapi(
           userId: target.id,
           role: 'member',
         });
+        await advanceCampaignProjectionRevision(tx, id);
       });
     } catch (err) {
       if (isUniqueViolation(err)) {
@@ -392,11 +394,13 @@ router.openapi(
       });
     }
     const updated = await withAudit(user.id, undefined, async (tx) => {
-      return tx
+      const rows = await tx
         .update(campaignMemberships)
         .set({ role: body.role, updatedAt: new Date() })
         .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
         .returning({ id: campaignMemberships.id });
+      if (rows.length > 0) await advanceCampaignProjectionRevision(tx, id);
+      return rows;
     });
     if (updated.length === 0) throw new HTTPException(404, { message: 'membership not found' });
     const members = await loadMembers(campaign.id);
@@ -455,6 +459,7 @@ router.openapi(
         .where(and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, userId)))
         .returning({ id: campaignMemberships.id });
       if (deleted.length === 0) throw new HTTPException(404, { message: 'membership not found' });
+      await advanceCampaignProjectionRevision(tx, id);
       return deleted;
     });
     if (result.length === 0) throw new HTTPException(404, { message: 'membership not found' });

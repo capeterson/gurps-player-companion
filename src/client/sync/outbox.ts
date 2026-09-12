@@ -423,6 +423,25 @@ export interface EnqueueDeleteArgs {
 
 export async function enqueueDelete(args: EnqueueDeleteArgs): Promise<void> {
   const db = getLocalDb();
+  await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
+    await enqueueDeleteInTransaction(args);
+  });
+}
+
+/** Delete one gesture's entities atomically and retain one history batch id. */
+export async function enqueueDeletes(args: readonly EnqueueDeleteArgs[]): Promise<void> {
+  if (args.length === 0) return;
+  const db = getLocalDb();
+  const batchId = args.length > 1 ? newBatchId() : undefined;
+  const stores = args.flatMap((entry) => storesForOp(entry.entityClass).map((store) => store.name));
+  await db.transaction('rw', [db.outbox, ...stores], async () => {
+    for (const entry of args)
+      await enqueueDeleteInTransaction({ ...entry, batchId: entry.batchId ?? batchId });
+  });
+}
+
+async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void> {
+  const db = getLocalDb();
   const now = new Date().toISOString();
   const op: OutboxEntry = {
     clientOpId: newClientId(),
@@ -440,10 +459,8 @@ export async function enqueueDelete(args: EnqueueDeleteArgs): Promise<void> {
     humanName: args.humanName,
     batchId: args.batchId,
   };
-  await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
-    await applyLocalDelete(args.entityClass, args.entityId);
-    await db.outbox.add(op);
-  });
+  await applyLocalDelete(args.entityClass, args.entityId);
+  await db.outbox.add(op);
 }
 
 /**
@@ -761,9 +778,33 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
     return a.clientOpId < b.clientOpId ? -1 : 1;
   });
   const heldBackCreates = new Set<string>();
+  const unsettledCreates = new Set(
+    unsettled
+      .filter((candidate) => candidate.command === 'create')
+      .map((candidate) => candidate.entityId),
+  );
   const ready: OutboxEntry[] = [];
   for (const op of all) {
     const backingOff = op.nextEarliestAttemptAt !== undefined && op.nextEarliestAttemptAt > now;
+    // Inventory containment is carried in the create body / parentId field,
+    // not in the envelope's parentId (that is the character id). Do not send
+    // a child or reparent operation until a speculative container create has
+    // been acknowledged and removed from the outbox. Using a later drain also
+    // prevents a transient parent outcome from turning its dependent into a
+    // permanent server rejection in the same request.
+    const inventoryContainerId =
+      op.entityClass === 'character_inventory' &&
+      ((op.command === 'create' &&
+        op.attemptedValue &&
+        typeof op.attemptedValue === 'object' &&
+        typeof (op.attemptedValue as { parentId?: unknown }).parentId === 'string') ||
+        (op.command === 'patch' &&
+          op.fieldPath === 'parentId' &&
+          typeof op.attemptedValue === 'string'))
+        ? op.command === 'create'
+          ? (op.attemptedValue as { parentId: string }).parentId
+          : (op.attemptedValue as string)
+        : undefined;
     const dependencyHeld =
       op.localCampaignDependencyUnknown === true ||
       (op.entityClass === 'character' &&
@@ -785,7 +826,8 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
         op.localRequiredCampaignId === undefined &&
         op.localWaitForCampaignAssignment === true &&
         op.parentId !== undefined &&
-        campaignAssignments.has(op.parentId));
+        campaignAssignments.has(op.parentId)) ||
+      (inventoryContainerId !== undefined && unsettledCreates.has(inventoryContainerId));
     if (!backingOff && !dependencyHeld && ready.length < limit) {
       ready.push(op);
     } else if (op.command === 'create') {
@@ -794,6 +836,39 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
     }
   }
   return ready;
+}
+
+/**
+ * Select and claim one outbound batch atomically. Enqueue coalescing sees
+ * every selected row as `in_flight`; a replacement therefore queues behind
+ * it instead of deleting an op whose stale in-memory envelope will be sent.
+ * Network I/O remains outside this short transaction.
+ */
+export async function claimDrainableOps(limit: number): Promise<OutboxEntry[]> {
+  const db = getLocalDb();
+  return db.transaction('rw', [db.outbox, db.characters], async () => {
+    const selected = await readDrainableOps(limit);
+    const claimedAt = new Date().toISOString();
+    const claimed: OutboxEntry[] = [];
+    for (const op of selected) {
+      const current = await db.outbox.get(op.clientOpId);
+      if (!current || (current.status !== 'pending' && current.status !== 'transient_retry'))
+        continue;
+      await db.outbox.update(op.clientOpId, {
+        status: 'in_flight',
+        lastAttemptAt: claimedAt,
+        attemptCount: current.attemptCount + 1,
+      });
+      // Keep the pre-claim attemptCount: outcome/backoff code computes the
+      // completed attempt as op.attemptCount + 1.
+      // Outcome handling needs the pre-claim status to distinguish the first
+      // transition into retry from later attempts in the same failure streak.
+      // The durable row is still `in_flight`; only this send-time snapshot
+      // retains the status that was atomically claimed.
+      claimed.push({ ...current, lastAttemptAt: claimedAt });
+    }
+    return claimed;
+  });
 }
 
 /**

@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createRoute } from '@hono/zod-openapi';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
@@ -33,9 +34,8 @@ import {
 import {
   consumeChallenge,
   createChallenge,
-  extractAttestation,
-  parseClientData,
   verifyAssertion,
+  verifyRegistration,
   webauthnRp,
 } from '../auth/webauthn.ts';
 import { loadConfig } from '../config.ts';
@@ -303,6 +303,7 @@ router.openapi(
       },
       401: errorResponse('Unauthorized'),
       403: errorResponse('Recent authentication required'),
+      409: errorResponse('Passkey already registered'),
       422: errorResponse('Validation error'),
     },
   }),
@@ -325,18 +326,32 @@ router.openapi(
     const challenge = await consumeChallenge(clientData.challenge, 'registration');
     if (challenge.userId !== user.id)
       throw new HTTPException(401, { message: 'invalid passkey challenge' });
-    parseClientData(body.response.clientDataJSON, clientData.challenge, 'webauthn.create');
-    const attestation = extractAttestation(body.response.attestationObject);
+    const registration = await verifyRegistration(
+      {
+        id: body.id,
+        rawId: body.rawId,
+        type: body.type,
+        authenticatorAttachment: body.authenticatorAttachment,
+        clientExtensionResults: body.clientExtensionResults,
+        response: body.response,
+      } as unknown as RegistrationResponseJSON,
+      clientData.challenge,
+    );
     const inserted = await getDb()
       .insert(passkeyCredentials)
       .values({
         userId: user.id,
-        credentialId: attestation.credentialId,
-        publicKey: attestation.publicKey,
-        signCount: attestation.signCount,
+        credentialId: registration.credential.id,
+        publicKey: Buffer.from(registration.credential.publicKey).toString('base64url'),
+        signCount: registration.credential.counter,
         name: body.name?.trim() || 'Passkey',
       })
-      .returning();
+      .returning()
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error))
+          throw new HTTPException(409, { message: 'passkey is already registered' });
+        throw error;
+      });
     const row = inserted[0];
     if (!row) throw new HTTPException(500, { message: 'insert failed' });
     return c.json(
@@ -446,16 +461,19 @@ router.openapi(
     const credential = rows[0];
     if (!credential) throw new HTTPException(401, { message: 'unknown passkey' });
     const verified = await verifyAssertion({
+      response: {
+        ...body,
+        clientExtensionResults: body.clientExtensionResults ?? {},
+        response: {
+          ...body.response,
+          userHandle: body.response.userHandle ?? undefined,
+        },
+      } as unknown as AuthenticationResponseJSON,
+      credentialId: credential.credentialId,
       credentialPublicKey: credential.publicKey,
-      authenticatorData: body.response.authenticatorData,
-      clientDataJSON: body.response.clientDataJSON,
-      signature: body.response.signature,
+      signCount: credential.signCount,
       challenge: clientData.challenge,
     });
-    // Reject cloned credentials: a non-zero stored counter must strictly advance.
-    if (credential.signCount > 0 && verified.signCount <= credential.signCount) {
-      throw new HTTPException(401, { message: 'invalid passkey' });
-    }
     // Advance counter conditionally so a concurrent assertion with the same counter
     // (e.g. a cloned key) fails the UPDATE rather than silently winning the race.
     const updated = await getDb()

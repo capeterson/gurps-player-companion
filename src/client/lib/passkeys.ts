@@ -47,6 +47,8 @@ export async function createPasskey(options: PublicKeyCredentialCreationOptions)
     id: credential.id,
     rawId: bytesToB64url(credential.rawId),
     type: credential.type,
+    authenticatorAttachment: credential.authenticatorAttachment ?? undefined,
+    clientExtensionResults: credential.getClientExtensionResults(),
     response: {
       clientDataJSON: bytesToB64url(response.clientDataJSON),
       attestationObject: bytesToB64url(response.attestationObject),
@@ -75,6 +77,8 @@ export async function getPasskey(options: PublicKeyCredentialRequestOptions) {
     id: credential.id,
     rawId: bytesToB64url(credential.rawId),
     type: credential.type,
+    authenticatorAttachment: credential.authenticatorAttachment ?? undefined,
+    clientExtensionResults: credential.getClientExtensionResults(),
     response: {
       clientDataJSON: bytesToB64url(response.clientDataJSON),
       authenticatorData: bytesToB64url(response.authenticatorData),

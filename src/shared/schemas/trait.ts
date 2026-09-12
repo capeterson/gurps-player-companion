@@ -7,14 +7,16 @@ export const traitKindEnum = z.enum(TRAIT_KINDS);
 export const modifierCategoryEnum = z.enum(MODIFIER_CATEGORIES);
 export const modifierCostTypeEnum = z.enum(MODIFIER_COST_TYPES);
 
-export const traitModifier = z.object({
-  name: z.string().min(1).max(160),
-  category: modifierCategoryEnum,
-  costType: modifierCostTypeEnum,
-  costValue: z.number().int().min(-200).max(500),
-  description: z.string().max(2000).optional(),
-  group: z.string().max(80).optional(),
-});
+export const traitModifier = z
+  .object({
+    name: z.string().min(1).max(160),
+    category: modifierCategoryEnum,
+    costType: modifierCostTypeEnum,
+    costValue: z.number().int().min(-200).max(500),
+    description: z.string().max(2000).optional(),
+    group: z.string().max(80).optional(),
+  })
+  .strict();
 
 /**
  * A named variant of a trait — e.g. Damage Resistance has "Hardened",
@@ -27,14 +29,16 @@ export const traitModifier = z.object({
  * Then existing trait modifiers (enhancements/limitations) apply on top
  * via `computeTraitCost` in domain/modifierMath.ts.
  */
-export const traitVariant = z.object({
-  name: z.string().min(1).max(80),
-  description: z.string().max(2000).optional(),
-  /** Multiplier applied to the leveled cost.  Omit for 1.0. */
-  pointCostMultiplier: z.number().min(0.05).max(20).optional(),
-  /** Flat delta added after the multiplier.  Omit for 0. */
-  pointCostDelta: z.number().int().min(-1000).max(1000).optional(),
-});
+export const traitVariant = z
+  .object({
+    name: z.string().min(1).max(80),
+    description: z.string().max(2000).optional(),
+    /** Multiplier applied to the leveled cost.  Omit for 1.0. */
+    pointCostMultiplier: z.number().min(0.05).max(20).optional(),
+    /** Flat delta added after the multiplier.  Omit for 0. */
+    pointCostDelta: z.number().int().min(-1000).max(1000).optional(),
+  })
+  .strict();
 
 export const traitOut = z.object({
   id: uuid,

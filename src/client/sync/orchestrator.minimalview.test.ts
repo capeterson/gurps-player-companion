@@ -230,6 +230,14 @@ describe('enforceMinimalViewLocally — character row rewrite', () => {
       { entityClass: 'character', revision: 99 },
       { entityClass: 'character_trait', revision: 99 },
     ]);
+    await db.syncMeta.put({
+      key: `accessible:${VIEWER_ID}`,
+      value: {
+        characterIds: [CHAR_ID],
+        campaignIds: [CAMPAIGN_ID],
+        observedAt: '2026-01-01T00:00:00.000Z',
+      },
+    });
 
     loginAs(VIEWER_ID);
     const fetchMock = vi

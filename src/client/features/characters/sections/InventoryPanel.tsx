@@ -29,7 +29,7 @@ import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.
 import { useRangeSelect } from '../../../hooks/useRangeSelect.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { enqueueDelete, enqueueFieldPatch } from '../../../sync/outbox.ts';
+import { enqueueDeletes, enqueueFieldPatches } from '../../../sync/outbox.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharacterDetail.ts';
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
@@ -128,61 +128,68 @@ export function InventoryPanel({
     setNewIsContainer(opt.isContainer);
   }
 
-  async function patchField(
-    id: string,
-    field: keyof InventoryItemUpdate,
-    value: unknown,
-    humanName: string,
-  ): Promise<void> {
-    await enqueueFieldPatch({
-      entityClass: 'character_inventory',
-      entityId: id,
-      fieldPath: field as string,
-      attemptedValue: value,
-      humanName,
-      flashKey: makeFlashKey('character_inventory', id, field as string),
-      characterId,
-    });
-  }
-
   async function patchMany(id: string, patch: InventoryItemUpdate, label: string): Promise<void> {
-    for (const [field, value] of Object.entries(patch)) {
-      await patchField(id, field as keyof InventoryItemUpdate, value, `${label} ${field}`);
-    }
+    await enqueueFieldPatches(
+      Object.entries(patch).map(([field, value]) => ({
+        entityClass: 'character_inventory' as const,
+        entityId: id,
+        fieldPath: field,
+        attemptedValue: value,
+        humanName: `${label} ${field}`,
+        flashKey: makeFlashKey('character_inventory', id, field),
+        characterId,
+      })),
+    );
   }
 
   async function bulkPatch(patch: InventoryItemUpdate, label: string): Promise<void> {
     const ids = Array.from(selectedIds);
-    for (const id of ids) {
-      for (const [field, value] of Object.entries(patch)) {
-        await patchField(id, field as keyof InventoryItemUpdate, value, `${label} ${field}`);
-      }
+    try {
+      await enqueueFieldPatches(
+        ids.flatMap((id) =>
+          Object.entries(patch).map(([field, value]) => ({
+            entityClass: 'character_inventory' as const,
+            entityId: id,
+            fieldPath: field,
+            attemptedValue: value,
+            humanName: `${label} ${field}`,
+            flashKey: makeFlashKey('character_inventory', id, field),
+            characterId,
+          })),
+        ),
+      );
+      toasts.push(`${label} ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
+    } catch (err) {
+      toasts.push(`Couldn't ${label.toLowerCase()} — ${(err as Error).message}`, { kind: 'error' });
     }
-    toasts.push(`${label} ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
   }
 
   async function bulkDelete(): Promise<void> {
     setConfirmBulkDelete(false);
     const ids = Array.from(selectedIds);
-    for (const id of ids) {
-      const target = tree.byId.get(id);
-      if (!target) continue;
-      try {
-        await enqueueDelete({
-          entityClass: 'character_inventory',
-          entityId: id,
-          humanName: `item "${target.name}"`,
-          characterId,
-          prevValue: target,
-        });
-      } catch (err) {
-        toasts.push(`Couldn't delete "${target.name}" — ${(err as Error).message}`, {
-          kind: 'error',
-        });
-      }
+    try {
+      const deletes = ids.flatMap((id) => {
+        const target = tree.byId.get(id);
+        return target
+          ? [
+              {
+                entityClass: 'character_inventory',
+                entityId: id,
+                humanName: `item "${target.name}"`,
+                characterId,
+                prevValue: target,
+              } as const,
+            ]
+          : [];
+      });
+      await enqueueDeletes(deletes);
+      clear();
+      toasts.push(`Deleted ${deletes.length} item${deletes.length === 1 ? '' : 's'}`, {
+        kind: 'success',
+      });
+    } catch (err) {
+      toasts.push(`Couldn't delete selected items — ${(err as Error).message}`, { kind: 'error' });
     }
-    clear();
-    toasts.push(`Deleted ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
   }
 
   async function onCreate(e: FormEvent): Promise<void> {
@@ -394,7 +401,9 @@ export function InventoryPanel({
       if (target.kind === 'container') patch = { parentId: target.id, worn: false };
       else if (target.kind === 'character') patch = { parentId: null, worn: true };
       else patch = { parentId: null, worn: false };
-      void patchMany(draggedId, patch, 'Moved');
+      void patchMany(draggedId, patch, 'Moved').catch((err) => {
+        toasts.push(`Couldn't move item — ${(err as Error).message}`, { kind: 'error' });
+      });
     },
   };
 
@@ -972,7 +981,12 @@ export function InventoryPanel({
         onCancel={() => setEditing(null)}
         onSubmit={(patch) => {
           if (editing) {
-            void patchMany(editing.id, patch, 'Updated').then(() => setEditing(null));
+            void patchMany(editing.id, patch, 'Updated')
+              .then(() => setEditing(null))
+              .catch((err) => {
+                // Keep the dialog and its draft open so the gesture can be retried.
+                toasts.push(`Couldn't update item — ${(err as Error).message}`, { kind: 'error' });
+              });
           }
         }}
       />

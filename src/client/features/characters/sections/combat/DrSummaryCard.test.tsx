@@ -249,6 +249,27 @@ describe('DrSummaryCard', () => {
     expect(bumpHp).toHaveBeenCalledWith(-12);
   });
 
+  it('shows the winning armor DB as defense information without reducing injury', () => {
+    const bumpHp = vi.fn();
+    const character = makeCharacter([
+      { dr: 0, locations: ['torso'] },
+      { dr: 0, locations: ['torso'] },
+    ]);
+    const first = character.inventory[0];
+    const second = character.inventory[1];
+    if (!first?.armor || !second?.armor) throw new Error('missing armor fixture');
+    first.name = 'Deflect Coat';
+    first.armor = { ...first.armor, db: 1 };
+    second.name = 'Deflect Plate';
+    second.armor = { ...second.armor, db: 3 };
+    render(<DrSummaryCard character={character} canWrite hpMax={20} bumpHp={bumpHp} />);
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '10' } });
+    expect(screen.getByText(/Armor DB 3 \(Deflect Plate\).*defense only/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Apply −10 HP' }));
+    expect(bumpHp).toHaveBeenCalledWith(-10);
+  });
+
   it('offers no incoming-damage button without write access', () => {
     render(<DrSummaryCard character={makeCharacter([{ dr: 4, locations: ['torso'] }])} />);
     expect(screen.queryByRole('button', { name: /Incoming damage/ })).not.toBeInTheDocument();

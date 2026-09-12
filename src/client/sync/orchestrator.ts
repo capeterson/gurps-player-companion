@@ -56,9 +56,9 @@ import {
 import { characterIdsToMinimize } from './minimalViewSweep.ts';
 import {
   backoffMs,
+  claimDrainableOps,
   countPending,
   enqueueFieldPatch,
-  readDrainableOps,
   recoverStaleInFlight,
   setOutboxStatus,
 } from './outbox.ts';
@@ -430,6 +430,14 @@ class SyncOrchestrator {
           signal: this.sessionAbort.signal,
         });
         if (!this.sessionIsCurrent(generation)) return false;
+        // Revisions describe row changes, not permission changes. If the
+        // authoritative access projection gains an old campaign/character,
+        // its rows may sit below every local cursor. Persist the observed set
+        // first, then restart from zero exactly once to backfill parents and
+        // children without relying on an unrelated future edit.
+        if (await this.resetCursorsForAccessExpansion(res.accessible)) {
+          return await this.pullInner(force, generation);
+        }
         if (!appliedAnything && res.changes && res.changes.length > 0) {
           syncStateStore.set('syncing');
           appliedAnything = true;
@@ -797,7 +805,7 @@ class SyncOrchestrator {
       // error between marking and settling).  Re-promote it so the
       // edit isn't stranded un-syncable forever.
       await recoverStaleInFlight();
-      const ops = await readDrainableOps(DRAIN_BATCH_SIZE);
+      const ops = await claimDrainableOps(DRAIN_BATCH_SIZE);
       if (ops.length === 0) {
         // Nothing to drain -- but if /sync/cursor hasn't run recently,
         // do that now to keep Dexie fresh.
@@ -805,13 +813,6 @@ class SyncOrchestrator {
         return;
       }
       syncStateStore.set('syncing');
-      // Mark in_flight so other refresh signals don't re-pick them.
-      for (const op of ops) {
-        await setOutboxStatus(op.clientOpId, 'in_flight', {
-          lastAttemptAt: new Date().toISOString(),
-          attemptCount: op.attemptCount + 1,
-        });
-      }
       let outcomes: OperationOutcome[] = [];
       try {
         const res = await api<SyncOperationsResponse>('/sync/operations', {
@@ -1354,6 +1355,47 @@ class SyncOrchestrator {
       entityClass,
       sinceRevision: lookup.get(entityClass) ?? 0,
     }));
+  }
+
+  private async resetCursorsForAccessExpansion(
+    accessible: SyncCursorResponse['accessible'],
+  ): Promise<boolean> {
+    if (!accessible || !this.currentUserId) return false;
+    const db = getLocalDb();
+    const key = `accessible:${this.currentUserId}`;
+    return db.transaction('rw', [db.syncMeta, db.syncCursors], async () => {
+      const previous = await db.syncMeta.get(key);
+      const prior = previous?.value as
+        | { characterIds?: unknown; campaignIds?: unknown }
+        | undefined;
+      const priorCharacters = new Set(
+        Array.isArray(prior?.characterIds)
+          ? prior.characterIds.filter((id): id is string => typeof id === 'string')
+          : [],
+      );
+      const priorCampaigns = new Set(
+        Array.isArray(prior?.campaignIds)
+          ? prior.campaignIds.filter((id): id is string => typeof id === 'string')
+          : [],
+      );
+      const hasExistingCursor = (await db.syncCursors.count()) > 0;
+      const firstObservationNeedsBackfill = previous === undefined && hasExistingCursor;
+      const expanded =
+        firstObservationNeedsBackfill ||
+        (previous !== undefined &&
+          (accessible.characterIds.some((id) => !priorCharacters.has(id)) ||
+            accessible.campaignIds.some((id) => !priorCampaigns.has(id))));
+      await db.syncMeta.put({
+        key,
+        value: {
+          characterIds: [...accessible.characterIds].sort(),
+          campaignIds: [...accessible.campaignIds].sort(),
+          observedAt: new Date().toISOString(),
+        },
+      });
+      if (expanded) await db.syncCursors.clear();
+      return expanded;
+    });
   }
 
   private async stampRevision(
