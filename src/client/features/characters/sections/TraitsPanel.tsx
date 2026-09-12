@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { type TraitEffect, traitEffect } from '../../../../shared/schemas/effects.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
@@ -14,6 +15,7 @@ import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.t
 import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
+import { EffectsEditor } from '../../library/EffectsEditor.tsx';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
@@ -406,10 +408,71 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
 interface TraitRowProps {
   characterId: string;
   trait: TraitOut;
+  inventory: CharacterDetail['inventory'];
   canWrite: boolean;
 }
 
-function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
+const characterEffectsSchema = traitEffect.array().max(50);
+
+function CharacterEffectsEditor({
+  trait,
+  inventory,
+  rowPatch,
+}: {
+  trait: TraitOut;
+  inventory: CharacterDetail['inventory'];
+  rowPatch: ReturnType<typeof useEntityRowPatch>;
+}) {
+  const [valid, setValid] = useState(true);
+  const effectsField = useDraftField<TraitEffect[]>({
+    name: `${trait.name} custom effects`,
+    serverValue: trait.customEffects ?? [],
+    format: JSON.stringify,
+    parse: (raw) => characterEffectsSchema.parse(JSON.parse(raw) as unknown),
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    onSave: (effects) => rowPatch.patch('customEffects', effects),
+    flashKey: rowPatch.flashKey('customEffects'),
+  });
+  const effects = characterEffectsSchema.parse(JSON.parse(effectsField.value) as unknown);
+
+  return (
+    <details className="mt-2 rounded-lg border border-base-300 bg-base-100/50 p-2">
+      <summary className="cursor-pointer text-xs font-medium">
+        Custom effects{effects.length > 0 ? ` (${effects.length})` : ''}
+      </summary>
+      <div
+        className={`${DRAFT_FIELD_CLASS} mt-2 space-y-2`}
+        data-flashing={effectsField.inputProps['data-flashing']}
+        data-flash-parity={effectsField.inputProps['data-flash-parity']}
+      >
+        <p className="text-xs text-base-content/60">
+          Add character-specific mechanics here. “This inventory item” is the safest way to bind a
+          bonus to one weapon; it becomes inactive while that item is unequipped.
+        </p>
+        <EffectsEditor
+          effects={effects}
+          inventoryItems={inventory}
+          portable={false}
+          onChange={(next) => effectsField.setValue(JSON.stringify(next))}
+          onValidityChange={setValid}
+        />
+        {effectsField.error && <p className="text-xs text-error">{effectsField.error}</p>}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={!valid}
+            onClick={effectsField.commit}
+          >
+            {effectsField.isSaving ? 'Save latest changes' : 'Save effects'}
+          </button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function TraitRow({ characterId, trait, inventory, canWrite }: TraitRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -473,6 +536,9 @@ function TraitRow({ characterId, trait, canWrite }: TraitRowProps) {
           </span>
         )}
         <LibraryMechanicsNote mechanics={trait.libraryMechanics} />
+        {canWrite && (
+          <CharacterEffectsEditor trait={trait} inventory={inventory} rowPatch={rowPatch} />
+        )}
         <p className="text-xs text-base-content/60 capitalize">
           {trait.kind.replace('_', ' ')}
           {trait.level != null && trait.level > 0 && canWrite && (
@@ -583,7 +649,13 @@ export function TraitsPanel({
             <h3 className="label-eyebrow mt-2">{kind.replace('_', ' ')}</h3>
             <ul>
               {(grouped.get(kind) ?? []).map((t) => (
-                <TraitRow key={t.id} characterId={character.id} trait={t} canWrite={canWrite} />
+                <TraitRow
+                  key={t.id}
+                  characterId={character.id}
+                  trait={t}
+                  inventory={character.inventory}
+                  canWrite={canWrite}
+                />
               ))}
             </ul>
           </div>

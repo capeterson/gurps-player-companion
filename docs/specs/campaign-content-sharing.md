@@ -390,7 +390,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 6`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 7`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
@@ -427,6 +427,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   explicitly means no default and is retained on export; null/absent means
   unknown and is the migration policy for older rows. Picks copy declarations
   onto the character; later library changes do not silently rewrite that copy.
+- **Weapon effects (v7):** adds weapon-scoped effects. Library-item selectors export their stable
+  normalized name but omit the campaign-local UUID; after import they match only
+  inventory rows with library provenance, never unrelated same-name custom items.
   Older YAML versions still parse; omitted defaults remain unknown.
 - **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
   campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set

@@ -1,6 +1,9 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
+import type { LibraryTraitEffect, TraitEffect } from '../../shared/schemas/effects.ts';
+import type { HistoryEventOut } from '../../shared/schemas/history.ts';
 import type { OAuthScope } from '../../shared/schemas/oauth.ts';
+import { parseLibraryYaml } from '../../shared/yaml/library.ts';
 import { createApp } from '../app.ts';
 import type { AppConfig } from '../config.ts';
 import { closeDb, getDb, runInDbTransaction } from '../db/client.ts';
@@ -762,5 +765,256 @@ describe('delegated operation behavioral parity', () => {
 
     const unchanged = await call<{ dx: number }>(owner, 'gpc_get_character', path(character.id));
     expect(unchanged.body.dx).toBe(20);
+  });
+
+  // Manifest anchor: effects-authoring-parity.
+  it('preserves library and owned effects, YAML v7 portability, retries and refinement errors', async () => {
+    const [client] = await getDb()
+      .insert(oauthClients)
+      .values({
+        clientId: `mcp-effects-${randomUUID()}`,
+        name: 'Effects parity',
+        redirectUris: ['http://127.0.0.1:49152/callback'],
+        allowedScopes: ['gpc:read', 'gpc:write', 'gpc:manage'],
+      })
+      .returning({ id: oauthClients.id });
+    if (!client) throw new Error('client insert failed');
+    const owner = await registerActor('effects-owner', client.id);
+    const member = await registerActor('effects-member', client.id);
+    const campaign = (
+      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+        body: { name: 'Effects parity', shareCharacterSheets: false },
+      })
+    ).body;
+    await call(owner, 'gpc_add_campaign_member', {
+      ...path(campaign.id),
+      body: { email: member.email },
+    });
+    const sourceItem = (
+      await call<{ id: string }>(owner, 'gpc_create_library_item', {
+        ...path(campaign.id),
+        body: { name: 'Spear', weaponData: { skill: 'Spear', damage: 'thr+2 imp' } },
+      })
+    ).body;
+    const portableEffects: [LibraryTraitEffect, LibraryTraitEffect] = [
+      {
+        target: 'weapon_damage',
+        value: 2,
+        scaling: 'per_level',
+        weaponSelector: {
+          kind: 'library_item',
+          libraryItemId: sourceItem.id,
+          libraryItemName: 'Spear',
+          modeName: 'Primary',
+        },
+      },
+      {
+        target: 'weapon_attack',
+        value: 1,
+        scaling: 'flat',
+        weaponSelector: { kind: 'weapon_skill', skillName: 'Spear' },
+        conditionGroup: 'focused',
+        conditionLabel: 'Focused',
+      },
+    ];
+    const libraryTrait = (
+      await call<{ id: string; effects: unknown[] }>(owner, 'gpc_create_library_trait', {
+        ...path(campaign.id),
+        body: { name: 'Spear Mastery', kind: 'advantage', effects: portableEffects },
+      })
+    ).body;
+    expect(libraryTrait.effects).toEqual(portableEffects);
+    await call(owner, 'gpc_update_library_trait', {
+      ...path(campaign.id, { traitId: libraryTrait.id }),
+      body: { effects: [...portableEffects].reverse() },
+    });
+    const skillEffects: [LibraryTraitEffect] = [
+      {
+        target: 'weapon_parry',
+        value: 1,
+        scaling: 'flat',
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Spear' },
+      },
+    ];
+    const librarySkill = (
+      await call<{ id: string }>(owner, 'gpc_create_library_skill', {
+        ...path(campaign.id),
+        body: { name: 'Spear', attribute: 'DX', difficulty: 'A', effects: skillEffects },
+      })
+    ).body;
+    await call(owner, 'gpc_update_library_skill', {
+      ...path(campaign.id, { skillId: librarySkill.id }),
+      body: { effects: skillEffects },
+    });
+    const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaign.id));
+    const yaml = parseLibraryYaml(exported.body);
+    expect(yaml.version).toBe(7);
+    expect(exported.body).not.toContain('libraryItemId');
+    expect(yaml.library.traits[0]?.effects).toEqual([
+      portableEffects[1],
+      {
+        ...portableEffects[0],
+        weaponSelector: { kind: 'library_item', libraryItemName: 'Spear', modeName: 'Primary' },
+      },
+    ]);
+    expect(yaml.library.skills[0]?.effects).toEqual(skillEffects);
+    const importArgs = {
+      ...path(campaign.id),
+      body: { yaml: exported.body, mode: 'merge' },
+      idempotencyKey: randomUUID(),
+    };
+    const imported = await call(owner, 'gpc_import_campaign_library', importArgs);
+    expect(
+      (await callAny(owner, 'gpc_import_campaign_library', importArgs)).structured.body,
+    ).toEqual(imported.body);
+    const library = (
+      await call<{ traits: Array<{ effects: unknown[] }>; skills: Array<{ effects: unknown[] }> }>(
+        owner,
+        'gpc_get_campaign_library',
+        path(campaign.id),
+      )
+    ).body;
+    expect(library.traits[0]?.effects).toEqual(yaml.library.traits[0]?.effects);
+    expect(library.skills[0]?.effects).toEqual(skillEffects);
+
+    const character = (
+      await call<{ id: string }>(owner, 'gpc_create_character', {
+        body: { name: 'Owned effects', campaignId: campaign.id },
+      })
+    ).body;
+    const inventory = (
+      await call<{ item: { id: string } }>(owner, 'gpc_create_inventory_item', {
+        ...path(character.id),
+        body: {
+          name: 'Spear',
+          equipped: true,
+          weaponData: { skill: 'Spear', damage: 'thr+2 imp' },
+        },
+      })
+    ).body.item;
+    const customEffects: [TraitEffect] = [
+      {
+        target: 'weapon_attack',
+        value: 3,
+        scaling: 'flat',
+        weaponSelector: {
+          kind: 'inventory_item',
+          inventoryItemId: inventory.id,
+          modeName: 'Primary',
+        },
+      },
+    ];
+    const createArgs = {
+      ...path(character.id),
+      body: { name: 'My spear mastery', kind: 'advantage', customEffects },
+      idempotencyKey: randomUUID(),
+    };
+    const created = (
+      await call<{ trait: { id: string; customEffects: unknown[] } }>(
+        owner,
+        'gpc_create_character_trait',
+        createArgs,
+      )
+    ).body;
+    expect(created.trait.customEffects).toEqual(customEffects);
+    expect(
+      (await callAny(owner, 'gpc_create_character_trait', createArgs)).structured.body,
+    ).toEqual(created);
+    const detail = (
+      await call<{ traits: unknown[]; effects: unknown[] }>(
+        owner,
+        'gpc_get_character',
+        path(character.id),
+      )
+    ).body;
+    expect(detail.traits).toHaveLength(1);
+    expect(detail.effects).toContainEqual(
+      expect.objectContaining({
+        target: 'weapon_attack',
+        value: 3,
+        weaponSelector: customEffects[0]?.weaponSelector,
+        matchedInventoryItemIds: [inventory.id],
+        weaponMatchStatus: 'one',
+      }),
+    );
+    const history = (
+      await call<HistoryEventOut[]>(owner, 'gpc_get_character_history', {
+        ...path(character.id),
+        query: { detail: '1' },
+      })
+    ).body;
+    const traitHistory = history.filter((event) => event.entityId === created.trait.id);
+    expect(traitHistory).toHaveLength(1);
+    expect(traitHistory[0]).toMatchObject({
+      actorUserId: owner.principal.user.id,
+      agentClientId: client.id,
+      agentGrantId: owner.principal.grantId,
+      newRow: { custom_effects: customEffects },
+    });
+
+    // These Zod refinements cannot be expressed by OpenAPI's field types; the
+    // delegated handler must preserve REST's field-specific failures.
+    for (const [name, args, status] of [
+      [
+        'gpc_create_library_trait',
+        {
+          ...path(campaign.id),
+          body: { name: 'Invalid', kind: 'advantage', effects: customEffects },
+        },
+        422,
+      ],
+      [
+        'gpc_create_library_skill',
+        {
+          ...path(campaign.id),
+          body: { name: 'Invalid', attribute: 'DX', difficulty: 'A', effects: customEffects },
+        },
+        422,
+      ],
+      [
+        'gpc_update_character_trait',
+        {
+          ...path(character.id, { traitId: created.trait.id }),
+          body: { customEffects: [{ target: 'weapon_damage', value: 1 }] },
+        },
+        422,
+      ],
+      [
+        'gpc_update_character_trait',
+        {
+          ...path(character.id, { traitId: created.trait.id }),
+          body: { customEffects: [{ ...customEffects[0], target: 'weapon_parry' }] },
+        },
+        422,
+      ],
+    ] as const) {
+      const rest = await previewRest(owner, name, args);
+      const mcp = await callAny(owner, name, args);
+      expect(rest.status).toBe(status);
+      expect(mcp.isError).toBe(true);
+      expect(mcp.structured.status).toBe(rest.status);
+      expect(mcp.structured.body).toEqual(rest.body);
+    }
+    const traitPath = path(character.id, { traitId: created.trait.id });
+    const deniedArgs = { ...traitPath, body: { customEffects: [] } };
+    const deniedRest = await previewRest(member, 'gpc_update_character_trait', deniedArgs);
+    const deniedMcp = await callAny(member, 'gpc_update_character_trait', deniedArgs);
+    expect(deniedRest.status).toBe(403);
+    expect(deniedMcp.structured.body).toEqual(deniedRest.body);
+    const privateRead = await call<Record<string, unknown>>(
+      member,
+      'gpc_get_character',
+      path(character.id),
+    );
+    expect(privateRead.body).toMatchObject({ view: 'minimal' });
+    expect(privateRead.body).not.toHaveProperty('effects');
+    expect(privateRead.body).not.toHaveProperty('traits');
+    await call(owner, 'gpc_update_character_trait', { ...traitPath, body: { customEffects: [] } });
+    const cleared = await call<{ effects: unknown[] }>(
+      owner,
+      'gpc_get_character',
+      path(character.id),
+    );
+    expect(cleared.body.effects).toEqual([]);
   });
 });

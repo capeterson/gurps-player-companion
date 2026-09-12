@@ -33,6 +33,7 @@ The two deliberate exceptions (`notifications.payload`,
 | `characters.dismissed_warnings` | `dismissedWarningsField` (character.ts) — `string[]` of warning codes | REST `/characters/{id}/warnings/dismiss` (`dismissWarningRequest`, one code at a time); sync patch `fieldPath: 'dismissedWarnings'` via `characterSyncPatch` |
 | `characters.temp_effects` | `tempEffectsField` (character.ts) — `TempEffect[]`, max 40, `{ id, name, mods }` with `mods` a strict per-axis object (`TEMP_STAT_AXES`); `superRefine` enforces unique ids and a per-axis SUM across all effects within [-50, 50]. The `id: 'manual'` sentinel (`MANUAL_TEMP_EFFECT_ID`) is the entry the ✦ modifier popovers write to; other ids are client uuids for named effects. | REST character create/update (`characterCreate` / `characterUpdate`, via `characterAttributesShape`); sync patch `fieldPath: 'tempEffects'` (whole-array replace) via `characterSyncPatch`. Share-gate masked to `[]` for minimal-view characters (`projectCharacterRow` in `routes/sync.ts`). |
 | `character_traits.modifiers` | `traitModifier[]` (trait.ts) | REST trait create/update (`traitCreate` / `traitUpdate`); sync per-field validator |
+| `character_traits.custom_effects` | `traitEffect[]` (effects.ts), max 50; unlike portable library declarations this may use an exact `inventory_item` selector | REST trait create/update and the local-first sync patch path; the character trait effect editor validates the full array before enqueueing it. Migration 0043 defaults existing rows to `[]`. |
 | `character_skills.defaults` | `skillDefaults` (skill.ts): null = unknown legacy declaration, [] = no default, otherwise up to 20 strict attribute/skill plus modifier records; skill references may specify specialization | REST skill create/update, sync create/per-field/whole-body validators; copied by the library picker and mirrored in Dexie |
 | `campaign_library_skills.defaults` | `skillDefaults` (skill.ts), same nullable declaration list | Library REST CRUD and YAML import/export |
 | `inventory_items.armor` | `armorData` (inventory.ts), nullable; nests `typedDr` (`typedArmorDr` — per-damage-type DR overrides for cut/imp/pi/pi−/pi+/pi++/burn/corr/fat/tox, defaults to `{}`; `aggregateDrByLocation` builds the per-location type total from each layer's override when present, else that layer's base `dr`, so a base-DR 4 jacket plus a DR 2 coif with `cut: 5` resolves cut DR 9 — the override replaces the affected layer's contribution, never the whole stack; `resolveDr` falls back to `drCrushing` for `cr` then `dr`; torso coverage also protects vitals, with repeated or explicit torso/vitals entries counted once per layer) plus an optional `db` (armor Defense Bonus from Deflect enchantments; `resolveArmorDb` chooses the highest equipped covering item for the selected location/facing, then that one value stacks with shield DB) | REST inventory create/update (`inventoryItemCreate` / `inventoryItemUpdate`); sync per-field validator |
@@ -45,9 +46,9 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_traits.available_modifiers` | `traitModifier[]` (trait.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
 | `campaign_library_traits.tags` | `tagList` (campaignLibrary.ts) — `string[]`, each 1–40 chars | REST library CRUD + YAML import |
 | `campaign_library_traits.variants` | `traitVariant[]` (trait.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
-| `campaign_library_traits.effects` | `traitEffect[]` (effects.ts); active `dr` effects retain optional `hitLocation` in the effective protection map. Unscoped innate DR excludes eyes; explicit eye/custom locations are supported; torso-scoped effects also protect vitals. | REST library CRUD + YAML import (`libraryTraitCreate`) |
+| `campaign_library_traits.effects` | `libraryTraitEffect[]` (effects.ts); global/stat/skill effects plus weapon attack/Parry/Block/damage/Accuracy targets. Weapon targets require a deterministic portable selector (governing skill + optional specialty, exact normalized weapon name, or library-item provenance); attack/damage/Accuracy may narrow to `Primary` or an exact alternate-mode name. Character-local `inventory_item` selectors exist only in the broader owned `traitEffect` schema and are rejected here. Active `dr` effects retain optional `hitLocation`. | REST library CRUD + YAML v7 import (`libraryTraitCreate`) |
 | `campaign_library_skills.situational_modifiers` | `situationalModifier[]` (skill.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
-| `campaign_library_skills.effects` | `traitEffect[]` (effects.ts); same DR location semantics as trait effects | REST library CRUD + YAML import (`librarySkillCreate`) |
+| `campaign_library_skills.effects` | `libraryTraitEffect[]` (effects.ts); same target-aware validation and portable weapon-selector rules as trait effects. Skill-definition authoring exposes flat effects because skills have no purchased trait level. | REST library CRUD + YAML v7 import (`librarySkillCreate`) |
 | `campaign_library_styles.techniques` | `styleTechniqueRef[]` (campaignLibrary.ts) — `{ name, defaultSkillName, difficulty, maxLevel? }`, max 100. Denormalized (no technique id) so a style survives a YAML round trip into a campaign whose technique rows don't exist yet | REST library CRUD + YAML import (`libraryStyleCreate`) |
 | `campaign_library_styles.perks` / `.skills` | `styleNameList` (campaignLibrary.ts) — `string[]`, each 1–160 chars, max 100 | REST library CRUD + YAML import (`libraryStyleCreate`) |
 | `campaign_library_items.armor` | `armorData` (inventory.ts), nullable — same shape as `inventory_items.armor` incl. `typedDr` / `db` | REST library CRUD + YAML import (`libraryItemCreate`) |
@@ -103,6 +104,13 @@ signed flat adds to the corresponding final ST-based damage dice. Scaling
 and active conditions apply before summation; temporary ST changes the base
 table lookup first. Weapon adds then apply once; explicit weapon dice do not
 receive these ST-based bonuses.
+
+Weapon-scoped declarations are copied into the same owned mechanics snapshots.
+Resolved character-detail effects add `matchedInventoryItemIds` and a
+`weaponMatchStatus` (`zero`, `one`, or `multiple`) for presentation only; those
+diagnostic fields are derived, not persisted. Runtime `library_item` matching
+uses its UUID when present. YAML export removes that local UUID and retains the
+name fallback, which still requires non-null `inventory_items.library_item_id`.
 
 ## Checklist for adding a new JSON field
 

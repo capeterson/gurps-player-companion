@@ -20,6 +20,13 @@ import type { RangedData, WeaponData } from '../../../../../shared/schemas/inven
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
+import {
+  ModifierBreakdown,
+  WeaponEffectDiagnostics,
+  effectTotal,
+  skillEffectsForRow,
+  weaponEffectsForRow,
+} from './weaponEffectView.tsx';
 
 function capitalize(s: string): string {
   return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
@@ -115,6 +122,7 @@ export interface AttacksCardProps {
 }
 
 export function AttacksCard({ character, openRoll }: AttacksCardProps) {
+  const effects = character.effects ?? [];
   const state = combatAdjustments({
     hp: character.combat?.currentHp ?? character.derived.hp,
     maxHp: character.derived.hp,
@@ -156,6 +164,12 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
           ST-based damage is unavailable until linked library effects load.
         </p>
       )}
+      <WeaponEffectDiagnostics
+        effects={effects.filter((effect) =>
+          ['weapon_attack', 'weapon_damage', 'weapon_accuracy'].includes(effect.target),
+        )}
+        inventory={character.inventory}
+      />
       <div className="space-y-3">
         {weapons.map((w) => {
           const wd = w.weaponData;
@@ -185,9 +199,29 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
           // ahead of hit locations. Single-select like every preset —
           // range + location stacking composes via the ± steppers.
           const ranged = wd.ranged;
+          const primaryAttackEffects = weaponEffectsForRow(
+            effects,
+            w.id,
+            'weapon_attack',
+            'primary',
+          );
+          const primaryAccuracyEffects = weaponEffectsForRow(
+            effects,
+            w.id,
+            'weapon_accuracy',
+            'primary',
+          );
+          const primaryAccuracy = (ranged?.acc ?? 0) + effectTotal(primaryAccuracyEffects);
           const presets: readonly RollPreset[] = ranged
             ? [
-                ...(ranged.acc != null ? [{ label: `Aim (+${ranged.acc})`, mod: ranged.acc }] : []),
+                ...(ranged.acc != null || primaryAccuracyEffects.length > 0
+                  ? [
+                      {
+                        label: `Aim (${primaryAccuracy >= 0 ? '+' : ''}${primaryAccuracy})`,
+                        mod: primaryAccuracy,
+                      },
+                    ]
+                  : []),
                 ...RANGE_PRESETS,
                 ...locationPresets,
               ]
@@ -203,67 +237,169 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
                   </span>
                 )}
               </div>
-              {parsedByLine.map(({ line, modes }) => (
-                <div
-                  key={line.key}
-                  className="num flex flex-wrap items-center gap-1.5 text-xs text-base-content/70"
-                >
-                  {line.modeName && <span className="label-eyebrow not-num">{line.modeName}</span>}
-                  {modes.length > 0 ? (
-                    modes.map((m) => {
-                      const resolved = resolveDamage(m, thrust, swing);
-                      if (!resolved) return <span key={`${line.key}:${m.raw}`}>{m.raw}</span>;
-                      const dice = formatDamageDice(resolved.dice);
-                      const type = resolved.type ? ` ${resolved.type}` : '';
-                      const divisor = resolved.armorDivisor ? ` (${resolved.armorDivisor})` : '';
-                      const display = `${dice}${type}${divisor}`;
-                      const rollLabel = line.modeName
-                        ? `${w.name} (${line.modeName}) damage`
-                        : `${w.name} damage`;
-                      return (
-                        <button
-                          key={`${line.key}:${m.raw}`}
-                          type="button"
-                          className="chip"
-                          onClick={() =>
-                            openRoll({
-                              label: rollLabel,
-                              baseTarget: 0,
-                              damage: {
-                                dice: resolved.dice,
-                                damageType: resolved.type,
-                                armorDivisor: resolved.armorDivisor,
-                              },
+              {parsedByLine.map(({ line, modes }) => {
+                const modeName = line.modeName ?? 'primary';
+                const damageEffects = weaponEffectsForRow(effects, w.id, 'weapon_damage', modeName);
+                const damageBonus = effectTotal(damageEffects);
+                return (
+                  <div key={line.key} className="space-y-1">
+                    <div className="num flex flex-wrap items-center gap-1.5 text-xs text-base-content/70">
+                      {line.modeName && (
+                        <span className="label-eyebrow not-num">{line.modeName}</span>
+                      )}
+                      {modes.length > 0 ? (
+                        modes.map((m) => {
+                          const resolved = resolveDamage(m, thrust, swing);
+                          if (!resolved) return <span key={`${line.key}:${m.raw}`}>{m.raw}</span>;
+                          const finalDice = {
+                            ...resolved.dice,
+                            adds: resolved.dice.adds + damageBonus,
+                          };
+                          const dice = formatDamageDice(finalDice);
+                          const type = resolved.type ? ` ${resolved.type}` : '';
+                          const divisor = resolved.armorDivisor
+                            ? ` (${resolved.armorDivisor})`
+                            : '';
+                          const display = `${dice}${type}${divisor}`;
+                          const rollLabel = line.modeName
+                            ? `${w.name} (${line.modeName}) damage`
+                            : `${w.name} damage`;
+                          return (
+                            <button
+                              key={`${line.key}:${m.raw}`}
+                              type="button"
+                              className="chip"
+                              onClick={() =>
+                                openRoll({
+                                  label: rollLabel,
+                                  baseTarget: 0,
+                                  damage: {
+                                    dice: finalDice,
+                                    damageType: resolved.type,
+                                    armorDivisor: resolved.armorDivisor,
+                                  },
+                                })
+                              }
+                            >
+                              {display}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <span>{line.damage ?? '—'}</span>
+                      )}
+                      {line.reach ? <span>· reach {line.reach}</span> : null}
+                    </div>
+                    <ModifierBreakdown
+                      baseLabel="Parsed damage"
+                      baseValue={
+                        modes[0]
+                          ? formatDamageDice(
+                              resolveDamage(modes[0], thrust, swing)?.dice ?? { dice: 0, adds: 0 },
+                            )
+                          : (line.damage ?? '—')
+                      }
+                      weaponEffects={damageEffects}
+                      finalValue={
+                        modes[0]
+                          ? formatDamageDice({
+                              ...(resolveDamage(modes[0], thrust, swing)?.dice ?? {
+                                dice: 0,
+                                adds: 0,
+                              }),
+                              adds:
+                                (resolveDamage(modes[0], thrust, swing)?.dice.adds ?? 0) +
+                                damageBonus,
                             })
-                          }
-                        >
-                          {display}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <span>{line.damage ?? '—'}</span>
-                  )}
-                  {line.reach ? <span>· reach {line.reach}</span> : null}
-                </div>
-              ))}
+                          : (line.damage ?? '—')
+                      }
+                    />
+                    {line.modeName &&
+                      resolution.kind === 'matched' &&
+                      (() => {
+                        const attackEffects = weaponEffectsForRow(
+                          effects,
+                          w.id,
+                          'weapon_attack',
+                          line.modeName,
+                        );
+                        const accuracyEffects = weaponEffectsForRow(
+                          effects,
+                          w.id,
+                          'weapon_accuracy',
+                          line.modeName,
+                        );
+                        if (attackEffects.length === 0 && accuracyEffects.length === 0) return null;
+                        const accuracy = (ranged?.acc ?? 0) + effectTotal(accuracyEffects);
+                        const modePresets: readonly RollPreset[] = ranged
+                          ? [
+                              ...(ranged.acc != null || accuracyEffects.length > 0
+                                ? [
+                                    {
+                                      label: `Aim (${accuracy >= 0 ? '+' : ''}${accuracy})`,
+                                      mod: accuracy,
+                                    },
+                                  ]
+                                : []),
+                              ...RANGE_PRESETS,
+                              ...locationPresets,
+                            ]
+                          : locationPresets;
+                        const base = resolution.level - stPenalty;
+                        const skillEffects = skillEffectsForRow(effects, resolution.name);
+                        const final = base + effectTotal(attackEffects);
+                        return (
+                          <RollableRow
+                            label={`${resolution.name} · ${line.modeName}`}
+                            baseTarget={final}
+                            presets={modePresets}
+                            openRoll={openRoll}
+                            sublabel={
+                              <ModifierBreakdown
+                                baseLabel="Skill after ST"
+                                baseValue={base - effectTotal(skillEffects)}
+                                globalEffects={skillEffects}
+                                weaponEffects={attackEffects}
+                                finalValue={final}
+                              />
+                            }
+                          />
+                        );
+                      })()}
+                  </div>
+                );
+              })}
               {ranged && rangedStatLine(ranged) !== '' && (
                 <p className="num text-xs text-base-content/70">{rangedStatLine(ranged)}</p>
               )}
               {resolution.kind === 'matched' ? (
-                <RollableRow
-                  label={resolution.name}
-                  baseTarget={resolution.level - stPenalty}
-                  presets={presets}
-                  openRoll={openRoll}
-                  sublabel={
-                    stPenalty > 0 ? (
-                      <span className="block text-[11px] text-base-content/60">
-                        {resolution.name} {resolution.level} − {stPenalty} ST
-                      </span>
-                    ) : undefined
-                  }
-                />
+                (() => {
+                  const skillEffects = skillEffectsForRow(effects, resolution.name);
+                  const base = resolution.level - stPenalty - effectTotal(skillEffects);
+                  const final = resolution.level - stPenalty + effectTotal(primaryAttackEffects);
+                  return (
+                    <RollableRow
+                      label={resolution.name}
+                      baseTarget={final}
+                      presets={presets}
+                      openRoll={openRoll}
+                      sublabel={
+                        <span className="block text-[11px] text-base-content/60">
+                          {stPenalty > 0
+                            ? `${resolution.name} ${resolution.level} − ${stPenalty} ST`
+                            : null}
+                          <ModifierBreakdown
+                            baseLabel="Skill after ST"
+                            baseValue={base}
+                            globalEffects={skillEffects}
+                            weaponEffects={primaryAttackEffects}
+                            finalValue={final}
+                          />
+                        </span>
+                      }
+                    />
+                  );
+                })()
               ) : resolution.kind === 'missing' ? (
                 <p className="text-[11px] text-base-content/50">
                   Skill '{resolution.skillName}' not on sheet — add it in the Skills tab.

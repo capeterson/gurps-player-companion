@@ -1,4 +1,4 @@
-version: 6
+version: 7
 campaign:
   name: Sample
   description: |
@@ -30,6 +30,26 @@ library:
           value: 1
         - target: block
           value: 1
+    - name: Weapon Master (Broadsword)
+      kind: advantage
+      basePoints: 20
+      description: |
+        Demonstrates portable weapon-scoped effects: the attack bonus follows
+        weapons using Broadsword skill, while the damage bonus follows the
+        campaign-library Broadsword item even when a character renames it.
+      tags: [combat]
+      effects:
+        - target: weapon_attack
+          value: 1
+          weaponSelector:
+            kind: weapon_skill
+            skillName: Broadsword
+        - target: weapon_damage
+          value: 2
+          weaponSelector:
+            kind: library_item
+            libraryItemName: Broadsword
+            modeName: Primary
     - name: Bad Temper
       kind: disadvantage
       basePoints: -10
@@ -220,6 +240,7 @@ library:
       description: A sturdy steel cut-and-thrust sword.
       source: B-271
       weaponData:
+        skill: Broadsword
         damage: sw+1 cut / thr+1 cr
         reach: '1'
         parry: '0'

@@ -50,6 +50,54 @@ function makeCharacter(damage: string, overrides: WeaponOverrides = {}): Charact
 }
 
 describe('AttacksCard', () => {
+  it('applies scoped attack, damage, and Accuracy bonuses with source breakdowns', () => {
+    const character = makeCharacter('thr imp', { ranged: { acc: 2 } });
+    character.effects = [
+      {
+        sourceKind: 'trait',
+        sourceName: 'Weapon Bond',
+        sourceId: '11111111-1111-4111-8111-111111111111',
+        target: 'weapon_attack',
+        value: 1,
+        active: true,
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Broadsword' },
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Puissance',
+        sourceId: '22222222-2222-4222-8222-222222222222',
+        target: 'weapon_damage',
+        value: 2,
+        active: true,
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Broadsword' },
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Accuracy',
+        sourceId: '33333333-3333-4333-8333-333333333333',
+        target: 'weapon_accuracy',
+        value: 1,
+        active: true,
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Broadsword' },
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+    ];
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '1d imp' }));
+    expect(openRoll.mock.calls[0]?.[0].damage.dice).toEqual({ dice: 1, adds: 0 });
+    fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
+    expect(openRoll.mock.calls[1]?.[0].baseTarget).toBe(15);
+    expect(openRoll.mock.calls[1]?.[0].presets[0]).toEqual({ label: 'Aim (+3)', mod: 3 });
+    expect(screen.getAllByText('Weapon Bond').length).toBeGreaterThan(0);
+  });
+
   it('withholds ST-based damage while effects are unknown, keeping fixed dice usable', () => {
     const character = {
       ...makeCharacter('thr+1 imp / sw+1 cut / 2d pi'),

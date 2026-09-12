@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MODIFIER_CATEGORIES, MODIFIER_COST_TYPES, TRAIT_KINDS } from '../constants/traits.ts';
 import { timestamps, uuid } from './common.ts';
+import { traitEffect } from './effects.ts';
 import { libraryMechanics } from './libraryMechanics.ts';
 
 export const traitKindEnum = z.enum(TRAIT_KINDS);
@@ -53,6 +54,14 @@ export const traitOut = z.object({
   modifiers: z.array(traitModifier).default([]),
   libraryTraitId: uuid.nullable(),
   libraryMechanics: libraryMechanics.nullable().optional(),
+  /** Character-owned declarations, including exact inventory-item bindings. */
+  customEffects: z
+    .array(traitEffect)
+    .max(50)
+    .optional()
+    .describe(
+      'Character-owned mechanics. May use inventory_item selectors that bind exact inventory UUIDs.',
+    ),
   ...timestamps,
 });
 
@@ -65,6 +74,13 @@ export const traitCreate = z.object({
   notes: z.string().max(20_000).nullable().optional(),
   modifiers: z.array(traitModifier).default([]),
   libraryTraitId: uuid.nullable().optional(),
+  customEffects: z
+    .array(traitEffect)
+    .max(50)
+    .default([])
+    .describe(
+      'Character-owned mechanics. May use inventory_item selectors that bind exact inventory UUIDs.',
+    ),
 });
 
 export const traitUpdate = traitCreate.partial();

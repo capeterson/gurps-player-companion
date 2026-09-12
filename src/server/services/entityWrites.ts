@@ -94,6 +94,7 @@ export function traitInsertValues(
     notes: body.notes ?? null,
     modifiers: body.modifiers ?? [],
     libraryTraitId: body.libraryTraitId ?? null,
+    customEffects: body.customEffects ?? [],
   };
 }
 

@@ -32,6 +32,7 @@ import type {
 import type { TraitModifier } from '../../../shared/schemas/trait.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { ApiError, api, apiFetch } from '../../lib/api.ts';
+import { EffectsEditor, effectPreview } from './EffectsEditor.tsx';
 
 interface LibraryPayload {
   traits: LibraryTraitOut[];
@@ -464,6 +465,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     }
                     onSubmit={(body) => updateTrait.mutate({ id: t.id, body })}
                     onCancel={() => setTraitsEditId(null)}
+                    libraryItems={library.data.items}
                   />
                 ) : (
                   <article key={t.id} className="card p-card">
@@ -512,6 +514,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                         ))}
                       </div>
                     )}
+                    {t.effects.length > 0 && (
+                      <ul className="mt-2 space-y-0.5 text-xs text-base-content/70">
+                        {t.effects.map((effect, index) => (
+                          <li key={`${effect.target}-${index}`}>• {effectPreview(effect)}</li>
+                        ))}
+                      </ul>
+                    )}
                   </article>
                 ),
               )}
@@ -527,6 +536,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   }
                   onSubmit={(body) => createTrait.mutate(body)}
                   onCancel={() => setTraitsAddOpen(false)}
+                  libraryItems={library.data.items}
                 />
               )}
               {counts.traits === 0 && !traitsAddOpen && (
@@ -565,6 +575,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     }
                     onSubmit={(body) => updateSkill.mutate({ id: s.id, body })}
                     onCancel={() => setSkillsEditId(null)}
+                    libraryItems={library.data.items}
                   />
                 ) : (
                   <article key={s.id} className="card p-card">
@@ -600,6 +611,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     </div>
                     {s.description && <p className="text-sm text-muted">{s.description}</p>}
                     {s.source && <p className="text-xs text-dim">Source · {s.source}</p>}
+                    {s.effects.length > 0 && (
+                      <ul className="mt-2 space-y-0.5 text-xs text-base-content/70">
+                        {s.effects.map((effect, index) => (
+                          <li key={`${effect.target}-${index}`}>• {effectPreview(effect)}</li>
+                        ))}
+                      </ul>
+                    )}
                   </article>
                 ),
               )}
@@ -615,6 +633,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   }
                   onSubmit={(body) => createSkill.mutate(body)}
                   onCancel={() => setSkillsAddOpen(false)}
+                  libraryItems={library.data.items}
                 />
               )}
               {counts.skills === 0 && !skillsAddOpen && (
@@ -891,9 +910,17 @@ interface TraitFormProps {
   error?: string | null;
   onSubmit: (body: LibraryTraitCreate) => void;
   onCancel: () => void;
+  libraryItems: readonly LibraryItemOut[];
 }
 
-function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormProps) {
+function TraitForm({
+  initial,
+  isPending,
+  error,
+  onSubmit,
+  onCancel,
+  libraryItems,
+}: TraitFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [kind, setKind] = useState<(typeof TRAIT_KINDS)[number]>(initial?.kind ?? 'advantage');
   // Keep as a string draft so typing a leading '-' isn't immediately clobbered.
@@ -901,6 +928,8 @@ function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormP
   const [description, setDescription] = useState(initial?.description ?? '');
   const [source, setSource] = useState(initial?.source ?? '');
   const [modifiers, setModifiers] = useState<TraitModifier[]>(initial?.availableModifiers ?? []);
+  const [effects, setEffects] = useState(initial?.effects ?? []);
+  const [effectsValid, setEffectsValid] = useState(true);
 
   function handleSubmit() {
     if (!name.trim()) return;
@@ -915,13 +944,13 @@ function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormP
       source: source.trim() || null,
       availableModifiers: modifiers,
       variants: initial?.variants ?? [],
-      effects: initial?.effects ?? [],
+      effects,
       tags: initial?.tags ?? [],
     });
   }
 
   return (
-    <div className="card p-card space-y-3 border border-primary/30">
+    <fieldset disabled={isPending} className="card p-card space-y-3 border border-primary/30">
       <div className="flex flex-wrap gap-3">
         <label className="form-control min-w-[10rem] flex-1">
           <span className="label-text">Name *</span>
@@ -979,6 +1008,12 @@ function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormP
         />
       </label>
       <ModifierSubEditor modifiers={modifiers} onChange={setModifiers} />
+      <EffectsEditor
+        effects={effects}
+        libraryItems={libraryItems}
+        onChange={setEffects}
+        onValidityChange={setEffectsValid}
+      />
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -992,13 +1027,13 @@ function TraitForm({ initial, isPending, error, onSubmit, onCancel }: TraitFormP
           type="button"
           className="btn btn-primary btn-sm"
           onClick={handleSubmit}
-          disabled={isPending || !name.trim()}
+          disabled={isPending || !name.trim() || !effectsValid}
         >
           {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add trait'}
         </button>
       </div>
       {error && <p className="alert alert-error text-sm">{error}</p>}
-    </div>
+    </fieldset>
   );
 }
 
@@ -1164,9 +1199,17 @@ interface SkillFormProps {
   error?: string | null;
   onSubmit: (body: LibrarySkillCreate) => void;
   onCancel: () => void;
+  libraryItems: readonly LibraryItemOut[];
 }
 
-function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormProps) {
+function SkillForm({
+  initial,
+  isPending,
+  error,
+  onSubmit,
+  onCancel,
+  libraryItems,
+}: SkillFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [attribute, setAttribute] = useState<(typeof SKILL_ATTRIBUTES)[number]>(
     initial?.attribute ?? 'IQ',
@@ -1182,6 +1225,8 @@ function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormP
   );
   const [description, setDescription] = useState(initial?.description ?? '');
   const [source, setSource] = useState(initial?.source ?? '');
+  const [effects, setEffects] = useState(initial?.effects ?? []);
+  const [effectsValid, setEffectsValid] = useState(true);
 
   function handleSubmit() {
     if (!name.trim()) return;
@@ -1195,12 +1240,12 @@ function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormP
       description: description.trim() || null,
       source: source.trim() || null,
       situationalModifiers: initial?.situationalModifiers ?? [],
-      effects: initial?.effects ?? [],
+      effects,
     });
   }
 
   return (
-    <div className="card p-card space-y-3 border border-primary/30">
+    <fieldset disabled={isPending} className="card p-card space-y-3 border border-primary/30">
       <div className="flex flex-wrap gap-3">
         <label className="form-control min-w-[10rem] flex-1">
           <span className="label-text">Name *</span>
@@ -1275,6 +1320,12 @@ function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormP
           placeholder="e.g. Shortsword"
         />
       </label>
+      <EffectsEditor
+        effects={effects}
+        libraryItems={libraryItems}
+        onChange={setEffects}
+        onValidityChange={setEffectsValid}
+      />
       <label className="form-control">
         <span className="label-text">Description</span>
         <textarea
@@ -1297,13 +1348,13 @@ function SkillForm({ initial, isPending, error, onSubmit, onCancel }: SkillFormP
           type="button"
           className="btn btn-primary btn-sm"
           onClick={handleSubmit}
-          disabled={isPending || !name.trim()}
+          disabled={isPending || !name.trim() || !effectsValid}
         >
           {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add skill'}
         </button>
       </div>
       {error && <p className="alert alert-error text-sm">{error}</p>}
-    </div>
+    </fieldset>
   );
 }
 

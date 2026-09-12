@@ -45,10 +45,10 @@ tool schemas and differential fixtures include the new API fields.
 
 ## Final validation
 
-- Docker/Bun `bun run check`: **1,128 passed, one existing skip, zero failures**,
-  10,649 assertions. Typecheck, OpenAPI drift, and MCP catalog drift checks pass.
+- Docker/Bun validation: **1,142 passed, one existing skip, zero failures**,
+  10,894 assertions. Typecheck, OpenAPI drift, and MCP catalog drift checks pass.
   Lint passes with four pre-existing React hook warnings.
-- Node 22/Vitest: **656 client tests passed across 73 files**.
+- Node 22/Vitest: **666 client tests passed across 74 files**.
 - Client, server, and migration production bundles build successfully.
 - Playwright 1.59.1 Chromium passes against development and built servers. The
   final rebased built-app run also passes with default request limits and an

@@ -8,7 +8,10 @@ import {
   applyEffectsToAttrs,
   distinctConditionGroups,
   resolveEffects,
+  resolveWeaponEffectMatches,
   skillBonusFor,
+  sumResolvedEffects,
+  weaponEffectsFor,
 } from './traitEffects.ts';
 
 const baseAttrs: CharacterAttrs = {
@@ -430,5 +433,150 @@ describe('distinctConditionGroups', () => {
     ];
     const eff = resolveEffects(traits, [], new Set());
     expect(distinctConditionGroups(eff)).toHaveLength(0);
+  });
+});
+
+describe('weapon-scoped effects', () => {
+  const broadswordEffect: TraitEffect = {
+    target: 'weapon_parry',
+    value: 1,
+    scaling: 'flat',
+    weaponSelector: { kind: 'weapon_skill', skillName: 'Broadsword' },
+  };
+
+  it('binds an exact inventory id without leaking to a second same-name weapon', () => {
+    const resolved = resolveEffects(
+      [
+        trait('bond', 'Weapon Bond', null, [
+          {
+            ...broadswordEffect,
+            weaponSelector: {
+              kind: 'inventory_item',
+              inventoryItemId: '11111111-1111-4111-8111-111111111111',
+            },
+          },
+        ]),
+      ],
+      [],
+      new Set(),
+    );
+    const matches = resolveWeaponEffectMatches(resolved, [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        name: 'Broadsword',
+        equipped: true,
+        weaponData: { skill: 'Broadsword' },
+      },
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        name: 'Broadsword',
+        equipped: true,
+        weaponData: { skill: 'Broadsword' },
+      },
+    ]);
+    expect(matches[0]?.matchStatus).toBe('one');
+    expect(matches[0]?.matchedInventoryItemIds).toEqual(['11111111-1111-4111-8111-111111111111']);
+  });
+
+  it('matches every equipped weapon with the exact skill and specialty', () => {
+    const resolved = resolveEffects(
+      [
+        trait('talent', 'Pistol Talent', 2, [
+          {
+            target: 'weapon_attack',
+            value: 1,
+            scaling: 'per_level',
+            weaponSelector: {
+              kind: 'weapon_skill',
+              skillName: 'Guns',
+              skillSpecialty: 'Pistol',
+            },
+          },
+        ]),
+      ],
+      [],
+      new Set(),
+    );
+    const matches = resolveWeaponEffectMatches(resolved, [
+      { id: 'p2', name: 'Pistol B', equipped: true, weaponData: { skill: 'Guns (Pistol)' } },
+      { id: 'r1', name: 'Rifle', equipped: true, weaponData: { skill: 'Guns (Rifle)' } },
+      { id: 'p1', name: 'Pistol A', equipped: true, weaponData: { skill: 'Guns (Pistol)' } },
+      { id: 'p3', name: 'Packed pistol', equipped: false, weaponData: { skill: 'Guns (Pistol)' } },
+    ]);
+    expect(matches[0]).toMatchObject({
+      matchStatus: 'multiple',
+      matchedInventoryItemIds: ['p1', 'p2'],
+    });
+    expect(sumResolvedEffects(weaponEffectsFor(matches, 'p1', 'weapon_attack'))).toBe(2);
+    expect(weaponEffectsFor(matches, 'r1', 'weapon_attack')).toHaveLength(0);
+  });
+
+  it('applies item-level effects once per mode and narrows named modes exactly', () => {
+    const resolved = resolveEffects(
+      [
+        trait('enchanted', 'Enchanted', null, [
+          {
+            target: 'weapon_damage',
+            value: 1,
+            scaling: 'flat',
+            weaponSelector: { kind: 'weapon_name', weaponName: 'Spear' },
+          },
+          {
+            target: 'weapon_damage',
+            value: 2,
+            scaling: 'flat',
+            weaponSelector: { kind: 'weapon_name', weaponName: 'Spear', modeName: 'Thrown' },
+          },
+        ]),
+      ],
+      [],
+      new Set(),
+    );
+    const matches = resolveWeaponEffectMatches(resolved, [
+      {
+        id: 'spear',
+        name: ' spear ',
+        equipped: true,
+        weaponData: { skill: 'Spear', alternateModes: [{ name: 'Thrown' }] },
+      },
+    ]);
+    expect(sumResolvedEffects(weaponEffectsFor(matches, 'spear', 'weapon_damage', 'primary'))).toBe(
+      1,
+    );
+    expect(sumResolvedEffects(weaponEffectsFor(matches, 'spear', 'weapon_damage', 'Thrown'))).toBe(
+      3,
+    );
+  });
+
+  it('diagnoses missing modes and never name-falls through to a custom item', () => {
+    const modeEffect = resolveEffects(
+      [
+        trait('mode', 'Mode', null, [
+          {
+            target: 'weapon_accuracy',
+            value: 1,
+            scaling: 'flat',
+            weaponSelector: {
+              kind: 'library_item',
+              libraryItemName: 'Fine Bow',
+              modeName: 'Quick Shot',
+            },
+          },
+        ]),
+      ],
+      [],
+      new Set(),
+    );
+    const matches = resolveWeaponEffectMatches(modeEffect, [
+      { id: 'custom', name: 'Fine Bow', equipped: true, libraryItemId: null, weaponData: {} },
+      {
+        id: 'linked',
+        name: 'Fine Bow',
+        equipped: true,
+        libraryItemId: '33333333-3333-4333-8333-333333333333',
+        weaponData: { alternateModes: [{ name: 'Aimed' }] },
+      },
+    ]);
+    expect(matches[0]?.matchStatus).toBe('zero');
   });
 });

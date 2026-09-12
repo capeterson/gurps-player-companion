@@ -235,6 +235,19 @@ describe('summarizeEvent character tempEffects', () => {
 // ---------- summarizeEvent — character_trait ----------
 
 describe('summarizeEvent character_trait', () => {
+  it('summarizes character-owned effect edits', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_trait',
+      op: 'update',
+      oldRow: { name: 'Weapon Mastery', custom_effects: [] },
+      newRow: {
+        name: 'Weapon Mastery',
+        custom_effects: [{ target: 'weapon_attack', value: 1 }],
+      },
+    });
+    expect(summary).toBe('Weapon Mastery: 1 custom effect saved');
+  });
+
   it('insert: "Added advantage Acute Vision"', () => {
     const { summary } = summarizeEvent({
       entityClass: 'character_trait',

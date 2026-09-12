@@ -24,11 +24,11 @@ import {
  * `effects` arrays to traits/skills (see schemas/effects.ts).  v3 added
  * container/powerstone/magic-item fields on items and `manaLevel` in the
  * campaign block.  v4 added the `languages`, `techniques`, and `styles`
- * library sections. v5 added item `enchantments`; v6 adds explicit skill
- * `defaults` and campaign attribute-cap enforcement. The parser still accepts
- * v1-v5 docs (new fields default/absent).
+ * library sections. v5 added item `enchantments`; v6 added explicit skill
+ * `defaults` and campaign attribute-cap enforcement. v7 adds item-aware weapon
+ * effects. The parser still accepts v1-v6 docs (new fields default/absent).
  */
-export const LIBRARY_YAML_VERSION = 6 as const;
+export const LIBRARY_YAML_VERSION = 7 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -155,10 +155,18 @@ function compactCampaign(input: NonNullable<LibraryYamlDoc['campaign']>): Record
 }
 
 export function emitLibraryYaml(input: LibraryYamlExportInput): string {
-  const traits = sortedTraits(input.traits).map((t) => compact(t));
+  const portableEffects = (effects: LibraryTraitCreate['effects']) =>
+    effects.map((effect) => {
+      if (effect.weaponSelector?.kind !== 'library_item') return effect;
+      const { libraryItemId: _libraryItemId, ...weaponSelector } = effect.weaponSelector;
+      return { ...effect, weaponSelector };
+    });
+  const traits = sortedTraits(input.traits).map((t) =>
+    compact({ ...t, effects: portableEffects(t.effects) }),
+  );
   // An empty defaults list means explicitly no default, unlike missing/unknown.
   const skills = sortedByName(input.skills).map((s) => ({
-    ...compact(s),
+    ...compact({ ...s, effects: portableEffects(s.effects) }),
     ...(s.defaults != null ? { defaults: s.defaults } : {}),
   }));
   const spells = sortedByName(input.spells).map((s) => compact(s));

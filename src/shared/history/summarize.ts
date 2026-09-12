@@ -293,6 +293,10 @@ function summarizeCharacterTrait(
   if (c.field === 'points') return `${name} points ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'level') return `${name} level ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'name') return `Renamed trait to ${c.newValue}`;
+  if (c.field === 'customEffects') {
+    const count = Array.isArray(c.newValue) ? c.newValue.length : 0;
+    return `${name}: ${count} custom ${count === 1 ? 'effect' : 'effects'} saved`;
+  }
   return describeFieldChanges(String(name), changes);
 }
 

@@ -3,7 +3,7 @@ import { MANA_LEVELS } from '../constants/magic.ts';
 import { campaignHouseRules } from './campaign.ts';
 import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
-import { effectTarget } from './effects.ts';
+import { effectTarget, weaponSelector } from './effects.ts';
 import { inventoryItemOut } from './inventory.ts';
 import { languageOut } from './language.ts';
 import { skillOut } from './skill.ts';
@@ -227,6 +227,9 @@ export const resolvedEffectOut = z.object({
   skillName: z.string().optional(),
   skillSpecialty: z.string().optional(),
   hitLocation: z.string().optional(),
+  weaponSelector: weaponSelector.optional(),
+  matchedInventoryItemIds: z.array(uuid).optional(),
+  weaponMatchStatus: z.enum(['zero', 'one', 'multiple']).optional(),
   conditionGroup: z.string().optional(),
   conditionLabel: z.string().optional(),
   active: z.boolean(),

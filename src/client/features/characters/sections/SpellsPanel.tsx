@@ -13,6 +13,7 @@ import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
 import { RollSheet } from './RollSheet.tsx';
+import { ModifierBreakdown, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
@@ -221,6 +222,7 @@ interface SpellRowProps {
   manaKnown: boolean;
   onCast(spell: SpellOut, mode: 'cast' | 'maintain'): void;
   onRoll(req: RollRequest): void;
+  effects: CharacterDetail['effects'];
 }
 
 function SpellRow({
@@ -231,6 +233,7 @@ function SpellRow({
   manaKnown,
   onCast,
   onRoll,
+  effects,
 }: SpellRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -238,6 +241,8 @@ function SpellRow({
   // in GURPS), so there is nothing to roll against — hold Cast/Maintain
   // for that row even when the ambient mana allows casting.
   const rowCastable = castable && spell.level != null;
+  const bonusEffects = skillEffectsForRow(effects, spell.name);
+  const effectBonus = bonusEffects.reduce((total, effect) => total + effect.value, 0);
   // The difficulty select commits instantly (no draft state), so it
   // wires the rollback flash through useFieldFlash directly (AGENTS.md
   // rule 2 / S5: a rejected patch must pulse the input it reverts).
@@ -398,6 +403,16 @@ function SpellRow({
           </button>
         )}
       </span>
+      {spell.level != null && bonusEffects.length > 0 && (
+        <div className="col-span-full">
+          <ModifierBreakdown
+            baseLabel="Spell before skill effects"
+            baseValue={spell.level - effectBonus}
+            globalEffects={bonusEffects}
+            finalValue={spell.level}
+          />
+        </div>
+      )}
       <ConfirmDialog
         open={confirmDelete}
         title={`Delete spell "${spell.name}"?`}
@@ -543,6 +558,7 @@ export function SpellsPanel({
                     context: rollContext,
                   })
                 }
+                effects={character.effects}
               />
             ))}
           </ul>

@@ -415,7 +415,7 @@ describe('emitLibraryYaml', () => {
     expect(second).toBe(first);
   });
 
-  it('upgrades a v3 document to the current v6 shape byte-stably', () => {
+  it('upgrades a v3 document to the current v7 shape byte-stably', () => {
     const doc = parseLibraryYaml(SAMPLE_V3);
     const first = emitLibraryYaml({
       campaign: doc.campaign,
@@ -427,7 +427,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 6');
+    expect(first).toContain('version: 7');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);
@@ -471,6 +471,45 @@ describe('emitLibraryYaml', () => {
     });
     expect(out).not.toMatch(/tags:/);
     expect(out).toMatch(/Hard to Kill/);
+  });
+
+  it('exports library-item weapon selectors without campaign-local UUIDs', () => {
+    const out = emitLibraryYaml({
+      traits: [
+        {
+          name: 'Named Blade Training',
+          kind: 'perk',
+          basePoints: 1,
+          availableModifiers: [],
+          variants: [],
+          tags: [],
+          effects: [
+            {
+              target: 'weapon_attack',
+              value: 1,
+              scaling: 'flat',
+              weaponSelector: {
+                kind: 'library_item',
+                libraryItemId: '11111111-1111-4111-8111-111111111111',
+                libraryItemName: 'Fine Broadsword',
+              },
+            },
+          ],
+        },
+      ],
+      skills: [],
+      spells: [],
+      items: [],
+      languages: [],
+      techniques: [],
+      styles: [],
+    });
+    expect(out).toContain('libraryItemName: Fine Broadsword');
+    expect(out).not.toContain('libraryItemId');
+    expect(parseLibraryYaml(out).library.traits[0]?.effects[0]?.weaponSelector).toEqual({
+      kind: 'library_item',
+      libraryItemName: 'Fine Broadsword',
+    });
   });
 
   it('preserves explicit null campaign settings while omitting undefined ones', () => {
