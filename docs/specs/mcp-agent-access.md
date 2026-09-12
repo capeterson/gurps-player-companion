@@ -195,6 +195,29 @@ actor; no external header can forge it, and OAuth bearer tokens are rejected by
 Mutation idempotency wraps the shared handler in an outer transaction, persists
 its response for 24 hours, and rejects key reuse with changed input or authority.
 
+The existing trait/skill library create/update tools accept ordered `effects`,
+including weapon attack, Parry, Block, damage and Accuracy targets. Their
+OpenAPI-derived schemas describe flat/per-level scaling, target-specific fields,
+conditional groups and exact selectors. Library declarations accept portable
+weapon-name, governing-skill/specialty and library-item selectors. Character trait
+create/update tools additionally accept `customEffects` (up to 50 declarations),
+including exact `inventory_item` selectors. Updating with `customEffects: []`
+clears those owned effects. Character detail returns the declarations and resolved
+effects, including matched inventory IDs and zero/one/multiple-match diagnostics,
+subject to the normal share gate. The shared Zod handler enforces cross-field
+rules that JSON Schema alone cannot express: library effects cannot bind a
+character inventory ID, weapon targets require a selector, and Parry/Block cannot
+select an attack mode.
+
+Library export returns YAML v7 as typed text, retaining effect order, scaling,
+conditions and mode names. Library-item selectors export their portable name
+without the campaign-local library UUID. Import accepts the existing v1–v7
+formats and preserves shared merge/replace and campaign-settings options. No
+extra tools or scopes are required for effects authoring. The manifest links
+these operations to the focused `effects-authoring-parity` fixture, which checks
+REST/MCP results, selector/schema coverage, YAML round trips, mutation retries,
+OAuth audit provenance, ownership/privacy and field-refinement errors.
+
 ## Client registration and operations
 
 Standards-compatible MCP clients that support Streamable HTTP, OAuth discovery,

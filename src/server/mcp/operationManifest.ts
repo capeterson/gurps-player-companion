@@ -14,6 +14,7 @@ export interface IncludedOperation {
   parityTests: readonly [
     'src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential',
     'src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope',
+    ...string[],
   ];
 }
 
@@ -25,6 +26,19 @@ export interface ExcludedOperation {
 }
 
 export type OperationPolicy = IncludedOperation | ExcludedOperation;
+
+const effectsOperations = new Set([
+  'gpc_get_campaign_library',
+  'gpc_create_library_trait',
+  'gpc_update_library_trait',
+  'gpc_create_library_skill',
+  'gpc_update_library_skill',
+  'gpc_export_campaign_library',
+  'gpc_import_campaign_library',
+  'gpc_create_character_trait',
+  'gpc_update_character_trait',
+  'gpc_get_character',
+]);
 
 const tool = (
   method: HttpMethod,
@@ -44,6 +58,9 @@ const tool = (
   parityTests: [
     'src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential',
     'src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope',
+    ...(effectsOperations.has(name)
+      ? ['src/server/mcp/parity.integration.test.ts#effects-authoring-parity']
+      : []),
   ],
 });
 const excluded = (method: HttpMethod, path: string, reason: string): ExcludedOperation => ({

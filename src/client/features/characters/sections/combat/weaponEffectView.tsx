@@ -28,12 +28,13 @@ export function effectTotal(effects: readonly ResolvedEffectOut[]): number {
 }
 
 export function skillEffectsForRow(
-  effects: readonly ResolvedEffectOut[],
+  effects: readonly ResolvedEffectOut[] | undefined,
   name: string,
   specialty?: string | null,
 ): ResolvedEffectOut[] {
   return [
-    ...skillBonusFor(name, effects as unknown as readonly ResolvedEffect[], specialty).sources,
+    ...skillBonusFor(name, (effects ?? []) as unknown as readonly ResolvedEffect[], specialty)
+      .sources,
   ] as ResolvedEffectOut[];
 }
 
@@ -59,7 +60,7 @@ export function ModifierBreakdown({
   const source = (effect: ResolvedEffectOut, index: number) => (
     <li key={`${effect.sourceId}-${effect.target}-${effect.value}-${index}`}>
       {effect.value >= 0 ? '+' : ''}
-      {effect.value} {effect.sourceName}
+      {effect.value} <span>{effect.sourceName}</span>
       {effect.conditionLabel ? ` (${effect.conditionLabel})` : ''}
     </li>
   );

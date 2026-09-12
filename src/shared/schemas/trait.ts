@@ -55,7 +55,13 @@ export const traitOut = z.object({
   libraryTraitId: uuid.nullable(),
   libraryMechanics: libraryMechanics.nullable().optional(),
   /** Character-owned declarations, including exact inventory-item bindings. */
-  customEffects: z.array(traitEffect).max(50).optional(),
+  customEffects: z
+    .array(traitEffect)
+    .max(50)
+    .optional()
+    .describe(
+      'Character-owned mechanics. May use inventory_item selectors that bind exact inventory UUIDs.',
+    ),
   ...timestamps,
 });
 
@@ -68,7 +74,13 @@ export const traitCreate = z.object({
   notes: z.string().max(20_000).nullable().optional(),
   modifiers: z.array(traitModifier).default([]),
   libraryTraitId: uuid.nullable().optional(),
-  customEffects: z.array(traitEffect).max(50).default([]),
+  customEffects: z
+    .array(traitEffect)
+    .max(50)
+    .default([])
+    .describe(
+      'Character-owned mechanics. May use inventory_item selectors that bind exact inventory UUIDs.',
+    ),
 });
 
 export const traitUpdate = traitCreate.partial();

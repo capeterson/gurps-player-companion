@@ -148,7 +148,7 @@ it('retains a visible rollback event when an owned-effects save fails', async ()
   fireEvent.click(screen.getByRole('button', { name: 'Save effects' }));
   await screen.findByText(/Couldn't save Weapon Mastery custom effects — effect rejected/);
   expect(
-    screen.getByText(
+    await screen.findByText(
       'No mechanical effects. Add one for stat, skill, defense, DR, damage, or weapon bonuses.',
     ),
   ).toBeInTheDocument();

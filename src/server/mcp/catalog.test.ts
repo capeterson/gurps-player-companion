@@ -56,6 +56,74 @@ describe('MCP canonical schema conversion', () => {
     }
   });
 
+  test('advertises weapon selectors and owned custom effects on the existing authoring tools', () => {
+    const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
+    const id = '0198aa77-1111-7111-8111-111111111111';
+    const selectors = [
+      { kind: 'library_item', libraryItemId: id, libraryItemName: 'Spear' },
+      { kind: 'weapon_skill', skillName: 'Guns', skillSpecialty: 'Rifle' },
+      { kind: 'weapon_name', weaponName: 'Spear' },
+      { kind: 'inventory_item', inventoryItemId: id },
+    ];
+    for (const kind of ['trait', 'skill'] as const) {
+      for (const command of ['create', 'update'] as const) {
+        const tool = tools.find((entry) => entry.policy.tool === `gpc_${command}_library_${kind}`);
+        if (!tool) throw new Error(`missing library ${kind} ${command} tool`);
+        for (const weaponSelector of selectors.slice(0, 3)) {
+          expect(
+            tool.validateInput({
+              path: { id, ...(command === 'update' ? { [`${kind}Id`]: id } : {}) },
+              body: {
+                name: 'Mechanics',
+                ...(kind === 'trait'
+                  ? { kind: 'advantage' }
+                  : { attribute: 'DX', difficulty: 'A' }),
+                effects: [
+                  {
+                    target: 'weapon_damage',
+                    value: 2,
+                    weaponSelector: { ...weaponSelector, modeName: 'Primary' },
+                  },
+                ],
+              },
+            }),
+            tool.policy.tool,
+          ).toBe(true);
+        }
+      }
+    }
+    for (const command of ['create', 'update'] as const) {
+      const tool = tools.find((entry) => entry.policy.tool === `gpc_${command}_character_trait`);
+      if (!tool) throw new Error(`missing character trait ${command} tool`);
+      for (const weaponSelector of selectors) {
+        const input = {
+          path: { id, ...(command === 'update' ? { traitId: id } : {}) },
+          body: {
+            name: 'Owned mastery',
+            kind: 'advantage',
+            customEffects: [{ target: 'weapon_attack', value: 1, weaponSelector }],
+          },
+        };
+        expect(tool.validateInput(input), tool.policy.tool).toBe(true);
+        expect(tool.validateInput({ ...input, body: { ...input.body, customEffects: [] } })).toBe(
+          true,
+        );
+        expect(tool.validateInput({ ...input, body: { ...input.body, customEffects: null } })).toBe(
+          false,
+        );
+        expect(
+          tool.validateInput({
+            ...input,
+            body: {
+              ...input.body,
+              customEffects: Array.from({ length: 51 }, () => input.body.customEffects[0]),
+            },
+          }),
+        ).toBe(false);
+      }
+    }
+  });
+
   test('preserves nullable refs, unconstrained values, enums and exclusive numeric bounds', () => {
     const ajv = new Ajv({ strict: false });
     const schema = toJsonSchema({

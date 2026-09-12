@@ -173,13 +173,25 @@ export function EffectsEditor<T extends TraitEffect>({
     const schema = portable ? libraryTraitEffect : traitEffect;
     const parsed = next.map((draft) => schema.safeParse(candidateFromDraft(draft)));
     setErrors(
-      parsed.map((result) =>
-        result.success
+      parsed.map((result, index) => {
+        const messages = result.success
           ? []
           : result.error.issues.map(
               (issue) => `${issue.path.join('.') || 'effect'}: ${issue.message}`,
-            ),
-      ),
+            );
+        // Invalid primitive fields can short-circuit Zod refinements. Keep
+        // independent cross-field guidance visible so authors can correct
+        // every obvious problem in one pass.
+        const draft = next[index];
+        if (
+          draft?.conditionLabel.trim() &&
+          !draft.conditionGroup.trim() &&
+          !messages.some((message) => message.includes('conditionLabel requires conditionGroup'))
+        ) {
+          messages.push('conditionLabel: conditionLabel requires conditionGroup');
+        }
+        return messages;
+      }),
     );
     const valid = parsed.every((result) => result.success);
     onValidityChange?.(valid);
