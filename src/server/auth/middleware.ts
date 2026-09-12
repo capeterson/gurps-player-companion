@@ -8,7 +8,7 @@ import type { MiddlewareHandler } from 'hono';
 import { trustedExecutionFor } from '../services/executionContext.ts';
 import { AuthError, type AuthenticatedUser, resolveAuthHeader } from './session.ts';
 
-export type AuthVariables = { user: AuthenticatedUser };
+export type AuthVariables = { user: AuthenticatedUser; requestId: string };
 
 export const requireUser: MiddlewareHandler<{ Variables: AuthVariables }> = async (c, next) => {
   const trusted = trustedExecutionFor(c.req.raw);

@@ -12,6 +12,7 @@ export class ApiError extends Error {
     readonly status: number,
     message: string,
     readonly body?: unknown,
+    readonly requestId?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -163,7 +164,12 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   const res = await apiFetch(path, options);
   const body = await parse<T>(res);
   if (originatingSession !== null && tokenStore.read()?.sessionId !== originatingSession) {
-    throw new ApiError(401, 'session changed while request was in flight');
+    throw new ApiError(
+      401,
+      'session changed while request was in flight',
+      undefined,
+      res.headers.get('x-request-id') ?? undefined,
+    );
   }
   return body;
 }
@@ -270,7 +276,7 @@ async function parse<T>(res: Response): Promise<T> {
         window.location.assign('/suspended?reason=disabled');
       }
     }
-    throw new ApiError(res.status, message, body);
+    throw new ApiError(res.status, message, body, res.headers.get('x-request-id') ?? undefined);
   }
   return body as T;
 }

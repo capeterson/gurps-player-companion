@@ -28,6 +28,16 @@ doesn't reject the token-in-query handshake) → raw bounded MCP transport →
 OpenAPI doc → error handler →
 static/SPA fallback (last, so it never shadows `/api/*`).
 
+Every request receives a server-generated UUID in `X-Request-ID`; incoming
+values are never trusted. Unhandled server failures log that request ID, the
+verified user ID when authentication already resolved, the method, and the
+pathname. The typed client preserves response-header request IDs on `ApiError`
+without changing REST/MCP JSON-body parity. React Router uses the app-styled
+`AppErrorPage` for unmatched routes and render/navigation failures; it shows a
+client error reference, the server request ID when the error has one, and the
+locally available current-user ID. Raw error details remain in the correlated browser
+log rather than being rendered to the player.
+
 The static handler marks `sw.js`, its registration bootstrap, the manifest, and
 both HTML entrypoints `no-store` for browsers and CDNs; content-hashed assets
 remain cacheable. The service worker's navigation fallback excludes `/api/*`,

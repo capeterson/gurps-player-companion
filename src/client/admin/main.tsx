@@ -15,6 +15,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { AppErrorPage } from '../components/AppErrorPage.tsx';
 import { LoginPage } from '../features/auth/LoginPage.tsx';
 import { RegisterPage } from '../features/auth/RegisterPage.tsx';
 import { SuspendedPage } from '../features/auth/SuspendedPage.tsx';
@@ -34,33 +35,38 @@ applyTheme(readStoredTheme());
 const queryClient = createSessionQueryClient();
 
 const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
-  { path: '/suspended', element: <SuspendedPage /> },
   {
-    element: <RequireAuth />,
+    errorElement: <AppErrorPage homeHref="/admin" />,
     children: [
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/suspended', element: <SuspendedPage /> },
       {
-        element: <AdminLayout />,
+        element: <RequireAuth />,
         children: [
-          { path: '/admin', element: <Navigate to="/admin/users" replace /> },
-          { path: '/admin/users', element: <UsersPage /> },
-          { path: '/admin/users/:id', element: <UserDetailPage /> },
-          { path: '/admin/campaigns', element: <CampaignsPage /> },
-          { path: '/admin/campaigns/:id', element: <CampaignDetailPage /> },
+          {
+            element: <AdminLayout />,
+            children: [
+              { path: '/admin', element: <Navigate to="/admin/users" replace /> },
+              { path: '/admin/users', element: <UsersPage /> },
+              { path: '/admin/users/:id', element: <UserDetailPage /> },
+              { path: '/admin/campaigns', element: <CampaignsPage /> },
+              { path: '/admin/campaigns/:id', element: <CampaignDetailPage /> },
+            ],
+          },
         ],
       },
+      // Anything else served by admin.html that isn't an /admin route
+      // bounces back to the player app via a hard nav.
+      {
+        path: '*',
+        loader: () => {
+          window.location.assign('/');
+          return null;
+        },
+        element: null,
+      },
     ],
-  },
-  // Anything else served by admin.html that isn't an /admin route
-  // bounces back to the player app via a hard nav.
-  {
-    path: '*',
-    loader: () => {
-      window.location.assign('/');
-      return null;
-    },
-    element: null,
   },
 ]);
 
