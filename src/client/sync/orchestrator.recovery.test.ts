@@ -172,6 +172,117 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
   });
 });
 
+describe('SyncOrchestrator.purge session fence', () => {
+  it('waits for an old cursor request and clears without applying its late rows', async () => {
+    await seedEveryStore();
+    tokenStore.write({
+      accessToken: jwtForUser('user-1'),
+      refreshToken: 'refresh-old',
+      accessTokenExpiresIn: 0,
+    });
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser('user-1');
+
+    let releaseCursor!: (response: Response) => void;
+    const heldCursor = new Promise<Response>((resolve) => {
+      releaseCursor = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => heldCursor),
+    );
+
+    const pull = orchestrator.triggerCursorPull();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    tokenStore.clear();
+    const purge = orchestrator.purge();
+    releaseCursor(
+      new Response(
+        JSON.stringify({
+          changes: [
+            {
+              entityClass: 'character',
+              entityId: 'late-old-character',
+              command: 'upsert',
+              revision: 10,
+              data: {
+                id: 'late-old-character',
+                ownerId: 'user-1',
+                name: 'Must not return',
+                revision: 10,
+              },
+            },
+          ],
+          nextCursor: { character: 10 },
+          hasMore: {},
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    await Promise.all([pull, purge]);
+
+    const db = getLocalDb();
+    const counts = await Promise.all(ALL_STORE_NAMES.map((name) => db[name].count()));
+    expect(counts.every((count) => count === 0)).toBe(true);
+    expect(await db.characters.get('late-old-character')).toBeUndefined();
+  });
+
+  it('waits for an old operation response and removes its in-flight local intent', async () => {
+    await seedEveryStore();
+    tokenStore.write({
+      accessToken: jwtForUser('user-1'),
+      refreshToken: 'refresh-old',
+      accessTokenExpiresIn: 0,
+    });
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser('user-1');
+
+    let releaseOperation!: (response: Response) => void;
+    const heldOperation = new Promise<Response>((resolve) => {
+      releaseOperation = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/sync/operations')) return heldOperation;
+        return Promise.resolve(
+          new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      }),
+    );
+
+    orchestrator.start();
+    await vi.waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/sync/operations'),
+        expect.anything(),
+      ),
+    );
+
+    tokenStore.clear();
+    const purge = orchestrator.purge();
+    releaseOperation(
+      new Response(
+        JSON.stringify({
+          outcomes: [{ clientOpId: 'op-1', status: 'applied', newRevision: 10 }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    await purge;
+
+    const db = getLocalDb();
+    const counts = await Promise.all(ALL_STORE_NAMES.map((name) => db[name].count()));
+    expect(counts.every((count) => count === 0)).toBe(true);
+  });
+});
+
 describe('SyncOrchestrator.revertFailedOperation', () => {
   it('restores a failed patch and records the explicit local revert', async () => {
     const db = getLocalDb();

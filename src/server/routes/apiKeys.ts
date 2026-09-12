@@ -8,7 +8,7 @@ import {
 } from '../../shared/schemas/apiKey.ts';
 import { generatePlaintextKey, hashApiKey } from '../auth/apiKey.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
-import type { AuthenticatedUser } from '../auth/session.ts';
+import { type AuthenticatedUser, hasRecentAuthentication } from '../auth/session.ts';
 import { getDb } from '../db/client.ts';
 import { apiKeys } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
@@ -83,6 +83,9 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     requireJwt(user);
+    if (!hasRecentAuthentication(user)) {
+      throw new HTTPException(403, { message: 'recent authentication required' });
+    }
     const body = c.req.valid('json');
     const plaintextKey = generatePlaintextKey();
     const keyHash = hashApiKey(plaintextKey);

@@ -7,9 +7,10 @@
  * the admin surface stays as small as possible per AGENTS.md.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../lib/api.ts';
+import { clearSessionQueryCache } from '../lib/sessionQueryCache.tsx';
 import { tokenStore } from '../lib/tokenStore.ts';
 
 interface MeResponse {
@@ -21,6 +22,7 @@ interface MeResponse {
 
 export function AdminLayout() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const me = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api<MeResponse>('/auth/me'),
@@ -45,6 +47,7 @@ export function AdminLayout() {
         if (err instanceof ApiError) return; // best-effort revoke
       });
     }
+    clearSessionQueryCache(queryClient);
     tokenStore.clear();
     navigate('/login', { replace: true });
   }

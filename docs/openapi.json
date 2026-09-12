@@ -482,6 +482,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Recent authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -590,6 +600,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Recent authentication required",
             "content": {
               "application/json": {
                 "schema": {
@@ -881,6 +901,10 @@
                   "refreshToken": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 },
                 "required": [

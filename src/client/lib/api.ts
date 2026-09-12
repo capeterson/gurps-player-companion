@@ -3,7 +3,7 @@
  * Replace with an OpenAPI-generated client in a follow-up.
  */
 
-import { tokenStore } from './tokenStore.ts';
+import { type TokenSnapshot, tokenStore } from './tokenStore.ts';
 
 const API_ROOT = '/api/v1';
 
@@ -25,7 +25,8 @@ export class ApiError extends Error {
  * one-time-use rotation rejects it) and blow away the freshly-issued
  * tokens, logging the user out.
  */
-let refreshInFlight: Promise<RefreshResult> | null = null;
+const refreshInFlight = new Map<string, Promise<RefreshResult>>();
+const REFRESH_LOCK = 'gpc-auth-refresh';
 
 /**
  * Why a refresh didn't produce a fresh token.
@@ -57,68 +58,93 @@ type RefreshResult =
       cause?: unknown;
     };
 
-async function refreshTokens(): Promise<RefreshResult> {
-  if (refreshInFlight) return refreshInFlight;
+async function refreshTokens(origin: TokenSnapshot): Promise<RefreshResult> {
+  const existing = refreshInFlight.get(origin.sessionId);
+  if (existing) return existing;
   const promise = (async (): Promise<RefreshResult> => {
     try {
-      const tokens = tokenStore.read();
-      if (!tokens) return { ok: false, kind: 'rejected' };
-      let res: Response;
-      try {
-        res = await fetch(`${API_ROOT}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-        });
-      } catch (cause) {
-        // Transport failure (offline, DNS, dropped connection).  The
-        // refresh token is almost certainly still valid -- keep it and
-        // let the caller retry.  See the comment below for why clearing
-        // here is so damaging.
-        return { ok: false, kind: 'unavailable', cause };
-      }
-      if (!res.ok) {
-        // ONLY a definitive rejection invalidates the session.  A 5xx,
-        // or a reverse-proxy/tunnel error (502/503/504, Cloudflare
-        // 52x/530), means the server never got to judge the token --
-        // clearing on those silently signs the user out for the rest of
-        // the session.  Nothing prompts a re-login, because the app is
-        // local-first and keeps rendering Dexie data; meanwhile every
-        // orchestrator cycle bails at its `!tokenStore.read()` guard, so
-        // the sync badge freezes on whatever it last showed (typically
-        // 'error', from the request that triggered this refresh) with no
-        // toast and no way for the user to find out why.
-        if (res.status === 401 || res.status === 403) {
-          tokenStore.clear();
+      return await runWithRefreshLock(async () => {
+        // Re-read only after taking the cross-tab lock. Another tab may
+        // already have rotated this session while we were waiting.
+        const current = tokenStore.read();
+        if (!current || current.sessionId !== origin.sessionId) {
           return { ok: false, kind: 'rejected' };
         }
-        // Drain the body here, once, into plain data. Every caller
-        // awaiting this same promise reconstructs its own Response
-        // below rather than sharing a single consumable one.
-        const bodyText = await res.text().catch(() => '');
-        return {
-          ok: false,
-          kind: 'unavailable',
-          failure: {
-            status: res.status,
-            bodyText,
-            contentType: res.headers.get('content-type'),
-          },
+        if (current.version > origin.version) return { ok: true };
+        if (current.version !== origin.version || current.refreshToken !== origin.refreshToken) {
+          return { ok: false, kind: 'rejected' };
+        }
+
+        let res: Response;
+        try {
+          res = await fetch(`${API_ROOT}/auth/refresh`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              refreshToken: current.refreshToken,
+              requestId: current.refreshRequestId,
+            }),
+          });
+        } catch (cause) {
+          // Transport failure (offline, DNS, dropped connection).  The
+          // refresh token is almost certainly still valid -- keep it and
+          // let the caller retry.  See the comment below for why clearing
+          // here is so damaging.
+          return { ok: false, kind: 'unavailable', cause };
+        }
+        if (!res.ok) {
+          // ONLY a definitive rejection invalidates the session.  A 5xx,
+          // or a reverse-proxy/tunnel error (502/503/504, Cloudflare
+          // 52x/530), means the server never got to judge the token --
+          // clearing on those silently signs the user out for the rest of
+          // the session.  Nothing prompts a re-login, because the app is
+          // local-first and keeps rendering Dexie data; meanwhile every
+          // orchestrator cycle bails at its `!tokenStore.read()` guard, so
+          // the sync badge freezes on whatever it last showed (typically
+          // 'error', from the request that triggered this refresh) with no
+          // toast and no way for the user to find out why.
+          if (res.status === 401 || res.status === 403) {
+            tokenStore.clearIfCurrent(current);
+            return { ok: false, kind: 'rejected' };
+          }
+          // Drain the body here, once, into plain data. Every caller
+          // awaiting this same promise reconstructs its own Response
+          // below rather than sharing a single consumable one.
+          const bodyText = await res.text().catch(() => '');
+          return {
+            ok: false,
+            kind: 'unavailable',
+            failure: {
+              status: res.status,
+              bodyText,
+              contentType: res.headers.get('content-type'),
+            },
+          };
+        }
+        const fresh = (await res.json()) as {
+          accessToken: string;
+          refreshToken: string;
+          accessTokenExpiresIn: number;
         };
-      }
-      const fresh = (await res.json()) as {
-        accessToken: string;
-        refreshToken: string;
-        accessTokenExpiresIn: number;
-      };
-      tokenStore.write(fresh);
-      return { ok: true };
+        return tokenStore.replaceIfCurrent(current, fresh)
+          ? { ok: true }
+          : { ok: false, kind: 'rejected' };
+      });
     } finally {
-      refreshInFlight = null;
+      refreshInFlight.delete(origin.sessionId);
     }
   })();
-  refreshInFlight = promise;
+  refreshInFlight.set(origin.sessionId, promise);
   return promise;
+}
+
+async function runWithRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== 'undefined' && 'locks' in navigator && navigator.locks?.request) {
+    return await navigator.locks.request(REFRESH_LOCK, fn);
+  }
+  // The per-session promise map above still coordinates callers in this
+  // document. Browsers with Web Locks extend the same serialization across tabs.
+  return await fn();
 }
 
 export interface ApiOptions {
@@ -127,11 +153,19 @@ export interface ApiOptions {
   headers?: Record<string, string>;
   /** Default true.  Set false for /auth/login etc. */
   authenticated?: boolean;
+  /** Allows session teardown to cancel requests before they can mutate local state. */
+  signal?: AbortSignal;
 }
 
 export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  const originatingSession =
+    options.authenticated === false ? null : (tokenStore.read()?.sessionId ?? null);
   const res = await apiFetch(path, options);
-  return parse<T>(res);
+  const body = await parse<T>(res);
+  if (originatingSession !== null && tokenStore.read()?.sessionId !== originatingSession) {
+    throw new ApiError(401, 'session changed while request was in flight');
+  }
+  return body;
 }
 
 /**
@@ -157,10 +191,24 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
     headers['content-type'] = headers['content-type'] ?? 'application/json';
   }
   const init: RequestInit = { method, headers };
+  if (options.signal) init.signal = options.signal;
   if (options.body !== undefined) init.body = JSON.stringify(options.body);
   const res = await fetch(`${API_ROOT}${path}`, init);
+  if (
+    options.authenticated !== false &&
+    tokens &&
+    tokenStore.read()?.sessionId !== tokens.sessionId
+  ) {
+    return new Response(JSON.stringify({ error: 'session changed while request was in flight' }), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
   if (res.status === 401 && options.authenticated !== false) {
-    const refreshed = await refreshTokens();
+    // The request may have crossed a logout/login boundary while it was in
+    // flight. Never refresh or retry an old account's request as the new one.
+    if (!tokens || !tokenStore.isCurrent(tokens)) return res;
+    const refreshed = await refreshTokens(tokens);
     if (!refreshed.ok && refreshed.kind === 'unavailable') {
       // Report the failure that actually blocked us. Returning the
       // original 401 would have the caller record "HTTP 401 — token
@@ -183,11 +231,12 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
     }
     if (refreshed.ok) {
       const next = tokenStore.read();
-      if (next) {
+      if (next?.sessionId === tokens.sessionId) {
         const retryInit: RequestInit = {
           method,
           headers: { ...headers, authorization: `Bearer ${next.accessToken}` },
         };
+        if (options.signal) retryInit.signal = options.signal;
         if (options.body !== undefined) retryInit.body = JSON.stringify(options.body);
         return await fetch(`${API_ROOT}${path}`, retryInit);
       }

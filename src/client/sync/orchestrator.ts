@@ -260,6 +260,20 @@ class SyncOrchestrator {
    * cycle that actually succeeds -- see `refreshIndicator`.
    */
   private syncHealthy = true;
+  /** Invalidates every response that originated before logout/account switch. */
+  private sessionGeneration = 0;
+  private sessionAbort = new AbortController();
+  private purging = false;
+
+  private invalidateSessionWork(): void {
+    this.sessionGeneration += 1;
+    this.sessionAbort.abort();
+    this.sessionAbort = new AbortController();
+  }
+
+  private sessionIsCurrent(generation: number): boolean {
+    return !this.purging && generation === this.sessionGeneration;
+  }
 
   /** Idempotent.  Wires online/offline + outbox liveQuery + drain loop. */
   start(): void {
@@ -326,6 +340,7 @@ class SyncOrchestrator {
       void this.maybeRunRejectionHousekeeping();
       return;
     }
+    this.invalidateSessionWork();
     this.currentUserId = userId;
     this.sessionLostReported = false;
     this.rejectionHousekeepingDone = false;
@@ -369,8 +384,10 @@ class SyncOrchestrator {
    * a stale pre-clear cursor and leave a permanent gap in local data).
    */
   async triggerCursorPull(force = false): Promise<void> {
+    const generation = this.sessionGeneration;
     await runWithLock(CURSOR_LOCK, async () => {
-      await this.pullInner(force);
+      if (!this.sessionIsCurrent(generation)) return;
+      await this.pullInner(force, generation);
     });
   }
 
@@ -381,7 +398,8 @@ class SyncOrchestrator {
    * uses the distinction to decide whether the per-user bootstrapped
    * flag may be written.
    */
-  private async pullInner(force: boolean): Promise<boolean> {
+  private async pullInner(force: boolean, generation = this.sessionGeneration): Promise<boolean> {
+    if (!this.sessionIsCurrent(generation)) return false;
     if (this.recoveryInProgress && !force) return false;
     if (!tokenStore.read()) {
       // A session that vanished *after* bootstrap wasn't a sign-out --
@@ -409,7 +427,9 @@ class SyncOrchestrator {
         const res = await api<SyncCursorResponse>('/sync/cursor', {
           method: 'POST',
           body: { cursors, pageSize: 200 },
+          signal: this.sessionAbort.signal,
         });
+        if (!this.sessionIsCurrent(generation)) return false;
         if (!appliedAnything && res.changes && res.changes.length > 0) {
           syncStateStore.set('syncing');
           appliedAnything = true;
@@ -436,7 +456,7 @@ class SyncOrchestrator {
           'character_inventory',
           'character_combat',
         ]);
-        return await this.pullInner(force);
+        return await this.pullInner(force, generation);
       }
       // Prune characters/campaigns the viewer has lost access to
       // entirely (removed from a campaign, campaign deleted, character
@@ -453,6 +473,7 @@ class SyncOrchestrator {
       this.refreshIndicator(pending);
       return true;
     } catch (err) {
+      if (!this.sessionIsCurrent(generation)) return false;
       // Leave a trace.  A failing pull produces no outbox row, no
       // rejection record and no toast, so before this the only symptom
       // was a red badge telling the user to go read a toast that never
@@ -498,18 +519,20 @@ class SyncOrchestrator {
     // Captured for `enforceMinimalViewLocally` — the periodic
     // cursor-pull doesn't otherwise know who's logged in.
     this.currentUserId = userId;
+    const generation = this.sessionGeneration;
     const db = getLocalDb();
     const flagKey = `bootstrap:${userId}`;
     let completed = false;
     try {
       completed = await runWithLock(CURSOR_LOCK, async () => {
+        if (!this.sessionIsCurrent(generation)) return false;
         const flag = await db.syncMeta.get(flagKey);
         if (!flag) {
           // Wipe any per-class cursors carried over from a previous
           // account so we definitely start at 0 and pull every owned row.
           await db.syncCursors.clear();
         }
-        const ran = await this.pullInner(forceCursorPull);
+        const ran = await this.pullInner(forceCursorPull, generation);
         if (ran) {
           await db.syncMeta.put({
             key: flagKey,
@@ -654,16 +677,27 @@ class SyncOrchestrator {
     return reverted;
   }
 
-  /** Wipe Dexie and reset state -- called on logout. */
+  /** Fence old work, then wipe Dexie under the global drain -> cursor lock order. */
   async purge(): Promise<void> {
+    this.purging = true;
+    this.invalidateSessionWork();
     this.currentUserId = null;
     this.rejectionHousekeepingDone = false;
     // The wiped Dexie no longer belongs to anyone.
     clearActiveUser();
     if (this.bootstrapRetryTimer) clearTimeout(this.bootstrapRetryTimer);
     this.bootstrapRetryTimer = null;
-    await this.clearAllLocalStores();
-    syncStateStore.reset('synced');
+    try {
+      await runWithLock(DRAIN_LOCK, async () => {
+        await runWithLock(CURSOR_LOCK, async () => {
+          await this.clearAllLocalStores();
+          syncStateStore.reset('synced');
+        });
+      });
+    } finally {
+      this.purging = false;
+      this.wake();
+    }
   }
 
   onCycleDone(cb: () => void): () => void {
@@ -734,6 +768,8 @@ class SyncOrchestrator {
   }
 
   private async maybeDrainOnce(): Promise<void> {
+    const generation = this.sessionGeneration;
+    if (!this.sessionIsCurrent(generation)) return;
     if (this.recoveryInProgress) return;
     if (!tokenStore.read()) {
       if (this.currentUserId !== null) this.reportSessionLost();
@@ -755,6 +791,7 @@ class SyncOrchestrator {
     // POST the same outbox rows.  The other tab still reads from
     // Dexie via useLiveQuery -- we just serialize the outbound flush.
     await runWithLock(DRAIN_LOCK, async () => {
+      if (!this.sessionIsCurrent(generation)) return;
       // Under the drain lock no POST can be outstanding anywhere, so
       // any row still `in_flight` was orphaned (crash / tab close /
       // error between marking and settling).  Re-promote it so the
@@ -780,7 +817,9 @@ class SyncOrchestrator {
         const res = await api<SyncOperationsResponse>('/sync/operations', {
           method: 'POST',
           body: { operations: ops.map(toEnvelope) },
+          signal: this.sessionAbort.signal,
         });
+        if (!this.sessionIsCurrent(generation)) return;
         outcomes = res.outcomes ?? [];
       } catch (err) {
         // Network or server error covering the whole batch.  Revert

@@ -173,6 +173,15 @@ Tables (grouped):
   `X-Forwarded-For`; missing forwarding headers fall back to the socket peer.
   The Bun fetch handler preserves its original Request and server binding so
   WebSocket upgrades continue to work.
+  Access and refresh JWTs also carry the user's server-checked authentication
+  version. Password changes and recovery increment it to reject every older
+  JWT. Refresh rotation preserves the original primary-authentication time;
+  passkey and API-key creation require that time to be no more than ten minutes
+  old. Recovery revokes API keys and removes passkeys, leaving the new password
+  as the account's sole credential. Refresh rows form token families. Rotation
+  consumes the parent and inserts one descendant atomically; the same client
+  request id can recover a lost response for 30 seconds, while conflicting or
+  late reuse revokes every still-active token in the family.
 - **Campaigns**: `campaigns`, `campaign_memberships`, `campaign_invitations`,
   `notifications`.
 - **Characters (sync-backed)**: `characters`, `character_traits`,
@@ -209,7 +218,12 @@ Key PG18 / trigger machinery, layered by migration:
   This is the heart of the app — see [offline-sync.md](offline-sync.md).
 - **Online-only surfaces** (campaign library, adventure log, invitations,
   notifications, settings, admin, and campaign encounters) use TanStack Query directly against the HTTP
-  API. Default query options: `staleTime: 30s`, no refetch-on-focus, one retry.
+  API. Query hashes include the current token-session id. Both the PWA and admin
+  entry mount `SessionQueryCacheBoundary`, which cancels and clears all query and
+  mutation state whenever login identity changes locally or in another tab.
+  Authenticated HTTP responses are also session-fenced before parsing, so a late
+  old-account response cannot repopulate the new session's cache. Default query
+  options: `staleTime: 30s`, no refetch-on-focus, one retry.
 - **Encounters** use query keys scoped by campaign/encounter. The existing WS
   subscriber dispatches `encounter_invalidate` frames to that query cache; the
    frame contains no combat data. A Dexie v6 `soloEncounters` store, keyed by

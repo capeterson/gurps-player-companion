@@ -134,4 +134,154 @@ describe('api refresh-on-401', () => {
     expect(refreshed).toBe(true);
     expect(tokenStore.read()).toMatchObject({ accessToken: 'access-2' });
   });
+
+  it('reuses the same rotation request id after a lost refresh response', async () => {
+    seedTokens();
+    const requestIds: string[] = [];
+    let refreshAttempts = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (String(url).includes('/auth/refresh')) {
+          refreshAttempts += 1;
+          const body = JSON.parse(String(init?.body)) as { requestId: string };
+          requestIds.push(body.requestId);
+          if (refreshAttempts === 1) throw new TypeError('response connection dropped');
+          return jsonResponse(200, {
+            accessToken: 'access-2',
+            refreshToken: 'refresh-2',
+            accessTokenExpiresIn: 3600,
+          });
+        }
+        const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
+        return auth === 'Bearer access-2'
+          ? jsonResponse(200, { ok: true })
+          : jsonResponse(401, { error: 'token expired' });
+      }),
+    );
+
+    await expect(api('/characters')).rejects.toThrow('response connection dropped');
+    await expect(api('/characters')).resolves.toEqual({ ok: true });
+    expect(requestIds).toHaveLength(2);
+    expect(requestIds[1]).toBe(requestIds[0]);
+  });
+
+  it('does not restore an old session when its refresh completes after account switching', async () => {
+    seedTokens();
+    let releaseRefresh!: (response: Response) => void;
+    const heldRefresh = new Promise<Response>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/auth/refresh')) return heldRefresh;
+        return jsonResponse(401, { error: 'token expired' });
+      }),
+    );
+
+    const oldRequest = api('/characters');
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    tokenStore.clear();
+    tokenStore.write({
+      accessToken: 'new-account-access',
+      refreshToken: 'new-account-refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    releaseRefresh(
+      jsonResponse(200, {
+        accessToken: 'late-old-access',
+        refreshToken: 'late-old-refresh',
+        accessTokenExpiresIn: 3600,
+      }),
+    );
+
+    await expect(oldRequest).rejects.toMatchObject({ status: 401 });
+    expect(tokenStore.read()).toMatchObject({
+      accessToken: 'new-account-access',
+      refreshToken: 'new-account-refresh',
+    });
+  });
+
+  it('rejects a successful response that arrives after the originating session changed', async () => {
+    seedTokens();
+    let release!: (response: Response) => void;
+    const held = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => held),
+    );
+
+    const oldRequest = api('/campaigns');
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    tokenStore.clear();
+    tokenStore.write({
+      accessToken: 'new-account-access',
+      refreshToken: 'new-account-refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    release(jsonResponse(200, [{ id: 'private-old-account', name: 'Must not escape' }]));
+
+    await expect(oldRequest).rejects.toMatchObject({
+      status: 401,
+      message: 'session changed while request was in flight',
+    });
+  });
+
+  it('coordinates rotation across isolated module contexts and reuses the winning pair', async () => {
+    seedTokens();
+    let lockTail = Promise.resolve();
+    const locks = {
+      request: vi.fn(async (_name: string, callback: () => Promise<unknown>) => {
+        const previous = lockTail;
+        let release!: () => void;
+        lockTail = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        await previous;
+        try {
+          return await callback();
+        } finally {
+          release();
+        }
+      }),
+    };
+    vi.stubGlobal('navigator', { ...navigator, locks });
+
+    let refreshCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
+        if (auth === 'Bearer access-2') return jsonResponse(200, { ok: true });
+        if (!auth) {
+          refreshCalls += 1;
+          return jsonResponse(200, {
+            accessToken: 'access-2',
+            refreshToken: 'refresh-2',
+            accessTokenExpiresIn: 3600,
+          });
+        }
+        return jsonResponse(401, { error: 'token expired' });
+      }),
+    );
+
+    vi.resetModules();
+    const firstTab = await import('./api.ts');
+    vi.resetModules();
+    const secondTab = await import('./api.ts');
+
+    await expect(
+      Promise.all([firstTab.api('/characters'), secondTab.api('/campaigns')]),
+    ).resolves.toEqual([{ ok: true }, { ok: true }]);
+    expect(refreshCalls).toBe(1);
+    expect(locks.request).toHaveBeenCalledTimes(2);
+    expect(tokenStore.read()).toMatchObject({
+      accessToken: 'access-2',
+      refreshToken: 'refresh-2',
+      version: 1,
+    });
+  });
 });

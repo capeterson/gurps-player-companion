@@ -11,13 +11,14 @@
  *    pages so unauthenticated admins can sign in.
  */
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { LoginPage } from '../features/auth/LoginPage.tsx';
 import { RegisterPage } from '../features/auth/RegisterPage.tsx';
 import { SuspendedPage } from '../features/auth/SuspendedPage.tsx';
+import { SessionQueryCacheBoundary, createSessionQueryClient } from '../lib/sessionQueryCache.tsx';
 import { applyTheme, readStoredTheme } from '../lib/theme.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { RequireAuth } from '../routes/RequireAuth.tsx';
@@ -30,15 +31,7 @@ import { UsersPage } from './pages/UsersPage.tsx';
 
 applyTheme(readStoredTheme());
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
+const queryClient = createSessionQueryClient();
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -77,6 +70,7 @@ if (!rootEl) throw new Error('root element missing');
 createRoot(rootEl).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
+      <SessionQueryCacheBoundary />
       <ToastProvider>
         <RouterProvider router={router} />
       </ToastProvider>

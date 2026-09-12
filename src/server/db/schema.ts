@@ -112,6 +112,8 @@ export const users = pgTable(
     id: id(),
     email: varchar('email', { length: 255 }).notNull(),
     passwordHash: text('password_hash').notNull(),
+    /** Incremented to revoke every access/refresh JWT issued under an older value. */
+    authVersion: integer('auth_version').notNull().default(0),
     displayName: varchar('display_name', { length: 80 }).notNull(),
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
     /**
@@ -180,8 +182,12 @@ export const refreshTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     jti: varchar('jti', { length: 64 }).notNull(),
+    familyId: uuid('family_id').notNull().default(sql`uuidv7()`),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    rotationRequestId: uuid('rotation_request_id'),
+    replacementJti: varchar('replacement_jti', { length: 64 }),
+    rotatedAt: timestamp('rotated_at', { withTimezone: true }),
     createdAt: createdAt(),
     /** PG18 virtual generated column — handy for query filters. */
     isActive: boolean('is_active').generatedAlwaysAs(sql`(revoked_at is null)`),
@@ -189,6 +195,7 @@ export const refreshTokens = pgTable(
   (t) => ({
     jtiKey: uniqueIndex('refresh_tokens_jti_key').on(t.jti),
     userIdx: index('refresh_tokens_user_idx').on(t.userId),
+    familyIdx: index('refresh_tokens_family_idx').on(t.familyId),
   }),
 );
 

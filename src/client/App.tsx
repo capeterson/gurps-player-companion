@@ -1,10 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
 import { api } from './lib/api.ts';
+import { clearSessionQueryCache } from './lib/sessionQueryCache.tsx';
 import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
 import type { ThemeName } from './lib/theme.ts';
 import { tokenStore } from './lib/tokenStore.ts';
@@ -29,6 +30,7 @@ interface MeResponse {
 
 export function App() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const location = useLocation();
   const campaignActive = CAMPAIGN_PATHS.has(location.pathname);
   const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
@@ -78,6 +80,7 @@ export function App() {
         authenticated: false,
       }).catch(() => {});
     }
+    clearSessionQueryCache(queryClient);
     tokenStore.clear();
     // Wipe the local Dexie before navigating so account switching on
     // the same device never leaks the previous user's rows into a

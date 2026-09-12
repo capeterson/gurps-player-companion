@@ -40,6 +40,8 @@ export const tokenPair = z.object({
 
 export const refreshRequest = z.object({
   refreshToken: z.string().min(1),
+  /** Stable for this refresh token so a lost success response can be retried safely. */
+  requestId: uuid.optional(),
 });
 
 export const logoutRequest = z.object({
