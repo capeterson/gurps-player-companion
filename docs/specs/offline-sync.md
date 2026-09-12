@@ -244,7 +244,10 @@ Every stored token pair carries a cross-tab session id and rotation version.
 `refreshTokens()` captures that identity before sending and may replace or clear
 the pair only while it is still current. A response from before logout or a new
 login is discarded, and an old authenticated request is never retried with a
-new account's credentials.
+new account's credentials. Refresh rotation is serialized across tabs with the
+Web Locks API. A waiter re-reads storage after acquiring the lock and reuses a
+newer pair already written by the winner instead of replaying the consumed
+refresh token; browsers without Web Locks still serialize callers in one tab.
 
 `refreshTokens()` in `src/client/lib/api.ts` clears the token store **only** on
 a `401`/`403` from `/auth/refresh` — a definitive rejection of the refresh

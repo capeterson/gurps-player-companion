@@ -171,4 +171,59 @@ describe('api refresh-on-401', () => {
       refreshToken: 'new-account-refresh',
     });
   });
+
+  it('coordinates rotation across isolated module contexts and reuses the winning pair', async () => {
+    seedTokens();
+    let lockTail = Promise.resolve();
+    const locks = {
+      request: vi.fn(async (_name: string, callback: () => Promise<unknown>) => {
+        const previous = lockTail;
+        let release!: () => void;
+        lockTail = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        await previous;
+        try {
+          return await callback();
+        } finally {
+          release();
+        }
+      }),
+    };
+    vi.stubGlobal('navigator', { ...navigator, locks });
+
+    let refreshCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
+        if (auth === 'Bearer access-2') return jsonResponse(200, { ok: true });
+        if (!auth) {
+          refreshCalls += 1;
+          return jsonResponse(200, {
+            accessToken: 'access-2',
+            refreshToken: 'refresh-2',
+            accessTokenExpiresIn: 3600,
+          });
+        }
+        return jsonResponse(401, { error: 'token expired' });
+      }),
+    );
+
+    vi.resetModules();
+    const firstTab = await import('./api.ts');
+    vi.resetModules();
+    const secondTab = await import('./api.ts');
+
+    await expect(
+      Promise.all([firstTab.api('/characters'), secondTab.api('/campaigns')]),
+    ).resolves.toEqual([{ ok: true }, { ok: true }]);
+    expect(refreshCalls).toBe(1);
+    expect(locks.request).toHaveBeenCalledTimes(2);
+    expect(tokenStore.read()).toMatchObject({
+      accessToken: 'access-2',
+      refreshToken: 'refresh-2',
+      version: 1,
+    });
+  });
 });
