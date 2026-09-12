@@ -158,7 +158,7 @@ test('campaign settings dialog keeps its close control reachable on a short mobi
     .toBe(true);
 });
 
-test('item edit dialog keeps its cancel control reachable on a short mobile viewport', async ({
+test('inline inventory categories toggle and retain populated advanced fields on mobile', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
@@ -182,16 +182,29 @@ test('item edit dialog keeps its cancel control reachable on a short mobile view
   await page.getByLabel('Item name').fill('Reachable item');
   await page.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Reachable item', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Edit Reachable item' }).click();
-
-  const itemDialog = page.locator('dialog[open]').filter({ hasText: 'Edit item' });
-  const cancel = itemDialog.getByRole('button', { name: 'Cancel' });
-  await expect(cancel).toBeVisible();
+  await page.getByRole('button', { name: 'Add category to Reachable item' }).click();
+  await page.getByRole('button', { name: '+ Armor', exact: true }).click();
+  const editor = page.getByRole('region', { name: 'Reachable item: Armor' });
+  const chip = page.getByRole('button', { name: 'Armor settings for Reachable item' });
+  await expect(editor).toBeVisible();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+  await editor.getByRole('button', { name: 'More options' }).click();
+  await editor.getByLabel('Crushing DR', { exact: true }).fill('0');
+  await editor.getByRole('button', { name: 'Fewer options' }).click();
+  await expect(editor.getByLabel('Crushing DR', { exact: true })).toBeVisible();
+  await expect(editor.getByLabel('Cutting DR', { exact: true })).toBeHidden();
+  await chip.click();
+  await expect(editor).toBeHidden();
+  await chip.click();
+  await expect(editor.getByLabel('Crushing DR', { exact: true })).toHaveValue('0');
+  await editor.getByLabel('Crushing DR', { exact: true }).fill('');
+  await editor.getByRole('heading', { name: 'Armor', exact: true }).click();
+  await expect(editor.getByLabel('Crushing DR', { exact: true })).toBeHidden();
   await expect
-    .poll(async () => {
-      const box = await cancel.boundingBox();
-      return box ? box.y >= 0 && box.y + box.height <= 568 : false;
-    })
+    .poll(() => editor.evaluate((element) => element.getBoundingClientRect().right <= innerWidth))
+    .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     .toBe(true);
 });
 

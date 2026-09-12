@@ -231,23 +231,35 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
   encumbrance, armor and weapon data, cost/weight rollups. Equipped
   armor and active innate DR are aggregated per hit location on the Combat tab's Effective DR
-  card. An item's categories (container/armor/weapon/powerstone/magic
-  item) are **derived facet chips** (`FacetChips.tsx`) rather than
-  independent checkboxes — clicking an inactive chip (`+ Weapon`)
-  turns the facet on and reveals its fieldset; clicking an active chip
-  turns it off, confirming first if the facet already carries data.
-  The same chip row appears in the item edit dialog and the inventory
-  add form's "More options" expander. Weapon data (damage, reach,
-  parry, ST required, governing **skill**, shield **Defense Bonus**,
-  an optional **ranged** stat block — Acc/Range/RoF/Shots/Bulk/
-  Recoil — and **alternate attack modes**: extra damage/reach/parry
-  rows beyond the primary line, e.g. swing + thrust + thrown) is
-  editable from the item edit dialog, and copied from
-  campaign library items on the inventory add form. Items can also
-  carry an **enchantments** list (B262 multi-enchant economy — e.g.
-  "Fortify +3" plus "Deflect +2" on one item), edited from the item
-  edit dialog and copied from library templates; it is non-mechanical
-  display metadata (nothing consumes it in combat math yet).
+  card. **Inline inventory editors** replace the item edit modal. Clicking a
+  category chip (Armor, Weapon/Shield, Container, Powerstone, Magic item, or
+  Enchantments) opens its editor immediately below the row; clicking that same
+  chip again collapses it. The pencil opens basic item details in the same
+  place. Category controls are separate from row selection and container
+  expansion, and hidden editors retain their drafts while switching sections.
+  **+ Category** adds another role without changing siblings or equipped/worn
+  state. Category removal has a separate inline confirmation; containers with
+  contents must be emptied first. Read-only viewers see summary badges only.
+  Fields save on blur through `useDraftField` and the local outbox. JSON leaf
+  edits merge with the latest stored item inside a Dexie transaction so rapid
+  edits to different armor/weapon properties cannot overwrite each other.
+  **More options** reveals unused advanced fields. Any populated optional
+  field is visible even with the disclosure closed, including numeric zero and
+  checked flags; blank/unchecked fields can hide again after focus leaves.
+  The field stays mounted in place so promotion does not steal focus. This
+  applies to armor typed DR, crushing DR, defense bonus, facing and notes;
+  weapon ST, shield DB, ranged stats, alternate modes and notes; powerstone and
+  magic-item notes; enchantment details; and basic notes/external location.
+  Armor retains every canonical and custom hit location. Weapons retain
+  damage, reach, parry, governing skill, optional ranged stats and alternate
+  attack modes. Powerstones and magic items retain their charge/energy state
+  and shared validation. Enchantments remain non-mechanical display metadata.
+  Library templates still populate the quick-add form, and its small optional
+  category/equipped/worn controls remain available; detailed editing uses the
+  new item's category chips. Implementation lives under
+  `characters/sections/inventory/` (`InventoryItemEditor`, `ItemField`, and
+  `itemMutations`), with regression tests for disclosure, local saves, rollback,
+  category changes, and structured-data preservation.
   Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
@@ -580,6 +592,8 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
+      characters/sections/inventory/ Inline category editors, field disclosure,
+                                      and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Languages/Techniques/Inventory:
                  LanguagesPanel and TechniquesPanel (the new P0 panels),

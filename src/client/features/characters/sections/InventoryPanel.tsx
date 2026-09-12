@@ -6,7 +6,7 @@
  *    move-to-container dropdown + bulk delete)
  *  - Add form with library autocomplete and a "More options" expander
  *    (container / armor / worn / equipped flags at create time)
- *  - Per-row Edit dialog (`ItemEditDialog`) with full container/armor editing
+ *  - Per-row inline category editors, with autosaved fields and optional details
  *  - DnD between rows / character / stashed targets, with valid/invalid
  *    visual feedback
  *
@@ -33,7 +33,6 @@ import { enqueueDeletes, enqueueFieldPatches } from '../../../sync/outbox.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharacterDetail.ts';
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
-import { ItemEditDialog } from './ItemEditDialog.tsx';
 import { buildTree, descendantsOf, flattenDFS } from './inventoryTree.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
@@ -107,7 +106,6 @@ export function InventoryPanel({
   });
 
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
-  const [editing, setEditing] = useState<InventoryItemOut | null>(null);
   const [pickedLibraryItem, setPickedLibraryItem] = useState<LibraryItemOut | null>(null);
 
   const containers = useMemo(() => items.filter((i) => i.isContainer), [items]);
@@ -443,7 +441,7 @@ export function InventoryPanel({
         isSelected={isSelected}
         onRowClick={handleClick}
         canEdit={canWrite}
-        onEdit={(it) => setEditing(it)}
+        skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
         {...(canWrite ? { drag: dragApi } : {})}
         {...(opts.inStashed ? { inStashed: true } : {})}
       />
@@ -715,7 +713,7 @@ export function InventoryPanel({
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
-                <table className="table table-zebra">
+                <table className="table table-zebra inventory-table">
                   {tableHead}
                   <tbody>{renderRows(wornRoots)}</tbody>
                 </table>
@@ -790,7 +788,7 @@ export function InventoryPanel({
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
-                <table className="table table-zebra">
+                <table className="table table-zebra inventory-table">
                   {tableHead}
                   <tbody>{renderRows(carriedRoots, { inStashed: true })}</tbody>
                 </table>
@@ -954,8 +952,7 @@ export function InventoryPanel({
               </label>
               {(newIsContainer || newIsArmor || newIsWeapon) && (
                 <span className="text-base-content/40">
-                  Save first; tune capacity / DR / locations / weapon stats from the row's Edit
-                  menu.
+                  Add the item, then click a category on its row to edit its settings.
                 </span>
               )}
             </div>
@@ -973,23 +970,6 @@ export function InventoryPanel({
       >
         These items will be permanently removed from this character's inventory.
       </ConfirmDialog>
-
-      <ItemEditDialog
-        open={editing !== null}
-        item={editing}
-        skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
-        onCancel={() => setEditing(null)}
-        onSubmit={(patch) => {
-          if (editing) {
-            void patchMany(editing.id, patch, 'Updated')
-              .then(() => setEditing(null))
-              .catch((err) => {
-                // Keep the dialog and its draft open so the gesture can be retried.
-                toasts.push(`Couldn't update item — ${(err as Error).message}`, { kind: 'error' });
-              });
-          }
-        }}
-      />
     </section>
   );
 }

@@ -154,7 +154,14 @@ works offline.**
    Inventory multi-select equip/wear/move actions and bulk deletes use the same
    all-or-nothing helpers with one history `batchId`. A storage failure rolls
    back every local row and queued op; the panel reports the error and retains
-   its selection or open edit dialog so the gesture can be retried.
+   its selection so the gesture can be retried. Inventory inline inputs use
+   `useDraftField` with commit-time enqueueing. Their JSON property updates
+   read the current item, merge the edited property, validate, and enqueue the
+   whole top-level field inside one Dexie transaction (`itemMutations.ts`).
+   Different properties therefore compose even before React refreshes. Fields
+   subscribe to the top-level field's rollback key; collapsed rows also flash.
+   Category additions/removals use the existing multi-field helper and shared
+   history batch, retaining unrelated categories and carrying state.
 2. **Drain.** The orchestrator selects and marks pending outbox ops `in_flight`
    in one short Dexie transaction (`claimDrainableOps`), then sends only those
    claimed rows (up to `DRAIN_BATCH_SIZE`) to `POST /sync/operations`. A
