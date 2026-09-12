@@ -132,7 +132,7 @@ New module `src/shared/history/summarize.ts` — pure functions, unit-testable, 
 - Examples it must handle:
   - Attribute change: `"ST 10 → 12"`, `"IQ 12 → 13"`.
   - **Temporary effects** (`characters.temp_effects`, a JSONB list since migration 0017): `"Temporary effect added: Might (ST +2, HT +1)"`, `"Temporary effect removed: Might"`, `"Temporary effects cleared"`, `"Temporary adjustment: ST +2"` (the reserved `manual` sentinel entry the ✦ popovers write to). Pre-migration history rows still carry the old per-stat scalar columns (`tempSt`, `tempDx`, …) in their jsonb snapshot forever — `TEMP_ATTR_LABELS` keeps those readable as `"Temp DX +2"` / `"Temp DX boost cleared"`.
-  - Skill/spell/trait: `"Added skill Broadsword (DX/A)"`, `"Removed spell Fireball"`, `"Acrobatics points 2 → 4"`.
+  - Skill/spell/trait: `"Added skill Broadsword (DX/A)"`, `"Removed spell Fireball"`, `"Acrobatics points 2 → 4"`. Character-owned trait mechanics summarize as `"Weapon Mastery: 2 custom effects saved"` rather than dumping JSON.
   - Inventory: `"Added Torch ×2"`, `"Moved Sword into Backpack"`, `"Removed Rations"`.
   - Campaign: `"Point target 100 → 125"`, `"Disadvantage cap changed"`.
   - Membership: `"Promoted Alice to manager"`, `"Removed Bob from campaign"`.

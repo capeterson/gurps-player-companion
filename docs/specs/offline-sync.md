@@ -36,10 +36,18 @@ when a WebSocket nudge is missed.
 Library editing remains online-only, but calculation no longer depends on its
 React Query cache. Trait/skill rows persist `libraryMechanics` in Postgres and
 Dexie: source ID, source campaign, source revision, raw effect declarations, and
-an optional `detached` flag. `effects: []` is known empty; `effects: null` is
+an optional `detached` flag. Effect declarations include deterministic weapon
+selectors and are resolved against the same mirrored inventory rows in local and
+server builds; unequipped rows do not match. `effects: []` is known empty; `effects: null` is
 unresolved. Server and client derive from the same owned copy; the cursor reads
 it after the character share gate without fetching live source data. The field
 is read-only and never accepted as an outbox patch or caller-supplied snapshot.
+
+Character traits additionally carry writable `customEffects`. The trait editor
+commits the validated whole array as a normal coalesced `character_trait` field
+patch, so exact inventory-item bindings work offline and receive the standard
+rejection toast and rollback flash. The shared detail builder merges these after
+the read-only library declarations on both server and client.
 
 Selecting an already loaded definition also seeds validated local-only declarations
 into the speculative create row, in the same Dexie transaction as its outbox entry.

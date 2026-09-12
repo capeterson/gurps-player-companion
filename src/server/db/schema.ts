@@ -598,6 +598,8 @@ export const characterTraits = pgTable(
     modifiers: jsonb('modifiers').$type<TraitModifier[]>().notNull().default([]),
     libraryTraitId: uuid('library_trait_id'),
     libraryMechanics: jsonb('library_mechanics').$type<LibraryMechanics>(),
+    /** User-authored mechanics; validated by traitEffect in trait create/update. */
+    customEffects: jsonb('custom_effects').$type<TraitEffect[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),

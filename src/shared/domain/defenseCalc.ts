@@ -200,12 +200,14 @@ export function stShortfallPenalty(
 }
 
 export interface ShieldItemRow {
+  readonly id?: string;
   readonly equipped: boolean;
   readonly name: string;
   readonly weaponData: WeaponData | null;
 }
 
 export interface PickedShield {
+  readonly id?: string;
   readonly name: string;
   readonly db: number;
   readonly weaponData: WeaponData;
@@ -228,7 +230,12 @@ export function pickShield(items: readonly ShieldItemRow[]): PickedShield | null
       db > best.db ||
       (db === best.db && item.name.localeCompare(best.name) < 0)
     ) {
-      best = { name: item.name, db, weaponData: item.weaponData };
+      best = {
+        ...(item.id ? { id: item.id } : {}),
+        name: item.name,
+        db,
+        weaponData: item.weaponData,
+      };
     }
   }
   return best;

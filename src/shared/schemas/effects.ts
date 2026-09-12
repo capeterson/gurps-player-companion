@@ -40,6 +40,12 @@ export const EFFECT_TARGETS = [
   // flat adds to final ST-based thrust/swing dice, after temporary ST
   'damage_thrust',
   'damage_swing',
+  // item-aware weapon effects (require weaponSelector)
+  'weapon_attack',
+  'weapon_parry',
+  'weapon_block',
+  'weapon_damage',
+  'weapon_accuracy',
 ] as const;
 
 export const effectTarget = z.enum(EFFECT_TARGETS);
@@ -47,6 +53,55 @@ export type EffectTarget = (typeof EFFECT_TARGETS)[number];
 
 export const effectScaling = z.enum(['flat', 'per_level']);
 export type EffectScaling = z.infer<typeof effectScaling>;
+
+export const WEAPON_EFFECT_TARGETS = [
+  'weapon_attack',
+  'weapon_parry',
+  'weapon_block',
+  'weapon_damage',
+  'weapon_accuracy',
+] as const satisfies readonly EffectTarget[];
+
+export const weaponEffectTarget = z.enum(WEAPON_EFFECT_TARGETS);
+export type WeaponEffectTarget = z.infer<typeof weaponEffectTarget>;
+
+const modeName = z.string().trim().min(1).max(40).optional();
+
+/**
+ * Deterministic weapon binding. Portable definitions use semantic selectors;
+ * an owned/local declaration may instead bind one exact inventory row.
+ * Mechanical matching is always normalized exact matching -- never fuzzy.
+ */
+export const weaponSelector = z.discriminatedUnion('kind', [
+  z
+    .object({ kind: z.literal('inventory_item'), inventoryItemId: z.string().uuid(), modeName })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('library_item'),
+      /** Same-campaign fast path. Name is the portable YAML/re-import fallback. */
+      libraryItemId: z.string().uuid().optional(),
+      libraryItemName: z.string().trim().min(1).max(160),
+      modeName,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('weapon_skill'),
+      skillName: z.string().trim().min(1).max(160),
+      skillSpecialty: z.string().trim().min(1).max(160).optional(),
+      modeName,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('weapon_name'),
+      weaponName: z.string().trim().min(1).max(160),
+      modeName,
+    })
+    .strict(),
+]);
+export type WeaponSelector = z.infer<typeof weaponSelector>;
 
 export const traitEffect = z
   .object({
@@ -56,6 +111,7 @@ export const traitEffect = z
     skillName: z.string().min(1).max(160).optional(),
     skillSpecialty: z.string().min(1).max(160).optional(),
     hitLocation: z.string().min(1).max(40).optional(),
+    weaponSelector: weaponSelector.optional(),
     conditionGroup: z
       .string()
       .min(1)
@@ -94,6 +150,43 @@ export const traitEffect = z
         message: 'conditionLabel requires conditionGroup',
       });
     }
+    const weaponTarget = WEAPON_EFFECT_TARGETS.includes(eff.target as WeaponEffectTarget);
+    if (weaponTarget && !eff.weaponSelector) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['weaponSelector'],
+        message: `weaponSelector is required when target='${eff.target}'`,
+      });
+    }
+    if (!weaponTarget && eff.weaponSelector) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['weaponSelector'],
+        message: 'weaponSelector is only allowed for weapon targets',
+      });
+    }
+    if (
+      (eff.target === 'weapon_parry' || eff.target === 'weapon_block') &&
+      eff.weaponSelector?.modeName
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['weaponSelector', 'modeName'],
+        message: `${eff.target} applies to the item defense and cannot select an attack mode`,
+      });
+    }
   });
 
 export type TraitEffect = z.infer<typeof traitEffect>;
+
+/** Campaign/YAML declarations must remain portable between characters. */
+export const libraryTraitEffect = traitEffect.superRefine((effect, ctx) => {
+  if (effect.weaponSelector?.kind === 'inventory_item') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['weaponSelector', 'kind'],
+      message: 'campaign-library effects cannot bind a character inventory item',
+    });
+  }
+});
+export type LibraryTraitEffect = z.infer<typeof libraryTraitEffect>;

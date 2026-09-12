@@ -302,6 +302,13 @@
       "when": 1790001000000,
       "tag": "0042_delegated_oauth",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1799712000000,
+      "tag": "0043_character_trait_custom_effects",
+      "breakpoints": true
     }
   ]
 }

@@ -87,6 +87,11 @@ lives in the **page** orchestrator, not the service worker — see below.)
   - `constants/` — GURPS reference data (attributes, skills, traits, combat,
     hit locations, magic).
   - `yaml/library.ts` — the round-trippable campaign-library YAML codec.
+  - `domain/traitEffects.ts` — the pure shared resolver for global, skill, and
+    deterministic item-aware weapon effects. Server and Dexie-built character
+    details use this same path and annotate weapon selectors with zero/one/multiple
+    equipped-row matches for UI diagnostics. It merges immutable owned library
+    declarations with the character trait's user-authored `customEffects`.
   - `history/summarize.ts` — shared history one-liner formatter.
 - **`src/server/`** — the Bun process (routes, auth, Drizzle, services, DB,
   OpenAPI).

@@ -15,10 +15,20 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
-import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type {
+  CharacterDetail,
+  ResolvedEffectOut,
+} from '../../../../../shared/schemas/character.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollRequest } from '../rollTypes.ts';
 import { locationLabel } from './armorViewOptions.ts';
+import {
+  ModifierBreakdown,
+  WeaponEffectDiagnostics,
+  effectTotal,
+  skillEffectsForRow,
+  weaponEffectsForRow,
+} from './weaponEffectView.tsx';
 
 export interface DefensesCardProps {
   character: CharacterDetail;
@@ -32,6 +42,9 @@ interface ParryRow {
   readonly value: number | null;
   readonly caption: string | undefined;
   readonly raw: string;
+  readonly baseValue?: number;
+  readonly skillEffects: readonly ResolvedEffectOut[];
+  readonly weaponEffects: readonly ResolvedEffectOut[];
 }
 
 function modifierCaption(value: number): string {
@@ -39,6 +52,7 @@ function modifierCaption(value: number): string {
 }
 
 export function DefensesCard({ character, openRoll }: DefensesCardProps) {
+  const effects = character.effects ?? [];
   const [defenseOption, setDefenseOption] = useState<AllOutDefenseOption>(null);
   const [hitLocation, setHitLocation] = useState('torso');
   const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
@@ -133,7 +147,15 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       // back to the raw-string row — for 'no' that display is now a
       // deliberate choice, not a parse failure.
       if (parsed == null || parsed.kind === 'no') {
-        return { key: i.id, name: i.name, value: null, caption: undefined, raw };
+        return {
+          key: i.id,
+          name: i.name,
+          value: null,
+          caption: undefined,
+          raw,
+          skillEffects: [],
+          weaponEffects: [],
+        };
       }
       const resolution = resolveWeaponSkill(i.name, wd?.skill, skillCandidates);
       if (resolution.kind === 'matched') {
@@ -142,12 +164,22 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         const adjusted =
           resolution.level -
           stShortfallPenalty(wd?.stRequired, state.strength(character.derived.effectiveSt));
+        const weaponEffects = weaponEffectsForRow(effects, i.id, 'weapon_parry');
+        const skillEffects = skillEffectsForRow(effects, resolution.name);
+        const baseValue = parryFromSkill(adjusted, parsed.mod);
         return {
           key: i.id,
           name: i.name,
-          value: parryFromSkill(adjusted, parsed.mod, character.derived.parryMod),
+          value: parryFromSkill(
+            adjusted,
+            parsed.mod,
+            (character.derived.parryMod ?? 0) + effectTotal(weaponEffects),
+          ),
           caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}${dbCaption}`,
           raw,
+          baseValue,
+          skillEffects,
+          weaponEffects,
         };
       }
       return {
@@ -159,6 +191,8 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
             ? `skill '${resolution.skillName}' not on sheet`
             : undefined,
         raw,
+        skillEffects: [],
+        weaponEffects: [],
       };
     });
 
@@ -171,6 +205,12 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   return (
     <section className="card space-y-2 p-5">
       <p className="label-eyebrow">Defenses</p>
+      <WeaponEffectDiagnostics
+        effects={effects.filter((effect) =>
+          ['weapon_parry', 'weapon_block'].includes(effect.target),
+        )}
+        inventory={character.inventory}
+      />
       {state.notes.length > 0 && (
         <p className="text-xs text-base-content/70">{state.notes.join(' · ')}</p>
       )}
@@ -268,7 +308,21 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
             baseTarget={state.defense('parry', row.value, defenseOption, db) ?? 0}
             unavailableReason={state.reason('parry')}
             openRoll={openRoll}
-            sublabel={<span className="block text-[11px] text-base-content/60">{row.caption}</span>}
+            sublabel={
+              <span className="block text-[11px] text-base-content/60">
+                {row.caption}
+                <ModifierBreakdown
+                  baseLabel="Weapon Parry"
+                  baseValue={row.baseValue ?? row.value}
+                  inputEffects={row.skillEffects}
+                  globalEffects={effects.filter(
+                    (effect) => effect.target === 'parry' && effect.active,
+                  )}
+                  weaponEffects={row.weaponEffects}
+                  finalValue={state.defense('parry', row.value, defenseOption, db) ?? 'unavailable'}
+                />
+              </span>
+            }
           />
         ) : (
           <div
@@ -286,28 +340,43 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         ),
       )}
 
-      {shield && blockResolution && blockResolution.kind === 'matched' && (
-        <RollableRow
-          label={`Block (${shield.name})`}
-          baseTarget={
-            state.defense(
-              'block',
-              blockFromSkill(blockResolution.level, character.derived.blockMod),
-              defenseOption,
-              db,
-            ) ?? 0
-          }
-          unavailableReason={state.reason('block')}
-          openRoll={openRoll}
-          sublabel={
-            <span className="block text-[11px] text-base-content/60">
-              via {blockResolution.name}–{blockResolution.level}
-              {modifierCaption(character.derived.blockMod)}
-              {dbCaption}
-            </span>
-          }
-        />
-      )}
+      {shield &&
+        blockResolution &&
+        blockResolution.kind === 'matched' &&
+        (() => {
+          const weaponEffects = weaponEffectsForRow(effects, shield.id ?? '', 'weapon_block');
+          const skillEffects = skillEffectsForRow(effects, blockResolution.name);
+          const base = blockFromSkill(blockResolution.level);
+          const final = blockFromSkill(
+            blockResolution.level,
+            (character.derived.blockMod ?? 0) + effectTotal(weaponEffects),
+          );
+          return (
+            <RollableRow
+              label={`Block (${shield.name})`}
+              baseTarget={state.defense('block', final, defenseOption, db) ?? 0}
+              unavailableReason={state.reason('block')}
+              openRoll={openRoll}
+              sublabel={
+                <span className="block text-[11px] text-base-content/60">
+                  via {blockResolution.name}–{blockResolution.level}
+                  {modifierCaption(character.derived.blockMod)}
+                  {dbCaption}
+                  <ModifierBreakdown
+                    baseLabel="Shield Block"
+                    baseValue={base}
+                    inputEffects={skillEffects}
+                    globalEffects={effects.filter(
+                      (effect) => effect.target === 'block' && effect.active,
+                    )}
+                    weaponEffects={weaponEffects}
+                    finalValue={state.defense('block', final, defenseOption, db) ?? 'unavailable'}
+                  />
+                </span>
+              }
+            />
+          );
+        })()}
       {shield && blockResolution && blockResolution.kind !== 'matched' && (
         <p className="text-xs text-base-content/60">
           {shield.name} is equipped but has no usable Shield skill —{' '}

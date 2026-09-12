@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { campaignHouseRules } from './campaign.ts';
 import { timestamps, uuid } from './common.ts';
-import { traitEffect } from './effects.ts';
+import { libraryTraitEffect } from './effects.ts';
 import {
   armorData,
   enchantmentRef,
@@ -48,7 +48,7 @@ export const libraryTraitOut = z.object({
    * and before per-instance modifiers.
    */
   variants: z.array(traitVariant).default([]),
-  effects: z.array(traitEffect).default([]),
+  effects: z.array(libraryTraitEffect).default([]),
   tags: tagList,
   ...timestamps,
 });
@@ -64,7 +64,7 @@ export const libraryTraitCreate = z
     source: z.string().max(40).trim().nullable().optional(),
     availableModifiers: z.array(traitModifier).default([]),
     variants: z.array(traitVariant).default([]),
-    effects: z.array(traitEffect).default([]),
+    effects: z.array(libraryTraitEffect).default([]),
     tags: tagList,
   })
   .strict();
@@ -84,7 +84,7 @@ export const librarySkillOut = z.object({
   defaults: skillDefaults.optional(),
   prerequisites: z.string().max(20_000).nullable(),
   situationalModifiers: z.array(situationalModifier).default([]),
-  effects: z.array(traitEffect).default([]),
+  effects: z.array(libraryTraitEffect).default([]),
   ...timestamps,
 });
 
@@ -100,7 +100,7 @@ export const librarySkillCreate = z
     defaults: skillDefaults.optional(),
     prerequisites: z.string().max(20_000).nullable().optional(),
     situationalModifiers: z.array(situationalModifier).default([]),
-    effects: z.array(traitEffect).default([]),
+    effects: z.array(libraryTraitEffect).default([]),
   })
   .strict();
 
@@ -346,7 +346,8 @@ export const importResult = z.object({
  * v1 docs (pre-effects), v2 docs (effects on traits/skills), v3 docs
  * (container/powerstone/magic-item item fields + campaign.manaLevel), v4
  * docs (languages + techniques + styles sections), v5 docs (item enchantments),
- * and v6 docs (explicit skill defaults) all parse. Schema unions on a literal version
+ * v6 docs (explicit skill defaults), and v7 docs (weapon-scoped effects) all parse.
+ * Schema unions on a literal version
  * field so older library files keep round-tripping without mutation.
  * Older docs that omit the newer fields get their defaults (empty
  * array / false / null) via the library*Create schemas.
@@ -358,6 +359,7 @@ export const libraryYamlVersion = z.union([
   z.literal(4),
   z.literal(5),
   z.literal(6),
+  z.literal(7),
 ]);
 
 export const libraryYamlDoc = z

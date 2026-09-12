@@ -33,6 +33,7 @@ import {
   type TempEffect,
   type TempStatAxis,
 } from '../../shared/schemas/character.ts';
+import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
 import { inferLegacyCampaignOrder, legacyReferenceFields } from './legacyCampaignDependencies.ts';
@@ -99,6 +100,8 @@ export interface LocalCharacterTrait {
   libraryTraitId: string | null;
   /** Validated read-only declaration projection from the sync cursor; absent on legacy rows. */
   libraryMechanics?: LibraryMechanics | null;
+  /** Character-owned effect declarations; absent on pre-migration local rows. */
+  customEffects?: TraitEffect[];
   createdAt: string;
   updatedAt: string;
   revision: number;

@@ -46,7 +46,12 @@ import {
   manaSkillModifier,
 } from './spellCalc.ts';
 import { computeTechniqueLevel, resolveDefaultSkillLevel } from './techniqueCalc.ts';
-import { applyEffectsToAttrs, resolveEffects, skillBonusFor } from './traitEffects.ts';
+import {
+  applyEffectsToAttrs,
+  resolveEffects,
+  resolveWeaponEffectMatches,
+  skillBonusFor,
+} from './traitEffects.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
 
 /**
@@ -100,6 +105,7 @@ export interface CharacterDetailInputTrait {
   modifiers: unknown[] | null;
   libraryTraitId: string | null;
   libraryMechanics?: LibraryMechanics | null;
+  customEffects?: TraitEffect[];
   /**
    * Effect declarations from the matching library_trait row, joined by
    * libraryTraitId at fetch time.  Empty array if the trait has no
@@ -291,6 +297,7 @@ export function buildTraitOut(trait: CharacterDetailInputTrait): TraitOut {
     modifiers: (trait.modifiers ?? []) as TraitModifier[],
     libraryTraitId: trait.libraryTraitId,
     libraryMechanics: trait.libraryMechanics ?? null,
+    customEffects: trait.customEffects ?? [],
     createdAt: toIso(trait.createdAt),
     updatedAt: toIso(trait.updatedAt),
   };
@@ -429,12 +436,13 @@ export function buildSpellOut(
   iq: number,
   magery: number,
   mana: ManaLevel = 'normal',
+  skillBonus = 0,
 ): SpellOut {
   const difficulty = spell.difficulty ?? 'H';
   // Null when the spell has no points invested (no default in GURPS);
   // an unknown spell gets no skill discount either.
   const baseLevel = computeSpellLevel(spell.points, iq, magery, difficulty);
-  const level = baseLevel == null ? null : baseLevel + manaSkillModifier(mana);
+  const level = baseLevel == null ? null : baseLevel + manaSkillModifier(mana) + skillBonus;
   return {
     id: spell.id,
     characterId: spell.characterId,
@@ -475,7 +483,7 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
       id: t.id,
       name: t.name,
       level: t.level,
-      libraryEffects: t.libraryEffects ?? [],
+      libraryEffects: [...(t.libraryEffects ?? []), ...(t.customEffects ?? [])],
     })),
     skills.map((s) => ({
       id: s.id,
@@ -535,7 +543,9 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   // fallback above -- flag it so the UI can hold cast actions instead
   // of trusting a guess.  Campaignless characters are always 'known'.
   const manaLevelKnown = character.campaignId == null || campaign != null;
-  const spellsOut = spells.map((s) => buildSpellOut(s, derived.effectiveIq, magery, manaLevel));
+  const spellsOut = spells.map((s) =>
+    buildSpellOut(s, derived.effectiveIq, magery, manaLevel, skillBonusFor(s.name, resolved).total),
+  );
   const languagesOut = languages.map(buildLanguageOut);
   // Techniques default from a skill on the sheet, so they resolve against
   // the ALREADY-COMPUTED skill rows (effectiveLevel, i.e. after Talents
@@ -552,19 +562,26 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
 
   // Strip the unused `sourceCharacterRecordId` field name — the schema
   // calls it `sourceId` for brevity.  resolveEffects already emits sourceId.
-  const effectsOut: ResolvedEffectOut[] = resolved.map((e) => ({
-    sourceKind: e.sourceKind,
-    sourceName: e.sourceName,
-    sourceId: e.sourceId,
-    target: e.target,
-    value: e.value,
-    skillName: e.skillName,
-    skillSpecialty: e.skillSpecialty,
-    hitLocation: e.hitLocation,
-    conditionGroup: e.conditionGroup,
-    conditionLabel: e.conditionLabel,
-    active: e.active,
-  }));
+  const weaponMatches = resolveWeaponEffectMatches(resolved, inventoryOut);
+  const effectsOut: ResolvedEffectOut[] = resolved.map((e) => {
+    const weaponMatch = weaponMatches.find((match) => match.effect === e);
+    return {
+      sourceKind: e.sourceKind,
+      sourceName: e.sourceName,
+      sourceId: e.sourceId,
+      target: e.target,
+      value: e.value,
+      skillName: e.skillName,
+      skillSpecialty: e.skillSpecialty,
+      hitLocation: e.hitLocation,
+      weaponSelector: e.weaponSelector,
+      matchedInventoryItemIds: weaponMatch ? [...weaponMatch.matchedInventoryItemIds] : undefined,
+      weaponMatchStatus: weaponMatch?.matchStatus,
+      conditionGroup: e.conditionGroup,
+      conditionLabel: e.conditionLabel,
+      active: e.active,
+    };
+  });
 
   const caps: CampaignCaps = {
     pointTarget: campaign?.pointTarget ?? null,

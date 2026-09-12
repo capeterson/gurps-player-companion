@@ -12,6 +12,7 @@ import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
+import { ModifierBreakdown, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
@@ -232,13 +233,15 @@ interface SkillRowProps {
   skill: SkillOut;
   canWrite: boolean;
   onRoll: (req: RollRequest) => void;
+  effects: CharacterDetail['effects'];
 }
 
-function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
+function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const displayName = skillDisplayName(skill.name, skill.specialization);
+  const bonusEffects = skillEffectsForRow(effects, skill.name, skill.specialization);
   const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, displayName);
 
   const nameField = useEntityNameField(rowPatch, skill.name);
@@ -327,6 +330,14 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
         </button>
       )}
       <div className="col-span-full">
+        {skill.level != null && skill.effectiveLevel != null && (
+          <ModifierBreakdown
+            baseLabel="Base skill"
+            baseValue={skill.level}
+            globalEffects={bonusEffects}
+            finalValue={skill.effectiveLevel}
+          />
+        )}
         <LibraryMechanicsNote mechanics={skill.libraryMechanics} />
       </div>
       <ConfirmDialog
@@ -393,6 +404,7 @@ export function SkillsPanel({
                 skill={s}
                 canWrite={canWrite}
                 onRoll={setRollRequest}
+                effects={character.effects}
               />
             ))}
           </ul>

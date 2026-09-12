@@ -162,6 +162,18 @@ on any sheet the viewer can edit — their own — it always shows).
   normalized). Unqualified names cover every specialty; `*` matches any name
   or specialty in its own field. Legacy `Name (Specialty)` effects retain
   that restriction unless an explicit `skillSpecialty` overrides it.
+  Campaign owners author ordered declarative effects directly in trait and
+  skill library forms: add, duplicate, reorder and delete rows; choose flat or
+  per-level scaling; and supply target-aware skill, DR, condition, or weapon
+  fields. Inline previews and field errors keep invalid drafts visible.
+  Character owners can expand **Custom effects** on any trait and use the same
+  editor. Those declarations are saved on the owned trait through the local-first
+  outbox; this is also where an effect can safely bind one exact inventory item.
+  Item-aware targets cover weapon attack, Parry, Block, damage and Accuracy.
+  Selectors are deterministic: an exact local inventory id for owned mechanics,
+  or portable exact normalized weapon name, governing skill/specialty, or
+  library-item provenance. Optional `Primary`/alternate-mode restrictions apply
+  only to attack, damage and Accuracy; global item effects reach each mode once.
 - **Skills** with attribute/difficulty relative levels. A skill
   copied from the library retains its specialization, learned tech level,
   description, source, and prerequisites (the latter three in notes).
@@ -409,7 +421,8 @@ on any sheet the viewer can edit — their own — it always shows).
     clears that selection. Breakdowns name pool/posture/stun/maneuver adjustments;
     unmodeled tactical situations and custom maneuvers remain player-supplied.
   - **Attacks** — one row per equipped weapon: resolved damage dice (ST
-    thrust/swing + the weapon's modifiers) as **tappable chips that
+    thrust/swing + the weapon's modifiers + weapon-scoped damage effects, or
+    fixed dice + weapon-scoped damage effects) as **tappable chips that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
     1-point floor from B378), reach, an ST-shortfall badge/caption
     (B270, applied to the roll target), a ranged stat line (Acc/Range/
@@ -423,7 +436,11 @@ on any sheet the viewer can edit — their own — it always shows).
     renders each mode as its own labelled damage chip row in addition
     to the primary line, with an alternate's reach inherited from the
     weapon when unset; vitals/eye presets are offered only when at
-    least one mode across every damage line can target them.
+    least one mode across every damage line can target them. Attack-mode
+    bonuses apply once per matching primary or named alternate mode. Affected
+    rows expose expandable base/global/weapon/final modifier breakdowns;
+    unmatched and multi-match selectors are diagnosed visibly instead of
+    becoming global.
   - **Roll sheet** — an ephemeral bottom-sheet/dialog roller with two
     variants sharing one shell. The default **check** variant: modifier
     stepper (−25..+10 — deep enough that a 200 yd range preset, B550,
@@ -614,6 +631,8 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
+      library/   LibraryPage plus EffectsEditor, the reusable ordered effect
+                 authoring UI shared with character-owned trait mechanics
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across

@@ -94,6 +94,57 @@ function targetFor(openRoll: ReturnType<typeof vi.fn>, index: number): number {
 }
 
 describe('DefensesCard', () => {
+  it('applies weapon-scoped Parry and Block only to their matched items', () => {
+    const character = makeCharacter(
+      [
+        { id: 'sword', name: 'Broadsword', parry: '0', skill: 'Broadsword' },
+        { id: 'saber', name: 'Saber', parry: '0', skill: 'Broadsword' },
+        { id: 'shield', name: 'Shield', db: 0, skill: 'Shield' },
+      ],
+      [
+        { name: 'Broadsword', level: 14 },
+        { name: 'Shield', level: 14 },
+      ],
+    );
+    character.effects = [
+      {
+        sourceKind: 'trait',
+        sourceName: 'Weapon Bond',
+        sourceId: '11111111-1111-4111-8111-111111111111',
+        target: 'weapon_parry',
+        value: 1,
+        active: true,
+        weaponSelector: {
+          kind: 'inventory_item',
+          inventoryItemId: '11111111-1111-4111-8111-111111111111',
+        },
+        matchedInventoryItemIds: ['sword'],
+        weaponMatchStatus: 'one',
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Shield Mastery',
+        sourceId: '22222222-2222-4222-8222-222222222222',
+        target: 'weapon_block',
+        value: 2,
+        active: true,
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Shield' },
+        matchedInventoryItemIds: ['shield'],
+        weaponMatchStatus: 'one',
+      },
+    ];
+    const openRoll = vi.fn();
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Parry \(Broadsword\)/ }));
+    expect(targetFor(openRoll, 0)).toBe(11);
+    fireEvent.click(screen.getByRole('button', { name: /Parry \(Saber\)/ }));
+    expect(targetFor(openRoll, 1)).toBe(10);
+    fireEvent.click(screen.getByRole('button', { name: /Block \(Shield\)/ }));
+    expect(targetFor(openRoll, 2)).toBe(12);
+    expect(screen.getAllByText('Weapon Bond').length).toBeGreaterThan(0);
+  });
+
   it.each(['All-Out Attack', 'Move and Attack'])(
     'preserves permanent parry diagnostics during %s',
     (maneuver) => {
