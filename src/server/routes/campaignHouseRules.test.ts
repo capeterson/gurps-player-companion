@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
+import { HOUSE_RULE_DEFINITIONS } from '../../shared/domain/campaignRules.ts';
 import type { CampaignOut } from '../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
@@ -30,12 +31,38 @@ function request(token: string, path: string, method = 'GET', body?: unknown) {
 }
 
 describe('campaign house rules', () => {
+  it('materializes named bundles and preserves their values when saved as Custom', async () => {
+    const owner = await user();
+    const created = await request(owner.accessToken, '/campaigns', 'POST', {
+      name: 'Named rules',
+      houseRules: { ruleSet: 'j_talisar' },
+    });
+    expect(created.status).toBe(201);
+    const campaign = (await created.json()) as CampaignOut;
+    expect(campaign.houseRules.ruleSet).toBe('j_talisar');
+    for (const { key } of HOUSE_RULE_DEFINITIONS) expect(campaign.houseRules[key]).toBe(true);
+
+    const customized = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+      houseRules: {
+        ...campaign.houseRules,
+        ruleSet: 'custom',
+        forbidAcidMagic: false,
+      },
+    });
+    expect(customized.status).toBe(200);
+    const saved = (await customized.json()) as CampaignOut;
+    expect(saved.houseRules.ruleSet).toBe('custom');
+    expect(saved.houseRules.forbidAcidMagic).toBe(false);
+    expect(saved.houseRules.forbidDistantBlow).toBe(true);
+    expect(saved.houseRules.eyeMissHitsFace).toBe(true);
+  });
+
   it('defaults on; owner updates persist in REST, cursor, character details, history, and YAML', async () => {
     const owner = await user();
     const created = await request(owner.accessToken, '/campaigns', 'POST', { name: 'House rules' });
     expect(created.status).toBe(201);
     const campaign = (await created.json()) as CampaignOut;
-    expect(campaign.houseRules).toEqual({ protectNaturalDr: true });
+    expect(campaign.houseRules).toMatchObject({ ruleSet: 'custom', protectNaturalDr: true });
     const patched = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
       houseRules: { protectNaturalDr: false },
     });
@@ -61,7 +88,7 @@ describe('campaign house rules', () => {
     });
     expect(characterRes.status).toBe(201);
     const character = (await characterRes.json()) as CharacterDetail;
-    expect(character.houseRules).toEqual({ protectNaturalDr: false });
+    expect(character.houseRules).toMatchObject({ ruleSet: 'custom', protectNaturalDr: false });
     expect(character.houseRulesKnown).toBe(true);
     const events = await getDb()
       .select()
@@ -77,7 +104,8 @@ describe('campaign house rules', () => {
       ),
     ).toBe(true);
     const exported = await request(owner.accessToken, `/campaigns/${campaign.id}/library/export`);
-    expect(parseLibraryYaml(await exported.text()).campaign?.houseRules).toEqual({
+    expect(parseLibraryYaml(await exported.text()).campaign?.houseRules).toMatchObject({
+      ruleSet: 'custom',
       protectNaturalDr: false,
     });
   });

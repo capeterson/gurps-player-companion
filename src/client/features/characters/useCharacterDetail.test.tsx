@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { campaignHouseRules } from '../../../shared/schemas/campaign.ts';
 import type { LibraryMechanics } from '../../../shared/schemas/libraryMechanics.ts';
 import { getLocalDb } from '../../db/dexie.ts';
 import { tokenStore } from '../../lib/tokenStore.ts';
@@ -394,7 +395,10 @@ it('loads campaign house rules from Dexie, preserves them offline, and reacts to
   const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
   await waitFor(() => expect(offline.result.current?.houseRules.protectNaturalDr).toBe(false));
   await waitFor(() => expect(gm.result.current?.[0]?.houseRules.protectNaturalDr).toBe(false));
-  await db.campaigns.update(CAMPAIGN, { houseRules: { protectNaturalDr: true }, revision: 11 });
+  await db.campaigns.update(CAMPAIGN, {
+    houseRules: campaignHouseRules.parse({ protectNaturalDr: true }),
+    revision: 11,
+  });
   await waitFor(() => expect(offline.result.current?.houseRules.protectNaturalDr).toBe(true));
   expect(fetch).not.toHaveBeenCalled();
 });

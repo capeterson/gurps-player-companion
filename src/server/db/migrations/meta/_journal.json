@@ -288,6 +288,13 @@
       "when": 1789202000000,
       "tag": "0040_commit_safe_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0041_campaign_attribute_caps",
+      "breakpoints": true
     }
   ]
 }

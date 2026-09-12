@@ -415,7 +415,7 @@ describe('emitLibraryYaml', () => {
     expect(second).toBe(first);
   });
 
-  it('round-trips a v3 document (full item/trait/campaign shape) byte-stably', () => {
+  it('upgrades a v3 document to the current v6 shape byte-stably', () => {
     const doc = parseLibraryYaml(SAMPLE_V3);
     const first = emitLibraryYaml({
       campaign: doc.campaign,

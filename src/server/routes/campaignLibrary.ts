@@ -24,6 +24,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, type sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
 import { campaignUpdate } from '../../shared/schemas/campaign.ts';
 import {
   importMode,
@@ -196,6 +197,7 @@ router.openapi(
         manaLevel: campaign.manaLevel,
         houseRules: campaign.houseRules,
         techLevel: campaign.techLevel,
+        enforceAttributeCaps: campaign.enforceAttributeCaps,
       },
       traits: traits.map(traitEntity.rowToCreate),
       skills: skills.map(skillEntity.rowToCreate),
@@ -221,7 +223,7 @@ const importBody = z.object({
     .max(20 * 1024 * 1024),
   mode: importMode.default('merge'),
   /** Opt-in: apply the doc's `campaign` block (description/pointTarget/
-   * disadvantageCap/quirkCap/manaLevel/techLevel) to the campaigns row.  Never
+   * disadvantageCap/quirkCap/manaLevel/techLevel/enforceAttributeCaps) to the campaigns row. Never
    * touches `name`.  Default off so a routine content import can't
    * silently rewrite campaign settings. */
   applyCampaignSettings: z.boolean().default(false),
@@ -280,6 +282,7 @@ router.openapi(
         manaLevel,
         techLevel,
         houseRules,
+        enforceAttributeCaps,
       } = doc.campaign;
       const checked = campaignUpdate.safeParse({
         description,
@@ -289,6 +292,7 @@ router.openapi(
         manaLevel,
         techLevel,
         houseRules,
+        enforceAttributeCaps,
       });
       if (!checked.success) {
         throw new HTTPException(400, {
@@ -298,7 +302,17 @@ router.openapi(
             .join('; ')}`,
         });
       }
-      campaignSettings = checked.data;
+      campaignSettings = {
+        ...checked.data,
+        ...(checked.data.houseRules === undefined
+          ? {}
+          : {
+              houseRules: applyHouseRuleSet(
+                checked.data.houseRules,
+                checked.data.houseRules.ruleSet,
+              ),
+            }),
+      };
     }
 
     const result = await withAudit(user.id, undefined, async (tx) => {

@@ -456,11 +456,17 @@ roster for the campaign — every member character in the campaign is listed
 there, regardless of the share gate; rows a viewer only sees minimally deep-link
 to `/characters/:id`, which renders `CharacterMinimalView`.
 
-- Owner-editable **House rules** in campaign settings; natural DR penetration
-  immunity defaults on and can be disabled for standard rules. Settings save
-  through the campaign REST path and are mirrored read-only for offline combat.
+- Owner-editable **House rule sets** in campaign settings: None, J Talisar, or
+  Custom. Named sets load their bundles; moving to Custom preserves all loaded
+  values, and changing one option never resets its siblings. Every rule includes
+  an in-app explanation. Natural DR penetration immunity remains enabled in the
+  legacy/default Custom state. Settings save through the campaign REST path and
+  are mirrored read-only with character mechanics.
 - Create/edit campaigns with **point target, disadvantage cap, quirk cap,
-  mana level, tech level**, and the **share-character-sheets** toggle. Tech
+  mana level, tech level**, the default-on **enforce attribute caps** rule,
+  and the **share-character-sheets** toggle. Attribute-cap enforcement blocks
+  purchased DX/IQ/HT above 20 and purchased Will/Per totals above 20; ST and
+  temporary bonuses are exempt (B14-B16). Tech
   level is campaign-wide (not per character); every character in the
   campaign displays it read-only, resolved the same way `manaLevel` is.
 - **Roles**: `owner` (GM), `manager`, `member`.

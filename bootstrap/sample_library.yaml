@@ -1,4 +1,4 @@
-version: 3
+version: 6
 campaign:
   name: Sample
   description: |
@@ -11,6 +11,7 @@ campaign:
   disadvantageCap: 50
   quirkCap: 5
   manaLevel: normal
+  enforceAttributeCaps: true
 library:
   traits:
     - name: Combat Reflexes

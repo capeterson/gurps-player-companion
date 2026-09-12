@@ -36,6 +36,7 @@ describe('listWarningCodes', () => {
   it('contains stable codes', () => {
     const codes = listWarningCodes();
     expect(codes).toContain('attr.st.below_minimum');
+    expect(codes).toContain('attr.st.very_high');
     expect(codes).toContain('attr.dx.very_high');
     expect(codes).toContain('encumbrance.heavy');
     expect(codes).toContain('encumbrance.x-heavy');
@@ -77,6 +78,16 @@ describe('evaluateWarnings', () => {
     });
     const warning = ws.find((w) => w.code === 'attr.iq.very_high');
     expect(warning?.severity).toBe('note');
+  });
+
+  it('does not flag ST above 20 because B14 explicitly exempts it', () => {
+    const ws = evaluateWarnings({
+      attrs: { st: 30, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
+      points: okPoints,
+      encumbrance: okEnc,
+      campaign: noCaps,
+    });
+    expect(ws.find((w) => w.code === 'attr.st.very_high')).toBeUndefined();
   });
 
   it('warns when encumbrance level is Heavy', () => {

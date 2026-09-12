@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
+import { campaignHouseRules } from '../../../../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { ArmorData } from '../../../../../shared/schemas/inventory.ts';
 import { getLocalDb } from '../../../../db/dexie.ts';
@@ -14,7 +15,7 @@ function makeCharacter(
 ): CharacterDetail {
   return {
     id: 'char-1',
-    houseRules: { protectNaturalDr: false },
+    houseRules: campaignHouseRules.parse({ protectNaturalDr: false }),
     inventory: armor.map((a, i) => ({
       id: `a${i}`,
       name: `Armor ${i}`,
@@ -349,7 +350,7 @@ it.each([
     character.id = '0193b3c0-f1f0-7000-8000-00000000d048';
     character.derived = { hp: 100, fp: 10 } as CharacterDetail['derived'];
     character.combat = null;
-    character.houseRules = { protectNaturalDr: enabled };
+    character.houseRules = campaignHouseRules.parse({ protectNaturalDr: enabled });
     character.effects = resolveEffects(
       [
         {
@@ -394,7 +395,10 @@ it('defaults the natural DR house rule on and updates both views when campaign r
   expect(screen.getByRole('button', { name: 'Apply −4 HP' })).toBeEnabled();
   view.rerender(
     <DrSummaryCard
-      character={{ ...character, houseRules: { protectNaturalDr: false } }}
+      character={{
+        ...character,
+        houseRules: campaignHouseRules.parse({ protectNaturalDr: false }),
+      }}
       canWrite
       hpMax={10}
       bumpHp={bumpHp}

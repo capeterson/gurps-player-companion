@@ -25,7 +25,8 @@ import {
  * container/powerstone/magic-item fields on items and `manaLevel` in the
  * campaign block.  v4 added the `languages`, `techniques`, and `styles`
  * library sections. v5 added item `enchantments`; v6 adds explicit skill
- * `defaults`. The parser still accepts v1-v5 docs (new fields default/absent).
+ * `defaults` and campaign attribute-cap enforcement. The parser still accepts
+ * v1-v5 docs (new fields default/absent).
  */
 export const LIBRARY_YAML_VERSION = 6 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB

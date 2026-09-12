@@ -466,6 +466,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken, { manaLevel: 'high' });
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
     expect(yaml).toContain('manaLevel: high');
+    expect(yaml).toContain('enforceAttributeCaps: true');
   });
 
   it('re-importing the same export into the same campaign (mode=merge, the default) updates existing rows in place and does not duplicate them', async () => {
@@ -685,7 +686,7 @@ describe('YAML export/import round trip', () => {
     expect(res.status).toBe(400);
   });
 
-  it('applyCampaignSettings=false (default) leaves the campaign row untouched; true applies description/pointTarget/disadvantageCap/quirkCap/manaLevel but never name', async () => {
+  it('applyCampaignSettings=false (default) leaves the campaign row untouched; true applies campaign rules but never name', async () => {
     const owner = await registerUser('apply-settings');
     const campaign = await createCampaign(owner.accessToken, {
       description: 'Original description',
@@ -693,6 +694,7 @@ describe('YAML export/import round trip', () => {
       disadvantageCap: 40,
       quirkCap: 5,
       manaLevel: 'normal',
+      enforceAttributeCaps: true,
     });
     const yaml = `version: 3
 campaign:
@@ -702,6 +704,7 @@ campaign:
   disadvantageCap: 60
   quirkCap: 10
   manaLevel: high
+  enforceAttributeCaps: false
 library:
   traits: []
   skills: []
@@ -722,6 +725,7 @@ library:
     ).json()) as Record<string, unknown>;
     expect(afterNoApply.description).toBe('Original description');
     expect(afterNoApply.manaLevel).toBe('normal');
+    expect(afterNoApply.enforceAttributeCaps).toBe(true);
 
     const applyRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
       method: 'POST',
@@ -740,6 +744,7 @@ library:
     expect(afterApply.disadvantageCap).toBe(60);
     expect(afterApply.quirkCap).toBe(10);
     expect(afterApply.manaLevel).toBe('high');
+    expect(afterApply.enforceAttributeCaps).toBe(false);
     expect(afterApply.name).toBe(campaign.name); // `name` is never touched by import
   });
 

@@ -279,6 +279,8 @@ export const campaigns = pgTable('campaigns', {
     .default('normal'),
   /** Campaign-wide tech level (Basic Set p. 513); characters no longer set their own. */
   techLevel: smallint('tech_level'),
+  /** Enforce purchased DX/IQ/HT and Will/Per caps from Basic Set pp. B14-B16. */
+  enforceAttributeCaps: boolean('enforce_attribute_caps').notNull().default(true),
   /**
    * When false, non-owner members fetching `/characters/{id}` get the
    * minimal "readily apparent" view (race / height / weight / age /

@@ -1,9 +1,11 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
 import {
   addMemberRequest,
   campaignCreate,
+  campaignHouseRules,
   campaignOut,
   campaignUpdate,
   setMemberRoleRequest,
@@ -69,8 +71,9 @@ function campaignToOut(row: DbCampaign, members: readonly MemberRow[]) {
     disadvantageCap: row.disadvantageCap,
     quirkCap: row.quirkCap,
     manaLevel: row.manaLevel,
-    houseRules: row.houseRules,
+    houseRules: campaignHouseRules.parse(row.houseRules),
     techLevel: row.techLevel,
+    enforceAttributeCaps: row.enforceAttributeCaps,
     shareCharacterSheets: row.shareCharacterSheets,
     allowGmCharacterEditing: row.allowGmCharacterEditing,
     members: members.map((m) => ({
@@ -177,9 +180,14 @@ router.openapi(
           pointTarget: body.pointTarget ?? null,
           disadvantageCap: body.disadvantageCap ?? null,
           quirkCap: body.quirkCap ?? 5,
-          ...(body.houseRules !== undefined ? { houseRules: body.houseRules } : {}),
+          ...(body.houseRules !== undefined
+            ? { houseRules: applyHouseRuleSet(body.houseRules, body.houseRules.ruleSet) }
+            : {}),
           ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
           ...(body.techLevel !== undefined ? { techLevel: body.techLevel } : {}),
+          ...(body.enforceAttributeCaps !== undefined
+            ? { enforceAttributeCaps: body.enforceAttributeCaps }
+            : {}),
           ...(body.shareCharacterSheets !== undefined
             ? { shareCharacterSheets: body.shareCharacterSheets }
             : {}),
@@ -252,7 +260,14 @@ router.openapi(
     const row = await withAudit(user.id, undefined, async (tx) => {
       const [updated] = await tx
         .update(campaigns)
-        .set(buildPatchSet(body))
+        .set(
+          buildPatchSet({
+            ...body,
+            ...(body.houseRules === undefined
+              ? {}
+              : { houseRules: applyHouseRuleSet(body.houseRules, body.houseRules.ruleSet) }),
+          }),
+        )
         .where(eq(campaigns.id, id))
         .returning();
       if (!updated) throw new HTTPException(500, { message: 'update failed' });

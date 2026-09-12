@@ -228,6 +228,8 @@ export interface LocalCampaign {
   /** Optional: rows synced before the tech-level column existed lack it;
    * readers default missing values to `null`. */
   techLevel?: number | null;
+  /** Missing on older rows; campaigns default to enforcing the canonical caps. */
+  enforceAttributeCaps?: boolean;
   /**
    * When false, non-owner members see the minimal "readily apparent"
    * view of other players' character sheets instead of the full

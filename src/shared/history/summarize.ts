@@ -67,6 +67,7 @@ const CAMPAIGN_FIELD_LABELS: Record<string, string> = {
   pointTarget: 'Point target',
   disadvantageCap: 'Disadvantage cap',
   quirkCap: 'Quirk cap',
+  enforceAttributeCaps: 'Attribute caps',
   shareCharacterSheets: 'Sheet sharing',
   allowGmCharacterEditing: 'GM character editing',
   ownerId: 'Owner',
@@ -432,12 +433,33 @@ function summarizeCampaign(
     if (c.field === 'shareCharacterSheets') {
       msgs.push(`Sheet sharing ${c.newValue ? 'enabled' : 'disabled'}`);
     } else if (c.field === 'houseRules') {
-      const rules = c.newValue as { protectNaturalDr?: boolean } | null;
-      msgs.push(
-        `Natural DR penetration immunity ${rules?.protectNaturalDr !== false ? 'enabled' : 'disabled'} (house rule)`,
-      );
+      const oldRules = c.oldValue as
+        | { ruleSet?: string; protectNaturalDr?: boolean }
+        | null
+        | undefined;
+      const rules = c.newValue as
+        | { ruleSet?: string; protectNaturalDr?: boolean }
+        | null
+        | undefined;
+      if (rules?.ruleSet && rules.ruleSet !== oldRules?.ruleSet) {
+        const setLabel =
+          rules.ruleSet === 'j_talisar'
+            ? 'J Talisar'
+            : rules.ruleSet === 'none'
+              ? 'None'
+              : 'Custom';
+        msgs.push(`House rule set changed to ${setLabel}`);
+      } else if (rules?.protectNaturalDr !== oldRules?.protectNaturalDr) {
+        msgs.push(
+          `Natural DR penetration immunity ${rules?.protectNaturalDr !== false ? 'enabled' : 'disabled'} (house rule)`,
+        );
+      } else {
+        msgs.push('House rules customized');
+      }
     } else if (c.field === 'allowGmCharacterEditing') {
       msgs.push(`GM character editing ${c.newValue ? 'enabled' : 'disabled'}`);
+    } else if (c.field === 'enforceAttributeCaps') {
+      msgs.push(`Attribute caps ${c.newValue ? 'enabled' : 'disabled'}`);
     } else {
       msgs.push(`${label} ${displayValue(c.oldValue)} → ${displayValue(c.newValue)}`);
     }

@@ -18,6 +18,7 @@ import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { campaignMemberships, campaigns, characters } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { assertAttributeCaps, touchesAttributeCaps } from '../services/attributeCapValidation.ts';
 import { resolveCharacterView } from '../services/characterAccess.ts';
 import { loadCharacterDetail } from '../services/characterSummary.ts';
 import { characterInsertValues } from '../services/entityWrites.ts';
@@ -169,10 +170,13 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const body = c.req.valid('json');
+    let enforceAttributeCaps = false;
     if (body.campaignId) {
       // Confirm visibility (member or owner).
-      await loadCampaignOr403(body.campaignId, user.id);
+      const { campaign } = await loadCampaignOr403(body.campaignId, user.id);
+      enforceAttributeCaps = campaign.enforceAttributeCaps;
     }
+    assertAttributeCaps(enforceAttributeCaps, body);
     const [created] = await withAudit(user.id, undefined, (tx) =>
       tx
         .insert(characters)
@@ -230,6 +234,7 @@ router.openapi(
       200: { description: 'Updated', content: { 'application/json': { schema: characterDetail } } },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      422: errorResponse('Attribute cap violation'),
     },
   }),
   async (c) => {
@@ -238,8 +243,17 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
+    let targetCampaign = null;
     if (body.campaignId !== undefined && body.campaignId !== null) {
-      await loadCampaignOr403(body.campaignId, user.id);
+      targetCampaign = (await loadCampaignOr403(body.campaignId, user.id)).campaign;
+    }
+    if (touchesAttributeCaps(body)) {
+      const campaignId =
+        body.campaignId === undefined ? access.character.campaignId : body.campaignId;
+      if (campaignId && !targetCampaign) {
+        targetCampaign = (await loadCampaignOr403(campaignId, user.id)).campaign;
+      }
+      assertAttributeCaps(targetCampaign?.enforceAttributeCaps ?? false, access.character, body);
     }
     const updates = buildPatchSet(body);
     await withAudit(user.id, undefined, async (tx) => {
