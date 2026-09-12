@@ -431,6 +431,11 @@ function summarizeCampaign(
     const label = CAMPAIGN_FIELD_LABELS[c.field] ?? humanizeFieldKey(c.field);
     if (c.field === 'shareCharacterSheets') {
       msgs.push(`Sheet sharing ${c.newValue ? 'enabled' : 'disabled'}`);
+    } else if (c.field === 'houseRules') {
+      const rules = c.newValue as { protectNaturalDr?: boolean } | null;
+      msgs.push(
+        `Natural DR penetration immunity ${rules?.protectNaturalDr !== false ? 'enabled' : 'disabled'} (house rule)`,
+      );
     } else if (c.field === 'allowGmCharacterEditing') {
       msgs.push(`GM character editing ${c.newValue ? 'enabled' : 'disabled'}`);
     } else {

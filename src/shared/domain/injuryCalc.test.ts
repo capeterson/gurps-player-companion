@@ -299,3 +299,57 @@ describe('applyDamage', () => {
     expect(result.injury).toBe(16);
   });
 });
+
+it.each(['0.5', '(0.2)', '0.1'])(
+  'gives an unprotected target final DR 1 against divisor %s (B379)',
+  (divisor) => {
+    for (const policy of [true, false]) {
+      expect(
+        applyDamage(3, 'cr', 'torso', effectiveDrByLocation([]), divisor, 10, policy),
+      ).toMatchObject({
+        drAtLocation: 0,
+        effectiveDr: 1,
+        penetrating: 2,
+        injury: 2,
+      });
+      expect(
+        applyDamage(1, 'cr', 'torso', effectiveDrByLocation([]), divisor, 10, policy).injury,
+      ).toBe(0);
+      expect(
+        applyDamage(
+          3,
+          'cut',
+          'torso',
+          drMap({ torso: { dr: 4, typedDr: { cut: 0 } } }),
+          divisor,
+          10,
+          policy,
+        ).effectiveDr,
+      ).toBe(1);
+    }
+  },
+);
+
+it.each(['cor', 'corr', ' COR '])('uses corrosion face/neck modifiers for %s', (type) => {
+  for (const location of ['face', 'neck']) {
+    expect(
+      applyDamage(
+        8,
+        type,
+        location,
+        drMap({ [location]: { dr: 4, typedDr: { corr: 2 } } }),
+        '2',
+        10,
+      ).injury,
+    ).toBe(10);
+  }
+});
+
+it.each([
+  ['pi_minus', 0.5],
+  ['pi_plus', 1.5],
+  ['pi_pp', 2],
+] as const)('uses the same damage alias for DR and wounding: %s', (type, multiplier) => {
+  expect(woundingMultiplier(type, 'torso')).toBe(multiplier);
+  expect(woundingMultiplier(type, 'vitals')).toBe(3);
+});

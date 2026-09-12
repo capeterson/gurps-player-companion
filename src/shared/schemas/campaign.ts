@@ -3,6 +3,14 @@ import { MANA_LEVELS } from '../constants/magic.ts';
 import { email } from './auth.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 
+/** Campaign house rules. Omitted legacy settings use the campaign defaults. */
+export const campaignHouseRules = z
+  .object({
+    protectNaturalDr: z.boolean().default(true),
+  })
+  .strict();
+export type CampaignHouseRules = z.infer<typeof campaignHouseRules>;
+
 export const campaignName = z.string().min(1).max(120).trim();
 export const campaignDescription = z.string().max(20_000).nullable();
 
@@ -40,6 +48,7 @@ export const campaignOut = z.object({
   shareCharacterSheets: z.boolean(),
   /** Allow campaign owners and managers to edit member-owned characters. */
   allowGmCharacterEditing: z.boolean(),
+  houseRules: campaignHouseRules.default({}),
   members: z.array(campaignMemberOut),
   ...timestamps,
   revision,
@@ -47,6 +56,7 @@ export const campaignOut = z.object({
 
 export const campaignCreate = z.object({
   name: campaignName,
+  houseRules: campaignHouseRules.optional(),
   description: campaignDescription.optional(),
   pointTarget: z.number().int().min(0).max(10_000).nullable().optional(),
   disadvantageCap: z.number().int().min(0).max(10_000).nullable().optional(),

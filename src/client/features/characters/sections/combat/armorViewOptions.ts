@@ -21,6 +21,9 @@ export const ARMOR_DIVISORS = [
   ['10', 'Divisor (10) · one-tenth DR'],
   ['100', 'Divisor (100)'],
   ['ignore', 'Ignores DR'],
+  ['0.5', 'Divisor (0.5) · double DR'],
+  ['0.2', 'Divisor (0.2) · five times DR'],
+  ['0.1', 'Divisor (0.1) · ten times DR'],
 ] as const;
 
 export function locationLabel(location: string): string {

@@ -294,7 +294,22 @@ on any sheet the viewer can edit — their own — it always shows).
     Known empty effect definitions remain distinguishable from missing entries.
     An **"Incoming damage…"** button carries the selected location, damage type,
     and penetration into a dialog. Presets include armor divisors and Ignore DR;
-    custom divisors are supported in the dialog. Vitals use ×3 for impaling and
+    custom divisors are supported in the dialog. The campaign's **House rules**
+    setting `protectNaturalDr` defaults **on** for existing/new campaigns and
+    campaignless characters: divisors above 1 (including Ignore DR) affect worn
+    armor only; innate and natural skull DR remain intact. Turn it off for the
+    standard GURPS calculation, including Penetrating Weapon (M63). All active
+    `dr` effects are treated as innate protection; free-text trait names and
+    enchantment notes never decide immunity. The selected DR, silhouette labels,
+    and incoming-damage result share this policy. Fractional divisors below 1
+    increase the complete DR; an unprotected target gets final DR 1 (B110/B379).
+    Presets include (0.5), (0.2), and (0.1). Skull DR 2 never protects against
+    toxic damage (B399); torso-scoped innate DR also covers vitals (B47).
+    Corrosion uses ×1.5 at face and neck, and damage-type aliases use the same
+    wounding and typed-DR rules. Missing campaign house rules (including a
+    pre-upgrade local mirror) make DR unavailable and block damage application
+    until the campaign cursor refreshes. Saved rules remain usable offline.
+    Vitals use ×3 for impaling and
     piercing, or ×2 for tight-beam burning (using burning DR), replacing the
     damage type's multiplier rather than multiplying it twice. Invalid damage
     and divisor inputs cannot be applied; fatigue damage is directed to FP.
@@ -306,7 +321,8 @@ on any sheet the viewer can edit — their own — it always shows).
     honoring the incoming type's typed override first, falling back to
     the crushing override (`drCrushing`, for `cr`) then the default `dr`
     (B378), dividing the complete protection (including natural skull
-    DR) by an armor divisor → penetrating × wounding multiplier (B379/B398-400) =
+    DR) by an armor divisor when standard rules are selected → penetrating
+    × wounding multiplier (B379/B398-400) =
     injury (`src/shared/domain/injuryCalc.ts`), applied to HP through
     the same shared `usePoolBumpers` instance as the rest of the tab.
     Limb/extremity HP loss is capped at the minimum crippling injury using
@@ -420,6 +436,9 @@ roster for the campaign — every member character in the campaign is listed
 there, regardless of the share gate; rows a viewer only sees minimally deep-link
 to `/characters/:id`, which renders `CharacterMinimalView`.
 
+- Owner-editable **House rules** in campaign settings; natural DR penetration
+  immunity defaults on and can be disabled for standard rules. Settings save
+  through the campaign REST path and are mirrored read-only for offline combat.
 - Create/edit campaigns with **point target, disadvantage cap, quirk cap,
   mana level, tech level**, and the **share-character-sheets** toggle. Tech
   level is campaign-wide (not per character); every character in the

@@ -14,6 +14,7 @@ function makeCharacter(
 ): CharacterDetail {
   return {
     id: 'char-1',
+    houseRules: { protectNaturalDr: false },
     inventory: armor.map((a, i) => ({
       id: `a${i}`,
       name: `Armor ${i}`,
@@ -313,4 +314,100 @@ describe('DrSummaryCard', () => {
     expect(screen.getByText(/− DR 6 →/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Apply −9 HP/ })).toBeInTheDocument();
   });
+});
+
+it.each([
+  [true, '2', 7, 52],
+  [false, '2', 4, 64],
+  [true, 'ignore', 5, 60],
+  [false, 'ignore', 0, 80],
+] as const)(
+  'keeps the map and actual HP outbox consistent with house rule %s and divisor %s',
+  async (enabled, divisor, dr, injury) => {
+    const character = makeCharacter([{ dr: 4, locations: ['skull'] }]);
+    character.id = '0193b3c0-f1f0-7000-8000-00000000d048';
+    character.derived = { hp: 100, fp: 10 } as CharacterDetail['derived'];
+    character.combat = null;
+    character.houseRules = { protectNaturalDr: enabled };
+    character.effects = resolveEffects(
+      [
+        {
+          id: 'skin',
+          name: 'Tough Skin',
+          level: 1,
+          libraryEffects: [{ target: 'dr', value: 3, scaling: 'flat' }],
+        },
+      ],
+      [],
+      new Set(),
+    );
+    function Sheet() {
+      const patch = useCombatPatch(character);
+      const pools = usePoolBumpers(character, true, patch);
+      return <DrSummaryCard character={character} canWrite hpMax={100} bumpHp={pools.bumpHp} />;
+    }
+    render(<Sheet />);
+    fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: 'skull' } });
+    fireEvent.change(screen.getByLabelText('Armor penetration'), { target: { value: divisor } });
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent(String(dr));
+    expect(screen.getAllByRole('button', { name: `Skull, DR ${dr}` })).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('button', { name: `Apply −${injury} HP` }));
+    await waitFor(async () =>
+      expect((await getLocalDb().characterCombat.get(character.id))?.currentHp).toBe(100 - injury),
+    );
+    expect((await getLocalDb().outbox.toArray())[0]?.attemptedValue).toBe(100 - injury);
+  },
+);
+
+it('defaults the natural DR house rule on and updates both views when campaign rules change', () => {
+  const bumpHp = vi.fn();
+  const character = { id: 'c', inventory: [] } as unknown as CharacterDetail;
+  const view = render(<DrSummaryCard character={character} canWrite hpMax={10} bumpHp={bumpHp} />);
+  fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: 'skull' } });
+  fireEvent.change(screen.getByLabelText('Armor penetration'), { target: { value: 'ignore' } });
+  expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('2');
+  fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+  fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '3' } });
+  expect(screen.getByRole('button', { name: 'Apply −4 HP' })).toBeEnabled();
+  view.rerender(
+    <DrSummaryCard
+      character={{ ...character, houseRules: { protectNaturalDr: false } }}
+      canWrite
+      hpMax={10}
+      bumpHp={bumpHp}
+    />,
+  );
+  expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('0');
+  expect(screen.getByRole('button', { name: 'Apply −12 HP' })).toBeEnabled();
+});
+
+it('blocks damage when campaign rules are not yet known', () => {
+  const bumpHp = vi.fn();
+  render(
+    <DrSummaryCard
+      character={{ ...makeCharacter([]), houseRulesKnown: false }}
+      canWrite
+      hpMax={10}
+      bumpHp={bumpHp}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+  fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '10' } });
+  const button = screen.getByRole('button', { name: 'Damage unavailable' });
+  expect(button).toBeDisabled();
+  fireEvent.submit(button.closest('form') as HTMLFormElement);
+  expect(bumpHp).not.toHaveBeenCalled();
+});
+
+it('shows fractional-divisor minimum DR and removes skull protection for toxic damage', () => {
+  render(<DrSummaryCard character={makeCharacter([])} />);
+  fireEvent.change(screen.getByLabelText('Armor penetration'), { target: { value: '0.5' } });
+  expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('1');
+  expect(screen.getByText(/Unprotected target: DR 1/)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: 'skull' } });
+  fireEvent.change(screen.getByLabelText('Damage type'), { target: { value: 'tox' } });
+  expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('1');
+  expect(screen.queryByText('Natural skull protection')).not.toBeInTheDocument();
 });

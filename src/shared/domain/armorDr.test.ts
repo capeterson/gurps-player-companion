@@ -260,3 +260,62 @@ describe('sumArmorDb', () => {
     expect(sumArmorDb([item(2, ['torso'], { db: 0 })])).toBe(0);
   });
 });
+
+describe('DR constraints and campaign penetration policy', () => {
+  it.each(['2', '3', '5', '10', '100', 'ignore'])(
+    'preserves only natural protection against (%s) with the house rule',
+    (divisor) => {
+      const map = effectiveDrByLocation(
+        [item(7, ['skull'], { typedDr: { imp: 9 }, drCrushing: 5 })],
+        [{ target: 'dr', value: 3, active: true }],
+      );
+      const d = divisor === 'ignore' ? Number.POSITIVE_INFINITY : Number(divisor);
+      const protectedHit = applyDamage(20, 'imp', 'skull', map, divisor, 30, true);
+      expect(protectedHit.effectiveDr).toBe(Math.floor(9 / d) + 5);
+      expect(protectedHit.injury).toBe((20 - protectedHit.effectiveDr) * 4);
+      expect(applyDamage(20, 'imp', 'skull', map, divisor, 30, false).effectiveDr).toBe(
+        Math.floor(14 / d),
+      );
+      expect(applyDamage(20, 'cr', 'skull', map, divisor, 30, true).effectiveDr).toBe(
+        Math.floor(5 / d) + 5,
+      );
+    },
+  );
+
+  it('does not grant natural skull protection against toxic damage', () => {
+    const map = effectiveDrByLocation(
+      [item(4, ['skull'], { typedDr: { tox: 6 } })],
+      [{ target: 'dr', value: 3, active: true }],
+    );
+    expect(resolveDr('tox', map.get('skull'))).toBe(9);
+    expect(applyDamage(12, ' TOX ', 'skull', map, '2', 30, true)).toMatchObject({
+      effectiveDr: 6,
+      multiplier: 1,
+      injury: 6,
+    });
+    expect(applyDamage(3, 'tox', 'skull', effectiveDrByLocation([]), null, 10).injury).toBe(3);
+  });
+
+  it('extends partial torso innate DR to vitals, without applying skull or inactive DR', () => {
+    const map = effectiveDrByLocation(
+      [],
+      [
+        { target: 'dr', value: 3, active: true, hitLocation: 'torso' },
+        { target: 'dr', value: 1, active: true, hitLocation: 'vitals' },
+        { target: 'dr', value: 9, active: false },
+      ],
+    );
+    expect(resolveDr('imp', map.get('vitals'))).toBe(4);
+    expect(resolveDr('imp', map.get('torso'))).toBe(3);
+    expect(applyDamage(6, 'imp', 'vitals', map, 'ignore', 10, true).injury).toBe(6);
+    expect(applyDamage(6, 'imp', 'eye', map, 'ignore', 10, true).injury).toBe(24);
+  });
+
+  it('still multiplies all DR for fractional divisors when the house rule is enabled', () => {
+    const map = effectiveDrByLocation(
+      [item(4, ['skull'])],
+      [{ target: 'dr', value: 3, active: true }],
+    );
+    expect(applyDamage(20, 'cr', 'skull', map, '0.5', 30, true).effectiveDr).toBe(18);
+  });
+});

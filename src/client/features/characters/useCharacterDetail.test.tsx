@@ -368,3 +368,33 @@ describe('durable character mechanics', () => {
     await waitFor(() => expect(player.result.current).toBeNull());
   });
 });
+
+it('loads campaign house rules from Dexie, preserves them offline, and reacts to synced changes', async () => {
+  await seed();
+  const db = getLocalDb();
+  const player = renderHook(() => useCharacterDetail(CID));
+  await waitFor(() => expect(player.result.current?.houseRulesKnown).toBe(false));
+  await db.campaigns.put({
+    id: CAMPAIGN,
+    ownerId: 'owner',
+    name: 'Campaign',
+    pointTarget: null,
+    disadvantageCap: null,
+    quirkCap: null,
+    houseRules: { protectNaturalDr: false },
+    revision: 10,
+  } as never);
+  await waitFor(() => expect(player.result.current?.houseRulesKnown).toBe(true));
+  expect(player.result.current?.houseRules.protectNaturalDr).toBe(false);
+  player.unmount();
+  db.close();
+  await db.open();
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+  const offline = renderHook(() => useCharacterDetail(CID));
+  const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
+  await waitFor(() => expect(offline.result.current?.houseRules.protectNaturalDr).toBe(false));
+  await waitFor(() => expect(gm.result.current?.[0]?.houseRules.protectNaturalDr).toBe(false));
+  await db.campaigns.update(CAMPAIGN, { houseRules: { protectNaturalDr: true }, revision: 11 });
+  await waitFor(() => expect(offline.result.current?.houseRules.protectNaturalDr).toBe(true));
+  expect(fetch).not.toHaveBeenCalled();
+});

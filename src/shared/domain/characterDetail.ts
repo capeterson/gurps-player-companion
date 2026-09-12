@@ -15,6 +15,7 @@
 
 import type { ManaLevel } from '../constants/magic.ts';
 import type { SpellDifficulty } from '../constants/skills.ts';
+import { type CampaignHouseRules, campaignHouseRules } from '../schemas/campaign.ts';
 import type { CharacterDetail, ResolvedEffectOut, TempEffect } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { TraitEffect } from '../schemas/effects.ts';
@@ -215,6 +216,7 @@ export interface CharacterDetailInputCombat {
 }
 
 export interface CharacterDetailInputCampaign {
+  houseRules?: CampaignHouseRules;
   pointTarget: number | null;
   disadvantageCap: number | null;
   quirkCap: number | null;
@@ -620,6 +622,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     warnings,
     manaLevel,
     manaLevelKnown,
+    houseRules: campaignHouseRules.parse(campaign?.houseRules ?? {}),
+    houseRulesKnown: character.campaignId == null || campaign?.houseRules != null,
     techLevel,
     traits: traitsOut,
     skills: skillsOut,

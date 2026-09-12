@@ -260,6 +260,13 @@
       "when": 1785704000000,
       "tag": "0036_owned_library_mechanics",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1785705000000,
+      "tag": "0037_campaign_house_rules",
+      "breakpoints": true
     }
   ]
 }

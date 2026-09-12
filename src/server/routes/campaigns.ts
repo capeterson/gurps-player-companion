@@ -68,6 +68,7 @@ function campaignToOut(row: DbCampaign, members: readonly MemberRow[]) {
     disadvantageCap: row.disadvantageCap,
     quirkCap: row.quirkCap,
     manaLevel: row.manaLevel,
+    houseRules: row.houseRules,
     techLevel: row.techLevel,
     shareCharacterSheets: row.shareCharacterSheets,
     allowGmCharacterEditing: row.allowGmCharacterEditing,
@@ -175,6 +176,7 @@ router.openapi(
           pointTarget: body.pointTarget ?? null,
           disadvantageCap: body.disadvantageCap ?? null,
           quirkCap: body.quirkCap ?? 5,
+          ...(body.houseRules !== undefined ? { houseRules: body.houseRules } : {}),
           ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
           ...(body.techLevel !== undefined ? { techLevel: body.techLevel } : {}),
           ...(body.shareCharacterSheets !== undefined

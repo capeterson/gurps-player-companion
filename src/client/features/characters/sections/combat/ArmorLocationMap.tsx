@@ -1,7 +1,6 @@
 import { useId, useState } from 'react';
 import type { DrByLocationMap } from '../../../../../shared/domain/armorDr.ts';
-import { resolveDr } from '../../../../../shared/domain/armorDr.ts';
-import { drAfterDivisor } from '../../../../../shared/domain/injuryCalc.ts';
+import { effectiveDrAgainstAttack } from '../../../../../shared/domain/injuryCalc.ts';
 import { locationLabel } from './armorViewOptions.ts';
 
 /** The reviewed rounded silhouette; left/right are the character's perspective. */
@@ -119,6 +118,7 @@ export function ArmorLocationMap({
   type,
   divisor,
   known,
+  protectNaturalDr = false,
   selected,
   onSelect,
 }: {
@@ -126,12 +126,14 @@ export function ArmorLocationMap({
   type: string;
   divisor: string;
   known: boolean;
+  protectNaturalDr?: boolean;
   selected: string;
   onSelect: (location: string) => void;
 }) {
   const id = useId();
   const [hovered, setHovered] = useState<string | null>(null);
-  const dr = (location: string) => drAfterDivisor(resolveDr(type, map.get(location)), divisor);
+  const dr = (location: string) =>
+    effectiveDrAgainstAttack(type, map.get(location), divisor, protectNaturalDr);
   const label = (location: string) =>
     `${locationLabel(location)}, ${known ? `DR ${dr(location)}` : 'DR unavailable'}`;
   return (
