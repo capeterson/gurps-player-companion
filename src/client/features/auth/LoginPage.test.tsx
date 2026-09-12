@@ -28,13 +28,15 @@ vi.mock('../../lib/tokenStore.ts', () => ({
   },
 }));
 
-function renderLogin() {
+function renderLogin(returnTo?: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter
+        initialEntries={[{ pathname: '/login', state: returnTo ? { returnTo } : null }]}
+      >
         <LoginPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -116,8 +118,32 @@ describe('LoginPage', () => {
 
     await waitFor(() => {
       expect(vi.mocked(tokenStore.write)).toHaveBeenCalledWith(fakeTokens);
-      expect(mockNavigate).toHaveBeenCalledWith('/');
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('returns to a validated OAuth consent request after login', async () => {
+    vi.mocked(api).mockResolvedValue(fakeTokens);
+    const user = userEvent.setup();
+    renderLogin('/oauth/consent?client_id=safe&state=abc');
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith('/oauth/consent?client_id=safe&state=abc', {
+        replace: true,
+      }),
+    );
+  });
+
+  it('rejects an external return target after login', async () => {
+    vi.mocked(api).mockResolvedValue(fakeTokens);
+    const user = userEvent.setup();
+    renderLogin('https://evil.example/steal');
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true }));
   });
 });

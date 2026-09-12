@@ -10,8 +10,10 @@
 #
 # Setup (run once, from the project folder this file lives in):
 #   1. mkdir -p /mnt/user/appdata/gurps-companion-dev/postgres
-#   2. echo "JWT_SECRET=$(openssl rand -hex 32)" > .env.dev
-#      (optional, in same .env.dev: TAG=sha-abcdef0, HOST_PORT=3031,
+#   2. printf 'JWT_SECRET=%s\nAPP_BASE_URL=https://dev.gpc.example.com\n' \
+#        "$(openssl rand -hex 32)" > .env.dev
+#      (replace the APP_BASE_URL example with this stack's public HTTPS origin;
+#       optional, in same .env.dev: TAG=sha-abcdef0, HOST_PORT=3031,
 #       CORS_ORIGINS=["https://dev.your.domain"])
 #   3. docker compose --env-file .env.dev -f docker-compose.unraid-dev.yml pull
 #   4. docker compose --env-file .env.dev -f docker-compose.unraid-dev.yml up -d
@@ -72,6 +74,8 @@ services:
       JWT_ACCESS_TTL_MINUTES: 15
       JWT_REFRESH_TTL_DAYS: 14
       CORS_ORIGINS: ${CORS_ORIGINS:-[]}
+      APP_BASE_URL: ${APP_BASE_URL:?APP_BASE_URL is required and must be the public HTTPS origin}
+      OAUTH_CLIENTS: ${OAUTH_CLIENTS:-[]}
     depends_on:
       db:
         condition: service_healthy

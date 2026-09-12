@@ -10,6 +10,9 @@ The **append-only history/audit log**:
 - Provides **local filtering & search** over loaded history.
 
 - Becomes a **required baseline**: every new syncable table must participate in history capture, enforced by an automated test.
+- Records nullable OAuth client and grant provenance for delegated writes; the UI
+  renders `Player via Client` while retaining the player as the actor. The API
+  fields are `agentClientId`, `agentGrantId`, and `agentClientName`.
 
 Library trait/skill updates and deletions also update owned `library_mechanics`
 and child revisions in the same audited transaction (`ownedLibraryMechanics.ts`,

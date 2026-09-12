@@ -254,6 +254,153 @@ export const apiKeys = pgTable(
   }),
 );
 
+// ---------- delegated OAuth ----------
+
+export const oauthClients = pgTable(
+  'oauth_clients',
+  {
+    id: id(),
+    clientId: varchar('client_id', { length: 200 }).notNull(),
+    name: varchar('name', { length: 120 }).notNull(),
+    redirectUris: text('redirect_uris').array().notNull(),
+    allowedScopes: text('allowed_scopes').array().notNull(),
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({ clientIdKey: uniqueIndex('oauth_clients_client_id_key').on(t.clientId) }),
+);
+
+export const oauthGrants = pgTable(
+  'oauth_grants',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    scopes: text('scopes').array().notNull(),
+    resource: text('resource').notNull(),
+    authVersion: integer('auth_version').notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    userIdx: index('oauth_grants_user_idx').on(t.userId),
+    clientIdx: index('oauth_grants_client_idx').on(t.clientId),
+  }),
+);
+
+export const oauthAuthorizationRequests = pgTable(
+  'oauth_authorization_requests',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    csrfHash: varchar('csrf_hash', { length: 64 }).notNull(),
+    requestHash: varchar('request_hash', { length: 64 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({ csrfKey: uniqueIndex('oauth_authorization_requests_csrf_key').on(t.csrfHash) }),
+);
+
+export const oauthAuthorizationCodes = pgTable(
+  'oauth_authorization_codes',
+  {
+    id: id(),
+    grantId: uuid('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: 'cascade' }),
+    codeHash: varchar('code_hash', { length: 64 }).notNull(),
+    redirectUri: text('redirect_uri').notNull(),
+    codeChallenge: varchar('code_challenge', { length: 128 }).notNull(),
+    scopes: text('scopes').array().notNull(),
+    resource: text('resource').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({ codeKey: uniqueIndex('oauth_authorization_codes_code_key').on(t.codeHash) }),
+);
+
+export const oauthAccessTokens = pgTable(
+  'oauth_access_tokens',
+  {
+    id: id(),
+    grantId: uuid('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    scopes: text('scopes').array().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({ tokenKey: uniqueIndex('oauth_access_tokens_token_key').on(t.tokenHash) }),
+);
+
+export const oauthRefreshTokens = pgTable(
+  'oauth_refresh_tokens',
+  {
+    id: id(),
+    grantId: uuid('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    familyId: uuid('family_id').notNull().default(sql`uuidv7()`),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    rotationRequestId: varchar('rotation_request_id', { length: 200 }),
+    replacementTokenHash: varchar('replacement_token_hash', { length: 64 }),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    tokenKey: uniqueIndex('oauth_refresh_tokens_token_key').on(t.tokenHash),
+    familyIdx: index('oauth_refresh_tokens_family_idx').on(t.familyId),
+  }),
+);
+
+export const mutationIdempotency = pgTable(
+  'mutation_idempotency',
+  {
+    id: id(),
+    actorUserId: uuid('actor_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientKey: varchar('client_key', { length: 200 }).notNull(),
+    operationKey: varchar('operation_key', { length: 300 }).notNull(),
+    idempotencyKey: varchar('idempotency_key', { length: 200 }).notNull(),
+    inputHash: varchar('input_hash', { length: 64 }).notNull(),
+    permissionHash: varchar('permission_hash', { length: 64 }).notNull(),
+    responseStatus: integer('response_status'),
+    responseContentType: varchar('response_content_type', { length: 200 }),
+    responseBody: text('response_body'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    key: uniqueIndex('mutation_idempotency_key').on(
+      t.actorUserId,
+      t.clientKey,
+      t.operationKey,
+      t.idempotencyKey,
+    ),
+    expiryIdx: index('mutation_idempotency_expiry_idx').on(t.expiresAt),
+  }),
+);
+
 // ---------- campaigns ----------
 
 export const campaigns = pgTable('campaigns', {
@@ -1130,6 +1277,10 @@ export const entityHistory = pgTable(
     campaignId: uuid('campaign_id'),
     ownerUserId: uuid('owner_user_id').notNull(),
     actorUserId: uuid('actor_user_id'),
+    agentClientId: uuid('agent_client_id').references(() => oauthClients.id, {
+      onDelete: 'set null',
+    }),
+    agentGrantId: uuid('agent_grant_id').references(() => oauthGrants.id, { onDelete: 'set null' }),
     batchId: uuid('batch_id'),
     oldRow: jsonb('old_row'),
     newRow: jsonb('new_row'),

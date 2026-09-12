@@ -49,6 +49,8 @@ services:
       JWT_ACCESS_TTL_MINUTES: 15
       JWT_REFRESH_TTL_DAYS: 14
       CORS_ORIGINS: '[]'
+      APP_BASE_URL: http://localhost:3001
+      OAUTH_CLIENTS: '[]'
       # Vite HMR client runs in the *host* browser, so it must connect
       # back to the host-mapped port (3001), not the container's
       # internal 3000. See vite.config.ts `server.hmr`.

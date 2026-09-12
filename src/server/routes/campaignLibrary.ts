@@ -100,15 +100,13 @@ router.openapi(
     const { id } = c.req.valid('param');
     await requireCampaignMember(id, user.id);
     const db = getDb();
-    const [traits, skills, spells, items, languages, techniques, styles] = await Promise.all([
-      selectLibrarySection(db, traitEntity, id),
-      selectLibrarySection(db, skillEntity, id),
-      selectLibrarySection(db, spellEntity, id),
-      selectLibrarySection(db, itemEntity, id),
-      selectLibrarySection(db, languageEntity, id),
-      selectLibrarySection(db, techniqueEntity, id),
-      selectLibrarySection(db, styleEntity, id),
-    ]);
+    const traits = await selectLibrarySection(db, traitEntity, id);
+    const skills = await selectLibrarySection(db, skillEntity, id);
+    const spells = await selectLibrarySection(db, spellEntity, id);
+    const items = await selectLibrarySection(db, itemEntity, id);
+    const languages = await selectLibrarySection(db, languageEntity, id);
+    const techniques = await selectLibrarySection(db, techniqueEntity, id);
+    const styles = await selectLibrarySection(db, styleEntity, id);
     return c.json(
       {
         traits: traits.map(traitEntity.toOut),

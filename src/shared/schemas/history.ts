@@ -22,6 +22,9 @@ export const historyEventOut = z.object({
   campaignId: uuid.nullable(),
   actorUserId: uuid.nullable(),
   actorDisplayName: z.string().nullable(),
+  agentClientId: uuid.nullable().optional(),
+  agentGrantId: uuid.nullable().optional(),
+  agentClientName: z.string().nullable().optional(),
   batchId: uuid.nullable(),
   // Total number of rows sharing this batchId in the requested history-feed
   // scope, including rows outside the current pagination page. This lets

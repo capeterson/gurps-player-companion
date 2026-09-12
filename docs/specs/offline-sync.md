@@ -26,6 +26,13 @@ Everything else is either read-only in the local store or fully online:
 - **Online-only** (HTTP + React Query, no offline support): the campaign
   library, adventure log, invitations, notifications, settings, admin.
 
+Delegated MCP calls are online server operations. They never fabricate Dexie
+rows or enter a browser outbox, and they cannot see unsynced browser edits.
+They use the same handlers, revisions, tombstones, history, and post-commit
+invalidations as REST. Browsers converge through the ordinary cursor pull;
+pending local fields remain protected and replay or conflict normally even
+when a WebSocket nudge is missed.
+
 Library editing remains online-only, but calculation no longer depends on its
 React Query cache. Trait/skill rows persist `libraryMechanics` in Postgres and
 Dexie: source ID, source campaign, source revision, raw effect declarations, and

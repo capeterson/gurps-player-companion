@@ -30,6 +30,7 @@ import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin, tryLoadCampaignRole } from '../auth/permissions.ts';
 import { loadConfig } from '../config.ts';
 import { withAudit } from '../db/auditContext.ts';
+import { afterDbCommit } from '../db/client.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
@@ -211,15 +212,18 @@ router.openapi(
 
     const config = loadConfig();
     const resend = getResend(config);
-    if (resend && config.resendFromEmail) {
-      sendCampaignInviteEmail(resend, config.resendFromEmail, {
-        to: target.email,
-        displayName: target.displayName,
-        inviterName: user.displayName,
-        campaignName: campaign.name,
-        role: requestedRole,
-        appUrl: config.appBaseUrl ?? '',
-      }).catch(() => {});
+    const resendFromEmail = config.resendFromEmail;
+    if (resend && resendFromEmail) {
+      afterDbCommit(() =>
+        sendCampaignInviteEmail(resend, resendFromEmail, {
+          to: target.email,
+          displayName: target.displayName,
+          inviterName: user.displayName,
+          campaignName: campaign.name,
+          role: requestedRole,
+          appUrl: config.appBaseUrl ?? '',
+        }).catch(() => {}),
+      );
     }
 
     const out = await loadInvitationOut(insertedId);

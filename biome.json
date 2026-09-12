@@ -12,6 +12,7 @@
       "drizzle",
       "src/server/db/migrations",
       "docs/openapi.json",
+      "docs/mcp-tools.json",
       ".bun"
     ]
   },

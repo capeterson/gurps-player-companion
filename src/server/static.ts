@@ -44,7 +44,12 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
     // of whether the static bundle has been built.  This must run BEFORE
     // the missing-bundle 503 check so tests and API consumers see a
     // proper JSON 404 even in environments without `dist/client/`.
-    if (url.pathname.startsWith('/api/')) {
+    const protocolPath =
+      url.pathname === '/mcp' ||
+      url.pathname.startsWith('/mcp/') ||
+      url.pathname.startsWith('/.well-known/') ||
+      (url.pathname.startsWith('/oauth/') && url.pathname !== '/oauth/consent');
+    if (url.pathname.startsWith('/api/') || protocolPath) {
       return c.json({ error: 'not_found' }, 404);
     }
     if (!existsSync(ROOT)) {

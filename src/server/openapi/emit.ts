@@ -22,6 +22,7 @@ const config: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   appBaseUrl: undefined,
+  oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,
   authRateLimitLoginMax: 10,

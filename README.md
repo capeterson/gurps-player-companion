@@ -96,12 +96,19 @@ docker compose -f docker-compose.dev.yml down -v
 
 ## Production build
 
-Generate a JWT signing key (≥ 32 chars) and put it in `.env`:
+Set a JWT signing key (≥ 32 chars) and the deployment's canonical public
+HTTPS origin in `.env`:
 
 ```sh
 cp .env.example .env
 echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
+echo "APP_BASE_URL=https://gpc.example.com" >> .env
 ```
+
+Replace the example origin with the URL users and delegated clients will open.
+Production startup rejects HTTP origins, paths, query strings, and fragments,
+so terminate TLS at the application or its reverse proxy. Use the development
+Compose stack above for localhost development.
 
 Build the runtime image and start the stack:
 
@@ -114,10 +121,10 @@ applies migrations baked into the image, and `app`. The `app` service
 will not start until `migrate` exits 0. The Bun runtime serves the
 built React client and the API on the same port.
 
-Open <http://localhost:3001>. Verify health:
+Open the configured `APP_BASE_URL`. Verify health through the same origin:
 
 ```sh
-curl -fsS http://localhost:3001/api/v1/healthz
+curl -fsS https://gpc.example.com/api/v1/healthz
 # => {"ok":true}
 ```
 
@@ -125,7 +132,7 @@ curl -fsS http://localhost:3001/api/v1/healthz
 
 ```
 src/
-  server/      Bun process: Hono routes, auth, Drizzle, OpenAPI, WS
+  server/      Bun process: Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
   client/      React PWA
   shared/      Pure TypeScript: Zod schemas, GURPS math, YAML codec
   sw/          Service worker registration (app-shell precache; NOT replay)
@@ -136,6 +143,22 @@ docs/
 bootstrap/
   sample_library.yaml    seeded into the "Sample" campaign
 ```
+
+## Delegated MCP access
+
+The Bun server exposes MCP 2025-11-25 Streamable HTTP at `/mcp` with OAuth
+authorization code + PKCE delegation. Set `APP_BASE_URL` to the canonical public
+origin and pre-register clients in `OAUTH_CLIENTS`; `.env.example` shows the JSON
+shape. Callback URLs must use HTTPS or HTTP on an exact loopback host, and may
+not contain credentials or fragments. Production requires HTTPS. Proxy `/mcp`, `/oauth/*`, and
+`/.well-known/*` to this process without caching them.
+
+Clients discover authorization at `/.well-known/oauth-protected-resource/mcp`.
+Scopes are `gpc:read`, `gpc:write`, and `gpc:manage`. Players approve through
+`/oauth/authorize` and revoke connections in Settings. OAuth tokens work only at
+`/mcp`; app API endpoints continue to require app JWTs/API keys. The exact
+88-tool report is `docs/mcp-tools.json`, checked by `bun run mcp:check`. See
+`docs/specs/mcp-agent-access.md` for protocol, lifecycle, and retention details.
 
 ## Offline sync
 

@@ -6,9 +6,8 @@
  * `docker compose -f docker-compose.dev.yml up` before invoking
  * `bun run test:e2e`.
  *
- * CI wiring is deferred — local-first developer ergonomics first; we
- * add a `webServer` block once we move dependency installation off
- * Docker and into the CI image.
+ * MCP_E2E_START_SERVER=1 starts the app for the delegated-access CI gate.
+ * Its public origin and registered OAuth client come from the environment.
  */
 
 import { defineConfig, devices } from '@playwright/test';
@@ -23,6 +22,19 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
+  ...(process.env.MCP_E2E_START_SERVER === '1'
+    ? {
+        webServer: {
+          command:
+            process.env.MCP_E2E_BUILT_SERVER === '1'
+              ? 'bun run dist/server/index.js'
+              : 'bun run dev',
+          url: new URL('/api/v1/healthz', BASE_URL).toString(),
+          reuseExistingServer: !process.env.CI,
+          timeout: 60_000,
+        },
+      }
+    : {}),
   use: {
     baseURL: BASE_URL,
     ...(CHROMIUM_EXECUTABLE ? { launchOptions: { executablePath: CHROMIUM_EXECUTABLE } } : {}),

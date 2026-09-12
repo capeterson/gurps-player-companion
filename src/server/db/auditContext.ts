@@ -18,7 +18,8 @@
  */
 
 import { sql } from 'drizzle-orm';
-import { getDb } from './client.ts';
+import { currentTrustedExecution } from '../services/executionContext.ts';
+import { getDb, runInDbSavepoint } from './client.ts';
 
 // Derive the transaction type from the actual schema-typed database that
 // getDb() returns. Deriving it from a bare NodePgDatabase (schema =
@@ -32,10 +33,17 @@ export async function withAudit<T>(
   batchId: string | null | undefined,
   fn: (tx: AuditTx) => Promise<T>,
 ): Promise<T> {
-  const db = getDb();
-  return db.transaction(async (tx) => {
+  return runInDbSavepoint(async () => {
+    const tx = getDb() as unknown as AuditTx;
+    const execution = currentTrustedExecution();
     await tx.execute(sql`select set_config('app.actor_id', ${actorId}, true)`);
     await tx.execute(sql`select set_config('app.batch_id', ${batchId ?? ''}, true)`);
+    await tx.execute(
+      sql`select set_config('app.oauth_client_id', ${execution?.oauthClientDbId ?? ''}, true)`,
+    );
+    await tx.execute(
+      sql`select set_config('app.oauth_grant_id', ${execution?.oauthGrantId ?? ''}, true)`,
+    );
     return fn(tx);
   });
 }
