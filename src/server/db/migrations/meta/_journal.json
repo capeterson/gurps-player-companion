@@ -309,6 +309,13 @@
       "when": 1799712000000,
       "tag": "0043_character_trait_custom_effects",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1799713000000,
+      "tag": "0044_oauth_client_registration",
+      "breakpoints": true
     }
   ]
 }

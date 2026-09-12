@@ -260,10 +260,15 @@ export const oauthClients = pgTable(
   'oauth_clients',
   {
     id: id(),
-    clientId: varchar('client_id', { length: 200 }).notNull(),
+    clientId: text('client_id').notNull(),
     name: varchar('name', { length: 120 }).notNull(),
     redirectUris: text('redirect_uris').array().notNull(),
     allowedScopes: text('allowed_scopes').array().notNull(),
+    registrationMethod: varchar('registration_method', { length: 20 })
+      .$type<'configured' | 'cimd' | 'dynamic'>()
+      .notNull()
+      .default('configured'),
+    metadataExpiresAt: timestamp('metadata_expires_at', { withTimezone: true }),
     disabledAt: timestamp('disabled_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

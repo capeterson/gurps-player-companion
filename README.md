@@ -148,9 +148,12 @@ bootstrap/
 
 The Bun server exposes MCP 2025-11-25 Streamable HTTP at `/mcp` with OAuth
 authorization code + PKCE delegation. Set `APP_BASE_URL` to the canonical public
-origin and pre-register clients in `OAUTH_CLIENTS`; `.env.example` shows the JSON
-shape. Callback URLs must use HTTPS or HTTP on an exact loopback host, and may
-not contain credentials or fragments. Production requires HTTPS. Proxy `/mcp`, `/oauth/*`, and
+origin. ChatGPT-style Client ID Metadata Documents and Claude-compatible Dynamic
+Client Registration are discovered automatically, so supported public clients
+need no `OAUTH_CLIENTS` entry or shared secret. `OAUTH_CLIENTS` remains optional
+for operator-defined clients; `.env.example` shows the JSON shape. Callback URLs
+must use HTTPS or HTTP on an exact loopback host, and may not contain credentials
+or fragments. Production requires HTTPS. Proxy `/mcp`, `/oauth/*`, and
 `/.well-known/*` to this process without caching them.
 
 Clients discover authorization at `/.well-known/oauth-protected-resource/mcp`.

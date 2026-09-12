@@ -59,6 +59,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     app.use('/.well-known/*', oauthCors);
     app.use('/oauth/token', oauthCors);
     app.use('/oauth/revoke', oauthCors);
+    app.use('/oauth/register', oauthCors);
   }
 
   app.route('/', createOAuthRouter(config));

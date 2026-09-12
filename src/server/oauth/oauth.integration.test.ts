@@ -3,7 +3,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createApp } from '../app.ts';
 import type { AppConfig } from '../config.ts';
 import { closeDb } from '../db/client.ts';
-import { integrationTestConfig } from '../testConfig.ts';
+import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
+
+configureIntegrationTestEnvironment();
 
 const redirectUri = 'http://127.0.0.1:49152/callback';
 const config: AppConfig = {
@@ -92,6 +94,13 @@ describe('delegated OAuth and MCP', () => {
     expect(metadata.status).toBe(200);
     expect(metadata.headers.get('cache-control')).toBe('no-store');
     expect(await metadata.json()).toMatchObject({ resource: 'http://localhost:3001/mcp' });
+    const authorizationMetadata = await app.request('/.well-known/oauth-authorization-server');
+    expect(authorizationMetadata.status).toBe(200);
+    expect(await authorizationMetadata.json()).toMatchObject({
+      client_id_metadata_document_supported: true,
+      registration_endpoint: 'http://localhost:3001/oauth/register',
+      token_endpoint_auth_methods_supported: ['none'],
+    });
     const api = await app.request('/api/v1/auth/me', {
       headers: { authorization: `Bearer ${tokens.access_token}` },
     });
@@ -160,7 +169,7 @@ describe('delegated OAuth and MCP', () => {
     });
     expect(secondOAuthRequest.status).toBe(429);
 
-    for (const path of ['/oauth/token', '/oauth/revoke']) {
+    for (const path of ['/oauth/token', '/oauth/revoke', '/oauth/register']) {
       const oversizedRequest = new Request(`http://localhost${path}`, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -178,6 +187,111 @@ describe('delegated OAuth and MCP', () => {
         error_description: 'request body is too large',
       });
     }
+  });
+
+  it('dynamically registers a public client and completes the OAuth code flow without config', async () => {
+    const app = createApp({ ...config, oauthClients: [] });
+    const dynamicRedirect = 'https://claude.ai/api/mcp/auth_callback';
+    const registration = await app.request('/oauth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        client_name: 'Claude',
+        redirect_uris: [dynamicRedirect],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'gpc:read gpc:write',
+      }),
+    });
+    expect(registration.status).toBe(201);
+    const registeredClient = (await registration.json()) as {
+      client_id: string;
+      client_secret?: string;
+    };
+    expect(registeredClient.client_id).toStartWith('gpcdcr_');
+    expect(registeredClient.client_secret).toBeUndefined();
+
+    const account = await app.request('/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: `dcr-${randomUUID()}@example.com`,
+        password: 'TestPassword1!',
+        displayName: 'Dynamic Client Player',
+      }),
+    });
+    expect(account.status).toBe(201);
+    const session = (await account.json()) as { accessToken: string };
+    const verifier = 'd'.repeat(43);
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: registeredClient.client_id,
+      redirect_uri: dynamicRedirect,
+      code_challenge: challenge(verifier),
+      code_challenge_method: 'S256',
+      scope: 'gpc:read',
+      state: randomUUID(),
+      resource: 'http://localhost:3001/mcp',
+    });
+    const details = await app.request(`/api/v1/oauth/authorization?${query}`, {
+      headers: { authorization: `Bearer ${session.accessToken}` },
+    });
+    expect(details.status).toBe(200);
+    expect(await details.clone().json()).toMatchObject({ clientName: 'Claude' });
+    const consent = (await details.json()) as { csrfToken: string };
+    const approved = await app.request('/api/v1/oauth/authorization', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${session.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...Object.fromEntries(query),
+        csrf_token: consent.csrfToken,
+        decision: 'approve',
+      }),
+    });
+    expect(approved.status).toBe(200);
+    const redirect = (await approved.json()) as { redirectTo: string };
+    const code = new URL(redirect.redirectTo).searchParams.get('code');
+    expect(code).toBeTruthy();
+    const exchanged = await app.request('/oauth/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: registeredClient.client_id,
+        redirect_uri: dynamicRedirect,
+        code: code ?? '',
+        code_verifier: verifier,
+        resource: 'http://localhost:3001/mcp',
+      }),
+    });
+    expect(exchanged.status).toBe(200);
+    expect(await exchanged.json()).toMatchObject({ token_type: 'Bearer', scope: 'gpc:read' });
+  });
+
+  it('rejects unsafe or confidential dynamic client registrations', async () => {
+    const app = createApp(config);
+    const insecure = await app.request('/oauth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ redirect_uris: ['http://client.example/callback'] }),
+    });
+    expect(insecure.status).toBe(400);
+    expect(await insecure.json()).toMatchObject({ error: 'invalid_redirect_uri' });
+
+    const confidential = await app.request('/oauth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'client_secret_basic',
+      }),
+    });
+    expect(confidential.status).toBe(400);
+    expect(await confidential.json()).toMatchObject({ error: 'invalid_client_metadata' });
   });
 
   it('enforces one-time codes, exact resource and PKCE', async () => {

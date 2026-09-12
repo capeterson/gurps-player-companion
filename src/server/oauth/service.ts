@@ -1,7 +1,8 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { and, desc, eq, gt, inArray, isNull, lt, notInArray } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, notExists, notInArray } from 'drizzle-orm';
 import {
   type OAuthAuthorizationQuery,
+  type OAuthDynamicClientRegistration,
   type OAuthScope,
   oauthScope,
   parseOAuthScopes,
@@ -18,12 +19,19 @@ import {
   oauthRefreshTokens,
   users,
 } from '../db/schema.ts';
+import {
+  ClientRegistrationError,
+  fetchClientMetadataDocument,
+  isSafeOAuthRedirectUri,
+} from './clientRegistration.ts';
 
 const ACCESS_TTL_MS = 15 * 60_000;
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60_000;
 const CODE_TTL_MS = 5 * 60_000;
 const CSRF_TTL_MS = 10 * 60_000;
 const ROTATION_RETRY_MS = 30_000;
+const UNUSED_DYNAMIC_CLIENT_TTL_MS = 24 * 60 * 60_000;
+const ALL_SCOPES: OAuthScope[] = ['gpc:read', 'gpc:write', 'gpc:manage'];
 let lastCleanupAt = 0;
 
 export class OAuthError extends Error {
@@ -97,19 +105,39 @@ export async function syncConfiguredOAuthClients(config: AppConfig): Promise<voi
     await db.delete(oauthAuthorizationCodes).where(lt(oauthAuthorizationCodes.expiresAt, cutoff));
     await db.delete(oauthAccessTokens).where(lt(oauthAccessTokens.expiresAt, cutoff));
     await db.delete(oauthRefreshTokens).where(lt(oauthRefreshTokens.expiresAt, cutoff));
+    await db
+      .delete(oauthClients)
+      .where(
+        and(
+          eq(oauthClients.registrationMethod, 'dynamic'),
+          lt(oauthClients.createdAt, new Date(now - UNUSED_DYNAMIC_CLIENT_TTL_MS)),
+          notExists(
+            db
+              .select({ id: oauthGrants.id })
+              .from(oauthGrants)
+              .where(eq(oauthGrants.clientId, oauthClients.id)),
+          ),
+        ),
+      );
   }
   const configuredIds = config.oauthClients.map((client) => client.clientId);
   if (configuredIds.length === 0) {
     await db
       .update(oauthClients)
       .set({ disabledAt: new Date() })
-      .where(isNull(oauthClients.disabledAt));
+      .where(
+        and(eq(oauthClients.registrationMethod, 'configured'), isNull(oauthClients.disabledAt)),
+      );
   } else {
     await db
       .update(oauthClients)
       .set({ disabledAt: new Date() })
       .where(
-        and(isNull(oauthClients.disabledAt), notInArray(oauthClients.clientId, configuredIds)),
+        and(
+          eq(oauthClients.registrationMethod, 'configured'),
+          isNull(oauthClients.disabledAt),
+          notInArray(oauthClients.clientId, configuredIds),
+        ),
       );
   }
   for (const client of config.oauthClients) {
@@ -120,6 +148,8 @@ export async function syncConfiguredOAuthClients(config: AppConfig): Promise<voi
         name: client.name,
         redirectUris: client.redirectUris,
         allowedScopes: client.scopes,
+        registrationMethod: 'configured',
+        metadataExpiresAt: null,
       })
       .onConflictDoUpdate({
         target: oauthClients.clientId,
@@ -127,6 +157,8 @@ export async function syncConfiguredOAuthClients(config: AppConfig): Promise<voi
           name: client.name,
           redirectUris: client.redirectUris,
           allowedScopes: client.scopes,
+          registrationMethod: 'configured',
+          metadataExpiresAt: null,
           disabledAt: null,
           updatedAt: new Date(),
         },
@@ -134,16 +166,111 @@ export async function syncConfiguredOAuthClients(config: AppConfig): Promise<voi
   }
 }
 
+export async function registerDynamicOAuthClient(input: OAuthDynamicClientRegistration) {
+  if (input.redirect_uris.some((redirect) => !isSafeOAuthRedirectUri(redirect))) {
+    throw new ClientRegistrationError(
+      'invalid_redirect_uri',
+      'redirect_uris must use HTTPS or loopback HTTP and cannot contain credentials or fragments',
+    );
+  }
+  const grantTypes = input.grant_types ?? ['authorization_code', 'refresh_token'];
+  if (!grantTypes.includes('authorization_code')) {
+    throw new ClientRegistrationError(
+      'invalid_client_metadata',
+      'grant_types must include authorization_code',
+    );
+  }
+  let scopes: OAuthScope[];
+  try {
+    scopes = input.scope ? parseOAuthScopes(input.scope) : ALL_SCOPES;
+  } catch {
+    throw new ClientRegistrationError(
+      'invalid_client_metadata',
+      'scope must contain only supported OAuth scopes',
+    );
+  }
+  const clientId = opaque('gpcdcr_');
+  const now = new Date();
+  await getDb()
+    .insert(oauthClients)
+    .values({
+      clientId,
+      name: input.client_name ?? 'MCP client',
+      redirectUris: [...new Set(input.redirect_uris)],
+      allowedScopes: scopes,
+      registrationMethod: 'dynamic',
+    });
+  return {
+    client_id: clientId,
+    client_id_issued_at: Math.floor(now.getTime() / 1000),
+    client_name: input.client_name ?? 'MCP client',
+    redirect_uris: [...new Set(input.redirect_uris)],
+    token_endpoint_auth_method: 'none' as const,
+    grant_types: grantTypes,
+    response_types: input.response_types ?? ['code'],
+    scope: scopes.join(' '),
+  };
+}
+
+async function resolveOAuthClient(config: AppConfig, clientId: string) {
+  await syncConfiguredOAuthClients(config);
+  const [existing] = await getDb()
+    .select()
+    .from(oauthClients)
+    .where(eq(oauthClients.clientId, clientId));
+  if (
+    existing &&
+    !existing.disabledAt &&
+    (existing.registrationMethod !== 'cimd' ||
+      (existing.metadataExpiresAt && existing.metadataExpiresAt > new Date()))
+  ) {
+    return existing;
+  }
+  if (!clientId.startsWith('https://')) {
+    throw new OAuthError('invalid_client', 'client is not registered');
+  }
+  let resolved: Awaited<ReturnType<typeof fetchClientMetadataDocument>>;
+  try {
+    resolved = await fetchClientMetadataDocument(clientId);
+  } catch (error) {
+    if (error instanceof ClientRegistrationError) {
+      throw new OAuthError('invalid_client', error.message);
+    }
+    throw error;
+  }
+  const [client] = await getDb()
+    .insert(oauthClients)
+    .values({
+      clientId,
+      name: resolved.metadata.client_name ?? new URL(clientId).hostname,
+      redirectUris: resolved.metadata.redirect_uris,
+      allowedScopes: ALL_SCOPES,
+      registrationMethod: 'cimd',
+      metadataExpiresAt: resolved.expiresAt,
+    })
+    .onConflictDoUpdate({
+      target: oauthClients.clientId,
+      set: {
+        name: resolved.metadata.client_name ?? new URL(clientId).hostname,
+        redirectUris: resolved.metadata.redirect_uris,
+        allowedScopes: ALL_SCOPES,
+        registrationMethod: 'cimd',
+        metadataExpiresAt: resolved.expiresAt,
+        disabledAt: null,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  if (!client) throw new OAuthError('invalid_client', 'client registration failed');
+  return client;
+}
+
 async function validatedClientAndScopes(config: AppConfig, query: OAuthAuthorizationQuery) {
   if (query.resource !== mcpResource(config)) {
     throw new OAuthError('invalid_request', 'resource must be the canonical MCP resource');
   }
-  await syncConfiguredOAuthClients(config);
-  const [client] = await getDb()
-    .select()
-    .from(oauthClients)
-    .where(and(eq(oauthClients.clientId, query.client_id), isNull(oauthClients.disabledAt)));
-  if (!client) throw new OAuthError('invalid_client', 'client is not registered');
+  const client = await resolveOAuthClient(config, query.client_id);
+  if (client.disabledAt) throw new OAuthError('invalid_client', 'client is not registered');
   if (!client.redirectUris.includes(query.redirect_uri)) {
     throw new OAuthError('invalid_request', 'redirect_uri is not registered');
   }

@@ -176,6 +176,16 @@
                           "none"
                         ]
                       }
+                    },
+                    "client_id_metadata_document_supported": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "registration_endpoint": {
+                      "type": "string",
+                      "format": "uri"
                     }
                   },
                   "required": [
@@ -187,7 +197,219 @@
                     "grant_types_supported",
                     "code_challenge_methods_supported",
                     "scopes_supported",
-                    "token_endpoint_auth_methods_supported"
+                    "token_endpoint_auth_methods_supported",
+                    "client_id_metadata_document_supported",
+                    "registration_endpoint"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth/register": {
+      "post": {
+        "tags": [
+          "oauth"
+        ],
+        "summary": "Dynamically register a public OAuth client",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "redirect_uris": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "minItems": 1,
+                    "maxItems": 20
+                  },
+                  "client_name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "token_endpoint_auth_method": {
+                    "type": "string",
+                    "enum": [
+                      "none"
+                    ],
+                    "default": "none"
+                  },
+                  "grant_types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "authorization_code",
+                        "refresh_token"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 2
+                  },
+                  "response_types": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "code"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 1
+                  },
+                  "scope": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "redirect_uris"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registered public OAuth client",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "client_id": {
+                      "type": "string"
+                    },
+                    "client_id_issued_at": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "client_name": {
+                      "type": "string"
+                    },
+                    "redirect_uris": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "minItems": 1,
+                      "maxItems": 20
+                    },
+                    "token_endpoint_auth_method": {
+                      "type": "string",
+                      "enum": [
+                        "none"
+                      ]
+                    },
+                    "grant_types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "authorization_code",
+                          "refresh_token"
+                        ]
+                      }
+                    },
+                    "response_types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "code"
+                        ]
+                      }
+                    },
+                    "scope": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_id",
+                    "client_id_issued_at",
+                    "client_name",
+                    "redirect_uris",
+                    "token_endpoint_auth_method",
+                    "grant_types",
+                    "response_types",
+                    "scope"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid client registration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_redirect_uri",
+                        "invalid_client_metadata"
+                      ]
+                    },
+                    "error_description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "error_description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "error_description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }
@@ -92500,7 +92722,7 @@
             "schema": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 200
+              "maxLength": 2048
             },
             "required": true,
             "name": "client_id",
@@ -92669,7 +92891,7 @@
                   "client_id": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 200
+                    "maxLength": 2048
                   },
                   "redirect_uri": {
                     "type": "string",
@@ -93422,7 +93644,7 @@
             "schema": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 200
+              "maxLength": 2048
             },
             "required": true,
             "name": "client_id",

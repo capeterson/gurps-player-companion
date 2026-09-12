@@ -70,6 +70,7 @@ describe('configured browser OAuth CORS', () => {
     ['GET', '/.well-known/oauth-authorization-server'],
     ['POST', '/oauth/token'],
     ['POST', '/oauth/revoke'],
+    ['POST', '/oauth/register'],
     ['POST', '/mcp'],
   ] as const) {
     it(`answers ${path} preflight for an allowed browser client`, async () => {

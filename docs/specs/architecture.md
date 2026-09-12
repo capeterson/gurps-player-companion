@@ -44,12 +44,20 @@ object-identity capability supplies the trusted OAuth actor, so no token is
 forwarded and external requests cannot inject one. App JWTs/API keys remain
 distinct from audience-bound, scoped, revocable OAuth credentials.
 
+Authorization-server discovery advertises Client ID Metadata Documents and a
+Dynamic Client Registration endpoint. CIMD metadata retrieval pins a public DNS
+address for an HTTPS-only, no-redirect, size/time-bounded request; DCR creates
+public clients only and issues no secret. Operator-defined `OAUTH_CLIENTS` are an
+optional compatibility path and do not disable self-registered clients.
+
 Migration 0042 stores clients, grants, one-time codes, hashed access/refresh
 tokens, and mutation idempotency outcomes. The outer idempotency transaction
 and nested `withAudit` savepoints commit writes, cached outcomes, history, and
 post-commit effects together. Audit context includes actor, OAuth client, and
 grant. `docs/mcp-tools.json` and `mcp:check` guard exact route coverage and live
 tool schema/catalog drift.
+Migration 0044 records whether a client is operator-configured, CIMD-resolved,
+or dynamically registered and stores CIMD cache expiry.
 
 ## Stack
 

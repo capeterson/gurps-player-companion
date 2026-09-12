@@ -9,9 +9,12 @@ import {
   oauthAuthorizationDetails,
   oauthAuthorizationQuery,
   oauthAuthorizationServerMetadata,
+  oauthDynamicClientRegistration,
+  oauthDynamicClientRegistrationResponse,
   oauthError,
   oauthGrantOut,
   oauthProtectedResourceMetadata,
+  oauthRegistrationError,
   oauthScope,
   oauthTokenResponse,
 } from '../../shared/schemas/oauth.ts';
@@ -22,6 +25,7 @@ import type { AppConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { oauthClients, oauthGrants } from '../db/schema.ts';
 import { type AppEnv, createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { ClientRegistrationError } from './clientRegistration.ts';
 import {
   OAuthError,
   beginAuthorization,
@@ -29,6 +33,7 @@ import {
   finishAuthorization,
   mcpResource,
   publicOrigin,
+  registerDynamicOAuthClient,
   revokeOAuthToken,
   rotateOAuthRefreshToken,
   syncConfiguredOAuthClients,
@@ -72,6 +77,15 @@ export function createOAuthRouter(config: AppConfig) {
     defaultHook: (result, c) => {
       if (!result.success) {
         c.header('cache-control', 'no-store');
+        if (c.req.path === '/oauth/register') {
+          return c.json(
+            {
+              error: 'invalid_client_metadata',
+              error_description: result.error.issues.map((issue) => issue.message).join('; '),
+            },
+            400,
+          );
+        }
         return c.json(
           {
             error: 'invalid_request',
@@ -112,6 +126,7 @@ export function createOAuthRouter(config: AppConfig) {
   // apply the OAuth body limit to them.
   router.use('/oauth/token', protectOAuthPost);
   router.use('/oauth/revoke', protectOAuthPost);
+  router.use('/oauth/register', protectOAuthPost);
   const origin = publicOrigin(config);
   const resource = mcpResource(config);
 
@@ -165,8 +180,55 @@ export function createOAuthRouter(config: AppConfig) {
         code_challenge_methods_supported: ['S256'],
         scopes_supported: ['gpc:read', 'gpc:write', 'gpc:manage'],
         token_endpoint_auth_methods_supported: ['none'],
+        client_id_metadata_document_supported: true,
+        registration_endpoint: `${origin}/oauth/register`,
       };
       return c.json(body);
+    },
+  );
+
+  router.openapi(
+    createRoute({
+      method: 'post',
+      path: '/oauth/register',
+      tags: ['oauth'],
+      summary: 'Dynamically register a public OAuth client',
+      request: {
+        body: {
+          required: true,
+          content: { 'application/json': { schema: oauthDynamicClientRegistration } },
+        },
+      },
+      responses: {
+        201: {
+          description: 'Registered public OAuth client',
+          content: { 'application/json': { schema: oauthDynamicClientRegistrationResponse } },
+        },
+        400: {
+          description: 'Invalid client registration',
+          content: { 'application/json': { schema: oauthRegistrationError } },
+        },
+        413: {
+          description: 'Request too large',
+          content: { 'application/json': { schema: oauthError } },
+        },
+        429: {
+          description: 'Rate limited',
+          content: { 'application/json': { schema: oauthError } },
+        },
+      },
+    }),
+    async (c) => {
+      c.header('cache-control', noStore['cache-control']);
+      c.header('pragma', noStore.pragma);
+      try {
+        return c.json(await registerDynamicOAuthClient(c.req.valid('json')), 201);
+      } catch (error) {
+        if (error instanceof ClientRegistrationError) {
+          return c.json({ error: error.code, error_description: error.message }, 400);
+        }
+        throw error;
+      }
     },
   );
 
