@@ -16,6 +16,9 @@ export interface AuthenticatedUser {
   readonly displayName: string;
   readonly suspendedAt: Date | null;
   readonly authMethod: 'jwt' | 'api_key';
+  readonly authVersion: number;
+  /** Unix seconds for the last primary credential ceremony; refresh does not advance it. */
+  readonly authenticatedAt: number | null;
   readonly apiKeyId?: string;
 }
 
@@ -47,7 +50,7 @@ export async function resolveAuthHeader(
 }
 
 async function resolveJwtToken(token: string): Promise<AuthenticatedUser> {
-  let payload: { sub: string };
+  let payload: { sub: string; authVersion: number; authTime: number };
   try {
     payload = await verifyAccessToken(token);
   } catch (err) {
@@ -57,12 +60,17 @@ async function resolveJwtToken(token: string): Promise<AuthenticatedUser> {
   const rows = await db.select().from(users).where(eq(users.id, payload.sub));
   const user = rows[0];
   if (!user) throw new AuthError('unknown_user', 'user not found');
+  if (payload.authVersion !== user.authVersion) {
+    throw new AuthError('invalid_token', 'access token has been revoked');
+  }
   return {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
     suspendedAt: user.suspendedAt,
     authMethod: 'jwt',
+    authVersion: user.authVersion,
+    authenticatedAt: payload.authTime,
   };
 }
 
@@ -96,6 +104,8 @@ async function resolveApiKeyToken(token: string): Promise<AuthenticatedUser> {
     displayName: row.user.displayName,
     suspendedAt: row.user.suspendedAt,
     authMethod: 'api_key',
+    authVersion: row.user.authVersion,
+    authenticatedAt: null,
     apiKeyId: row.apiKey.id,
   };
 }
@@ -124,7 +134,7 @@ export async function verifyAndConsumeRefreshToken(rawToken: string): Promise<{
   tokenRowId: string;
   jti: string;
 }> {
-  let payload: { sub: string; jti: string };
+  let payload: { sub: string; jti: string; authVersion: number; authTime: number };
   try {
     payload = await verifyRefreshToken(rawToken);
   } catch (err) {
@@ -152,6 +162,9 @@ export async function verifyAndConsumeRefreshToken(rawToken: string): Promise<{
   const userRows = await db.select().from(users).where(eq(users.id, payload.sub));
   const user = userRows[0];
   if (!user) throw new AuthError('unknown_user', 'user not found');
+  if (payload.authVersion !== user.authVersion) {
+    throw new AuthError('invalid_token', 'refresh token has been revoked');
+  }
 
   return {
     user: {
@@ -160,8 +173,23 @@ export async function verifyAndConsumeRefreshToken(rawToken: string): Promise<{
       displayName: user.displayName,
       suspendedAt: user.suspendedAt,
       authMethod: 'jwt',
+      authVersion: user.authVersion,
+      authenticatedAt: payload.authTime,
     },
     tokenRowId: tokenRow.id,
     jti: payload.jti,
   };
+}
+
+export const RECENT_AUTH_MAX_AGE_SECONDS = 10 * 60;
+
+export function hasRecentAuthentication(
+  user: AuthenticatedUser,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): boolean {
+  return (
+    user.authMethod === 'jwt' &&
+    user.authenticatedAt !== null &&
+    nowSeconds - user.authenticatedAt <= RECENT_AUTH_MAX_AGE_SECONDS
+  );
 }

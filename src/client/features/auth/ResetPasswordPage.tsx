@@ -25,7 +25,9 @@ export function ResetPasswordPage() {
     onSuccess: async () => {
       tokenStore.clear();
       await getSyncOrchestrator().purge();
-      toasts.push('Password updated. Please sign in.', { kind: 'success' });
+      toasts.push('Password updated. Other sessions and credentials were revoked.', {
+        kind: 'success',
+      });
       navigate('/login');
     },
     onError: (err) => {

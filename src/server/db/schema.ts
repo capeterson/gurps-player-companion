@@ -112,6 +112,8 @@ export const users = pgTable(
     id: id(),
     email: varchar('email', { length: 255 }).notNull(),
     passwordHash: text('password_hash').notNull(),
+    /** Incremented to revoke every access/refresh JWT issued under an older value. */
+    authVersion: integer('auth_version').notNull().default(0),
     displayName: varchar('display_name', { length: 80 }).notNull(),
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
     /**

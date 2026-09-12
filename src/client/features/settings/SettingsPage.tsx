@@ -1,13 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
 import { createPasskey, passkeysSupported } from '../../lib/passkeys.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { tokenStore } from '../../lib/tokenStore.ts';
+import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 import { ApiKeysSection } from './ApiKeysSection.tsx';
 
 export function SettingsPage() {
   const toasts = useToasts();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,7 +35,7 @@ export function SettingsPage() {
       const credential = await createPasskey(options);
       return api('/auth/passkeys/register', { method: 'POST', body: credential });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toasts.push('Passkey added', { kind: 'success' });
       queryClient.invalidateQueries({ queryKey: ['passkeys'] });
     },
@@ -63,12 +67,15 @@ export function SettingsPage() {
         body: { currentPassword, newPassword },
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setError(null);
-      toasts.push('Password changed', { kind: 'success' });
+      tokenStore.clear();
+      await getSyncOrchestrator().purge();
+      toasts.push('Password changed. Please sign in again.', { kind: 'success' });
+      navigate('/login');
     },
     onError: (err) => {
       const message =

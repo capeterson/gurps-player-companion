@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createRoute } from '@hono/zod-openapi';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
 import {
@@ -24,7 +24,12 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/j
 import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
 import { enforceAuthRateLimit } from '../auth/rateLimit.ts';
-import { AuthError, resolveAuthHeader, verifyAndConsumeRefreshToken } from '../auth/session.ts';
+import {
+  AuthError,
+  hasRecentAuthentication,
+  resolveAuthHeader,
+  verifyAndConsumeRefreshToken,
+} from '../auth/session.ts';
 import {
   consumeChallenge,
   createChallenge,
@@ -36,16 +41,27 @@ import {
 import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
-import { passkeyCredentials, passwordResetTokens, refreshTokens, users } from '../db/schema.ts';
+import {
+  apiKeys,
+  passkeyCredentials,
+  passwordResetTokens,
+  refreshTokens,
+  users,
+} from '../db/schema.ts';
 import { getResend, sendPasswordResetEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();
 
-async function issueTokenPair(userId: string) {
-  const access = await signAccessToken(userId);
+async function issueTokenPair(userId: string, authenticatedAt = Math.floor(Date.now() / 1000)) {
+  const [user] = await getDb()
+    .select({ authVersion: users.authVersion })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!user) throw new HTTPException(401, { message: 'unknown_user' });
+  const access = await signAccessToken(userId, user.authVersion, authenticatedAt);
   const jti = randomUUID();
-  const refresh = await signRefreshToken(userId, jti);
+  const refresh = await signRefreshToken(userId, jti, user.authVersion, authenticatedAt);
   await getDb().insert(refreshTokens).values({
     userId,
     jti,
@@ -227,10 +243,14 @@ router.openapi(
         content: { 'application/json': { schema: passkeyRegistrationOptions } },
       },
       401: errorResponse('Unauthorized'),
+      403: errorResponse('Recent authentication required'),
     },
   }),
   async (c) => {
     const user = c.get('user');
+    if (!hasRecentAuthentication(user)) {
+      throw new HTTPException(403, { message: 'recent authentication required' });
+    }
     const { rpName, rpId } = webauthnRp();
     const challenge = await createChallenge(user.id, 'registration');
     const existing = await getDb()
@@ -281,12 +301,16 @@ router.openapi(
         content: { 'application/json': { schema: passkeyInfo } },
       },
       401: errorResponse('Unauthorized'),
+      403: errorResponse('Recent authentication required'),
       422: errorResponse('Validation error'),
     },
   }),
   async (c) => {
     const body = c.req.valid('json');
     const user = c.get('user');
+    if (!hasRecentAuthentication(user)) {
+      throw new HTTPException(403, { message: 'recent authentication required' });
+    }
     let clientData: { challenge?: string };
     try {
       clientData = JSON.parse(
@@ -474,7 +498,7 @@ router.openapi(
     const body = c.req.valid('json');
     try {
       const { user } = await verifyAndConsumeRefreshToken(body.refreshToken);
-      const tokens = await issueTokenPair(user.id);
+      const tokens = await issueTokenPair(user.id, user.authenticatedAt ?? undefined);
       return c.json(tokens, 200);
     } catch (err) {
       if (err instanceof AuthError) {
@@ -546,7 +570,14 @@ router.openapi(
     const passwordHash = await hashPassword(body.newPassword);
 
     await db.transaction(async (tx) => {
-      await tx.update(users).set({ passwordHash, updatedAt: now }).where(eq(users.id, user.id));
+      await tx
+        .update(users)
+        .set({
+          passwordHash,
+          authVersion: user.authVersion + 1,
+          updatedAt: now,
+        })
+        .where(eq(users.id, user.id));
       await tx
         .update(refreshTokens)
         .set({ revokedAt: now })
@@ -710,7 +741,11 @@ router.openapi(
         .where(eq(passwordResetTokens.id, token.id));
       await tx
         .update(users)
-        .set({ passwordHash, updatedAt: now })
+        .set({
+          passwordHash,
+          authVersion: sql`${users.authVersion} + 1`,
+          updatedAt: now,
+        })
         .where(eq(users.id, token.userId));
       await tx
         .update(refreshTokens)
@@ -722,6 +757,11 @@ router.openapi(
             gt(refreshTokens.expiresAt, now),
           ),
         );
+      await tx
+        .update(apiKeys)
+        .set({ revokedAt: now, updatedAt: now })
+        .where(and(eq(apiKeys.userId, token.userId), isNull(apiKeys.revokedAt)));
+      await tx.delete(passkeyCredentials).where(eq(passkeyCredentials.userId, token.userId));
       return token.userId;
     });
 

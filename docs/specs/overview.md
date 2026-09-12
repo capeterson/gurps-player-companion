@@ -53,8 +53,10 @@ checklists for extending sync/history) live in
   registration, recovery, and passkey requests by source and (when supplied)
   normalized account. Throttled requests return JSON `429` with `Retry-After`.
 - **API keys** for programmatic access, created and revoked from Settings.
-- JWT access tokens + rotating refresh tokens; logout revokes the refresh token
-  server-side.
+- JWT access tokens + rotating refresh tokens. Password changes and recovery
+  advance a server-checked authentication version so every older JWT is rejected;
+  recovery also revokes API keys and removes passkeys. Creating a new passkey or
+  API key requires a primary sign-in within the last ten minutes.
 - **Account suspension**: a suspended user is bounced to `/suspended`; admins
   can suspend / unsuspend / schedule purge.
 
