@@ -3,7 +3,7 @@
  * Replace with an OpenAPI-generated client in a follow-up.
  */
 
-import { tokenStore } from './tokenStore.ts';
+import { type TokenSnapshot, tokenStore } from './tokenStore.ts';
 
 const API_ROOT = '/api/v1';
 
@@ -57,18 +57,17 @@ type RefreshResult =
       cause?: unknown;
     };
 
-async function refreshTokens(): Promise<RefreshResult> {
+async function refreshTokens(origin: TokenSnapshot): Promise<RefreshResult> {
   if (refreshInFlight) return refreshInFlight;
   const promise = (async (): Promise<RefreshResult> => {
     try {
-      const tokens = tokenStore.read();
-      if (!tokens) return { ok: false, kind: 'rejected' };
+      if (!tokenStore.isCurrent(origin)) return { ok: false, kind: 'rejected' };
       let res: Response;
       try {
         res = await fetch(`${API_ROOT}/auth/refresh`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+          body: JSON.stringify({ refreshToken: origin.refreshToken }),
         });
       } catch (cause) {
         // Transport failure (offline, DNS, dropped connection).  The
@@ -89,7 +88,7 @@ async function refreshTokens(): Promise<RefreshResult> {
         // 'error', from the request that triggered this refresh) with no
         // toast and no way for the user to find out why.
         if (res.status === 401 || res.status === 403) {
-          tokenStore.clear();
+          tokenStore.clearIfCurrent(origin);
           return { ok: false, kind: 'rejected' };
         }
         // Drain the body here, once, into plain data. Every caller
@@ -111,8 +110,9 @@ async function refreshTokens(): Promise<RefreshResult> {
         refreshToken: string;
         accessTokenExpiresIn: number;
       };
-      tokenStore.write(fresh);
-      return { ok: true };
+      return tokenStore.replaceIfCurrent(origin, fresh)
+        ? { ok: true }
+        : { ok: false, kind: 'rejected' };
     } finally {
       refreshInFlight = null;
     }
@@ -127,6 +127,8 @@ export interface ApiOptions {
   headers?: Record<string, string>;
   /** Default true.  Set false for /auth/login etc. */
   authenticated?: boolean;
+  /** Allows session teardown to cancel requests before they can mutate local state. */
+  signal?: AbortSignal;
 }
 
 export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
@@ -157,10 +159,14 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
     headers['content-type'] = headers['content-type'] ?? 'application/json';
   }
   const init: RequestInit = { method, headers };
+  if (options.signal) init.signal = options.signal;
   if (options.body !== undefined) init.body = JSON.stringify(options.body);
   const res = await fetch(`${API_ROOT}${path}`, init);
   if (res.status === 401 && options.authenticated !== false) {
-    const refreshed = await refreshTokens();
+    // The request may have crossed a logout/login boundary while it was in
+    // flight. Never refresh or retry an old account's request as the new one.
+    if (!tokens || !tokenStore.isCurrent(tokens)) return res;
+    const refreshed = await refreshTokens(tokens);
     if (!refreshed.ok && refreshed.kind === 'unavailable') {
       // Report the failure that actually blocked us. Returning the
       // original 401 would have the caller record "HTTP 401 — token
@@ -183,11 +189,12 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
     }
     if (refreshed.ok) {
       const next = tokenStore.read();
-      if (next) {
+      if (next?.sessionId === tokens.sessionId) {
         const retryInit: RequestInit = {
           method,
           headers: { ...headers, authorization: `Bearer ${next.accessToken}` },
         };
+        if (options.signal) retryInit.signal = options.signal;
         if (options.body !== undefined) retryInit.body = JSON.stringify(options.body);
         return await fetch(`${API_ROOT}${path}`, retryInit);
       }

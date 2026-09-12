@@ -134,4 +134,41 @@ describe('api refresh-on-401', () => {
     expect(refreshed).toBe(true);
     expect(tokenStore.read()).toMatchObject({ accessToken: 'access-2' });
   });
+
+  it('does not restore an old session when its refresh completes after account switching', async () => {
+    seedTokens();
+    let releaseRefresh!: (response: Response) => void;
+    const heldRefresh = new Promise<Response>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/auth/refresh')) return heldRefresh;
+        return jsonResponse(401, { error: 'token expired' });
+      }),
+    );
+
+    const oldRequest = api('/characters');
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    tokenStore.clear();
+    tokenStore.write({
+      accessToken: 'new-account-access',
+      refreshToken: 'new-account-refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    releaseRefresh(
+      jsonResponse(200, {
+        accessToken: 'late-old-access',
+        refreshToken: 'late-old-refresh',
+        accessTokenExpiresIn: 3600,
+      }),
+    );
+
+    await expect(oldRequest).rejects.toMatchObject({ status: 401 });
+    expect(tokenStore.read()).toMatchObject({
+      accessToken: 'new-account-access',
+      refreshToken: 'new-account-refresh',
+    });
+  });
 });

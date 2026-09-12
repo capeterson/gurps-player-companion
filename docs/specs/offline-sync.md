@@ -240,6 +240,12 @@ foreign link or containment cycle.
 
 ## The session must survive a server outage
 
+Every stored token pair carries a cross-tab session id and rotation version.
+`refreshTokens()` captures that identity before sending and may replace or clear
+the pair only while it is still current. A response from before logout or a new
+login is discarded, and an old authenticated request is never retried with a
+new account's credentials.
+
 `refreshTokens()` in `src/client/lib/api.ts` clears the token store **only** on
 a `401`/`403` from `/auth/refresh` — a definitive rejection of the refresh
 token. A `5xx`, a reverse-proxy/tunnel error (Cloudflare `52x`/`530`), or a
@@ -556,9 +562,11 @@ rule that has been broken at least once.
 - **Bootstrap before UI** (tenet 7). First login pulls the full snapshot into
   Dexie before first paint; a `bootstrap:<userId>` flag in `syncMeta`
   short-circuits it thereafter.
-- **Logout purges** (S9). `orchestrator.purge` wipes every Dexie store on
-  logout so account switching never leaks rows into a `useLiveQuery`. New
-  tables and new `syncMeta` keys **must** be added to the purge.
+- **Logout purges** (S9). `orchestrator.purge` first invalidates and aborts the
+  current session's requests, then acquires the global drain and cursor locks in
+  that order before wiping every Dexie store. Late sync responses therefore
+  cannot repopulate storage after logout. New tables and new `syncMeta` keys
+  **must** be added to the purge.
 
 ## Self-healing & pruning
 

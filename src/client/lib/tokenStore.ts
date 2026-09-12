@@ -6,6 +6,7 @@
 
 const ACCESS_KEY = 'gpc.access';
 const REFRESH_KEY = 'gpc.refresh';
+const TOKEN_PAIR_KEY = 'gpc.tokenPair.v1';
 
 export interface Tokens {
   readonly accessToken: string;
@@ -13,21 +14,101 @@ export interface Tokens {
   readonly accessTokenExpiresIn: number;
 }
 
+export interface TokenSnapshot extends Tokens {
+  /** Identifies one login session across every tab sharing localStorage. */
+  readonly sessionId: string;
+  /** Increments when that session rotates its token pair. */
+  readonly version: number;
+}
+
+function newSessionId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
+
+function parseStoredPair(raw: string | null): TokenSnapshot | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<TokenSnapshot>;
+    if (
+      typeof value.accessToken !== 'string' ||
+      typeof value.refreshToken !== 'string' ||
+      typeof value.accessTokenExpiresIn !== 'number' ||
+      typeof value.sessionId !== 'string' ||
+      typeof value.version !== 'number'
+    ) {
+      return null;
+    }
+    return value as TokenSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function persist(pair: TokenSnapshot): void {
+  window.localStorage.setItem(TOKEN_PAIR_KEY, JSON.stringify(pair));
+  // Remove the pre-session-fence representation once it has been migrated.
+  window.localStorage.removeItem(ACCESS_KEY);
+  window.localStorage.removeItem(REFRESH_KEY);
+}
+
 export const tokenStore = {
-  read(): Tokens | null {
+  read(): TokenSnapshot | null {
     if (typeof window === 'undefined') return null;
+    const stored = parseStoredPair(window.localStorage.getItem(TOKEN_PAIR_KEY));
+    if (stored) return stored;
+
+    // One-time migration from the original two-key representation. Giving
+    // the pair a session id makes already-signed-in installations safe as
+    // soon as the upgraded client boots.
     const access = window.localStorage.getItem(ACCESS_KEY);
     const refresh = window.localStorage.getItem(REFRESH_KEY);
     if (!access || !refresh) return null;
-    return { accessToken: access, refreshToken: refresh, accessTokenExpiresIn: 0 };
+    const migrated: TokenSnapshot = {
+      accessToken: access,
+      refreshToken: refresh,
+      accessTokenExpiresIn: 0,
+      sessionId: newSessionId(),
+      version: 0,
+    };
+    persist(migrated);
+    return migrated;
   },
   write(tokens: Tokens): void {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    window.localStorage.setItem(REFRESH_KEY, tokens.refreshToken);
+    persist({ ...tokens, sessionId: newSessionId(), version: 0 });
+  },
+  /** Replace a rotated pair only if the session that requested it still owns storage. */
+  replaceIfCurrent(expected: TokenSnapshot, tokens: Tokens): boolean {
+    if (typeof window === 'undefined') return false;
+    const current = this.read();
+    if (
+      !current ||
+      current.sessionId !== expected.sessionId ||
+      current.version !== expected.version ||
+      current.refreshToken !== expected.refreshToken
+    ) {
+      return false;
+    }
+    persist({ ...tokens, sessionId: current.sessionId, version: current.version + 1 });
+    return true;
+  },
+  isCurrent(expected: Pick<TokenSnapshot, 'sessionId' | 'version'>): boolean {
+    const current = this.read();
+    return (
+      current !== null &&
+      current.sessionId === expected.sessionId &&
+      current.version === expected.version
+    );
+  },
+  /** Clear only the pair a rejected request actually presented. */
+  clearIfCurrent(expected: Pick<TokenSnapshot, 'sessionId' | 'version'>): boolean {
+    if (!this.isCurrent(expected)) return false;
+    this.clear();
+    return true;
   },
   clear(): void {
     if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(TOKEN_PAIR_KEY);
     window.localStorage.removeItem(ACCESS_KEY);
     window.localStorage.removeItem(REFRESH_KEY);
   },
