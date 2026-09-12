@@ -99,6 +99,28 @@ async function postOperations(accessToken: string, operations: unknown[]) {
 }
 
 describe('POST /api/v1/sync/operations -- batch-local revision fast-forward', () => {
+  it('lets only one concurrent patch apply for the same base revision', async () => {
+    const { accessToken } = await registerUser('concurrent-base');
+    const character = await createCharacter(accessToken);
+    const operations = ['First writer', 'Second writer'].map((name) => [
+      patchOp({
+        clientOpId: crypto.randomUUID(),
+        entityId: character.id,
+        fieldPath: 'name',
+        attemptedValue: name,
+        baseRevision: character.revision,
+      }),
+    ]);
+
+    const responses = await Promise.all(
+      operations.map((batch) => postOperations(accessToken, batch)),
+    );
+    expect(responses.map((response) => response.outcomes[0]?.status).sort()).toEqual([
+      'applied',
+      'stale_base',
+    ]);
+  });
+
   it('applies a burst of same-base patches to distinct fields in one request', async () => {
     const { accessToken } = await registerUser('burst-character');
     const character = await createCharacter(accessToken);
@@ -208,6 +230,66 @@ describe('POST /api/v1/sync/operations -- batch-local revision fast-forward', ()
     for (const outcome of body.outcomes) {
       expect(outcome.status).toBe('applied');
     }
+  });
+
+  it('serializes reciprocal inventory moves so concurrent requests cannot create a cycle', async () => {
+    const { accessToken } = await registerUser('inventory-cycle');
+    const character = await createCharacter(accessToken);
+    const firstId = crypto.randomUUID();
+    const secondId = crypto.randomUUID();
+    const created = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory',
+        entityId: firstId,
+        command: 'create',
+        attemptedValue: { name: 'First container', isContainer: true },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory',
+        entityId: secondId,
+        command: 'create',
+        attemptedValue: { name: 'Second container', isContainer: true },
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    const firstRevision = created.outcomes[0]?.newRevision as number;
+    const secondRevision = created.outcomes[1]?.newRevision as number;
+    const move = (entityId: string, parentId: string, baseRevision: number) =>
+      postOperations(accessToken, [
+        {
+          clientOpId: crypto.randomUUID(),
+          entityClass: 'character_inventory',
+          entityId,
+          command: 'patch',
+          fieldPath: 'parentId',
+          attemptedValue: parentId,
+          baseRevision,
+          parentId: character.id,
+          validationVersion: 1,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+    const responses = await Promise.all([
+      move(firstId, secondId, firstRevision),
+      move(secondId, firstId, secondRevision),
+    ]);
+    expect(responses.map((response) => response.outcomes[0]?.status).sort()).toEqual([
+      'applied',
+      'rejected',
+    ]);
+
+    const detail = await getCharacter(accessToken, character.id);
+    const inventory = detail.inventory as Array<{ id: string; parentId: string | null }>;
+    const parents = new Map(inventory.map((item) => [item.id, item.parentId]));
+    expect(parents.get(firstId) === secondId && parents.get(secondId) === firstId).toBe(false);
   });
 
   it('still returns stale_base for a base older than the batch chain start (genuine conflict)', async () => {

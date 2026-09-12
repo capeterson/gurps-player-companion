@@ -168,27 +168,34 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const { campaign } = await requireCampaignMember(id, user.id);
     const db = getDb();
-    const [traits, skills, spells, items, languages, techniques, styles] = await Promise.all([
-      selectLibrarySection(db, traitEntity, id),
-      selectLibrarySection(db, skillEntity, id),
-      selectLibrarySection(db, spellEntity, id),
-      selectLibrarySection(db, itemEntity, id),
-      selectLibrarySection(db, languageEntity, id),
-      selectLibrarySection(db, techniqueEntity, id),
-      selectLibrarySection(db, styleEntity, id),
-    ]);
+    const snapshot = await db.transaction(
+      async (tx) => {
+        const { campaign } = await requireCampaignMember(id, user.id, tx);
+        // A node-postgres transaction owns one connection; keep its statements
+        // sequential while REPEATABLE READ supplies the cross-section snapshot.
+        const traits = await selectLibrarySection(tx, traitEntity, id);
+        const skills = await selectLibrarySection(tx, skillEntity, id);
+        const spells = await selectLibrarySection(tx, spellEntity, id);
+        const items = await selectLibrarySection(tx, itemEntity, id);
+        const languages = await selectLibrarySection(tx, languageEntity, id);
+        const techniques = await selectLibrarySection(tx, techniqueEntity, id);
+        const styles = await selectLibrarySection(tx, styleEntity, id);
+        return { campaign, traits, skills, spells, items, languages, techniques, styles };
+      },
+      { isolationLevel: 'repeatable read', accessMode: 'read only' },
+    );
+    const { campaign, traits, skills, spells, items, languages, techniques, styles } = snapshot;
     const yamlText = emitLibraryYaml({
       campaign: {
         name: campaign.name,
-        description: campaign.description ?? undefined,
-        pointTarget: campaign.pointTarget ?? undefined,
-        disadvantageCap: campaign.disadvantageCap ?? undefined,
-        quirkCap: campaign.quirkCap ?? undefined,
+        description: campaign.description,
+        pointTarget: campaign.pointTarget,
+        disadvantageCap: campaign.disadvantageCap,
+        quirkCap: campaign.quirkCap,
         manaLevel: campaign.manaLevel,
         houseRules: campaign.houseRules,
-        techLevel: campaign.techLevel ?? undefined,
+        techLevel: campaign.techLevel,
       },
       traits: traits.map(traitEntity.rowToCreate),
       skills: skills.map(skillEntity.rowToCreate),

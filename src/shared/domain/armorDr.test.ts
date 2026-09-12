@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { aggregateDrByLocation, effectiveDrByLocation, resolveDr, sumArmorDb } from './armorDr.ts';
+import {
+  aggregateDrByLocation,
+  effectiveDrByLocation,
+  resolveArmorDb,
+  resolveDr,
+} from './armorDr.ts';
 import type { ArmorItemRow } from './armorDr.ts';
 import { applyDamage } from './injuryCalc.ts';
 import { resolveEffects } from './traitEffects.ts';
@@ -10,6 +15,8 @@ function item(
   opts: Partial<ArmorItemRow['armor']> = {},
 ): ArmorItemRow {
   return {
+    id: `armor-${dr}-${locations.join('-')}`,
+    name: `Armor ${dr}`,
     equipped: true,
     isArmor: true,
     armor: {
@@ -237,27 +244,44 @@ describe('resolveDr', () => {
   });
 });
 
-describe('sumArmorDb', () => {
-  it('returns 0 with no equipped armor', () => {
-    expect(sumArmorDb([])).toBe(0);
-    expect(sumArmorDb([{ equipped: true, isArmor: false, armor: null }])).toBe(0);
+describe('resolveArmorDb', () => {
+  it('returns no source with no covering equipped armor', () => {
+    expect(resolveArmorDb([], 'torso')).toBeNull();
+    expect(resolveArmorDb([{ equipped: true, isArmor: false, armor: null }], 'torso')).toBeNull();
   });
 
-  it('sums db across multiple equipped armor pieces', () => {
-    const result = sumArmorDb([item(2, ['torso'], { db: 1 }), item(3, ['torso'], { db: 2 })]);
-    expect(result).toBe(3);
+  it('uses the maximum covering DB once and resolves by location', () => {
+    const torso1 = item(2, ['torso'], { db: 1 });
+    const torso3 = { ...item(3, ['torso'], { db: 3 }), id: 'torso-3', name: 'Deflect Plate' };
+    const head2 = { ...item(1, ['skull'], { db: 2 }), id: 'head-2', name: 'Deflect Helm' };
+    expect(resolveArmorDb([torso1, torso3, head2], 'torso')).toEqual({
+      db: 3,
+      itemId: 'torso-3',
+      itemName: 'Deflect Plate',
+    });
+    expect(resolveArmorDb([torso1, torso3, head2], 'skull')?.db).toBe(2);
   });
 
-  it('skips unequipped armor and armor with no db', () => {
-    const result = sumArmorDb([
-      item(2, ['torso'], { db: 1 }),
-      { equipped: false, isArmor: true, armor: item(2, ['torso'], { db: 5 }).armor },
-    ]);
-    expect(result).toBe(1);
+  it('skips unequipped, non-covering, empty-location, and zero DB armor', () => {
+    const result = resolveArmorDb(
+      [
+        item(2, ['torso'], { db: 1 }),
+        { equipped: false, isArmor: true, armor: item(2, ['torso'], { db: 5 }).armor },
+        item(2, ['skull'], { db: 4 }),
+        item(2, [], { db: 4 }),
+        item(2, ['torso'], { db: 0 }),
+      ],
+      'torso',
+    );
+    expect(result?.db).toBe(1);
   });
 
-  it('treats db 0 as present (a 0 DB armor addition adds nothing)', () => {
-    expect(sumArmorDb([item(2, ['torso'], { db: 0 })])).toBe(0);
+  it('respects known facing and deterministically breaks equal maxima', () => {
+    const back = { ...item(2, ['torso'], { db: 3, backOnly: true }), id: 'b', name: 'Back' };
+    const frontZ = { ...item(2, ['torso'], { db: 3, frontOnly: true }), id: 'z', name: 'Front Z' };
+    const frontA = { ...item(2, ['torso'], { db: 3, frontOnly: true }), id: 'a', name: 'Front A' };
+    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'front')?.itemId).toBe('a');
+    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'back')?.itemId).toBe('b');
   });
 });
 

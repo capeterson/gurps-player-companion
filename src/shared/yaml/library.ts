@@ -137,7 +137,7 @@ function sortedByName<T extends { name: string }>(rows: readonly T[]): T[] {
   );
 }
 
-/** Drop undefined / null fields so the YAML output is minimal. */
+/** Drop undefined / null fields so resource-entry YAML stays minimal. */
 function compact<T extends Record<string, unknown>>(input: T): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(input)) {
@@ -146,6 +146,11 @@ function compact<T extends Record<string, unknown>>(input: T): Record<string, un
     out[k] = v;
   }
   return out;
+}
+
+/** Campaign nulls are portable instructions to clear a target setting. */
+function compactCampaign(input: NonNullable<LibraryYamlDoc['campaign']>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 }
 
 export function emitLibraryYaml(input: LibraryYamlExportInput): string {
@@ -162,7 +167,7 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
   const styles = sortedByName(input.styles).map((st) => compact(st));
 
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };
-  if (input.campaign) payload.campaign = compact(input.campaign);
+  if (input.campaign) payload.campaign = compactCampaign(input.campaign);
   payload.library = { traits, skills, spells, items, languages, techniques, styles };
 
   const doc = new Document(payload);

@@ -1,7 +1,7 @@
 /**
  * DefensesCard — shield Defense Bonus flows into Dodge/Parry/Block from
- * an equipped shield item, armor DB (Deflect enchantments) stacks on
- * top of it, Block is gated on that equipped shield (not a bare skill),
+ * an equipped shield item, the highest location-aware armor DB stacks on
+ * top of the shield once, Block is gated on that equipped shield (not a bare skill),
  * the ST shortfall lowers Parry, and 'No' parry weapons render a
  * non-rollable row.
  */
@@ -31,6 +31,9 @@ interface ArmorItem {
   readonly equipped?: boolean;
   /** armor.db — Defense Bonus from Deflect enchantments. */
   readonly db?: number | null;
+  readonly locations?: string[];
+  readonly frontOnly?: boolean;
+  readonly backOnly?: boolean;
 }
 
 interface Skill {
@@ -63,13 +66,13 @@ function makeCharacter(
     equipped: a.equipped ?? true,
     isArmor: true,
     armor: {
-      locations: ['torso'],
+      locations: a.locations ?? ['torso'],
       dr: 4,
       drCrushing: null,
       typedDr: {},
       flexible: false,
-      frontOnly: false,
-      backOnly: false,
+      frontOnly: a.frontOnly ?? false,
+      backOnly: a.backOnly ?? false,
       db: a.db ?? null,
       notes: null,
     },
@@ -428,7 +431,7 @@ describe('DefensesCard', () => {
     expect(targetFor(openRoll, 1)).toBe(11);
 
     // The Dodge caption names the armor source.
-    expect(screen.getByText('+ 1 armor DB')).toBeInTheDocument();
+    expect(screen.getByText('+ 1 armor DB (Deflect Hauberk)')).toBeInTheDocument();
   });
 
   it('stacks armor DB with shield DB on Dodge, Parry, and Block', () => {
@@ -459,7 +462,32 @@ describe('DefensesCard', () => {
     expect(targetFor(openRoll, 2)).toBe(12);
 
     // The Dodge caption names both sources in the breakdown.
-    expect(screen.getByText('+ 2 DB (Medium Shield) + 1 armor DB')).toBeInTheDocument();
+    expect(
+      screen.getByText('+ 2 DB (Medium Shield) + 1 armor DB (Deflect Breastplate)'),
+    ).toBeInTheDocument();
+  });
+
+  it('uses one maximum armor DB for the selected location and facing', () => {
+    const openRoll = vi.fn();
+    const character = makeCharacter(
+      [],
+      [],
+      [
+        { id: 'torso-low', name: 'Low Coat', db: 1 },
+        { id: 'torso-high', name: 'High Plate', db: 3, frontOnly: true },
+        { id: 'head', name: 'Helm', db: 2, locations: ['skull'] },
+      ],
+    );
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
+    expect(targetFor(openRoll, 0)).toBe(12); // 9 + max(1, 3), never +4
+    fireEvent.change(screen.getByLabelText('Defense hit location'), { target: { value: 'skull' } });
+    fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
+    expect(targetFor(openRoll, 1)).toBe(11);
+    fireEvent.change(screen.getByLabelText('Defense hit location'), { target: { value: 'torso' } });
+    fireEvent.change(screen.getByLabelText('Defense facing'), { target: { value: 'back' } });
+    fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
+    expect(targetFor(openRoll, 2)).toBe(10);
   });
 
   it('ignores armor DB on unequipped armor', () => {

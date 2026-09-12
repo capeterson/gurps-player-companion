@@ -53,19 +53,21 @@ export const libraryTraitOut = z.object({
   ...timestamps,
 });
 
-export const libraryTraitCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  kind: traitKindEnum,
-  basePoints: z.number().int().min(-1000).max(1000).default(0),
-  pointsPerLevel: z.number().int().min(-1000).max(1000).nullable().optional(),
-  maxLevel: z.number().int().min(1).max(99).nullable().optional(),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).trim().nullable().optional(),
-  availableModifiers: z.array(traitModifier).default([]),
-  variants: z.array(traitVariant).default([]),
-  effects: z.array(traitEffect).default([]),
-  tags: tagList,
-});
+export const libraryTraitCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    kind: traitKindEnum,
+    basePoints: z.number().int().min(-1000).max(1000).default(0),
+    pointsPerLevel: z.number().int().min(-1000).max(1000).nullable().optional(),
+    maxLevel: z.number().int().min(1).max(99).nullable().optional(),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+    availableModifiers: z.array(traitModifier).default([]),
+    variants: z.array(traitVariant).default([]),
+    effects: z.array(traitEffect).default([]),
+    tags: tagList,
+  })
+  .strict();
 
 export const libraryTraitUpdate = libraryTraitCreate.partial();
 
@@ -86,19 +88,21 @@ export const librarySkillOut = z.object({
   ...timestamps,
 });
 
-export const librarySkillCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  attribute: skillAttributeEnum,
-  difficulty: skillDifficultyEnum,
-  techLevel: z.number().int().min(0).max(12).nullable().optional(),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).nullable().optional(),
-  defaultSpecialization: z.string().max(160).nullable().optional(),
-  defaults: skillDefaults.optional(),
-  prerequisites: z.string().max(20_000).nullable().optional(),
-  situationalModifiers: z.array(situationalModifier).default([]),
-  effects: z.array(traitEffect).default([]),
-});
+export const librarySkillCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    attribute: skillAttributeEnum,
+    difficulty: skillDifficultyEnum,
+    techLevel: z.number().int().min(0).max(12).nullable().optional(),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).nullable().optional(),
+    defaultSpecialization: z.string().max(160).nullable().optional(),
+    defaults: skillDefaults.optional(),
+    prerequisites: z.string().max(20_000).nullable().optional(),
+    situationalModifiers: z.array(situationalModifier).default([]),
+    effects: z.array(traitEffect).default([]),
+  })
+  .strict();
 
 export const librarySkillUpdate = librarySkillCreate.partial();
 
@@ -127,19 +131,21 @@ export const librarySpellOut = z.object({
   ...timestamps,
 });
 
-export const librarySpellCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  college: z.string().max(80).trim().nullable().optional(),
-  difficulty: spellDifficulty.default('H'),
-  baseEnergyCost: z.number().int().min(0).max(99).default(1),
-  maintenanceCost: z.number().int().min(0).max(99).nullable().optional(),
-  castingTime: z.string().max(40).trim().nullable().optional(),
-  duration: z.string().max(40).trim().nullable().optional(),
-  /** Must fit spellCreate.prerequisites (2000) -- see librarySpellOut. */
-  prerequisites: z.string().max(2000).nullable().optional(),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).trim().nullable().optional(),
-});
+export const librarySpellCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    college: z.string().max(80).trim().nullable().optional(),
+    difficulty: spellDifficulty.default('H'),
+    baseEnergyCost: z.number().int().min(0).max(99).default(1),
+    maintenanceCost: z.number().int().min(0).max(99).nullable().optional(),
+    castingTime: z.string().max(40).trim().nullable().optional(),
+    duration: z.string().max(40).trim().nullable().optional(),
+    /** Must fit spellCreate.prerequisites (2000) -- see librarySpellOut. */
+    prerequisites: z.string().max(2000).nullable().optional(),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+  })
+  .strict();
 
 export const librarySpellUpdate = librarySpellCreate.partial();
 
@@ -160,12 +166,14 @@ export const libraryLanguageOut = z.object({
   ...timestamps,
 });
 
-export const libraryLanguageCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).trim().nullable().optional(),
-  isSignLanguage: z.boolean().default(false),
-});
+export const libraryLanguageCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+    isSignLanguage: z.boolean().default(false),
+  })
+  .strict();
 
 export const libraryLanguageUpdate = libraryLanguageCreate.partial();
 
@@ -191,16 +199,18 @@ export const libraryTechniqueOut = z.object({
   ...timestamps,
 });
 
-export const libraryTechniqueCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  defaultSkillName: z.string().min(1).max(160).trim(),
-  difficulty: techniqueDifficulty.default('A'),
-  maxLevel: z.number().int().min(0).max(20).nullable().optional(),
-  defaultModifier: z.number().int().min(-99).max(0).default(0),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).trim().nullable().optional(),
-  prereq: z.string().max(2000).nullable().optional(),
-});
+export const libraryTechniqueCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    defaultSkillName: z.string().min(1).max(160).trim(),
+    difficulty: techniqueDifficulty.default('A'),
+    maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+    defaultModifier: z.number().int().min(-99).max(0).default(0),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+    prereq: z.string().max(2000).nullable().optional(),
+  })
+  .strict();
 
 export const libraryTechniqueUpdate = libraryTechniqueCreate.partial();
 
@@ -214,13 +224,15 @@ export const libraryTechniqueUpdate = libraryTechniqueCreate.partial();
  * Validates `campaign_library_styles.techniques` (jsonb) -- see
  * docs/specs/json-fields.md.
  */
-export const styleTechniqueRef = z.object({
-  name: z.string().min(1).max(160).trim(),
-  defaultSkillName: z.string().min(1).max(160).trim(),
-  difficulty: techniqueDifficulty.default('A'),
-  maxLevel: z.number().int().min(0).max(20).nullable().optional(),
-  defaultModifier: z.number().int().min(-99).max(0).default(0),
-});
+export const styleTechniqueRef = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    defaultSkillName: z.string().min(1).max(160).trim(),
+    difficulty: techniqueDifficulty.default('A'),
+    maxLevel: z.number().int().min(0).max(20).nullable().optional(),
+    defaultModifier: z.number().int().min(-99).max(0).default(0),
+  })
+  .strict();
 export type StyleTechniqueRef = z.infer<typeof styleTechniqueRef>;
 
 /** Validates `campaign_library_styles.perks` / `.skills` (jsonb). */
@@ -244,14 +256,16 @@ export const libraryStyleOut = z.object({
   ...timestamps,
 });
 
-export const libraryStyleCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).trim().nullable().optional(),
-  techniques: z.array(styleTechniqueRef).max(100).default([]),
-  perks: styleNameList,
-  skills: styleNameList,
-});
+export const libraryStyleCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+    techniques: z.array(styleTechniqueRef).max(100).default([]),
+    perks: styleNameList,
+    skills: styleNameList,
+  })
+  .strict();
 
 export const libraryStyleUpdate = libraryStyleCreate.partial();
 
@@ -278,24 +292,26 @@ export const libraryItemOut = z.object({
   ...timestamps,
 });
 
-export const libraryItemCreate = z.object({
-  name: z.string().min(1).max(160).trim(),
-  category: z.string().max(40).trim().default('general'),
-  defaultQuantity: z.number().int().min(0).max(1_000_000).default(1),
-  weightLbs: z.number().min(0).max(1_000_000).default(0),
-  cost: z.number().min(0).max(100_000_000_000).default(0),
-  description: z.string().max(20_000).nullable().optional(),
-  source: z.string().max(40).trim().nullable().optional(),
-  isArmor: z.boolean().default(false),
-  armor: armorData.nullable().optional(),
-  weaponData: weaponData.nullable().optional(),
-  isContainer: z.boolean().default(false),
-  hideawayCapacityLbs: z.number().min(0).max(1_000_000).default(0),
-  weightReductionPercent: z.number().int().min(0).max(100).default(0),
-  powerstoneData: powerstoneData.nullable().optional(),
-  magicItemData: magicItemData.nullable().optional(),
-  enchantments: z.array(enchantmentRef).max(50).default([]),
-});
+export const libraryItemCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    category: z.string().max(40).trim().default('general'),
+    defaultQuantity: z.number().int().min(0).max(1_000_000).default(1),
+    weightLbs: z.number().min(0).max(1_000_000).default(0),
+    cost: z.number().min(0).max(100_000_000_000).default(0),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+    isArmor: z.boolean().default(false),
+    armor: armorData.nullable().optional(),
+    weaponData: weaponData.nullable().optional(),
+    isContainer: z.boolean().default(false),
+    hideawayCapacityLbs: z.number().min(0).max(1_000_000).default(0),
+    weightReductionPercent: z.number().int().min(0).max(100).default(0),
+    powerstoneData: powerstoneData.nullable().optional(),
+    magicItemData: magicItemData.nullable().optional(),
+    enchantments: z.array(enchantmentRef).max(50).default([]),
+  })
+  .strict();
 
 export const libraryItemUpdate = libraryItemCreate.partial();
 
@@ -344,41 +360,46 @@ export const libraryYamlVersion = z.union([
   z.literal(6),
 ]);
 
-export const libraryYamlDoc = z.object({
-  version: libraryYamlVersion,
-  campaign: z
-    .object({
-      name: z.string().min(1).max(120).optional(),
-      description: z.string().max(20_000).nullable().optional(),
-      pointTarget: z.number().int().nullable().optional(),
-      disadvantageCap: z.number().int().nullable().optional(),
-      quirkCap: z.number().int().nullable().optional(),
-      /** Ambient mana level (Basic Set p. 235); reuses the campaign schema's enum. */
-      manaLevel: z.enum(MANA_LEVELS).optional(),
-      houseRules: campaignHouseRules.optional(),
-      /** Campaign-wide tech level (Basic Set p. 513). */
-      techLevel: z.number().int().min(0).max(12).nullable().optional(),
-    })
-    .optional(),
-  library: z.object({
-    traits: z.array(libraryTraitCreate).default([]),
-    skills: z.array(librarySkillCreate).default([]),
-    /** Optional (no default): pre-spell-library exports lack this
-     * section, and a replace-mode import must be able to tell "no
-     * spells section" (leave existing spells alone) apart from an
-     * explicit empty list (delete them all). */
-    spells: z.array(librarySpellCreate).optional(),
-    items: z.array(libraryItemCreate).default([]),
-    /** Optional for the same reason as `spells`: pre-v4 exports have no
-     * languages section, and a replace-mode import of one of those files
-     * must not wipe the campaign's language library. */
-    languages: z.array(libraryLanguageCreate).optional(),
-    /** Optional for the same reason as `languages`. */
-    techniques: z.array(libraryTechniqueCreate).optional(),
-    /** Optional for the same reason as `languages`. */
-    styles: z.array(libraryStyleCreate).optional(),
-  }),
-});
+export const libraryYamlDoc = z
+  .object({
+    version: libraryYamlVersion,
+    campaign: z
+      .object({
+        name: z.string().min(1).max(120).optional(),
+        description: z.string().max(20_000).nullable().optional(),
+        pointTarget: z.number().int().nullable().optional(),
+        disadvantageCap: z.number().int().nullable().optional(),
+        quirkCap: z.number().int().nullable().optional(),
+        /** Ambient mana level (Basic Set p. 235); reuses the campaign schema's enum. */
+        manaLevel: z.enum(MANA_LEVELS).optional(),
+        houseRules: campaignHouseRules.optional(),
+        /** Campaign-wide tech level (Basic Set p. 513). */
+        techLevel: z.number().int().min(0).max(12).nullable().optional(),
+      })
+      .strict()
+      .optional(),
+    library: z
+      .object({
+        traits: z.array(libraryTraitCreate).default([]),
+        skills: z.array(librarySkillCreate).default([]),
+        /** Optional (no default): pre-spell-library exports lack this
+         * section, and a replace-mode import must be able to tell "no
+         * spells section" (leave existing spells alone) apart from an
+         * explicit empty list (delete them all). */
+        spells: z.array(librarySpellCreate).optional(),
+        items: z.array(libraryItemCreate).default([]),
+        /** Optional for the same reason as `spells`: pre-v4 exports have no
+         * languages section, and a replace-mode import of one of those files
+         * must not wipe the campaign's language library. */
+        languages: z.array(libraryLanguageCreate).optional(),
+        /** Optional for the same reason as `languages`. */
+        techniques: z.array(libraryTechniqueCreate).optional(),
+        /** Optional for the same reason as `languages`. */
+        styles: z.array(libraryStyleCreate).optional(),
+      })
+      .strict(),
+  })
+  .strict();
 
 export type LibraryTraitOut = z.infer<typeof libraryTraitOut>;
 export type LibraryTraitCreate = z.infer<typeof libraryTraitCreate>;
@@ -404,3 +425,101 @@ export type LibraryItemUpdate = z.infer<typeof libraryItemUpdate>;
 export type ImportMode = z.infer<typeof importMode>;
 export type ImportResult = z.infer<typeof importResult>;
 export type LibraryYamlDoc = z.infer<typeof libraryYamlDoc>;
+
+/**
+ * Exhaustive portability manifest. `satisfies Record<keyof …, true>` makes a
+ * schema field addition a compile error until import/export ownership is made
+ * explicit; the YAML tests also compare these keys to the runtime Zod shapes.
+ */
+export const libraryPortableFieldManifest = {
+  campaign: {
+    name: true,
+    description: true,
+    pointTarget: true,
+    disadvantageCap: true,
+    quirkCap: true,
+    manaLevel: true,
+    houseRules: true,
+    techLevel: true,
+  } satisfies Record<keyof NonNullable<LibraryYamlDoc['campaign']>, true>,
+  traits: {
+    name: true,
+    kind: true,
+    basePoints: true,
+    pointsPerLevel: true,
+    maxLevel: true,
+    description: true,
+    source: true,
+    availableModifiers: true,
+    variants: true,
+    effects: true,
+    tags: true,
+  } satisfies Record<keyof LibraryTraitCreate, true>,
+  skills: {
+    name: true,
+    attribute: true,
+    difficulty: true,
+    techLevel: true,
+    description: true,
+    source: true,
+    defaultSpecialization: true,
+    defaults: true,
+    prerequisites: true,
+    situationalModifiers: true,
+    effects: true,
+  } satisfies Record<keyof LibrarySkillCreate, true>,
+  spells: {
+    name: true,
+    college: true,
+    difficulty: true,
+    baseEnergyCost: true,
+    maintenanceCost: true,
+    castingTime: true,
+    duration: true,
+    prerequisites: true,
+    description: true,
+    source: true,
+  } satisfies Record<keyof LibrarySpellCreate, true>,
+  items: {
+    name: true,
+    category: true,
+    defaultQuantity: true,
+    weightLbs: true,
+    cost: true,
+    description: true,
+    source: true,
+    isArmor: true,
+    armor: true,
+    weaponData: true,
+    isContainer: true,
+    hideawayCapacityLbs: true,
+    weightReductionPercent: true,
+    powerstoneData: true,
+    magicItemData: true,
+    enchantments: true,
+  } satisfies Record<keyof LibraryItemCreate, true>,
+  languages: {
+    name: true,
+    description: true,
+    source: true,
+    isSignLanguage: true,
+  } satisfies Record<keyof LibraryLanguageCreate, true>,
+  techniques: {
+    name: true,
+    defaultSkillName: true,
+    difficulty: true,
+    maxLevel: true,
+    defaultModifier: true,
+    description: true,
+    source: true,
+    prereq: true,
+  } satisfies Record<keyof LibraryTechniqueCreate, true>,
+  styles: {
+    name: true,
+    description: true,
+    source: true,
+    techniques: true,
+    perks: true,
+    skills: true,
+  } satisfies Record<keyof LibraryStyleCreate, true>,
+} as const;

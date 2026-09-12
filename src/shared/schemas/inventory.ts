@@ -8,39 +8,44 @@ import { timestamps, uuid } from './common.ts';
  * `dr`. Unset / null entries fall through to `drCrushing` (for `cr`)
  * or `dr`.
  */
-export const typedArmorDr = z.object({
-  cut: z.number().int().min(0).max(1000).nullable().optional(),
-  imp: z.number().int().min(0).max(1000).nullable().optional(),
-  pi: z.number().int().min(0).max(1000).nullable().optional(),
-  pi_minus: z.number().int().min(0).max(1000).nullable().optional(),
-  pi_plus: z.number().int().min(0).max(1000).nullable().optional(),
-  pi_pp: z.number().int().min(0).max(1000).nullable().optional(),
-  burn: z.number().int().min(0).max(1000).nullable().optional(),
-  corr: z.number().int().min(0).max(1000).nullable().optional(),
-  fat: z.number().int().min(0).max(1000).nullable().optional(),
-  tox: z.number().int().min(0).max(1000).nullable().optional(),
-});
+export const typedArmorDr = z
+  .object({
+    cut: z.number().int().min(0).max(1000).nullable().optional(),
+    imp: z.number().int().min(0).max(1000).nullable().optional(),
+    pi: z.number().int().min(0).max(1000).nullable().optional(),
+    pi_minus: z.number().int().min(0).max(1000).nullable().optional(),
+    pi_plus: z.number().int().min(0).max(1000).nullable().optional(),
+    pi_pp: z.number().int().min(0).max(1000).nullable().optional(),
+    burn: z.number().int().min(0).max(1000).nullable().optional(),
+    corr: z.number().int().min(0).max(1000).nullable().optional(),
+    fat: z.number().int().min(0).max(1000).nullable().optional(),
+    tox: z.number().int().min(0).max(1000).nullable().optional(),
+  })
+  .strict();
 
-export const armorData = z.object({
-  /** Hit-location strings; well-known values are in shared/constants/hitLocations.ts. */
-  locations: z.array(z.string().min(1).max(40)).default([]),
-  /** Default DR against most damage types (B378). */
-  dr: z.number().int().min(0).max(1000).default(0),
-  /** Crushing-specific DR override — legacy field preserved for backward compat. */
-  drCrushing: z.number().int().min(0).max(1000).nullable().optional(),
-  /** Per-damage-type DR overrides (cut/imp/pi/burn/corr/fat/tox). */
-  typedDr: typedArmorDr.default({}),
-  flexible: z.boolean().default(false),
-  frontOnly: z.boolean().default(false),
-  backOnly: z.boolean().default(false),
-  /**
-   * Defense Bonus from Deflect enchantments (B287). Non-null marks the
-   * armor as granting DB; when equipped, armor DB stacks with shield DB
-   * and adds to Dodge, every Parry, and Block.
-   */
-  db: z.number().int().min(0).max(4).nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
-});
+export const armorData = z
+  .object({
+    /** Hit-location strings; well-known values are in shared/constants/hitLocations.ts. */
+    locations: z.array(z.string().min(1).max(40)).default([]),
+    /** Default DR against most damage types (B378). */
+    dr: z.number().int().min(0).max(1000).default(0),
+    /** Crushing-specific DR override — legacy field preserved for backward compat. */
+    drCrushing: z.number().int().min(0).max(1000).nullable().optional(),
+    /** Per-damage-type DR overrides (cut/imp/pi/burn/corr/fat/tox). */
+    typedDr: typedArmorDr.default({}),
+    flexible: z.boolean().default(false),
+    frontOnly: z.boolean().default(false),
+    backOnly: z.boolean().default(false),
+    /**
+     * Defense Bonus from Deflect enchantments (B287). Non-null marks the
+     * armor as granting DB. The highest equipped DB covering the defended
+     * location/facing stacks with shield DB and adds to Dodge, every Parry,
+     * and Block; overlapping armor DB does not add together.
+     */
+    db: z.number().int().min(0).max(4).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .strict();
 
 /**
  * Ranged stat block (GURPS 4e weapon table columns, B268-271).
@@ -48,14 +53,16 @@ export const armorData = z.object({
  * preset, B364), free text where book notation is irregular
  * (`range` "100/150" or "x10/x15", `rof` "3~", `shots` "9+1(3)").
  */
-export const rangedData = z.object({
-  acc: z.number().int().min(0).max(20).nullable().optional(),
-  range: z.string().max(40).nullable().optional(),
-  rof: z.string().max(20).nullable().optional(),
-  shots: z.string().max(20).nullable().optional(),
-  bulk: z.number().int().min(-12).max(0).nullable().optional(),
-  recoil: z.number().int().min(1).max(9).nullable().optional(),
-});
+export const rangedData = z
+  .object({
+    acc: z.number().int().min(0).max(20).nullable().optional(),
+    range: z.string().max(40).nullable().optional(),
+    rof: z.string().max(20).nullable().optional(),
+    shots: z.string().max(20).nullable().optional(),
+    bulk: z.number().int().min(-12).max(0).nullable().optional(),
+    recoil: z.number().int().min(1).max(9).nullable().optional(),
+  })
+  .strict();
 
 /**
  * One alternate attack mode on a weapon (Basic Set p. 271 weapon tables
@@ -69,46 +76,50 @@ export const rangedData = z.object({
  * the primary parry -- you parry with the weapon, not with one of its
  * damage lines.
  */
-export const weaponMode = z.object({
-  /** "Swing", "Thrust", "Thrown", ... */
-  name: z.string().min(1).max(40).trim(),
-  damage: z.string().max(160).optional(),
-  reach: z.string().max(40).nullable().optional(),
-  parry: z.string().max(40).nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
-});
+export const weaponMode = z
+  .object({
+    /** "Swing", "Thrust", "Thrown", ... */
+    name: z.string().min(1).max(40).trim(),
+    damage: z.string().max(160).optional(),
+    reach: z.string().max(40).nullable().optional(),
+    parry: z.string().max(40).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .strict();
 
-export const weaponData = z.object({
-  damage: z.string().max(160).optional(),
-  reach: z.string().max(40).nullable().optional(),
-  parry: z.string().max(40).nullable().optional(),
-  stRequired: z.number().int().min(0).max(99).nullable().optional(),
-  /**
-   * Governing skill, matched by exact case-insensitive name against the
-   * character's skills. A name string (not a skillId) because this same
-   * object lives on campaign_library_items rows shared across
-   * characters. Unset => combat falls back to fuzzy name matching on
-   * the weapon's name (matchSkillForWeapon).
-   */
-  skill: z.string().max(160).trim().nullable().optional(),
-  /**
-   * Shield Defense Bonus (B287). Non-null marks the item as a shield:
-   * when equipped, DB adds to Dodge/Parry/Block and enables the Block
-   * row (a DB 0 shield still blocks, so presence — not magnitude — is
-   * the marker).
-   */
-  db: z.number().int().min(0).max(4).nullable().optional(),
-  /** Ranged stat block; null/absent = melee-only. Melee fields coexist
-   *  (a thrown knife has reach AND ranged). Damage is shared via the
-   *  top-level `damage` field. */
-  ranged: rangedData.nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
-  /**
-   * Extra attack modes beyond the primary one (swing/thrust/thrown).
-   * Defaults to `[]`, so every pre-existing weapon row parses unchanged.
-   */
-  alternateModes: z.array(weaponMode).max(10).default([]),
-});
+export const weaponData = z
+  .object({
+    damage: z.string().max(160).optional(),
+    reach: z.string().max(40).nullable().optional(),
+    parry: z.string().max(40).nullable().optional(),
+    stRequired: z.number().int().min(0).max(99).nullable().optional(),
+    /**
+     * Governing skill, matched by exact case-insensitive name against the
+     * character's skills. A name string (not a skillId) because this same
+     * object lives on campaign_library_items rows shared across
+     * characters. Unset => combat falls back to fuzzy name matching on
+     * the weapon's name (matchSkillForWeapon).
+     */
+    skill: z.string().max(160).trim().nullable().optional(),
+    /**
+     * Shield Defense Bonus (B287). Non-null marks the item as a shield:
+     * when equipped, DB adds to Dodge/Parry/Block and enables the Block
+     * row (a DB 0 shield still blocks, so presence — not magnitude — is
+     * the marker).
+     */
+    db: z.number().int().min(0).max(4).nullable().optional(),
+    /** Ranged stat block; null/absent = melee-only. Melee fields coexist
+     *  (a thrown knife has reach AND ranged). Damage is shared via the
+     *  top-level `damage` field. */
+    ranged: rangedData.nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+    /**
+     * Extra attack modes beyond the primary one (swing/thrust/thrown).
+     * Defaults to `[]`, so every pre-existing weapon row parses unchanged.
+     */
+    alternateModes: z.array(weaponMode).max(10).default([]),
+  })
+  .strict();
 
 /**
  * Powerstone metadata -- attached to an inventory item that stores
@@ -129,6 +140,7 @@ export const powerstoneData = z
     currentEnergy: z.number().int().min(0).max(100),
     notes: z.string().max(2000).nullable().optional(),
   })
+  .strict()
   .refine((d) => d.currentEnergy <= d.maxEnergy, {
     message: 'currentEnergy must not exceed maxEnergy',
     path: ['currentEnergy'],
@@ -154,16 +166,18 @@ export const magicItemMode = z.enum(['charged', 'powered', 'continuous']);
  * single *castable* spell). Non-mechanical metadata: nothing consumes
  * it in combat math yet; it records what the enchantments are.
  */
-export const enchantmentRef = z.object({
-  /** The enchantment's spell name, e.g. "Fortify". */
-  spellName: z.string().min(1).max(160),
-  /** Enchanter's skill when the item was made (GURPS item spells are
-   * cast at a fixed level); null = unknown/unrecorded. */
-  spellLevel: z.number().int().min(0).max(40).nullable().optional(),
-  /** Free-text category label, e.g. "Fortify +3" or "Deflect +2". */
-  category: z.string().max(80).nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
-});
+export const enchantmentRef = z
+  .object({
+    /** The enchantment's spell name, e.g. "Fortify". */
+    spellName: z.string().min(1).max(160),
+    /** Enchanter's skill when the item was made (GURPS item spells are
+     * cast at a fixed level); null = unknown/unrecorded. */
+    spellLevel: z.number().int().min(0).max(40).nullable().optional(),
+    /** Free-text category label, e.g. "Fortify +3" or "Deflect +2". */
+    category: z.string().max(80).nullable().optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .strict();
 
 export const magicItemData = z
   .object({
@@ -175,6 +189,7 @@ export const magicItemData = z
     energyCost: z.number().int().min(0).max(99).nullable().optional(),
     notes: z.string().max(2000).nullable().optional(),
   })
+  .strict()
   .refine(
     // chargesCurrent must not exceed chargesMax when both are present.
     // Either field may legitimately be absent on `powered` / `continuous`

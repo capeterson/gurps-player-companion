@@ -60,6 +60,71 @@ const STALE_CAMPAIGN_ID = '0193b3c0-f1f0-7000-8000-00000000dc01';
 const SPECULATIVE_CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000d003';
 
 describe('accessible-set prune', () => {
+  it('resets every cursor once when access expands so old rows are backfilled', async () => {
+    const db = getLocalDb();
+    await db.syncCursors.bulkPut([
+      { entityClass: 'character', revision: 500 },
+      { entityClass: 'character_trait', revision: 500 },
+      { entityClass: 'campaign', revision: 500 },
+    ]);
+    await db.syncMeta.put({
+      key: 'accessible:user-1',
+      value: { characterIds: [], campaignIds: [], observedAt: '2026-01-01T00:00:00.000Z' },
+    });
+    loginAs('user-1');
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        cursorResponse([], {
+          characterIds: [STALE_CHAR_ID],
+          campaignIds: [STALE_CAMPAIGN_ID],
+        }),
+      )
+      .mockResolvedValueOnce(
+        cursorResponse(
+          [
+            {
+              entityClass: 'character',
+              entityId: STALE_CHAR_ID,
+              command: 'patch',
+              revision: 12,
+              data: {
+                id: STALE_CHAR_ID,
+                ownerId: 'user-2',
+                campaignId: STALE_CAMPAIGN_ID,
+                name: 'Newly shared old character',
+                revision: 12,
+              },
+            },
+          ],
+          { characterIds: [STALE_CHAR_ID], campaignIds: [STALE_CAMPAIGN_ID] },
+        ),
+      )
+      .mockResolvedValue(
+        cursorResponse([], {
+          characterIds: [STALE_CHAR_ID],
+          campaignIds: [STALE_CAMPAIGN_ID],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser('user-1');
+    await orchestrator.triggerCursorPull();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string) as {
+      cursors: { sinceRevision: number }[];
+    };
+    expect(secondBody.cursors.every((cursor) => cursor.sinceRevision === 0)).toBe(true);
+    expect(await db.characters.get(STALE_CHAR_ID)).toMatchObject({
+      name: 'Newly shared old character',
+    });
+
+    await orchestrator.triggerCursorPull();
+    expect(fetchMock).toHaveBeenCalledTimes(3); // unchanged access does not loop/reset again
+  });
+
   it('refreshes the changed campaign library after HTTP commit even without a WS frame', async () => {
     const client = new QueryClient();
     const otherTab = new QueryClient();

@@ -27,11 +27,13 @@ export const skillDefault = z.discriminatedUnion('kind', [
 export const skillDefaults = z.array(skillDefault).max(20).nullable();
 export type SkillDefaults = z.infer<typeof skillDefaults>;
 
-export const situationalModifier = z.object({
-  name: z.string().min(1).max(160),
-  modifier: z.number().int().min(-50).max(50),
-  description: z.string().max(2000).optional(),
-});
+export const situationalModifier = z
+  .object({
+    name: z.string().min(1).max(160),
+    modifier: z.number().int().min(-50).max(50),
+    description: z.string().max(2000).optional(),
+  })
+  .strict();
 
 export const skillOut = z.object({
   id: uuid,

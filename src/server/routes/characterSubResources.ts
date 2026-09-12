@@ -1056,18 +1056,19 @@ router.openapi(
     const { id, itemId } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
-    const [doomed] = await db
-      .select()
-      .from(inventoryItems)
-      .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)));
-    if (!doomed) throw new HTTPException(404, { message: 'item not found' });
     // Reparent children up one level so we don't strand them.  Always
     // scope to this character's items: even though create/patch validate
     // `parentId`, defence in depth means a stray cross-character link
     // (e.g. from an older record) can't pull a sibling character's row
     // along on delete.
     await withAudit(user.id, undefined, async (tx) => {
+      await lockLibraryReferenceScope(tx, id, user.id);
+      const [doomed] = await tx
+        .select()
+        .from(inventoryItems)
+        .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)))
+        .for('update');
+      if (!doomed) throw new HTTPException(404, { message: 'item not found' });
       await tx
         .update(inventoryItems)
         .set({ parentId: doomed.parentId, updatedAt: new Date() })

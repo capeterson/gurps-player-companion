@@ -302,7 +302,14 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
     if (existingRow) {
       await tx
         .update(asTable(cfg.table))
-        .set({ ...cfg.toUpdateValues(entry), updatedAt: new Date() })
+        // Natural keys match case-insensitively, but the incoming spelling is
+        // the canonical display spelling. Preserve the row id and live links
+        // while allowing "broadsword" -> "Broadsword" for every kind.
+        .set({
+          ...cfg.toUpdateValues(entry),
+          name: (entry as { name: string }).name,
+          updatedAt: new Date(),
+        })
         .where(eq(cfg.table.id, existingRow.id));
       await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, String(existingRow.id));
       updated++;

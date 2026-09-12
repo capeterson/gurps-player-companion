@@ -13,7 +13,9 @@ import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrat
 import {
   MAX_ATTEMPTS,
   backoffMs,
+  claimDrainableOps,
   enqueueCreate,
+  enqueueDeletes,
   enqueueFieldPatch,
   enqueueFieldPatches,
   readDrainableOps,
@@ -69,6 +71,64 @@ async function seedCharacter() {
 }
 
 describe('enqueueFieldPatch', () => {
+  it('rolls back an entire multi-field gesture when durable queueing fails', async () => {
+    await seedCharacter();
+    const db = getLocalDb();
+    const add = db.outbox.add.bind(db.outbox);
+    vi.spyOn(db.outbox, 'add')
+      .mockImplementationOnce(add)
+      .mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(
+      enqueueFieldPatches([
+        {
+          entityClass: 'character',
+          entityId: CHAR_ID,
+          fieldPath: 'st',
+          attemptedValue: 12,
+        },
+        {
+          entityClass: 'character',
+          entityId: CHAR_ID,
+          fieldPath: 'dx',
+          attemptedValue: 13,
+        },
+      ]),
+    ).rejects.toThrow('storage unavailable');
+
+    expect(await db.characters.get(CHAR_ID)).toMatchObject({ st: 10, dx: 10 });
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('rolls back every local delete in a failed bulk-delete gesture', async () => {
+    const db = getLocalDb();
+    const firstId = '0193b3c0-f1f0-7000-8000-00000000d101';
+    const secondId = '0193b3c0-f1f0-7000-8000-00000000d102';
+    const rows = [
+      { id: firstId, characterId: CHAR_ID, name: 'One', revision: 1 },
+      { id: secondId, characterId: CHAR_ID, name: 'Two', revision: 1 },
+    ] as never[];
+    await db.characterInventory.bulkPut(rows);
+    const add = db.outbox.add.bind(db.outbox);
+    vi.spyOn(db.outbox, 'add')
+      .mockImplementationOnce(add)
+      .mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(
+      enqueueDeletes(
+        rows.map((row) => ({
+          entityClass: 'character_inventory',
+          entityId: (row as { id: string }).id,
+          characterId: CHAR_ID,
+          prevValue: row,
+        })),
+      ),
+    ).rejects.toThrow('storage unavailable');
+
+    expect(await db.characterInventory.bulkGet([firstId, secondId])).toEqual(rows);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
   it('rejects mismatched local create declarations atomically', async () => {
     await seedCharacter();
     const entityId = '0193b3c0-f1f0-7000-8000-00000000d003';
@@ -1017,6 +1077,65 @@ describe('readDrainableOps', () => {
     );
     const ready = await readDrainableOps(50);
     expect(ready.map((o) => o.command)).toEqual(['create', 'patch']);
+  });
+
+  it('holds inventory children and reparent patches until their container create settles', async () => {
+    const db = getLocalDb();
+    const containerId = '0193b3c0-f1f0-7000-8000-00000000e101';
+    const childId = '0193b3c0-f1f0-7000-8000-00000000e102';
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'container-create',
+        entityClass: 'character_inventory',
+        entityId: containerId,
+        command: 'create',
+        coalesceKey: `${containerId}|:create`,
+        fieldPath: undefined,
+        parentId: CHAR_ID,
+        attemptedValue: { name: 'Bag', isContainer: true, parentId: null },
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      opRow({
+        clientOpId: 'child-create',
+        entityClass: 'character_inventory',
+        entityId: childId,
+        command: 'create',
+        coalesceKey: `${childId}|:create`,
+        fieldPath: undefined,
+        parentId: CHAR_ID,
+        attemptedValue: { name: 'Rations', parentId: containerId },
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+      opRow({
+        clientOpId: 'reparent',
+        entityClass: 'character_inventory',
+        entityId: '0193b3c0-f1f0-7000-8000-00000000e103',
+        coalesceKey: '0193b3c0-f1f0-7000-8000-00000000e103|parentId',
+        fieldPath: 'parentId',
+        parentId: CHAR_ID,
+        attemptedValue: containerId,
+        enqueuedAt: '2026-01-01T00:00:02.000Z',
+      }),
+    ]);
+
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual(['container-create']);
+    await db.outbox.delete('container-create');
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      'child-create',
+      'reparent',
+    ]);
+  });
+});
+
+describe('claimDrainableOps', () => {
+  it('atomically gives a pending operation to only one concurrent drain', async () => {
+    const db = getLocalDb();
+    await db.outbox.put(opRow({ clientOpId: 'claim-once' }));
+
+    const claims = await Promise.all([claimDrainableOps(50), claimDrainableOps(50)]);
+    expect(claims.flat().map((op) => op.clientOpId)).toEqual(['claim-once']);
+    expect((await db.outbox.get('claim-once'))?.status).toBe('in_flight');
+    expect((await db.outbox.get('claim-once'))?.attemptCount).toBe(1);
   });
 });
 

@@ -44,6 +44,7 @@ import {
 } from '../db/schema.ts';
 import { getResend, sendCampaignInviteEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { advanceCampaignProjectionRevision } from '../services/libraryInvalidation.ts';
 
 const router = createOpenApiApp();
 router.use('/campaigns/*', requireActiveUser);
@@ -464,6 +465,7 @@ router.openapi(
           role: invitation.role,
         });
       }
+      await advanceCampaignProjectionRevision(tx, invitation.campaignId);
       return true;
     });
     if (!flipped) {

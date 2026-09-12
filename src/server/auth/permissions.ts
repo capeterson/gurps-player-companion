@@ -7,6 +7,7 @@
 
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import type { AuditTx } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
   type DbCampaign,
@@ -30,8 +31,8 @@ interface CampaignRoleLookup {
 async function lookupCampaignRole(
   campaignId: string,
   userId: string,
+  db: ReturnType<typeof getDb> | AuditTx = getDb(),
 ): Promise<CampaignRoleLookup | null> {
-  const db = getDb();
   const rows = await db
     .select({ campaign: campaigns, membership: campaignMemberships })
     .from(campaigns)
@@ -50,11 +51,12 @@ async function lookupCampaignRole(
 export async function loadCampaignOr403(
   campaignId: string,
   userId: string,
+  db?: ReturnType<typeof getDb> | AuditTx,
 ): Promise<{
   campaign: DbCampaign;
   role: CampaignRole;
 }> {
-  const result = await lookupCampaignRole(campaignId, userId);
+  const result = await lookupCampaignRole(campaignId, userId, db);
   if (!result) throw new HTTPException(404, { message: 'campaign not found' });
   if (result.role === null) throw new HTTPException(403, { message: 'forbidden' });
   return { campaign: result.campaign, role: result.role };
@@ -113,8 +115,9 @@ export async function requireCampaignAdmin(
 export async function requireCampaignMember(
   campaignId: string,
   userId: string,
+  db?: ReturnType<typeof getDb> | AuditTx,
 ): Promise<{ campaign: DbCampaign; role: CampaignRole }> {
-  return loadCampaignOr403(campaignId, userId);
+  return loadCampaignOr403(campaignId, userId, db);
 }
 
 export interface CharacterAccess {

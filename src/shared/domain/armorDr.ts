@@ -25,6 +25,8 @@ import type { ResolvedEffectOut } from '../schemas/character.ts';
 import type { ArmorData } from '../schemas/inventory.ts';
 
 export interface ArmorItemRow {
+  readonly id?: string;
+  readonly name?: string;
   readonly equipped: boolean;
   readonly isArmor: boolean;
   readonly armor: ArmorData | null;
@@ -178,19 +180,52 @@ export function effectiveDrByLocation(
   return map;
 }
 
+export type ArmorFacing = 'front' | 'back';
+
+export interface ArmorDbResolution {
+  readonly db: number;
+  readonly itemId: string;
+  readonly itemName: string;
+}
+
 /**
- * Sum armor Defense Bonus from all equipped armor pieces (B287).
- * Unlike shields (which use pickShield to select one), multiple armor
- * pieces can each contribute DB from Deflect enchantments.
+ * Resolve the one armor Defense Bonus that applies to an incoming hit.
+ * Armor DB does not stack: filter by equipment, location, and known facing,
+ * then choose the maximum. Empty `locations` means no coverage, matching
+ * `aggregateDrByLocation`. Equal values use stable id/name ordering so the
+ * displayed source never flickers or gets counted twice.
  */
-export function sumArmorDb(items: readonly ArmorItemRow[]): number {
-  let total = 0;
-  for (const item of items) {
-    if (!item.equipped || !item.isArmor || item.armor == null) continue;
-    const db = item.armor.db;
-    if (db != null) total += db;
-  }
-  return total;
+export function resolveArmorDb(
+  items: readonly ArmorItemRow[],
+  hitLocation: string,
+  facing?: ArmorFacing,
+): ArmorDbResolution | null {
+  const candidates = items.flatMap((item, index) => {
+    const armor = item.armor;
+    if (
+      !item.equipped ||
+      !item.isArmor ||
+      armor == null ||
+      !armorCoversLocation(armor, hitLocation)
+    )
+      return [];
+    if (facing === 'front' && armor.backOnly) return [];
+    if (facing === 'back' && armor.frontOnly) return [];
+    const db = armor.db ?? 0;
+    if (db <= 0) return [];
+    return [
+      {
+        db,
+        itemId: item.id ?? `armor-${index}`,
+        itemName: item.name ?? 'Armor',
+      },
+    ];
+  });
+  candidates.sort(
+    (a, b) =>
+      b.db - a.db || a.itemId.localeCompare(b.itemId) || a.itemName.localeCompare(b.itemName),
+  );
+  return candidates[0] ?? null;
 }
 
 /** Canonical GURPS damage type keys for typed DR lookup. */

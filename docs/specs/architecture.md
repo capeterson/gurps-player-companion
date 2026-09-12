@@ -39,10 +39,10 @@ Hono API on the same port — see `dev-entry.ts` and `vite.config.ts`.
 | Validation | Zod — shared across server, client, and service worker |
 | Database | PostgreSQL 18 + Drizzle ORM |
 | Client | React 19, React Router 7, TanStack Query 5 |
-| Local store | Dexie 6 (IndexedDB) |
+| Local store | Dexie 4 package (IndexedDB), application schema version 10 |
 | PWA | vite-plugin-pwa + Workbox |
 | Styling | Tailwind 4 + DaisyUI 5 ("Arcane" theme) |
-| Auth | JWT (`jose`) + refresh tokens; WebAuthn passkeys; API keys |
+| Auth | JWT (`jose`) + refresh tokens; WebAuthn passkeys verified by `@simplewebauthn/server`; API keys |
 | Email | Resend |
 | Tests | `bun:test` (server/shared), Vitest (client), Playwright (e2e) |
 | Lint/format | Biome |
@@ -200,8 +200,11 @@ Tables (grouped):
 Key PG18 / trigger machinery, layered by migration:
 
 - `bump_revision()` BEFORE-UPDATE trigger + a **shared `revisions_seq`**
-  (migrations `0002`/`0004`) — gives every syncable row a globally-ordered
-  `revision` so the cursor pull paginates cleanly across classes.
+  (migrations `0002`/`0004`) — gives every syncable row a global revision.
+  Migration `0040` routes live-row defaults, updates, tombstones, and history
+  through `next_sync_revision()`, which takes one transaction-scoped advisory
+  lock before allocating. Transactions therefore become visible in revision
+  order and a cursor cannot advance past an older uncommitted write.
 - `record_*_tombstone()` AFTER-DELETE triggers (`0003`/`0004`) — deletes leave
   tombstones so `/sync/cursor` can tell a client to drop a row it no longer has
   access to.
@@ -226,7 +229,8 @@ Key PG18 / trigger machinery, layered by migration:
   options: `staleTime: 30s`, no refetch-on-focus, one retry.
 - **Encounters** use query keys scoped by campaign/encounter. The existing WS
   subscriber dispatches `encounter_invalidate` frames to that query cache; the
-   frame contains no combat data. A Dexie v6 `soloEncounters` store, keyed by
+   frame contains no combat data. The `soloEncounters` store (introduced in
+   application schema version 6, currently schema version 10), keyed by
    `characterId`, is explicitly device-only and is included in the logout purge.
 - **Draft inputs**: `useDraftField.ts` is the canonical draft-on-blur hook (do
   not fork it). It queues same-field edits, per-field syncs from the server only

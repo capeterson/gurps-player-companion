@@ -12,7 +12,11 @@
 
 import { type FormEvent, useMemo, useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
-import { effectiveDrByLocation } from '../../../../../shared/domain/armorDr.ts';
+import {
+  type ArmorFacing,
+  effectiveDrByLocation,
+  resolveArmorDb,
+} from '../../../../../shared/domain/armorDr.ts';
 import { applyDamage, parseArmorDivisor } from '../../../../../shared/domain/injuryCalc.ts';
 import { useDialogState } from '../../../../hooks/useDialogState.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
@@ -45,6 +49,7 @@ export function IncomingDamageDialog({
   const [basicRaw, setBasicRaw] = useState('');
   const [type, setType] = useState(initialType);
   const [location, setLocation] = useState(initialLocation);
+  const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
   const [divisorRaw, setDivisorRaw] = useState(initialDivisor);
   const [customDivisor, setCustomDivisor] = useState(
     !ARMOR_DIVISORS.some(([value]) => value === initialDivisor),
@@ -79,6 +84,7 @@ export function IncomingDamageDialog({
     hpMax,
     protectNaturalDr,
   );
+  const armorDb = resolveArmorDb(character.inventory, location, facing);
   const cripplingHint = result.destroyed
     ? `Pre-cap injury is at least twice the crippling threshold: the body part is destroyed${type.trim().toLowerCase() === 'cut' ? ' (severed by cutting damage)' : ''}. Apply the condition manually (B421).`
     : result.crippled
@@ -152,6 +158,23 @@ export function IncomingDamageDialog({
               </select>
             </label>
           </div>
+          <label className="flex flex-col gap-1">
+            <span className="label-eyebrow">Incoming facing</span>
+            <select
+              aria-label="Incoming facing"
+              value={facing ?? ''}
+              onChange={(event) =>
+                setFacing(
+                  event.target.value === '' ? undefined : (event.target.value as ArmorFacing),
+                )
+              }
+              className="select select-sm select-bordered"
+            >
+              <option value="">Unknown</option>
+              <option value="front">Front</option>
+              <option value="back">Back</option>
+            </select>
+          </label>
 
           {!DAMAGE_TYPES.some(([value]) => value === type) && (
             <label className="flex flex-col gap-1">
@@ -236,6 +259,11 @@ export function IncomingDamageDialog({
 
           <p className="num rounded-lg border border-base-300/60 bg-base-200/40 px-3 py-2 text-xs text-base-content/80">
             {breakdown}
+          </p>
+          <p className="rounded-lg border border-base-300/60 px-3 py-2 text-xs text-base-content/80">
+            {armorDb
+              ? `Armor DB ${armorDb.db} (${armorDb.itemName}) applies to defense only; it is not DR and does not reduce damage.`
+              : 'Armor DB: none at this location. DB does not reduce damage.'}
           </p>
           {effectsKnown && cripplingHint && (
             <p className="text-[11px] text-warning">{cripplingHint}</p>
