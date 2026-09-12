@@ -20,8 +20,9 @@ Everything else is either read-only in the local store or fully online:
 
 - **Campaigns** are pulled **READ-ONLY** through `/sync/cursor` (rows land in
   Dexie so the minimal-view sweep can evaluate `shareCharacterSheets` and
-  `useCharacterDetail` can resolve campaign names offline) but have **no outbox
-  path** — campaign *mutations* go through REST.
+  character inputs can resolve campaign names and the default-on
+  `enforceAttributeCaps` rule offline) but have **no outbox path** — campaign
+  *mutations* go through REST.
 - **Online-only** (HTTP + React Query, no offline support): the campaign
   library, adventure log, invitations, notifications, settings, admin.
 

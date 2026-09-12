@@ -15,6 +15,7 @@
 
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq, gt, inArray, or } from 'drizzle-orm';
+import { campaignHouseRules } from '../../shared/schemas/campaign.ts';
 import {
   type EntityClass,
   type OperationEnvelope,
@@ -642,6 +643,7 @@ async function fetchClassUpserts(args: {
       return rows.map(({ campaign, viewerRole }) =>
         upsertChange('campaign', campaign.id, Number(campaign.revision), {
           ...campaign,
+          houseRules: campaignHouseRules.parse(campaign.houseRules),
           viewerRole: campaign.ownerId === userId ? 'owner' : viewerRole,
         }),
       );

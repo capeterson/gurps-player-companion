@@ -1597,6 +1597,9 @@
                         "minimum": 0,
                         "maximum": 12
                       },
+                      "enforceAttributeCaps": {
+                        "type": "boolean"
+                      },
                       "shareCharacterSheets": {
                         "type": "boolean"
                       },
@@ -1606,9 +1609,98 @@
                       "houseRules": {
                         "type": "object",
                         "properties": {
+                          "ruleSet": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "j_talisar",
+                              "custom"
+                            ],
+                            "default": "custom"
+                          },
                           "protectNaturalDr": {
                             "type": "boolean",
                             "default": true
+                          },
+                          "enchantedItemPricing": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "eyeMissHitsFace": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "requireMagicAdvancementRites": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "mediumMaterialSpiritLimits": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "shieldDamageOnDbBlock": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "braverySpellRewrite": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "highestDeflectOnly": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "highestFortifyOnly": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "forbidDistantBlow": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "forbidAcidMagic": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "requireSpellIngredients": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "hideThoughtsInterpretation": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "sunboltBurningDamage": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "pathAdeptLocksSubject": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "curseRitualExpandedTargets": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "dispelRitualCrossTradition": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "mysticSymbolsAsAdvantages": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "pathCharmsSingleUse": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "shieldReadyTimeByDb": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "allowJtSupplementalPerks": {
+                            "type": "boolean",
+                            "default": false
                           }
                         },
                         "default": {},
@@ -1670,6 +1762,7 @@
                       "disadvantageCap",
                       "quirkCap",
                       "techLevel",
+                      "enforceAttributeCaps",
                       "shareCharacterSheets",
                       "allowGmCharacterEditing",
                       "members",
@@ -1719,9 +1812,98 @@
                   "houseRules": {
                     "type": "object",
                     "properties": {
+                      "ruleSet": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "j_talisar",
+                          "custom"
+                        ],
+                        "default": "custom"
+                      },
                       "protectNaturalDr": {
                         "type": "boolean",
                         "default": true
+                      },
+                      "enchantedItemPricing": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "eyeMissHitsFace": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "requireMagicAdvancementRites": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "mediumMaterialSpiritLimits": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "shieldDamageOnDbBlock": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "braverySpellRewrite": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "highestDeflectOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "highestFortifyOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "forbidDistantBlow": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "forbidAcidMagic": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "requireSpellIngredients": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "hideThoughtsInterpretation": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "sunboltBurningDamage": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "pathAdeptLocksSubject": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "curseRitualExpandedTargets": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "dispelRitualCrossTradition": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "mysticSymbolsAsAdvantages": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "pathCharmsSingleUse": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "shieldReadyTimeByDb": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "allowJtSupplementalPerks": {
+                        "type": "boolean",
+                        "default": false
                       }
                     },
                     "additionalProperties": false
@@ -1764,6 +1946,9 @@
                     "nullable": true,
                     "minimum": 0,
                     "maximum": 12
+                  },
+                  "enforceAttributeCaps": {
+                    "type": "boolean"
                   },
                   "shareCharacterSheets": {
                     "type": "boolean"
@@ -1834,6 +2019,9 @@
                       "minimum": 0,
                       "maximum": 12
                     },
+                    "enforceAttributeCaps": {
+                      "type": "boolean"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -1843,9 +2031,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -1907,6 +2184,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "techLevel",
+                    "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -2018,6 +2296,9 @@
                       "minimum": 0,
                       "maximum": 12
                     },
+                    "enforceAttributeCaps": {
+                      "type": "boolean"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2027,9 +2308,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -2091,6 +2461,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "techLevel",
+                    "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -2160,9 +2531,98 @@
                   "houseRules": {
                     "type": "object",
                     "properties": {
+                      "ruleSet": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "j_talisar",
+                          "custom"
+                        ],
+                        "default": "custom"
+                      },
                       "protectNaturalDr": {
                         "type": "boolean",
                         "default": true
+                      },
+                      "enchantedItemPricing": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "eyeMissHitsFace": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "requireMagicAdvancementRites": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "mediumMaterialSpiritLimits": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "shieldDamageOnDbBlock": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "braverySpellRewrite": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "highestDeflectOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "highestFortifyOnly": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "forbidDistantBlow": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "forbidAcidMagic": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "requireSpellIngredients": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "hideThoughtsInterpretation": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "sunboltBurningDamage": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "pathAdeptLocksSubject": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "curseRitualExpandedTargets": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "dispelRitualCrossTradition": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "mysticSymbolsAsAdvantages": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "pathCharmsSingleUse": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "shieldReadyTimeByDb": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "allowJtSupplementalPerks": {
+                        "type": "boolean",
+                        "default": false
                       }
                     },
                     "additionalProperties": false
@@ -2205,6 +2665,9 @@
                     "nullable": true,
                     "minimum": 0,
                     "maximum": 12
+                  },
+                  "enforceAttributeCaps": {
+                    "type": "boolean"
                   },
                   "shareCharacterSheets": {
                     "type": "boolean"
@@ -2272,6 +2735,9 @@
                       "minimum": 0,
                       "maximum": 12
                     },
+                    "enforceAttributeCaps": {
+                      "type": "boolean"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2281,9 +2747,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -2345,6 +2900,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "techLevel",
+                    "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -2523,6 +3079,9 @@
                       "minimum": 0,
                       "maximum": 12
                     },
+                    "enforceAttributeCaps": {
+                      "type": "boolean"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2532,9 +3091,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -2596,6 +3244,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "techLevel",
+                    "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -2748,6 +3397,9 @@
                       "minimum": 0,
                       "maximum": 12
                     },
+                    "enforceAttributeCaps": {
+                      "type": "boolean"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -2757,9 +3409,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -2821,6 +3562,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "techLevel",
+                    "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -3027,6 +3769,9 @@
                       "minimum": 0,
                       "maximum": 12
                     },
+                    "enforceAttributeCaps": {
+                      "type": "boolean"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -3036,9 +3781,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -3100,6 +3934,7 @@
                     "disadvantageCap",
                     "quirkCap",
                     "techLevel",
+                    "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "members",
@@ -4983,6 +5818,9 @@
                             "type": "integer",
                             "minimum": 0
                           },
+                          "enforceAttributeCaps": {
+                            "type": "boolean"
+                          },
                           "shareCharacterSheets": {
                             "type": "boolean"
                           },
@@ -5000,6 +5838,7 @@
                           "ownerEmail",
                           "memberCount",
                           "characterCount",
+                          "enforceAttributeCaps",
                           "shareCharacterSheets",
                           "createdAt"
                         ]
@@ -5096,6 +5935,9 @@
                       "type": "integer",
                       "nullable": true
                     },
+                    "enforceAttributeCaps": {
+                      "type": "boolean"
+                    },
                     "shareCharacterSheets": {
                       "type": "boolean"
                     },
@@ -5182,6 +6024,7 @@
                     "pointTarget",
                     "disadvantageCap",
                     "quirkCap",
+                    "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "createdAt",
                     "members",
@@ -17744,9 +18587,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -19685,9 +20617,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -21884,9 +22905,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -23347,6 +24457,16 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Attribute cap violation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       },
@@ -23894,9 +25014,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -26175,9 +27384,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -28477,9 +29775,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -30440,9 +31827,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -32805,9 +34281,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -35190,9 +36755,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -37153,9 +38807,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -39282,9 +41025,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -41433,9 +43265,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -43396,9 +45317,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -45470,9 +47480,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -47566,9 +49665,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -49529,9 +51717,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -51622,9 +53899,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -53736,9 +56102,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -55699,9 +58154,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -58545,9 +61089,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -61413,9 +64046,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -63376,9 +66098,98 @@
                     "houseRules": {
                       "type": "object",
                       "properties": {
+                        "ruleSet": {
+                          "type": "string",
+                          "enum": [
+                            "none",
+                            "j_talisar",
+                            "custom"
+                          ],
+                          "default": "custom"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "enchantedItemPricing": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "eyeMissHitsFace": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireMagicAdvancementRites": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mediumMaterialSpiritLimits": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldDamageOnDbBlock": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "braverySpellRewrite": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestDeflectOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "highestFortifyOnly": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidDistantBlow": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "forbidAcidMagic": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "requireSpellIngredients": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "hideThoughtsInterpretation": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "sunboltBurningDamage": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathAdeptLocksSubject": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "curseRitualExpandedTargets": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "dispelRitualCrossTradition": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "mysticSymbolsAsAdvantages": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "pathCharmsSingleUse": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "shieldReadyTimeByDb": {
+                          "type": "boolean",
+                          "default": false
+                        },
+                        "allowJtSupplementalPerks": {
+                          "type": "boolean",
+                          "default": false
                         }
                       },
                       "default": {},
@@ -65430,9 +68241,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -67396,9 +70296,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},
@@ -69360,9 +72349,98 @@
                         "houseRules": {
                           "type": "object",
                           "properties": {
+                            "ruleSet": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "j_talisar",
+                                "custom"
+                              ],
+                              "default": "custom"
+                            },
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "enchantedItemPricing": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "eyeMissHitsFace": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireMagicAdvancementRites": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mediumMaterialSpiritLimits": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldDamageOnDbBlock": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "braverySpellRewrite": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestDeflectOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "highestFortifyOnly": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidDistantBlow": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "forbidAcidMagic": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "requireSpellIngredients": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "hideThoughtsInterpretation": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "sunboltBurningDamage": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathAdeptLocksSubject": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "curseRitualExpandedTargets": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "dispelRitualCrossTradition": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "mysticSymbolsAsAdvantages": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "pathCharmsSingleUse": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "shieldReadyTimeByDb": {
+                              "type": "boolean",
+                              "default": false
+                            },
+                            "allowJtSupplementalPerks": {
+                              "type": "boolean",
+                              "default": false
                             }
                           },
                           "default": {},

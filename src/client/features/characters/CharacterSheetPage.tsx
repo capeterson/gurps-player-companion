@@ -2,6 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
+  maxIqWithMentalSecondaryCaps,
+  maxMentalSecondaryModifier,
+} from '../../../shared/domain/attributeCaps.ts';
+import {
   ATTR_INFLUENCE,
   SECONDARY_INFO,
   type SecondaryModKey,
@@ -204,6 +208,7 @@ function ModifierButton({
   permField,
   permValue,
   permCostLabel,
+  permMax,
   displayScale,
 }: {
   label: string;
@@ -223,6 +228,8 @@ function ModifierButton({
   permField?: AttrField;
   permValue?: number;
   permCostLabel?: string;
+  /** Optional campaign-rule maximum for the permanent modifier. */
+  permMax?: number | undefined;
   displayScale?: number | undefined;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
@@ -279,7 +286,7 @@ function ModifierButton({
                     void permSaver.onSave(v);
                   },
                   min: -50,
-                  max: 50,
+                  max: permMax ?? 50,
                 }
               : undefined
           }
@@ -352,6 +359,7 @@ function PrimaryAttrCell({
   tempEffects,
   effective,
   min,
+  max,
   characterId,
   canWrite,
 }: {
@@ -362,6 +370,7 @@ function PrimaryAttrCell({
   tempEffects: TempEffectsApi;
   effective: number;
   min: number;
+  max: number;
   characterId: string;
   canWrite: boolean;
 }) {
@@ -399,7 +408,7 @@ function PrimaryAttrCell({
                 characterId={characterId}
                 canWrite={canWrite}
                 min={min}
-                max={99}
+                max={max}
                 width="w-12 sm:w-9"
                 size="sm"
               />
@@ -414,7 +423,7 @@ function PrimaryAttrCell({
             characterId={characterId}
             canWrite={canWrite}
             min={min}
-            max={99}
+            max={max}
             width="w-14"
             size="lg"
           />
@@ -454,6 +463,7 @@ function SecondaryModCell({
   modScale,
   infoKey,
   characterId,
+  permMax,
   canWrite,
 }: {
   label: string;
@@ -468,6 +478,7 @@ function SecondaryModCell({
   modScale?: number;
   infoKey: SecondaryModKey;
   characterId: string;
+  permMax?: number | undefined;
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
@@ -526,6 +537,7 @@ function SecondaryModCell({
             permField={modField}
             permValue={modValue}
             permCostLabel={info.nextCostLabel}
+            permMax={permMax}
             displayScale={modScale}
           />
         )}
@@ -720,10 +732,12 @@ function AttributesPanel({
   character,
   canWrite,
   tempEffects,
+  enforceAttributeCaps,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
   tempEffects: TempEffectsApi;
+  enforceAttributeCaps: boolean;
 }) {
   const tempActive = canWrite && TEMP_STAT_AXES.some((axis) => tempEffects.totals[axis] !== 0);
   return (
@@ -737,6 +751,7 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveSt}
           min={1}
+          max={99}
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -748,6 +763,7 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveDx}
           min={1}
+          max={enforceAttributeCaps ? 20 : 99}
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -759,6 +775,11 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveIq}
           min={1}
+          max={
+            enforceAttributeCaps
+              ? maxIqWithMentalSecondaryCaps(character.willMod, character.perMod)
+              : 99
+          }
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -770,6 +791,7 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveHt}
           min={1}
+          max={enforceAttributeCaps ? 20 : 99}
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -791,10 +813,12 @@ function SecondaryModsPanel({
   character,
   canWrite,
   tempEffects,
+  enforceAttributeCaps,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
   tempEffects: TempEffectsApi;
+  enforceAttributeCaps: boolean;
 }) {
   return (
     <StatCard title="Secondary" points={character.points.secondary}>
@@ -819,6 +843,7 @@ function SecondaryModsPanel({
           derived={character.derived.will}
           infoKey="will"
           characterId={character.id}
+          permMax={enforceAttributeCaps ? maxMentalSecondaryModifier(character.iq) : undefined}
           canWrite={canWrite}
         />
         <SecondaryModCell
@@ -830,6 +855,7 @@ function SecondaryModsPanel({
           derived={character.derived.per}
           infoKey="per"
           characterId={character.id}
+          permMax={enforceAttributeCaps ? maxMentalSecondaryModifier(character.iq) : undefined}
           canWrite={canWrite}
         />
         <SecondaryModCell
@@ -1618,11 +1644,17 @@ export function CharacterSheetPage() {
           <WarningsPanel character={character} canWrite={canWrite} />
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <AttributesPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
+            <AttributesPanel
+              character={character}
+              canWrite={canWrite}
+              tempEffects={tempEffects}
+              enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+            />
             <SecondaryModsPanel
               character={character}
               canWrite={canWrite}
               tempEffects={tempEffects}
+              enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
             />
             <StatusPanel character={character} canWrite={canWrite} />
             <div className="grid grid-cols-1 gap-4">

@@ -375,6 +375,8 @@ export const libraryYamlDoc = z
         houseRules: campaignHouseRules.optional(),
         /** Campaign-wide tech level (Basic Set p. 513). */
         techLevel: z.number().int().min(0).max(12).nullable().optional(),
+        /** Purchased-attribute cap enforcement (Basic Set pp. B14-B16). */
+        enforceAttributeCaps: z.boolean().optional(),
       })
       .strict()
       .optional(),
@@ -441,6 +443,7 @@ export const libraryPortableFieldManifest = {
     manaLevel: true,
     houseRules: true,
     techLevel: true,
+    enforceAttributeCaps: true,
   } satisfies Record<keyof NonNullable<LibraryYamlDoc['campaign']>, true>,
   traits: {
     name: true,

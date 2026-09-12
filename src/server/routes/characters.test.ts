@@ -1131,6 +1131,40 @@ describe('POST /api/v1/characters', () => {
     expect(character.st).toBe(12);
   });
 
+  it('enforces the default campaign caps while leaving ST open-ended', async () => {
+    const { accessToken } = await registerUser('create-caps');
+    const campaign = await createCampaign(accessToken);
+    expect(campaign.enforceAttributeCaps).toBe(true);
+
+    const tooDexterous = await app.request('/api/v1/characters', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Too Dexterous', campaignId: campaign.id, dx: 21 }),
+    });
+    expect(tooDexterous.status).toBe(422);
+    expect(((await tooDexterous.json()) as { error: string }).error).toContain('DX');
+
+    const strong = await createCharacter(accessToken, {
+      name: 'Very Strong',
+      campaignId: campaign.id,
+      st: 30,
+    });
+    expect(strong.st).toBe(30);
+  });
+
+  it('allows over-cap attributes when the campaign rule is disabled', async () => {
+    const { accessToken } = await registerUser('create-caps-off');
+    const campaign = await createCampaign(accessToken, { enforceAttributeCaps: false });
+    const character = await createCharacter(accessToken, {
+      name: 'Super',
+      campaignId: campaign.id,
+      dx: 25,
+      iq: 22,
+      willMod: 4,
+    });
+    expect(character.derived).toMatchObject({ will: 26 });
+  });
+
   it('403s creating a character attached to a campaign the user does not belong to', async () => {
     const owner = await registerUser('create-owner');
     const outsider = await registerUser('create-outsider');
@@ -1150,6 +1184,44 @@ describe('POST /api/v1/characters', () => {
       body: JSON.stringify({ name: 'Nobody' }),
     });
     expect(res.status).toBe(401);
+  });
+});
+
+describe('PATCH /api/v1/characters/{id} -- campaign attribute caps', () => {
+  it('rejects Will above 20 and validates the combined value when IQ changes', async () => {
+    const { accessToken } = await registerUser('patch-caps');
+    const campaign = await createCampaign(accessToken);
+    const character = await createCharacter(accessToken, {
+      campaignId: campaign.id,
+      iq: 18,
+      willMod: 2,
+    });
+
+    const willRes = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ willMod: 3 }),
+    });
+    expect(willRes.status).toBe(422);
+
+    const iqRes = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ iq: 19 }),
+    });
+    expect(iqRes.status).toBe(422);
+  });
+
+  it('rejects moving an existing over-cap character into an enforcing campaign', async () => {
+    const { accessToken } = await registerUser('patch-campaign-caps');
+    const campaign = await createCampaign(accessToken);
+    const character = await createCharacter(accessToken, { dx: 25 });
+    const res = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ campaignId: campaign.id }),
+    });
+    expect(res.status).toBe(422);
   });
 });
 

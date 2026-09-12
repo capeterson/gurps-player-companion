@@ -423,6 +423,7 @@ router.openapi(
           ownerEmail: ownerEmail,
           memberCount: Number(memberCount[0]?.n ?? 0),
           characterCount: Number(charCount[0]?.n ?? 0),
+          enforceAttributeCaps: campaign.enforceAttributeCaps,
           shareCharacterSheets: campaign.shareCharacterSheets,
           createdAt: campaign.createdAt.toISOString(),
         };
@@ -479,6 +480,7 @@ router.openapi(
       pointTarget: campRow.pointTarget,
       disadvantageCap: campRow.disadvantageCap,
       quirkCap: campRow.quirkCap,
+      enforceAttributeCaps: campRow.enforceAttributeCaps,
       shareCharacterSheets: campRow.shareCharacterSheets,
       createdAt: campRow.createdAt.toISOString(),
       members: memberRows

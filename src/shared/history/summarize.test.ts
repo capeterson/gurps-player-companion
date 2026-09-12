@@ -588,6 +588,16 @@ describe('summarizeEvent campaign', () => {
     expect(summary).toContain('100');
     expect(summary).toContain('125');
   });
+
+  it('describes the attribute-cap campaign toggle', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { enforceAttributeCaps: true },
+      newRow: { enforceAttributeCaps: false },
+    });
+    expect(summary).toBe('Attribute caps disabled');
+  });
 });
 
 describe('summarizeEvent campaign_library_trait', () => {
@@ -891,4 +901,15 @@ it('summarizes a campaign house rule change from DB history', () => {
       newRow: { house_rules: { protectNaturalDr: false } },
     }).summary,
   ).toBe('Natural DR penetration immunity disabled (house rule)');
+});
+
+it('summarizes a named campaign house-rule set selection', () => {
+  expect(
+    summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { house_rules: { ruleSet: 'custom', protectNaturalDr: true } },
+      newRow: { house_rules: { ruleSet: 'j_talisar', protectNaturalDr: true } },
+    }).summary,
+  ).toBe('House rule set changed to J Talisar');
 });

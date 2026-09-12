@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
-import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
+import { type CampaignOut, campaignHouseRules } from '../../../shared/schemas/campaign.ts';
 import { api } from '../../lib/api.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 
@@ -22,6 +22,7 @@ const campaign = {
   disadvantageCap: null,
   quirkCap: null,
   techLevel: null,
+  enforceAttributeCaps: true,
   shareCharacterSheets: true,
   allowGmCharacterEditing: false,
 } as unknown as CampaignOut;
@@ -45,7 +46,12 @@ it('defaults on and saves an explicit off selection, retaining the draft through
   const view = setup();
   expect(checkbox()).toBeChecked();
   fireEvent.click(checkbox());
-  view.rerender(view.component({ ...campaign, houseRules: { protectNaturalDr: true } }));
+  view.rerender(
+    view.component({
+      ...campaign,
+      houseRules: campaignHouseRules.parse({ protectNaturalDr: true }),
+    }),
+  );
   expect(checkbox()).not.toBeChecked();
   fireEvent.click(screen.getByRole('button', { name: /Save/ }));
   await waitFor(() =>
@@ -53,7 +59,12 @@ it('defaults on and saves an explicit off selection, retaining the draft through
       '/campaigns/campaign',
       expect.objectContaining({
         method: 'PATCH',
-        body: expect.objectContaining({ houseRules: { protectNaturalDr: false } }),
+        body: expect.objectContaining({
+          houseRules: expect.objectContaining({
+            ruleSet: 'custom',
+            protectNaturalDr: false,
+          }),
+        }),
       }),
     ),
   );
@@ -74,4 +85,45 @@ it('lets managers read the rule but reserves edits for the owner', () => {
   setup('manager');
   expect(checkbox()).toBeDisabled();
   expect(screen.queryByRole('button', { name: /Save/ })).not.toBeInTheDocument();
+});
+
+it('preserves the J Talisar bundle when moving from the named set to Custom', async () => {
+  vi.mocked(api).mockResolvedValue(campaign);
+  setup();
+
+  const selector = screen.getByRole('combobox', { name: 'House rule set' });
+  fireEvent.change(selector, { target: { value: 'j_talisar' } });
+
+  const acidMagic = screen.getByRole('checkbox', { name: /Acid magic is forbidden/ });
+  expect(checkbox()).toBeChecked();
+  expect(acidMagic).toBeChecked();
+  expect(acidMagic).toBeDisabled();
+
+  fireEvent.change(selector, { target: { value: 'custom' } });
+  expect(checkbox()).toBeChecked();
+  expect(acidMagic).toBeChecked();
+  expect(acidMagic).toBeEnabled();
+
+  fireEvent.click(acidMagic);
+  expect(acidMagic).not.toBeChecked();
+  expect(checkbox()).toBeChecked();
+
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.objectContaining({
+          enforceAttributeCaps: true,
+          houseRules: expect.objectContaining({
+            ruleSet: 'custom',
+            forbidAcidMagic: false,
+            forbidDistantBlow: true,
+            protectNaturalDr: true,
+          }),
+        }),
+      }),
+    ),
+  );
 });

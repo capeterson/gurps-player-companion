@@ -18,13 +18,33 @@ into Dexie for the share gate, campaign names, mana, and house rules). See
 
 ## House rules
 
-Campaign settings include a House rules section, editable by the owner and
-readable by managers. `houseRules.protectNaturalDr` defaults to true for both
-existing and new campaigns. It exempts innate DR (all active `dr` effects,
-including tough skin) and natural skull DR from armor-piercing divisors and
-Ignore DR. Worn armor still divides, rounded down. Turning it off restores
-standard B378/M63 penetration of the full DR total. Fractional divisors below
-1 still increase all protection, with final DR 1 for unprotected targets.
+Campaign settings include a House rule set selector, editable by the owner and
+readable by managers. Its choices are **None**, **J Talisar**, and **Custom**.
+Selecting None or J Talisar deliberately loads that named bundle. Selecting
+Custom changes only `houseRules.ruleSet`: every currently loaded option remains
+unchanged so a GM can start with J Talisar and alter one or two rulings instead
+of rebuilding the set. Changing an individual option also records the set as
+Custom without changing any sibling option. The preset identity is persisted
+alongside the values rather than inferred from value equality, so an unchanged
+copy of J Talisar can still remain explicitly Custom.
+
+The J Talisar bundle enables every option documented in the E'arles campaign
+house-rules source: enchanted-item pricing; the eye-miss location; advancement
+rites for magical advantages; Medium and material spirits; shield damage;
+Bravery; layered Deflect and Fortify; prohibited Distant Blow and acid magic;
+spell ingredients; Hide Thoughts and Sunbolt interpretations; Path casting,
+curse, dispel, Mystic Symbol, and charm rulings; shield-ready timing; and the
+supplemental perks. Each control carries a concise explanation in the settings
+dialog. None disables every option. The default-on `enforceAttributeCaps`
+campaign rule is stored separately and is therefore enabled regardless of
+which house-rule set is selected.
+
+`houseRules.protectNaturalDr` remains on in the legacy/default Custom state. It
+exempts innate DR (all active `dr` effects, including tough skin) and natural
+skull DR from armor-piercing divisors and Ignore DR. Worn armor still divides,
+rounded down. Turning it off restores standard B378/M63 penetration of the full
+DR total. Fractional divisors below 1 still increase all protection, with final
+DR 1 for unprotected targets.
 
 This is an explicit house rule, not an inferred trait-name mechanic. The
 setting saves with the rest of the settings form through owner-only REST,
@@ -73,10 +93,22 @@ costs, grants mages next-turn recovery of personal FP spent casting on their own
 critical), `techLevel` (the campaign's tech
 level, resolved onto every member character's `CharacterDetail.techLevel`
 the same way `manaLevel` is — characters no longer set their own),
-`shareCharacterSheets`, and the default-off `allowGmCharacterEditing`
+the default-on `enforceAttributeCaps` rule, `shareCharacterSheets`, and the
+default-off `allowGmCharacterEditing`
 switch. The latter grants owners/managers normal sheet editing through
 the character outbox and server `assertWrite` path; it does not create a
 dashboard-specific mutation path.
+
+`enforceAttributeCaps` applies the Basic Set's purchased-stat ceilings on both
+character write doors (REST and `/sync/operations`): DX, IQ, and HT may not
+exceed 20; purchased Will and Per (`IQ + permanent modifier`) may not exceed
+20. ST is deliberately exempt because B14 explicitly allows it well beyond
+20, and temporary/trait effects are not purchases. The switch defaults true
+for new campaigns and migration `0041_campaign_attribute_caps.sql` enables it
+for every existing campaign. Campaignless characters have no campaign rule.
+The client mirrors the switch into Dexie and tightens the existing draft input
+bounds immediately; the server remains authoritative and an asynchronous sync
+rejection still uses the standard toast + rollback flash path.
 
 ### Invitations
 
@@ -398,6 +430,9 @@ mechanism for sharing content between campaigns or seeding a new one.
 - **House rules:** optional `campaign.houseRules` shares the campaign schema.
   Export includes it; opt-in settings import applies it when present. Older
   files that omit it leave the destination rules unchanged.
+- **Campaign block `enforceAttributeCaps` (v6):** export always includes the
+  default-on B14-B16 purchased-attribute rule. Older documents omit it and
+  therefore leave the target campaign's current setting unchanged on import.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
   campaign settings, and all seven library sections are read on one read-only
@@ -415,8 +450,8 @@ mechanism for sharing content between campaigns or seeding a new one.
   - **`applyCampaignSettings`** (boolean, default `false`): opt-in. When
     true and the document carries a `campaign` block, `description`,
     `pointTarget`, `disadvantageCap`, `quirkCap`, `manaLevel`,
-    `techLevel`, and optional `houseRules` are copied onto the campaigns row —
-    only the fields
+    `techLevel`, optional `houseRules`, and `enforceAttributeCaps` are copied
+    onto the campaigns row — only the fields
     actually present in the
     document (an omitted field leaves the current value alone); `name` is
     never touched by import. The response's `campaignSettingsApplied`

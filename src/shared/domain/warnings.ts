@@ -50,7 +50,11 @@ function rule(code: string, evaluate: Rule['evaluate']): void {
   RULES.push({ code, evaluate });
 }
 
-function attrRule(attrName: 'st' | 'dx' | 'iq' | 'ht', display: 'ST' | 'DX' | 'IQ' | 'HT'): void {
+function attrRule(
+  attrName: 'st' | 'dx' | 'iq' | 'ht',
+  display: 'ST' | 'DX' | 'IQ' | 'HT',
+  warnAbove20 = true,
+): void {
   rule(`attr.${attrName}.below_minimum`, ({ attrs }) =>
     attrs[attrName] < 1
       ? {
@@ -60,8 +64,10 @@ function attrRule(attrName: 'st' | 'dx' | 'iq' | 'ht', display: 'ST' | 'DX' | 'I
         }
       : null,
   );
+  // Keep the stable warning code registered even when the canonical rule
+  // exempts an attribute (ST). Characters may already have dismissed it.
   rule(`attr.${attrName}.very_high`, ({ attrs }) =>
-    attrs[attrName] > 20
+    warnAbove20 && attrs[attrName] > 20
       ? {
           code: `attr.${attrName}.very_high`,
           severity: 'note',
@@ -71,7 +77,8 @@ function attrRule(attrName: 'st' | 'dx' | 'iq' | 'ht', display: 'ST' | 'DX' | 'I
   );
 }
 
-attrRule('st', 'ST');
+// B14 explicitly exempts ST from the usual 20 ceiling.
+attrRule('st', 'ST', false);
 attrRule('dx', 'DX');
 attrRule('iq', 'IQ');
 attrRule('ht', 'HT');

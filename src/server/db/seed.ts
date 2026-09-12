@@ -59,6 +59,7 @@ async function seedCampaign(db: ReturnType<typeof getDb>, ownerId: string): Prom
       pointTarget: 150,
       disadvantageCap: 50,
       quirkCap: 5,
+      enforceAttributeCaps: true,
     })
     .returning({ id: campaigns.id });
   if (!created) throw new Error('failed to insert seed campaign');

@@ -3,10 +3,38 @@ import { MANA_LEVELS } from '../constants/magic.ts';
 import { email } from './auth.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 
-/** Campaign house rules. Omitted legacy settings use the campaign defaults. */
+export const houseRuleSet = z.enum(['none', 'j_talisar', 'custom']);
+export type HouseRuleSet = z.infer<typeof houseRuleSet>;
+
+/**
+ * Campaign house rules. Omitted legacy settings use the campaign defaults.
+ * `ruleSet` is stored independently from the values so a GM can choose
+ * Custom without destroying the named preset they intend to edit.
+ */
 export const campaignHouseRules = z
   .object({
+    ruleSet: houseRuleSet.default('custom'),
     protectNaturalDr: z.boolean().default(true),
+    enchantedItemPricing: z.boolean().default(false),
+    eyeMissHitsFace: z.boolean().default(false),
+    requireMagicAdvancementRites: z.boolean().default(false),
+    mediumMaterialSpiritLimits: z.boolean().default(false),
+    shieldDamageOnDbBlock: z.boolean().default(false),
+    braverySpellRewrite: z.boolean().default(false),
+    highestDeflectOnly: z.boolean().default(false),
+    highestFortifyOnly: z.boolean().default(false),
+    forbidDistantBlow: z.boolean().default(false),
+    forbidAcidMagic: z.boolean().default(false),
+    requireSpellIngredients: z.boolean().default(false),
+    hideThoughtsInterpretation: z.boolean().default(false),
+    sunboltBurningDamage: z.boolean().default(false),
+    pathAdeptLocksSubject: z.boolean().default(false),
+    curseRitualExpandedTargets: z.boolean().default(false),
+    dispelRitualCrossTradition: z.boolean().default(false),
+    mysticSymbolsAsAdvantages: z.boolean().default(false),
+    pathCharmsSingleUse: z.boolean().default(false),
+    shieldReadyTimeByDb: z.boolean().default(false),
+    allowJtSupplementalPerks: z.boolean().default(false),
   })
   .strict();
 export type CampaignHouseRules = z.infer<typeof campaignHouseRules>;
@@ -39,6 +67,8 @@ export const campaignOut = z.object({
   manaLevel: z.enum(MANA_LEVELS).default('normal'),
   /** Tech level for the whole campaign (Basic Set p. 513). */
   techLevel: z.number().int().min(0).max(12).nullable(),
+  /** Enforce the purchased-attribute limits from Basic Set pp. B14-B16. */
+  enforceAttributeCaps: z.boolean(),
   /**
    * When false, non-owner members get the minimal "readily apparent"
    * view of other players' character sheets instead of the full
@@ -63,6 +93,7 @@ export const campaignCreate = z.object({
   quirkCap: z.number().int().min(0).max(50).nullable().optional(),
   manaLevel: z.enum(MANA_LEVELS).optional(),
   techLevel: z.number().int().min(0).max(12).nullable().optional(),
+  enforceAttributeCaps: z.boolean().optional(),
   shareCharacterSheets: z.boolean().optional(),
   allowGmCharacterEditing: z.boolean().optional(),
 });

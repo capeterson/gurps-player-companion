@@ -12,11 +12,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { MANA_LEVELS, MANA_LEVEL_LABELS, type ManaLevel } from '../../../shared/constants/magic.ts';
+import {
+  HOUSE_RULE_DEFINITIONS,
+  applyHouseRuleSet,
+  customizeHouseRule,
+} from '../../../shared/domain/campaignRules.ts';
+import { campaignHouseRules } from '../../../shared/schemas/campaign.ts';
 import type {
+  CampaignHouseRules,
   CampaignMemberOut,
   CampaignOut,
   CampaignRole,
   CampaignUpdate,
+  HouseRuleSet,
   TransferOwnershipRequest,
 } from '../../../shared/schemas/campaign.ts';
 import { useDialogState } from '../../hooks/useDialogState.ts';
@@ -61,10 +69,11 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   const [techLevel, setTechLevel] = useState(
     campaign.techLevel == null ? '' : String(campaign.techLevel),
   );
+  const [enforceAttributeCaps, setEnforceAttributeCaps] = useState(campaign.enforceAttributeCaps);
   const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets);
   const [allowGmEditing, setAllowGmEditing] = useState(campaign.allowGmCharacterEditing);
-  const [protectNaturalDr, setProtectNaturalDr] = useState(
-    campaign.houseRules?.protectNaturalDr ?? true,
+  const [houseRules, setHouseRules] = useState<CampaignHouseRules>(() =>
+    campaignHouseRules.parse(campaign.houseRules ?? {}),
   );
   const [error, setError] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<CampaignMemberOut | null>(null);
@@ -87,9 +96,10 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     setQuirkCap(campaign.quirkCap == null ? '' : String(campaign.quirkCap));
     setManaLevel(campaign.manaLevel);
     setTechLevel(campaign.techLevel == null ? '' : String(campaign.techLevel));
+    setEnforceAttributeCaps(campaign.enforceAttributeCaps);
     setShareSheets(campaign.shareCharacterSheets);
     setAllowGmEditing(campaign.allowGmCharacterEditing);
-    setProtectNaturalDr(campaign.houseRules?.protectNaturalDr ?? true);
+    setHouseRules(campaignHouseRules.parse(campaign.houseRules ?? {}));
     setError(null);
   }, [open, campaign]);
 
@@ -156,9 +166,10 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       quirkCap: qcVal,
       manaLevel,
       techLevel: tl,
+      enforceAttributeCaps,
       shareCharacterSheets: shareSheets,
       allowGmCharacterEditing: allowGmEditing,
-      houseRules: { protectNaturalDr },
+      houseRules,
     });
   };
 
@@ -263,6 +274,24 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
               <input
                 type="checkbox"
                 className="checkbox checkbox-sm mt-0.5"
+                checked={enforceAttributeCaps}
+                onChange={(e) => setEnforceAttributeCaps(e.target.checked)}
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-medium">Enforce attribute caps</span>
+                <span className="block text-xs text-base-content/60">
+                  Caps purchased DX, IQ, and HT at 20, and purchased Will and Per at 20 total. ST
+                  and temporary bonuses remain uncapped (B14-B16).
+                </span>
+              </span>
+            </label>
+          )}
+
+          {viewerRole === 'owner' && (
+            <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm mt-0.5"
                 checked={shareSheets}
                 onChange={(e) => setShareSheets(e.target.checked)}
               />
@@ -296,28 +325,66 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
           )}
 
           <fieldset
-            className="border-t border-base-300 pt-3"
+            className="border-t border-base-300 pt-3 space-y-3"
             disabled={viewerRole !== 'owner' || update.isPending}
           >
-            <legend className="label-eyebrow">House rules</legend>
-            <label className="cursor-pointer flex items-start gap-3">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm mt-0.5"
-                checked={protectNaturalDr}
-                onChange={(e) => setProtectNaturalDr(e.target.checked)}
-              />
-              <span>
-                <span className="block text-sm font-medium">
-                  Armor penetration leaves natural DR intact
-                </span>
-                <span className="block text-xs text-base-content/60">
-                  On by default. Armor-piercing divisors and Ignore DR reduce worn armor only;
-                  innate DR (including tough skin) and skull DR remain intact. Turn off for standard
-                  GURPS rules. Fractional divisors below 1 still increase all DR.
-                </span>
+            <legend className="label-eyebrow">Campaign rules</legend>
+            <label className="form-control">
+              <span className="label-text text-xs">House rule set</span>
+              <select
+                className="select select-bordered select-sm"
+                aria-label="House rule set"
+                value={houseRules.ruleSet}
+                onChange={(e) =>
+                  setHouseRules((current) =>
+                    applyHouseRuleSet(current, e.target.value as HouseRuleSet),
+                  )
+                }
+              >
+                <option value="none">None</option>
+                <option value="j_talisar">J Talisar</option>
+                <option value="custom">Custom</option>
+              </select>
+              <span className="label-text-alt text-xs text-base-content/60">
+                Named sets load their complete bundle. Choose Custom to edit the current bundle;
+                none of its options are reset.
               </span>
             </label>
+
+            {(['General', 'Combat', 'Magic', 'Path magic', 'Campaign content'] as const).map(
+              (group) => (
+                <details
+                  key={group}
+                  open={group === 'Combat'}
+                  className="rounded-box bg-base-200/50 p-2"
+                >
+                  <summary className="cursor-pointer text-sm font-semibold">{group}</summary>
+                  <div className="mt-2 space-y-3">
+                    {HOUSE_RULE_DEFINITIONS.filter((rule) => rule.group === group).map((rule) => (
+                      <label key={rule.key} className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm mt-0.5"
+                          checked={houseRules[rule.key]}
+                          disabled={houseRules.ruleSet !== 'custom'}
+                          onChange={(e) =>
+                            setHouseRules((current) =>
+                              customizeHouseRule(current, rule.key, e.target.checked),
+                            )
+                          }
+                        />
+                        <span>
+                          <span className="block text-sm font-medium">{rule.label}</span>
+                          <span className="block text-xs text-base-content/60">
+                            {rule.description}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </details>
+              ),
+            )}
           </fieldset>
 
           {error && <p className="alert alert-error text-sm">{error}</p>}
