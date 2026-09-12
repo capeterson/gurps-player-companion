@@ -1,7 +1,10 @@
-import { type DragEvent, Fragment, type MouseEvent, useState } from 'react';
+import './inventory/inventory.css';
+import { type DragEvent, Fragment, type MouseEvent, type ReactNode, useRef, useState } from 'react';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { useFlashState } from '../../../hooks/useFlashState.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
+import { InventoryItemEditor } from './inventory/InventoryItemEditor.tsx';
+import { CATEGORY_LABELS, type ItemCategory, type ItemSection } from './inventory/itemMutations.ts';
 
 export interface InventoryRowProps {
   item: InventoryItemOut;
@@ -10,7 +13,7 @@ export interface InventoryRowProps {
   isSelected: (id: string) => boolean;
   onRowClick: (id: string, e: MouseEvent) => void;
   canEdit: boolean;
-  onEdit: (item: InventoryItemOut) => void;
+  skillNames?: readonly string[];
   drag?: InventoryDragApi;
   // Stashed items don't count against encumbrance, so the row renders the
   // raw weight directly instead of the encumbrance-effective number plus a
@@ -45,17 +48,59 @@ function EditIcon({ className = 'h-4 w-4' }: { className?: string }) {
 }
 
 export function InventoryRow(props: InventoryRowProps) {
-  const { item, depth, byParent, isSelected, onRowClick, canEdit, onEdit, drag, inStashed } = props;
+  const {
+    item,
+    depth,
+    byParent,
+    isSelected,
+    onRowClick,
+    canEdit,
+    skillNames = [],
+    drag,
+    inStashed,
+  } = props;
   const children = byParent.get(item.id) ?? [];
   const isRoot = item.parentId === null;
   const hasChildren = item.isContainer && children.length > 0;
   const [open, setOpen] = useState(true);
   const sel = isSelected(item.id);
+  const [section, setSection] = useState<ItemSection | null>(null);
+  const [visited, setVisited] = useState<ItemSection[]>([]);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const editorId = `inventory-editor-${item.id}`;
+  function showSection(next: ItemSection) {
+    setVisited((before) => (before.includes(next) ? before : [...before, next]));
+    setSection(next);
+  }
+  function toggleSection(next: ItemSection, trigger: HTMLButtonElement) {
+    triggerRef.current = trigger;
+    if (section === next) setSection(null);
+    else showSection(next);
+  }
+  function closeEditor() {
+    setSection(null);
+    triggerRef.current?.focus();
+  }
+  function categoryChip(category: ItemCategory, children: ReactNode) {
+    if (!canEdit) return <span className="badge badge-sm badge-ghost">{children}</span>;
+    return (
+      <button
+        type="button"
+        aria-label={`${CATEGORY_LABELS[category]} settings for ${item.name}`}
+        aria-expanded={section === category}
+        aria-controls={editorId}
+        className={`badge badge-sm min-h-8 h-auto py-1 ${section === category ? 'badge-primary' : 'badge-ghost'}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleSection(category, event.currentTarget);
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
 
-  // Row-level rollback flash: the item-edit dialog closes on submit, so
-  // any later rejection (e.g. an `enchantments`/`weaponData` patch that
-  // fails async) has no mounted input to flash. The row subscribes to
-  // every field of this item and pulses itself instead (AGENTS.md S5).
+  // The row remains the rollback target when its inline editor is collapsed.
   const rowFlash = useFlashState(undefined, undefined, `character_inventory:${item.id}:`);
 
   function stop(e: MouseEvent) {
@@ -135,7 +180,7 @@ export function InventoryRow(props: InventoryRowProps) {
         onDragLeave={canEdit && drag ? handleDragLeave : undefined}
         onDrop={canEdit && drag ? handleDrop : undefined}
         className={[
-          'transition-colors',
+          'inventory-item-row transition-colors',
           rowFlash.flashing ? 'field-rollback-flash' : '',
           canEdit ? 'cursor-pointer' : '',
           isDragging ? 'opacity-40' : '',
@@ -174,68 +219,100 @@ export function InventoryRow(props: InventoryRowProps) {
             <span className="flex flex-wrap items-center gap-1 pl-7 sm:pl-0">
               {isRoot && item.worn && <span className="badge badge-sm badge-primary">Worn</span>}
               {item.equipped && <span className="badge badge-sm badge-secondary">Equipped</span>}
-              {item.isContainer && (
-                <span className="badge badge-sm badge-ghost">
-                  Container
-                  {isRoot && item.worn && reductionLabel && (
-                    <span className="text-base-content/50 text-[10px] ml-1">{reductionLabel}</span>
-                  )}
-                </span>
-              )}
-              {item.isArmor && item.armor && (
-                <span className="badge badge-sm badge-ghost">
-                  Armor DR {item.armor.dr}
-                  <span className="text-base-content/50 text-[10px] ml-1">
-                    {locationSummary(item.armor.locations)}
-                  </span>
-                </span>
-              )}
+              {item.isContainer &&
+                categoryChip(
+                  'container',
+                  <>
+                    Container
+                    {isRoot && item.worn && reductionLabel && (
+                      <span className="text-base-content/50 text-[10px] ml-1">
+                        {reductionLabel}
+                      </span>
+                    )}
+                  </>,
+                )}
+              {item.isArmor &&
+                item.armor &&
+                categoryChip(
+                  'armor',
+                  <>
+                    Armor DR {item.armor.dr}
+                    <span className="text-base-content/50 text-[10px] ml-1">
+                      {locationSummary(item.armor.locations)}
+                    </span>
+                  </>,
+                )}
               {item.weaponData != null &&
-                (item.weaponData.db != null ? (
-                  <span className="badge badge-sm badge-ghost">
-                    Shield DB {item.weaponData.db}
-                    {item.weaponData.skill && (
-                      <span className="text-base-content/50 text-[10px] ml-1">
-                        {item.weaponData.skill}
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="badge badge-sm badge-ghost">
-                    Weapon
-                    {(item.weaponData.damage ||
-                      item.weaponData.skill ||
-                      item.weaponData.ranged != null) && (
-                      <span className="text-base-content/50 text-[10px] ml-1">
-                        {[
-                          item.weaponData.damage || null,
-                          item.weaponData.ranged != null ? 'ranged' : null,
-                          item.weaponData.skill ? `· ${item.weaponData.skill}` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              {item.powerstoneData != null && (
-                <span className="badge badge-sm badge-ghost">
-                  Powerstone
-                  <span className="text-base-content/50 text-[10px] ml-1">
-                    {item.powerstoneData.currentEnergy}/{item.powerstoneData.maxEnergy}
-                  </span>
-                </span>
-              )}
-              {item.magicItemData != null && (
-                <span className="badge badge-sm badge-ghost">
-                  Magic
-                  <span className="text-base-content/50 text-[10px] ml-1">
-                    {item.magicItemData.spellName}
-                    {item.magicItemData.mode === 'charged' &&
-                      item.magicItemData.chargesCurrent != null &&
-                      ` ${item.magicItemData.chargesCurrent}/${item.magicItemData.chargesMax ?? '—'}`}
-                  </span>
-                </span>
+                (item.weaponData.db != null
+                  ? categoryChip(
+                      'weapon',
+                      <>
+                        Shield DB {item.weaponData.db}
+                        {item.weaponData.skill && (
+                          <span className="text-base-content/50 text-[10px] ml-1">
+                            {item.weaponData.skill}
+                          </span>
+                        )}
+                      </>,
+                    )
+                  : categoryChip(
+                      'weapon',
+                      <>
+                        Weapon
+                        {(item.weaponData.damage ||
+                          item.weaponData.skill ||
+                          item.weaponData.ranged != null) && (
+                          <span className="text-base-content/50 text-[10px] ml-1">
+                            {[
+                              item.weaponData.damage || null,
+                              item.weaponData.ranged != null ? 'ranged' : null,
+                              item.weaponData.skill ? `· ${item.weaponData.skill}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                          </span>
+                        )}
+                      </>,
+                    ))}
+              {item.powerstoneData != null &&
+                categoryChip(
+                  'powerstone',
+                  <>
+                    Powerstone
+                    <span className="text-base-content/50 text-[10px] ml-1">
+                      {item.powerstoneData.currentEnergy}/{item.powerstoneData.maxEnergy}
+                    </span>
+                  </>,
+                )}
+              {item.magicItemData != null &&
+                categoryChip(
+                  'magicItem',
+                  <>
+                    Magic
+                    <span className="text-base-content/50 text-[10px] ml-1">
+                      {item.magicItemData.spellName}
+                      {item.magicItemData.mode === 'charged' &&
+                        item.magicItemData.chargesCurrent != null &&
+                        ` ${item.magicItemData.chargesCurrent}/${item.magicItemData.chargesMax ?? '—'}`}
+                    </span>
+                  </>,
+                )}
+              {(item.enchantments?.length ?? 0) > 0 &&
+                categoryChip('enchantments', <>Enchantments · {item.enchantments.length}</>)}
+              {canEdit && (
+                <button
+                  type="button"
+                  className="badge badge-sm badge-ghost min-h-8 h-auto border-dashed"
+                  aria-expanded={section === 'add'}
+                  aria-controls={editorId}
+                  aria-label={`Add category to ${item.name}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleSection('add', event.currentTarget);
+                  }}
+                >
+                  + Category
+                </button>
               )}
             </span>
           </div>
@@ -248,8 +325,11 @@ export function InventoryRow(props: InventoryRowProps) {
             </div>
           )}
         </td>
-        <td className="num text-right align-top sm:align-middle">{item.quantity}</td>
+        <td data-label="Qty" className="num text-right align-top sm:align-middle">
+          {item.quantity}
+        </td>
         <td
+          data-label="Weight (lb)"
           className={`num text-right align-top sm:align-middle ${netWeight === 0 ? 'text-base-content/50' : ''}`}
           title={
             weightModified
@@ -277,7 +357,10 @@ export function InventoryRow(props: InventoryRowProps) {
             <span className={weightModified ? 'font-semibold' : ''}>{netWeight.toFixed(1)}</span>
           </span>
         </td>
-        <td className="num text-right text-base-content/60 align-top sm:align-middle">
+        <td
+          data-label="Cost"
+          className="num text-right text-base-content/60 align-top sm:align-middle"
+        >
           {item.cost.toFixed(0)}
         </td>
         {canEdit && (
@@ -289,9 +372,11 @@ export function InventoryRow(props: InventoryRowProps) {
               className="btn btn-ghost btn-xs text-base-content/50 hover:text-base-content"
               aria-label={`Edit ${item.name}`}
               title="Edit item"
+              aria-expanded={section === 'basics'}
+              aria-controls={editorId}
               onClick={(e) => {
                 e.stopPropagation();
-                onEdit(item);
+                toggleSection('basics', e.currentTarget);
               }}
             >
               <EditIcon />
@@ -299,6 +384,24 @@ export function InventoryRow(props: InventoryRowProps) {
           </td>
         )}
       </tr>
+      {canEdit && visited.length > 0 && (
+        <tr className="inventory-editor-row" hidden={section === null} id={editorId}>
+          <td colSpan={5} className="!p-2 sm:!p-3">
+            {visited.map((entry) => (
+              <div key={entry} hidden={section !== entry}>
+                <InventoryItemEditor
+                  item={item}
+                  section={entry}
+                  skillNames={skillNames}
+                  hasChildren={children.length > 0}
+                  onSection={showSection}
+                  onClose={closeEditor}
+                />
+              </div>
+            ))}
+          </td>
+        </tr>
+      )}
       {hasChildren &&
         open &&
         children.map((child) => (

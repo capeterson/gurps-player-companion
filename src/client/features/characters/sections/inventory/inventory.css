@@ -1,0 +1,54 @@
+/* Below the sheet's small breakpoint, an item and its editor occupy the
+   full available width. A table scroller must never clip editable fields. */
+@media (max-width: 639px) {
+  .inventory-table,
+  .inventory-table > tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .inventory-table > thead {
+    display: none;
+  }
+
+  .inventory-table .inventory-item-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .inventory-table .inventory-item-row > td {
+    min-width: 0;
+    padding: 4px;
+    text-align: left;
+  }
+
+  .inventory-table .inventory-item-row > td:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .inventory-table .inventory-item-row > td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    opacity: 0.65;
+  }
+
+  .inventory-table .inventory-editor-row,
+  .inventory-table .inventory-editor-row > td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .inventory-table .inventory-editor-row[hidden] {
+    display: none;
+  }
+
+  .inventory-table .inventory-item-row .badge {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
