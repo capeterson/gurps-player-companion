@@ -4,10 +4,28 @@ import {
   fetchClientMetadataDocument,
   isSafeOAuthRedirectUri,
   oauthRedirectUriMatches,
+  pinnedMetadataRequestOptions,
   readPublicClientMetadata,
 } from './clientRegistration.ts';
 
 describe('OAuth client registration', () => {
+  it('pins HTTPS to the validated address while retaining hostname TLS verification', () => {
+    const url = new URL('https://client.example/oauth/client.json?version=1');
+    const selected = { address: '203.0.113.10', family: 4 as const };
+    expect(pinnedMetadataRequestOptions(url, selected)).toMatchObject({
+      hostname: selected.address,
+      family: selected.family,
+      port: 443,
+      servername: url.hostname,
+      path: '/oauth/client.json?version=1',
+      method: 'GET',
+      headers: {
+        host: url.host,
+        accept: 'application/json, application/oauth-client-metadata+json',
+      },
+    });
+  });
+
   it('accepts HTTPS and loopback HTTP redirects only', () => {
     expect(isSafeOAuthRedirectUri('https://chatgpt.com/connector/oauth/callback')).toBe(true);
     expect(isSafeOAuthRedirectUri('http://127.0.0.1:49152/callback')).toBe(true);

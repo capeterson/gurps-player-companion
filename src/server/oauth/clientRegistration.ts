@@ -1,5 +1,5 @@
 import { lookup } from 'node:dns/promises';
-import { request as httpsRequest } from 'node:https';
+import { type RequestOptions, request as httpsRequest } from 'node:https';
 import { isIP } from 'node:net';
 import {
   type OAuthClientMetadataDocument,
@@ -147,11 +147,38 @@ async function resolvePublicAddress(hostname: string): Promise<{ address: string
       'CIMD hostname must resolve only to public addresses',
     );
   }
-  const selected = addresses[0];
+  // Prefer IPv4 when both families are public because some production
+  // containers resolve IPv6 without having an IPv6 route.
+  const selected = addresses.find((entry) => entry.family === 4) ?? addresses[0];
   if (!selected) {
     throw new ClientRegistrationError('invalid_client_metadata', 'CIMD hostname has no address');
   }
   return { address: selected.address, family: selected.family as 4 | 6 };
+}
+
+/**
+ * Connect directly to the public address that passed SSRF validation while
+ * retaining the original hostname for TLS identity and HTTP virtual hosting.
+ * Bun's node:https compatibility layer cannot reliably consume a custom DNS
+ * lookup callback, so avoiding a second lookup is both safer and portable.
+ */
+export function pinnedMetadataRequestOptions(
+  url: URL,
+  selected: { address: string; family: 4 | 6 },
+): RequestOptions {
+  return {
+    hostname: selected.address,
+    family: selected.family,
+    port: 443,
+    servername: url.hostname,
+    path: `${url.pathname}${url.search}`,
+    method: 'GET',
+    headers: {
+      host: url.host,
+      accept: 'application/json, application/oauth-client-metadata+json',
+      'user-agent': 'gurps-player-companion-oauth/1.0',
+    },
+  };
 }
 
 export interface MetadataResponse {
@@ -164,71 +191,56 @@ export type MetadataReader = (url: URL) => Promise<MetadataResponse>;
 export const readPublicClientMetadata: MetadataReader = async (url) => {
   const selected = await resolvePublicAddress(url.hostname);
   return new Promise<MetadataResponse>((resolve, reject) => {
-    const request = httpsRequest(
-      url,
-      {
-        method: 'GET',
-        headers: {
-          accept: 'application/json, application/oauth-client-metadata+json',
-          'user-agent': 'gurps-player-companion-oauth/1.0',
-        },
-        lookup: ((_hostname: string, _options: unknown, callback: CallableFunction) =>
-          callback(null, selected.address, selected.family)) as never,
-      },
-      (response) => {
-        if (response.statusCode !== 200) {
-          response.resume();
-          reject(
-            new ClientRegistrationError(
-              'invalid_client_metadata',
-              `CIMD endpoint returned HTTP ${response.statusCode ?? 0}`,
-            ),
+    const request = httpsRequest(pinnedMetadataRequestOptions(url, selected), (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(
+          new ClientRegistrationError(
+            'invalid_client_metadata',
+            `CIMD endpoint returned HTTP ${response.statusCode ?? 0}`,
+          ),
+        );
+        return;
+      }
+      const contentType = response.headers['content-type']?.split(';', 1)[0]?.trim();
+      if (
+        contentType !== 'application/json' &&
+        contentType !== 'application/oauth-client-metadata+json'
+      ) {
+        response.resume();
+        reject(
+          new ClientRegistrationError('invalid_client_metadata', 'CIMD endpoint must return JSON'),
+        );
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let size = 0;
+      response.on('data', (chunk: Buffer) => {
+        size += chunk.byteLength;
+        if (size > MAX_METADATA_BYTES) {
+          response.destroy(
+            new ClientRegistrationError('invalid_client_metadata', 'CIMD response is too large'),
           );
           return;
         }
-        const contentType = response.headers['content-type']?.split(';', 1)[0]?.trim();
-        if (
-          contentType !== 'application/json' &&
-          contentType !== 'application/oauth-client-metadata+json'
-        ) {
-          response.resume();
+        chunks.push(chunk);
+      });
+      response.on('error', reject);
+      response.on('end', () => {
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+          const maxAge = /(?:^|,)\s*max-age=(\d+)/i.exec(
+            response.headers['cache-control'] ?? '',
+          )?.[1];
+          const requestedCacheMs = maxAge ? Number(maxAge) * 1000 : DEFAULT_CACHE_MS;
+          resolve({ body, cacheMs: Math.min(MAX_CACHE_MS, Math.max(0, requestedCacheMs)) });
+        } catch {
           reject(
-            new ClientRegistrationError(
-              'invalid_client_metadata',
-              'CIMD endpoint must return JSON',
-            ),
+            new ClientRegistrationError('invalid_client_metadata', 'CIMD response is not JSON'),
           );
-          return;
         }
-        const chunks: Buffer[] = [];
-        let size = 0;
-        response.on('data', (chunk: Buffer) => {
-          size += chunk.byteLength;
-          if (size > MAX_METADATA_BYTES) {
-            response.destroy(
-              new ClientRegistrationError('invalid_client_metadata', 'CIMD response is too large'),
-            );
-            return;
-          }
-          chunks.push(chunk);
-        });
-        response.on('error', reject);
-        response.on('end', () => {
-          try {
-            const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
-            const maxAge = /(?:^|,)\s*max-age=(\d+)/i.exec(
-              response.headers['cache-control'] ?? '',
-            )?.[1];
-            const requestedCacheMs = maxAge ? Number(maxAge) * 1000 : DEFAULT_CACHE_MS;
-            resolve({ body, cacheMs: Math.min(MAX_CACHE_MS, Math.max(0, requestedCacheMs)) });
-          } catch {
-            reject(
-              new ClientRegistrationError('invalid_client_metadata', 'CIMD response is not JSON'),
-            );
-          }
-        });
-      },
-    );
+      });
+    });
     request.setTimeout(METADATA_TIMEOUT_MS, () => {
       request.destroy(
         new ClientRegistrationError('invalid_client_metadata', 'CIMD request timed out'),
