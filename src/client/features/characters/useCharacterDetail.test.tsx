@@ -233,6 +233,50 @@ describe('durable character mechanics', () => {
     },
   );
 
+  it('renders human labels for active and legacy dismissed warning codes', async () => {
+    await seed();
+    const db = getLocalDb();
+    await db.characters.update(CID, {
+      dismissedWarnings: ['legacy.some_old-warning'],
+    });
+    await db.campaigns.put({
+      id: CAMPAIGN,
+      ownerId: 'owner',
+      viewerRole: 'owner',
+      name: 'Local Campaign',
+      description: null,
+      pointTarget: 10,
+      disadvantageCap: null,
+      quirkCap: null,
+      revision: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 0,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[`/characters/${CID}`]}>
+          <Routes>
+            <Route path="/characters/:id" element={<CharacterSheetPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Point target exceeded')).toBeInTheDocument());
+    expect(screen.getByText('Legacy: Some old warning')).toBeInTheDocument();
+    expect(screen.queryByText('points.over_target')).not.toBeInTheDocument();
+    expect(screen.queryByText('legacy.some_old-warning')).not.toBeInTheDocument();
+  });
+
   it('validates synced declarations, preserves pending input, and retains definitions on HTTP failure', async () => {
     await seed();
     const db = getLocalDb();

@@ -21,7 +21,8 @@ export const techniqueOut = z.object({
   /**
    * Name of the skill this technique defaults from, matched
    * case-insensitively against the character's skills (including the
-   * `Name (Specialization)` display form).  A name rather than a
+   * `Name/Specialization` display form; legacy `Name (Specialization)`
+   * references remain accepted). A name rather than a
    * skill id because the same technique definition lives on
    * campaign_library_techniques rows shared across characters.
    */

@@ -41,13 +41,14 @@ export interface WarningInput {
 
 interface Rule {
   readonly code: string;
+  readonly label: string;
   readonly evaluate: (input: WarningInput) => Warning | null;
 }
 
 const RULES: Rule[] = [];
 
-function rule(code: string, evaluate: Rule['evaluate']): void {
-  RULES.push({ code, evaluate });
+function rule(code: string, label: string, evaluate: Rule['evaluate']): void {
+  RULES.push({ code, label, evaluate });
 }
 
 function attrRule(
@@ -55,7 +56,7 @@ function attrRule(
   display: 'ST' | 'DX' | 'IQ' | 'HT',
   warnAbove20 = true,
 ): void {
-  rule(`attr.${attrName}.below_minimum`, ({ attrs }) =>
+  rule(`attr.${attrName}.below_minimum`, `${display} below minimum`, ({ attrs }) =>
     attrs[attrName] < 1
       ? {
           code: `attr.${attrName}.below_minimum`,
@@ -66,7 +67,7 @@ function attrRule(
   );
   // Keep the stable warning code registered even when the canonical rule
   // exempts an attribute (ST). Characters may already have dismissed it.
-  rule(`attr.${attrName}.very_high`, ({ attrs }) =>
+  rule(`attr.${attrName}.very_high`, `${display} unusually high`, ({ attrs }) =>
     warnAbove20 && attrs[attrName] > 20
       ? {
           code: `attr.${attrName}.very_high`,
@@ -83,7 +84,7 @@ attrRule('dx', 'DX');
 attrRule('iq', 'IQ');
 attrRule('ht', 'HT');
 
-rule('encumbrance.heavy', ({ encumbrance }) =>
+rule('encumbrance.heavy', 'Heavy encumbrance', ({ encumbrance }) =>
   encumbrance.level === 3
     ? {
         code: 'encumbrance.heavy',
@@ -93,7 +94,7 @@ rule('encumbrance.heavy', ({ encumbrance }) =>
     : null,
 );
 
-rule('encumbrance.x-heavy', ({ encumbrance }) =>
+rule('encumbrance.x-heavy', 'X-Heavy encumbrance', ({ encumbrance }) =>
   encumbrance.level === 4
     ? {
         code: 'encumbrance.x-heavy',
@@ -103,7 +104,7 @@ rule('encumbrance.x-heavy', ({ encumbrance }) =>
     : null,
 );
 
-rule('encumbrance.over_carry_cap', ({ encumbrance }) =>
+rule('encumbrance.over_carry_cap', 'Carry limit exceeded', ({ encumbrance }) =>
   encumbrance.ratio > 10
     ? {
         code: 'encumbrance.over_carry_cap',
@@ -116,7 +117,7 @@ rule('encumbrance.over_carry_cap', ({ encumbrance }) =>
 
 // HP may be adjusted by no more than ±30% of ST, and FP by no more
 // than ±30% of HT (B16-17).  Warn, don't block, per app philosophy.
-rule('hp.mod_out_of_range', ({ attrs }) => {
+rule('hp.mod_out_of_range', 'HP modifier out of range', ({ attrs }) => {
   const cap = Math.floor(attrs.st * 0.3);
   return Math.abs(attrs.hpMod) > cap
     ? {
@@ -127,7 +128,7 @@ rule('hp.mod_out_of_range', ({ attrs }) => {
     : null;
 });
 
-rule('fp.mod_out_of_range', ({ attrs }) => {
+rule('fp.mod_out_of_range', 'FP modifier out of range', ({ attrs }) => {
   const cap = Math.floor(attrs.ht * 0.3);
   return Math.abs(attrs.fpMod) > cap
     ? {
@@ -138,7 +139,7 @@ rule('fp.mod_out_of_range', ({ attrs }) => {
     : null;
 });
 
-rule('disadvantages.over_cap', ({ points, campaign }) => {
+rule('disadvantages.over_cap', 'Disadvantage cap exceeded', ({ points, campaign }) => {
   const cap = campaign.disadvantageCap;
   if (cap === null) return null;
   // Disadvantage points are stored negative; -150 < cap=-50 means we are over.
@@ -152,7 +153,7 @@ rule('disadvantages.over_cap', ({ points, campaign }) => {
   return null;
 });
 
-rule('quirks.over_cap', ({ points, campaign }) => {
+rule('quirks.over_cap', 'Quirk cap exceeded', ({ points, campaign }) => {
   const cap = campaign.quirkCap ?? 5;
   // Quirks are stored as negative points.  RAW quirks are -1 apiece
   // (B162), so a cap of 5 quirks is a cap of -5 points — comparing
@@ -169,7 +170,7 @@ rule('quirks.over_cap', ({ points, campaign }) => {
   return null;
 });
 
-rule('points.over_target', ({ points, campaign }) => {
+rule('points.over_target', 'Point target exceeded', ({ points, campaign }) => {
   if (campaign.pointTarget === null) return null;
   if (points.total > campaign.pointTarget) {
     return {
@@ -181,7 +182,7 @@ rule('points.over_target', ({ points, campaign }) => {
   return null;
 });
 
-rule('points.under_target', ({ points, campaign }) => {
+rule('points.under_target', 'Unspent points', ({ points, campaign }) => {
   if (campaign.pointTarget === null) return null;
   if (points.total < campaign.pointTarget) {
     return {
@@ -208,4 +209,23 @@ export function evaluateWarnings(
 
 export function listWarningCodes(): string[] {
   return RULES.map((r) => r.code);
+}
+
+/**
+ * User-facing title for a stable warning code. Unknown codes can survive in a
+ * character's dismissed-warning list after rules change, so keep their UI
+ * readable without pretending they are current registry entries.
+ */
+export function getWarningLabel(code: string): string {
+  const registered = RULES.find((r) => r.code === code);
+  if (registered) return registered.label;
+
+  return code
+    .split('.')
+    .map((part) => {
+      const words = part.replaceAll(/[_-]+/g, ' ');
+      const [first = '', ...rest] = words;
+      return `${first.toUpperCase()}${rest.join('')}`;
+    })
+    .join(': ');
 }

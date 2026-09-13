@@ -332,7 +332,9 @@ and prerequisites in notes. This snapshot is queued durably through the characte
 outbox. Changing the campaign TL does not rewrite learned skill TL. Editing the
 add form's name detaches its selected definition; a pending save cannot clear a
 newer selection, even one with the same base name. Sheet rows, rolls, roll history and
-GM lookup identify specialized skills by `skillDisplayName`; the GM lookup keeps
+GM lookup identify specialized skills by `skillDisplayName` in the compact
+`Name/Specialization` form; legacy parenthesized weapon and technique references
+remain resolvable. The GM lookup keeps
 each specialty selectable and reports its effective level.
 
 Trait/skill effect declarations are materialized on the owned character rows,

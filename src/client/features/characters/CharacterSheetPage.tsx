@@ -14,6 +14,7 @@ import {
   secondarySpent,
 } from '../../../shared/domain/attributeTooltips.ts';
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
+import { getWarningLabel } from '../../../shared/domain/warnings.ts';
 import { formatScaled } from '../../../shared/format/number.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import {
@@ -1393,7 +1394,7 @@ function WarningsPanel({
           <li key={w.code}>
             <WarningBanner
               severity={w.severity === 'warn' ? 'warn' : 'info'}
-              title={w.code}
+              title={getWarningLabel(w.code)}
               onDismiss={
                 canWrite ? () => dismiss.mutate({ code: w.code, dismissed: true }) : undefined
               }
@@ -1411,7 +1412,7 @@ function WarningsPanel({
           <ul className="mt-1 space-y-1">
             {character.dismissedWarnings.map((code) => (
               <li key={code} className="flex justify-between gap-3">
-                <span className="text-base-content/60">{code}</span>
+                <span className="text-base-content/60">{getWarningLabel(code)}</span>
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs"

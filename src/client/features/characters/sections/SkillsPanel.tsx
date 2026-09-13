@@ -5,6 +5,7 @@ import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
+import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
@@ -12,7 +13,7 @@ import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
-import { ModifierBreakdown, skillEffectsForRow } from './combat/weaponEffectView.tsx';
+import { ModifierBreakdownContent, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
@@ -236,12 +237,54 @@ interface SkillRowProps {
   effects: CharacterDetail['effects'];
 }
 
+function SkillModifierTooltip({
+  displayName,
+  baseValue,
+  effects,
+  finalValue,
+}: {
+  displayName: string;
+  baseValue: number | null;
+  effects: CharacterDetail['effects'];
+  finalValue: number | null;
+}) {
+  if (effects.length === 0) return null;
+  return (
+    <InfoTooltip
+      ariaLabel={`View ${displayName} modifiers`}
+      side="bottom"
+      triggerClassName="num shrink-0 cursor-help rounded border border-warning px-1 text-[10px] text-warning transition-colors hover:bg-warning/10 focus-visible:outline-2 focus-visible:outline-primary"
+      content={
+        <div>
+          <div className="label-eyebrow mb-2">{displayName} modifiers</div>
+          <ModifierBreakdownContent
+            baseLabel="Base skill"
+            baseValue={baseValue ?? '—'}
+            globalEffects={effects}
+            finalValue={finalValue ?? '—'}
+          />
+        </div>
+      }
+    >
+      <span aria-hidden="true">✦</span>
+    </InfoTooltip>
+  );
+}
+
 function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const displayName = skillDisplayName(skill.name, skill.specialization);
   const bonusEffects = skillEffectsForRow(effects, skill.name, skill.specialization);
+  const modifierTooltip = (
+    <SkillModifierTooltip
+      displayName={displayName}
+      baseValue={skill.level}
+      effects={bonusEffects}
+      finalValue={skill.effectiveLevel}
+    />
+  );
   const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, displayName);
 
   const nameField = useEntityNameField(rowPatch, skill.name);
@@ -271,22 +314,32 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
     <li className="grid grid-cols-[minmax(0,1fr)_minmax(3.5rem,4rem)_minmax(3rem,4rem)_minmax(3rem,4rem)_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 items-center py-2 border-b border-base-300 last:border-0">
       {canWrite ? (
         <div className="min-w-0">
-          <input
-            aria-label={`${displayName} name`}
-            className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 font-medium`}
-            {...nameField.inputProps}
-          />
-          {(skill.specialization || skill.techLevel != null) && (
+          <div className="flex min-w-0 items-center gap-1.5 font-medium">
+            <span className="flex min-w-0 items-center">
+              <input
+                aria-label={`${displayName} name`}
+                className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm min-w-[1ch] max-w-full shrink px-0 font-medium [field-sizing:content]`}
+                {...nameField.inputProps}
+              />
+              {skill.specialization && (
+                <span className="min-w-0 break-words">/{skill.specialization}</span>
+              )}
+            </span>
+            {modifierTooltip}
+          </div>
+          {skill.techLevel != null && (
             <span className="block break-words text-xs text-base-content/70">
-              {skill.specialization ? `(${skill.specialization})` : ''}
-              {skill.techLevel != null ? ` TL${skill.techLevel}` : ''}
+              TL{skill.techLevel}
             </span>
           )}
         </div>
       ) : (
-        <span className="min-w-0 break-words font-medium">
-          {displayName}
-          {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 break-words font-medium">
+            {displayName}
+            {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+          </span>
+          {modifierTooltip}
         </span>
       )}
       <span className="text-xs text-base-content/70 num text-center">
@@ -330,14 +383,6 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
         </button>
       )}
       <div className="col-span-full">
-        {skill.level != null && skill.effectiveLevel != null && (
-          <ModifierBreakdown
-            baseLabel="Base skill"
-            baseValue={skill.level}
-            globalEffects={bonusEffects}
-            finalValue={skill.effectiveLevel}
-          />
-        )}
         <LibraryMechanicsNote mechanics={skill.libraryMechanics} />
       </div>
       <ConfirmDialog

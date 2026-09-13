@@ -85,8 +85,8 @@ export interface MatchedSkill {
 }
 
 /**
- * Display/match name for a skill row: "Guns (Pistol)" when a
- * specialization is set, else the bare name. Two skill rows can share
+ * Display name for a skill row: "Guns/Pistol" when a specialization
+ * is set, else the bare name. Two skill rows can share
  * the same `name` with different `specialization` (e.g. "Guns"/Pistol
  * vs "Guns"/Rifle) — every `SkillCandidate` fed into
  * `matchSkillForWeapon` / `resolveWeaponSkill` should be built with
@@ -95,8 +95,48 @@ export interface MatchedSkill {
  * matches against.
  */
 export function skillDisplayName(name: string, specialization: string | null | undefined): string {
+  const base = name.trim();
   const spec = specialization?.trim();
-  return spec ? `${name} (${spec})` : name;
+  return spec ? `${base}/${spec}` : base;
+}
+
+export interface SkillReferenceParts {
+  readonly name: string;
+  readonly specialization: string;
+}
+
+/**
+ * Split the current `Name/Specialization` display form as well as the legacy
+ * `Name (Specialization)` form still present in saved weapon and technique
+ * references. This is parsing for compatibility, not a second display style.
+ */
+export function splitSkillReference(value: string): SkillReferenceParts {
+  const trimmed = value.trim();
+  const legacy = trimmed.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  if (legacy) {
+    return { name: legacy[1]?.trim() ?? '', specialization: legacy[2]?.trim() ?? '' };
+  }
+  const current = trimmed.match(/^(.*?)\s*\/\s*(.+)$/);
+  return current
+    ? { name: current[1]?.trim() ?? '', specialization: current[2]?.trim() ?? '' }
+    : { name: trimmed, specialization: '' };
+}
+
+/** Render a stored current or legacy skill reference in the current style. */
+export function skillReferenceDisplayName(value: string): string {
+  const { name, specialization } = splitSkillReference(value);
+  return skillDisplayName(name, specialization);
+}
+
+function normalizedSkillReference(value: string): string {
+  const { name, specialization } = splitSkillReference(value);
+  const normalize = (part: string) => part.replace(/\s+/g, ' ').trim().toLowerCase();
+  return `${normalize(name)}\u0000${normalize(specialization)}`;
+}
+
+/** Match current and legacy spellings of a specialization-qualified skill. */
+export function skillReferencesMatch(left: string, right: string): boolean {
+  return normalizedSkillReference(left) === normalizedSkillReference(right);
 }
 
 /**
@@ -172,10 +212,9 @@ export function resolveWeaponSkill(
 ): WeaponSkillResolution {
   const explicit = explicitSkill?.trim();
   if (explicit) {
-    const explicitLower = explicit.toLowerCase();
     const usable = skills.filter(
       (s): s is SkillCandidate & { level: number } =>
-        s.level !== null && s.name.trim().toLowerCase() === explicitLower,
+        s.level !== null && skillReferencesMatch(s.name, explicit),
     );
     const best = pickBest(usable);
     if (best) return { kind: 'matched', name: best.name, level: best.level, explicit: true };

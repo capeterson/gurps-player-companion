@@ -28,7 +28,7 @@
  */
 
 import type { TechniqueDifficulty } from '../schemas/technique.ts';
-import { skillDisplayName } from './defenseCalc.ts';
+import { skillDisplayName, skillReferencesMatch } from './defenseCalc.ts';
 
 /**
  * Bonus a technique gets over its default skill for `points` invested.
@@ -75,8 +75,9 @@ export interface TechniqueSkillCandidate {
 /**
  * Resolve a technique's `defaultSkillName` against the character's
  * skills.  Matches case-insensitively against both the bare skill name
- * and its `Name (Specialization)` display form, so "Broadsword" and
- * "Savoir-Faire (Dojo)" both work. Ties break on the highest level so a
+ * and its `Name/Specialization` display form, so "Broadsword" and
+ * "Savoir-Faire/Dojo" both work. Legacy parenthesized references remain
+ * accepted. Ties break on the highest level so a
  * character with two specializations of the same skill defaults from
  * their best. Returns null when nothing usable matches — the technique
  * then has a null level rather than silently defaulting to something
@@ -92,8 +93,8 @@ export function resolveDefaultSkillLevel(
   for (const skill of skills) {
     if (skill.level === null) continue;
     const bare = skill.name.trim().toLowerCase();
-    const display = skillDisplayName(skill.name, skill.specialization).trim().toLowerCase();
-    if (bare !== needle && display !== needle) continue;
+    const display = skillDisplayName(skill.name, skill.specialization);
+    if (bare !== needle && !skillReferencesMatch(display, defaultSkillName)) continue;
     if (best === null || skill.level > best) best = skill.level;
   }
   return best;

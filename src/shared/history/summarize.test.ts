@@ -293,6 +293,23 @@ describe('summarizeEvent character_skill', () => {
     });
     expect(summary).toContain('Acrobatics');
   });
+
+  it('formats specializations with a slash', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_skill',
+      op: 'insert',
+      oldRow: null,
+      newRow: {
+        name: 'Current Affairs',
+        specialization: 'Popular Culture',
+        attribute: 'IQ',
+        difficulty: 'E',
+        points: 1,
+      },
+    });
+    expect(summary).toContain('Current Affairs/Popular Culture');
+    expect(summary).not.toContain('Current Affairs (Popular Culture)');
+  });
 });
 
 // ---------- summarizeEvent — character_language ----------
