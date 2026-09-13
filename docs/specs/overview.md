@@ -214,7 +214,9 @@ on any sheet the viewer can edit — their own — it always shows).
   its listed target skills only. A computed level is a
   tappable roll target: it opens the same roll sheet used everywhere
   else on the character (dispatch only, so read-only viewers can roll
-  too); null-level rows stay plain text.
+  too); null-level rows stay plain text. On narrow screens, each skill
+  becomes a labeled card row so its name keeps the full content width instead
+  of being squeezed by the attribute, points, level, and action columns.
 - **Point ledger** with one bucket per source: attributes, secondary
   characteristics, advantages, disadvantages, quirks, languages, skills,
   spells, and techniques, plus a derived `unspent`
@@ -240,7 +242,9 @@ on any sheet the viewer can edit — their own — it always shows).
   a "Skill 'X' not on sheet" tooltip instead of guessing. The default
   line and points are editable per row. A resolved
   level is a tappable roll target like a skill's. Rendered on the Skills
-  tab. Martial-arts **styles** live in the campaign library only
+  tab. Its add form and rows reflow into labeled two-column mobile layouts;
+  the desktop column header is hidden rather than forcing horizontal scroll.
+  Martial-arts **styles** live in the campaign library only
   (name + technique/perk/skill lists); a character adopts one by adding
   its pieces, so there is no per-character style row.
 - **Languages** (`character_languages`, sync-backed) with independent
@@ -250,9 +254,13 @@ on any sheet the viewer can edit — their own — it always shows).
   tongue and a house-ruled cost are both expressible. They bill to their
   own **languages** bucket in the point ledger rather than inflating
   advantages, and the add form autocompletes against the campaign's
-  language library. Rendered on the Skills tab under the skills table.
+  language library. Rendered on the Skills tab under the skills table, with
+  the same labeled mobile-card treatment as skills and techniques.
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
+  On mobile, the add form, spell fields, stored-energy controls, magic-item
+  controls, and cast-dialog resource rows stack in place with visible labels;
+  the spell list never falls back to a desktop-width horizontal scroller.
   Spells have no default: a 0-point (legacy) spell row has a null level,
   gets no energy discount, and its Cast/Maintain actions are held. The
   cast dialog suggests drawing from a single powerstone and warns when
@@ -607,7 +615,9 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   support correlation without exposing raw error details.
 - **Themeable** (light/dark; "Arcane" DaisyUI theme), installable PWA, works
   offline for the character surface.
-- **Settings** page: profile, password, passkeys, API keys.
+- **Settings** page: profile, password, passkeys, API keys. Long credential and
+  connected-app names wrap inside their cards, with destructive actions stacked
+  below them on narrow screens rather than overlapping the metadata.
 
 ### Admin (separate bundle)
 A **separate Vite entry** (`src/client/admin/`, served at `/admin/*`) — not
