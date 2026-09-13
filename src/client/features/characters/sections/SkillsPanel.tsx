@@ -380,71 +380,82 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
   };
 
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_minmax(3.5rem,4rem)_minmax(3rem,4rem)_minmax(3rem,4rem)_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 items-center py-2 border-b border-base-300 last:border-0">
-      {canWrite ? (
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-1.5 font-medium">
-            <span className="flex min-w-0 items-center">
-              <input
-                aria-label={`${displayName} name`}
-                className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm min-w-[1ch] max-w-full shrink px-0 font-medium [field-sizing:content]`}
-                {...nameField.inputProps}
-              />
-              {skill.specialization && (
-                <span className="min-w-0 break-words">/{skill.specialization}</span>
-              )}
+    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:items-center sm:gap-2 sm:py-2">
+      <div className="col-span-2 min-w-0 sm:col-span-1">
+        {canWrite ? (
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5 font-medium">
+              <span className="flex min-w-0 items-center">
+                <input
+                  aria-label={`${displayName} name`}
+                  className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm min-w-[1ch] max-w-full shrink px-0 font-medium [field-sizing:content]`}
+                  {...nameField.inputProps}
+                />
+                {skill.specialization && (
+                  <span className="min-w-0 break-words">/{skill.specialization}</span>
+                )}
+              </span>
+              {modifierTooltip}
+            </div>
+            {skill.techLevel != null && (
+              <span className="block break-words text-xs text-base-content/70">
+                TL{skill.techLevel}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 break-words font-medium">
+              {displayName}
+              {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
             </span>
             {modifierTooltip}
-          </div>
-          {skill.techLevel != null && (
-            <span className="block break-words text-xs text-base-content/70">
-              TL{skill.techLevel}
-            </span>
-          )}
-        </div>
-      ) : (
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 break-words font-medium">
-            {displayName}
-            {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
           </span>
-          {modifierTooltip}
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block sm:hidden">Attr/Diff</span>
+        <span className="num block text-xs text-base-content/70 sm:text-center">
+          {skill.attribute}/{skill.difficulty}
         </span>
-      )}
-      <span className="text-xs text-base-content/70 num text-center">
-        {skill.attribute}/{skill.difficulty}
-      </span>
-      {canWrite ? (
-        <input
-          aria-label={`${displayName} points`}
-          className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right`}
-          {...pointsField.inputProps}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block sm:hidden">Pts</span>
+        {canWrite ? (
+          <input
+            aria-label={`${displayName} points`}
+            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
+            {...pointsField.inputProps}
+          />
+        ) : (
+          <span className="num block text-right">{skill.points}</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block sm:hidden">Lvl</span>
+        <RollLevelChip
+          level={skill.effectiveLevel ?? skill.level}
+          name={displayName}
+          title={
+            skill.points <= 0
+              ? skill.defaults == null
+                ? 'Defaults unknown — add the skill definition'
+                : skill.defaults.length === 0
+                  ? 'This skill has no default'
+                  : 'Best available declared default (B173)'
+              : skill.effectiveLevel != null &&
+                  skill.level != null &&
+                  skill.effectiveLevel !== skill.level
+                ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
+                : undefined
+          }
+          onRoll={(level) => onRoll({ label: displayName, baseTarget: level })}
         />
-      ) : (
-        <span className="num text-right">{skill.points}</span>
-      )}
-      <RollLevelChip
-        level={skill.effectiveLevel ?? skill.level}
-        name={displayName}
-        title={
-          skill.points <= 0
-            ? skill.defaults == null
-              ? 'Defaults unknown — add the skill definition'
-              : skill.defaults.length === 0
-                ? 'This skill has no default'
-                : 'Best available declared default (B173)'
-            : skill.effectiveLevel != null &&
-                skill.level != null &&
-                skill.effectiveLevel !== skill.level
-              ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
-              : undefined
-        }
-        onRoll={(level) => onRoll({ label: displayName, baseTarget: level })}
-      />
+      </div>
       {canWrite && (
         <button
           type="button"
-          className="btn btn-ghost btn-xs"
+          className="btn btn-ghost btn-xs justify-self-end self-end sm:self-center"
           onClick={() => setConfirmDelete(true)}
           aria-label={`Delete skill ${displayName}`}
         >
@@ -482,8 +493,8 @@ export function SkillsPanel({
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
 
   return (
-    <section className="card space-y-3 p-5">
-      <header className="flex items-baseline justify-between">
+    <section className="card space-y-3 p-4 sm:p-5">
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
           <p className="label-eyebrow">Skills</p>
           <h2 className="font-display text-2xl">Skills & abilities</h2>
@@ -503,7 +514,7 @@ export function SkillsPanel({
         <p className="text-sm text-base-content/60">No skills yet.</p>
       ) : (
         <>
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(3.5rem,4rem)_minmax(3rem,4rem)_minmax(3rem,4rem)_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 label-eyebrow border-b border-base-300 pb-1">
+          <div className="label-eyebrow hidden grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] gap-2 border-b border-base-300 pb-1 sm:grid">
             <span>Skill</span>
             <span className="text-center">Attr/Dif</span>
             <span className="text-right">Pts</span>

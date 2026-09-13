@@ -39,15 +39,15 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
   const ratio = data.maxEnergy > 0 ? data.currentEnergy / data.maxEnergy : 0;
 
   return (
-    <li className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
-      <span className="flex min-w-0 flex-col">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:py-2">
+      <span className="col-span-2 flex min-w-0 flex-col sm:col-span-1">
         <span className="break-words font-medium">{item.name}</span>
         {data.notes ? (
           <span className="break-words text-xs text-base-content/60">{data.notes}</span>
         ) : null}
       </span>
       <div
-        className="w-24 h-2 rounded-full bg-base-300/60 overflow-hidden"
+        className="h-2 w-full min-w-0 overflow-hidden rounded-full bg-base-300/60 sm:w-24"
         aria-label={`${item.name} energy meter`}
       >
         <div
@@ -59,7 +59,7 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
         {data.currentEnergy} / {data.maxEnergy}
       </span>
       {canWrite && (
-        <span className="join">
+        <span className="join col-span-2 justify-self-end sm:col-span-1">
           <button
             type="button"
             className="btn btn-xs join-item"
@@ -105,8 +105,8 @@ export function PowerstonesPanel({
   const total = totalPowerstoneEnergy(stones);
 
   return (
-    <section className="card space-y-3 p-5">
-      <header className="flex items-baseline justify-between">
+    <section className="card space-y-3 p-4 sm:p-5">
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
           <p className="label-eyebrow">Powerstones</p>
           <h2 className="font-display text-2xl">Stored energy</h2>
@@ -144,7 +144,7 @@ export function MagicItemsPanel({
     return null;
   }
   return (
-    <section className="card space-y-3 p-5">
+    <section className="card space-y-3 p-4 sm:p-5">
       <header>
         <p className="label-eyebrow">Magic items</p>
         <h2 className="font-display text-2xl">Wands &amp; relics</h2>
@@ -185,10 +185,10 @@ function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
   if (!data) return null;
 
   return (
-    <li className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
-      <span className="flex flex-col">
-        <span className="font-medium">{item.name}</span>
-        <span className="text-xs text-base-content/60">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:py-2">
+      <span className="col-span-2 flex min-w-0 flex-col sm:col-span-1">
+        <span className="break-words font-medium">{item.name}</span>
+        <span className="break-words text-xs text-base-content/60">
           casts <em>{data.spellName}</em> at skill {data.spellSkillLevel}
           {' · '}
           {data.mode}
@@ -204,9 +204,8 @@ function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
           {data.mode === 'continuous' ? 'always-on' : 'powered by user'}
         </span>
       )}
-      <span />
       {charged && canWrite && (
-        <span className="join">
+        <span className="join justify-self-end">
           <button
             type="button"
             className="btn btn-xs join-item"

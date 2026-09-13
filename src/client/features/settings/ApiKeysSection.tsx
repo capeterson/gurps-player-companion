@@ -70,18 +70,25 @@ export function ApiKeysSection() {
         </p>
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2">
-        <label className="form-control flex-1 min-w-[12rem]">
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-end"
+      >
+        <label className="form-control min-w-0 flex-1 sm:min-w-[12rem]">
           <span className="label-text text-xs">Name</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. CLI on laptop"
-            className="input input-sm input-bordered"
+            className="input input-sm input-bordered w-full min-w-0"
             maxLength={80}
           />
         </label>
-        <button type="submit" className="btn btn-primary btn-sm" disabled={create.isPending}>
+        <button
+          type="submit"
+          className="btn btn-primary btn-sm w-full sm:w-auto"
+          disabled={create.isPending}
+        >
           {create.isPending ? 'Minting…' : 'Mint key'}
         </button>
       </form>
@@ -98,20 +105,20 @@ export function ApiKeysSection() {
         {items.map((k) => (
           <div
             key={k.id}
-            className="flex items-center justify-between gap-2 rounded border border-base-300 bg-base-100 px-3 py-2 text-sm"
+            className="flex flex-col items-stretch gap-2 rounded border border-base-300 bg-base-100 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0">
-              <span className="font-medium">{k.name}</span>
-              <span className="ml-2 text-xs text-base-content/60">
+              <p className="break-words font-medium">{k.name}</p>
+              <p className="break-words text-xs text-base-content/60">
                 created {new Date(k.createdAt).toLocaleDateString()}
                 {k.lastUsedAt
                   ? ` · last used ${new Date(k.lastUsedAt).toLocaleDateString()}`
                   : ' · never used'}
-              </span>
+              </p>
             </div>
             <button
               type="button"
-              className="btn btn-ghost btn-xs text-error"
+              className="btn btn-ghost btn-xs self-end text-error sm:self-auto"
               disabled={revoke.isPending}
               onClick={() => setRevokeTarget({ id: k.id, name: k.name })}
               aria-label={`Revoke ${k.name}`}

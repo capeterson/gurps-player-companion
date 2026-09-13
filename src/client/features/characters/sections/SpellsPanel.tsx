@@ -107,7 +107,7 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
   return (
     <form
       {...flashProps}
-      className="field-rollback-flash flex flex-wrap items-end gap-2 p-3 bg-base-100/40 border border-base-300 rounded"
+      className="field-rollback-flash grid grid-cols-2 gap-2 rounded border border-base-300 bg-base-100/40 p-3 sm:flex sm:flex-wrap sm:items-end"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -128,7 +128,7 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
         });
       }}
     >
-      <div className="form-control flex-1 min-w-[10rem]">
+      <div className="form-control col-span-2 min-w-0 sm:flex-1 sm:min-w-[10rem]">
         <span className="label-text text-xs" id="add-spell-name-label">
           Spell
         </span>
@@ -162,26 +162,26 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
         ) : (
           <input
             aria-labelledby="add-spell-name-label"
-            className="input input-bordered input-sm"
+            className="input input-bordered input-sm w-full min-w-0"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Light"
           />
         )}
       </div>
-      <label className="form-control w-32">
+      <label className="form-control col-span-2 min-w-0 sm:w-32">
         <span className="label-text text-xs">College</span>
         <input
-          className="input input-bordered input-sm"
+          className="input input-bordered input-sm w-full min-w-0"
           value={college}
           onChange={(e) => setCollege(e.target.value)}
           placeholder="e.g. Light"
         />
       </label>
-      <label className="form-control">
+      <label className="form-control min-w-0">
         <span className="label-text text-xs">Diff</span>
         <select
-          className="select select-bordered select-sm"
+          className="select select-bordered select-sm w-full min-w-0"
           value={difficulty}
           onChange={(e) => setDifficulty(e.target.value as SpellDifficulty)}
         >
@@ -190,23 +190,27 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
           ))}
         </select>
       </label>
-      <label className="form-control w-16">
+      <label className="form-control min-w-0 sm:w-16">
         <span className="label-text text-xs">Pts</span>
         <input
-          className="input input-bordered input-sm num"
+          className="input input-bordered input-sm num w-full min-w-0"
           value={points}
           onChange={(e) => setPoints(e.target.value)}
         />
       </label>
-      <label className="form-control w-16">
+      <label className="form-control min-w-0 sm:w-16">
         <span className="label-text text-xs">Cost</span>
         <input
-          className="input input-bordered input-sm num"
+          className="input input-bordered input-sm num w-full min-w-0"
           value={baseEnergyCost}
           onChange={(e) => setBaseEnergyCost(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+      <button
+        type="submit"
+        className="btn btn-sm btn-primary col-span-2 w-full sm:w-auto"
+        disabled={creating}
+      >
         {creating ? 'Adding…' : 'Add'}
       </button>
     </form>
@@ -287,76 +291,98 @@ function SpellRow({
   };
 
   return (
-    <li className="grid grid-cols-[1fr_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] gap-2 items-center py-2 border-b border-base-300 last:border-0">
-      {canWrite ? (
-        <input
-          aria-label={`${spell.name} name`}
-          className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm font-medium`}
-          {...nameField.inputProps}
+    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 md:grid-cols-[minmax(0,1fr)_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] md:items-center md:gap-2 md:py-2">
+      <div className="col-span-2 min-w-0 md:col-span-1">
+        {canWrite ? (
+          <input
+            aria-label={`${spell.name} name`}
+            className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 px-0 font-medium`}
+            {...nameField.inputProps}
+          />
+        ) : (
+          <span className="break-words font-medium">{spell.name}</span>
+        )}
+      </div>
+      <div className="col-span-2 min-w-0 md:col-span-1">
+        <span className="label-eyebrow mb-1 block md:hidden">College</span>
+        <span className="block break-words text-xs text-base-content/70">
+          {spell.college ?? '—'}
+        </span>
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block md:hidden">Diff</span>
+        {canWrite ? (
+          <select
+            aria-label={`${spell.name} difficulty`}
+            className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm w-full min-w-0`}
+            data-flashing={difficultyFlash['data-flashing']}
+            data-flash-parity={difficultyFlash['data-flash-parity']}
+            value={spell.difficulty}
+            onChange={(e) => void rowPatch.patch('difficulty', e.target.value as SpellDifficulty)}
+          >
+            {SPELL_DIFFICULTIES.map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="num text-xs text-base-content/70">IQ/{spell.difficulty}</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block md:hidden">Pts</span>
+        {canWrite ? (
+          <input
+            aria-label={`${spell.name} points`}
+            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
+            {...pointsField.inputProps}
+          />
+        ) : (
+          <span className="num block text-right">{spell.points}</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block md:hidden">Lvl</span>
+        <RollLevelChip
+          level={manaKnown ? spell.level : null}
+          name={spell.name}
+          title={
+            !manaKnown
+              ? 'Waiting for campaign mana'
+              : spell.level == null
+                ? 'No points invested — spells have no default'
+                : undefined
+          }
+          onRoll={(level) => onRoll({ label: spell.name, baseTarget: level })}
         />
-      ) : (
-        <span className="font-medium">{spell.name}</span>
-      )}
-      <span className="text-xs text-base-content/70 truncate">{spell.college ?? '—'}</span>
-      {canWrite ? (
-        <select
-          aria-label={`${spell.name} difficulty`}
-          className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm`}
-          data-flashing={difficultyFlash['data-flashing']}
-          data-flash-parity={difficultyFlash['data-flash-parity']}
-          value={spell.difficulty}
-          onChange={(e) => void rowPatch.patch('difficulty', e.target.value as SpellDifficulty)}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block md:hidden">Base cost</span>
+        {canWrite ? (
+          <input
+            aria-label={`${spell.name} base cost`}
+            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
+            {...costField.inputProps}
+          />
+        ) : (
+          <span className="num block text-right">{spell.baseEnergyCost}</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block md:hidden">Effective cost</span>
+        <span
+          className="num block text-right font-medium text-primary"
+          aria-label={`${spell.name} effective cost`}
+          title={`After skill discount: ${spell.effectiveCost} energy to cast${
+            spell.effectiveMaintenanceCost != null
+              ? `, ${spell.effectiveMaintenanceCost} to maintain`
+              : ''
+          }`}
         >
-          {SPELL_DIFFICULTIES.map((d) => (
-            <option key={d}>{d}</option>
-          ))}
-        </select>
-      ) : (
-        <span className="text-xs text-base-content/70 num text-center">IQ/{spell.difficulty}</span>
-      )}
-      {canWrite ? (
-        <input
-          aria-label={`${spell.name} points`}
-          className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right`}
-          {...pointsField.inputProps}
-        />
-      ) : (
-        <span className="num text-right">{spell.points}</span>
-      )}
-      <RollLevelChip
-        level={manaKnown ? spell.level : null}
-        name={spell.name}
-        title={
-          !manaKnown
-            ? 'Waiting for campaign mana'
-            : spell.level == null
-              ? 'No points invested — spells have no default'
-              : undefined
-        }
-        onRoll={(level) => onRoll({ label: spell.name, baseTarget: level })}
-      />
-      {canWrite ? (
-        <input
-          aria-label={`${spell.name} base cost`}
-          className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right`}
-          {...costField.inputProps}
-        />
-      ) : (
-        <span className="num text-right">{spell.baseEnergyCost}</span>
-      )}
-      <span
-        className="num text-right font-medium text-primary"
-        aria-label={`${spell.name} effective cost`}
-        title={`After skill discount: ${spell.effectiveCost} energy to cast${
-          spell.effectiveMaintenanceCost != null
-            ? `, ${spell.effectiveMaintenanceCost} to maintain`
-            : ''
-        }`}
-      >
-        {spell.effectiveCost}
-      </span>
-      <span className="flex gap-1 justify-end">
-        {canWrite && (
+          {spell.effectiveCost}
+        </span>
+      </div>
+      {canWrite && (
+        <span className="col-span-2 flex flex-wrap justify-end gap-1 md:col-span-1 md:flex-nowrap">
           <button
             type="button"
             className="btn btn-primary btn-xs"
@@ -373,26 +399,24 @@ function SpellRow({
           >
             Cast
           </button>
-        )}
-        {canWrite && spell.maintenanceCost != null && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs"
-            onClick={() => onCast(spell, 'maintain')}
-            disabled={!rowCastable}
-            aria-label={`Maintain ${spell.name}`}
-            title={
-              rowCastable
-                ? `Pay the maintenance cost (${spell.effectiveMaintenanceCost ?? spell.maintenanceCost} after discount) to keep this spell running`
-                : spell.level == null
-                  ? 'No points invested — this spell has no skill level to cast against'
-                  : 'This character cannot cast here — see the mana notice above'
-            }
-          >
-            Maint
-          </button>
-        )}
-        {canWrite && (
+          {spell.maintenanceCost != null && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={() => onCast(spell, 'maintain')}
+              disabled={!rowCastable}
+              aria-label={`Maintain ${spell.name}`}
+              title={
+                rowCastable
+                  ? `Pay the maintenance cost (${spell.effectiveMaintenanceCost ?? spell.maintenanceCost} after discount) to keep this spell running`
+                  : spell.level == null
+                    ? 'No points invested — this spell has no skill level to cast against'
+                    : 'This character cannot cast here — see the mana notice above'
+              }
+            >
+              Maint
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-ghost btn-xs"
@@ -401,8 +425,8 @@ function SpellRow({
           >
             ✕
           </button>
-        )}
-      </span>
+        </span>
+      )}
       {spell.level != null && bonusEffects.length > 0 && (
         <div className="col-span-full">
           <ModifierBreakdown
@@ -509,8 +533,8 @@ export function SpellsPanel({
   const castable = characterCanCast(character);
 
   return (
-    <section className="card space-y-3 p-5">
-      <header className="flex items-baseline justify-between">
+    <section className="card space-y-3 p-4 sm:p-5">
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
           <p className="label-eyebrow">Spells</p>
           <h2 className="font-display text-2xl">Known spells</h2>
@@ -531,8 +555,8 @@ export function SpellsPanel({
       {character.spells.length === 0 ? (
         <p className="text-sm text-base-content/60">No spells learned yet.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <div className="grid min-w-[31rem] grid-cols-[1fr_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] gap-2 label-eyebrow border-b border-base-300 pb-1">
+        <div>
+          <div className="label-eyebrow hidden grid-cols-[minmax(0,1fr)_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] gap-2 border-b border-base-300 pb-1 md:grid">
             <span>Spell</span>
             <span>College</span>
             <span>Diff</span>
@@ -542,7 +566,7 @@ export function SpellsPanel({
             <span className="text-right">Cost</span>
             <span />
           </div>
-          <ul className="min-w-[31rem]">
+          <ul>
             {character.spells.map((s) => (
               <SpellRow
                 key={s.id}
