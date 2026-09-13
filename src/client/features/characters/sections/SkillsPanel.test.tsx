@@ -33,6 +33,21 @@ const picks = vi.hoisted(() =>
     attribute: 'DX',
     difficulty: 'E',
     defaultSpecialization: specialty,
+    specializationPolicy: {
+      kind: 'required_catalog' as const,
+      options:
+        specialty === 'Pistol'
+          ? [
+              { name: 'Pistol' },
+              {
+                name: 'Revolver',
+                description: 'Revolver training',
+                prerequisites: 'Revolver permit',
+                defaults: [{ kind: 'attribute' as const, attribute: 'DX' as const, modifier: -5 }],
+              },
+            ]
+          : [{ name: specialty }],
+    },
     techLevel: 8 + index,
     description: `${specialty} training`,
     source: 'B198',
@@ -273,6 +288,19 @@ describe('SkillsPanel', () => {
       flashBus.emit({ key: 'character_skill:char-1:create', reason: 'Library link rejected' }),
     );
     expect(screen.getByLabelText('Skill').closest('form')).toHaveAttribute('data-flashing', 'true');
+  });
+
+  it('copies a selected catalog specialization and its per-specialty overrides', async () => {
+    renderPanel({ ...makeCharacter([]), campaignId: '0193b3c0-f1f0-7000-8000-00000000c002' }, true);
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Pistol' }));
+    fireEvent.change(screen.getByLabelText('Specialization'), { target: { value: 'Revolver' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0].attemptedValue).toMatchObject({
+      specialization: 'Revolver',
+      defaults: [{ kind: 'attribute', attribute: 'DX', modifier: -5 }],
+      notes: 'Revolver training\n\nSource: B198\n\nPrerequisites: Revolver permit',
+    });
   });
 
   it('detaches picked metadata after a manual name change', async () => {

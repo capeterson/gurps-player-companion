@@ -120,6 +120,37 @@ it('round-trips known, absent and explicit no-default skill declarations', () =>
   );
 });
 
+it('round-trips specialization catalogs and structured default matchers', () => {
+  const skill = librarySkillCreate.parse({
+    name: 'Armoury',
+    attribute: 'IQ',
+    difficulty: 'A',
+    specializationPolicy: {
+      kind: 'required_catalog',
+      options: [
+        {
+          name: 'Small Arms',
+          description: 'Firearms and beam weapons.',
+          defaults: [
+            { kind: 'skill', name: 'Guns', specialization: { kind: 'any' }, modifier: -4 },
+          ],
+        },
+      ],
+    },
+  });
+  const yaml = emitLibraryYaml({
+    traits: [],
+    skills: [skill],
+    spells: [],
+    items: [],
+    languages: [],
+    techniques: [],
+    styles: [],
+  });
+  expect(yaml).toContain('version: 8');
+  expect(parseLibraryYaml(yaml).library.skills[0]).toEqual(skill);
+});
+
 // v3: a fully-loaded item (weapon w/ skill/db/ranged, container fields,
 // powerstone, magic item), a leveled trait with variants + effects, and a
 // campaign block with manaLevel.
@@ -415,7 +446,7 @@ describe('emitLibraryYaml', () => {
     expect(second).toBe(first);
   });
 
-  it('upgrades a v3 document to the current v7 shape byte-stably', () => {
+  it('upgrades a v3 document to the current v8 shape byte-stably', () => {
     const doc = parseLibraryYaml(SAMPLE_V3);
     const first = emitLibraryYaml({
       campaign: doc.campaign,
@@ -427,7 +458,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 7');
+    expect(first).toContain('version: 8');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

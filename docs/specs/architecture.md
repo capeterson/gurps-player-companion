@@ -249,6 +249,9 @@ Tables (grouped):
   `campaign_library_techniques`, `campaign_library_styles`, plus
   online-only live-session `encounters`, `encounter_combatants`, and
   `encounter_effects`.
+  `campaign_library_skills.specialization_policy` is JSONB validated by the
+  shared discriminated-union schema; it stores free-form/catalog requirements
+  and per-specialty rule overrides.
 - **Sync/audit infra**: `entity_tombstones` (deletes for cursor backfill),
   `entity_history` (append-only audit log).
 

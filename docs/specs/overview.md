@@ -182,6 +182,11 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Skills** with attribute/difficulty relative levels. A skill
   copied from the library retains its specialization, learned tech level,
   description, source, and prerequisites (the latter three in notes).
+  Library definitions explicitly declare whether specialization is forbidden,
+  optional, or required and whether it is free-form or selected from a catalog.
+  Catalog choices can override description, prerequisites, and defaults. The
+  REST, sync, and MCP copy paths enforce the policy, canonicalize catalog names,
+  and materialize the selected option's defaults and generated notes.
   Specialized skills use the compact `Name/Specialization` format consistently
   across sheet rows, rolls, history, combat bindings, and GM lookup. An applied
   skill modifier is marked by a small warning-colored `✦` beside the skill name;
@@ -192,7 +197,8 @@ on any sheet the viewer can edit — their own — it always shows).
   declarations: attribute plus offset or another trained skill plus offset.
   An empty list means no default; absent/null legacy definitions mean unknown,
   shown with an explanatory tooltip and no invented roll target at zero points.
-  Defaults are authored through library YAML/API and character REST/sync fields.
+  Defaults are authored through library YAML/API and character REST/sync fields;
+  skill-source declarations support exact, same-specialty, and any-specialty matching.
   Difficulty never decides whether a default exists, including Very Hard skills.
   Basic-attribute defaults cap their source ST/DX/IQ/HT at 20 before applying
   the listed penalty (B173). Purchased levels and learned-skill defaults remain
@@ -534,6 +540,8 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   for sharing between campaigns. The top-nav **Library** page (`/library`,
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
+  Library skill forms also author first-class free-form/catalog specialization
+  policies and per-catalog-option rule overrides; portable YAML v8 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal, e.g. 13) and **location** (free-form text, e.g. "The

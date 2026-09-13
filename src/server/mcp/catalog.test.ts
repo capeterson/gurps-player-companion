@@ -124,6 +124,39 @@ describe('MCP canonical schema conversion', () => {
     }
   });
 
+  test('advertises library specialization policies and structured default matchers', () => {
+    const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
+    const id = '0198aa77-1111-7111-8111-111111111111';
+    for (const command of ['create', 'update'] as const) {
+      const tool = tools.find((entry) => entry.policy.tool === `gpc_${command}_library_skill`);
+      if (!tool) throw new Error(`missing library skill ${command} tool`);
+      expect(
+        tool.validateInput({
+          path: { id, ...(command === 'update' ? { skillId: id } : {}) },
+          body: {
+            ...(command === 'create' ? { name: 'Armoury', attribute: 'IQ', difficulty: 'A' } : {}),
+            specializationPolicy: {
+              kind: 'required_catalog',
+              options: [
+                {
+                  name: 'Small Arms',
+                  defaults: [
+                    {
+                      kind: 'skill',
+                      name: 'Guns',
+                      specialization: { kind: 'any' },
+                      modifier: -4,
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        }),
+      ).toBe(true);
+    }
+  });
+
   test('preserves nullable refs, unconstrained values, enums and exclusive numeric bounds', () => {
     const ajv = new Ajv({ strict: false });
     const schema = toJsonSchema({

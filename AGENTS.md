@@ -41,6 +41,17 @@ requirement — not optional documentation.**
   means adding a new `docs/specs/*.md` and linking it from `overview.md`'s
   document map and this section.
 
+## Isolate Docker Compose per worktree
+
+An agent working in a Git worktree MUST create and use that worktree's own
+Docker Compose stack. Give it a stable, worktree-specific project name (for
+example with `docker compose -p <unique-worktree-name>`) so containers,
+networks, and named volumes are never shared with another agent's stack.
+Assign worktree-specific host ports as well, or omit host port publishing when
+the services are accessed only inside Compose. Never recreate, migrate, stop,
+or run tests in a stack belonging to another checkout; tear down only the exact
+project created for the current worktree.
+
 ## Interaction design rules
 
 ### 1. Never silently discard user edits — queue them client-side

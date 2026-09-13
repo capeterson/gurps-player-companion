@@ -22,6 +22,44 @@ import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
 
 const tagList = z.array(z.string().min(1).max(40)).default([]);
 
+export const librarySkillSpecialization = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    description: z.string().max(20_000).nullable().optional(),
+    prerequisites: z.string().max(20_000).nullable().optional(),
+    defaults: skillDefaults.optional(),
+  })
+  .strict();
+
+const specializationCatalog = z
+  .array(librarySkillSpecialization)
+  .min(1)
+  .max(100)
+  .superRefine((options, ctx) => {
+    const seen = new Set<string>();
+    options.forEach((option, index) => {
+      const key = option.name.trim().replace(/\s+/g, ' ').toLowerCase();
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'name'],
+          message: 'specialization names must be unique',
+        });
+      }
+      seen.add(key);
+    });
+  });
+
+/** Whether a copied library skill accepts or requires a specialization. */
+export const librarySkillSpecializationPolicy = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z.object({ kind: z.literal('required_freeform') }).strict(),
+  z.object({ kind: z.literal('optional_freeform') }).strict(),
+  z.object({ kind: z.literal('required_catalog'), options: specializationCatalog }).strict(),
+  z.object({ kind: z.literal('optional_catalog'), options: specializationCatalog }).strict(),
+]);
+export type LibrarySkillSpecializationPolicy = z.infer<typeof librarySkillSpecializationPolicy>;
+
 // ---------- Library entities (server-side persisted shape) ----------
 
 export const libraryTraitOut = z.object({
@@ -81,6 +119,7 @@ export const librarySkillOut = z.object({
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
   defaultSpecialization: z.string().max(160).nullable(),
+  specializationPolicy: librarySkillSpecializationPolicy,
   defaults: skillDefaults.optional(),
   prerequisites: z.string().max(20_000).nullable(),
   situationalModifiers: z.array(situationalModifier).default([]),
@@ -97,6 +136,7 @@ export const librarySkillCreate = z
     description: z.string().max(20_000).nullable().optional(),
     source: z.string().max(40).nullable().optional(),
     defaultSpecialization: z.string().max(160).nullable().optional(),
+    specializationPolicy: librarySkillSpecializationPolicy.optional(),
     defaults: skillDefaults.optional(),
     prerequisites: z.string().max(20_000).nullable().optional(),
     situationalModifiers: z.array(situationalModifier).default([]),
@@ -346,7 +386,8 @@ export const importResult = z.object({
  * v1 docs (pre-effects), v2 docs (effects on traits/skills), v3 docs
  * (container/powerstone/magic-item item fields + campaign.manaLevel), v4
  * docs (languages + techniques + styles sections), v5 docs (item enchantments),
- * v6 docs (explicit skill defaults), and v7 docs (weapon-scoped effects) all parse.
+ * v6 docs (explicit skill defaults), v7 docs (weapon-scoped effects), and v8
+ * docs (skill specialization policies and structured default matchers) all parse.
  * Schema unions on a literal version
  * field so older library files keep round-tripping without mutation.
  * Older docs that omit the newer fields get their defaults (empty
@@ -360,6 +401,7 @@ export const libraryYamlVersion = z.union([
   z.literal(5),
   z.literal(6),
   z.literal(7),
+  z.literal(8),
 ]);
 
 export const libraryYamlDoc = z
@@ -468,6 +510,7 @@ export const libraryPortableFieldManifest = {
     description: true,
     source: true,
     defaultSpecialization: true,
+    specializationPolicy: true,
     defaults: true,
     prerequisites: true,
     situationalModifiers: true,

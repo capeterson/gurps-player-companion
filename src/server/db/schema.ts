@@ -30,7 +30,10 @@ import {
 // columns and their owning schemas lives in docs/specs/json-fields.md.
 import type { XpAward } from '../../shared/schemas/adventureLog.ts';
 import type { CampaignHouseRules } from '../../shared/schemas/campaign.ts';
-import type { StyleTechniqueRef } from '../../shared/schemas/campaignLibrary.ts';
+import type {
+  LibrarySkillSpecializationPolicy,
+  StyleTechniqueRef,
+} from '../../shared/schemas/campaignLibrary.ts';
 import type { TempEffect } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { CombatantConditionsField, EffectDuration } from '../../shared/schemas/encounter.ts';
@@ -1005,6 +1008,11 @@ export const campaignLibrarySkills = pgTable(
     description: text('description'),
     source: varchar('source', { length: 40 }),
     defaultSpecialization: varchar('default_specialization', { length: 160 }),
+    /** Validated by librarySkillSpecializationPolicy (campaignLibrary.ts). */
+    specializationPolicy: jsonb('specialization_policy')
+      .$type<LibrarySkillSpecializationPolicy>()
+      .notNull()
+      .default({ kind: 'none' }),
     /** skillDefaults in shared/schemas/skill.ts. */
     defaults: jsonb('defaults').$type<import('../../shared/schemas/skill.ts').SkillDefaults>(),
     prerequisites: text('prerequisites'),

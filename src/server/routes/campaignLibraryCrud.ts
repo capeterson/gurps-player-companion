@@ -119,7 +119,10 @@ export function registerLibraryCrud<
   // the precise `{ id, [paramName]: string }` shape through `createRoute`)
   // is the honest type here — the handlers below read `params[cfg.paramName]`
   // against the `ItemParams<TParamName>` type declared explicitly instead.
-  const itemParams: z.AnyZodObject = z.object({ id: uuid, [cfg.paramName]: uuid });
+  const itemParams: z.AnyZodObject = z.object({
+    id: uuid,
+    [cfg.paramName]: uuid,
+  });
 
   loose.openapi(
     createRoute({
@@ -130,10 +133,17 @@ export function registerLibraryCrud<
       summary: cfg.summaries.post,
       request: {
         params: z.object({ id: uuid }),
-        body: { required: true, content: { 'application/json': { schema: cfg.createSchema } } },
+        body: {
+          required: true,
+          content: { 'application/json': { schema: cfg.createSchema } },
+        },
       },
       responses: {
-        201: { description: 'Created', content: { 'application/json': { schema: cfg.outSchema } } },
+        201: {
+          description: 'Created',
+          content: { 'application/json': { schema: cfg.outSchema } },
+        },
+        400: errorResponse('Validation failed'),
         403: errorResponse('Forbidden'),
         409: errorResponse('Duplicate name'),
       },
@@ -143,6 +153,7 @@ export function registerLibraryCrud<
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
       await requireCampaignOwner(id, user.id);
+      cfg.validateCreate?.(body);
       let row: TTable['$inferSelect'];
       try {
         row = await withAudit(user.id, undefined, async (tx) => {
@@ -176,10 +187,17 @@ export function registerLibraryCrud<
       summary: cfg.summaries.patch,
       request: {
         params: itemParams,
-        body: { required: true, content: { 'application/json': { schema: cfg.updateSchema } } },
+        body: {
+          required: true,
+          content: { 'application/json': { schema: cfg.updateSchema } },
+        },
       },
       responses: {
-        200: { description: 'Updated', content: { 'application/json': { schema: cfg.outSchema } } },
+        200: {
+          description: 'Updated',
+          content: { 'application/json': { schema: cfg.outSchema } },
+        },
+        400: errorResponse('Validation failed'),
         403: errorResponse('Forbidden'),
         404: errorResponse('Not found'),
         409: errorResponse('Duplicate name'),
@@ -205,7 +223,11 @@ export function registerLibraryCrud<
             .set(updates)
             .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
             .returning()) as TTable['$inferSelect'][];
-          if (!updated) throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+          if (!updated)
+            throw new HTTPException(404, {
+              message: `${cfg.entityLabel} not found`,
+            });
+          cfg.validateRow?.(updated);
           await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, id, itemId);
           return updated;
         });
@@ -250,11 +272,15 @@ export function registerLibraryCrud<
           .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
           .returning({ id: cfg.table.id })) as { id: string }[];
         if (deleted.length === 0)
-          throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+          throw new HTTPException(404, {
+            message: `${cfg.entityLabel} not found`,
+          });
         return deleted;
       });
       if (result.length === 0)
-        throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+        throw new HTTPException(404, {
+          message: `${cfg.entityLabel} not found`,
+        });
       await publishLibraryInvalidation(id);
       return c.body(null, 204);
     },
@@ -296,6 +322,7 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
   const incomingKeys = new Set<string>();
 
   for (const entry of incoming ?? []) {
+    cfg.validateCreate?.(entry);
     const key = cfg.keyOf(entry as { name: string; kind?: string });
     incomingKeys.add(key);
     const existingRow = existingByKey.get(key);

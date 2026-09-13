@@ -845,7 +845,11 @@ describe('owned mechanics survive source lifecycle changes', () => {
                 basePoints: 10,
                 variants: [{ name: 'Chosen', pointCostDelta: 2 }],
               }
-            : { attribute: 'DX', difficulty: 'A' }),
+            : {
+                attribute: 'DX',
+                difficulty: 'A',
+                specializationPolicy: { kind: 'optional_freeform' },
+              }),
         };
         const sourceResponse = await request(`/campaigns/${campaign.id}/library/${kind}`, template);
         expect(sourceResponse.status).toBe(201);

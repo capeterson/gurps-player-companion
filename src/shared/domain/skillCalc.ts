@@ -33,7 +33,7 @@ import {
 } from '../constants/skills.ts';
 import type { SkillDefaults } from '../schemas/skill.ts';
 import type { DerivedStats } from './characterCalc.ts';
-import { skillDisplayName } from './defenseCalc.ts';
+import { skillDisplayName, splitSkillReference } from './defenseCalc.ts';
 
 /**
  * Offset for an invested skill, per the B170 ladder.  Callers must
@@ -84,6 +84,30 @@ export interface TrainedSkillDefaultSource {
   level: number;
 }
 
+function skillDefaultMatches(
+  declaration: Extract<NonNullable<SkillDefaults>[number], { kind: 'skill' }>,
+  source: TrainedSkillDefaultSource,
+  targetSpecialization: string | null | undefined,
+): boolean {
+  const normalize = (value: string | null | undefined) =>
+    value?.trim().replace(/\s+/g, ' ').toLowerCase() ?? '';
+  const legacy = splitSkillReference(declaration.name);
+  const sourceReference = splitSkillReference(skillDisplayName(source.name, source.specialization));
+  if (normalize(sourceReference.name) !== normalize(legacy.name)) return false;
+  const matcher = declaration.specialization;
+  if (matcher === undefined) {
+    return normalize(sourceReference.specialization) === normalize(legacy.specialization);
+  }
+  if (typeof matcher === 'string') {
+    return normalize(sourceReference.specialization) === normalize(matcher);
+  }
+  if (matcher.kind === 'any') return true;
+  if (matcher.kind === 'same') {
+    return normalize(sourceReference.specialization) === normalize(targetSpecialization);
+  }
+  return normalize(sourceReference.specialization) === normalize(matcher.value);
+}
+
 /** Point value of a default on the target skill's own learning ladder. */
 function defaultPointCredit(level: number, attribute: number, difficulty: SkillDifficulty): number {
   const steps = level - attribute - DIFFICULTY_BASE_OFFSET[difficulty];
@@ -105,19 +129,16 @@ export function computeSkillLevel(
   derived: DerivedStats,
   defaults: SkillDefaults = null,
   trainedSkills: readonly TrainedSkillDefaultSource[] = [],
+  targetSpecialization?: string | null,
 ): number | null {
   const attr = attributeLevelFor(attribute, derived);
   let best = points > 0 ? attr + skillOffset(difficulty, points) : null;
-  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
   for (const candidate of defaults ?? []) {
     const levels =
       candidate.kind === 'attribute'
         ? [defaultAttributeLevel(candidate.attribute, derived) + candidate.modifier]
         : trainedSkills
-            .filter((source) => {
-              const wanted = normalize(skillDisplayName(candidate.name, candidate.specialization));
-              return normalize(skillDisplayName(source.name, source.specialization)) === wanted;
-            })
+            .filter((source) => skillDefaultMatches(candidate, source, targetSpecialization))
             .map((source) => source.level + candidate.modifier);
     for (const level of levels) {
       let improved = level;
@@ -176,6 +197,7 @@ export function resolveSkillLevels(
             },
           ]
         : [],
+      skill.specialization,
     );
     levels.set(skill.id, level);
     return level;
@@ -207,6 +229,7 @@ export function resolveSkillLevels(
             derived,
             [declaration],
             [{ name: source.name, specialization: source.specialization, level: sourceLevel }],
+            skill.specialization,
           );
           if (candidate !== null && (best === null || candidate > best)) {
             best = candidate;
