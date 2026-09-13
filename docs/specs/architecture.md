@@ -310,6 +310,13 @@ Key PG18 / trigger machinery, layered by migration:
   (**server + shared only**) + `openapi:check` (contract drift). It does **not**
   run the client vitest or Playwright suites — run those separately for client
   changes. This is the baseline gate before finishing a change.
+- Per-PR GitHub CI runs lint, typechecking, server/shared tests, client tests,
+  contract drift checks, and the production build; it deliberately does not
+  install Playwright or a browser. PR authors run relevant browser automation
+  locally. The heavyweight delegated OAuth/MCP/offline Chromium acceptance is a
+  mandatory named-image promotion gate: it runs against the selected source
+  image and must pass before any version tag, image alias, or GitHub Release is
+  created.
 - **Guard tests** enforce the extension invariants: `historyTriggers.test.ts`
   (every syncable table has a history trigger), `auditContext.test.ts` (no bare
   `getDb().insert/update/delete` in mutating route files). A forgotten step in

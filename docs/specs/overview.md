@@ -818,6 +818,11 @@ Things that repeatedly surprise people working in this repo:
    covers e2e. `npm run check` = lint + typecheck + **`bun test`
    (server+shared only)** + OpenAPI drift — it does **not** run the client
    vitest or Playwright suites, so run those separately for client changes.
+   Per-PR GitHub CI includes client tests and the production build but
+   intentionally omits browser installation/automation. PR authors run relevant
+   Playwright coverage locally; promotion to a named image release runs the
+   delegated OAuth/MCP/offline Chromium acceptance against the selected source
+   image before creating any release tags or aliases.
 
 8. **When in doubt, read the file's top comment and the relevant `AGENTS.md`
    rule** before editing — most invariants are annotated at the call site

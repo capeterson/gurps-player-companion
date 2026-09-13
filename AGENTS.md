@@ -402,6 +402,18 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   current merge target (normally `origin/main`). Resolve conflicts and rerun
   the appropriate validation before pushing and creating the PR; do not rely
   on a stale local target branch.
+- Browser automation is intentionally excluded from the per-PR GitHub CI job.
+  When authoring a PR that can affect browser or runtime behaviour, agents MUST
+  run the relevant Playwright coverage locally before handoff. Changes touching
+  delegated OAuth, MCP, offline convergence, the service worker, or production
+  serving MUST run `tests/e2e/mcp-oauth.spec.ts` with Chromium against both the
+  development server and the production build; use `MCP_E2E_START_SERVER=1`
+  and add `MCP_E2E_BUILT_SERVER=1` for the built pass.
+- Named image promotion is the mandatory remote browser gate. The promotion
+  workflow MUST run the delegated OAuth/MCP/offline Playwright acceptance test
+  against the selected source image before it creates a git tag, image version
+  aliases (including `latest`), or a GitHub Release. Do not bypass or reorder
+  that gate.
 
 ## Database backend
 
