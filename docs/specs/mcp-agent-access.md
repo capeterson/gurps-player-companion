@@ -229,7 +229,10 @@ authorization code, PKCE S256, and bearer protected resources need only the
 
 - ChatGPT can identify itself with its HTTPS Client ID Metadata Document. GPC
   fetches and validates that document on first authorization and caches the
-  resulting public-client registration for at most one hour.
+  resulting public-client registration for at most one hour. The SSRF-safe
+  fetch connects directly to a validated public DNS address while retaining
+  the original hostname for TLS certificate verification and HTTP virtual
+  hosting; it does not perform a second, rebinding-prone lookup.
 - Claude and other DCR clients can register their callback automatically at
   `/oauth/register`. GPC creates an opaque public client ID and never issues a
   client secret.
