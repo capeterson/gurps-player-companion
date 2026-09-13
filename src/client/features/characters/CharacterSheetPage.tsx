@@ -15,6 +15,7 @@ import {
 } from '../../../shared/domain/attributeTooltips.ts';
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
 import { formatScaled } from '../../../shared/format/number.ts';
+import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import {
   MANUAL_TEMP_EFFECT_ID,
   TEMP_STAT_AXES,
@@ -1528,7 +1529,7 @@ export function CharacterSheetPage() {
   // this REST call.
   const campaigns = useQuery({
     queryKey: ['campaigns'],
-    queryFn: () => api<CampaignSummary[]>('/campaigns'),
+    queryFn: () => api<CampaignOut[]>('/campaigns'),
     // Always fetch when the user is known so the Identity panel can offer
     // the full campaign list — even for characters not yet in a campaign.
     enabled: !!me.data,
