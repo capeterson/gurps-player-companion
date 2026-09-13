@@ -95,8 +95,9 @@ export interface MatchedSkill {
  * matches against.
  */
 export function skillDisplayName(name: string, specialization: string | null | undefined): string {
+  const base = name.trim();
   const spec = specialization?.trim();
-  return spec ? `${name}/${spec}` : name;
+  return spec ? `${base}/${spec}` : base;
 }
 
 export interface SkillReferenceParts {

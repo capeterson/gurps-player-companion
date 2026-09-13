@@ -135,6 +135,7 @@ describe('parseParryString', () => {
 describe('skillDisplayName', () => {
   it('appends the specialization with a slash when present', () => {
     expect(skillDisplayName('Guns', 'Pistol')).toBe('Guns/Pistol');
+    expect(skillDisplayName(' guns ', ' pistol ')).toBe('guns/pistol');
   });
 
   it('trims whitespace-only or blank specialization down to the bare name', () => {
