@@ -330,7 +330,10 @@ describe('skillBonusFor', () => {
     [' GUNS ', '  Auto   Pistol ', 'guns', 'auto pistol', 2],
     ['Guns', 'Pistol', 'Guns (Pistol)', undefined, 2],
     ['Guns', 'Rifle', 'Guns (Pistol)', undefined, 0],
+    ['Guns', 'Pistol', 'Guns/Pistol', undefined, 2],
+    ['Guns', 'Rifle', 'Guns/Pistol', undefined, 0],
     ['Guns (Pistol)', null, 'Guns', 'Pistol', 2],
+    ['Guns/Pistol', null, 'Guns', 'Pistol', 2],
     ['Guns', 'Rifle', 'Guns (Pistol)', 'Rifle', 2],
   ] as const)('matches %s/%s against %s/%s: %s', (name, spec, effectName, effectSpec, total) => {
     const effects = resolveEffects(
@@ -498,7 +501,7 @@ describe('weapon-scoped effects', () => {
       new Set(),
     );
     const matches = resolveWeaponEffectMatches(resolved, [
-      { id: 'p2', name: 'Pistol B', equipped: true, weaponData: { skill: 'Guns (Pistol)' } },
+      { id: 'p2', name: 'Pistol B', equipped: true, weaponData: { skill: 'Guns/Pistol' } },
       { id: 'r1', name: 'Rifle', equipped: true, weaponData: { skill: 'Guns (Rifle)' } },
       { id: 'p1', name: 'Pistol A', equipped: true, weaponData: { skill: 'Guns (Pistol)' } },
       { id: 'p3', name: 'Packed pistol', equipped: false, weaponData: { skill: 'Guns (Pistol)' } },

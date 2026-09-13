@@ -29,6 +29,7 @@ import {
   type WeaponSelector,
 } from '../schemas/effects.ts';
 import type { CharacterAttrs } from './characterCalc.ts';
+import { splitSkillReference } from './defenseCalc.ts';
 
 export interface CharacterTraitWithEffects {
   readonly id: string;
@@ -178,10 +179,10 @@ export function normalizeMechanicalName(value: string): string {
 }
 
 function splitSkillName(value: string): { name: string; specialty: string } {
-  const match = value.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+  const parsed = splitSkillReference(value);
   return {
-    name: normalizeMechanicalName(match?.[1] ?? value),
-    specialty: normalizeMechanicalName(match?.[2] ?? ''),
+    name: normalizeMechanicalName(parsed.name),
+    specialty: normalizeMechanicalName(parsed.specialization),
   };
 }
 
@@ -390,8 +391,9 @@ export function applyEffectsToAttrs(
 /**
  * Sum ACTIVE skill bonuses matching name and specialization. Unqualified
  * effects cover every specialty; explicit specialties match exactly. `*`
- * matches any name/specialty in its own field. Legacy "Name (Specialty)"
- * strings retain their specialty; a separate specialty field takes priority.
+ * matches any name/specialty in its own field. Current "Name/Specialty" and
+ * legacy "Name (Specialty)" strings retain their specialty; a separate
+ * specialty field takes priority.
  */
 export function skillBonusFor(
   skillName: string,
@@ -400,10 +402,10 @@ export function skillBonusFor(
 ): { total: number; sources: ReadonlyArray<ResolvedEffect> } {
   const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
   function split(name: string, specialty?: string | null) {
-    const match = name.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+    const parsed = splitSkillReference(name);
     return {
-      name: normalize(match?.[1] ?? name),
-      specialty: normalize(specialty?.trim() || match?.[2] || ''),
+      name: normalize(parsed.name),
+      specialty: normalize(specialty?.trim() || parsed.specialization),
     };
   }
   const wanted = split(skillName, specialization);

@@ -38,14 +38,7 @@ export function skillEffectsForRow(
   ] as ResolvedEffectOut[];
 }
 
-export function ModifierBreakdown({
-  baseLabel,
-  baseValue,
-  inputEffects = [],
-  globalEffects = [],
-  weaponEffects = [],
-  finalValue,
-}: {
+export interface ModifierBreakdownProps {
   baseLabel: string;
   baseValue: number | string;
   /** Effects already folded into the base input (for example weapon skill). */
@@ -53,10 +46,24 @@ export function ModifierBreakdown({
   globalEffects?: readonly ResolvedEffectOut[];
   weaponEffects?: readonly ResolvedEffectOut[];
   finalValue: number | string;
-}) {
-  if (inputEffects.length === 0 && globalEffects.length === 0 && weaponEffects.length === 0) {
-    return null;
-  }
+}
+
+function hasModifierEffects({
+  inputEffects = [],
+  globalEffects = [],
+  weaponEffects = [],
+}: ModifierBreakdownProps): boolean {
+  return inputEffects.length > 0 || globalEffects.length > 0 || weaponEffects.length > 0;
+}
+
+export function ModifierBreakdownContent({
+  baseLabel,
+  baseValue,
+  inputEffects = [],
+  globalEffects = [],
+  weaponEffects = [],
+  finalValue,
+}: ModifierBreakdownProps) {
   const source = (effect: ResolvedEffectOut, index: number) => (
     <li key={`${effect.sourceId}-${effect.target}-${effect.value}-${index}`}>
       {effect.value >= 0 ? '+' : ''}
@@ -65,31 +72,40 @@ export function ModifierBreakdown({
     </li>
   );
   return (
+    <div className="not-num text-left text-[11px] text-base-content/70">
+      <div>
+        {baseLabel}: {baseValue}
+      </div>
+      {inputEffects.length > 0 && (
+        <>
+          <div className="mt-1 font-medium">Skill effects before defense formula</div>
+          <ul>{inputEffects.map(source)}</ul>
+        </>
+      )}
+      {globalEffects.length > 0 && (
+        <>
+          <div className="mt-1 font-medium">Global effects</div>
+          <ul>{globalEffects.map(source)}</ul>
+        </>
+      )}
+      {weaponEffects.length > 0 && (
+        <>
+          <div className="mt-1 font-medium">Weapon effects</div>
+          <ul>{weaponEffects.map(source)}</ul>
+        </>
+      )}
+      <div className="mt-1 font-medium">Final: {finalValue}</div>
+    </div>
+  );
+}
+
+export function ModifierBreakdown(props: ModifierBreakdownProps) {
+  if (!hasModifierEffects(props)) return null;
+  return (
     <details className="not-num text-[11px] text-base-content/60">
       <summary className="cursor-pointer">Modifiers</summary>
       <div className="mt-1 rounded bg-base-200/60 p-2">
-        <div>
-          {baseLabel}: {baseValue}
-        </div>
-        {inputEffects.length > 0 && (
-          <>
-            <div className="mt-1 font-medium">Skill effects before defense formula</div>
-            <ul>{inputEffects.map(source)}</ul>
-          </>
-        )}
-        {globalEffects.length > 0 && (
-          <>
-            <div className="mt-1 font-medium">Global effects</div>
-            <ul>{globalEffects.map(source)}</ul>
-          </>
-        )}
-        {weaponEffects.length > 0 && (
-          <>
-            <div className="mt-1 font-medium">Weapon effects</div>
-            <ul>{weaponEffects.map(source)}</ul>
-          </>
-        )}
-        <div className="mt-1 font-medium">Final: {finalValue}</div>
+        <ModifierBreakdownContent {...props} />
       </div>
     </details>
   );

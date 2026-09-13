@@ -114,7 +114,9 @@ on any sheet the viewer can edit — their own — it always shows).
   Lift rounds to the nearest whole number once it reaches 10 (B15). All
   GURPS math is pure and shared (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
-  disadvantage / quirk cap warnings.
+  disadvantage / quirk cap warnings. Warning codes stay stable for API and
+  dismissal persistence, while every active and dismissed warning is presented
+  with a human-readable label; legacy unknown codes receive a readable fallback.
 - **Offline mechanical definitions.** Trait/skill cursor rows carry validated
   `libraryMechanics` declarations with source ID, campaign, revision and explicit
   availability. Both player and GM readers derive from these durable rows, with
@@ -180,8 +182,12 @@ on any sheet the viewer can edit — their own — it always shows).
 - **Skills** with attribute/difficulty relative levels. A skill
   copied from the library retains its specialization, learned tech level,
   description, source, and prerequisites (the latter three in notes).
-  Specialized skills have distinct sheet and roll labels; long selected-library
-  captions wrap inside the add form without displacing its controls. Learned TL is
+  Specialized skills use the compact `Name/Specialization` format consistently
+  across sheet rows, rolls, history, combat bindings, and GM lookup. An applied
+  skill modifier is marked by a small warning-colored `✦` beside the skill name;
+  hovering, focusing, or tapping it opens the source breakdown in a tooltip rather
+  than expanding the row. Long selected-library captions wrap inside the add form
+  without displacing its controls. Learned TL is
   independent of later campaign TL changes. Skill **defaults** are copied
   declarations: attribute plus offset or another trained skill plus offset.
   An empty list means no default; absent/null legacy definitions mean unknown,
@@ -222,7 +228,8 @@ on any sheet the viewer can edit — their own — it always shows).
   written penalty doesn't expose the full skill level as a roll target
   until points are bought up. The default skill
   is resolved by name against the sheet — bare name or
-  `Name (Specialization)` — using the skill's *effective* level, so
+  `Name/Specialization` (while accepting legacy parenthesized references) — using
+  the skill's *effective* level, so
   Talents flow through; an unresolvable default renders an em dash with
   a "Skill 'X' not on sheet" tooltip instead of guessing. The default
   line and points are editable per row. A resolved

@@ -4,6 +4,7 @@
  * client-side (for detail expansion).  No imports from server or client code.
  */
 
+import { skillDisplayName, skillReferenceDisplayName } from '../domain/defenseCalc.ts';
 import { formatSigned } from '../format/number.ts';
 import { MANUAL_TEMP_EFFECT_ID } from '../schemas/character.ts';
 import type { HistoryEventOut } from '../schemas/history.ts';
@@ -309,9 +310,15 @@ function summarizeCharacterSkill(
   const attr = next?.attribute ?? old?.attribute ?? '';
   const diff = next?.difficulty ?? old?.difficulty ?? '';
   const spec = next?.specialization ?? old?.specialization;
-  const fullName = spec ? `${name} (${spec})` : name;
+  const fullName = skillDisplayName(String(name), typeof spec === 'string' ? spec : null);
   if (op === 'insert') return `Added skill ${fullName} (${attr}/${diff})`;
-  if (op === 'delete') return `Removed skill ${old?.name ?? ''}`;
+  if (op === 'delete') {
+    const oldSpec = old?.specialization;
+    return `Removed skill ${skillDisplayName(
+      String(old?.name ?? ''),
+      typeof oldSpec === 'string' ? oldSpec : null,
+    )}`;
+  }
   const mechanics = summarizeOwnedMechanics(fullName, old, next);
   if (mechanics) return mechanics;
   const changes = diffRows(old, next);
@@ -363,8 +370,12 @@ function summarizeCharacterTechnique(
 ): string {
   const name = next?.name ?? old?.name ?? 'technique';
   const defaultSkill = next?.defaultSkillName ?? old?.defaultSkillName;
+  const displayedDefault =
+    typeof defaultSkill === 'string' ? skillReferenceDisplayName(defaultSkill) : null;
   if (op === 'insert') {
-    return defaultSkill ? `Added technique ${name} (${defaultSkill})` : `Added technique ${name}`;
+    return displayedDefault
+      ? `Added technique ${name} (${displayedDefault})`
+      : `Added technique ${name}`;
   }
   if (op === 'delete') return `Removed technique ${old?.name ?? ''}`;
   const changes = diffRows(old, next);
@@ -372,7 +383,9 @@ function summarizeCharacterTechnique(
   const c = changes[0] as FieldChange;
   if (c.field === 'points') return `${name} ${c.oldValue} → ${c.newValue} pts`;
   if (c.field === 'difficulty') return `${name} difficulty ${c.oldValue} → ${c.newValue}`;
-  if (c.field === 'defaultSkillName') return `${name} now defaults from ${c.newValue}`;
+  if (c.field === 'defaultSkillName') {
+    return `${name} now defaults from ${skillReferenceDisplayName(String(c.newValue))}`;
+  }
   if (c.field === 'maxLevel') return `${name} max level ${displayValue(c.newValue)}`;
   if (c.field === 'name') return `Renamed technique to ${c.newValue}`;
   return `${name} updated`;

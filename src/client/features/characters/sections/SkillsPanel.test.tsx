@@ -261,7 +261,7 @@ describe('SkillsPanel', () => {
       defaults: picks[0]?.defaults,
       notes: 'Pistol training\n\nSource: B198\n\nPrerequisites: Training',
     });
-    expect(enqueueCreate.mock.calls[0]?.[0].humanName).toBe('skill "Guns (Pistol)"');
+    expect(enqueueCreate.mock.calls[0]?.[0].humanName).toBe('skill "Guns/Pistol"');
     expect(enqueueCreate.mock.calls[0]?.[0].localLibraryMechanics).toMatchObject({
       sourceId: picks[0]?.id,
       effects: picks[0]?.effects,
@@ -324,13 +324,66 @@ describe('SkillsPanel', () => {
       }),
     );
     renderPanel({ ...makeCharacter(skills), techLevel: 4 });
-    expect(screen.getByText('Guns (Pistol) / TL8')).toBeInTheDocument();
-    expect(screen.getByText('Guns (Rifle) / TL8')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll Guns (Pistol)' }));
-    expect(screen.getByRole('dialog', { name: 'Roll Guns (Pistol)' })).toBeInTheDocument();
+    expect(screen.getByText('Guns/Pistol / TL8')).toBeInTheDocument();
+    expect(screen.getByText('Guns/Rifle / TL8')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Guns/Pistol' }));
+    expect(screen.getByRole('dialog', { name: 'Roll Guns/Pistol' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
     const history = JSON.parse(localStorage.getItem('gurps:rollHistory:char-1') ?? '[]');
-    expect(history[0].label).toBe('Guns (Pistol)');
+    expect(history[0].label).toBe('Guns/Pistol');
+  });
+
+  it('keeps the specialization beside the editable base name', () => {
+    renderPanel(
+      makeCharacter([
+        makeSkill({ name: 'Current Affairs', specialization: 'Popular Culture', techLevel: 8 }),
+      ]),
+      true,
+    );
+
+    const name = screen.getByLabelText('Current Affairs/Popular Culture name');
+    const specialization = screen.getByText('/Popular Culture');
+    expect(name).toHaveValue('Current Affairs');
+    expect(specialization.previousElementSibling).toBe(name);
+    expect(specialization.parentElement).toHaveClass('flex');
+  });
+
+  it('shows applied skill modifiers from a compact tooltip affordance', () => {
+    const character = {
+      ...makeCharacter([
+        makeSkill({
+          name: 'Guns',
+          specialization: 'Pistol',
+          level: 12,
+          effectiveLevel: 14,
+        }),
+      ]),
+      effects: [
+        {
+          sourceKind: 'trait',
+          sourceName: 'Gunslinger Talent',
+          sourceId: 'trait-1',
+          target: 'skill',
+          value: 2,
+          skillName: 'Guns',
+          skillSpecialty: 'Pistol',
+          active: true,
+        },
+      ],
+    } as CharacterDetail;
+    renderPanel(character);
+
+    expect(screen.queryByText('Global effects')).not.toBeInTheDocument();
+    expect(screen.queryByText('Modifiers')).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'View Guns/Pistol modifiers' });
+    expect(trigger).toHaveClass('border-warning', 'text-warning');
+
+    fireEvent.mouseEnter(trigger);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Guns/Pistol modifiers');
+    expect(tooltip).toHaveTextContent('Base skill: 12');
+    expect(tooltip).toHaveTextContent('+2 Gunslinger Talent');
+    expect(tooltip).toHaveTextContent('Final: 14');
   });
 
   it('renders a roll button for a skill with a computed level that opens the roll sheet at that target', () => {

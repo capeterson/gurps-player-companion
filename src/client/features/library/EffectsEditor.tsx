@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { skillDisplayName } from '../../../shared/domain/defenseCalc.ts';
 import type { LibraryItemOut } from '../../../shared/schemas/campaignLibrary.ts';
 import {
   EFFECT_TARGETS,
@@ -110,12 +111,12 @@ export function effectPreview(effect: TraitEffect): string {
   const scale = effect.scaling === 'per_level' ? '/level' : '';
   let target = TARGET_LABELS[effect.target];
   if (effect.target === 'skill') {
-    target = `${effect.skillName}${effect.skillSpecialty ? ` (${effect.skillSpecialty})` : ''}`;
+    target = skillDisplayName(effect.skillName ?? '', effect.skillSpecialty);
   }
   const selector = effect.weaponSelector;
   if (selector) {
     if (selector.kind === 'weapon_skill') {
-      target += ` using ${selector.skillName}${selector.skillSpecialty ? ` (${selector.skillSpecialty})` : ''}`;
+      target += ` using ${skillDisplayName(selector.skillName, selector.skillSpecialty)}`;
     } else if (selector.kind === 'weapon_name') target += ` for “${selector.weaponName}”`;
     else if (selector.kind === 'library_item') target += ` for “${selector.libraryItemName}”`;
     else target += ' for selected inventory item';

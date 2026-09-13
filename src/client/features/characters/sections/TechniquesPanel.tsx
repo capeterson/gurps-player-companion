@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { skillReferenceDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import { techniqueBonus } from '../../../../shared/domain/techniqueCalc.ts';
 import type { LibraryTechniqueOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
@@ -175,7 +176,7 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
               <span className="flex items-baseline justify-between gap-2">
                 <span className="truncate">{o.name}</span>
                 <span className="num text-xs text-base-content/70">
-                  {o.defaultSkillName}/{o.difficulty}
+                  {skillReferenceDisplayName(o.defaultSkillName)}/{o.difficulty}
                 </span>
               </span>
             )}
@@ -311,10 +312,11 @@ function TechniqueRow({ characterId, technique, canWrite, onRoll }: TechniqueRow
   };
 
   const bonus = techniqueBonus(technique.points, technique.difficulty, technique.maxLevel);
+  const defaultSkillDisplayName = skillReferenceDisplayName(technique.defaultSkillName);
   const levelTitle =
     technique.level === null
-      ? `Skill "${technique.defaultSkillName}" not on sheet`
-      : `${technique.defaultSkillName} ${technique.defaultSkillLevel}${
+      ? `Skill "${defaultSkillDisplayName}" not on sheet`
+      : `${defaultSkillDisplayName} ${technique.defaultSkillLevel}${
           technique.defaultModifier !== 0
             ? ` ${technique.defaultModifier > 0 ? '+' : ''}${technique.defaultModifier}`
             : ''
@@ -338,7 +340,7 @@ function TechniqueRow({ characterId, technique, canWrite, onRoll }: TechniqueRow
           {...defaultSkillField.inputProps}
         />
       ) : (
-        <span className="text-sm text-base-content/70">{technique.defaultSkillName}</span>
+        <span className="text-sm text-base-content/70">{defaultSkillDisplayName}</span>
       )}
       {canWrite ? (
         <select

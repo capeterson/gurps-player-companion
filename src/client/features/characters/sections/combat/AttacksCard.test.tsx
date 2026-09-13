@@ -288,7 +288,7 @@ describe('AttacksCard', () => {
     } as unknown as CharacterDetail;
     render(<AttacksCard character={character} openRoll={openRoll} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Guns \(Rifle\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Guns\/Rifle/ }));
     const call = openRoll.mock.calls[0] as [RollRequest];
     expect(call[0].baseTarget).toBe(12);
   });

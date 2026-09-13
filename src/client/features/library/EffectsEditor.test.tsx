@@ -29,7 +29,7 @@ describe('EffectsEditor', () => {
       target: { value: 'While aiming' },
     });
 
-    expect(screen.getByText('+1/level to Guns (Pistol) while While aiming')).toBeInTheDocument();
+    expect(screen.getByText('+1/level to Guns/Pistol while While aiming')).toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith([
       {
         target: 'skill',
