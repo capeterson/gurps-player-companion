@@ -6,8 +6,10 @@
  * `docker compose -f docker-compose.dev.yml up` before invoking
  * `bun run test:e2e`.
  *
- * MCP_E2E_START_SERVER=1 starts the app for the delegated-access CI gate.
+ * MCP_E2E_START_SERVER=1 starts the app for local delegated-access acceptance.
  * Its public origin and registered OAuth client come from the environment.
+ * Named image promotion instead starts the candidate container itself and
+ * points this suite at it without asking Playwright to start a server.
  */
 
 import { defineConfig, devices } from '@playwright/test';

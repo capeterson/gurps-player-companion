@@ -290,6 +290,9 @@ The implementation is released only with evidence for these gates:
    agent read/write → player history/cursor observation → revoke flow, and a
    concurrent offline-browser edit case with missed WS delivery. Run the normal
    `check`, client tests for consent/Settings changes, and relevant Playwright tests.
+   PR authors run the browser coverage locally; the named-image promotion
+   workflow reruns the complete Chromium flow against the selected source image
+   and blocks every release tag and alias until it passes.
 5. Document supported clients, their registration flow, canonical public origin,
    proxy/TLS setup, scopes, credential expiry/revocation and backup/cleanup needs.
    Publish a completed operation coverage report. Update overview, architecture,

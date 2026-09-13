@@ -60,9 +60,10 @@ tool schemas and differential fixtures include the new API fields.
 - The complete migration chain applies to fresh Postgres 18. The delegated OAuth
   migration also passes repeat application. Temporary review apps and databases
   are removed after validation.
-- `git diff --check` passes. CI runs contract checks, server/client tests, builds,
-  and browser acceptance for both development and built apps; browser tests use
-  an isolated database.
+- `git diff --check` passes. Per-PR CI runs contract checks, server/client tests,
+  and builds. Browser acceptance is run locally during PR authoring against both
+  development and built apps, then enforced remotely against the selected source
+  image, with an isolated database, before named release promotion.
 
 ## Reproducing validation
 
