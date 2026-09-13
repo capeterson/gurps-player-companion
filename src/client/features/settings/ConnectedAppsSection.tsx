@@ -52,9 +52,9 @@ export function ConnectedAppsSection() {
         {grants.data?.length === 0 && <p className="text-sm text-muted">No connected apps.</p>}
         {grants.data?.map((grant) => (
           <div key={grant.id} className="space-y-2 rounded-box border border-base-300 p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">{grant.clientName}</p>
+            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="break-words font-medium">{grant.clientName}</p>
                 <p className="text-xs text-muted">
                   Connected {new Date(grant.createdAt).toLocaleDateString()}
                 </p>
@@ -66,7 +66,7 @@ export function ConnectedAppsSection() {
               </div>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm text-error"
+                className="btn btn-ghost btn-sm self-end text-error sm:self-auto"
                 disabled={revoke.isPending}
                 onClick={() => revoke.mutate(grant.id)}
               >

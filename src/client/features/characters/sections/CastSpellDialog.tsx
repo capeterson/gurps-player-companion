@@ -218,7 +218,7 @@ export function CastSpellDialog({
   return (
     <dialog ref={ref} className="modal" onClose={onClose} onCancel={onClose}>
       <div className="modal-box max-h-[calc(100dvh-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
-        <h3 className="font-display text-2xl">
+        <h3 className="break-words font-display text-2xl">
           {maintaining ? `Maintain ${spell.name}` : spell.name}
         </h3>
         <p className="text-sm text-base-content/70 mt-1">
@@ -228,7 +228,7 @@ export function CastSpellDialog({
             <> · {MANA_LEVEL_LABELS[character.manaLevel].toLowerCase()}</>
           )}
         </p>
-        <div className="mt-3 grid grid-cols-4 gap-3 text-sm">
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div>
             <p className="label-eyebrow">{maintaining ? 'Base upkeep' : 'Base cost'}</p>
             <p className="num text-xl">
@@ -259,12 +259,12 @@ export function CastSpellDialog({
 
         <div className="divider my-3" />
 
-        <div className="flex items-end gap-3 mb-2">
-          <label className="form-control w-28 shrink-0">
+        <div className="mb-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-end sm:gap-3">
+          <label className="form-control w-full min-w-0 sm:w-28 sm:shrink-0">
             <span className="label-text text-xs">Energy to spend</span>
             <input
               type="number"
-              className="input input-bordered input-sm num text-right"
+              className="input input-bordered input-sm num w-full min-w-0 text-right"
               min={0}
               value={energyRaw}
               onChange={(e) => setEnergyRaw(e.target.value)}
@@ -330,7 +330,7 @@ export function CastSpellDialog({
             from {stonesUsed}.
           </p>
         )}
-        <div className="mt-3 flex items-baseline justify-between text-sm">
+        <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <span className="text-base-content/70">
             Allocated <span className="num text-base-content">{allocated}</span> / {cost}
           </span>
@@ -376,13 +376,19 @@ interface SourceRowProps {
 
 function SourceRow({ label, available, value, onChange, tone }: SourceRowProps) {
   return (
-    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-3">
-      <span className={tone === 'warning' ? 'text-warning' : ''}>{label}</span>
-      <span className="text-xs text-base-content/60 num">avail {available}</span>
+    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+      <span
+        className={`col-span-2 min-w-0 break-words sm:col-span-1 ${
+          tone === 'warning' ? 'text-warning' : ''
+        }`}
+      >
+        {label}
+      </span>
+      <span className="num text-xs text-base-content/60">avail {available}</span>
       <input
         type="number"
         aria-label={label}
-        className="input input-bordered input-sm w-20 num text-right"
+        className="input input-bordered input-sm num w-20 min-w-0 text-right"
         value={value}
         min={0}
         max={available}

@@ -175,17 +175,17 @@ export function SettingsPage() {
             {passkeys.data?.map((passkey) => (
               <div
                 key={passkey.id}
-                className="flex items-center justify-between gap-3 rounded-box border border-base-300 p-3"
+                className="flex flex-col items-stretch gap-3 rounded-box border border-base-300 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div>
-                  <p className="font-medium">{passkey.name}</p>
+                <div className="min-w-0">
+                  <p className="break-words font-medium">{passkey.name}</p>
                   <p className="text-xs text-muted">
                     Added {new Date(passkey.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm text-error"
+                  className="btn btn-ghost btn-sm self-end text-error sm:self-auto"
                   disabled={deletePasskey.isPending}
                   onClick={() => deletePasskey.mutate(passkey.id)}
                 >
