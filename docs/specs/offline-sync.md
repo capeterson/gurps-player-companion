@@ -724,6 +724,10 @@ orchestrator test files are the working references.
 ### Campaign house rules
 
 The read-only campaign mirror also carries `houseRules` for combat resolution.
+Both the cursor pull and the character page's REST campaign-list refresh preserve
+that complete settings object when writing Dexie; the REST mirror must never
+replace a synced campaign row with a partial projection that makes known rules
+appear unavailable.
 No new outbox class or store is involved. Migration 0037 advances each existing
 campaign revision once so clients with an old cursor receive the default-on
 natural-DR policy. `buildCharacterDetail` marks missing campaign settings as

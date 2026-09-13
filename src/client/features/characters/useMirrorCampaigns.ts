@@ -1,14 +1,10 @@
 /**
  * Mirrors fetched campaign rows into Dexie.
  *
- * The sync cursor only pulls the character-family entity classes
- * (`ALL_ENTITY_CLASSES`); campaigns are read-only and have no outbox
- * path, so this `/campaigns` fetch is the only route campaign rows
- * have into the local store. The character sheet reads it (the Combat
- * tab's Skills card needs the campaign's mana level), and the sheet is
- * the sole surface; this fetch is how a sheet opened offline-first on
- * a cold cache still resolves the share gate and mana level (S0 —
- * campaigns are pulled read-only via sync, no outbox path).
+ * Campaigns are pulled read-only through the sync cursor and refreshed
+ * from `/campaigns` for the character picker. Both paths must retain the
+ * complete campaign mechanics projection in Dexie: replacing a cursor row
+ * with a partial REST mirror makes known settings look unavailable offline.
  *
  * Campaigns have no outbox mutations, so a plain upsert can't clobber
  * pending local intent (rule S4): there's never a pending patch on a
@@ -16,11 +12,11 @@
  */
 
 import { useEffect } from 'react';
+import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { getLocalDb } from '../../db/dexie.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
-import type { CampaignSummary } from './useCharacterAccess.ts';
 
-export function useMirrorCampaigns(campaigns: CampaignSummary[] | undefined): void {
+export function useMirrorCampaigns(campaigns: CampaignOut[] | undefined): void {
   useEffect(() => {
     if (!campaigns || campaigns.length === 0) return;
     const db = getLocalDb();
@@ -37,6 +33,7 @@ export function useMirrorCampaigns(campaigns: CampaignSummary[] | undefined): vo
           disadvantageCap: c.disadvantageCap,
           quirkCap: c.quirkCap,
           manaLevel: c.manaLevel,
+          houseRules: c.houseRules,
           techLevel: c.techLevel,
           enforceAttributeCaps: c.enforceAttributeCaps,
           shareCharacterSheets: c.shareCharacterSheets,
