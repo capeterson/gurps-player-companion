@@ -30,8 +30,21 @@ describe('healthz', () => {
   it('returns ok', async () => {
     const res = await app.request('/api/v1/healthz');
     expect(res.status).toBe(200);
+    expect(res.headers.get('x-request-id')).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
+  });
+
+  it('assigns a new trusted correlation ID to each request', async () => {
+    const suppliedId = '00000000-0000-4000-8000-000000000000';
+    const first = await app.request('/api/v1/healthz', {
+      headers: { 'x-request-id': suppliedId },
+    });
+    const second = await app.request('/api/v1/healthz');
+    expect(first.headers.get('x-request-id')).not.toBe(suppliedId);
+    expect(first.headers.get('x-request-id')).not.toBe(second.headers.get('x-request-id'));
   });
 
   it('404s unknown routes under /api', async () => {

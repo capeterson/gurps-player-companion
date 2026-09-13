@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { type OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { upgradeWebSocket, websocket } from 'hono/bun';
 import { cors } from 'hono/cors';
@@ -30,6 +31,16 @@ import { attachStaticHandler } from './static.ts';
 export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   const app = createOpenApiApp();
 
+  // Generate correlation IDs at the trusted server boundary. Never accept a
+  // caller-supplied ID: the response header can be shown to a user safely and
+  // the same value identifies an unhandled-error entry in server logs.
+  app.use('*', async (c, next) => {
+    const requestId = randomUUID();
+    c.set('requestId', requestId);
+    c.header('x-request-id', requestId);
+    await next();
+  });
+
   app.use('/api/v1/*', durableIdempotency);
   app.use('/api/v1/*', mutationInvalidation);
 
@@ -40,6 +51,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
         origin: config.corsOrigins,
         credentials: true,
         allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+        exposeHeaders: ['X-Request-ID'],
       }),
     );
     app.use(
@@ -48,13 +60,14 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
         origin: config.corsOrigins,
         allowMethods: ['POST', 'OPTIONS'],
         allowHeaders: ['Authorization', 'Content-Type', 'MCP-Protocol-Version'],
-        exposeHeaders: ['WWW-Authenticate', 'MCP-Protocol-Version'],
+        exposeHeaders: ['WWW-Authenticate', 'MCP-Protocol-Version', 'X-Request-ID'],
       }),
     );
     const oauthCors = cors({
       origin: config.corsOrigins,
       allowMethods: ['GET', 'POST', 'OPTIONS'],
       allowHeaders: ['Content-Type'],
+      exposeHeaders: ['X-Request-ID'],
     });
     app.use('/.well-known/*', oauthCors);
     app.use('/oauth/token', oauthCors);
@@ -178,10 +191,32 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   }
 
   app.onError((err, c) => {
+    const requestId = c.get('requestId');
     if (err instanceof HTTPException) {
+      if (err.status >= 500) {
+        console.error(
+          'server request failed',
+          {
+            requestId,
+            userId: c.get('user')?.id,
+            method: c.req.method,
+            path: new URL(c.req.url).pathname,
+          },
+          err,
+        );
+      }
       return c.json({ error: err.message || 'http_error' }, err.status);
     }
-    console.error('unhandled error', err);
+    console.error(
+      'unhandled server error',
+      {
+        requestId,
+        userId: c.get('user')?.id,
+        method: c.req.method,
+        path: new URL(c.req.url).pathname,
+      },
+      err,
+    );
     return c.json({ error: 'internal_error' }, 500);
   });
 

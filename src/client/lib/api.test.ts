@@ -11,7 +11,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from './api.ts';
+import { type ApiError, api } from './api.ts';
 import { tokenStore } from './tokenStore.ts';
 
 function seedTokens() {
@@ -36,6 +36,27 @@ afterEach(() => {
 });
 
 describe('api refresh-on-401', () => {
+  it('retains the server request ID on API errors', async () => {
+    const requestId = '8d952a62-ee65-4faa-bce0-64b55ac56a96';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: 'internal_error' }), {
+            status: 500,
+            headers: { 'content-type': 'application/json', 'x-request-id': requestId },
+          }),
+      ),
+    );
+
+    const result = api('/characters').catch((error: unknown) => error);
+    await expect(result).resolves.toMatchObject({
+      name: 'ApiError',
+      status: 500,
+      requestId,
+    } satisfies Partial<ApiError>);
+  });
+
   it('keeps the session and reports the outage when refresh returns HTTP 530', async () => {
     seedTokens();
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {

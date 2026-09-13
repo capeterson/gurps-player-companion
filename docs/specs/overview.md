@@ -585,6 +585,11 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
   button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
+- **Styled error recovery**: unknown routes and unexpected router/render errors
+  use the Arcane app shell rather than React Router's developer fallback. The
+  page offers home/reload actions and shows a unique error reference, server
+  request ID when available, current-user ID when available, route, and time for
+  support correlation without exposing raw error details.
 - **Themeable** (light/dark; "Arcane" DaisyUI theme), installable PWA, works
   offline for the character surface.
 - **Settings** page: profile, password, passkeys, API keys.
