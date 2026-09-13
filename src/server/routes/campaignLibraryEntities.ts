@@ -15,6 +15,8 @@
 import type { z } from '@hono/zod-openapi';
 import { type SQL, asc } from 'drizzle-orm';
 import type { AnyPgColumn, PgTable } from 'drizzle-orm/pg-core';
+import { HTTPException } from 'hono/http-exception';
+import { validateLibrarySkillSpecializationDefault } from '../../shared/domain/librarySkillSpecializations.ts';
 import {
   type LibraryItemCreate,
   type LibraryItemOut,
@@ -117,6 +119,9 @@ export interface LibraryEntityConfig<
     readonly delete: string;
   };
   readonly toOut: (row: TTable['$inferSelect']) => TOut;
+  /** Cross-field checks that require either the full create body or persisted row. */
+  readonly validateCreate?: (body: TCreate) => void;
+  readonly validateRow?: (row: TTable['$inferSelect']) => void;
   /** Natural key for YAML upsert matching (lowercased name, +kind for traits). */
   readonly keyOf: (input: { readonly name: string; readonly kind?: string }) => string;
   /** Values for a new row — shared by the POST route and YAML import-insert. */
@@ -216,6 +221,11 @@ function skillEditableFields(body: LibrarySkillCreate) {
     description: body.description ?? null,
     source: body.source ?? null,
     defaultSpecialization: body.defaultSpecialization ?? null,
+    specializationPolicy:
+      body.specializationPolicy ??
+      (body.defaultSpecialization
+        ? { kind: 'optional_freeform' as const }
+        : { kind: 'none' as const }),
     defaults: body.defaults ?? null,
     prerequisites: body.prerequisites ?? null,
     situationalModifiers: body.situationalModifiers ?? [],
@@ -255,6 +265,7 @@ export const skillEntity: LibraryEntityConfig<
       description: row.description,
       source: row.source,
       defaultSpecialization: row.defaultSpecialization,
+      specializationPolicy: row.specializationPolicy,
       defaults: row.defaults,
       prerequisites: row.prerequisites,
       situationalModifiers: row.situationalModifiers ?? [],
@@ -262,6 +273,28 @@ export const skillEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
+  validateCreate: (body) => {
+    try {
+      validateLibrarySkillSpecializationDefault(
+        body.name,
+        body.specializationPolicy,
+        body.defaultSpecialization,
+      );
+    } catch (error) {
+      throw new HTTPException(400, { message: (error as Error).message });
+    }
+  },
+  validateRow: (row) => {
+    try {
+      validateLibrarySkillSpecializationDefault(
+        row.name,
+        row.specializationPolicy,
+        row.defaultSpecialization,
+      );
+    } catch (error) {
+      throw new HTTPException(400, { message: (error as Error).message });
+    }
+  },
   keyOf: (input) => input.name.toLowerCase(),
   toInsertValues: (campaignId, body) => ({
     campaignId,
@@ -278,6 +311,7 @@ export const skillEntity: LibraryEntityConfig<
       description: row.description ?? undefined,
       source: row.source ?? undefined,
       defaultSpecialization: row.defaultSpecialization ?? undefined,
+      specializationPolicy: row.specializationPolicy,
       defaults: row.defaults,
       prerequisites: row.prerequisites ?? undefined,
       situationalModifiers: row.situationalModifiers ?? [],

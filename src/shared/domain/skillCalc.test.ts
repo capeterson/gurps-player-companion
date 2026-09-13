@@ -89,6 +89,83 @@ describe('attributeLevelFor', () => {
 });
 
 describe('computeSkillLevel', () => {
+  it('matches exact, same, and any specialization default policies', () => {
+    const sources = [
+      { name: 'Guns', specialization: 'Pistol', level: 14 },
+      { name: 'Guns', specialization: 'Rifle', level: 16 },
+    ];
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [
+          {
+            kind: 'skill',
+            name: 'Guns',
+            specialization: { kind: 'exact', value: 'Pistol' },
+            modifier: -2,
+          },
+        ],
+        sources,
+        'Rifle',
+      ),
+    ).toBe(12);
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [{ kind: 'skill', name: 'Guns', specialization: { kind: 'same' }, modifier: -2 }],
+        sources,
+        'Rifle',
+      ),
+    ).toBe(14);
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [{ kind: 'skill', name: 'Guns', specialization: { kind: 'any' }, modifier: -1 }],
+        sources,
+      ),
+    ).toBe(15);
+  });
+
+  it('preserves legacy specialization-qualified names in default declarations', () => {
+    for (const name of ['Guns/Pistol', 'Guns (Pistol)']) {
+      expect(
+        computeSkillLevel(
+          'DX',
+          'A',
+          0,
+          derived,
+          [{ kind: 'skill', name, modifier: -2 }],
+          [{ name: 'Guns', specialization: 'Pistol', level: 14 }],
+        ),
+      ).toBe(12);
+    }
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [
+          {
+            kind: 'skill',
+            name: 'Guns',
+            specialization: { kind: 'exact', value: 'Pistol' },
+            modifier: -2,
+          },
+        ],
+        [{ name: 'Guns/Pistol', specialization: null, level: 14 }],
+      ),
+    ).toBe(12);
+  });
   const derived = computeDerived(baseAttrs);
   it('uses the FAQ Shortsword/Broadsword default and point-difference buy-up', () => {
     const defaults = [{ kind: 'skill' as const, name: 'Shortsword', modifier: -2 }];

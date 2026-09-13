@@ -26,9 +26,10 @@ import {
  * campaign block.  v4 added the `languages`, `techniques`, and `styles`
  * library sections. v5 added item `enchantments`; v6 added explicit skill
  * `defaults` and campaign attribute-cap enforcement. v7 adds item-aware weapon
- * effects. The parser still accepts v1-v6 docs (new fields default/absent).
+ * effects. v8 adds library skill specialization policies and structured skill
+ * default matchers. The parser still accepts v1-v7 docs (new fields absent).
  */
-export const LIBRARY_YAML_VERSION = 7 as const;
+export const LIBRARY_YAML_VERSION = 8 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {

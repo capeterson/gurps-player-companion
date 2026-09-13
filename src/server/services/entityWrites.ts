@@ -112,9 +112,9 @@ export function skillInsertValues(
     points: body.points ?? 1,
     techLevel: body.techLevel ?? null,
     specialization: body.specialization ?? null,
-    notes: body.notes ?? null,
+    ...(body.notes !== undefined ? { notes: body.notes } : {}),
     librarySkillId: body.librarySkillId ?? null,
-    defaults: body.defaults ?? null,
+    ...(body.defaults !== undefined ? { defaults: body.defaults } : {}),
   };
 }
 

@@ -6,6 +6,19 @@ import { libraryMechanics } from './libraryMechanics.ts';
 export const skillAttributeEnum = z.enum(SKILL_ATTRIBUTES);
 export const skillDifficultyEnum = z.enum(SKILL_DIFFICULTIES);
 
+/** How a skill default selects a specialization of its source skill. */
+export const skillDefaultSpecialization = z.union([
+  // Backward-compatible shorthand used by YAML v1-v7 and existing rows.
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(160),
+  z.object({ kind: z.literal('exact'), value: z.string().trim().min(1).max(160) }).strict(),
+  z.object({ kind: z.literal('same') }).strict(),
+  z.object({ kind: z.literal('any') }).strict(),
+]);
+
 /** Null/absent = legacy unknown; [] = explicitly no defaults. */
 export const skillDefault = z.discriminatedUnion('kind', [
   z
@@ -19,7 +32,7 @@ export const skillDefault = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('skill'),
       name: z.string().trim().min(1).max(160),
-      specialization: z.string().trim().min(1).max(160).optional(),
+      specialization: skillDefaultSpecialization.optional(),
       modifier: z.number().int().min(-50).max(0),
     })
     .strict(),

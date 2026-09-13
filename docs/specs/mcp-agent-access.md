@@ -211,9 +211,17 @@ rules that JSON Schema alone cannot express: library effects cannot bind a
 character inventory ID, weapon targets require a selector, and Parry/Block cannot
 select an attack mode.
 
-Library export returns YAML v7 as typed text, retaining effect order, scaling,
+Library skill create/update tools expose the same specialization policies as the
+REST API: non-specialized, required/optional free-form, and required/optional
+catalog options with per-specialty description, prerequisite, and default
+overrides. Character skill creates and patches enforce the selected library
+policy through the shared REST/sync handler.
+That handler canonicalizes catalog names and materializes per-specialty defaults
+and generated notes, so agents do not need to reconstruct the UI copy behavior.
+
+Library export returns YAML v8 as typed text, retaining effect order, scaling,
 conditions and mode names. Library-item selectors export their portable name
-without the campaign-local library UUID. Import accepts the existing v1–v7
+without the campaign-local library UUID. Import accepts the existing v1–v8
 formats and preserves shared merge/replace and campaign-settings options. No
 extra tools or scopes are required for effects authoring. The manifest links
 these operations to the focused `effects-authoring-parity` fixture, which checks

@@ -326,9 +326,16 @@ seeds the character row's written fluency to `n/a`.
   character sheet, which let a player search the campaign library when adding a
   trait/skill/spell/item/language/technique.
 
-Picking a library skill copies its base name, attribute, difficulty, default
-specialization and learned TL into the character row, with description, source
-and prerequisites in notes. This snapshot is queued durably through the character
+Library skills declare a first-class `specializationPolicy`: `none`, required or
+optional free-form, or required or optional catalog. Catalog options carry a
+canonical name plus optional description, prerequisites, and defaults overrides.
+The editor exposes policy and catalog authoring. Picking a library skill requires
+the appropriate free-form/catalog choice and copies its base name, attribute,
+difficulty, resolved specialization and learned TL into the character row, with
+the resolved description, source and prerequisites in notes. The shared server
+reference handler canonicalizes the specialty and applies its defaults/notes when
+REST, sync, or MCP creates a linked skill, so non-UI clients get the same snapshot.
+This snapshot is queued durably through the character
 outbox. Changing the campaign TL does not rewrite learned skill TL. Editing the
 add form's name detaches its selected definition; a pending save cannot clear a
 newer selection, even one with the same base name. Sheet rows, rolls, roll history and
@@ -392,11 +399,14 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 7`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 8`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
-  parser unions on the literal `version` field and newer fields
+  v5 (item enchantments), v6 (explicit skill defaults), and v7
+  (weapon-scoped effects) also parse. v8 adds skill specialization policies,
+  catalog option overrides, and structured `exact`/`same`/`any` specialization
+  matching for skill defaults. The parser unions on the literal `version` field and newer fields
   default/absent on older docs.
 - **Item fields (v3):** library items carry the same container/powerstone/
   magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):

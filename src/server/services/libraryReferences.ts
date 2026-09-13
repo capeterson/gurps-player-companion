@@ -1,5 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import {
+  librarySkillCopyNotes,
+  resolveLibrarySkillSpecialization,
+} from '../../shared/domain/librarySkillSpecializations.ts';
 import { assertWrite, canWriteCharacter } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
@@ -22,10 +26,26 @@ import {
 import { captureLibraryMechanics, reconcileOwnedTraitKind } from './ownedLibraryMechanics.ts';
 
 const references = {
-  traits: { source: campaignLibraryTraits, child: characterTraits, field: 'libraryTraitId' },
-  skills: { source: campaignLibrarySkills, child: characterSkills, field: 'librarySkillId' },
-  spells: { source: campaignLibrarySpells, child: characterSpells, field: 'librarySpellId' },
-  items: { source: campaignLibraryItems, child: inventoryItems, field: 'libraryItemId' },
+  traits: {
+    source: campaignLibraryTraits,
+    child: characterTraits,
+    field: 'libraryTraitId',
+  },
+  skills: {
+    source: campaignLibrarySkills,
+    child: characterSkills,
+    field: 'librarySkillId',
+  },
+  spells: {
+    source: campaignLibrarySpells,
+    child: characterSpells,
+    field: 'librarySpellId',
+  },
+  items: {
+    source: campaignLibraryItems,
+    child: inventoryItems,
+    field: 'libraryItemId',
+  },
   languages: {
     source: campaignLibraryLanguages,
     child: characterLanguages,
@@ -55,7 +75,9 @@ export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string
     .for('update');
   if (!parent) throw new HTTPException(404, { message: 'character not found' });
   if (parent.campaignId !== observed?.campaignId)
-    throw new HTTPException(503, { message: 'Character campaign changed; retry this edit' });
+    throw new HTTPException(503, {
+      message: 'Character campaign changed; retry this edit',
+    });
   const [membership] =
     campaign && campaign.ownerId !== userId
       ? await tx
@@ -70,7 +92,10 @@ export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string
           .for('share')
       : [];
   const role = campaign?.ownerId === userId ? 'owner' : (membership?.role ?? null);
-  assertWrite({ character: parent, canWrite: canWriteCharacter(parent, userId, campaign, role) });
+  assertWrite({
+    character: parent,
+    canWrite: canWriteCharacter(parent, userId, campaign, role),
+  });
   return { parent, campaign, membership };
 }
 
@@ -85,7 +110,11 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
 ): Promise<T> {
   const cfg = references[kind];
   const { parent, campaign, membership } = await lockLibraryReferenceScope(tx, characterId, userId);
-  if (values[cfg.field] === undefined && !(kind === 'traits' && values.kind !== undefined))
+  if (
+    values[cfg.field] === undefined &&
+    !(kind === 'traits' && values.kind !== undefined) &&
+    !(kind === 'skills' && values.specialization !== undefined)
+  )
     return values;
   if (
     kind === 'traits' &&
@@ -138,6 +167,42 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
   if (kind === 'traits' && 'kind' in source) {
     const traitKind = values.kind ?? (existing && 'kind' in existing ? existing.kind : undefined);
     if (source.kind !== traitKind) throw denied();
+  }
+  if (kind === 'skills') {
+    const skillSource = source as typeof campaignLibrarySkills.$inferSelect;
+    const existingSpecialization =
+      existing && 'specialization' in existing ? existing.specialization : undefined;
+    let requested =
+      values.specialization === undefined ? existingSpecialization : values.specialization;
+    if (
+      !requested &&
+      (skillSource.specializationPolicy.kind === 'required_freeform' ||
+        skillSource.specializationPolicy.kind === 'required_catalog')
+    ) {
+      requested = skillSource.defaultSpecialization;
+    }
+    try {
+      const resolved = resolveLibrarySkillSpecialization(skillSource, requested as string | null);
+      if (values[cfg.field] !== undefined || values.specialization !== undefined || !existing) {
+        (values as Record<string, unknown>).specialization = resolved.specialization;
+      }
+      const existingReference =
+        existing && cfg.field in existing
+          ? (existing as unknown as Record<string, unknown>)[cfg.field]
+          : undefined;
+      const referenceChanged = !existing || existingReference !== canonicalSourceId;
+      if (values.defaults === undefined && referenceChanged) {
+        (values as Record<string, unknown>).defaults = resolved.defaults ?? null;
+      }
+      if (!existing && values.notes === undefined) {
+        (values as Record<string, unknown>).notes = librarySkillCopyNotes(
+          skillSource.source,
+          resolved,
+        );
+      }
+    } catch (error) {
+      throw new HTTPException(400, { message: (error as Error).message });
+    }
   }
   if (kind === 'traits' || kind === 'skills')
     (values as Record<string, unknown>).libraryMechanics = await captureLibraryMechanics(

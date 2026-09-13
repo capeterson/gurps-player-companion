@@ -1,5 +1,12 @@
 import { useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
+import {
+  type ResolvedLibrarySkillSpecialization,
+  effectiveSpecializationPolicy,
+  initialLibrarySkillSpecialization,
+  librarySkillCopyNotes,
+  resolveLibrarySkillSpecialization,
+} from '../../../../shared/domain/librarySkillSpecializations.ts';
 import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
@@ -42,6 +49,7 @@ interface SkillSnapshot {
   points: number;
   pointsRaw: string;
   picked: LibrarySkillOut | null;
+  specialization: string;
   nameVersion: number;
 }
 
@@ -51,11 +59,16 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   const [difficulty, setDifficulty] = useState<SkillDifficulty>('A');
   const [points, setPoints] = useState('1');
   const [picked, setPicked] = useState<LibrarySkillOut | null>(null);
+  const [specialization, setSpecialization] = useState('');
+  const pickedPolicy = picked
+    ? effectiveSpecializationPolicy(picked.specializationPolicy, picked.defaultSpecialization)
+    : null;
   const nameVersion = useRef(0);
   const editName = (value: string) => {
     setName(value);
     nameVersion.current++;
     setPicked(null);
+    setSpecialization('');
   };
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
@@ -67,13 +80,27 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   } = useAddEntityForm({
     entityClass: 'character_skill',
     characterId,
-    label: `skill "${skillDisplayName(name, picked?.defaultSpecialization)}"`,
+    label: `skill "${skillDisplayName(name, specialization)}"`,
   });
 
   async function submit(snap: SkillSnapshot) {
     if (snap.picked && snap.picked.campaignId !== campaignId) {
       reject('Campaign changed — select a skill from the current campaign library');
       return;
+    }
+    let resolved: ResolvedLibrarySkillSpecialization = {
+      specialization: snap.specialization.trim() || null,
+      description: null,
+      prerequisites: null,
+      defaults: null,
+    };
+    if (snap.picked) {
+      try {
+        resolved = resolveLibrarySkillSpecialization(snap.picked, snap.specialization);
+      } catch (error) {
+        reject((error as Error).message);
+        return;
+      }
     }
     await submitEntity(
       {
@@ -83,17 +110,10 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         points: snap.points,
         characterId,
         librarySkillId: snap.picked?.id ?? null,
-        defaults: snap.picked?.defaults ?? null,
-        specialization: snap.picked?.defaultSpecialization ?? null,
+        defaults: resolved.defaults,
+        specialization: resolved.specialization,
         techLevel: snap.picked?.techLevel ?? null,
-        notes:
-          [
-            snap.picked?.description,
-            snap.picked?.source ? `Source: ${snap.picked.source}` : null,
-            snap.picked?.prerequisites ? `Prerequisites: ${snap.picked.prerequisites}` : null,
-          ]
-            .filter(Boolean)
-            .join('\n\n') || null,
+        notes: librarySkillCopyNotes(snap.picked?.source, resolved),
       },
       () => {
         // Per AGENTS.md (rule 1: never silently discard user edits): only
@@ -107,6 +127,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         if (nameVersion.current === snap.nameVersion) {
           setName((cur) => (cur === snap.nameRaw ? '' : cur));
           setPicked((cur) => (cur === snap.picked ? null : cur));
+          setSpecialization((cur) => (cur === snap.specialization ? '' : cur));
         }
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
       },
@@ -139,6 +160,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           points: Number.isFinite(pParsed) && pParsed >= 0 ? pParsed : 1,
           pointsRaw: points,
           picked,
+          specialization,
           nameVersion: nameVersion.current,
         });
       }}
@@ -157,13 +179,14 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
               setDifficulty(opt.difficulty as SkillDifficulty);
               nameVersion.current++;
               setPicked(opt);
+              setSpecialization(initialLibrarySkillSpecialization(opt) ?? '');
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">
                 <span className="truncate">
-                  {skillDisplayName(o.name, o.defaultSpecialization)}
+                  {o.name}
                   {o.techLevel != null ? ` / TL${o.techLevel}` : ''}
                 </span>
                 <span className="num text-xs text-base-content/70">
@@ -185,11 +208,48 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         )}
         {picked && (
           <span className="min-w-0 break-words text-xs text-base-content/70">
-            {skillDisplayName(picked.name, picked.defaultSpecialization)}
+            {skillDisplayName(picked.name, specialization)}
             {picked.techLevel != null ? ` / TL${picked.techLevel}` : ''}
           </span>
         )}
       </div>
+      {pickedPolicy?.kind === 'required_catalog' || pickedPolicy?.kind === 'optional_catalog' ? (
+        <label className="form-control min-w-36">
+          <span className="label-text text-xs">Specialization</span>
+          <select
+            aria-label="Specialization"
+            className="select select-bordered select-sm"
+            value={specialization}
+            onChange={(event) => {
+              setSpecialization(event.target.value);
+              nameVersion.current++;
+            }}
+          >
+            {pickedPolicy.kind === 'optional_catalog' && <option value="">None</option>}
+            {pickedPolicy.options.map((option) => (
+              <option key={option.name} value={option.name}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : pickedPolicy?.kind === 'required_freeform' ||
+        pickedPolicy?.kind === 'optional_freeform' ? (
+        <label className="form-control min-w-36">
+          <span className="label-text text-xs">Specialization</span>
+          <input
+            aria-label="Specialization"
+            className="input input-bordered input-sm"
+            value={specialization}
+            maxLength={160}
+            required={pickedPolicy.kind === 'required_freeform'}
+            onChange={(event) => {
+              setSpecialization(event.target.value);
+              nameVersion.current++;
+            }}
+          />
+        </label>
+      ) : null}
       <label className="form-control">
         <span className="label-text text-xs">Attr</span>
         <select
@@ -222,7 +282,16 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           onChange={(e) => setPoints(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+      <button
+        type="submit"
+        className="btn btn-sm btn-primary"
+        disabled={
+          creating ||
+          ((pickedPolicy?.kind === 'required_catalog' ||
+            pickedPolicy?.kind === 'required_freeform') &&
+            !specialization.trim())
+        }
+      >
         {creating ? 'Adding…' : 'Add'}
       </button>
     </form>

@@ -24,6 +24,7 @@ import type {
   LibraryItemOut,
   LibrarySkillCreate,
   LibrarySkillOut,
+  LibrarySkillSpecializationPolicy,
   LibrarySpellCreate,
   LibrarySpellOut,
   LibraryTraitCreate,
@@ -610,6 +611,17 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                       </div>
                     </div>
                     {s.description && <p className="text-sm text-muted">{s.description}</p>}
+                    {s.specializationPolicy.kind !== 'none' && (
+                      <p className="text-xs text-dim">
+                        Specialization ·{' '}
+                        {s.specializationPolicy.kind.startsWith('required')
+                          ? 'required'
+                          : 'optional'}
+                        {(s.specializationPolicy.kind === 'required_catalog' ||
+                          s.specializationPolicy.kind === 'optional_catalog') &&
+                          ` · ${s.specializationPolicy.options.map((option) => option.name).join(', ')}`}
+                      </p>
+                    )}
                     {s.source && <p className="text-xs text-dim">Source · {s.source}</p>}
                     {s.effects.length > 0 && (
                       <ul className="mt-2 space-y-0.5 text-xs text-base-content/70">
@@ -1223,6 +1235,18 @@ function SkillForm({
   const [defaultSpecialization, setDefaultSpecialization] = useState(
     initial?.defaultSpecialization ?? '',
   );
+  const [specializationKind, setSpecializationKind] = useState<
+    LibrarySkillSpecializationPolicy['kind']
+  >(initial?.specializationPolicy.kind ?? 'none');
+  const [specializations, setSpecializations] = useState(
+    initial?.specializationPolicy.kind === 'required_catalog' ||
+      initial?.specializationPolicy.kind === 'optional_catalog'
+      ? initial.specializationPolicy.options.map((option) => ({
+          ...option,
+          editorKey: crypto.randomUUID(),
+        }))
+      : [],
+  );
   const [description, setDescription] = useState(initial?.description ?? '');
   const [source, setSource] = useState(initial?.source ?? '');
   const [effects, setEffects] = useState(initial?.effects ?? []);
@@ -1231,12 +1255,29 @@ function SkillForm({
   function handleSubmit() {
     if (!name.trim()) return;
     const tl = techLevel.trim() !== '' ? Number.parseInt(techLevel, 10) : null;
+    const specializationPolicy: LibrarySkillSpecializationPolicy =
+      specializationKind === 'required_catalog' || specializationKind === 'optional_catalog'
+        ? {
+            kind: specializationKind,
+            options: specializations.map(({ editorKey: _editorKey, ...option }) => option),
+          }
+        : { kind: specializationKind };
+    const selectedDefault = defaultSpecialization.trim();
+    const validDefault =
+      specializationKind === 'none'
+        ? null
+        : specializationKind === 'required_catalog' || specializationKind === 'optional_catalog'
+          ? (specializations.find(
+              (option) => option.name.trim().toLowerCase() === selectedDefault.toLowerCase(),
+            )?.name ?? null)
+          : selectedDefault || null;
     onSubmit({
       name: name.trim(),
       attribute,
       difficulty,
       techLevel: tl,
-      defaultSpecialization: defaultSpecialization.trim() || null,
+      defaultSpecialization: validDefault,
+      specializationPolicy,
       description: description.trim() || null,
       source: source.trim() || null,
       situationalModifiers: initial?.situationalModifiers ?? [],
@@ -1309,17 +1350,138 @@ function SkillForm({
           />
         </label>
       </div>
-      <label className="form-control">
-        <span className="label-text">Default specialization</span>
-        <input
-          type="text"
-          className="input input-bordered input-sm"
-          value={defaultSpecialization}
-          onChange={(e) => setDefaultSpecialization(e.target.value)}
-          maxLength={160}
-          placeholder="e.g. Shortsword"
-        />
-      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="form-control">
+          <span className="label-text">Specializations</span>
+          <select
+            className="select select-bordered select-sm"
+            value={specializationKind}
+            onChange={(event) =>
+              setSpecializationKind(event.target.value as LibrarySkillSpecializationPolicy['kind'])
+            }
+          >
+            <option value="none">Not allowed</option>
+            <option value="required_freeform">Required, free-form</option>
+            <option value="optional_freeform">Optional, free-form</option>
+            <option value="required_catalog">Required, from catalog</option>
+            <option value="optional_catalog">Optional, from catalog</option>
+          </select>
+        </label>
+        <div className="form-control">
+          <span className="label-text">Default specialization</span>
+          {specializationKind === 'required_catalog' ||
+          specializationKind === 'optional_catalog' ? (
+            <select
+              className="select select-bordered select-sm"
+              aria-label="Default specialization"
+              value={defaultSpecialization}
+              onChange={(event) => setDefaultSpecialization(event.target.value)}
+            >
+              <option value="">None</option>
+              {specializations.map((option, index) => (
+                <option key={`${option.name}-${index}`} value={option.name}>
+                  {option.name || `Option ${index + 1}`}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              className="input input-bordered input-sm"
+              aria-label="Default specialization"
+              value={defaultSpecialization}
+              onChange={(event) => setDefaultSpecialization(event.target.value)}
+              maxLength={160}
+              disabled={specializationKind === 'none'}
+              placeholder="e.g. Shortsword"
+            />
+          )}
+        </div>
+      </div>
+      {(specializationKind === 'required_catalog' || specializationKind === 'optional_catalog') && (
+        <div className="space-y-2 rounded border border-base-300 p-3">
+          <div className="flex items-center justify-between">
+            <span className="label-text">Specialization catalog</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={() =>
+                setSpecializations((current) => [
+                  ...current,
+                  { name: '', editorKey: crypto.randomUUID() },
+                ])
+              }
+            >
+              + Add option
+            </button>
+          </div>
+          {specializations.map((option, index) => (
+            <div
+              key={option.editorKey}
+              className="grid gap-2 rounded bg-base-200/50 p-2 sm:grid-cols-2"
+            >
+              <input
+                aria-label={`Specialization ${index + 1} name`}
+                className="input input-bordered input-sm"
+                value={option.name}
+                maxLength={160}
+                placeholder="Name"
+                onChange={(event) =>
+                  setSpecializations((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index ? { ...item, name: event.target.value } : item,
+                    ),
+                  )
+                }
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs justify-self-end text-error"
+                onClick={() =>
+                  setSpecializations((current) =>
+                    current.filter((_, itemIndex) => itemIndex !== index),
+                  )
+                }
+              >
+                Remove
+              </button>
+              <textarea
+                aria-label={`Specialization ${index + 1} description`}
+                className="textarea textarea-bordered textarea-sm"
+                value={option.description ?? ''}
+                placeholder="Description override (optional)"
+                onChange={(event) =>
+                  setSpecializations((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index
+                        ? { ...item, description: event.target.value || null }
+                        : item,
+                    ),
+                  )
+                }
+              />
+              <textarea
+                aria-label={`Specialization ${index + 1} prerequisites`}
+                className="textarea textarea-bordered textarea-sm"
+                value={option.prerequisites ?? ''}
+                placeholder="Prerequisite override (optional)"
+                onChange={(event) =>
+                  setSpecializations((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index
+                        ? { ...item, prerequisites: event.target.value || null }
+                        : item,
+                    ),
+                  )
+                }
+              />
+            </div>
+          ))}
+          {specializations.length === 0 && (
+            <p className="text-xs text-error">Catalog policies require at least one option.</p>
+          )}
+        </div>
+      )}
       <EffectsEditor
         effects={effects}
         libraryItems={libraryItems}
@@ -1348,7 +1510,15 @@ function SkillForm({
           type="button"
           className="btn btn-primary btn-sm"
           onClick={handleSubmit}
-          disabled={isPending || !name.trim() || !effectsValid}
+          disabled={
+            isPending ||
+            !name.trim() ||
+            !effectsValid ||
+            ((specializationKind === 'required_catalog' ||
+              specializationKind === 'optional_catalog') &&
+              (specializations.length === 0 ||
+                specializations.some((option) => !option.name.trim())))
+          }
         >
           {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add skill'}
         </button>

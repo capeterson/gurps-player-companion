@@ -52,7 +52,13 @@ interface OperationArgs {
 }
 
 class RestPreview extends Error {
-  constructor(readonly result: { status: number; body: unknown; contentType: string | null }) {
+  constructor(
+    readonly result: {
+      status: number;
+      body: unknown;
+      contentType: string | null;
+    },
+  ) {
     super(`REST preview ${result.status}`);
   }
 }
@@ -144,7 +150,11 @@ async function registerActor(label: string, clientDbId: string): Promise<Actor> 
   const registered = await app.request('/api/v1/auth/register', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: 'TestPassword1!', displayName: `Matrix ${label}` }),
+    body: JSON.stringify({
+      email,
+      password: 'TestPassword1!',
+      displayName: `Matrix ${label}`,
+    }),
   });
   expect(registered.status).toBe(201);
   const { accessToken } = (await registered.json()) as { accessToken: string };
@@ -214,7 +224,11 @@ async function call<T = unknown>(
   );
   rememberIds(result.structured.body);
   exercised.add(name);
-  return result.structured as { status: number; body: T; contentType: string | null };
+  return result.structured as {
+    status: number;
+    body: T;
+    contentType: string | null;
+  };
 }
 
 async function callAny(
@@ -248,7 +262,11 @@ async function callAny(
   const envelope = (await response.json()) as {
     result?: {
       isError?: boolean;
-      structuredContent?: { status: number; body: unknown; contentType: string | null };
+      structuredContent?: {
+        status: number;
+        body: unknown;
+        contentType: string | null;
+      };
       content?: Array<{ text?: string }>;
     };
   };
@@ -351,7 +369,9 @@ describe('delegated operation behavioral parity', () => {
       })
     ).body;
     await call(member, 'gpc_list_invitations');
-    await call(member, 'gpc_accept_invitation', { path: { invitationId: acceptedInvite.id } });
+    await call(member, 'gpc_accept_invitation', {
+      path: { invitationId: acceptedInvite.id },
+    });
 
     const rejectedCampaign = (
       await call<{ id: string }>(owner, 'gpc_create_campaign', {
@@ -364,7 +384,9 @@ describe('delegated operation behavioral parity', () => {
         body: { handle: member.email },
       })
     ).body;
-    await call(member, 'gpc_reject_invitation', { path: { invitationId: rejectedInvite.id } });
+    await call(member, 'gpc_reject_invitation', {
+      path: { invitationId: rejectedInvite.id },
+    });
 
     const notificationCampaign = (
       await call<{ id: string }>(owner, 'gpc_create_campaign', {
@@ -381,9 +403,13 @@ describe('delegated operation behavioral parity', () => {
     expect(notificationList.length).toBeGreaterThan(0);
     const notification = notificationList[0];
     if (!notification) throw new Error('invitation did not create a notification');
-    await call(member, 'gpc_mark_notification_read', { path: { id: notification.id } });
+    await call(member, 'gpc_mark_notification_read', {
+      path: { id: notification.id },
+    });
     await call(member, 'gpc_mark_all_notifications_read');
-    await call(member, 'gpc_delete_notification', { path: { id: notification.id } });
+    await call(member, 'gpc_delete_notification', {
+      path: { id: notification.id },
+    });
 
     await call(owner, 'gpc_get_campaign_library', path(campaignId));
     const libraryKinds = [
@@ -476,7 +502,13 @@ describe('delegated operation behavioral parity', () => {
     const combatant = (
       await call<{ id: string }>(owner, 'gpc_create_encounter_combatant', {
         ...encounterPath,
-        body: { kind: 'npc', name: 'Goblin', basicSpeed: 5.5, dx: 11, maxHp: 8 },
+        body: {
+          kind: 'npc',
+          name: 'Goblin',
+          basicSpeed: 5.5,
+          dx: 11,
+          maxHp: 8,
+        },
       })
     ).body;
     const combatantPath = path(campaignId, {
@@ -497,8 +529,14 @@ describe('delegated operation behavioral parity', () => {
         },
       })
     ).body;
-    const effectPath = path(campaignId, { encounterId: encounter.id, effectId: effect.id });
-    await call(owner, 'gpc_update_encounter_effect', { ...effectPath, body: { notes: 'updated' } });
+    const effectPath = path(campaignId, {
+      encounterId: encounter.id,
+      effectId: effect.id,
+    });
+    await call(owner, 'gpc_update_encounter_effect', {
+      ...effectPath,
+      body: { notes: 'updated' },
+    });
     await call(owner, 'gpc_delete_encounter_effect', effectPath);
     await call(owner, 'gpc_delete_encounter_combatant', combatantPath);
 
@@ -510,7 +548,10 @@ describe('delegated operation behavioral parity', () => {
     ).body;
     const characterId = character.id as string;
     await call(owner, 'gpc_get_character', path(characterId));
-    await call(owner, 'gpc_update_character', { ...path(characterId), body: { st: 11 } });
+    await call(owner, 'gpc_update_character', {
+      ...path(characterId),
+      body: { st: 11 },
+    });
     await call(owner, 'gpc_dismiss_character_warning', {
       ...path(characterId),
       body: { code: 'matrix_warning', dismissed: true },
@@ -520,7 +561,12 @@ describe('delegated operation behavioral parity', () => {
       [
         'skill',
         'skillId',
-        { name: `C Skill ${suffix}`, attribute: 'DX', difficulty: 'A', points: 1 },
+        {
+          name: `C Skill ${suffix}`,
+          attribute: 'DX',
+          difficulty: 'A',
+          points: 1,
+        },
         { points: 2 },
       ],
       ['spell', 'spellId', { name: `C Spell ${suffix}`, points: 1 }, { points: 2 }],
@@ -528,7 +574,11 @@ describe('delegated operation behavioral parity', () => {
       [
         'technique',
         'techniqueId',
-        { name: `C Technique ${suffix}`, defaultSkillName: 'Broadsword', points: 1 },
+        {
+          name: `C Technique ${suffix}`,
+          defaultSkillName: 'Broadsword',
+          points: 1,
+        },
         { points: 2 },
       ],
     ] as const;
@@ -542,7 +592,10 @@ describe('delegated operation behavioral parity', () => {
       const child = created[kind];
       if (!child) throw new Error(`character ${kind} response omitted its row`);
       const childPath = path(characterId, { [idKey]: child.id });
-      await call(owner, `gpc_update_character_${kind}`, { ...childPath, body: update });
+      await call(owner, `gpc_update_character_${kind}`, {
+        ...childPath,
+        body: update,
+      });
       await call(owner, `gpc_delete_character_${kind}`, childPath);
     }
     const inventory = (
@@ -552,7 +605,10 @@ describe('delegated operation behavioral parity', () => {
       })
     ).body;
     const inventoryPath = path(characterId, { itemId: inventory.item.id });
-    await call(owner, 'gpc_update_inventory_item', { ...inventoryPath, body: { quantity: 2 } });
+    await call(owner, 'gpc_update_inventory_item', {
+      ...inventoryPath,
+      body: { quantity: 2 },
+    });
     await call(owner, 'gpc_delete_inventory_item', inventoryPath);
     await call(owner, 'gpc_update_character_combat', {
       ...path(characterId),
@@ -665,7 +721,10 @@ describe('delegated operation behavioral parity', () => {
     expect(restRead.status).toBe(200);
     expect(mcpRead.status).toBe(restRead.status);
     expect(mcpRead.body).toEqual(await restRead.json());
-    expect(mcpRead.body).toMatchObject({ view: 'minimal', name: 'Private sheet' });
+    expect(mcpRead.body).toMatchObject({
+      view: 'minimal',
+      name: 'Private sheet',
+    });
     expect(mcpRead.body.st).toBeUndefined();
 
     const updateBody = { name: 'Must remain private' };
@@ -734,7 +793,10 @@ describe('delegated operation behavioral parity', () => {
     const preset = (
       await call<typeof campaign>(owner, 'gpc_update_campaign', {
         ...path(campaign.id),
-        body: { enforceAttributeCaps: true, houseRules: { ruleSet: 'j_talisar' } },
+        body: {
+          enforceAttributeCaps: true,
+          houseRules: { ruleSet: 'j_talisar' },
+        },
       })
     ).body;
     expect(preset).toMatchObject({
@@ -761,14 +823,16 @@ describe('delegated operation behavioral parity', () => {
       restRejected.contentType?.split(';', 1)[0] ?? null,
     );
     expect(mcpRejected.structured.body).toEqual(restRejected.body);
-    expect(mcpRejected.structured.body).toMatchObject({ error: expect.stringContaining('DX') });
+    expect(mcpRejected.structured.body).toMatchObject({
+      error: expect.stringContaining('DX'),
+    });
 
     const unchanged = await call<{ dx: number }>(owner, 'gpc_get_character', path(character.id));
     expect(unchanged.body.dx).toBe(20);
   });
 
   // Manifest anchor: effects-authoring-parity.
-  it('preserves library and owned effects, YAML v7 portability, retries and refinement errors', async () => {
+  it('preserves library and owned effects, YAML v8 portability, retries and refinement errors', async () => {
     const [client] = await getDb()
       .insert(oauthClients)
       .values({
@@ -793,7 +857,10 @@ describe('delegated operation behavioral parity', () => {
     const sourceItem = (
       await call<{ id: string }>(owner, 'gpc_create_library_item', {
         ...path(campaign.id),
-        body: { name: 'Spear', weaponData: { skill: 'Spear', damage: 'thr+2 imp' } },
+        body: {
+          name: 'Spear',
+          weaponData: { skill: 'Spear', damage: 'thr+2 imp' },
+        },
       })
     ).body;
     const portableEffects: [LibraryTraitEffect, LibraryTraitEffect] = [
@@ -820,7 +887,11 @@ describe('delegated operation behavioral parity', () => {
     const libraryTrait = (
       await call<{ id: string; effects: unknown[] }>(owner, 'gpc_create_library_trait', {
         ...path(campaign.id),
-        body: { name: 'Spear Mastery', kind: 'advantage', effects: portableEffects },
+        body: {
+          name: 'Spear Mastery',
+          kind: 'advantage',
+          effects: portableEffects,
+        },
       })
     ).body;
     expect(libraryTrait.effects).toEqual(portableEffects);
@@ -839,7 +910,29 @@ describe('delegated operation behavioral parity', () => {
     const librarySkill = (
       await call<{ id: string }>(owner, 'gpc_create_library_skill', {
         ...path(campaign.id),
-        body: { name: 'Spear', attribute: 'DX', difficulty: 'A', effects: skillEffects },
+        body: {
+          name: 'Spear',
+          attribute: 'DX',
+          difficulty: 'A',
+          effects: skillEffects,
+          defaultSpecialization: 'One-Handed',
+          specializationPolicy: {
+            kind: 'required_catalog',
+            options: [
+              {
+                name: 'One-Handed',
+                defaults: [
+                  {
+                    kind: 'skill',
+                    name: 'Spear Thrower',
+                    specialization: { kind: 'same' },
+                    modifier: -3,
+                  },
+                ],
+              },
+            ],
+          },
+        },
       })
     ).body;
     await call(owner, 'gpc_update_library_skill', {
@@ -848,16 +941,36 @@ describe('delegated operation behavioral parity', () => {
     });
     const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaign.id));
     const yaml = parseLibraryYaml(exported.body);
-    expect(yaml.version).toBe(7);
+    expect(yaml.version).toBe(8);
     expect(exported.body).not.toContain('libraryItemId');
     expect(yaml.library.traits[0]?.effects).toEqual([
       portableEffects[1],
       {
         ...portableEffects[0],
-        weaponSelector: { kind: 'library_item', libraryItemName: 'Spear', modeName: 'Primary' },
+        weaponSelector: {
+          kind: 'library_item',
+          libraryItemName: 'Spear',
+          modeName: 'Primary',
+        },
       },
     ]);
     expect(yaml.library.skills[0]?.effects).toEqual(skillEffects);
+    expect(yaml.library.skills[0]?.specializationPolicy).toEqual({
+      kind: 'required_catalog',
+      options: [
+        {
+          name: 'One-Handed',
+          defaults: [
+            {
+              kind: 'skill',
+              name: 'Spear Thrower',
+              specialization: { kind: 'same' },
+              modifier: -3,
+            },
+          ],
+        },
+      ],
+    });
     const importArgs = {
       ...path(campaign.id),
       body: { yaml: exported.body, mode: 'merge' },
@@ -868,20 +981,45 @@ describe('delegated operation behavioral parity', () => {
       (await callAny(owner, 'gpc_import_campaign_library', importArgs)).structured.body,
     ).toEqual(imported.body);
     const library = (
-      await call<{ traits: Array<{ effects: unknown[] }>; skills: Array<{ effects: unknown[] }> }>(
-        owner,
-        'gpc_get_campaign_library',
-        path(campaign.id),
-      )
+      await call<{
+        traits: Array<{ effects: unknown[] }>;
+        skills: Array<{ effects: unknown[]; specializationPolicy: unknown }>;
+      }>(owner, 'gpc_get_campaign_library', path(campaign.id))
     ).body;
     expect(library.traits[0]?.effects).toEqual(yaml.library.traits[0]?.effects);
     expect(library.skills[0]?.effects).toEqual(skillEffects);
+    expect(library.skills[0]?.specializationPolicy).toEqual(
+      yaml.library.skills[0]?.specializationPolicy,
+    );
 
     const character = (
       await call<{ id: string }>(owner, 'gpc_create_character', {
         body: { name: 'Owned effects', campaignId: campaign.id },
       })
     ).body;
+    const learnedSkill = (
+      await call<{
+        skill: { id: string; specialization: string; defaults: unknown };
+      }>(owner, 'gpc_create_character_skill', {
+        ...path(character.id),
+        body: {
+          name: 'Spear',
+          attribute: 'DX',
+          difficulty: 'A',
+          specialization: ' one-handed ',
+          librarySkillId: librarySkill.id,
+        },
+      })
+    ).body.skill;
+    expect(learnedSkill.specialization).toBe('One-Handed');
+    expect(learnedSkill.defaults).toEqual([
+      {
+        kind: 'skill',
+        name: 'Spear Thrower',
+        specialization: { kind: 'same' },
+        modifier: -3,
+      },
+    ]);
     const inventory = (
       await call<{ item: { id: string } }>(owner, 'gpc_create_inventory_item', {
         ...path(character.id),
@@ -967,7 +1105,12 @@ describe('delegated operation behavioral parity', () => {
         'gpc_create_library_skill',
         {
           ...path(campaign.id),
-          body: { name: 'Invalid', attribute: 'DX', difficulty: 'A', effects: customEffects },
+          body: {
+            name: 'Invalid',
+            attribute: 'DX',
+            difficulty: 'A',
+            effects: customEffects,
+          },
         },
         422,
       ],
@@ -983,7 +1126,9 @@ describe('delegated operation behavioral parity', () => {
         'gpc_update_character_trait',
         {
           ...path(character.id, { traitId: created.trait.id }),
-          body: { customEffects: [{ ...customEffects[0], target: 'weapon_parry' }] },
+          body: {
+            customEffects: [{ ...customEffects[0], target: 'weapon_parry' }],
+          },
         },
         422,
       ],
@@ -1009,12 +1154,26 @@ describe('delegated operation behavioral parity', () => {
     expect(privateRead.body).toMatchObject({ view: 'minimal' });
     expect(privateRead.body).not.toHaveProperty('effects');
     expect(privateRead.body).not.toHaveProperty('traits');
-    await call(owner, 'gpc_update_character_trait', { ...traitPath, body: { customEffects: [] } });
+    await call(owner, 'gpc_update_character_trait', {
+      ...traitPath,
+      body: { customEffects: [] },
+    });
     const cleared = await call<{ effects: unknown[] }>(
       owner,
       'gpc_get_character',
       path(character.id),
     );
-    expect(cleared.body.effects).toEqual([]);
+    expect(cleared.body.effects).not.toContainEqual(
+      expect.objectContaining({
+        target: 'weapon_attack',
+        sourceId: created.trait.id,
+      }),
+    );
+    expect(cleared.body.effects).toContainEqual(
+      expect.objectContaining({
+        target: 'weapon_parry',
+        sourceId: learnedSkill.id,
+      }),
+    );
   });
 });
