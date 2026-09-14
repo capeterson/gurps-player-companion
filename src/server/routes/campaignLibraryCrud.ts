@@ -210,8 +210,9 @@ export function registerLibraryCrud<
       const itemId = params[cfg.paramName];
       const body = c.req.valid('json');
       await requireCampaignOwner(id, user.id);
+      const normalized = cfg.normalizePatch ? cfg.normalizePatch(body) : body;
       const updates = buildPatchSet(
-        body as Record<string, unknown>,
+        normalized as Record<string, unknown>,
         cfg.stringifyKeys ? { stringifyKeys: cfg.stringifyKeys } : undefined,
       );
       let row: TTable['$inferSelect'];

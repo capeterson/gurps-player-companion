@@ -4,6 +4,12 @@ import {
   librarySkillCopyNotes,
   resolveLibrarySkillSpecialization,
 } from '../../shared/domain/librarySkillSpecializations.ts';
+import {
+  evaluateSkillPrerequisite,
+  failedPrerequisiteMessages,
+} from '../../shared/domain/skillRules.ts';
+import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import type { SkillPrerequisite } from '../../shared/schemas/skill.ts';
 import { assertWrite, canWriteCharacter } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
@@ -23,6 +29,7 @@ import {
   characters,
   inventoryItems,
 } from '../db/schema.ts';
+import { loadCharacterDetail } from './characterSummary.ts';
 import { captureLibraryMechanics, reconcileOwnedTraitKind } from './ownedLibraryMechanics.ts';
 
 const references = {
@@ -58,6 +65,12 @@ const references = {
   },
 } as const;
 type ReferenceKind = keyof typeof references;
+
+function gmPermissionLabels(rule: SkillPrerequisite): string[] {
+  if (rule.kind === 'gm_permission') return [rule.label];
+  if (rule.kind === 'all' || rule.kind === 'any') return rule.children.flatMap(gmPermissionLabels);
+  return [];
+}
 
 /** Lock campaign before character, matching library writes and member removal. */
 export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string, userId: string) {
@@ -113,7 +126,12 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
   if (
     values[cfg.field] === undefined &&
     !(kind === 'traits' && values.kind !== undefined) &&
-    !(kind === 'skills' && values.specialization !== undefined)
+    !(
+      kind === 'skills' &&
+      (values.specialization !== undefined ||
+        values.points !== undefined ||
+        values.techLevel !== undefined)
+    )
   )
     return values;
   if (
@@ -139,6 +157,21 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
       ? (existing as Record<string, unknown> | undefined)?.[cfg.field]
       : values[cfg.field];
   if (sourceId === null || sourceId === undefined) {
+    if (kind === 'skills' && values.specialization !== undefined && existing) {
+      const saved = libraryMechanics.safeParse(
+        'libraryMechanics' in existing ? existing.libraryMechanics : null,
+      );
+      if (saved.success && saved.data.detached && saved.data.skillRules) {
+        (values as Record<string, unknown>).libraryMechanics = {
+          ...saved.data,
+          skillRules: {
+            ...saved.data.skillRules,
+            gmPermissions: [],
+            gmPermissionSpecialization: null,
+          },
+        };
+      }
+    }
     if (
       values[cfg.field] !== undefined &&
       (kind === 'traits' || kind === 'skills') &&
@@ -168,6 +201,8 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
     const traitKind = values.kind ?? (existing && 'kind' in existing ? existing.kind : undefined);
     if (source.kind !== traitKind) throw denied();
   }
+  let resolvedSkill: ReturnType<typeof resolveLibrarySkillSpecialization> | undefined;
+  let skillGmPermissions: string[] | undefined;
   if (kind === 'skills') {
     const skillSource = source as typeof campaignLibrarySkills.$inferSelect;
     const existingSpecialization =
@@ -183,14 +218,56 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
     }
     try {
       const resolved = resolveLibrarySkillSpecialization(skillSource, requested as string | null);
-      if (values[cfg.field] !== undefined || values.specialization !== undefined || !existing) {
-        (values as Record<string, unknown>).specialization = resolved.specialization;
-      }
+      resolvedSkill = resolved;
       const existingReference =
         existing && cfg.field in existing
           ? (existing as unknown as Record<string, unknown>)[cfg.field]
           : undefined;
       const referenceChanged = !existing || existingReference !== canonicalSourceId;
+      const existingMechanics = libraryMechanics.safeParse(
+        existing && 'libraryMechanics' in existing ? existing.libraryMechanics : null,
+      );
+      const granted = new Set(
+        existingMechanics.success &&
+          existingMechanics.data.sourceId === canonicalSourceId &&
+          existingMechanics.data.campaignId === campaign.id &&
+          existingMechanics.data.skillRules?.gmPermissionSpecialization === resolved.specialization
+          ? existingMechanics.data.skillRules?.gmPermissions
+          : [],
+      );
+      if (campaign.ownerId === userId && resolved.prerequisiteRules) {
+        for (const label of gmPermissionLabels(resolved.prerequisiteRules)) granted.add(label);
+      }
+      skillGmPermissions = [...granted];
+      const requestedTechLevel =
+        values.techLevel === undefined
+          ? existing && 'techLevel' in existing
+            ? existing.techLevel
+            : undefined
+          : values.techLevel;
+      if (skillSource.techLevelPolicy.kind === 'required' && requestedTechLevel == null) {
+        throw new Error(`${skillSource.name} requires a concrete Tech Level`);
+      }
+      if (
+        skillSource.techLevelPolicy.kind === 'fixed' &&
+        requestedTechLevel != null &&
+        requestedTechLevel !== skillSource.techLevelPolicy.techLevel
+      ) {
+        throw new Error(
+          `${skillSource.name} is fixed at TL${skillSource.techLevelPolicy.techLevel}`,
+        );
+      }
+      if (values[cfg.field] !== undefined || values.techLevel !== undefined || !existing) {
+        (values as Record<string, unknown>).techLevel =
+          skillSource.techLevelPolicy.kind === 'fixed'
+            ? skillSource.techLevelPolicy.techLevel
+            : skillSource.techLevelPolicy.kind === 'not_applicable'
+              ? null
+              : requestedTechLevel;
+      }
+      if (values[cfg.field] !== undefined || values.specialization !== undefined || !existing) {
+        (values as Record<string, unknown>).specialization = resolved.specialization;
+      }
       if (values.defaults === undefined && referenceChanged) {
         (values as Record<string, unknown>).defaults = resolved.defaults ?? null;
       }
@@ -200,16 +277,91 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
           resolved,
         );
       }
+      const nextPoints = Number(
+        typeof values.points === 'number'
+          ? values.points
+          : existing && 'points' in existing
+            ? existing.points
+            : 1,
+      );
+      const previousPoints = Number(existing && 'points' in existing ? existing.points : -1);
+      const specializationChanged =
+        !existing ||
+        ('specialization' in existing && existing.specialization !== resolved.specialization);
+      if (
+        resolved.prerequisiteRules &&
+        (referenceChanged || specializationChanged || nextPoints > previousPoints)
+      ) {
+        const detail = await loadCharacterDetail(characterId, tx);
+        const evaluation = evaluateSkillPrerequisite(resolved.prerequisiteRules, {
+          skills: detail.skills
+            .filter((skill) => skill.id !== existingId)
+            .map((skill) => {
+              return {
+                name: skill.name,
+                specialization: skill.specialization,
+                level: skill.effectiveLevel,
+                relativeLevel:
+                  skill.effectiveLevel == null
+                    ? null
+                    : skill.effectiveLevel -
+                      (skill.attribute === 'ST'
+                        ? detail.derived.effectiveSt
+                        : skill.attribute === 'DX'
+                          ? detail.derived.effectiveDx
+                          : skill.attribute === 'IQ'
+                            ? detail.derived.effectiveIq
+                            : skill.attribute === 'HT'
+                              ? detail.derived.effectiveHt
+                              : skill.attribute === 'Will'
+                                ? detail.derived.will
+                                : skill.attribute === 'Per'
+                                  ? detail.derived.per
+                                  : 10),
+                points: skill.points,
+              };
+            }),
+          traits: detail.traits.map((trait) => ({ name: trait.name, level: trait.level })),
+          attributes: {
+            ST: detail.derived.effectiveSt,
+            DX: detail.derived.effectiveDx,
+            IQ: detail.derived.effectiveIq,
+            HT: detail.derived.effectiveHt,
+            Will: detail.derived.will,
+            Per: detail.derived.per,
+          },
+          techLevel: campaign.techLevel,
+          campaignRules: campaign.houseRules,
+          gmPermissions: granted,
+          targetSpecialization: resolved.specialization,
+        });
+        if (evaluation.truth !== 'met' && campaign.skillPrerequisitePolicy === 'block') {
+          throw new Error(
+            `Unmet prerequisites for ${skillSource.name}: ${failedPrerequisiteMessages(evaluation).join('; ')}`,
+          );
+        }
+      }
     } catch (error) {
       throw new HTTPException(400, { message: (error as Error).message });
     }
   }
-  if (kind === 'traits' || kind === 'skills')
-    (values as Record<string, unknown>).libraryMechanics = await captureLibraryMechanics(
-      tx,
-      characterId,
-      kind,
-      canonicalSourceId,
-    );
+  if (kind === 'traits' || kind === 'skills') {
+    const snapshot = await captureLibraryMechanics(tx, characterId, kind, canonicalSourceId);
+    if (kind === 'skills' && snapshot) {
+      if (!resolvedSkill) throw new Error('skill mechanics were not resolved');
+      (values as Record<string, unknown>).libraryMechanics = libraryMechanics.parse({
+        ...snapshot,
+        skillRules: {
+          ...snapshot.skillRules,
+          prerequisites: resolvedSkill.prerequisiteRules,
+          defaults: resolvedSkill.defaults ?? null,
+          gmPermissions: skillGmPermissions ?? [],
+          gmPermissionSpecialization: resolvedSkill.specialization,
+        },
+      });
+    } else {
+      (values as Record<string, unknown>).libraryMechanics = snapshot;
+    }
+  }
   return values;
 }

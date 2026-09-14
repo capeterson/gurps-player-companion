@@ -22,6 +22,7 @@ import type { TraitEffect } from '../schemas/effects.ts';
 import type { InventoryItemOut } from '../schemas/inventory.ts';
 import type { LanguageOut } from '../schemas/language.ts';
 import type { LibraryMechanics } from '../schemas/libraryMechanics.ts';
+import { libraryMechanics } from '../schemas/libraryMechanics.ts';
 import type { SkillDefaults, SkillOut } from '../schemas/skill.ts';
 import type { SpellOut } from '../schemas/spell.ts';
 import type { TechniqueDifficulty, TechniqueOut } from '../schemas/technique.ts';
@@ -37,7 +38,13 @@ import {
   computePointBreakdown,
 } from './characterCalc.ts';
 import { type InventoryItemRow, computeEncumbrance, computeWeights } from './encumbrance.ts';
-import { computeSkillLevel, resolveSkillLevels } from './skillCalc.ts';
+import {
+  attributeLevelFor,
+  computeSkillLevel,
+  resolveSkillLevels,
+  unresolvedDefaultConditionMessages,
+} from './skillCalc.ts';
+import { evaluateSkillPrerequisite, failedPrerequisiteMessages } from './skillRules.ts';
 import {
   computeSpellLevel,
   effectiveCastingCost,
@@ -222,6 +229,7 @@ export interface CharacterDetailInputCombat {
 }
 
 export interface CharacterDetailInputCampaign {
+  skillPrerequisitePolicy?: 'block' | 'warn';
   houseRules?: CampaignHouseRules;
   pointTarget: number | null;
   disadvantageCap: number | null;
@@ -378,6 +386,7 @@ export function buildSkillOut(
     skill.defaults,
   ),
 ): SkillOut {
+  const mechanics = libraryMechanics.safeParse(skill.libraryMechanics);
   return {
     id: skill.id,
     characterId: skill.characterId,
@@ -389,7 +398,7 @@ export function buildSkillOut(
     specialization: skill.specialization,
     notes: skill.notes,
     librarySkillId: skill.librarySkillId,
-    libraryMechanics: skill.libraryMechanics ?? null,
+    libraryMechanics: mechanics.success ? mechanics.data : (skill.libraryMechanics ?? null),
     defaults: skill.defaults ?? null,
     level,
     // No usable declared default means there is no bonus target to apply against.
@@ -526,8 +535,20 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   const encumbrance = computeEncumbrance(weights.playerWeightLbs, derived.basicLift);
   const inventoryOut = inventory.map((i) => buildInventoryItemOut(i, weights.perItem));
   const traitsOut = traits.map(buildTraitOut);
-  const skillLevels = resolveSkillLevels(skills, derived);
-  const skillsOut = skills.map((s) =>
+  const defaultableSkills = skills.map((skill) => {
+    const snapshot = libraryMechanics.safeParse(skill.libraryMechanics);
+    return {
+      ...skill,
+      ...(snapshot.success && snapshot.data.skillRules
+        ? { groups: snapshot.data.skillRules.groups, tags: snapshot.data.skillRules.tags }
+        : {}),
+    };
+  });
+  const defaultConditionContext = campaign?.houseRules
+    ? { campaignRules: campaign.houseRules }
+    : undefined;
+  const skillLevels = resolveSkillLevels(defaultableSkills, derived, defaultConditionContext);
+  let skillsOut = skills.map((s) =>
     buildSkillOut(
       s,
       derived,
@@ -535,6 +556,72 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
       skillLevels.get(s.id) ?? null,
     ),
   );
+  skillsOut = skillsOut.map((skill) => {
+    const source = defaultableSkills.find((row) => row.id === skill.id);
+    const messages = unresolvedDefaultConditionMessages(
+      source?.defaults ?? null,
+      defaultableSkills
+        .filter((candidate) => candidate.id !== skill.id && candidate.points > 0)
+        .flatMap((candidate) => {
+          const level = skillLevels.get(candidate.id) ?? null;
+          return level === null
+            ? []
+            : [
+                {
+                  name: candidate.name,
+                  specialization: candidate.specialization,
+                  level,
+                  techLevel: candidate.techLevel,
+                  ...(candidate.groups ? { groups: candidate.groups } : {}),
+                  ...(candidate.tags ? { tags: candidate.tags } : {}),
+                },
+              ];
+        }),
+      skill.specialization,
+      defaultConditionContext,
+    );
+    return messages.length ? { ...skill, defaultConditionMessages: messages } : skill;
+  });
+  skillsOut = skillsOut.map((skill) => {
+    const source = skills.find((row) => row.id === skill.id);
+    const snapshot = libraryMechanics.safeParse(source?.libraryMechanics);
+    const prerequisite = snapshot.success ? snapshot.data.skillRules?.prerequisites : null;
+    if (!prerequisite) return skill;
+    const evaluation = evaluateSkillPrerequisite(prerequisite, {
+      skills: skillsOut
+        .filter((candidate) => candidate.id !== skill.id)
+        .map((candidate) => ({
+          name: candidate.name,
+          specialization: candidate.specialization,
+          level: candidate.effectiveLevel,
+          relativeLevel:
+            candidate.effectiveLevel == null
+              ? null
+              : candidate.effectiveLevel - attributeLevelFor(candidate.attribute, derived),
+          points: candidate.points,
+        })),
+      traits: traitsOut.map((trait) => ({ name: trait.name, level: trait.level })),
+      attributes: {
+        ST: derived.effectiveSt,
+        DX: derived.effectiveDx,
+        IQ: derived.effectiveIq,
+        HT: derived.effectiveHt,
+        Will: derived.will,
+        Per: derived.per,
+      },
+      techLevel: campaign?.techLevel ?? null,
+      ...(campaign?.houseRules ? { campaignRules: campaign.houseRules } : {}),
+      ...(snapshot.success && snapshot.data.skillRules?.gmPermissions
+        ? { gmPermissions: new Set(snapshot.data.skillRules.gmPermissions) }
+        : {}),
+      targetSpecialization: skill.specialization,
+    });
+    return {
+      ...skill,
+      prerequisiteStatus: evaluation.truth,
+      prerequisiteMessages: failedPrerequisiteMessages(evaluation),
+    };
+  });
   const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
   const techLevel: number | null = campaign?.techLevel ?? null;

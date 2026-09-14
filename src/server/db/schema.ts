@@ -46,6 +46,7 @@ import type {
 } from '../../shared/schemas/inventory.ts';
 import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import type { SkillPrerequisite, SkillTechLevelPolicy } from '../../shared/schemas/skill.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
 import { TECHNIQUE_DIFFICULTIES } from '../../shared/schemas/technique.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
@@ -446,6 +447,13 @@ export const campaigns = pgTable('campaigns', {
   shareCharacterSheets: boolean('share_character_sheets').notNull().default(true),
   /** Owner/manager edits of member-owned character sheets; opt-in. */
   allowGmCharacterEditing: boolean('allow_gm_character_editing').notNull().default(false),
+  /** Authoritative handling of unmet structured skill prerequisites. */
+  skillPrerequisitePolicy: varchar('skill_prerequisite_policy', {
+    length: 8,
+    enum: ['block', 'warn'],
+  })
+    .notNull()
+    .default('block'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   revision: revision(),
@@ -1005,6 +1013,10 @@ export const campaignLibrarySkills = pgTable(
     attribute: skillAttributeEnum('attribute').notNull(),
     difficulty: skillDifficultyEnum('difficulty').notNull(),
     techLevel: smallint('tech_level'),
+    techLevelPolicy: jsonb('tech_level_policy')
+      .$type<SkillTechLevelPolicy>()
+      .notNull()
+      .default({ kind: 'not_applicable' }),
     description: text('description'),
     source: varchar('source', { length: 40 }),
     defaultSpecialization: varchar('default_specialization', { length: 160 }),
@@ -1016,6 +1028,9 @@ export const campaignLibrarySkills = pgTable(
     /** skillDefaults in shared/schemas/skill.ts. */
     defaults: jsonb('defaults').$type<import('../../shared/schemas/skill.ts').SkillDefaults>(),
     prerequisites: text('prerequisites'),
+    prerequisiteRules: jsonb('prerequisite_rules').$type<SkillPrerequisite>(),
+    groups: jsonb('groups').$type<string[]>().notNull().default([]),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
     /** Validated by `situationalModifier` (src/shared/schemas/skill.ts). */
     situationalModifiers: jsonb('situational_modifiers')
       .$type<SituationalModifier[]>()

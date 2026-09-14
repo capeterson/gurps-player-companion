@@ -78,6 +78,7 @@ export const campaignOut = z.object({
   shareCharacterSheets: z.boolean(),
   /** Allow campaign owners and managers to edit member-owned characters. */
   allowGmCharacterEditing: z.boolean(),
+  skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
   houseRules: campaignHouseRules.default({}),
   members: z.array(campaignMemberOut),
   ...timestamps,
@@ -96,6 +97,7 @@ export const campaignCreate = z.object({
   enforceAttributeCaps: z.boolean().optional(),
   shareCharacterSheets: z.boolean().optional(),
   allowGmCharacterEditing: z.boolean().optional(),
+  skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
 });
 
 export const campaignUpdate = campaignCreate.partial();

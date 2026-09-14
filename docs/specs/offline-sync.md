@@ -639,6 +639,9 @@ rule that has been broken at least once.
 Campaign assignment patches detach all six child library references in the same
 IndexedDB transaction as the parent edit and outbox operation. Trait and skill
 declarations remain available as retained copies while offline, after reload,
+including structured prerequisites, TL policy, group/tag provenance, and
+conditional defaults plus durable GM-permission grants inside the validated
+owned skill-rule snapshot,
 and if an acknowledged transfer is followed by a failed cursor pull. Local-only
 undo data on the operation restores links when the transfer is rejected or
 explicitly discarded, preserves unrelated child edits, and follows coalesced

@@ -7,6 +7,7 @@ export interface ResolvedLibrarySkillSpecialization {
   specialization: string | null;
   description: string | null;
   prerequisites: string | null;
+  prerequisiteRules?: LibrarySkillOut['prerequisiteRules'];
   defaults: LibrarySkillOut['defaults'];
 }
 
@@ -75,7 +76,12 @@ export function initialLibrarySkillSpecialization(
 export function resolveLibrarySkillSpecialization(
   skill: Pick<
     LibrarySkillOut,
-    'name' | 'defaultSpecialization' | 'description' | 'prerequisites' | 'defaults'
+    | 'name'
+    | 'defaultSpecialization'
+    | 'description'
+    | 'prerequisites'
+    | 'prerequisiteRules'
+    | 'defaults'
   > & { specializationPolicy?: LibrarySkillSpecializationPolicy },
   requested: string | null | undefined,
 ): ResolvedLibrarySkillSpecialization {
@@ -96,6 +102,9 @@ export function resolveLibrarySkillSpecialization(
       specialization: null,
       description: skill.description,
       prerequisites: skill.prerequisites,
+      ...(skill.prerequisiteRules !== undefined
+        ? { prerequisiteRules: skill.prerequisiteRules }
+        : {}),
       defaults: skill.defaults,
     };
   }
@@ -105,6 +114,9 @@ export function resolveLibrarySkillSpecialization(
       specialization: null,
       description: skill.description,
       prerequisites: skill.prerequisites,
+      ...(skill.prerequisiteRules !== undefined
+        ? { prerequisiteRules: skill.prerequisiteRules }
+        : {}),
       defaults: skill.defaults,
     };
   }
@@ -113,6 +125,9 @@ export function resolveLibrarySkillSpecialization(
       specialization: value,
       description: skill.description,
       prerequisites: skill.prerequisites,
+      ...(skill.prerequisiteRules !== undefined
+        ? { prerequisiteRules: skill.prerequisiteRules }
+        : {}),
       defaults: skill.defaults,
     };
   }
@@ -122,6 +137,14 @@ export function resolveLibrarySkillSpecialization(
     specialization: option.name,
     description: option.description === undefined ? skill.description : option.description,
     prerequisites: option.prerequisites === undefined ? skill.prerequisites : option.prerequisites,
+    ...((option.prerequisiteRules ?? skill.prerequisiteRules) !== undefined
+      ? {
+          prerequisiteRules:
+            option.prerequisiteRules === undefined
+              ? skill.prerequisiteRules
+              : option.prerequisiteRules,
+        }
+      : {}),
     defaults: option.defaults === undefined ? skill.defaults : option.defaults,
   };
 }

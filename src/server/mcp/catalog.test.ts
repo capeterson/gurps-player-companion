@@ -154,6 +154,27 @@ describe('MCP canonical schema conversion', () => {
           },
         }),
       ).toBe(true);
+      const base = {
+        path: { id, ...(command === 'update' ? { skillId: id } : {}) },
+        body: {
+          ...(command === 'create' ? { name: 'Rules', attribute: 'IQ', difficulty: 'A' } : {}),
+        },
+      };
+      expect(tool.validateInput({ ...base, body: { ...base.body, prerequisiteRules: null } })).toBe(
+        true,
+      );
+      expect(
+        tool.validateInput({ ...base, body: { ...base.body, prerequisiteRules: 'anything' } }),
+      ).toBe(false);
+      expect(
+        tool.validateInput({
+          ...base,
+          body: {
+            ...base.body,
+            prerequisiteRules: { kind: 'all', children: [null] },
+          },
+        }),
+      ).toBe(false);
     }
   });
 

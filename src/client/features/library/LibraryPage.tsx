@@ -585,7 +585,11 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="num text-xs uppercase tracking-widest text-dim">
                           {s.attribute}/{s.difficulty}
-                          {s.techLevel != null ? ` · TL${s.techLevel}` : ''}
+                          {s.techLevelPolicy?.kind === 'required'
+                            ? ' · /TL'
+                            : s.techLevel != null
+                              ? ` · TL${s.techLevel}`
+                              : ''}
                         </span>
                         {isOwner && (
                           <>
@@ -623,6 +627,15 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                       </p>
                     )}
                     {s.source && <p className="text-xs text-dim">Source · {s.source}</p>}
+                    {s.prerequisites && (
+                      <p className="text-xs text-dim">Prerequisites · {s.prerequisites}</p>
+                    )}
+                    {s.prerequisiteRules && (
+                      <p className="text-xs text-warning">Structured prerequisite rules active</p>
+                    )}
+                    {s.defaults?.some((rule) => (rule.conditions?.length ?? 0) > 0) && (
+                      <p className="text-xs text-info">Includes conditional default candidates</p>
+                    )}
                     {s.effects.length > 0 && (
                       <ul className="mt-2 space-y-0.5 text-xs text-base-content/70">
                         {s.effects.map((effect, index) => (
@@ -1232,6 +1245,19 @@ function SkillForm({
   const [techLevel, setTechLevel] = useState(
     initial?.techLevel != null ? String(initial.techLevel) : '',
   );
+  const [techLevelKind, setTechLevelKind] = useState(
+    initial?.techLevelPolicy?.kind ?? (initial?.techLevel != null ? 'fixed' : 'not_applicable'),
+  );
+  const [prerequisites, setPrerequisites] = useState(initial?.prerequisites ?? '');
+  const [prerequisiteRules, setPrerequisiteRules] = useState(
+    initial?.prerequisiteRules ? JSON.stringify(initial.prerequisiteRules, null, 2) : '',
+  );
+  const [defaults, setDefaults] = useState(
+    initial?.defaults != null ? JSON.stringify(initial.defaults, null, 2) : '',
+  );
+  const [groups, setGroups] = useState((initial?.groups ?? []).join(', '));
+  const [tags, setTags] = useState((initial?.tags ?? []).join(', '));
+  const [rulesError, setRulesError] = useState<string | null>(null);
   const [defaultSpecialization, setDefaultSpecialization] = useState(
     initial?.defaultSpecialization ?? '',
   );
@@ -1254,7 +1280,17 @@ function SkillForm({
 
   function handleSubmit() {
     if (!name.trim()) return;
+    setRulesError(null);
     const tl = techLevel.trim() !== '' ? Number.parseInt(techLevel, 10) : null;
+    let structuredPrerequisites: LibrarySkillCreate['prerequisiteRules'];
+    let structuredDefaults: LibrarySkillCreate['defaults'];
+    try {
+      structuredPrerequisites = prerequisiteRules.trim() ? JSON.parse(prerequisiteRules) : null;
+      structuredDefaults = defaults.trim() ? JSON.parse(defaults) : null;
+    } catch {
+      setRulesError('Prerequisite and default rules must be valid JSON.');
+      return;
+    }
     const specializationPolicy: LibrarySkillSpecializationPolicy =
       specializationKind === 'required_catalog' || specializationKind === 'optional_catalog'
         ? {
@@ -1276,10 +1312,27 @@ function SkillForm({
       attribute,
       difficulty,
       techLevel: tl,
+      techLevelPolicy:
+        techLevelKind === 'fixed'
+          ? { kind: 'fixed', techLevel: tl ?? 0 }
+          : techLevelKind === 'required'
+            ? { kind: 'required', suggestedFrom: 'campaign' }
+            : { kind: 'not_applicable' },
       defaultSpecialization: validDefault,
       specializationPolicy,
       description: description.trim() || null,
       source: source.trim() || null,
+      prerequisites: prerequisites.trim() || null,
+      prerequisiteRules: structuredPrerequisites,
+      defaults: structuredDefaults,
+      groups: groups
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
+      tags: tags
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
       situationalModifiers: initial?.situationalModifiers ?? [],
       effects,
     });
@@ -1326,8 +1379,22 @@ function SkillForm({
             ))}
           </select>
         </label>
+        <label className="form-control w-32">
+          <span className="label-text">TL policy</span>
+          <select
+            className="select select-bordered select-sm"
+            value={techLevelKind}
+            onChange={(event) =>
+              setTechLevelKind(event.target.value as 'not_applicable' | 'required' | 'fixed')
+            }
+          >
+            <option value="not_applicable">N/A</option>
+            <option value="required">Required /TL</option>
+            <option value="fixed">Fixed</option>
+          </select>
+        </label>
         <label className="form-control w-16">
-          <span className="label-text">TL</span>
+          <span className="label-text">TL value</span>
           <input
             type="number"
             className="input input-bordered input-sm"
@@ -1336,6 +1403,7 @@ function SkillForm({
             min={0}
             max={12}
             placeholder="—"
+            disabled={techLevelKind !== 'fixed'}
           />
         </label>
         <label className="form-control w-28">
@@ -1488,6 +1556,52 @@ function SkillForm({
         onChange={setEffects}
         onValidityChange={setEffectsValid}
       />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="form-control">
+          <span className="label-text">Prerequisite source text</span>
+          <textarea
+            className="textarea textarea-bordered textarea-sm"
+            value={prerequisites}
+            onChange={(event) => setPrerequisites(event.target.value)}
+          />
+        </label>
+        <label className="form-control">
+          <span className="label-text">Structured prerequisites (JSON)</span>
+          <textarea
+            className="textarea textarea-bordered textarea-sm font-mono text-xs"
+            value={prerequisiteRules}
+            onChange={(event) => setPrerequisiteRules(event.target.value)}
+            placeholder='{"kind":"trait","name":"Magery","minimumLevel":1}'
+          />
+        </label>
+        <label className="form-control">
+          <span className="label-text">Default rules (JSON)</span>
+          <textarea
+            className="textarea textarea-bordered textarea-sm font-mono text-xs"
+            value={defaults}
+            onChange={(event) => setDefaults(event.target.value)}
+            placeholder='[{"kind":"attribute","attribute":"IQ","modifier":-6}]'
+          />
+        </label>
+        <div className="grid gap-2">
+          <label className="form-control">
+            <span className="label-text">Groups (comma-separated)</span>
+            <input
+              className="input input-bordered input-sm"
+              value={groups}
+              onChange={(event) => setGroups(event.target.value)}
+            />
+          </label>
+          <label className="form-control">
+            <span className="label-text">Tags (comma-separated)</span>
+            <input
+              className="input input-bordered input-sm"
+              value={tags}
+              onChange={(event) => setTags(event.target.value)}
+            />
+          </label>
+        </div>
+      </div>
       <label className="form-control">
         <span className="label-text">Description</span>
         <textarea
@@ -1523,7 +1637,7 @@ function SkillForm({
           {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add skill'}
         </button>
       </div>
-      {error && <p className="alert alert-error text-sm">{error}</p>}
+      {(error || rulesError) && <p className="alert alert-error text-sm">{error || rulesError}</p>}
     </fieldset>
   );
 }

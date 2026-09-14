@@ -1,5 +1,6 @@
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { resolveLibrarySkillSpecialization } from '../../shared/domain/librarySkillSpecializations.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { traitKindEnum } from '../../shared/schemas/trait.ts';
 import type { AuditTx } from '../db/auditContext.ts';
@@ -39,11 +40,23 @@ export async function captureLibraryMechanics(
     throw new HTTPException(403, {
       message: 'Library reference is unavailable in this character campaign',
     });
+  const skillSource = source as typeof campaignLibrarySkills.$inferSelect;
   return libraryMechanics.parse({
     sourceId,
     campaignId: parent?.campaignId ?? null,
     sourceRevision: source ? Number(source.revision) : null,
     effects: source?.effects ?? null,
+    ...(kind === 'skills'
+      ? {
+          skillRules: {
+            techLevelPolicy: skillSource.techLevelPolicy,
+            prerequisites: skillSource.prerequisiteRules,
+            defaults: skillSource.defaults,
+            groups: skillSource.groups,
+            tags: skillSource.tags,
+          },
+        }
+      : {}),
   });
 }
 
@@ -63,6 +76,76 @@ export async function refreshOwnedLibraryMechanics(
     .where(and(eq(sourceTable.id, sourceId), eq(sourceTable.campaignId, campaignId)))
     .for('update');
   if (!source) return;
+  const skillSource = source as typeof campaignLibrarySkills.$inferSelect;
+  if (kind === 'skills') {
+    const children = await tx
+      .select({
+        id: characterSkills.id,
+        specialization: characterSkills.specialization,
+        libraryMechanics: characterSkills.libraryMechanics,
+      })
+      .from(characterSkills)
+      .innerJoin(characters, eq(characterSkills.characterId, characters.id))
+      .where(
+        and(eq(characterSkills.librarySkillId, sourceId), eq(characters.campaignId, campaignId)),
+      );
+    for (const child of children) {
+      const saved = libraryMechanics.safeParse(child.libraryMechanics);
+      let resolved: ReturnType<typeof resolveLibrarySkillSpecialization>;
+      try {
+        resolved = resolveLibrarySkillSpecialization(skillSource, child.specialization);
+      } catch {
+        const retained =
+          saved.success && saved.data.sourceId === sourceId && saved.data.campaignId === campaignId
+            ? saved.data
+            : {
+                sourceId,
+                campaignId,
+                sourceRevision: null,
+                effects: null,
+                detached: true,
+              };
+        await tx
+          .update(characterSkills)
+          .set({
+            librarySkillId: null,
+            libraryMechanics: libraryMechanics.parse({ ...retained, detached: true }),
+            updatedAt: new Date(),
+          })
+          .where(eq(characterSkills.id, child.id));
+        continue;
+      }
+      const snapshot = libraryMechanics.parse({
+        sourceId,
+        campaignId,
+        sourceRevision: Number(skillSource.revision),
+        effects: skillSource.effects,
+        skillRules: {
+          techLevelPolicy: skillSource.techLevelPolicy,
+          prerequisites: resolved.prerequisiteRules,
+          defaults: resolved.defaults ?? null,
+          groups: skillSource.groups,
+          tags: skillSource.tags,
+          gmPermissions:
+            saved.success &&
+            saved.data.skillRules?.gmPermissionSpecialization === resolved.specialization
+              ? (saved.data.skillRules.gmPermissions ?? [])
+              : [],
+          gmPermissionSpecialization: resolved.specialization,
+        },
+        ...(detach ? { detached: true } : {}),
+      });
+      await tx
+        .update(characterSkills)
+        .set({
+          libraryMechanics: snapshot,
+          updatedAt: new Date(),
+          ...(detach ? { librarySkillId: null } : {}),
+        })
+        .where(eq(characterSkills.id, child.id));
+    }
+    return;
+  }
   const childTable = kind === 'traits' ? characterTraits : characterSkills;
   const reference =
     kind === 'traits' ? characterTraits.libraryTraitId : characterSkills.librarySkillId;

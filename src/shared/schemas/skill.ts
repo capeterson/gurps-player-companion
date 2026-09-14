@@ -2,43 +2,27 @@ import { z } from 'zod';
 import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../constants/skills.ts';
 import { timestamps, uuid } from './common.ts';
 import { libraryMechanics } from './libraryMechanics.ts';
+import { skillDefaults } from './skillRules.ts';
+
+export {
+  prerequisiteSpecialization,
+  skillDefault,
+  skillDefaultCondition,
+  skillDefaultSpecialization,
+  skillDefaults,
+  skillPrerequisite,
+  skillPrerequisites,
+  skillTechLevelPolicy,
+} from './skillRules.ts';
+export type {
+  SkillDefaultCondition,
+  SkillDefaults,
+  SkillPrerequisite,
+  SkillTechLevelPolicy,
+} from './skillRules.ts';
 
 export const skillAttributeEnum = z.enum(SKILL_ATTRIBUTES);
 export const skillDifficultyEnum = z.enum(SKILL_DIFFICULTIES);
-
-/** How a skill default selects a specialization of its source skill. */
-export const skillDefaultSpecialization = z.union([
-  // Backward-compatible shorthand used by YAML v1-v7 and existing rows.
-  z
-    .string()
-    .trim()
-    .min(1)
-    .max(160),
-  z.object({ kind: z.literal('exact'), value: z.string().trim().min(1).max(160) }).strict(),
-  z.object({ kind: z.literal('same') }).strict(),
-  z.object({ kind: z.literal('any') }).strict(),
-]);
-
-/** Null/absent = legacy unknown; [] = explicitly no defaults. */
-export const skillDefault = z.discriminatedUnion('kind', [
-  z
-    .object({
-      kind: z.literal('attribute'),
-      attribute: skillAttributeEnum,
-      modifier: z.number().int().min(-50).max(0),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal('skill'),
-      name: z.string().trim().min(1).max(160),
-      specialization: skillDefaultSpecialization.optional(),
-      modifier: z.number().int().min(-50).max(0),
-    })
-    .strict(),
-]);
-export const skillDefaults = z.array(skillDefault).max(20).nullable();
-export type SkillDefaults = z.infer<typeof skillDefaults>;
 
 export const situationalModifier = z
   .object({
@@ -72,6 +56,11 @@ export const skillOut = z.object({
    * no matching effects apply.
    */
   effectiveLevel: z.number().int().nullable(),
+  /** Current evaluation of the owned structured prerequisite snapshot. */
+  prerequisiteStatus: z.enum(['met', 'unmet', 'unknown']).optional(),
+  prerequisiteMessages: z.array(z.string()).optional(),
+  /** Conditional defaults excluded from automatic calculation and why. */
+  defaultConditionMessages: z.array(z.string()).optional(),
   ...timestamps,
 });
 

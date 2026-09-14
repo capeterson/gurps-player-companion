@@ -147,7 +147,7 @@ it('round-trips specialization catalogs and structured default matchers', () => 
     techniques: [],
     styles: [],
   });
-  expect(yaml).toContain('version: 8');
+  expect(yaml).toContain('version: 9');
   expect(parseLibraryYaml(yaml).library.skills[0]).toEqual(skill);
 });
 
@@ -446,7 +446,7 @@ describe('emitLibraryYaml', () => {
     expect(second).toBe(first);
   });
 
-  it('upgrades a v3 document to the current v8 shape byte-stably', () => {
+  it('upgrades a v3 document to the current v9 shape byte-stably', () => {
     const doc = parseLibraryYaml(SAMPLE_V3);
     const first = emitLibraryYaml({
       campaign: doc.campaign,
@@ -458,7 +458,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 8');
+    expect(first).toContain('version: 9');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

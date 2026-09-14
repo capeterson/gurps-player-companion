@@ -199,6 +199,25 @@ on any sheet the viewer can edit — their own — it always shows).
   shown with an explanatory tooltip and no invented roll target at zero points.
   Defaults are authored through library YAML/API and character REST/sync fields;
   skill-source declarations support exact, same-specialty, and any-specialty matching.
+  Library skills also carry an explicit TL policy: not applicable, fixed, or
+  required `/TL`. A required definition cannot be learned until the player
+  chooses a concrete TL; fixed definitions canonicalize the learned value.
+  The shared cross-TL helper applies the asymmetric IQ-based table: higher-TL
+  use is -5/-10/-15 at +1/+2/+3 TL and impossible at +4, while lower-TL use is
+  -1/-3/-5/-7 and then -2 per further TL; non-IQ technological skills use
+  -1 per TL in either direction. Defaults may select exact
+  skills, campaign-owned groups, or tags and may declare task, campaign-rule,
+  character-fact, and same-specialization-dimension conditions. Unknown
+  conditions remain visible candidates but never contribute an automatic level.
+  Structured prerequisites form nested AND/OR trees over skills (level,
+  relative level, points, and specialization), traits/levels, attributes, TL,
+  campaign rules, and explicit GM permission. A campaign owner grants a named
+  GM gate by adding the skill; that grant is retained in the owned snapshot so
+  later point changes and offline warnings remain stable. Campaigns either block learning
+  and point increases or allow them with persistent sheet warnings; unrelated
+  later edits never delete an existing skill. Prose remains beside the typed
+  rule for source fidelity. All rule data is captured in the owned library
+  snapshot so offline calculation and warnings match the server.
   Difficulty never decides whether a default exists, including Very Hard skills.
   Basic-attribute defaults cap their source ST/DX/IQ/HT at 20 before applying
   the listed penalty (B173). Purchased levels and learned-skill defaults remain
@@ -549,7 +568,7 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
   Library skill forms also author first-class free-form/catalog specialization
-  policies and per-catalog-option rule overrides; portable YAML v8 retains them.
+  policies and per-catalog-option rule overrides; portable YAML v9 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal, e.g. 13) and **location** (free-form text, e.g. "The

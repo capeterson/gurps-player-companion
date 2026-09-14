@@ -832,7 +832,7 @@ describe('delegated operation behavioral parity', () => {
   });
 
   // Manifest anchor: effects-authoring-parity.
-  it('preserves library and owned effects, YAML v8 portability, retries and refinement errors', async () => {
+  it('preserves library and owned effects, YAML v9 portability, retries and refinement errors', async () => {
     const [client] = await getDb()
       .insert(oauthClients)
       .values({
@@ -915,6 +915,19 @@ describe('delegated operation behavioral parity', () => {
           attribute: 'DX',
           difficulty: 'A',
           effects: skillEffects,
+          prerequisiteRules: {
+            kind: 'all',
+            children: [
+              { kind: 'attribute', attribute: 'DX', minimum: 10 },
+              {
+                kind: 'any',
+                children: [
+                  { kind: 'trait', name: 'Weapon Master' },
+                  { kind: 'gm_permission', label: 'Martial training approved' },
+                ],
+              },
+            ],
+          },
           defaultSpecialization: 'One-Handed',
           specializationPolicy: {
             kind: 'required_catalog',
@@ -941,7 +954,7 @@ describe('delegated operation behavioral parity', () => {
     });
     const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaign.id));
     const yaml = parseLibraryYaml(exported.body);
-    expect(yaml.version).toBe(8);
+    expect(yaml.version).toBe(9);
     expect(exported.body).not.toContain('libraryItemId');
     expect(yaml.library.traits[0]?.effects).toEqual([
       portableEffects[1],
@@ -955,6 +968,19 @@ describe('delegated operation behavioral parity', () => {
       },
     ]);
     expect(yaml.library.skills[0]?.effects).toEqual(skillEffects);
+    expect(yaml.library.skills[0]?.prerequisiteRules).toEqual({
+      kind: 'all',
+      children: [
+        { kind: 'attribute', attribute: 'DX', minimum: 10 },
+        {
+          kind: 'any',
+          children: [
+            { kind: 'trait', name: 'Weapon Master' },
+            { kind: 'gm_permission', label: 'Martial training approved' },
+          ],
+        },
+      ],
+    });
     expect(yaml.library.skills[0]?.specializationPolicy).toEqual({
       kind: 'required_catalog',
       options: [

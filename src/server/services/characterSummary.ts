@@ -29,6 +29,7 @@ import {
   buildTraitOut as buildTraitOutShared,
 } from '../../shared/domain/characterDetail.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
+import type { AuditTx } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
   type DbCampaign,
@@ -121,8 +122,10 @@ export function buildCharacterDetail(input: SummaryInput) {
  * `characterDetail` after a read or a write calls this rather than
  * re-selecting the same six tables itself.
  */
-export async function loadCharacterDetail(id: string) {
-  const db = getDb();
+export async function loadCharacterDetail(
+  id: string,
+  db: ReturnType<typeof getDb> | AuditTx = getDb(),
+) {
   const [c] = await db.select().from(characters).where(eq(characters.id, id));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
   // Delegated operations intentionally run the whole shared handler on one

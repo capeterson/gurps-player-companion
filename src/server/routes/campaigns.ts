@@ -73,6 +73,7 @@ function campaignToOut(row: DbCampaign, members: readonly MemberRow[]) {
     manaLevel: row.manaLevel,
     houseRules: campaignHouseRules.parse(row.houseRules),
     techLevel: row.techLevel,
+    skillPrerequisitePolicy: row.skillPrerequisitePolicy,
     enforceAttributeCaps: row.enforceAttributeCaps,
     shareCharacterSheets: row.shareCharacterSheets,
     allowGmCharacterEditing: row.allowGmCharacterEditing,
@@ -185,6 +186,9 @@ router.openapi(
             : {}),
           ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
           ...(body.techLevel !== undefined ? { techLevel: body.techLevel } : {}),
+          ...(body.skillPrerequisitePolicy !== undefined
+            ? { skillPrerequisitePolicy: body.skillPrerequisitePolicy }
+            : {}),
           ...(body.enforceAttributeCaps !== undefined
             ? { enforceAttributeCaps: body.enforceAttributeCaps }
             : {}),
