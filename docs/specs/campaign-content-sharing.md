@@ -335,6 +335,15 @@ difficulty, resolved specialization and learned TL into the character row, with
 the resolved description, source and prerequisites in notes. The shared server
 reference handler canonicalizes the specialty and applies its defaults/notes when
 REST, sync, or MCP creates a linked skill, so non-UI clients get the same snapshot.
+Definitions may additionally declare `techLevelPolicy`, structured
+`prerequisiteRules`, natural-name `groups`/`tags`, and conditional group/tag
+defaults. The reference handler is authoritative for REST, sync, and MCP: it
+rejects unresolved required `/TL` values and, under the campaign's `block`
+policy, unmet/unknown prerequisites on adds or point increases. `warn` accepts
+the edit and the shared detail builder exposes the failed clauses. Selected
+specialization rules and durable campaign-owner GM-permission grants are retained
+in `character_skills.library_mechanics`; refresh and detach operations preserve
+the selected specialization's overrides rather than replacing them with base rules.
 This snapshot is queued durably through the character
 outbox. Changing the campaign TL does not rewrite learned skill TL. Editing the
 add form's name detaches its selected definition; a pending save cannot clear a
@@ -399,15 +408,17 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 8`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 9`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
   v5 (item enchantments), v6 (explicit skill defaults), and v7
   (weapon-scoped effects) also parse. v8 adds skill specialization policies,
   catalog option overrides, and structured `exact`/`same`/`any` specialization
-  matching for skill defaults. The parser unions on the literal `version` field and newer fields
-  default/absent on older docs.
+  matching for skill defaults. v9 adds TL policies, structured prerequisites,
+  conditional group/tag defaults, and the campaign prerequisite policy. The
+  parser unions on the literal `version` field and newer fields default/absent
+  on older docs.
 - **Item fields (v3):** library items carry the same container/powerstone/
   magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):
   `isContainer`, `hideawayCapacityLbs`, `weightReductionPercent`,

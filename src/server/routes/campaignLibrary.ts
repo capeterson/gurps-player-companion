@@ -195,6 +195,7 @@ router.openapi(
         manaLevel: campaign.manaLevel,
         houseRules: campaign.houseRules,
         techLevel: campaign.techLevel,
+        skillPrerequisitePolicy: campaign.skillPrerequisitePolicy,
         enforceAttributeCaps: campaign.enforceAttributeCaps,
       },
       traits: traits.map(traitEntity.rowToCreate),
@@ -279,6 +280,7 @@ router.openapi(
         quirkCap,
         manaLevel,
         techLevel,
+        skillPrerequisitePolicy,
         houseRules,
         enforceAttributeCaps,
       } = doc.campaign;
@@ -289,6 +291,7 @@ router.openapi(
         quirkCap,
         manaLevel,
         techLevel,
+        skillPrerequisitePolicy,
         houseRules,
         enforceAttributeCaps,
       });

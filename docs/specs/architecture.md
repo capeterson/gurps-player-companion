@@ -252,6 +252,10 @@ Tables (grouped):
   `campaign_library_skills.specialization_policy` is JSONB validated by the
   shared discriminated-union schema; it stores free-form/catalog requirements
   and per-specialty rule overrides.
+  Skill definitions also persist validated JSONB TL policies, recursive
+  prerequisite expressions, defaults with three-valued conditions, and
+  natural-name group/tag selectors. `domain/skillRules.ts` is the pure shared
+  evaluator used by authoritative REST/sync writes and offline character detail.
 - **Sync/audit infra**: `entity_tombstones` (deletes for cursor backfill),
   `entity_history` (append-only audit log).
 

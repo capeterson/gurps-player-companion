@@ -15,18 +15,21 @@ import {
   skillAttributeEnum,
   skillDefaults,
   skillDifficultyEnum,
+  skillPrerequisites,
+  skillTechLevelPolicy,
 } from './skill.ts';
 import { spellDifficulty } from './spell.ts';
 import { techniqueDifficulty } from './technique.ts';
 import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
 
-const tagList = z.array(z.string().min(1).max(40)).default([]);
+export const tagList = z.array(z.string().min(1).max(40)).max(100).default([]);
 
 export const librarySkillSpecialization = z
   .object({
     name: z.string().trim().min(1).max(160),
     description: z.string().max(20_000).nullable().optional(),
     prerequisites: z.string().max(20_000).nullable().optional(),
+    prerequisiteRules: skillPrerequisites.optional(),
     defaults: skillDefaults.optional(),
   })
   .strict();
@@ -116,12 +119,16 @@ export const librarySkillOut = z.object({
   attribute: skillAttributeEnum,
   difficulty: skillDifficultyEnum,
   techLevel: z.number().int().min(0).max(12).nullable(),
+  techLevelPolicy: skillTechLevelPolicy.optional(),
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
   defaultSpecialization: z.string().max(160).nullable(),
   specializationPolicy: librarySkillSpecializationPolicy,
   defaults: skillDefaults.optional(),
   prerequisites: z.string().max(20_000).nullable(),
+  prerequisiteRules: skillPrerequisites.optional(),
+  groups: tagList,
+  tags: tagList,
   situationalModifiers: z.array(situationalModifier).default([]),
   effects: z.array(libraryTraitEffect).default([]),
   ...timestamps,
@@ -133,12 +140,16 @@ export const librarySkillCreate = z
     attribute: skillAttributeEnum,
     difficulty: skillDifficultyEnum,
     techLevel: z.number().int().min(0).max(12).nullable().optional(),
+    techLevelPolicy: skillTechLevelPolicy.optional(),
     description: z.string().max(20_000).nullable().optional(),
     source: z.string().max(40).nullable().optional(),
     defaultSpecialization: z.string().max(160).nullable().optional(),
     specializationPolicy: librarySkillSpecializationPolicy.optional(),
     defaults: skillDefaults.optional(),
     prerequisites: z.string().max(20_000).nullable().optional(),
+    prerequisiteRules: skillPrerequisites.optional(),
+    groups: tagList,
+    tags: tagList,
     situationalModifiers: z.array(situationalModifier).default([]),
     effects: z.array(libraryTraitEffect).default([]),
   })
@@ -402,6 +413,7 @@ export const libraryYamlVersion = z.union([
   z.literal(6),
   z.literal(7),
   z.literal(8),
+  z.literal(9),
 ]);
 
 export const libraryYamlDoc = z
@@ -419,6 +431,7 @@ export const libraryYamlDoc = z
         houseRules: campaignHouseRules.optional(),
         /** Campaign-wide tech level (Basic Set p. 513). */
         techLevel: z.number().int().min(0).max(12).nullable().optional(),
+        skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
         /** Purchased-attribute cap enforcement (Basic Set pp. B14-B16). */
         enforceAttributeCaps: z.boolean().optional(),
       })
@@ -487,6 +500,7 @@ export const libraryPortableFieldManifest = {
     manaLevel: true,
     houseRules: true,
     techLevel: true,
+    skillPrerequisitePolicy: true,
     enforceAttributeCaps: true,
   } satisfies Record<keyof NonNullable<LibraryYamlDoc['campaign']>, true>,
   traits: {
@@ -513,6 +527,10 @@ export const libraryPortableFieldManifest = {
     specializationPolicy: true,
     defaults: true,
     prerequisites: true,
+    prerequisiteRules: true,
+    techLevelPolicy: true,
+    groups: true,
+    tags: true,
     situationalModifiers: true,
     effects: true,
   } satisfies Record<keyof LibrarySkillCreate, true>,

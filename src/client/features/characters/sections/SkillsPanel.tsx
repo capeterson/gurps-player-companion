@@ -50,7 +50,14 @@ interface SkillSnapshot {
   pointsRaw: string;
   picked: LibrarySkillOut | null;
   specialization: string;
+  techLevel: number | null;
   nameVersion: number;
+}
+
+function fixedPickedTechLevel(skill: LibrarySkillOut | null): number | null {
+  if (!skill) return null;
+  if (skill.techLevelPolicy?.kind === 'fixed') return skill.techLevelPolicy.techLevel;
+  return skill.techLevelPolicy == null ? skill.techLevel : null;
 }
 
 function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) {
@@ -60,6 +67,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   const [points, setPoints] = useState('1');
   const [picked, setPicked] = useState<LibrarySkillOut | null>(null);
   const [specialization, setSpecialization] = useState('');
+  const [techLevel, setTechLevel] = useState('');
   const pickedPolicy = picked
     ? effectiveSpecializationPolicy(picked.specializationPolicy, picked.defaultSpecialization)
     : null;
@@ -69,6 +77,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
     nameVersion.current++;
     setPicked(null);
     setSpecialization('');
+    setTechLevel('');
   };
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
@@ -92,6 +101,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
       specialization: snap.specialization.trim() || null,
       description: null,
       prerequisites: null,
+      prerequisiteRules: null,
       defaults: null,
     };
     if (snap.picked) {
@@ -112,7 +122,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         librarySkillId: snap.picked?.id ?? null,
         defaults: resolved.defaults,
         specialization: resolved.specialization,
-        techLevel: snap.picked?.techLevel ?? null,
+        techLevel: snap.techLevel,
         notes: librarySkillCopyNotes(snap.picked?.source, resolved),
       },
       () => {
@@ -128,6 +138,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           setName((cur) => (cur === snap.nameRaw ? '' : cur));
           setPicked((cur) => (cur === snap.picked ? null : cur));
           setSpecialization((cur) => (cur === snap.specialization ? '' : cur));
+          setTechLevel('');
         }
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
       },
@@ -137,6 +148,17 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
             campaignId: snap.picked.campaignId,
             sourceRevision: null,
             effects: snap.picked.effects ?? null,
+            skillRules: {
+              techLevelPolicy:
+                snap.picked.techLevelPolicy ??
+                (snap.picked.techLevel == null
+                  ? { kind: 'not_applicable' }
+                  : { kind: 'fixed', techLevel: snap.picked.techLevel }),
+              prerequisites: resolved.prerequisiteRules ?? null,
+              defaults: resolved.defaults ?? null,
+              groups: snap.picked.groups ?? [],
+              tags: snap.picked.tags ?? [],
+            },
           })
         : null,
     );
@@ -161,6 +183,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           pointsRaw: points,
           picked,
           specialization,
+          techLevel: fixedPickedTechLevel(picked) ?? (techLevel.trim() ? Number(techLevel) : null),
           nameVersion: nameVersion.current,
         });
       }}
@@ -180,6 +203,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
               nameVersion.current++;
               setPicked(opt);
               setSpecialization(initialLibrarySkillSpecialization(opt) ?? '');
+              setTechLevel(fixedPickedTechLevel(opt)?.toString() ?? '');
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
@@ -187,7 +211,11 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
               <span className="flex items-baseline justify-between gap-2">
                 <span className="truncate">
                   {o.name}
-                  {o.techLevel != null ? ` / TL${o.techLevel}` : ''}
+                  {o.techLevelPolicy?.kind === 'required'
+                    ? ' / TL'
+                    : o.techLevel != null
+                      ? ` / TL${o.techLevel}`
+                      : ''}
                 </span>
                 <span className="num text-xs text-base-content/70">
                   {o.attribute}/{o.difficulty}
@@ -209,7 +237,11 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         {picked && (
           <span className="min-w-0 break-words text-xs text-base-content/70">
             {skillDisplayName(picked.name, specialization)}
-            {picked.techLevel != null ? ` / TL${picked.techLevel}` : ''}
+            {picked.techLevelPolicy?.kind === 'required'
+              ? ' / TL'
+              : picked.techLevel != null
+                ? ` / TL${picked.techLevel}`
+                : ''}
           </span>
         )}
       </div>
@@ -250,6 +282,21 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           />
         </label>
       ) : null}
+      {picked?.techLevelPolicy?.kind === 'required' && (
+        <label className="form-control w-20">
+          <span className="label-text text-xs">TL *</span>
+          <input
+            aria-label="Skill Tech Level"
+            className="input input-bordered input-sm num"
+            type="number"
+            min={0}
+            max={12}
+            required
+            value={techLevel}
+            onChange={(event) => setTechLevel(event.target.value)}
+          />
+        </label>
+      )}
       <label className="form-control">
         <span className="label-text text-xs">Attr</span>
         <select
@@ -289,7 +336,8 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           creating ||
           ((pickedPolicy?.kind === 'required_catalog' ||
             pickedPolicy?.kind === 'required_freeform') &&
-            !specialization.trim())
+            !specialization.trim()) ||
+          (picked?.techLevelPolicy?.kind === 'required' && !techLevel.trim())
         }
       >
         {creating ? 'Adding…' : 'Add'}
@@ -402,14 +450,38 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
                 TL{skill.techLevel}
               </span>
             )}
+            {skill.prerequisiteStatus && skill.prerequisiteStatus !== 'met' && (
+              <span className="block break-words text-xs text-warning">
+                {skill.prerequisiteStatus === 'unknown' ? 'Check prerequisites' : 'Unmet'}:{' '}
+                {skill.prerequisiteMessages?.join('; ')}
+              </span>
+            )}
+            {skill.defaultConditionMessages?.length ? (
+              <span className="block break-words text-xs text-base-content/70">
+                Defaults: {skill.defaultConditionMessages.join('; ')}
+              </span>
+            ) : null}
           </div>
         ) : (
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="min-w-0 break-words font-medium">
-              {displayName}
-              {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+          <span className="min-w-0">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="min-w-0 break-words font-medium">
+                {displayName}
+                {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+              </span>
+              {modifierTooltip}
             </span>
-            {modifierTooltip}
+            {skill.prerequisiteStatus && skill.prerequisiteStatus !== 'met' ? (
+              <span className="block break-words text-xs text-warning">
+                {skill.prerequisiteStatus === 'unknown' ? 'Check prerequisites' : 'Unmet'}:{' '}
+                {skill.prerequisiteMessages?.join('; ')}
+              </span>
+            ) : null}
+            {skill.defaultConditionMessages?.length ? (
+              <span className="block break-words text-xs text-base-content/70">
+                Defaults: {skill.defaultConditionMessages.join('; ')}
+              </span>
+            ) : null}
           </span>
         )}
       </div>

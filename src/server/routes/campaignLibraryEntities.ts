@@ -128,6 +128,8 @@ export interface LibraryEntityConfig<
   readonly toInsertValues: (campaignId: string, body: TCreate) => TTable['$inferInsert'];
   /** Full-replace editable fields — used by YAML import-update (not PATCH, which diffs via `buildPatchSet`). */
   readonly toUpdateValues: (body: TCreate) => Record<string, unknown>;
+  /** Normalize compatibility fields before a partial REST/MCP PATCH. */
+  readonly normalizePatch?: (body: TUpdate) => Record<string, unknown>;
   /** Row → YAML-create shape, used by the export mapper. */
   readonly rowToCreate: (row: TTable['$inferSelect']) => TCreate;
 }
@@ -214,10 +216,16 @@ export const traitEntity: LibraryEntityConfig<
 // ===================== skills =====================
 
 function skillEditableFields(body: LibrarySkillCreate) {
+  const techLevelPolicy =
+    body.techLevelPolicy ??
+    (body.techLevel == null
+      ? { kind: 'not_applicable' as const }
+      : { kind: 'fixed' as const, techLevel: body.techLevel });
   return {
     attribute: body.attribute,
     difficulty: body.difficulty,
-    techLevel: body.techLevel ?? null,
+    techLevel: techLevelPolicy.kind === 'fixed' ? techLevelPolicy.techLevel : null,
+    techLevelPolicy,
     description: body.description ?? null,
     source: body.source ?? null,
     defaultSpecialization: body.defaultSpecialization ?? null,
@@ -228,6 +236,9 @@ function skillEditableFields(body: LibrarySkillCreate) {
         : { kind: 'none' as const }),
     defaults: body.defaults ?? null,
     prerequisites: body.prerequisites ?? null,
+    prerequisiteRules: body.prerequisiteRules ?? null,
+    groups: body.groups ?? [],
+    tags: body.tags ?? [],
     situationalModifiers: body.situationalModifiers ?? [],
     effects: body.effects ?? [],
   } satisfies Record<Exclude<keyof LibrarySkillCreate, 'name'>, unknown>;
@@ -262,12 +273,16 @@ export const skillEntity: LibraryEntityConfig<
       attribute: row.attribute,
       difficulty: row.difficulty,
       techLevel: row.techLevel,
+      techLevelPolicy: row.techLevelPolicy,
       description: row.description,
       source: row.source,
       defaultSpecialization: row.defaultSpecialization,
       specializationPolicy: row.specializationPolicy,
       defaults: row.defaults,
       prerequisites: row.prerequisites,
+      prerequisiteRules: row.prerequisiteRules,
+      groups: row.groups,
+      tags: row.tags,
       situationalModifiers: row.situationalModifiers ?? [],
       effects: row.effects ?? [],
       createdAt: row.createdAt.toISOString(),
@@ -302,18 +317,35 @@ export const skillEntity: LibraryEntityConfig<
     ...skillEditableFields(body),
   }),
   toUpdateValues: (body) => skillEditableFields(body),
+  normalizePatch: (body) => {
+    const normalized = { ...body } as Record<string, unknown>;
+    if (body.techLevelPolicy !== undefined) {
+      normalized.techLevel =
+        body.techLevelPolicy.kind === 'fixed' ? body.techLevelPolicy.techLevel : null;
+    } else if (body.techLevel !== undefined) {
+      normalized.techLevelPolicy =
+        body.techLevel == null
+          ? { kind: 'not_applicable' as const }
+          : { kind: 'fixed' as const, techLevel: body.techLevel };
+    }
+    return normalized;
+  },
   rowToCreate: (row) =>
     librarySkillCreate.parse({
       name: row.name,
       attribute: row.attribute,
       difficulty: row.difficulty,
       techLevel: row.techLevel ?? undefined,
+      techLevelPolicy: row.techLevelPolicy,
       description: row.description ?? undefined,
       source: row.source ?? undefined,
       defaultSpecialization: row.defaultSpecialization ?? undefined,
       specializationPolicy: row.specializationPolicy,
       defaults: row.defaults,
       prerequisites: row.prerequisites ?? undefined,
+      prerequisiteRules: row.prerequisiteRules ?? undefined,
+      groups: row.groups ?? [],
+      tags: row.tags ?? [],
       situationalModifiers: row.situationalModifiers ?? [],
       effects: row.effects ?? [],
     }),

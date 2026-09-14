@@ -228,6 +228,7 @@ describe('character skill effect specialization', () => {
           ? {
               ...skill,
               points: 0,
+              techLevel: 9,
               defaults: [
                 { kind: 'skill' as const, name: 'Guns', specialization: 'Pistol', modifier: -2 },
               ],
@@ -236,6 +237,6 @@ describe('character skill effect specialization', () => {
       ),
     });
     // FAQ: Talent is applied after defaults and only to its listed skills.
-    expect(defaulted.skills.map((skill) => skill.effectiveLevel)).toEqual([14, 10]);
+    expect(defaulted.skills.map((skill) => skill.effectiveLevel)).toEqual([14, 9]);
   });
 });

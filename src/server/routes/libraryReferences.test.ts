@@ -585,6 +585,86 @@ it('member removal waits for an authorized in-flight copy and then detaches it',
   expect(detail.traits[0]?.libraryMechanics?.detached).toBe(true);
 });
 
+it('does not reuse a GM grant after a detached skill changes specialization', async () => {
+  const gm = await register();
+  const player = await register();
+  const campaign = await create(gm.token, '/campaigns', { name: 'Scoped GM approval' });
+  expect(
+    (await request(gm.token, `/campaigns/${campaign.id}/members`, { email: player.email })).status,
+  ).toBe(200);
+  expect(
+    (
+      await request(
+        gm.token,
+        `/campaigns/${campaign.id}`,
+        { allowGmCharacterEditing: true },
+        'PATCH',
+      )
+    ).status,
+  ).toBe(200);
+  const source = await create(gm.token, `/campaigns/${campaign.id}/library/skills`, {
+    name: 'Approved specialty',
+    attribute: 'IQ',
+    difficulty: 'VH',
+    specializationPolicy: { kind: 'required_freeform' },
+    prerequisiteRules: { kind: 'gm_permission', label: 'GM approved specialty' },
+  });
+  const character = await create(player.token, '/characters', {
+    name: 'Approval owner',
+    campaignId: campaign.id,
+  });
+  const approved = await request(gm.token, `/characters/${character.id}/skills`, {
+    name: 'Approved specialty',
+    attribute: 'IQ',
+    difficulty: 'VH',
+    specialization: 'A',
+    librarySkillId: source.id,
+  });
+  expect(approved.status).toBe(201);
+  const approvedBody = (await approved.json()) as { skill: { id: string } };
+  const destination = await create(player.token, '/campaigns', { name: 'Detached approvals' });
+  expect(
+    (
+      await request(
+        player.token,
+        `/characters/${character.id}`,
+        { campaignId: destination.id },
+        'PATCH',
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await request(
+        player.token,
+        `/characters/${character.id}/skills/${approvedBody.skill.id}`,
+        { specialization: 'B' },
+        'PATCH',
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await request(
+        player.token,
+        `/characters/${character.id}`,
+        { campaignId: campaign.id },
+        'PATCH',
+      )
+    ).status,
+  ).toBe(200);
+  const relink = await request(
+    player.token,
+    `/characters/${character.id}/skills/${approvedBody.skill.id}`,
+    { librarySkillId: source.id },
+    'PATCH',
+  );
+  expect(relink.status).toBe(400);
+  expect((await relink.json()) as { error: string }).toEqual({
+    error: 'Unmet prerequisites for Approved specialty: GM permission: GM approved specialty',
+  });
+});
+
 for (const cfg of configs) {
   it(`${cfg.kind}: scopes every REST/sync write and preserves copies when membership ends`, async () => {
     const gm = await register();

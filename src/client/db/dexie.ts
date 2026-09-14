@@ -224,6 +224,7 @@ export interface LocalCampaign {
   pointTarget: number | null;
   disadvantageCap: number | null;
   quirkCap: number | null;
+  skillPrerequisitePolicy?: 'block' | 'warn' | undefined;
   /** Optional: rows synced before the mana column existed lack it;
    * readers default missing values to 'normal'. */
   houseRules?: import('../../shared/schemas/campaign.ts').CampaignHouseRules;

@@ -72,6 +72,9 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   const [enforceAttributeCaps, setEnforceAttributeCaps] = useState(campaign.enforceAttributeCaps);
   const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets);
   const [allowGmEditing, setAllowGmEditing] = useState(campaign.allowGmCharacterEditing);
+  const [skillPrerequisitePolicy, setSkillPrerequisitePolicy] = useState(
+    campaign.skillPrerequisitePolicy ?? 'block',
+  );
   const [houseRules, setHouseRules] = useState<CampaignHouseRules>(() =>
     campaignHouseRules.parse(campaign.houseRules ?? {}),
   );
@@ -99,6 +102,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     setEnforceAttributeCaps(campaign.enforceAttributeCaps);
     setShareSheets(campaign.shareCharacterSheets);
     setAllowGmEditing(campaign.allowGmCharacterEditing);
+    setSkillPrerequisitePolicy(campaign.skillPrerequisitePolicy ?? 'block');
     setHouseRules(campaignHouseRules.parse(campaign.houseRules ?? {}));
     setError(null);
   }, [open, campaign]);
@@ -169,6 +173,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       enforceAttributeCaps,
       shareCharacterSheets: shareSheets,
       allowGmCharacterEditing: allowGmEditing,
+      skillPrerequisitePolicy,
       houseRules,
     });
   };
@@ -266,6 +271,22 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
                 turn next turn, and makes every failure critical. Applied to every character sheet
                 in this campaign.
               </span>
+            </label>
+          )}
+
+          {viewerRole === 'owner' && (
+            <label className="form-control">
+              <span className="label-text text-xs">Skill prerequisites</span>
+              <select
+                className="select select-bordered select-sm"
+                value={skillPrerequisitePolicy}
+                onChange={(event) =>
+                  setSkillPrerequisitePolicy(event.target.value as 'block' | 'warn')
+                }
+              >
+                <option value="block">Block unmet prerequisites</option>
+                <option value="warn">Warn only</option>
+              </select>
             </label>
           )}
 

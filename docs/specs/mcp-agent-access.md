@@ -218,10 +218,14 @@ overrides. Character skill creates and patches enforce the selected library
 policy through the shared REST/sync handler.
 That handler canonicalizes catalog names and materializes per-specialty defaults
 and generated notes, so agents do not need to reconstruct the UI copy behavior.
+The same generated tools expose library `techLevelPolicy`, nested
+`prerequisiteRules`, natural-name groups/tags, conditional default declarations,
+and `campaign.skillPrerequisitePolicy`. Because MCP executes the raw OpenAPI
+handler, required-TL and block/warn enforcement is identical to REST and sync.
 
-Library export returns YAML v8 as typed text, retaining effect order, scaling,
+Library export returns YAML v9 as typed text, retaining effect order, scaling,
 conditions and mode names. Library-item selectors export their portable name
-without the campaign-local library UUID. Import accepts the existing v1–v8
+without the campaign-local library UUID. Import accepts the existing v1–v9
 formats and preserves shared merge/replace and campaign-settings options. No
 extra tools or scopes are required for effects authoring. The manifest links
 these operations to the focused `effects-authoring-parity` fixture, which checks

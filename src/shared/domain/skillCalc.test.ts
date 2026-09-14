@@ -6,6 +6,7 @@ import {
   computeSkillLevel,
   resolveSkillLevels,
   skillOffset,
+  unresolvedDefaultConditionMessages,
 } from './skillCalc.ts';
 
 const baseAttrs: CharacterAttrs = {
@@ -89,6 +90,132 @@ describe('attributeLevelFor', () => {
 });
 
 describe('computeSkillLevel', () => {
+  it('resolves group/tag sources only when every condition is proven', () => {
+    const derived = computeDerived(baseAttrs);
+    const sources = [
+      {
+        name: 'Broadsword',
+        specialization: null,
+        level: 15,
+        groups: ['Sword'],
+        tags: ['actual_combat_skill'],
+      },
+    ];
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [
+          {
+            kind: 'skill_group',
+            group: 'sword',
+            modifier: -3,
+            conditions: [{ kind: 'task', task: 'stage performance' }],
+          },
+        ],
+        sources,
+        null,
+        { task: 'stage performance' },
+      ),
+    ).toBe(12);
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [{ kind: 'skill_tag', tag: 'actual_combat_skill', modifier: -3 }],
+        sources,
+      ),
+    ).toBe(12);
+    expect(
+      computeSkillLevel(
+        'DX',
+        'A',
+        0,
+        derived,
+        [
+          {
+            kind: 'skill_group',
+            group: 'Sword',
+            modifier: -3,
+            conditions: [{ kind: 'task', task: 'stage performance' }],
+          },
+        ],
+        sources,
+      ),
+    ).toBeNull();
+  });
+
+  it('applies known campaign/specialization conditions and cross-TL penalties', () => {
+    const derived = computeDerived(baseAttrs);
+    const defaults = [
+      {
+        kind: 'skill' as const,
+        name: 'Engineer',
+        specialization: { kind: 'same' as const },
+        modifier: 0,
+        conditions: [
+          { kind: 'campaign_rule' as const, rule: 'cinematicRecovery', value: true },
+          { kind: 'same_specialization_dimension' as const, dimension: 'field' },
+        ],
+      },
+    ];
+    const source = [{ name: 'Engineer', specialization: 'Robotics', level: 16, techLevel: 8 }];
+    expect(
+      computeSkillLevel(
+        'IQ',
+        'H',
+        0,
+        derived,
+        defaults,
+        source,
+        'Robotics',
+        { campaignRules: { cinematicRecovery: true } },
+        9,
+      ),
+    ).toBe(11);
+    expect(
+      computeSkillLevel(
+        'IQ',
+        'H',
+        0,
+        derived,
+        defaults,
+        source,
+        'Civil',
+        { campaignRules: { cinematicRecovery: true } },
+        9,
+      ),
+    ).toBeNull();
+    expect(
+      computeSkillLevel('IQ', 'H', 0, derived, defaults, source, 'Robotics', undefined, 9),
+    ).toBeNull();
+    expect(
+      computeSkillLevel(
+        'IQ',
+        'H',
+        0,
+        derived,
+        defaults,
+        [{ name: 'Engineer', specialization: null, level: 16, techLevel: 8 }],
+        null,
+        { campaignRules: { cinematicRecovery: true } },
+        9,
+      ),
+    ).toBeNull();
+    expect(
+      unresolvedDefaultConditionMessages(defaults, source, 'Robotics', {
+        campaignRules: { cinematicRecovery: false },
+      }),
+    ).toEqual(['Unmet: Campaign rule cinematicRecovery = true']);
+    expect(unresolvedDefaultConditionMessages(defaults, source, 'Robotics')).toEqual([
+      'Unknown: Campaign rule cinematicRecovery = true',
+    ]);
+  });
+
   it('matches exact, same, and any specialization default policies', () => {
     const sources = [
       { name: 'Guns', specialization: 'Pistol', level: 14 },
