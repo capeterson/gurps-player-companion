@@ -1,5 +1,6 @@
 import './inventory/inventory.css';
 import { type DragEvent, Fragment, type MouseEvent, type ReactNode, useRef, useState } from 'react';
+import type { LibraryEnchantmentOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { useFlashState } from '../../../hooks/useFlashState.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
@@ -14,6 +15,7 @@ export interface InventoryRowProps {
   onRowClick: (id: string, e: MouseEvent) => void;
   canEdit: boolean;
   skillNames?: readonly string[];
+  fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
   drag?: InventoryDragApi;
   // Stashed items don't count against encumbrance, so the row renders the
   // raw weight directly instead of the encumbrance-effective number plus a
@@ -56,6 +58,7 @@ export function InventoryRow(props: InventoryRowProps) {
     onRowClick,
     canEdit,
     skillNames = [],
+    fetchEnchantmentOptions,
     drag,
     inStashed,
   } = props;
@@ -324,6 +327,30 @@ export function InventoryRow(props: InventoryRowProps) {
               {item.externalLocation}
             </div>
           )}
+          {(item.enchantmentBreakdown?.length ?? 0) > 0 && (
+            <div
+              className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-base-content/60"
+              style={{ paddingLeft: `${depth * 1.25 + 1.5}rem` }}
+            >
+              {item.enchantmentBreakdown?.map((effect, index) => (
+                <span
+                  key={`${effect.sourceName}:${effect.target}:${index}`}
+                  className={
+                    !effect.active || effect.suppressedByStacking ? 'line-through opacity-60' : ''
+                  }
+                >
+                  {effect.sourceName}: {effect.target.replaceAll('_', ' ')}{' '}
+                  {effect.value >= 0 ? '+' : ''}
+                  {effect.value}
+                  {!effect.active
+                    ? ' (inactive)'
+                    : effect.suppressedByStacking
+                      ? ' (suppressed)'
+                      : ''}
+                </span>
+              ))}
+            </div>
+          )}
         </td>
         <td data-label="Qty" className="num text-right align-top sm:align-middle">
           {item.quantity}
@@ -390,9 +417,14 @@ export function InventoryRow(props: InventoryRowProps) {
             {visited.map((entry) => (
               <div key={entry} hidden={section !== entry}>
                 <InventoryItemEditor
-                  item={item}
+                  item={{
+                    ...item,
+                    armor: item.baseArmor ?? item.armor,
+                    weaponData: item.baseWeaponData ?? item.weaponData,
+                  }}
                   section={entry}
                   skillNames={skillNames}
+                  {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})}
                   hasChildren={children.length > 0}
                   onSection={showSection}
                   onClose={closeEditor}

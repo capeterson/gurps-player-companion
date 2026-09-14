@@ -339,6 +339,19 @@ describe('AttacksCard', () => {
     });
   });
 
+  it('uses the enchanted armor divisor in both the damage chip and roll payload', () => {
+    const openRoll = vi.fn();
+    const character = makeCharacter('1d(2) pi');
+    const weapon = character.inventory[0];
+    if (!weapon) throw new Error('expected weapon fixture');
+    weapon.effectiveArmorDivisor = 5;
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '1d pi (5)' }));
+    const call = openRoll.mock.calls[0] as [RollRequest];
+    expect(call[0].damage?.armorDivisor).toBe('5');
+  });
+
   it('renders each alternate mode as its own damage chip, reach inherited when unset', () => {
     const openRoll = vi.fn();
     // Primary: swing; alternates: thrust (reach set) + thrown (reach unset

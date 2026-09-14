@@ -101,7 +101,7 @@ tools. The current covered surface is:
 | Current user (`GET /auth/me`) | Safe current-user identity with no credentials. |
 | Characters | List/detail/create/update/delete, warning dismissal, all trait/skill/spell/language/technique/inventory writes, combat updates, condition-group activation/deactivation. Include every writable field, optional/null/default behavior, and computed detail field. |
 | Campaigns | List/detail/create/update/delete, member and role changes, ownership transfer; use existing role checks. |
-| Campaign library | Read, CRUD for all seven library types, YAML import/export with all existing options and result semantics. Preserve YAML as a typed text payload. |
+| Campaign library | Read, CRUD for all eight library types (including mechanical enchantments), YAML import/export with all existing options and result semantics. Preserve YAML as a typed text payload. |
 | Invitations and notifications | All list, invite/cancel/accept/reject, mark-read/read-all, and deletion operations. |
 | Adventure log | All reads/writes, privacy, session/location fields, and XP award semantics. |
 | Encounters | List/detail/create/update, advance turn, combatant and effect CRUD; retain optimistic turn-concurrency checks and hidden-NPC/PC privacy. |
@@ -223,7 +223,7 @@ The same generated tools expose library `techLevelPolicy`, nested
 and `campaign.skillPrerequisitePolicy`. Because MCP executes the raw OpenAPI
 handler, required-TL and block/warn enforcement is identical to REST and sync.
 
-Library export returns YAML v9 as typed text, retaining effect order, scaling,
+Library export returns YAML v10 as typed text, retaining effect order, scaling,
 conditions and mode names. Library-item selectors export their portable name
 without the campaign-local library UUID. Import accepts the existing v1–v9
 formats and preserves shared merge/replace and campaign-settings options. No

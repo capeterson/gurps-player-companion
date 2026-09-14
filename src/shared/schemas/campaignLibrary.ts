@@ -5,7 +5,11 @@ import { timestamps, uuid } from './common.ts';
 import { libraryTraitEffect } from './effects.ts';
 import {
   armorData,
+  enchantmentApplicability,
+  enchantmentEffect,
+  enchantmentLevels,
   enchantmentRef,
+  enchantmentStackingPolicy,
   magicItemData,
   powerstoneData,
   weaponData,
@@ -62,6 +66,35 @@ export const librarySkillSpecializationPolicy = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('optional_catalog'), options: specializationCatalog }).strict(),
 ]);
 export type LibrarySkillSpecializationPolicy = z.infer<typeof librarySkillSpecializationPolicy>;
+
+export const libraryEnchantmentOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  tags: tagList,
+  applicability: enchantmentApplicability,
+  effects: z.array(enchantmentEffect).max(30),
+  levels: enchantmentLevels,
+  stackingPolicy: enchantmentStackingPolicy,
+  revision: z.number().int().min(0),
+  ...timestamps,
+});
+
+export const libraryEnchantmentCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+    tags: tagList,
+    applicability: enchantmentApplicability.default('any'),
+    effects: z.array(enchantmentEffect).max(30).default([]),
+    levels: enchantmentLevels.default([]),
+    stackingPolicy: enchantmentStackingPolicy.default({ kind: 'stack' }),
+  })
+  .strict();
+export const libraryEnchantmentUpdate = libraryEnchantmentCreate.partial();
 
 // ---------- Library entities (server-side persisted shape) ----------
 
@@ -338,7 +371,7 @@ export const libraryItemOut = z.object({
   weightReductionPercent: z.number().int().min(0).max(100),
   powerstoneData: powerstoneData.nullable(),
   magicItemData: magicItemData.nullable(),
-  /** Non-mechanical enchantment list carried onto inventory copies. */
+  /** Enchantment instances and owned mechanical snapshots carried onto inventory copies. */
   enchantments: z.array(enchantmentRef).max(50).default([]),
   ...timestamps,
 });
@@ -385,6 +418,7 @@ export const importResult = z.object({
   languages: importSectionResult,
   techniques: importSectionResult,
   styles: importSectionResult,
+  enchantments: importSectionResult,
   /** Whether the opt-in `applyCampaignSettings` flag actually updated the
    * campaigns row (false when the flag was off or the doc had no `campaign`
    * block). */
@@ -414,6 +448,7 @@ export const libraryYamlVersion = z.union([
   z.literal(7),
   z.literal(8),
   z.literal(9),
+  z.literal(10),
 ]);
 
 export const libraryYamlDoc = z
@@ -455,6 +490,8 @@ export const libraryYamlDoc = z
         techniques: z.array(libraryTechniqueCreate).optional(),
         /** Optional for the same reason as `languages`. */
         styles: z.array(libraryStyleCreate).optional(),
+        /** Reusable typed enchantment definitions were added in v10. */
+        enchantments: z.array(libraryEnchantmentCreate).optional(),
       })
       .strict(),
   })
@@ -481,6 +518,9 @@ export type LibraryLanguageUpdate = z.infer<typeof libraryLanguageUpdate>;
 export type LibraryItemOut = z.infer<typeof libraryItemOut>;
 export type LibraryItemCreate = z.infer<typeof libraryItemCreate>;
 export type LibraryItemUpdate = z.infer<typeof libraryItemUpdate>;
+export type LibraryEnchantmentOut = z.infer<typeof libraryEnchantmentOut>;
+export type LibraryEnchantmentCreate = z.infer<typeof libraryEnchantmentCreate>;
+export type LibraryEnchantmentUpdate = z.infer<typeof libraryEnchantmentUpdate>;
 export type ImportMode = z.infer<typeof importMode>;
 export type ImportResult = z.infer<typeof importResult>;
 export type LibraryYamlDoc = z.infer<typeof libraryYamlDoc>;
@@ -564,6 +604,16 @@ export const libraryPortableFieldManifest = {
     magicItemData: true,
     enchantments: true,
   } satisfies Record<keyof LibraryItemCreate, true>,
+  enchantments: {
+    name: true,
+    description: true,
+    source: true,
+    tags: true,
+    applicability: true,
+    effects: true,
+    levels: true,
+    stackingPolicy: true,
+  } satisfies Record<keyof LibraryEnchantmentCreate, true>,
   languages: {
     name: true,
     description: true,

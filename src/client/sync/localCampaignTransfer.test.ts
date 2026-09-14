@@ -566,7 +566,27 @@ describe('local campaign transfer', () => {
         entityClass,
         entityId,
         characterId,
-        attemptedValue: { characterId, name: 'Owned', [field]: sourceId },
+        attemptedValue: {
+          characterId,
+          name: 'Owned',
+          [field]: sourceId,
+          ...(entityClass === 'character_inventory'
+            ? {
+                enchantments: [
+                  {
+                    spellName: 'Fortify',
+                    definitionId: sourceId,
+                    mechanics: {
+                      applicability: 'any',
+                      effects: [{ target: 'dr', value: 1 }],
+                      levels: [],
+                      stackingPolicy: { kind: 'stack' },
+                    },
+                  },
+                ],
+              }
+            : {}),
+        },
       });
     }
     await db.characterSkills.update(skillId, { libraryMechanics: null });
@@ -580,12 +600,22 @@ describe('local campaign transfer', () => {
       if (!id) throw new Error('Missing fixture');
       expect(await table.get(id)).toHaveProperty(field, null);
     }
+    const movedInventory = await db.characterInventory.get(ids[3] as string);
+    expect(
+      (movedInventory?.enchantments as Array<{ definitionId?: string | null }> | undefined)?.[0]
+        ?.definitionId,
+    ).toBeNull();
     await finish(await queued(), 'rejected');
     for (const [index, [, table, field]] of children.entries()) {
       const id = ids[index];
       if (!id) throw new Error('Missing fixture');
       expect(await table.get(id)).toHaveProperty(field, sourceId);
     }
+    const restoredInventory = await db.characterInventory.get(ids[3] as string);
+    expect(
+      (restoredInventory?.enchantments as Array<{ definitionId?: string | null }> | undefined)?.[0]
+        ?.definitionId,
+    ).toBe(sourceId);
   });
 
   it('does not resurrect deleted children or overwrite a newer reference on rollback', async () => {

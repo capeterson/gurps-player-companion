@@ -12,7 +12,6 @@ import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { ManaLevel } from '../../shared/constants/magic.ts';
 import { computeDerived } from '../../shared/domain/characterCalc.ts';
-import { computeWeights } from '../../shared/domain/encumbrance.ts';
 import { mageryLevel } from '../../shared/domain/spellCalc.ts';
 import { characterDetail } from '../../shared/schemas/character.ts';
 import { combatStateOut, combatStateUpdate } from '../../shared/schemas/combat.ts';
@@ -45,7 +44,6 @@ import { campaigns as campaignsTable } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import {
   buildCombatStateOut,
-  buildInventoryItemOut,
   buildLanguageOut,
   buildSkillOut,
   buildSpellOut,
@@ -899,7 +897,6 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    const db = getDb();
     const created = await withAudit(user.id, undefined, async (tx) => {
       // Hold a row lock on the character so concurrent inventory tree
       // changes for this character serialize.  Without it two parent
@@ -924,26 +921,13 @@ router.openapi(
       return row;
     });
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    const allItems = await db
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.characterId, id));
-    const weights = computeWeights(
-      allItems.map((i) => ({
-        id: i.id,
-        parentId: i.parentId,
-        weightLbs: Number(i.weightLbs),
-        quantity: i.quantity,
-        worn: i.worn,
-        isContainer: i.isContainer,
-        hideawayCapacityLbs: Number(i.hideawayCapacityLbs),
-        weightReductionPercent: i.weightReductionPercent,
-      })),
-    );
+    const character = await loadCharacterDetail(id);
+    const item = character.inventory.find((candidate) => candidate.id === created.id);
+    if (!item) throw new HTTPException(500, { message: 'created item missing from detail' });
     return c.json(
       {
-        item: buildInventoryItemOut(created, weights.perItem),
-        character: await loadCharacterDetail(id),
+        item,
+        character,
       },
       201,
     );
@@ -984,7 +968,6 @@ router.openapi(
     if (body.parentId !== undefined && body.parentId !== null && body.parentId === itemId) {
       throw new HTTPException(400, { message: 'an item cannot be its own parent' });
     }
-    const db = getDb();
     // numeric columns expect strings (drizzle decimal).
     const updates = buildPatchSet(body, {
       stringifyKeys: ['weightLbs', 'cost', 'hideawayCapacityLbs'],
@@ -1008,26 +991,13 @@ router.openapi(
       return row;
     });
     if (!updated) throw new HTTPException(404, { message: 'item not found' });
-    const allItems = await db
-      .select()
-      .from(inventoryItems)
-      .where(eq(inventoryItems.characterId, id));
-    const weights = computeWeights(
-      allItems.map((i) => ({
-        id: i.id,
-        parentId: i.parentId,
-        weightLbs: Number(i.weightLbs),
-        quantity: i.quantity,
-        worn: i.worn,
-        isContainer: i.isContainer,
-        hideawayCapacityLbs: Number(i.hideawayCapacityLbs),
-        weightReductionPercent: i.weightReductionPercent,
-      })),
-    );
+    const character = await loadCharacterDetail(id);
+    const item = character.inventory.find((candidate) => candidate.id === updated.id);
+    if (!item) throw new HTTPException(500, { message: 'updated item missing from detail' });
     return c.json(
       {
-        item: buildInventoryItemOut(updated, weights.perItem),
-        character: await loadCharacterDetail(id),
+        item,
+        character,
       },
       200,
     );

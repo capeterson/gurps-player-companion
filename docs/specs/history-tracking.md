@@ -22,6 +22,11 @@ retained rules after detachment, cleared rules, and unresolved copies. The campa
 library event records the definition edit too; transfers retain the source version.
 Member removal detaches the removed member's library copies in its audited transaction,
 so character history records retained rules and the actor who ended the live link.
+Mechanical enchantment definition edits likewise refresh linked library-item and
+character-inventory snapshots inside the definition writer's audit transaction.
+The definition row records `campaign_library_enchantment` history, while affected
+item rows record the exact old/new owned snapshot; deletion preserves mechanics and
+records the live-ID detachment.
 
 Chosen approach: **Postgres triggers** for capture, **paginated REST endpoints** for delivery, **indefinite retention**.
 
@@ -45,7 +50,9 @@ Columns:
 - `id` uuid PK default `gen_random_uuid()`
 - `revision` bigint NOT NULL default `next_sync_revision()` (migration `0040`; originally `nextval('revisions_seq')`) — reuses the shared global sequence behind a transaction advisory fence so history is commit-ordered against other changes and paginates without late-commit gaps.
 - `scope` text NOT NULL — `'character'` or `'campaign'` (the discriminator that keeps the two views separate).
-- `entity_class` text NOT NULL — `character` | `character_trait` | `character_skill` | `character_spell` | `character_inventory` | `character_combat` | `campaign` | `campaign_membership` | `campaign_library_trait` | `campaign_library_skill` | `campaign_library_item` | `adventure_log` (the existing `entityClass` enum from `src/shared/schemas/sync.ts`).
+- `entity_class` text NOT NULL — the existing `entityClass` enum from
+  `src/shared/schemas/sync.ts`, including character children and campaign content
+  such as `campaign_library_enchantment`.
 - `entity_id` uuid NOT NULL.
 - `op` text NOT NULL — `create` | `patch` | `delete` (matches `operationCommand`).
 - `character_id` uuid NULL — set for `scope='character'` rows (the parent character), so per-character queries are a single indexed lookup. NULL for campaign scope.

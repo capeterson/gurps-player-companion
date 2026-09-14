@@ -20,6 +20,8 @@ import {
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import type {
   ImportResult,
+  LibraryEnchantmentCreate,
+  LibraryEnchantmentOut,
   LibraryItemCreate,
   LibraryItemOut,
   LibrarySkillCreate,
@@ -30,6 +32,7 @@ import type {
   LibraryTraitCreate,
   LibraryTraitOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import type { EnchantmentEffectTarget } from '../../../shared/schemas/inventory.ts';
 import type { TraitModifier } from '../../../shared/schemas/trait.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { ApiError, api, apiFetch } from '../../lib/api.ts';
@@ -40,9 +43,10 @@ interface LibraryPayload {
   skills: LibrarySkillOut[];
   spells: LibrarySpellOut[];
   items: LibraryItemOut[];
+  enchantments: LibraryEnchantmentOut[];
 }
 
-type SectionKey = 'traits' | 'skills' | 'spells' | 'items';
+type SectionKey = 'traits' | 'skills' | 'spells' | 'items' | 'enchantments';
 
 /**
  * Top-level library page.  Mirrors LogPage: when the parent route
@@ -111,6 +115,19 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   const [itemsAddOpen, setItemsAddOpen] = useState(false);
   const [itemsEditId, setItemsEditId] = useState<string | null>(null);
   const [itemsDeleteId, setItemsDeleteId] = useState<string | null>(null);
+  const [enchantmentsAddOpen, setEnchantmentsAddOpen] = useState(false);
+  const [enchantmentsEditId, setEnchantmentsEditId] = useState<string | null>(null);
+  const [enchantmentsDeleteId, setEnchantmentsDeleteId] = useState<string | null>(null);
+  const [enchantmentSearch, setEnchantmentSearch] = useState('');
+  const filteredEnchantments = useMemo(() => {
+    const needle = enchantmentSearch.trim().toLowerCase();
+    if (!needle) return library.data?.enchantments ?? [];
+    return (library.data?.enchantments ?? []).filter((entry) =>
+      [entry.name, entry.description ?? '', entry.source ?? '', ...entry.tags].some((value) =>
+        value.toLowerCase().includes(needle),
+      ),
+    );
+  }, [enchantmentSearch, library.data?.enchantments]);
 
   // Trait mutations
   const createTrait = useMutation({
@@ -228,6 +245,37 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     },
   });
 
+  const createEnchantment = useMutation({
+    mutationFn: (body: LibraryEnchantmentCreate) =>
+      api<LibraryEnchantmentOut>(`/campaigns/${campaignId}/library/enchantments`, {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: () => {
+      setEnchantmentsAddOpen(false);
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+    },
+  });
+  const updateEnchantment = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: LibraryEnchantmentCreate }) =>
+      api<LibraryEnchantmentOut>(`/campaigns/${campaignId}/library/enchantments/${id}`, {
+        method: 'PATCH',
+        body,
+      }),
+    onSuccess: () => {
+      setEnchantmentsEditId(null);
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+    },
+  });
+  const deleteEnchantment = useMutation({
+    mutationFn: (id: string) =>
+      api(`/campaigns/${campaignId}/library/enchantments/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setEnchantmentsDeleteId(null);
+      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+    },
+  });
+
   const importMutation = useMutation({
     mutationFn: (snap: {
       yaml: string;
@@ -262,6 +310,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       skills: lib?.skills.length ?? 0,
       spells: lib?.spells?.length ?? 0,
       items: lib?.items.length ?? 0,
+      enchantments: lib?.enchantments.length ?? 0,
     };
   }, [library.data]);
 
@@ -312,6 +361,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   const skillToDelete = library.data?.skills.find((s) => s.id === skillsDeleteId);
   const spellToDelete = library.data?.spells?.find((s) => s.id === spellsDeleteId);
   const itemToDelete = library.data?.items.find((i) => i.id === itemsDeleteId);
+  const enchantmentToDelete = library.data?.enchantments.find(
+    (entry) => entry.id === enchantmentsDeleteId,
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -441,6 +493,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           className={`chip ${section === 'items' ? 'on' : ''}`}
         >
           Items <span className="num text-dim ml-1">{counts.items}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setSection('enchantments')}
+          className={`chip ${section === 'enchantments' ? 'on' : ''}`}
+        >
+          Enchantments <span className="num text-dim ml-1">{counts.enchantments}</span>
         </button>
       </div>
 
@@ -796,6 +855,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     }
                     onSubmit={(body) => updateItem.mutate({ id: i.id, body })}
                     onCancel={() => setItemsEditId(null)}
+                    definitions={library.data.enchantments}
                   />
                 ) : (
                   <article key={i.id} className="card p-card">
@@ -845,6 +905,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   }
                   onSubmit={(body) => createItem.mutate(body)}
                   onCancel={() => setItemsAddOpen(false)}
+                  definitions={library.data.enchantments}
                 />
               )}
               {counts.items === 0 && !itemsAddOpen && (
@@ -860,6 +921,113 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   }}
                 >
                   + Add item
+                </button>
+              )}
+            </>
+          )}
+
+          {section === 'enchantments' && (
+            <>
+              <input
+                type="search"
+                className="input input-bordered input-sm w-full"
+                aria-label="Search enchantments"
+                placeholder="Search name, source, description, or tags"
+                value={enchantmentSearch}
+                onChange={(event) => setEnchantmentSearch(event.target.value)}
+              />
+              {filteredEnchantments.map((entry) =>
+                enchantmentsEditId === entry.id ? (
+                  <EnchantmentForm
+                    key={entry.id}
+                    initial={entry}
+                    isPending={updateEnchantment.isPending}
+                    error={
+                      updateEnchantment.error instanceof ApiError
+                        ? updateEnchantment.error.message
+                        : updateEnchantment.error
+                          ? 'Save failed'
+                          : null
+                    }
+                    onSubmit={(body) => updateEnchantment.mutate({ id: entry.id, body })}
+                    onCancel={() => setEnchantmentsEditId(null)}
+                  />
+                ) : (
+                  <article key={entry.id} className="card p-card">
+                    <div className="mb-1 flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-display text-lg font-semibold">{entry.name}</span>
+                        <p className="text-xs text-dim">
+                          {entry.applicability} · {entry.stackingPolicy.kind}
+                          {entry.stackingPolicy.kind === 'highest'
+                            ? ` (${entry.stackingPolicy.key})`
+                            : ''}
+                        </p>
+                      </div>
+                      {isOwner && (
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs"
+                            onClick={() => {
+                              setEnchantmentsEditId(entry.id);
+                              setEnchantmentsAddOpen(false);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs text-error"
+                            onClick={() => setEnchantmentsDeleteId(entry.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {entry.description && <p className="text-sm text-muted">{entry.description}</p>}
+                    {entry.effects.length > 0 && (
+                      <p className="text-xs text-base-content/70">
+                        {entry.effects
+                          .map(
+                            (effect) =>
+                              `${effect.target} ${effect.value >= 0 ? '+' : ''}${effect.value}`,
+                          )
+                          .join(' · ')}
+                      </p>
+                    )}
+                    {entry.source && <p className="text-xs text-dim">Source · {entry.source}</p>}
+                  </article>
+                ),
+              )}
+              {isOwner && enchantmentsAddOpen && (
+                <EnchantmentForm
+                  isPending={createEnchantment.isPending}
+                  error={
+                    createEnchantment.error instanceof ApiError
+                      ? createEnchantment.error.message
+                      : createEnchantment.error
+                        ? 'Save failed'
+                        : null
+                  }
+                  onSubmit={(body) => createEnchantment.mutate(body)}
+                  onCancel={() => setEnchantmentsAddOpen(false)}
+                />
+              )}
+              {counts.enchantments === 0 && !enchantmentsAddOpen && (
+                <p className="text-center text-muted">No enchantment definitions yet.</p>
+              )}
+              {isOwner && !enchantmentsAddOpen && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm self-start"
+                  onClick={() => {
+                    setEnchantmentsAddOpen(true);
+                    setEnchantmentsEditId(null);
+                  }}
+                >
+                  + Add enchantment
                 </button>
               )}
             </>
@@ -922,6 +1090,20 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       >
         Delete <strong>{itemToDelete?.name}</strong> from the library? Existing characters that have
         this item are not affected.
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={!!enchantmentsDeleteId}
+        title="Delete enchantment definition"
+        confirmLabel="Delete"
+        tone="error"
+        onConfirm={() => {
+          if (enchantmentsDeleteId) deleteEnchantment.mutate(enchantmentsDeleteId);
+        }}
+        onCancel={() => setEnchantmentsDeleteId(null)}
+      >
+        Delete <strong>{enchantmentToDelete?.name}</strong>? Existing item snapshots keep their
+        mechanics and become detached.
       </ConfirmDialog>
     </div>
   );
@@ -1833,9 +2015,10 @@ interface ItemFormProps {
   error?: string | null;
   onSubmit: (body: LibraryItemCreate) => void;
   onCancel: () => void;
+  definitions: readonly LibraryEnchantmentOut[];
 }
 
-function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormProps) {
+function ItemForm({ initial, isPending, error, onSubmit, onCancel, definitions }: ItemFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [category, setCategory] = useState(initial?.category ?? 'general');
   const [defaultQuantity, setDefaultQuantity] = useState(initial?.defaultQuantity ?? 1);
@@ -1848,6 +2031,8 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
   const [weightReductionPercent, setWeightReductionPercent] = useState(
     initial?.weightReductionPercent ?? 0,
   );
+  const [enchantments, setEnchantments] = useState(initial?.enchantments ?? []);
+  const [definitionId, setDefinitionId] = useState('');
 
   function handleSubmit() {
     if (!name.trim()) return;
@@ -1870,7 +2055,7 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
       // doesn't wipe YAML-authored data.
       powerstoneData: initial?.powerstoneData ?? null,
       magicItemData: initial?.magicItemData ?? null,
-      enchantments: initial?.enchantments ?? [],
+      enchantments,
     });
   }
 
@@ -1994,6 +2179,74 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
           </>
         )}
       </div>
+      <div className="space-y-2 rounded-field border border-base-300 p-3">
+        <span className="label-text">Enchantments</span>
+        {enchantments.map((entry, index) => (
+          <div
+            key={`${entry.spellName}-${index}`}
+            className="flex items-center justify-between gap-2"
+          >
+            <span className="text-sm">
+              {entry.spellName}
+              {entry.level ? ` (level ${entry.level})` : ''}
+              {!entry.mechanics ? ' · metadata only' : ''}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs text-error"
+              onClick={() =>
+                setEnchantments(enchantments.filter((_, entryIndex) => entryIndex !== index))
+              }
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+        {definitions.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <select
+              className="select select-bordered select-sm min-w-[12rem] flex-1"
+              value={definitionId}
+              onChange={(event) => setDefinitionId(event.target.value)}
+              aria-label="Enchantment definition"
+            >
+              <option value="">Select definition…</option>
+              {definitions.map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={!definitionId}
+              onClick={() => {
+                const definition = definitions.find((entry) => entry.id === definitionId);
+                if (!definition) return;
+                setEnchantments([
+                  ...enchantments,
+                  {
+                    spellName: definition.name,
+                    definitionId: definition.id,
+                    definitionRevision: definition.revision,
+                    definitionSource: definition.source,
+                    mechanics: {
+                      applicability: definition.applicability,
+                      effects: definition.effects,
+                      levels: definition.levels,
+                      stackingPolicy: definition.stackingPolicy,
+                    },
+                  },
+                ]);
+                setDefinitionId('');
+              }}
+            >
+              Attach
+            </button>
+          </div>
+        )}
+      </div>
       {(initial?.powerstoneData || initial?.magicItemData) && (
         <p className="text-xs text-dim">
           {initial?.powerstoneData && 'This item carries powerstone data. '}
@@ -2024,6 +2277,463 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel }: ItemFormPro
   );
 }
 
+const ENCHANTMENT_TARGETS: readonly EnchantmentEffectTarget[] = [
+  'weapon_attack',
+  'weapon_damage',
+  'weapon_accuracy',
+  'weapon_parry',
+  'weapon_block',
+  'armor_divisor',
+  'dr',
+  'db',
+  'weight_reduction_percent',
+  'skill',
+];
+
+function EnchantmentForm({
+  initial,
+  isPending,
+  error,
+  onSubmit,
+  onCancel,
+}: {
+  initial?: LibraryEnchantmentOut;
+  isPending: boolean;
+  error?: string | null;
+  onSubmit: (body: LibraryEnchantmentCreate) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [source, setSource] = useState(initial?.source ?? '');
+  const [tags, setTags] = useState((initial?.tags ?? []).join(', '));
+  const [applicability, setApplicability] = useState<LibraryEnchantmentCreate['applicability']>(
+    initial?.applicability ?? 'any',
+  );
+  const [stackingKind, setStackingKind] = useState<'stack' | 'highest'>(
+    initial?.stackingPolicy.kind ?? 'stack',
+  );
+  const [stackingKey, setStackingKey] = useState(
+    initial?.stackingPolicy.kind === 'highest' ? initial.stackingPolicy.key : '',
+  );
+  const [effects, setEffects] = useState<LibraryEnchantmentCreate['effects']>(
+    initial?.effects ?? [],
+  );
+  const [levels, setLevels] = useState<LibraryEnchantmentCreate['levels']>(initial?.levels ?? []);
+  const valid =
+    name.trim() &&
+    (stackingKind === 'stack' || stackingKey.trim()) &&
+    effects.every((effect) => effect.target !== 'skill' || effect.skillName?.trim()) &&
+    new Set(levels.map((entry) => entry.level)).size === levels.length &&
+    levels.every((entry) =>
+      entry.effects.every((effect) => effect.target !== 'skill' || effect.skillName?.trim()),
+    );
+  return (
+    <div className="card p-card space-y-3 border border-primary/30">
+      <div className="flex flex-wrap gap-3">
+        <label className="form-control min-w-[12rem] flex-1">
+          <span className="label-text">Name *</span>
+          <input
+            className="input input-bordered input-sm"
+            value={name}
+            maxLength={160}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <label className="form-control w-32">
+          <span className="label-text">Applies to</span>
+          <select
+            className="select select-bordered select-sm"
+            value={applicability}
+            onChange={(event) =>
+              setApplicability(event.target.value as LibraryEnchantmentCreate['applicability'])
+            }
+          >
+            {['any', 'weapon', 'armor', 'shield'].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="form-control w-28">
+          <span className="label-text">Source</span>
+          <input
+            className="input input-bordered input-sm"
+            value={source}
+            maxLength={40}
+            onChange={(event) => setSource(event.target.value)}
+          />
+        </label>
+      </div>
+      <label className="form-control">
+        <span className="label-text">Description</span>
+        <textarea
+          className="textarea textarea-bordered textarea-sm"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </label>
+      <label className="form-control">
+        <span className="label-text">Tags (comma separated)</span>
+        <input
+          className="input input-bordered input-sm"
+          value={tags}
+          onChange={(event) => setTags(event.target.value)}
+        />
+      </label>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="form-control w-36">
+          <span className="label-text">Stacking</span>
+          <select
+            className="select select-bordered select-sm"
+            value={stackingKind}
+            onChange={(event) => setStackingKind(event.target.value as 'stack' | 'highest')}
+          >
+            <option value="stack">Stack all</option>
+            <option value="highest">Highest by key</option>
+          </select>
+        </label>
+        {stackingKind === 'highest' && (
+          <label className="form-control min-w-[12rem] flex-1">
+            <span className="label-text">Combination key *</span>
+            <input
+              className="input input-bordered input-sm"
+              value={stackingKey}
+              maxLength={80}
+              onChange={(event) => setStackingKey(event.target.value)}
+              placeholder="fortify"
+            />
+          </label>
+        )}
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="label-text">Typed mechanics</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => setEffects([...effects, { target: 'weapon_attack', value: 1 }])}
+          >
+            + Add effect
+          </button>
+        </div>
+        {effects.map((effect, index) => (
+          <div key={`${index}-${effect.target}`} className="flex flex-wrap items-end gap-2">
+            <label className="form-control min-w-[12rem] flex-1">
+              <span className="label-text">Target</span>
+              <select
+                className="select select-bordered select-sm"
+                value={effect.target}
+                onChange={(event) => {
+                  const target = event.target.value as EnchantmentEffectTarget;
+                  setEffects(
+                    effects.map((entry, entryIndex) =>
+                      entryIndex === index
+                        ? {
+                            target,
+                            value: entry.value,
+                            ...(target === 'skill' ? { skillName: '*' } : {}),
+                          }
+                        : entry,
+                    ),
+                  );
+                }}
+              >
+                {ENCHANTMENT_TARGETS.map((target) => (
+                  <option key={target} value={target}>
+                    {target}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-control w-24">
+              <span className="label-text">Value</span>
+              <input
+                type="number"
+                className="input input-bordered input-sm"
+                value={effect.value}
+                onChange={(event) => {
+                  const value = Number.parseInt(event.target.value, 10);
+                  setEffects(
+                    effects.map((entry, entryIndex) =>
+                      entryIndex === index
+                        ? { ...entry, value: Number.isNaN(value) ? 0 : value }
+                        : entry,
+                    ),
+                  );
+                }}
+                min={-100}
+                max={100}
+              />
+            </label>
+            {effect.target === 'skill' && (
+              <label className="form-control min-w-[10rem] flex-1">
+                <span className="label-text">Skill</span>
+                <input
+                  className="input input-bordered input-sm"
+                  value={effect.skillName ?? ''}
+                  onChange={(event) =>
+                    setEffects(
+                      effects.map((entry, entryIndex) =>
+                        entryIndex === index ? { ...entry, skillName: event.target.value } : entry,
+                      ),
+                    )
+                  }
+                />
+              </label>
+            )}
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm text-error"
+              onClick={() => setEffects(effects.filter((_, entryIndex) => entryIndex !== index))}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2 border-t border-base-300/60 pt-3">
+        <div className="flex items-center justify-between">
+          <span className="label-text">Optional levels</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() =>
+              setLevels([
+                ...levels,
+                {
+                  level: Math.max(0, ...levels.map((entry) => entry.level)) + 1,
+                  effects: [],
+                },
+              ])
+            }
+          >
+            + Add level
+          </button>
+        </div>
+        {levels.map((level, levelIndex) => (
+          <fieldset
+            key={`${levelIndex}-${level.level}`}
+            className="rounded-lg border p-3 space-y-2"
+          >
+            <legend className="px-2 text-xs">Level {levelIndex + 1}</legend>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="form-control w-24">
+                <span className="label-text">Level *</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  className="input input-bordered input-sm"
+                  value={level.level}
+                  onChange={(event) => {
+                    const value = Number.parseInt(event.target.value, 10);
+                    setLevels(
+                      levels.map((entry, index) =>
+                        index === levelIndex
+                          ? { ...entry, level: Number.isNaN(value) ? 1 : value }
+                          : entry,
+                      ),
+                    );
+                  }}
+                />
+              </label>
+              <label className="form-control min-w-[10rem] flex-1">
+                <span className="label-text">Label</span>
+                <input
+                  className="input input-bordered input-sm"
+                  value={level.label ?? ''}
+                  onChange={(event) =>
+                    setLevels(
+                      levels.map((entry, index) =>
+                        index === levelIndex
+                          ? { ...entry, label: event.target.value || undefined }
+                          : entry,
+                      ),
+                    )
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                onClick={() =>
+                  setLevels(
+                    levels.map((entry, index) =>
+                      index === levelIndex
+                        ? {
+                            ...entry,
+                            effects: [...entry.effects, { target: 'dr', value: 1 }],
+                          }
+                        : entry,
+                    ),
+                  )
+                }
+              >
+                + Effect
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs text-error"
+                onClick={() =>
+                  setLevels(levels.filter((_, entryIndex) => entryIndex !== levelIndex))
+                }
+              >
+                Remove level
+              </button>
+            </div>
+            {level.effects.map((effect, effectIndex) => (
+              <div
+                key={`${effectIndex}-${effect.target}`}
+                className="flex flex-wrap items-end gap-2 pl-3"
+              >
+                <label className="form-control min-w-[11rem] flex-1">
+                  <span className="label-text">Target</span>
+                  <select
+                    className="select select-bordered select-sm"
+                    value={effect.target}
+                    onChange={(event) => {
+                      const target = event.target.value as EnchantmentEffectTarget;
+                      setLevels(
+                        levels.map((entry, index) =>
+                          index === levelIndex
+                            ? {
+                                ...entry,
+                                effects: entry.effects.map((candidate, candidateIndex) =>
+                                  candidateIndex === effectIndex
+                                    ? {
+                                        target,
+                                        value: candidate.value,
+                                        ...(target === 'skill' ? { skillName: '*' } : {}),
+                                      }
+                                    : candidate,
+                                ),
+                              }
+                            : entry,
+                        ),
+                      );
+                    }}
+                  >
+                    {ENCHANTMENT_TARGETS.map((target) => (
+                      <option key={target} value={target}>
+                        {target}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-control w-24">
+                  <span className="label-text">Value</span>
+                  <input
+                    type="number"
+                    min={-100}
+                    max={100}
+                    className="input input-bordered input-sm"
+                    value={effect.value}
+                    onChange={(event) => {
+                      const value = Number.parseInt(event.target.value, 10);
+                      setLevels(
+                        levels.map((entry, index) =>
+                          index === levelIndex
+                            ? {
+                                ...entry,
+                                effects: entry.effects.map((candidate, candidateIndex) =>
+                                  candidateIndex === effectIndex
+                                    ? { ...candidate, value: Number.isNaN(value) ? 0 : value }
+                                    : candidate,
+                                ),
+                              }
+                            : entry,
+                        ),
+                      );
+                    }}
+                  />
+                </label>
+                {effect.target === 'skill' && (
+                  <label className="form-control min-w-[10rem] flex-1">
+                    <span className="label-text">Skill</span>
+                    <input
+                      className="input input-bordered input-sm"
+                      value={effect.skillName ?? ''}
+                      onChange={(event) =>
+                        setLevels(
+                          levels.map((entry, index) =>
+                            index === levelIndex
+                              ? {
+                                  ...entry,
+                                  effects: entry.effects.map((candidate, candidateIndex) =>
+                                    candidateIndex === effectIndex
+                                      ? { ...candidate, skillName: event.target.value }
+                                      : candidate,
+                                  ),
+                                }
+                              : entry,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs text-error"
+                  onClick={() =>
+                    setLevels(
+                      levels.map((entry, index) =>
+                        index === levelIndex
+                          ? {
+                              ...entry,
+                              effects: entry.effects.filter(
+                                (_, candidateIndex) => candidateIndex !== effectIndex,
+                              ),
+                            }
+                          : entry,
+                      ),
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </fieldset>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={isPending || !valid}
+          onClick={() =>
+            onSubmit({
+              name: name.trim(),
+              description: description.trim() || null,
+              source: source.trim() || null,
+              tags: tags
+                .split(',')
+                .map((tag) => tag.trim())
+                .filter(Boolean),
+              applicability,
+              effects,
+              levels,
+              stackingPolicy:
+                stackingKind === 'highest'
+                  ? { kind: 'highest', key: stackingKey.trim() }
+                  : { kind: 'stack' },
+            })
+          }
+        >
+          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add enchantment'}
+        </button>
+      </div>
+      {error && <p className="alert alert-error text-sm">{error}</p>}
+    </div>
+  );
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatImportResult(r: ImportResult): string {
@@ -2032,7 +2742,7 @@ function formatImportResult(r: ImportResult): string {
     return `${label}: +${s.created} · ~${s.updated} · −${s.deleted}`;
   };
   const settingsNote = r.campaignSettingsApplied ? '; campaign settings applied' : '';
-  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}${settingsNote}`;
+  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('enchantments')}${settingsNote}`;
 }
 
 function slugify(name: string): string {

@@ -584,6 +584,17 @@ function summarizeLibraryItem(
   return describeFieldChanges(`Library item ${name}`, diffRows(old, next));
 }
 
+function summarizeLibraryEnchantment(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'enchantment';
+  if (op === 'insert') return `Added library enchantment ${name}`;
+  if (op === 'delete') return `Removed library enchantment ${old?.name ?? ''}`;
+  return describeFieldChanges(`Library enchantment ${name}`, diffRows(old, next));
+}
+
 function summarizeAdventureLog(
   op: string,
   old: Record<string, unknown> | null,
@@ -673,6 +684,9 @@ export function summarizeEvent(event: {
       break;
     case 'campaign_library_style':
       summary = summarizeLibraryStyle(op, oldRow, newRow);
+      break;
+    case 'campaign_library_enchantment':
+      summary = summarizeLibraryEnchantment(op, oldRow, newRow);
       break;
     case 'adventure_log':
       summary = summarizeAdventureLog(op, oldRow, newRow);

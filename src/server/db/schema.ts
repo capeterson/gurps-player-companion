@@ -39,7 +39,11 @@ import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { CombatantConditionsField, EffectDuration } from '../../shared/schemas/encounter.ts';
 import type {
   ArmorData,
+  EnchantmentApplicability,
+  EnchantmentEffect,
+  EnchantmentLevel,
   EnchantmentRef,
+  EnchantmentStackingPolicy,
   MagicItemData,
   PowerstoneData,
   WeaponData,
@@ -1180,6 +1184,42 @@ export const campaignLibraryStyles = pgTable(
   }),
 );
 
+export const campaignLibraryEnchantments = pgTable(
+  'campaign_library_enchantments',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 40 }),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    applicability: varchar('applicability', {
+      length: 16,
+      enum: ['weapon', 'armor', 'shield', 'any'],
+    })
+      .$type<EnchantmentApplicability>()
+      .notNull()
+      .default('any'),
+    effects: jsonb('effects').$type<EnchantmentEffect[]>().notNull().default([]),
+    levels: jsonb('levels').$type<EnchantmentLevel[]>().notNull().default([]),
+    stackingPolicy: jsonb('stacking_policy')
+      .$type<EnchantmentStackingPolicy>()
+      .notNull()
+      .default({ kind: 'stack' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    naturalKey: uniqueIndex('campaign_library_enchantments_key').on(
+      t.campaignId,
+      sql`lower(${t.name})`,
+    ),
+  }),
+);
+
 export const campaignLibraryItems = pgTable(
   'campaign_library_items',
   {
@@ -1242,6 +1282,7 @@ export type DbAdventureLogEntry = typeof adventureLogEntries.$inferSelect;
 export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
 export type DbCampaignLibrarySpell = typeof campaignLibrarySpells.$inferSelect;
+export type DbCampaignLibraryEnchantment = typeof campaignLibraryEnchantments.$inferSelect;
 export type DbCampaignLibraryItem = typeof campaignLibraryItems.$inferSelect;
 export type DbCampaignLibraryLanguage = typeof campaignLibraryLanguages.$inferSelect;
 export type DbCampaignLibraryTechnique = typeof campaignLibraryTechniques.$inferSelect;

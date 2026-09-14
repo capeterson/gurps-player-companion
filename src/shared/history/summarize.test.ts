@@ -519,6 +519,33 @@ describe('summarizeEvent campaign library techniques and styles', () => {
   });
 });
 
+describe('summarizeEvent campaign_library_enchantment', () => {
+  it('names creates, mechanics updates, and deletes', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_enchantment',
+        op: 'insert',
+        newRow: { name: 'Fortify', effects: [{ target: 'dr', value: 1 }] },
+      }).summary,
+    ).toBe('Added library enchantment Fortify');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_enchantment',
+        op: 'update',
+        oldRow: { name: 'Fortify', effects: [{ target: 'dr', value: 1 }] },
+        newRow: { name: 'Fortify', effects: [{ target: 'dr', value: 2 }] },
+      }).summary,
+    ).toContain('Effects');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_enchantment',
+        op: 'delete',
+        oldRow: { name: 'Fortify' },
+      }).summary,
+    ).toBe('Removed library enchantment Fortify');
+  });
+});
+
 // ---------- summarizeEvent — character_inventory ----------
 
 describe('summarizeEvent character_inventory', () => {

@@ -115,6 +115,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_library_language: null,
   campaign_library_technique: null,
   campaign_library_style: null,
+  campaign_library_enchantment: null,
   adventure_log: null,
 };
 

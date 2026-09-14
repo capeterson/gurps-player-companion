@@ -8,11 +8,13 @@ import {
   evaluateSkillPrerequisite,
   failedPrerequisiteMessages,
 } from '../../shared/domain/skillRules.ts';
+import { enchantmentRef } from '../../shared/schemas/inventory.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { SkillPrerequisite } from '../../shared/schemas/skill.ts';
 import { assertWrite, canWriteCharacter } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
+  campaignLibraryEnchantments,
   campaignLibraryItems,
   campaignLibraryLanguages,
   campaignLibrarySkills,
@@ -65,6 +67,75 @@ const references = {
   },
 } as const;
 type ReferenceKind = keyof typeof references;
+
+export async function hydrateItemEnchantmentDefinitions<T extends Record<string, unknown>>(
+  tx: AuditTx,
+  campaignId: string | null,
+  values: T,
+  existing?: { weaponData: unknown; armor: unknown; isArmor: boolean },
+): Promise<T> {
+  if (values.enchantments === undefined) return values;
+  const parsed = enchantmentRef.array().safeParse(values.enchantments);
+  if (!parsed.success)
+    throw new HTTPException(400, { message: 'Enchantments must be a valid list' });
+  const weaponData = values.weaponData === undefined ? existing?.weaponData : values.weaponData;
+  const armor = values.armor === undefined ? existing?.armor : values.armor;
+  const isArmor = values.isArmor === undefined ? existing?.isArmor : values.isArmor;
+  const hydrated = [];
+  for (const entry of parsed.data) {
+    if (!entry.definitionId) {
+      hydrated.push(entry);
+      continue;
+    }
+    if (!campaignId)
+      throw new HTTPException(403, {
+        message: 'Enchantment definition is unavailable in this campaign',
+      });
+    const [definition] = await tx
+      .select()
+      .from(campaignLibraryEnchantments)
+      .where(
+        and(
+          eq(campaignLibraryEnchantments.id, entry.definitionId.toLowerCase()),
+          eq(campaignLibraryEnchantments.campaignId, campaignId),
+        ),
+      )
+      .for('share');
+    if (!definition)
+      throw new HTTPException(403, {
+        message: 'Enchantment definition is unavailable in this campaign',
+      });
+    const compatible =
+      definition.applicability === 'any' ||
+      (definition.applicability === 'weapon' && weaponData != null) ||
+      (definition.applicability === 'armor' && isArmor === true && armor != null) ||
+      (definition.applicability === 'shield' &&
+        typeof weaponData === 'object' &&
+        weaponData != null &&
+        'db' in weaponData &&
+        weaponData.db != null);
+    if (!compatible)
+      throw new HTTPException(400, {
+        message: `${definition.name} does not apply to this item`,
+      });
+    hydrated.push(
+      enchantmentRef.parse({
+        ...entry,
+        spellName: definition.name,
+        definitionId: definition.id,
+        definitionRevision: Number(definition.revision),
+        definitionSource: definition.source,
+        mechanics: {
+          applicability: definition.applicability,
+          effects: definition.effects,
+          levels: definition.levels,
+          stackingPolicy: definition.stackingPolicy,
+        },
+      }),
+    );
+  }
+  return { ...values, enchantments: hydrated };
+}
 
 function gmPermissionLabels(rule: SkillPrerequisite): string[] {
   if (rule.kind === 'gm_permission') return [rule.label];
@@ -131,7 +202,8 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
       (values.specialization !== undefined ||
         values.points !== undefined ||
         values.techLevel !== undefined)
-    )
+    ) &&
+    !(kind === 'items' && values.enchantments !== undefined)
   )
     return values;
   if (
@@ -152,6 +224,15 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
     : [];
   if (existingId && !existing)
     throw new HTTPException(404, { message: 'character entry not found' });
+  if (kind === 'items' && values.enchantments !== undefined) {
+    const item = existing as typeof inventoryItems.$inferSelect | undefined;
+    const readableCampaignId =
+      campaign && (campaign.ownerId === userId || membership) ? parent.campaignId : null;
+    Object.assign(
+      values,
+      await hydrateItemEnchantmentDefinitions(tx, readableCampaignId, values, item),
+    );
+  }
   const sourceId =
     values[cfg.field] === undefined
       ? (existing as Record<string, unknown> | undefined)?.[cfg.field]

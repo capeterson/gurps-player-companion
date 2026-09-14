@@ -257,9 +257,8 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
                           };
                           const dice = formatDamageDice(finalDice);
                           const type = resolved.type ? ` ${resolved.type}` : '';
-                          const divisor = resolved.armorDivisor
-                            ? ` (${resolved.armorDivisor})`
-                            : '';
+                          const effectiveDivisor = w.effectiveArmorDivisor ?? resolved.armorDivisor;
+                          const divisor = effectiveDivisor ? ` (${effectiveDivisor})` : '';
                           const display = `${dice}${type}${divisor}`;
                           const rollLabel = line.modeName
                             ? `${w.name} (${line.modeName}) damage`
@@ -276,7 +275,8 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
                                   damage: {
                                     dice: finalDice,
                                     damageType: resolved.type,
-                                    armorDivisor: resolved.armorDivisor,
+                                    armorDivisor:
+                                      effectiveDivisor == null ? null : String(effectiveDivisor),
                                   },
                                 })
                               }

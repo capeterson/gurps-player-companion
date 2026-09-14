@@ -22,6 +22,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type {
+  LibraryEnchantmentOut,
   LibraryItemOut,
   LibraryLanguageOut,
   LibrarySkillOut,
@@ -31,7 +32,7 @@ import type {
 } from '../../../../shared/schemas/campaignLibrary.ts';
 import { ApiError, api } from '../../../lib/api.ts';
 
-type Kind = 'traits' | 'skills' | 'spells' | 'items' | 'languages' | 'techniques';
+type Kind = 'traits' | 'skills' | 'spells' | 'items' | 'languages' | 'techniques' | 'enchantments';
 
 type LibraryEntry =
   | LibraryTraitOut
@@ -39,7 +40,8 @@ type LibraryEntry =
   | LibrarySpellOut
   | LibraryItemOut
   | LibraryLanguageOut
-  | LibraryTechniqueOut;
+  | LibraryTechniqueOut
+  | LibraryEnchantmentOut;
 
 interface LibraryPayload {
   readonly traits: LibraryTraitOut[];
@@ -51,6 +53,7 @@ interface LibraryPayload {
   readonly languages?: LibraryLanguageOut[];
   /** Optional: servers from before the technique library omit it. */
   readonly techniques?: LibraryTechniqueOut[];
+  readonly enchantments?: LibraryEnchantmentOut[];
 }
 
 const EMPTY_LIBRARY: LibraryPayload = {
@@ -60,6 +63,7 @@ const EMPTY_LIBRARY: LibraryPayload = {
   items: [],
   languages: [],
   techniques: [],
+  enchantments: [],
 };
 
 export function useLibraryFetcher<T extends LibraryEntry>(

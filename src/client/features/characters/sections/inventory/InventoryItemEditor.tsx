@@ -1,6 +1,11 @@
 import { type ReactNode, useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
-import type { InventoryItemOut } from '../../../../../shared/schemas/inventory.ts';
+import type { LibraryEnchantmentOut } from '../../../../../shared/schemas/campaignLibrary.ts';
+import type {
+  EnchantmentEffectTarget,
+  InventoryItemOut,
+} from '../../../../../shared/schemas/inventory.ts';
+import { LibraryAutocomplete } from '../../../../components/ui/LibraryAutocomplete.tsx';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
 import { ItemField, type ItemFieldSpec } from './ItemField.tsx';
@@ -242,8 +247,18 @@ function ItemListEditor({
   item,
   kind,
   more,
-}: { item: InventoryItemOut; kind: 'enchantments' | 'alternateModes'; more: boolean }) {
+  fetchEnchantmentOptions,
+}: {
+  item: InventoryItemOut;
+  kind: 'enchantments' | 'alternateModes';
+  more: boolean;
+  fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
+}) {
   const [name, setName] = useState('');
+  const [pickedDefinition, setPickedDefinition] = useState<LibraryEnchantmentOut | null>(null);
+  const [customTarget, setCustomTarget] = useState<EnchantmentEffectTarget | ''>('');
+  const [customValue, setCustomValue] = useState('1');
+  const [customSkillName, setCustomSkillName] = useState('');
   const { run, pending, flash } = useItemAction(item);
   const enchantments = kind === 'enchantments';
   const list = enchantments ? item.enchantments : (item.weaponData?.alternateModes ?? []);
@@ -259,10 +274,11 @@ function ItemListEditor({
       <h4 className="label-eyebrow">{enchantments ? 'Enchantments' : 'Alternate attacks'}</h4>
       {enchantments && (
         <p className="text-xs text-base-content/60">
-          Enchantment records are notes; they do not automatically change DR or attacks.
+          Campaign definitions and custom typed effects change stats while this item is equipped or
+          worn. Older note-only records remain non-mechanical.
         </p>
       )}
-      {list.map((_, index) => {
+      {list.map((listEntry, index) => {
         const prefix = enchantments
           ? `enchantments.${index}`
           : `weaponData.alternateModes.${index}`;
@@ -270,6 +286,7 @@ function ItemListEditor({
           ? [
               { path: `${prefix}.spellName`, label: 'Spell name' },
               number(`${prefix}.spellLevel`, 'Enchanter skill level', true, true),
+              number(`${prefix}.level`, 'Mechanical level', true, true),
               text(`${prefix}.category`, 'Enchantment label', true),
               text(`${prefix}.notes`, 'Enchantment notes', true),
             ]
@@ -290,6 +307,15 @@ function ItemListEditor({
             <legend className="text-xs px-2">
               {title} {index + 1}
             </legend>
+            {enchantments &&
+              'definitionRevision' in listEntry &&
+              listEntry.definitionRevision != null && (
+                <p className="text-xs text-base-content/60">
+                  Campaign snapshot revision {listEntry.definitionRevision}
+                  {listEntry.definitionSource ? ` · ${listEntry.definitionSource}` : ''}
+                  {listEntry.definitionId == null ? ' · retained' : ' · follows library'}
+                </p>
+              )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {specs.map((spec) => (
                 <ItemField key={spec.path} item={item} spec={spec} more={more} />
@@ -355,7 +381,45 @@ function ItemListEditor({
             () =>
               mutateItem(item.id, `Add ${title}`, (current) => {
                 if (enchantments)
-                  return { enchantments: [...current.enchantments, { spellName: name.trim() }] };
+                  return {
+                    enchantments: [
+                      ...current.enchantments,
+                      pickedDefinition
+                        ? {
+                            spellName: pickedDefinition.name,
+                            definitionId: pickedDefinition.id,
+                            definitionRevision: pickedDefinition.revision,
+                            definitionSource: pickedDefinition.source,
+                            mechanics: {
+                              applicability: pickedDefinition.applicability,
+                              effects: pickedDefinition.effects,
+                              levels: pickedDefinition.levels,
+                              stackingPolicy: pickedDefinition.stackingPolicy,
+                            },
+                          }
+                        : {
+                            spellName: name.trim(),
+                            ...(customTarget
+                              ? {
+                                  mechanics: {
+                                    applicability: 'any' as const,
+                                    effects: [
+                                      {
+                                        target: customTarget,
+                                        value: Number(customValue),
+                                        ...(customTarget === 'skill'
+                                          ? { skillName: customSkillName.trim() }
+                                          : {}),
+                                      },
+                                    ],
+                                    levels: [],
+                                    stackingPolicy: { kind: 'stack' as const },
+                                  },
+                                }
+                              : {}),
+                          },
+                    ],
+                  };
                 if (!current.weaponData) throw new Error('Weapon was removed');
                 return {
                   weaponData: {
@@ -364,22 +428,110 @@ function ItemListEditor({
                   },
                 };
               }),
-            () => setName(''),
+            () => {
+              setName('');
+              setPickedDefinition(null);
+              setCustomTarget('');
+              setCustomValue('1');
+              setCustomSkillName('');
+            },
           );
         }}
       >
-        <input
-          aria-label={`New ${title.toLowerCase()} name`}
-          maxLength={enchantments ? 160 : 40}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder={`${title} name`}
-          className="input input-sm input-bordered min-w-0"
-        />
+        {enchantments && fetchEnchantmentOptions ? (
+          <LibraryAutocomplete<LibraryEnchantmentOut>
+            value={name}
+            onChange={(value) => {
+              setName(value);
+              if (pickedDefinition?.name !== value) setPickedDefinition(null);
+            }}
+            onPick={(definition) => {
+              setName(definition.name);
+              setPickedDefinition(definition);
+              setCustomTarget('');
+            }}
+            fetchOptions={fetchEnchantmentOptions}
+            getOptionKey={(definition) => definition.id}
+            renderOption={(definition) => (
+              <div className="flex items-baseline justify-between gap-2">
+                <span>{definition.name}</span>
+                <span className="text-xs text-base-content/60">{definition.applicability}</span>
+              </div>
+            )}
+            placeholder="Campaign enchantment or custom name"
+            aria-label="New enchantment name"
+            className="min-w-[15rem] flex-1"
+          />
+        ) : (
+          <input
+            aria-label={`New ${title.toLowerCase()} name`}
+            maxLength={enchantments ? 160 : 40}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={`${title} name`}
+            className="input input-sm input-bordered min-w-0"
+          />
+        )}
+        {enchantments && !pickedDefinition && (
+          <>
+            <select
+              aria-label="Custom enchantment effect"
+              value={customTarget}
+              onChange={(event) =>
+                setCustomTarget(event.target.value as EnchantmentEffectTarget | '')
+              }
+              className="select select-sm select-bordered"
+            >
+              <option value="">Note only</option>
+              {[
+                'weapon_attack',
+                'weapon_damage',
+                'weapon_accuracy',
+                'weapon_parry',
+                'weapon_block',
+                'armor_divisor',
+                'dr',
+                'db',
+                'weight_reduction_percent',
+                'skill',
+              ].map((target) => (
+                <option key={target} value={target}>
+                  {target.replaceAll('_', ' ')}
+                </option>
+              ))}
+            </select>
+            {customTarget && (
+              <input
+                aria-label="Custom enchantment value"
+                type="number"
+                min={-100}
+                max={100}
+                value={customValue}
+                onChange={(event) => setCustomValue(event.target.value)}
+                className="input input-sm input-bordered w-20"
+              />
+            )}
+            {customTarget === 'skill' && (
+              <input
+                aria-label="Custom enchantment skill"
+                value={customSkillName}
+                onChange={(event) => setCustomSkillName(event.target.value)}
+                className="input input-sm input-bordered min-w-0"
+                placeholder="Skill name"
+              />
+            )}
+          </>
+        )}
         <button
           type="submit"
           className="btn btn-sm"
-          disabled={pending || !name.trim() || list.length >= limit}
+          disabled={
+            pending ||
+            !name.trim() ||
+            list.length >= limit ||
+            (!!customTarget && !Number.isFinite(Number(customValue))) ||
+            (customTarget === 'skill' && !customSkillName.trim())
+          }
         >
           Add {title.toLowerCase()}
         </button>
@@ -392,6 +544,7 @@ export function InventoryItemEditor({
   item,
   section,
   skillNames = [],
+  fetchEnchantmentOptions,
   hasChildren,
   onSection,
   onClose,
@@ -399,6 +552,7 @@ export function InventoryItemEditor({
   item: InventoryItemOut;
   section: ItemSection;
   skillNames?: readonly string[];
+  fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
   hasChildren: boolean;
   onSection: (section: ItemSection) => void;
   onClose: () => void;
@@ -486,7 +640,12 @@ export function InventoryItemEditor({
         {section === 'armor' && <ArmorLocations item={item} more={more} />}
         {section === 'weapon' && <ItemListEditor item={item} kind="alternateModes" more={more} />}
         {section === 'enchantments' && (
-          <ItemListEditor item={item} kind="enchantments" more={more} />
+          <ItemListEditor
+            item={item}
+            kind="enchantments"
+            more={more}
+            {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})}
+          />
         )}
         {(specs.some((spec) => spec.advanced) || section === 'enchantments') && (
           <button

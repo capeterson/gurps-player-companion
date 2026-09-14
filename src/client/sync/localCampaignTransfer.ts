@@ -1,4 +1,5 @@
 import type { Table } from 'dexie';
+import { enchantmentRef } from '../../shared/schemas/inventory.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { type LocalCampaignTransferUndo, getLocalDb } from '../db/dexie.ts';
 
@@ -30,10 +31,24 @@ export function localCampaignReferenceUndo(
 ): LocalCampaignTransferUndo | null {
   const index = campaignTransferStores().findIndex((table) => table.name === store);
   const field = fields[index];
-  if (!field || typeof row[field] !== 'string') return null;
-  const before: Record<string, unknown> = { [field]: row[field] };
-  const after: Record<string, unknown> = { [field]: null };
-  if (index < 2) {
+  if (!field) return null;
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
+  if (typeof row[field] === 'string') {
+    before[field] = row[field];
+    after[field] = null;
+  }
+  if (index === 3) {
+    const parsed = enchantmentRef.array().safeParse(row.enchantments ?? []);
+    if (parsed.success && parsed.data.some((entry) => entry.definitionId)) {
+      before.enchantments = parsed.data;
+      after.enchantments = parsed.data.map((entry) =>
+        entry.definitionId ? { ...entry, definitionId: null } : entry,
+      );
+    }
+  }
+  if (Object.keys(after).length === 0) return null;
+  if (index < 2 && typeof row[field] === 'string') {
     before.libraryMechanics = row.libraryMechanics ?? null;
     const saved = libraryMechanics.safeParse(row.libraryMechanics);
     const trusted =

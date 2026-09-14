@@ -18,7 +18,10 @@
 
 import { type FormEvent, type ReactNode, useMemo, useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
-import type { LibraryItemOut } from '../../../../shared/schemas/campaignLibrary.ts';
+import type {
+  LibraryEnchantmentOut,
+  LibraryItemOut,
+} from '../../../../shared/schemas/campaignLibrary.ts';
 import type {
   InventoryItemOut,
   InventoryItemUpdate,
@@ -95,6 +98,8 @@ export function InventoryPanel({
   const [newIsWeapon, setNewIsWeapon] = useState(false);
   const [newWorn, setNewWorn] = useState(false);
   const [newEquipped, setNewEquipped] = useState(false);
+  const [newEnchantmentQuery, setNewEnchantmentQuery] = useState('');
+  const [newEnchantments, setNewEnchantments] = useState<InventoryItemOut['enchantments']>([]);
   const {
     creating,
     flashProps,
@@ -111,6 +116,10 @@ export function InventoryPanel({
   const containers = useMemo(() => items.filter((i) => i.isContainer), [items]);
 
   const { fetchOptions } = useLibraryFetcher<LibraryItemOut>('items', campaignId);
+  const { fetchOptions: fetchEnchantments } = useLibraryFetcher<LibraryEnchantmentOut>(
+    'enchantments',
+    campaignId,
+  );
 
   function onPickLibraryItem(opt: LibraryItemOut) {
     setPickedLibraryItem(opt);
@@ -175,7 +184,6 @@ export function InventoryPanel({
                 entityId: id,
                 humanName: `item "${target.name}"`,
                 characterId,
-                prevValue: target,
               } as const,
             ]
           : [];
@@ -233,10 +241,13 @@ export function InventoryPanel({
       linkedLibraryId && pickedLibraryItem?.magicItemData ? pickedLibraryItem.magicItemData : null;
     // Enchantments ride along with the library template like the other
     // magic metadata; an unlinked (hand-typed) item starts unenchanted.
-    const enchantmentsFromLibrary =
-      linkedLibraryId && pickedLibraryItem && (pickedLibraryItem.enchantments?.length ?? 0) > 0
-        ? pickedLibraryItem.enchantments
-        : [];
+    const enchantmentsFromLibrary = [
+      ...(linkedLibraryId && pickedLibraryItem ? pickedLibraryItem.enchantments : []),
+      ...newEnchantments,
+    ];
+    const requiresShieldMarker = enchantmentsFromLibrary.some(
+      (entry) => entry.mechanics?.applicability === 'shield',
+    );
     const containerFromLibrary =
       linkedLibraryId && pickedLibraryItem?.isContainer ? pickedLibraryItem : null;
     //  Mirrors the armor-from-library / default-armor fallback: checking
@@ -249,7 +260,7 @@ export function InventoryPanel({
       parry: null,
       stRequired: null,
       skill: null,
-      db: null,
+      db: requiresShieldMarker ? 0 : null,
       ranged: null,
       notes: null,
     };
@@ -292,7 +303,12 @@ export function InventoryPanel({
               notes: null,
             })
           : null,
-        weaponData: newIsWeapon ? (weaponFromLibrary ?? weaponDefault) : null,
+        weaponData: newIsWeapon
+          ? {
+              ...(weaponFromLibrary ?? weaponDefault),
+              ...(requiresShieldMarker && weaponFromLibrary?.db == null ? { db: 0 } : {}),
+            }
+          : null,
         powerstoneData: powerstoneFromLibrary,
         magicItemData: magicItemFromLibrary,
         enchantments: enchantmentsFromLibrary,
@@ -309,6 +325,8 @@ export function InventoryPanel({
         setNewIsWeapon(false);
         setNewWorn(false);
         setNewEquipped(false);
+        setNewEnchantmentQuery('');
+        setNewEnchantments([]);
         setMoreOpen(false);
         setPickedLibraryItem(null);
       },
@@ -442,6 +460,7 @@ export function InventoryPanel({
         onRowClick={handleClick}
         canEdit={canWrite}
         skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
+        fetchEnchantmentOptions={fetchEnchantments}
         {...(canWrite ? { drag: dragApi } : {})}
         {...(opts.inStashed ? { inStashed: true } : {})}
       />
@@ -950,6 +969,67 @@ export function InventoryPanel({
                 />
                 <span>Equipped</span>
               </label>
+              {campaignId && (
+                <div className="min-w-[16rem] flex-1">
+                  <LibraryAutocomplete<LibraryEnchantmentOut>
+                    value={newEnchantmentQuery}
+                    onChange={setNewEnchantmentQuery}
+                    onPick={(definition) => {
+                      setNewEnchantments((current) => [
+                        ...current,
+                        {
+                          spellName: definition.name,
+                          definitionId: definition.id,
+                          definitionRevision: definition.revision,
+                          definitionSource: definition.source,
+                          mechanics: {
+                            applicability: definition.applicability,
+                            effects: definition.effects,
+                            levels: definition.levels,
+                            stackingPolicy: definition.stackingPolicy,
+                          },
+                        },
+                      ]);
+                      setNewEnchantmentQuery('');
+                      if (definition.applicability === 'armor') setNewIsArmor(true);
+                      if (
+                        definition.applicability === 'weapon' ||
+                        definition.applicability === 'shield'
+                      )
+                        setNewIsWeapon(true);
+                    }}
+                    fetchOptions={fetchEnchantments}
+                    getOptionKey={(option) => option.id}
+                    renderOption={(option) => (
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-medium">{option.name}</span>
+                        <span className="text-base-content/60 text-xs">{option.applicability}</span>
+                      </div>
+                    )}
+                    placeholder="Attach campaign enchantment"
+                    aria-label="Attach campaign enchantment"
+                  />
+                </div>
+              )}
+              {newEnchantments.map((enchantment, index) => (
+                <span
+                  key={`${enchantment.definitionId ?? enchantment.spellName}:${index}`}
+                  className="badge badge-secondary gap-1"
+                >
+                  {enchantment.spellName}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${enchantment.spellName}`}
+                    onClick={() =>
+                      setNewEnchantments((current) =>
+                        current.filter((_, entryIndex) => entryIndex !== index),
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
               {(newIsContainer || newIsArmor || newIsWeapon) && (
                 <span className="text-base-content/40">
                   Add the item, then click a category on its row to edit its settings.
