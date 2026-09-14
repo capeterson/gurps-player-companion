@@ -54,6 +54,12 @@ interface SkillSnapshot {
   nameVersion: number;
 }
 
+function fixedPickedTechLevel(skill: LibrarySkillOut | null): number | null {
+  if (!skill) return null;
+  if (skill.techLevelPolicy?.kind === 'fixed') return skill.techLevelPolicy.techLevel;
+  return skill.techLevelPolicy == null ? skill.techLevel : null;
+}
+
 function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) {
   const [name, setName] = useState('');
   const [attribute, setAttribute] = useState<SkillAttribute>('DX');
@@ -148,10 +154,10 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
                 (snap.picked.techLevel == null
                   ? { kind: 'not_applicable' }
                   : { kind: 'fixed', techLevel: snap.picked.techLevel }),
-              prerequisites: resolved.prerequisiteRules,
+              prerequisites: resolved.prerequisiteRules ?? null,
               defaults: resolved.defaults ?? null,
-              groups: snap.picked.groups,
-              tags: snap.picked.tags,
+              groups: snap.picked.groups ?? [],
+              tags: snap.picked.tags ?? [],
             },
           })
         : null,
@@ -177,12 +183,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           pointsRaw: points,
           picked,
           specialization,
-          techLevel:
-            picked?.techLevelPolicy?.kind === 'fixed'
-              ? picked.techLevelPolicy.techLevel
-              : techLevel.trim()
-                ? Number(techLevel)
-                : null,
+          techLevel: fixedPickedTechLevel(picked) ?? (techLevel.trim() ? Number(techLevel) : null),
           nameVersion: nameVersion.current,
         });
       }}
@@ -202,9 +203,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
               nameVersion.current++;
               setPicked(opt);
               setSpecialization(initialLibrarySkillSpecialization(opt) ?? '');
-              setTechLevel(
-                opt.techLevelPolicy?.kind === 'fixed' ? String(opt.techLevelPolicy.techLevel) : '',
-              );
+              setTechLevel(fixedPickedTechLevel(opt)?.toString() ?? '');
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
