@@ -227,6 +227,109 @@ describe('DrSummaryCard', () => {
     expect(screen.getByRole('list', { name: 'Protection layers' })).toHaveTextContent('3 DR');
   });
 
+  it('nests Fortify DR under base armor and identifies the highest-only winner', () => {
+    const character = makeCharacter([{ dr: 3, locations: ['torso'] }]);
+    const armor = character.inventory[0];
+    if (!armor?.armor) throw new Error('missing armor fixture');
+    armor.baseArmor = { ...armor.armor, dr: 3 };
+    armor.armor = { ...armor.armor, dr: 6 };
+    armor.enchantmentBreakdown = [
+      {
+        sourceName: 'Armor 0: Fortify I',
+        target: 'dr',
+        value: 1,
+        active: true,
+        stackingKey: 'fortify',
+        suppressedByStacking: true,
+      },
+      {
+        sourceName: 'Armor 0: Fortify III',
+        target: 'dr',
+        value: 1,
+        active: true,
+        stackingKey: 'fortify',
+        suppressedByStacking: false,
+      },
+      {
+        sourceName: 'Armor 0: Fortify III',
+        target: 'dr',
+        value: 2,
+        active: true,
+        stackingKey: 'fortify',
+        suppressedByStacking: false,
+      },
+    ];
+
+    render(<DrSummaryCard character={character} />);
+
+    const breakdown = screen.getByRole('list', { name: 'Armor 0 DR breakdown' });
+    expect(breakdown).toHaveTextContent('Base armor3 DR');
+    expect(within(breakdown).getByText('Fortify I').closest('li')).toHaveTextContent(
+      /suppressed — Fortify III wins.*\+1 DR/,
+    );
+    expect(within(breakdown).getByText('Fortify III').closest('li')).toHaveTextContent(
+      /winning.*\+3 DR/,
+    );
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
+  });
+
+  it('does not mislabel effective DR when the base armor snapshot is unavailable', () => {
+    const character = makeCharacter([{ dr: 6, locations: ['torso'] }]);
+    const armor = character.inventory[0];
+    if (!armor) throw new Error('missing armor fixture');
+    armor.enchantmentBreakdown = [
+      {
+        sourceName: 'Armor 0: Fortify III',
+        target: 'dr',
+        value: 3,
+        active: true,
+        stackingKey: 'fortify',
+        suppressedByStacking: false,
+      },
+    ];
+
+    render(<DrSummaryCard character={character} />);
+
+    const breakdown = screen.getByRole('list', { name: 'Armor 0 DR breakdown' });
+    expect(breakdown).toHaveTextContent('Base armor unavailable');
+    expect(breakdown).not.toHaveTextContent('Base armor6 DR');
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
+  });
+
+  it.each([
+    ['cr', 3],
+    ['cut', 1],
+  ] as const)('explains the zero floor for negative enchantment DR using %s DR', (type, baseDr) => {
+    const character = makeCharacter([{ dr: 3, locations: ['torso'], typedDr: { cut: 1 } }]);
+    const armor = character.inventory[0];
+    if (!armor?.armor) throw new Error('missing armor fixture');
+    armor.baseArmor = { ...armor.armor };
+    armor.armor = {
+      ...armor.armor,
+      dr: 0,
+      typedDr: { ...armor.armor.typedDr, cut: 0 },
+    };
+    armor.enchantmentBreakdown = [
+      {
+        sourceName: 'Armor 0: Frailty',
+        target: 'dr',
+        value: -5,
+        active: true,
+        stackingKey: null,
+        suppressedByStacking: false,
+      },
+    ];
+
+    render(<DrSummaryCard character={character} />);
+    fireEvent.change(screen.getByLabelText('Damage type'), { target: { value: type } });
+
+    const breakdown = screen.getByRole('list', { name: 'Armor 0 DR breakdown' });
+    expect(breakdown).toHaveTextContent(`Base armor${baseDr} DR`);
+    expect(breakdown).toHaveTextContent('Frailty-5 DR');
+    expect(breakdown).toHaveTextContent(`Minimum DR floor+${5 - baseDr} DR`);
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('0');
+  });
+
   it('resolves incoming damage through DR and applies injury to HP', () => {
     const bumpHp = vi.fn();
     // Torso DR 4; 12 cut => 8 penetrating × 1.5 = 12 injury.

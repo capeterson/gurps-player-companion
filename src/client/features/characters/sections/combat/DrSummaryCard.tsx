@@ -26,6 +26,76 @@ export interface DrSummaryCardProps {
   bumpHp?: (delta: number) => void;
 }
 
+interface ArmorDrEnchantmentLine {
+  sourceName: string;
+  value: number;
+  stackingKey: string | null;
+  status: 'applied' | 'winning' | 'suppressed' | 'inactive';
+  winnerName?: string;
+}
+
+function enchantmentLabel(itemName: string, sourceName: string): string {
+  const prefix = `${itemName}: `;
+  return sourceName.startsWith(prefix) ? sourceName.slice(prefix.length) : sourceName;
+}
+
+export function armorDrEnchantmentLines(
+  item: CharacterDetail['inventory'][number],
+): ArmorDrEnchantmentLine[] {
+  const grouped = new Map<string, Omit<ArmorDrEnchantmentLine, 'status' | 'winnerName'>>();
+  for (const contribution of item.enchantmentBreakdown ?? []) {
+    if (contribution.target !== 'dr') continue;
+    const sourceName = enchantmentLabel(item.name, contribution.sourceName);
+    const key = [
+      sourceName,
+      contribution.stackingKey ?? '',
+      contribution.active ? 'active' : 'inactive',
+      contribution.suppressedByStacking ? 'suppressed' : 'applied',
+    ].join('|');
+    const previous = grouped.get(key);
+    grouped.set(key, {
+      sourceName,
+      value: (previous?.value ?? 0) + contribution.value,
+      stackingKey: contribution.stackingKey,
+    });
+  }
+  const raw = [...grouped.entries()].map(([key, line]) => ({ key, ...line }));
+  const winnerByKey = new Map(
+    raw
+      .filter(
+        (line) =>
+          line.stackingKey &&
+          line.key.endsWith('|active|applied') &&
+          raw.some(
+            (candidate) =>
+              candidate.stackingKey === line.stackingKey &&
+              candidate.key.endsWith('|active|suppressed'),
+          ),
+      )
+      .map((line) => [line.stackingKey as string, line.sourceName]),
+  );
+  return raw.map(({ key, ...line }) => {
+    if (key.endsWith('|inactive|applied') || key.endsWith('|inactive|suppressed'))
+      return { ...line, status: 'inactive' };
+    if (key.endsWith('|active|suppressed')) {
+      const winnerName = line.stackingKey ? winnerByKey.get(line.stackingKey) : undefined;
+      return {
+        ...line,
+        status: 'suppressed',
+        ...(winnerName ? { winnerName } : {}),
+      };
+    }
+    return {
+      ...line,
+      status: line.stackingKey && winnerByKey.has(line.stackingKey) ? 'winning' : 'applied',
+    };
+  });
+}
+
+function signed(value: number): string {
+  return value >= 0 ? `+${value}` : String(value);
+}
+
 export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: DrSummaryCardProps) {
   const [location, setLocation] = useState('torso');
   const [type, setType] = useState('cr');
@@ -157,14 +227,97 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
             <div>
               <h3 className="label-eyebrow mb-2">Protection before penetration</h3>
               <ul className="divide-y divide-base-300 text-sm" aria-label="Protection layers">
-                {layers.map((item) => (
-                  <li className="flex justify-between gap-3 py-2" key={item.id}>
-                    <span>{item.name}</span>
-                    <span className="num shrink-0">
-                      {resolveDr(type, aggregateDrByLocation([item]).get(location))} DR
-                    </span>
-                  </li>
-                ))}
+                {layers.map((item) => {
+                  const enchantments = armorDrEnchantmentLines(item);
+                  const baseArmor = item.baseArmor;
+                  const baseDr = baseArmor
+                    ? resolveDr(
+                        type,
+                        aggregateDrByLocation([{ ...item, armor: baseArmor }]).get(location),
+                      )
+                    : null;
+                  const appliedEnchantmentDr = enchantments
+                    .filter((entry) => entry.status === 'applied' || entry.status === 'winning')
+                    .reduce((sum, entry) => sum + entry.value, 0);
+                  const floorAdjustment =
+                    baseDr === null ? 0 : Math.max(0, -(baseDr + appliedEnchantmentDr));
+                  return (
+                    <li className="py-2" key={item.id}>
+                      <div className="flex justify-between gap-3">
+                        <span>{item.name}</span>
+                        <span className="num shrink-0">
+                          {resolveDr(type, aggregateDrByLocation([item]).get(location))} DR
+                        </span>
+                      </div>
+                      {enchantments.length > 0 && (
+                        <ul
+                          className="ml-3 mt-1 space-y-1 border-l border-base-300 pl-3 text-xs"
+                          aria-label={`${item.name} DR breakdown`}
+                        >
+                          {baseDr === null ? (
+                            <li className="flex justify-between gap-3 text-muted">
+                              <span>Base armor unavailable</span>
+                            </li>
+                          ) : (
+                            <li className="flex justify-between gap-3 text-muted">
+                              <span>Base armor</span>
+                              <span className="num shrink-0">{baseDr} DR</span>
+                            </li>
+                          )}
+                          {enchantments.map((entry, index) => (
+                            <li
+                              key={`${entry.sourceName}:${entry.stackingKey ?? 'stack'}:${index}`}
+                              className={`flex justify-between gap-3 ${
+                                entry.status === 'suppressed' || entry.status === 'inactive'
+                                  ? 'text-muted'
+                                  : ''
+                              }`}
+                            >
+                              <span>
+                                <span
+                                  className={
+                                    entry.status === 'suppressed' || entry.status === 'inactive'
+                                      ? 'line-through'
+                                      : undefined
+                                  }
+                                >
+                                  {entry.sourceName}
+                                </span>
+                                {entry.status === 'winning' && (
+                                  <span className="badge badge-success badge-xs ml-2">winning</span>
+                                )}
+                                {entry.status === 'suppressed' && (
+                                  <small className="ml-2">
+                                    suppressed
+                                    {entry.winnerName ? ` — ${entry.winnerName} wins` : ''}
+                                  </small>
+                                )}
+                                {entry.status === 'inactive' && (
+                                  <small className="ml-2">inactive</small>
+                                )}
+                              </span>
+                              <span
+                                className={`num shrink-0 ${
+                                  entry.status === 'suppressed' || entry.status === 'inactive'
+                                    ? 'line-through'
+                                    : ''
+                                }`}
+                              >
+                                {signed(entry.value)} DR
+                              </span>
+                            </li>
+                          ))}
+                          {floorAdjustment > 0 && (
+                            <li className="flex justify-between gap-3 text-muted">
+                              <span>Minimum DR floor</span>
+                              <span className="num shrink-0">+{floorAdjustment} DR</span>
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
                 {innate !== 0 && (
                   <li className="flex justify-between gap-3 py-2">
                     <span>Active innate DR</span>
