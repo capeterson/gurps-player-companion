@@ -303,8 +303,10 @@ on any sheet the viewer can edit — their own — it always shows).
   encumbrance, armor and weapon data, cost/weight rollups. Equipped
   armor and active innate DR are aggregated per hit location on the Combat tab's Effective DR
   card. Each enchanted armor layer expands its base DR into nested enchantment
-  contributions; highest-only conflicts label the applied source as winning and
-  retain suppressed sources visibly for an auditable total.
+  contributions; highest-only conflicts are resolved across every equipped layer
+  covering the selected hit location, label the applied source as winning, and
+  retain suppressed sources visibly for an auditable total. Non-overlapping armor
+  resolves independently, so a stronger coif enchantment does not suppress boots.
   **Inline inventory editors** replace the item edit modal. Clicking a
   category chip (Armor, Weapon/Shield, Container, Powerstone, Magic item, or
   Enchantments) opens its editor immediately below the row; clicking that same

@@ -2,11 +2,13 @@ import { describe, expect, it } from 'bun:test';
 import {
   aggregateDrByLocation,
   effectiveDrByLocation,
+  layeredArmorDrContributions,
   resolveArmorDb,
   resolveDr,
 } from './armorDr.ts';
 import type { ArmorItemRow } from './armorDr.ts';
 import { applyDamage } from './injuryCalc.ts';
+import { resolveItemEnchantments } from './itemEnchantments.ts';
 import { resolveEffects } from './traitEffects.ts';
 
 function item(
@@ -133,6 +135,227 @@ describe('aggregateDrByLocation', () => {
     // is just its own base dr.
     expect(result.get('arm_left')?.typedDr.cut).toBe(1);
     expect(result.get('torso')?.typedDr.cut).toBe(9);
+  });
+
+  it('applies the highest Fortify once per covered location across armor layers', () => {
+    const coif = {
+      ...item(7, ['skull'], { drCrushing: 7, typedDr: { cut: 5 } }),
+      id: 'coif',
+      name: 'Coif',
+      baseArmor: item(4, ['skull'], { drCrushing: 4, typedDr: { cut: 2 } }).armor,
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Coif: Fortify',
+          target: 'dr' as const,
+          value: 3,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+    const hat = {
+      ...item(5, ['skull']),
+      id: 'hat',
+      name: 'Hat',
+      baseArmor: item(2, ['skull']).armor,
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Hat: Fortify',
+          target: 'dr' as const,
+          value: 3,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+    const boots = {
+      ...item(5, ['foot_left']),
+      id: 'boots',
+      name: 'Boots',
+      baseArmor: item(3, ['foot_left']).armor,
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Boots: Fortify',
+          target: 'dr' as const,
+          value: 2,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+
+    const map = aggregateDrByLocation([hat, boots, coif]);
+    expect(map.get('skull')).toMatchObject({ dr: 9, drCrushing: 9 });
+    expect(map.get('skull')?.typedDr.cut).toBe(7);
+    expect(map.get('foot_left')?.dr).toBe(5);
+    expect(aggregateDrByLocation([coif, boots, hat])).toEqual(map);
+    expect(layeredArmorDrContributions([hat, coif], 'skull')).toMatchObject([
+      { sourceName: 'Hat: Fortify', status: 'suppressed', winnerName: 'Coif: Fortify' },
+      { sourceName: 'Coif: Fortify', status: 'winning' },
+    ]);
+  });
+
+  it('does not let a higher inactive Fortify suppress an equipped layer', () => {
+    const active = {
+      ...item(3, ['torso']),
+      baseArmor: item(1, ['torso']).armor,
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Active: Fortify',
+          target: 'dr' as const,
+          value: 2,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+    const inactive = {
+      ...item(6, ['torso']),
+      id: 'inactive',
+      baseArmor: item(1, ['torso']).armor,
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Inactive: Fortify',
+          target: 'dr' as const,
+          value: 5,
+          active: false,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+
+    expect(aggregateDrByLocation([active, inactive]).get('torso')?.dr).toBe(4);
+  });
+
+  it('preserves item-local suppression for duplicate highest-only enchantments', () => {
+    const baseArmor = item(2, ['torso']).armor;
+    if (!baseArmor) throw new Error('missing armor fixture');
+    const mechanics = {
+      applicability: 'armor' as const,
+      effects: [{ target: 'dr' as const, value: 3 }],
+      levels: [],
+      stackingPolicy: { kind: 'highest' as const, key: 'fortify' },
+    };
+    const resolved = resolveItemEnchantments({
+      id: 'duplicate-fortify',
+      name: 'Duplicate Fortify',
+      worn: true,
+      equipped: true,
+      isArmor: true,
+      armor: baseArmor,
+      weaponData: null,
+      weightReductionPercent: 0,
+      enchantments: [
+        { spellName: 'Fortify', mechanics },
+        { spellName: 'Fortify', mechanics },
+      ],
+    });
+
+    expect(resolved.armor?.dr).toBe(5);
+    expect(
+      aggregateDrByLocation([
+        {
+          id: 'duplicate-fortify',
+          name: 'Duplicate Fortify',
+          equipped: true,
+          isArmor: true,
+          armor: resolved.armor,
+          baseArmor,
+          enchantmentBreakdown: resolved.breakdown,
+        },
+      ]).get('torso')?.dr,
+    ).toBe(5);
+  });
+
+  it('keeps effective armor when a partial payload has no enchantment breakdown', () => {
+    const effective = item(5, ['torso']);
+    const partial = {
+      ...effective,
+      baseArmor: item(2, ['torso']).armor,
+    };
+
+    expect(aggregateDrByLocation([partial]).get('torso')?.dr).toBe(5);
+  });
+
+  it('does not call an undecomposable legacy layer suppressed by a current layer', () => {
+    const legacy = {
+      ...item(6, ['torso']),
+      id: 'legacy',
+      name: 'Legacy armor',
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Legacy armor: Fortify',
+          target: 'dr' as const,
+          value: 5,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+    const current = {
+      ...item(4, ['torso']),
+      id: 'current',
+      name: 'Current armor',
+      baseArmor: item(1, ['torso']).armor,
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Current armor: Fortify',
+          target: 'dr' as const,
+          value: 3,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+
+    expect(layeredArmorDrContributions([legacy, current], 'torso')).toMatchObject([
+      { sourceName: 'Legacy armor: Fortify', status: 'applied' },
+      { sourceName: 'Current armor: Fortify', status: 'applied' },
+    ]);
+    expect(aggregateDrByLocation([legacy, current]).get('torso')?.dr).toBe(10);
+  });
+
+  it('retains item-local suppression labels on an undecomposable legacy layer', () => {
+    const legacy = {
+      ...item(5, ['torso']),
+      id: 'legacy-duplicates',
+      name: 'Legacy duplicates',
+      enchantmentBreakdown: [
+        {
+          sourceName: 'Legacy duplicates: Fortify I',
+          target: 'dr' as const,
+          value: 1,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: true,
+        },
+        {
+          sourceName: 'Legacy duplicates: Fortify III',
+          target: 'dr' as const,
+          value: 3,
+          active: true,
+          stackingKey: 'fortify',
+          suppressedByStacking: false,
+        },
+      ],
+    };
+
+    expect(layeredArmorDrContributions([legacy], 'torso')).toMatchObject([
+      {
+        sourceName: 'Legacy duplicates: Fortify I',
+        status: 'suppressed',
+        winnerName: 'Legacy duplicates: Fortify III',
+      },
+      { sourceName: 'Legacy duplicates: Fortify III', status: 'applied' },
+    ]);
+    expect(aggregateDrByLocation([legacy]).get('torso')?.dr).toBe(5);
   });
 });
 

@@ -273,6 +273,55 @@ describe('DrSummaryCard', () => {
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
   });
 
+  it('shows which armor layer wins a highest-only Fortify conflict', () => {
+    const character = makeCharacter([
+      { dr: 5, locations: ['torso'] },
+      { dr: 3, locations: ['torso'] },
+    ]);
+    const coif = character.inventory[0];
+    const hat = character.inventory[1];
+    if (!coif?.armor || !hat?.armor) throw new Error('missing armor fixtures');
+    coif.baseArmor = { ...coif.armor, dr: 2 };
+    hat.baseArmor = { ...hat.armor, dr: 1 };
+    coif.enchantmentBreakdown = [
+      {
+        sourceName: 'Armor 0: Fortify',
+        target: 'dr',
+        value: 3,
+        active: true,
+        stackingKey: 'fortify',
+        suppressedByStacking: false,
+      },
+    ];
+    hat.enchantmentBreakdown = [
+      {
+        sourceName: 'Armor 1: Fortify',
+        target: 'dr',
+        value: 2,
+        active: true,
+        stackingKey: 'fortify',
+        suppressedByStacking: false,
+      },
+    ];
+
+    render(<DrSummaryCard character={character} />);
+
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
+    expect(
+      within(screen.getByRole('list', { name: 'Armor 0 DR breakdown' }))
+        .getByText('Fortify')
+        .closest('li'),
+    ).toHaveTextContent(/winning.*\+3 DR/);
+    expect(
+      within(screen.getByRole('list', { name: 'Armor 1 DR breakdown' }))
+        .getByText('Fortify')
+        .closest('li'),
+    ).toHaveTextContent(/suppressed — Armor 0: Fortify wins.*\+2 DR/);
+    expect(screen.getByRole('list', { name: 'Protection layers' })).toHaveTextContent(
+      /Armor 0.*5 DR.*Armor 1.*1 DR/,
+    );
+  });
+
   it('does not mislabel effective DR when the base armor snapshot is unavailable', () => {
     const character = makeCharacter([{ dr: 6, locations: ['torso'] }]);
     const armor = character.inventory[0];
@@ -294,6 +343,20 @@ describe('DrSummaryCard', () => {
     expect(breakdown).toHaveTextContent('Base armor unavailable');
     expect(breakdown).not.toHaveTextContent('Base armor6 DR');
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
+  });
+
+  it('keeps effective DR when a partial payload omits the enchantment breakdown', () => {
+    const character = makeCharacter([{ dr: 5, locations: ['torso'] }]);
+    const armor = character.inventory[0];
+    if (!armor?.armor) throw new Error('missing armor fixture');
+    armor.baseArmor = { ...armor.armor, dr: 2 };
+
+    render(<DrSummaryCard character={character} />);
+
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('5');
+    expect(screen.getByRole('list', { name: 'Protection layers' })).toHaveTextContent(
+      'Armor 05 DR',
+    );
   });
 
   it.each([

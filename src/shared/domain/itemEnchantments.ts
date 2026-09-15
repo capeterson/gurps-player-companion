@@ -8,6 +8,8 @@ import type {
 import type { ResolvedEffect } from './traitEffects.ts';
 
 export interface EnchantmentContribution {
+  /** Stable within one item resolution; groups multiple effects from one enchantment instance. */
+  instanceKey: string;
   sourceName: string;
   target: EnchantmentEffect['target'];
   value: number;
@@ -197,6 +199,7 @@ export function resolveItemEnchantments(item: ItemInput): ItemEnchantmentResolut
     breakdown: all.map((candidate) => {
       const key = candidateKey(candidate);
       return {
+        instanceKey: candidate.instanceKey,
         sourceName: candidate.sourceName,
         target: candidate.effect.target,
         value: candidate.effect.value,
