@@ -307,6 +307,8 @@ export const magicItemData = z
   );
 
 export const enchantmentContribution = z.object({
+  /** Optional for compatibility with character details cached before this field existed. */
+  instanceKey: z.string().min(1).max(240).optional(),
   sourceName: z.string().min(1).max(322),
   target: enchantmentEffectTarget,
   value: z.number(),

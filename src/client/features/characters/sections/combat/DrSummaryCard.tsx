@@ -6,6 +6,7 @@ import {
   armorCoversLocation,
   effectiveDrByLocation,
   innateDrCoversLocation,
+  layeredArmorDrContributions,
   naturalSkullDr,
   resolveDr,
 } from '../../../../../shared/domain/armorDr.ts';
@@ -41,55 +42,18 @@ function enchantmentLabel(itemName: string, sourceName: string): string {
 
 export function armorDrEnchantmentLines(
   item: CharacterDetail['inventory'][number],
+  layers: readonly CharacterDetail['inventory'][number][],
+  location: string,
 ): ArmorDrEnchantmentLine[] {
-  const grouped = new Map<string, Omit<ArmorDrEnchantmentLine, 'status' | 'winnerName'>>();
-  for (const contribution of item.enchantmentBreakdown ?? []) {
-    if (contribution.target !== 'dr') continue;
-    const sourceName = enchantmentLabel(item.name, contribution.sourceName);
-    const key = [
-      sourceName,
-      contribution.stackingKey ?? '',
-      contribution.active ? 'active' : 'inactive',
-      contribution.suppressedByStacking ? 'suppressed' : 'applied',
-    ].join('|');
-    const previous = grouped.get(key);
-    grouped.set(key, {
-      sourceName,
-      value: (previous?.value ?? 0) + contribution.value,
-      stackingKey: contribution.stackingKey,
-    });
-  }
-  const raw = [...grouped.entries()].map(([key, line]) => ({ key, ...line }));
-  const winnerByKey = new Map(
-    raw
-      .filter(
-        (line) =>
-          line.stackingKey &&
-          line.key.endsWith('|active|applied') &&
-          raw.some(
-            (candidate) =>
-              candidate.stackingKey === line.stackingKey &&
-              candidate.key.endsWith('|active|suppressed'),
-          ),
-      )
-      .map((line) => [line.stackingKey as string, line.sourceName]),
-  );
-  return raw.map(({ key, ...line }) => {
-    if (key.endsWith('|inactive|applied') || key.endsWith('|inactive|suppressed'))
-      return { ...line, status: 'inactive' };
-    if (key.endsWith('|active|suppressed')) {
-      const winnerName = line.stackingKey ? winnerByKey.get(line.stackingKey) : undefined;
-      return {
-        ...line,
-        status: 'suppressed',
-        ...(winnerName ? { winnerName } : {}),
-      };
-    }
-    return {
-      ...line,
-      status: line.stackingKey && winnerByKey.has(line.stackingKey) ? 'winning' : 'applied',
-    };
-  });
+  return layeredArmorDrContributions(layers, location)
+    .filter((line) => line.itemKey === item.id)
+    .map((line) => ({
+      sourceName: enchantmentLabel(item.name, line.sourceName),
+      value: line.value,
+      stackingKey: line.stackingKey,
+      status: line.status,
+      ...(line.winnerName ? { winnerName: enchantmentLabel(item.name, line.winnerName) } : {}),
+    }));
 }
 
 function signed(value: number): string {
@@ -228,12 +192,15 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
               <h3 className="label-eyebrow mb-2">Protection before penetration</h3>
               <ul className="divide-y divide-base-300 text-sm" aria-label="Protection layers">
                 {layers.map((item) => {
-                  const enchantments = armorDrEnchantmentLines(item);
-                  const baseArmor = item.baseArmor;
+                  const enchantments = armorDrEnchantmentLines(item, layers, location);
+                  const baseArmor =
+                    item.enchantmentBreakdown !== undefined ? item.baseArmor : undefined;
                   const baseDr = baseArmor
                     ? resolveDr(
                         type,
-                        aggregateDrByLocation([{ ...item, armor: baseArmor }]).get(location),
+                        aggregateDrByLocation([
+                          { equipped: true, isArmor: true, armor: baseArmor },
+                        ]).get(location),
                       )
                     : null;
                   const appliedEnchantmentDr = enchantments
@@ -241,13 +208,15 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
                     .reduce((sum, entry) => sum + entry.value, 0);
                   const floorAdjustment =
                     baseDr === null ? 0 : Math.max(0, -(baseDr + appliedEnchantmentDr));
+                  const layerDr =
+                    baseDr === null
+                      ? resolveDr(type, aggregateDrByLocation([item]).get(location))
+                      : Math.max(0, baseDr + appliedEnchantmentDr);
                   return (
                     <li className="py-2" key={item.id}>
                       <div className="flex justify-between gap-3">
                         <span>{item.name}</span>
-                        <span className="num shrink-0">
-                          {resolveDr(type, aggregateDrByLocation([item]).get(location))} DR
-                        </span>
+                        <span className="num shrink-0">{layerDr} DR</span>
                       </div>
                       {enchantments.length > 0 && (
                         <ul
