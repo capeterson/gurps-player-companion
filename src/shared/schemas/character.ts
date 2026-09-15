@@ -219,7 +219,7 @@ export const derivedStatsOut = z.object({
  * for UI breakdowns.
  */
 export const resolvedEffectOut = z.object({
-  sourceKind: z.enum(['trait', 'skill']),
+  sourceKind: z.enum(['trait', 'skill', 'item']),
   sourceName: z.string(),
   sourceId: uuid,
   target: effectTarget,

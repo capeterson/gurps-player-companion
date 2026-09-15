@@ -19,7 +19,7 @@ import { type CampaignHouseRules, campaignHouseRules } from '../schemas/campaign
 import type { CharacterDetail, ResolvedEffectOut, TempEffect } from '../schemas/character.ts';
 import type { CombatStateOut } from '../schemas/combat.ts';
 import type { TraitEffect } from '../schemas/effects.ts';
-import type { InventoryItemOut } from '../schemas/inventory.ts';
+import { type InventoryItemOut, armorData, weaponData } from '../schemas/inventory.ts';
 import type { LanguageOut } from '../schemas/language.ts';
 import type { LibraryMechanics } from '../schemas/libraryMechanics.ts';
 import { libraryMechanics } from '../schemas/libraryMechanics.ts';
@@ -38,6 +38,7 @@ import {
   computePointBreakdown,
 } from './characterCalc.ts';
 import { type InventoryItemRow, computeEncumbrance, computeWeights } from './encumbrance.ts';
+import { type ItemEnchantmentResolution, resolveItemEnchantments } from './itemEnchantments.ts';
 import {
   attributeLevelFor,
   computeSkillLevel,
@@ -279,7 +280,10 @@ function characterAttrsFromRow(c: CharacterDetailInputCharacter): CharacterAttrs
   };
 }
 
-function inventoryRowFor(i: CharacterDetailInputInventory): InventoryItemRow {
+function inventoryRowFor(
+  i: CharacterDetailInputInventory,
+  enchantments?: ItemEnchantmentResolution,
+): InventoryItemRow {
   return {
     id: i.id,
     parentId: i.parentId,
@@ -288,7 +292,7 @@ function inventoryRowFor(i: CharacterDetailInputInventory): InventoryItemRow {
     worn: i.worn,
     isContainer: i.isContainer,
     hideawayCapacityLbs: Number(i.hideawayCapacityLbs),
-    weightReductionPercent: i.weightReductionPercent,
+    weightReductionPercent: enchantments?.weightReductionPercent ?? i.weightReductionPercent,
   };
 }
 
@@ -411,7 +415,19 @@ export function buildSkillOut(
 export function buildInventoryItemOut(
   item: CharacterDetailInputInventory,
   perItemEffective: Map<string, number>,
+  enchantmentResolution?: ItemEnchantmentResolution,
 ): InventoryItemOut {
+  const baseArmor = item.armor == null ? null : armorData.parse(item.armor);
+  const baseWeaponData = item.weaponData == null ? null : weaponData.parse(item.weaponData);
+  const resolved =
+    enchantmentResolution ??
+    resolveItemEnchantments({
+      ...item,
+      armor: baseArmor,
+      weaponData: baseWeaponData,
+      weightReductionPercent: item.weightReductionPercent,
+      enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
+    });
   return {
     id: item.id,
     characterId: item.characterId,
@@ -428,8 +444,13 @@ export function buildInventoryItemOut(
     hideawayCapacityLbs: Number(item.hideawayCapacityLbs),
     weightReductionPercent: item.weightReductionPercent,
     isArmor: item.isArmor,
-    armor: (item.armor as InventoryItemOut['armor']) ?? null,
-    weaponData: (item.weaponData as InventoryItemOut['weaponData']) ?? null,
+    armor: resolved.armor,
+    weaponData: resolved.weaponData,
+    baseArmor,
+    baseWeaponData,
+    effectiveArmorDivisor: resolved.armorDivisor,
+    effectiveWeightReductionPercent: resolved.weightReductionPercent,
+    enchantmentBreakdown: resolved.breakdown,
     powerstoneData: (item.powerstoneData as InventoryItemOut['powerstoneData']) ?? null,
     magicItemData: (item.magicItemData as InventoryItemOut['magicItemData']) ?? null,
     enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
@@ -487,20 +508,35 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   // its libraryEffects (joined by libraryTraitId/librarySkillId at fetch
   // time).  Active conditional groups gate which effects are "on".
   const activeGroups = new Set(character.activeConditionGroups ?? []);
-  const resolved = resolveEffects(
-    traits.map((t) => ({
-      id: t.id,
-      name: t.name,
-      level: t.level,
-      libraryEffects: [...(t.libraryEffects ?? []), ...(t.customEffects ?? [])],
-    })),
-    skills.map((s) => ({
-      id: s.id,
-      name: s.name,
-      libraryEffects: s.libraryEffects ?? [],
-    })),
-    activeGroups,
+  const itemEnchantments = new Map(
+    inventory.map((item) => [
+      item.id,
+      resolveItemEnchantments({
+        ...item,
+        armor: (item.armor as InventoryItemOut['armor']) ?? null,
+        weaponData: (item.weaponData as InventoryItemOut['weaponData']) ?? null,
+        weightReductionPercent: item.weightReductionPercent,
+        enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
+      }),
+    ]),
   );
+  const resolved = [
+    ...resolveEffects(
+      traits.map((t) => ({
+        id: t.id,
+        name: t.name,
+        level: t.level,
+        libraryEffects: [...(t.libraryEffects ?? []), ...(t.customEffects ?? [])],
+      })),
+      skills.map((s) => ({
+        id: s.id,
+        name: s.name,
+        libraryEffects: s.libraryEffects ?? [],
+      })),
+      activeGroups,
+    ),
+    ...[...itemEnchantments.values()].flatMap((entry) => entry.effects),
+  ];
 
   // Apply effects to attrs, THEN compute derived stats — so dodge / parry
   // / block / dr already include the trait contributions when the UI
@@ -531,9 +567,13 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     campaign?.pointTarget ?? null,
   );
 
-  const weights = computeWeights(inventory.map(inventoryRowFor));
+  const weights = computeWeights(
+    inventory.map((item) => inventoryRowFor(item, itemEnchantments.get(item.id))),
+  );
   const encumbrance = computeEncumbrance(weights.playerWeightLbs, derived.basicLift);
-  const inventoryOut = inventory.map((i) => buildInventoryItemOut(i, weights.perItem));
+  const inventoryOut = inventory.map((item) =>
+    buildInventoryItemOut(item, weights.perItem, itemEnchantments.get(item.id)),
+  );
   const traitsOut = traits.map(buildTraitOut);
   const defaultableSkills = skills.map((skill) => {
     const snapshot = libraryMechanics.safeParse(skill.libraryMechanics);

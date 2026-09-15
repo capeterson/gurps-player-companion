@@ -158,9 +158,12 @@ export function registerLibraryCrud<
       try {
         row = await withAudit(user.id, undefined, async (tx) => {
           await advanceLibraryCampaignRevision(tx, id);
+          const prepared = cfg.prepareValues
+            ? ((await cfg.prepareValues(tx, id, body)) as TCreate)
+            : body;
           const [inserted] = (await tx
             .insert(asTable(cfg.table))
-            .values(cfg.toInsertValues(id, body))
+            .values(cfg.toInsertValues(id, prepared))
             .returning()) as TTable['$inferSelect'][];
           if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
           return inserted;
@@ -210,15 +213,23 @@ export function registerLibraryCrud<
       const itemId = params[cfg.paramName];
       const body = c.req.valid('json');
       await requireCampaignOwner(id, user.id);
-      const normalized = cfg.normalizePatch ? cfg.normalizePatch(body) : body;
-      const updates = buildPatchSet(
-        normalized as Record<string, unknown>,
-        cfg.stringifyKeys ? { stringifyKeys: cfg.stringifyKeys } : undefined,
-      );
       let row: TTable['$inferSelect'];
       try {
         row = await withAudit(user.id, undefined, async (tx) => {
           await advanceLibraryCampaignRevision(tx, id);
+          const [existing] = (await tx
+            .select()
+            .from(asTable(cfg.table))
+            .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
+            .for('update')) as TTable['$inferSelect'][];
+          const prepared = cfg.prepareValues
+            ? ((await cfg.prepareValues(tx, id, body, existing)) as TUpdate)
+            : body;
+          const normalized = cfg.normalizePatch ? cfg.normalizePatch(prepared) : prepared;
+          const updates = buildPatchSet(
+            normalized as Record<string, unknown>,
+            cfg.stringifyKeys ? { stringifyKeys: cfg.stringifyKeys } : undefined,
+          );
           const [updated] = (await tx
             .update(asTable(cfg.table))
             .set(updates)
@@ -327,6 +338,9 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
     const key = cfg.keyOf(entry as { name: string; kind?: string });
     incomingKeys.add(key);
     const existingRow = existingByKey.get(key);
+    const prepared = cfg.prepareValues
+      ? ((await cfg.prepareValues(tx, campaignId, entry, existingRow)) as TCreate)
+      : entry;
     if (existingRow) {
       await tx
         .update(asTable(cfg.table))
@@ -334,7 +348,7 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
         // the canonical display spelling. Preserve the row id and live links
         // while allowing "broadsword" -> "Broadsword" for every kind.
         .set({
-          ...cfg.toUpdateValues(entry),
+          ...cfg.toUpdateValues(prepared),
           name: (entry as { name: string }).name,
           updatedAt: new Date(),
         })
@@ -342,7 +356,7 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
       await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, String(existingRow.id));
       updated++;
     } else {
-      await tx.insert(asTable(cfg.table)).values(cfg.toInsertValues(campaignId, entry));
+      await tx.insert(asTable(cfg.table)).values(cfg.toInsertValues(campaignId, prepared));
       created++;
     }
   }

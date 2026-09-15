@@ -141,6 +141,10 @@ on any sheet the viewer can edit — their own — it always shows).
   write path share `services/libraryReferences.ts`. Removing a member detaches
   live references while preserving owned rules; unavailable sources produce visible
   rejections, including a toast and add-form flash for each character entry type.
+  Inventory enchantment references use the same campaign check: the server replaces
+  caller-supplied mechanics with the definition's current revision and complete owned
+  snapshot. Definition edits refresh linked library/character items; deletion or
+  campaign transfer clears only the live ID, leaving offline mechanics intact.
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -320,7 +324,11 @@ on any sheet the viewer can edit — their own — it always shows).
   Armor retains every canonical and custom hit location. Weapons retain
   damage, reach, parry, governing skill, optional ranged stats and alternate
   attack modes. Powerstones and magic items retain their charge/energy state
-  and shared validation. Enchantments remain non-mechanical display metadata.
+  and shared validation. Legacy enchantment rows remain display metadata, while
+  typed campaign or character-local enchantments contribute attack, damage, Accuracy,
+  Parry/Block/DB, DR, armor divisor, weight reduction, or skill modifiers only under
+  their equipped/worn rule. Rows show the base-to-effective contribution breakdown,
+  including inactive and highest-policy-suppressed effects.
   Library templates still populate the quick-add form, and its small optional
   category/equipped/worn controls remain available; detailed editing uses the
   new item's category chips. Implementation lives under
@@ -555,9 +563,9 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
-  items, languages, techniques, and styles. The in-app catalog editor
+  items, enchantments, languages, techniques, and styles. The in-app catalog editor
   (`/campaigns/:id/library`) offers dedicated CRUD forms for **traits,
-  skills, spells, and items**; **languages, techniques, and styles** are
+  skills, spells, items, and mechanical enchantments**; **languages, techniques, and styles** are
   authored via the versioned YAML import/export flow (or the owner-only
   `.../library/{languages|techniques|styles}` REST routes the generic
   factory registers) — the dedicated character-sheet Languages and
@@ -568,7 +576,7 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
   Library skill forms also author first-class free-form/catalog specialization
-  policies and per-catalog-option rule overrides; portable YAML v9 retains them.
+  policies and per-catalog-option rule overrides; portable YAML v10 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal, e.g. 13) and **location** (free-form text, e.g. "The
@@ -669,7 +677,7 @@ src/
                  snapshot, and same-process shared-handler executor
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
                  libraryReferences (transactional source authorization for all
-                 six character reference types), ownedLibraryMechanics (saved
+                 six character reference types plus nested item enchantments), ownedLibraryMechanics (saved
                  declarations, live updates and detachment),
                  (incl. loadCharacterDetail, the shared character-detail
                  loader), characterAccess (resolveCharacterView, the
@@ -683,8 +691,8 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
-      library/   LibraryPage plus EffectsEditor, the reusable ordered effect
-                 authoring UI shared with character-owned trait mechanics
+      library/   LibraryPage plus EffectsEditor and typed enchantment authoring;
+                 ordered effect UI shared with character-owned trait mechanics
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
@@ -718,7 +726,7 @@ src/
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text
-     domain/      GURPS math (characterCalc, skillCalc, spellCalc,
+     domain/      GURPS math (characterCalc, skillCalc, spellCalc, itemEnchantments,
                   techniqueCalc (level from default skill + points offset for
                   A/H difficulty), encumbrance,
                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +

@@ -29,6 +29,7 @@ import { campaignUpdate } from '../../shared/schemas/campaign.ts';
 import {
   importMode,
   importResult,
+  libraryEnchantmentOut,
   libraryItemOut,
   libraryLanguageOut,
   librarySkillOut,
@@ -52,6 +53,7 @@ import {
 import { buildPatchSet } from '../services/patchSet.ts';
 import { registerLibraryCrud, selectLibrarySection, upsertByKey } from './campaignLibraryCrud.ts';
 import {
+  enchantmentEntity,
   itemEntity,
   languageEntity,
   skillEntity,
@@ -87,6 +89,7 @@ router.openapi(
               languages: z.array(libraryLanguageOut),
               techniques: z.array(libraryTechniqueOut),
               styles: z.array(libraryStyleOut),
+              enchantments: z.array(libraryEnchantmentOut),
             }),
           },
         },
@@ -107,6 +110,7 @@ router.openapi(
     const languages = await selectLibrarySection(db, languageEntity, id);
     const techniques = await selectLibrarySection(db, techniqueEntity, id);
     const styles = await selectLibrarySection(db, styleEntity, id);
+    const enchantments = await selectLibrarySection(db, enchantmentEntity, id);
     return c.json(
       {
         traits: traits.map(traitEntity.toOut),
@@ -116,6 +120,7 @@ router.openapi(
         languages: languages.map(languageEntity.toOut),
         techniques: techniques.map(techniqueEntity.toOut),
         styles: styles.map(styleEntity.toOut),
+        enchantments: enchantments.map(enchantmentEntity.toOut),
       },
       200,
     );
@@ -131,6 +136,7 @@ registerLibraryCrud(router, itemEntity);
 registerLibraryCrud(router, languageEntity);
 registerLibraryCrud(router, techniqueEntity);
 registerLibraryCrud(router, styleEntity);
+registerLibraryCrud(router, enchantmentEntity);
 
 // ===================== YAML EXPORT =====================
 
@@ -180,11 +186,23 @@ router.openapi(
         const languages = await selectLibrarySection(tx, languageEntity, id);
         const techniques = await selectLibrarySection(tx, techniqueEntity, id);
         const styles = await selectLibrarySection(tx, styleEntity, id);
-        return { campaign, traits, skills, spells, items, languages, techniques, styles };
+        const enchantments = await selectLibrarySection(tx, enchantmentEntity, id);
+        return {
+          campaign,
+          traits,
+          skills,
+          spells,
+          items,
+          languages,
+          techniques,
+          styles,
+          enchantments,
+        };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
     );
-    const { campaign, traits, skills, spells, items, languages, techniques, styles } = snapshot;
+    const { campaign, traits, skills, spells, items, languages, techniques, styles, enchantments } =
+      snapshot;
     const yamlText = emitLibraryYaml({
       campaign: {
         name: campaign.name,
@@ -205,6 +223,7 @@ router.openapi(
       languages: languages.map(languageEntity.rowToCreate),
       techniques: techniques.map(techniqueEntity.rowToCreate),
       styles: styles.map(styleEntity.rowToCreate),
+      enchantments: enchantments.map(enchantmentEntity.rowToCreate),
     });
     return c.body(yamlText, 200, {
       'content-type': 'application/yaml; charset=utf-8',
@@ -334,6 +353,13 @@ router.openapi(
       const languages = await upsertByKey(tx, languageEntity, id, doc.library.languages, mode);
       const techniques = await upsertByKey(tx, techniqueEntity, id, doc.library.techniques, mode);
       const styles = await upsertByKey(tx, styleEntity, id, doc.library.styles, mode);
+      const enchantments = await upsertByKey(
+        tx,
+        enchantmentEntity,
+        id,
+        doc.library.enchantments,
+        mode,
+      );
 
       // Opt-in campaign-settings apply (validated above): only fields
       // actually present in the doc get copied (undefined = leave
@@ -359,6 +385,7 @@ router.openapi(
         languages,
         techniques,
         styles,
+        enchantments,
         campaignSettingsApplied,
       };
     });

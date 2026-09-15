@@ -55,7 +55,16 @@ export async function mutateItem(
     if (!stored) throw new Error('This inventory item no longer exists');
     // Sync cursor rows retain Postgres numeric strings; use the same
     // normalization as the character sheet before validating/editing them.
-    const current = inventoryItemOut.parse(buildInventoryItemOut(stored, new Map()));
+    const displayed = buildInventoryItemOut(stored, new Map());
+    // CharacterDetail exposes enchanted armor/weapon values for display, but
+    // edits must always start from the persisted base blocks. Otherwise an
+    // unrelated edit (for example, toggling Flexible) bakes a bonus into the
+    // base value and the resolver applies it again.
+    const current = inventoryItemOut.parse({
+      ...displayed,
+      armor: displayed.baseArmor,
+      weaponData: displayed.baseWeaponData,
+    });
     const patch = inventoryItemUpdate.parse(update(current));
     if (
       patch.isContainer === false &&

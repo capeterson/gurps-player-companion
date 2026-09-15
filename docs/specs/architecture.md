@@ -246,7 +246,8 @@ Tables (grouped):
 - **Campaign content**: `adventure_log_entries`, `campaign_library_traits`,
   `campaign_library_skills`, `campaign_library_spells`,
   `campaign_library_items`, `campaign_library_languages`,
-  `campaign_library_techniques`, `campaign_library_styles`, plus
+  `campaign_library_techniques`, `campaign_library_styles`,
+  `campaign_library_enchantments`, plus
   online-only live-session `encounters`, `encounter_combatants`, and
   `encounter_effects`.
   `campaign_library_skills.specialization_policy` is JSONB validated by the
@@ -256,6 +257,10 @@ Tables (grouped):
   prerequisite expressions, defaults with three-valued conditions, and
   natural-name group/tag selectors. `domain/skillRules.ts` is the pure shared
   evaluator used by authoritative REST/sync writes and offline character detail.
+  Enchantment definitions persist typed applicability, effect/level declarations,
+  tags, and stacking policy. Item references carry the live definition UUID plus
+  a revisioned owned snapshot; `domain/itemEnchantments.ts` resolves that snapshot
+  identically in server and browser character-detail builds.
 - **Sync/audit infra**: `entity_tombstones` (deletes for cursor backfill),
   `entity_history` (append-only audit log).
 

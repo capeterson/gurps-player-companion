@@ -298,11 +298,11 @@ campaign's past-encounter list with an on-page final-round summary.
 
 ## The campaign library
 
-A per-campaign catalog of reusable content, backed by seven tables:
+A per-campaign catalog of reusable content, backed by eight tables:
 `campaign_library_traits`, `campaign_library_skills`,
 `campaign_library_spells`, `campaign_library_items`,
-`campaign_library_languages`, `campaign_library_techniques`, and
-`campaign_library_styles`. It's what lets a GM define campaign-specific
+`campaign_library_languages`, `campaign_library_techniques`,
+`campaign_library_styles`, and `campaign_library_enchantments`. It's what lets a GM define campaign-specific
 advantages, skills, spells, gear, languages, and martial-arts content
 once and have players pull them onto their sheets.
 
@@ -313,9 +313,9 @@ seeds the character row's written fluency to `n/a`.
 
 - **Read** (`GET /campaigns/{id}/library`): any campaign **member**.
 - **Write** (per-entity CRUD): campaign **owner** only. Endpoints are
-  `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|languages|techniques|styles}[/{id}]`
+  `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|enchantments|languages|techniques|styles}[/{id}]`
   in `src/server/routes/campaignLibrary.ts`. These back the library editor UI
-  (traits/skills/spells/items have dedicated editor forms; the
+  (traits/skills/spells/items/enchantments have dedicated editor forms; the
   languages/techniques/styles routes are primarily exercised via the YAML
   import flow and consumed on the character sheet — the editor's own tabs
   do not yet render those kinds); library mutations do **not** go through
@@ -324,7 +324,23 @@ seeds the character row's written fluency to `n/a`.
   and the top-nav `LibraryPage` (`/library`, the primary home for YAML
   import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
   character sheet, which let a player search the campaign library when adding a
-  trait/skill/spell/item/language/technique.
+  trait/skill/spell/item/enchantment/language/technique.
+
+Library enchantments declare `weapon`, `armor`, `shield`, or `any` applicability;
+typed flat effects; optional level-specific effects; and either additive stacking
+or a highest-only stacking key. Library items and character inventory items can
+attach definitions. The server verifies same-campaign scope and applicability and
+requires current library membership before hydrating a linked definition, then
+stores an authoritative name/source/revision/mechanics snapshot. Character-local
+typed instances omit the definition ID. Weapon/armor/shield combat effects require
+`equipped`; weight effects require a worn root; legacy
+spell-name/category/note entries remain valid and non-mechanical. Definition edits
+refresh every live snapshot in the audited transaction. Deletes and campaign
+transfers detach live IDs but preserve the last owned snapshot. Persisted armor and
+weapon blocks always remain the editable base layer; detail payloads expose their
+derived base-plus-effect values separately, without applying persistence caps to
+the derived totals. A DB effect can enhance an existing shield or armor DB but
+does not turn an ordinary weapon into a shield.
 
 Library skills declare a first-class `specializationPolicy`: `none`, required or
 optional free-form, or required or optional catalog. Catalog options carry a
@@ -408,7 +424,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 9`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 10`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
@@ -416,7 +432,10 @@ mechanism for sharing content between campaigns or seeding a new one.
   (weapon-scoped effects) also parse. v8 adds skill specialization policies,
   catalog option overrides, and structured `exact`/`same`/`any` specialization
   matching for skill defaults. v9 adds TL policies, structured prerequisites,
-  conditional group/tag defaults, and the campaign prerequisite policy. The
+  conditional group/tag defaults, and the campaign prerequisite policy. v10 adds
+  portable mechanical enchantment definitions and structured owned item snapshots;
+  campaign-local definition UUIDs are removed on export while source revision and
+  mechanics remain. The
   parser unions on the literal `version` field and newer fields default/absent
   on older docs.
 - **Item fields (v3):** library items carry the same container/powerstone/
@@ -442,9 +461,11 @@ mechanism for sharing content between campaigns or seeding a new one.
   style survives a round trip into a campaign that has no matching technique
   rows yet. Both sections follow the same optional-section rule as
   `languages`.
-- **Item enchantments (v5):** `library.items` entries carry an optional
+- **Item enchantments (v5/v10):** `library.items` entries carry an optional
   `enchantments: []` list (`enchantmentRef[]`: spellName, spellLevel?, category?,
-  notes?) which copies onto character inventory items upon add.
+  notes?) which copies onto character inventory items upon add. v10 extends an
+  entry with optional definition revision/source, selected level, and a complete
+  typed mechanics snapshot while preserving the v5 note-only shape.
 - **Skill defaults (v6):** `library.skills[].defaults` stores attribute/skill
   plus offset candidates, including an optional skill specialization. `[]`
   explicitly means no default and is retained on export; null/absent means
@@ -467,7 +488,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   therefore leave the target campaign's current setting unchanged on import.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
-  campaign settings, and all seven library sections are read on one read-only
+  campaign settings, and all eight library sections are read on one read-only
   `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
   document assembled from different database moments.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. Two modes:
@@ -494,8 +515,8 @@ mechanism for sharing content between campaigns or seeding a new one.
   campaign by `db:seed`.
 
 Keys used for upsert matching: traits by `kind::lower(name)`; skills, spells,
-items, languages, techniques, and styles by `lower(name)`. The natural-key
-unique indexes on all seven `campaign_library_*` tables are
+items, enchantments, languages, techniques, and styles by `lower(name)`. The natural-key
+unique indexes on all eight `campaign_library_*` tables are
 **case-insensitive** (`UNIQUE (campaign_id,
 lower(name))`, traits additionally scoped by `kind`; see migration 0021), so
 `POST`/`PATCH` reject a case-insensitive duplicate with `409` and an import's

@@ -60,6 +60,22 @@ patch, so exact inventory-item bindings work offline and receive the standard
 rejection toast and rollback flash. The shared detail builder merges these after
 the read-only library declarations on both server and client.
 
+Inventory rows keep mechanical enchantments inside the existing sync-backed
+`enchantments` field. A linked instance carries a campaign definition UUID plus
+the authoritative source revision/name/source and complete typed mechanics;
+character-local instances omit the UUID. The pure shared item resolver consumes
+only this owned snapshot, so DR, DB, attack/damage/Accuracy, Parry/Block, armor
+divisor, weight reduction, and skill effects remain identical offline. The item
+field still uses the normal coalesced outbox patch, pending-field protection,
+rejection toast, and row flash. Campaign enchantment definitions themselves stay
+online-only with the rest of the library. Library edits refresh linked inventory
+snapshots and their revisions in the same audited transaction; delete/transfer
+clears live IDs without deleting the snapshot. An optimistic offline campaign
+transfer performs the same nested-ID detachment in its character/outbox
+transaction and restores it on rollback only when no later item edit superseded
+that field. Editors and delete rollback snapshots always use the raw Dexie base
+row, never the derived base-plus-enchantment detail value.
+
 Selecting an already loaded definition also seeds validated local-only declarations
 into the speculative create row, in the same Dexie transaction as its outbox entry.
 They survive offline reloads and are excluded from the operation envelope; the server

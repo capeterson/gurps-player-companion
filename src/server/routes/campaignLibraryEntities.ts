@@ -18,6 +18,9 @@ import type { AnyPgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { HTTPException } from 'hono/http-exception';
 import { validateLibrarySkillSpecializationDefault } from '../../shared/domain/librarySkillSpecializations.ts';
 import {
+  type LibraryEnchantmentCreate,
+  type LibraryEnchantmentOut,
+  type LibraryEnchantmentUpdate,
   type LibraryItemCreate,
   type LibraryItemOut,
   type LibraryItemUpdate,
@@ -39,6 +42,9 @@ import {
   type LibraryTraitCreate,
   type LibraryTraitOut,
   type LibraryTraitUpdate,
+  libraryEnchantmentCreate,
+  libraryEnchantmentOut,
+  libraryEnchantmentUpdate,
   libraryItemCreate,
   libraryItemOut,
   libraryItemUpdate,
@@ -61,7 +67,9 @@ import {
   libraryTraitOut,
   libraryTraitUpdate,
 } from '../../shared/schemas/campaignLibrary.ts';
+import type { AuditTx } from '../db/auditContext.ts';
 import {
+  campaignLibraryEnchantments,
   campaignLibraryItems,
   campaignLibraryLanguages,
   campaignLibrarySkills,
@@ -70,6 +78,7 @@ import {
   campaignLibraryTechniques,
   campaignLibraryTraits,
 } from '../db/schema.ts';
+import { hydrateItemEnchantmentDefinitions } from '../services/libraryReferences.ts';
 
 /** The columns every campaign-library table needs for the generic factory. */
 export type LibraryTable = PgTable & {
@@ -98,7 +107,8 @@ export interface LibraryEntityConfig<
     | 'items'
     | 'languages'
     | 'techniques'
-    | 'styles';
+    | 'styles'
+    | 'enchantments';
   readonly table: TTable;
   /** List ordering for `GET /campaigns/{id}/library`. */
   readonly orderBy: readonly SQL[];
@@ -130,6 +140,13 @@ export interface LibraryEntityConfig<
   readonly toUpdateValues: (body: TCreate) => Record<string, unknown>;
   /** Normalize compatibility fields before a partial REST/MCP PATCH. */
   readonly normalizePatch?: (body: TUpdate) => Record<string, unknown>;
+  /** Resolve campaign-local references inside an audited transaction. */
+  readonly prepareValues?: (
+    tx: AuditTx,
+    campaignId: string,
+    body: TCreate | TUpdate,
+    existing?: TTable['$inferSelect'],
+  ) => Promise<TCreate | TUpdate>;
   /** Row → YAML-create shape, used by the export mapper. */
   readonly rowToCreate: (row: TTable['$inferSelect']) => TCreate;
 }
@@ -427,6 +444,77 @@ export const spellEntity: LibraryEntityConfig<
     }),
 };
 
+// ===================== enchantments =====================
+
+function enchantmentEditableFields(body: LibraryEnchantmentCreate) {
+  return {
+    description: body.description ?? null,
+    source: body.source ?? null,
+    tags: body.tags ?? [],
+    applicability: body.applicability ?? 'any',
+    effects: body.effects ?? [],
+    levels: body.levels ?? [],
+    stackingPolicy: body.stackingPolicy ?? { kind: 'stack' as const },
+  } satisfies Record<Exclude<keyof LibraryEnchantmentCreate, 'name'>, unknown>;
+}
+
+export const enchantmentEntity: LibraryEntityConfig<
+  typeof campaignLibraryEnchantments,
+  LibraryEnchantmentCreate,
+  LibraryEnchantmentUpdate,
+  LibraryEnchantmentOut,
+  'enchantmentId'
+> = {
+  pathSegment: 'enchantments',
+  paramName: 'enchantmentId',
+  entityLabel: 'enchantment',
+  yamlKey: 'enchantments',
+  table: campaignLibraryEnchantments,
+  orderBy: [asc(campaignLibraryEnchantments.name)],
+  createSchema: libraryEnchantmentCreate,
+  updateSchema: libraryEnchantmentUpdate,
+  outSchema: libraryEnchantmentOut,
+  summaries: {
+    post: 'Add a library enchantment (owner only)',
+    patch: 'Update a library enchantment (owner only)',
+    delete: 'Delete a library enchantment (owner only)',
+  },
+  toOut: (row) =>
+    libraryEnchantmentOut.parse({
+      id: row.id,
+      campaignId: row.campaignId,
+      name: row.name,
+      description: row.description,
+      source: row.source,
+      tags: row.tags,
+      applicability: row.applicability,
+      effects: row.effects,
+      levels: row.levels,
+      stackingPolicy: row.stackingPolicy,
+      revision: Number(row.revision),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  keyOf: (input) => input.name.toLowerCase(),
+  toInsertValues: (campaignId, body) => ({
+    campaignId,
+    name: body.name,
+    ...enchantmentEditableFields(body),
+  }),
+  toUpdateValues: (body) => enchantmentEditableFields(body),
+  rowToCreate: (row) =>
+    libraryEnchantmentCreate.parse({
+      name: row.name,
+      description: row.description ?? undefined,
+      source: row.source ?? undefined,
+      tags: row.tags,
+      applicability: row.applicability,
+      effects: row.effects,
+      levels: row.levels,
+      stackingPolicy: row.stackingPolicy,
+    }),
+};
+
 // ===================== items =====================
 
 function itemEditableFields(body: LibraryItemCreate) {
@@ -471,6 +559,8 @@ export const itemEntity: LibraryEntityConfig<
     patch: 'Update a library item (owner only)',
     delete: 'Delete a library item (owner only)',
   },
+  prepareValues: (tx, campaignId, body, existing) =>
+    hydrateItemEnchantmentDefinitions(tx, campaignId, body, existing),
   toOut: (row) =>
     libraryItemOut.parse({
       id: row.id,
@@ -723,4 +813,5 @@ export const libraryEntities = [
   languageEntity,
   techniqueEntity,
   styleEntity,
+  enchantmentEntity,
 ] as const;

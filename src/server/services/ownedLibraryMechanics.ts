@@ -1,10 +1,13 @@
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { resolveLibrarySkillSpecialization } from '../../shared/domain/librarySkillSpecializations.ts';
+import { enchantmentRef } from '../../shared/schemas/inventory.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { traitKindEnum } from '../../shared/schemas/trait.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
+  campaignLibraryEnchantments,
+  campaignLibraryItems,
   campaignLibrarySkills,
   campaignLibraryTraits,
   characterLanguages,
@@ -68,6 +71,68 @@ export async function refreshOwnedLibraryMechanics(
   sourceId: string,
   detach = false,
 ) {
+  if (kind === 'enchantments') {
+    const [source] = await tx
+      .select()
+      .from(campaignLibraryEnchantments)
+      .where(
+        and(
+          eq(campaignLibraryEnchantments.id, sourceId),
+          eq(campaignLibraryEnchantments.campaignId, campaignId),
+        ),
+      )
+      .for('update');
+    if (!source) return;
+    const refresh = (entries: unknown) => {
+      const parsed = enchantmentRef.array().safeParse(entries);
+      if (!parsed.success) return null;
+      let changed = false;
+      const next = parsed.data.map((entry) => {
+        if (entry.definitionId !== sourceId) return entry;
+        changed = true;
+        if (detach) return { ...entry, definitionId: null };
+        return enchantmentRef.parse({
+          ...entry,
+          spellName: source.name,
+          definitionRevision: Number(source.revision),
+          definitionSource: source.source,
+          mechanics: {
+            applicability: source.applicability,
+            effects: source.effects,
+            levels: source.levels,
+            stackingPolicy: source.stackingPolicy,
+          },
+        });
+      });
+      return changed ? next : null;
+    };
+    const libraryItems = await tx
+      .select()
+      .from(campaignLibraryItems)
+      .where(eq(campaignLibraryItems.campaignId, campaignId));
+    for (const item of libraryItems) {
+      const enchantments = refresh(item.enchantments);
+      if (enchantments)
+        await tx
+          .update(campaignLibraryItems)
+          .set({ enchantments, updatedAt: new Date() })
+          .where(eq(campaignLibraryItems.id, item.id));
+    }
+    const ownedItems = await tx
+      .select({ id: inventoryItems.id, enchantments: inventoryItems.enchantments })
+      .from(inventoryItems)
+      .innerJoin(characters, eq(inventoryItems.characterId, characters.id))
+      .where(eq(characters.campaignId, campaignId));
+    for (const item of ownedItems) {
+      const enchantments = refresh(item.enchantments);
+      if (enchantments)
+        await tx
+          .update(inventoryItems)
+          .set({ enchantments, updatedAt: new Date() })
+          .where(eq(inventoryItems.id, item.id));
+    }
+    return;
+  }
   if (kind !== 'traits' && kind !== 'skills') return;
   const sourceTable = kind === 'traits' ? campaignLibraryTraits : campaignLibrarySkills;
   const [source] = await tx
@@ -248,8 +313,20 @@ export async function detachLibraryReferencesForTransfer(
       .for('update');
     for (const row of rows) {
       const sourceId = (row as unknown as Record<string, unknown>)[field];
-      if (typeof sourceId !== 'string') continue;
-      const patch: Record<string, unknown> = { [field]: null, updatedAt: new Date() };
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (table === inventoryItems && 'enchantments' in row) {
+        const parsed = enchantmentRef.array().safeParse(row.enchantments);
+        if (parsed.success && parsed.data.some((entry) => entry.definitionId))
+          patch.enchantments = parsed.data.map((entry) =>
+            entry.definitionId ? { ...entry, definitionId: null } : entry,
+          );
+      }
+      if (typeof sourceId !== 'string') {
+        if (patch.enchantments !== undefined)
+          await tx.update(table).set(patch).where(eq(table.id, row.id));
+        continue;
+      }
+      patch[field] = null;
       if ('libraryMechanics' in row) {
         const saved = libraryMechanics.safeParse(row.libraryMechanics);
         const trusted =

@@ -443,6 +443,10 @@ export async function enqueueDeletes(args: readonly EnqueueDeleteArgs[]): Promis
 async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void> {
   const db = getLocalDb();
   const now = new Date().toISOString();
+  const prevValue =
+    args.prevValue === undefined
+      ? await readLocalEntity(args.entityClass, args.entityId)
+      : args.prevValue;
   const op: OutboxEntry = {
     clientOpId: newClientId(),
     entityClass: args.entityClass,
@@ -450,7 +454,7 @@ async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void
     command: 'delete',
     coalesceKey: `${coalesceKey(args.entityId, undefined)}:delete`,
     attemptedValue: args.characterId ? { characterId: args.characterId } : null,
-    prevValue: args.prevValue,
+    prevValue,
     parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
     validationVersion: 1,
     status: 'pending',
@@ -461,6 +465,32 @@ async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void
   };
   await applyLocalDelete(args.entityClass, args.entityId);
   await db.outbox.add(op);
+}
+
+async function readLocalEntity(entityClass: EntityClass, entityId: string): Promise<unknown> {
+  const db = getLocalDb();
+  switch (entityClass) {
+    case 'character':
+      return db.characters.get(entityId);
+    case 'character_trait':
+      return db.characterTraits.get(entityId);
+    case 'character_skill':
+      return db.characterSkills.get(entityId);
+    case 'character_spell':
+      return db.characterSpells.get(entityId);
+    case 'character_language':
+      return db.characterLanguages.get(entityId);
+    case 'character_technique':
+      return db.characterTechniques.get(entityId);
+    case 'character_inventory':
+      return db.characterInventory.get(entityId);
+    case 'character_combat':
+      return db.characterCombat.get(entityId);
+    case 'campaign':
+      return db.campaigns.get(entityId);
+    default:
+      return undefined;
+  }
 }
 
 /**

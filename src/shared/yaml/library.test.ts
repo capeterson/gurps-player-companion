@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  libraryEnchantmentCreate,
   libraryItemCreate,
   libraryLanguageCreate,
   libraryPortableFieldManifest,
@@ -25,6 +26,7 @@ describe('library portability field manifest', () => {
       skills: librarySkillCreate.shape,
       spells: librarySpellCreate.shape,
       items: libraryItemCreate.shape,
+      enchantments: libraryEnchantmentCreate.shape,
       languages: libraryLanguageCreate.shape,
       techniques: libraryTechniqueCreate.shape,
       styles: libraryStyleCreate.shape,
@@ -34,6 +36,58 @@ describe('library portability field manifest', () => {
         Object.keys(shapes[key]).sort(),
       );
     }
+  });
+});
+
+it('round-trips mechanical enchantment definitions and portable owned snapshots', () => {
+  const definition = libraryEnchantmentCreate.parse({
+    name: 'Fortify',
+    description: 'Reinforces armor.',
+    source: 'M66',
+    tags: ['armor'],
+    applicability: 'armor',
+    effects: [{ target: 'dr', value: 1 }],
+    levels: [{ level: 2, label: 'Greater', effects: [{ target: 'dr', value: 2 }] }],
+    stackingPolicy: { kind: 'highest', key: 'fortify' },
+  });
+  const yaml = emitLibraryYaml({
+    traits: [],
+    skills: [],
+    spells: [],
+    items: [
+      libraryItemCreate.parse({
+        name: 'Enchanted mail',
+        enchantments: [
+          {
+            spellName: definition.name,
+            definitionId: '01990000-0000-7000-8000-000000000001',
+            definitionRevision: 7,
+            definitionSource: definition.source,
+            level: 2,
+            mechanics: {
+              applicability: definition.applicability,
+              effects: definition.effects,
+              levels: definition.levels,
+              stackingPolicy: definition.stackingPolicy,
+            },
+          },
+        ],
+      }),
+    ],
+    languages: [],
+    techniques: [],
+    styles: [],
+    enchantments: [definition],
+  });
+  expect(yaml).toContain('version: 10');
+  expect(yaml).not.toContain('definitionId');
+  const parsed = parseLibraryYaml(yaml).library;
+  expect(parsed.enchantments).toEqual([definition]);
+  expect(parsed.items[0]?.enchantments[0]).toMatchObject({
+    spellName: 'Fortify',
+    level: 2,
+    definitionRevision: 7,
+    mechanics: { applicability: 'armor', stackingPolicy: { kind: 'highest', key: 'fortify' } },
   });
 });
 
@@ -147,7 +201,7 @@ it('round-trips specialization catalogs and structured default matchers', () => 
     techniques: [],
     styles: [],
   });
-  expect(yaml).toContain('version: 9');
+  expect(yaml).toContain('version: 10');
   expect(parseLibraryYaml(yaml).library.skills[0]).toEqual(skill);
 });
 
@@ -446,7 +500,7 @@ describe('emitLibraryYaml', () => {
     expect(second).toBe(first);
   });
 
-  it('upgrades a v3 document to the current v9 shape byte-stably', () => {
+  it('upgrades a v3 document to the current v10 shape byte-stably', () => {
     const doc = parseLibraryYaml(SAMPLE_V3);
     const first = emitLibraryYaml({
       campaign: doc.campaign,
@@ -458,7 +512,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 9');
+    expect(first).toContain('version: 10');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

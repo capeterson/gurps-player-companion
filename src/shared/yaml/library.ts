@@ -8,6 +8,7 @@
 
 import { Document, parse, stringify } from 'yaml';
 import {
+  type LibraryEnchantmentCreate,
   type LibraryItemCreate,
   type LibraryLanguageCreate,
   type LibrarySkillCreate,
@@ -28,10 +29,11 @@ import {
  * `defaults` and campaign attribute-cap enforcement. v7 adds item-aware weapon
  * effects. v8 adds library skill specialization policies and structured skill
  * default matchers. v9 adds structured prerequisites, TL policies, conditional
- * family defaults, and campaign enforcement policy. The parser still accepts
- * v1-v8 docs (new fields absent).
+ * family defaults, and campaign enforcement policy. v10 adds reusable
+ * enchantment definitions and mechanical item snapshots. The parser still accepts
+ * v1-v9 docs (new fields absent).
  */
-export const LIBRARY_YAML_VERSION = 9 as const;
+export const LIBRARY_YAML_VERSION = 10 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -111,6 +113,13 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     if (styleKeys.has(k)) throw new LibraryYamlError(`duplicate style (${st.name})`);
     styleKeys.add(k);
   }
+  const enchantmentKeys = new Set<string>();
+  for (const enchantment of doc.library.enchantments ?? []) {
+    const key = enchantment.name.toLowerCase();
+    if (enchantmentKeys.has(key))
+      throw new LibraryYamlError(`duplicate enchantment (${enchantment.name})`);
+    enchantmentKeys.add(key);
+  }
 }
 
 export interface LibraryYamlExportInput {
@@ -122,6 +131,7 @@ export interface LibraryYamlExportInput {
   readonly languages: readonly LibraryLanguageCreate[];
   readonly techniques: readonly LibraryTechniqueCreate[];
   readonly styles: readonly LibraryStyleCreate[];
+  readonly enchantments?: readonly LibraryEnchantmentCreate[];
 }
 
 /** Stable ordering for byte-stable round trip. */
@@ -173,14 +183,31 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
     ...(s.defaults != null ? { defaults: s.defaults } : {}),
   }));
   const spells = sortedByName(input.spells).map((s) => compact(s));
-  const items = sortedByName(input.items).map((i) => compact(i));
+  const items = sortedByName(input.items).map((item) =>
+    compact({
+      ...item,
+      enchantments: item.enchantments.map(({ definitionId: _definitionId, ...entry }) =>
+        compact(entry),
+      ),
+    }),
+  );
   const languages = sortedByName(input.languages).map((l) => compact(l));
   const techniques = sortedByName(input.techniques).map((t) => compact(t));
   const styles = sortedByName(input.styles).map((st) => compact(st));
+  const enchantments = sortedByName(input.enchantments ?? []).map((entry) => compact(entry));
 
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };
   if (input.campaign) payload.campaign = compactCampaign(input.campaign);
-  payload.library = { traits, skills, spells, items, languages, techniques, styles };
+  payload.library = {
+    traits,
+    skills,
+    spells,
+    items,
+    languages,
+    techniques,
+    styles,
+    enchantments,
+  };
 
   const doc = new Document(payload);
   return stringify(doc, {
