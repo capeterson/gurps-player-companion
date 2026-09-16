@@ -132,7 +132,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   }
 
   function doRoll() {
-    // Pushed to session history directly in this click handler — never
+    // Pushed to device-only roll history directly in this click handler — never
     // in an effect — so a StrictMode double-invoke can't double-log a
     // roll, and "Roll again" is just another call to the same handler.
     if (damage && effectiveDice) {

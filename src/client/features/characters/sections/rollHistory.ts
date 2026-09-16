@@ -1,15 +1,15 @@
 /**
  * Per-character roll log, persisted to localStorage (not sync'd).
  *
- * Each character gets its own localStorage key holding its last 100
+ * Each character gets its own localStorage key holding its last 250
  * rolls (newest first, oldest pruned from the tail). The log is
- * browser-local convenience state — it carries no sync, purge, or
- * history obligations (AGENTS.md S6/S9/H1-H5) because it is not a
- * Dexie store and never touches the server. `clearAllRollHistory`
- * is called on logout so account switching on the same device does
- * not leak one user's roll labels to the next.
+ * browser-local convenience state — it carries no sync-entity or
+ * server-history obligations (AGENTS.md S6/H1-H5) because it never
+ * touches the server. `clearAllRollHistory` is called on logout so
+ * account switching on the same device does not leak one user's roll
+ * labels to the next.
  *
- * Exposed via `useSyncExternalStore` so every `RollHistoryStrip`
+ * Exposed via `useSyncExternalStore` so every `RollHistoryPanel`
  * instance re-renders the moment a roll lands, without React state
  * living outside a component.
  */
@@ -37,7 +37,7 @@ export interface RollHistoryEntry {
   readonly damageType?: string | null;
 }
 
-const MAX_ENTRIES = 100;
+const MAX_ENTRIES = 250;
 const KEY_PREFIX = 'gurps:rollHistory:';
 
 interface StoredEntry {
@@ -97,7 +97,7 @@ function writeToStorage(characterId: string, entries: readonly RollHistoryEntry[
   } catch {}
 }
 
-/** Push a new roll onto the front of the log, newest first, capped at 100 per character. */
+/** Push a new roll onto the front of the log, pruning beyond 250 per character. */
 export function pushRoll(entry: RollHistoryEntry): void {
   const cid = entry.characterId;
   const current = cache.get(cid) ?? readFromStorage(cid);

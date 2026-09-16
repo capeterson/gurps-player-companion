@@ -349,8 +349,8 @@ on any sheet the viewer can edit — their own — it always shows).
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
   hop. Full-width Pools put HP, FP, and posture/conditions side by side on wide
-  screens. Maneuver and Defenses share a row; Attacks, armor coverage, the Solo
-  tracker, and roll history each use the full width below. Sections stack on
+  screens. Maneuver and Defenses share a row; Attacks, armor coverage, and the Solo
+  tracker each use the full width below. Sections stack on
   mobile instead of accumulating into two independent, uneven columns.
   - **Pools** — HP/FP with bumpers/reset, posture chips, and all 12
     common-condition chips (normalized against legacy Capitalized entries
@@ -514,21 +514,20 @@ on any sheet the viewer can edit — their own — it always shows).
     roll sheet (`.RollSheet` / `RollableRow` live under `sections/`) so
     tapping a skill/spell level in those tables opens the identical
     roller.
-  - **Roll history strip** — a collapsible log of this character's
-    recent rolls (newest first, capped at 100 entries per character),
-    rendering both check entries (target/margin/crit) and damage
-    entries (dice + total + type) distinctly; entries persisted before
-    damage rolls existed have no `kind` and deserialize as checks.
-    Persisted to `localStorage` (keyed `gurps:rollHistory:<characterId>`)
-    so the log survives page reloads, but **not sync'd to the server**
-    and carrying no sync/purge/history obligations. Cleared on logout
-    (`clearAllRollHistory`) so account switching on the same device
-    doesn't leak roll labels.
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
   and carried weight past the 10×BL carry cap.
-- **History tab**: per-character audit log (see history-tracking.md).
+- **History tab**: defaults to the per-character server audit log (see
+  history-tracking.md) and provides a second **Roll history** sub-tab for browsing
+  this character's rolls. Roll history is newest first and capped at 250 entries
+  per character; adding a roll prunes the oldest entries beyond that limit. Check
+  entries show target/dice/total/margin/crit and damage entries show dice/total/type.
+  Entries persisted before damage rolls existed have no `kind` and deserialize as
+  checks. Rolls live only in `localStorage` under
+  `gurps:rollHistory:<characterId>`: they survive reloads but are never sent through
+  the outbox, sync API, history API, or MCP. Logout calls `clearAllRollHistory` so
+  account switching on the same device cannot expose prior roll labels.
 
 Every editable input on the sheet is **draft-on-blur** and never silently
 loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
@@ -709,8 +708,9 @@ src/
                  useClampedJsonbBumper (powerstone/magic-item charge
                   steppers), useTempEffects (the temporary-effects list
                   backing the Attributes panel's modifier popovers), shared
-                  RollSheet/RollableRow/rollHistory (per-character
-                  localStorage roll log) primitives, and combat/
+                 RollSheet/RollableRow/rollHistory (per-character
+                  localStorage roll log) primitives, RollHistoryPanel (the History
+                  sub-tab browser), and combat/
                   (CombatTab + Pools/Maneuver/Defenses/Attacks/DrSummary cards,
                    ArmorLocationMap + IncomingDamageDialog)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,

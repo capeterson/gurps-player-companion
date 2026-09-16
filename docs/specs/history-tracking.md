@@ -6,7 +6,10 @@ GURPS Player Companion is a local-first PWA (React 19 + Dexie/IndexedDB) backed 
 
 The **append-only history/audit log**:
 - Captures every mutation to characters (attributes incl. **temporary stat boosts**, traits, skills, spells, inventory, combat) and to campaign-level data (settings, membership, library, adventure log).
-- Surfaces a **History tab** on the character sheet (one-line summaries; foldable detail for batched changes) and a **History view** on the campaign page (campaign-level changes only).
+- Surfaces a **History tab** on the character sheet. Its default Change history
+  sub-tab shows one-line audit summaries and foldable detail for batched changes;
+  a sibling Roll history sub-tab browses device-only rolls without adding them to
+  the server audit log. The campaign page retains its campaign-level History view.
 - Provides **local filtering & search** over loaded history.
 
 - Becomes a **required baseline**: every new syncable table must participate in history capture, enforced by an automated test.
@@ -154,18 +157,29 @@ Diff helpers live alongside (`diffRows(old, new, ignoreKeys)` ignoring `revision
 ## UI
 
 ### Character History tab
-- Add `'History'` to `SHEET_TABS` in `src/client/features/characters/CharacterSheetPage.tsx` and render a new `sections/HistoryPanel.tsx`.
-- `HistoryPanel` (props `{ characterId, canRead }`):
+- `'History'` in `SHEET_TABS` renders `sections/HistoryPanel.tsx`, which contains
+  two sub-tabs. **Change history is the default** and preserves the existing
+  server-backed audit view. **Roll history** mounts `RollHistoryPanel` and reads
+  only the selected character's browser-local roll log.
+- The Change history view:
   - `useInfiniteQuery` → `GET /characters/:id/history`; runs `groupIntoBatches(summarizeEvent(...))`.
   - Renders a vertical list reusing the row styling from `sections/SkillsPanel.tsx` (grid rows, border-b). Each group is **one line**: timestamp (relative), summary, actor name. The timestamp carries a `title` tooltip with the full localized date/time down to the second (`HistoryGroupRow.tsx`'s `formatAbsolute`), for when the relative label ("3h ago") isn't precise enough.
   - **Foldable batches:** groups with >1 child render a disclosure arrow, reusing existing expand patterns already in this file — the `▸`/`▾` toggle in PointsPanel (CharacterSheetPage.tsx:1062) and the `<details>` pattern in WarningsPanel (~:1303); expanding fetches `?detail=1` for that `batchId` and shows each child's `old → new` per field.
   - **Local filter & search:** a search box + filter chips (by entity type: Attributes/Skills/Spells/Inventory/Combat; by op: added/changed/removed; optional date range) that filter the already-loaded list **in memory** (no server round-trip), matching against the summary line and field names. "Load older" button triggers the next page.
+- `RollHistoryPanel` renders check and damage rolls newest first, including their
+  local timestamps. `rollHistory.ts` persists them per character in `localStorage`
+  and prunes the oldest entries whenever a new roll would exceed 250. It never
+  uses TanStack Query, the outbox, a sync entity, an API route, or MCP. Logout
+  clears every roll-history key to prevent cross-account leakage on a shared device.
 
 ### Campaign History view
 - Add a `History` section/tab to `src/client/features/campaigns/CampaignDetailPage.tsx` rendering a new `CampaignHistoryPanel.tsx`.
 - Same component shell as `HistoryPanel`, but hits `GET /campaigns/:id/history` (scope `campaign` only — **no character changes**). For the campaign **owner**, optionally include a sub-toggle "Character changes" that switches to `?scope=character` (the GM roll-up). Reuses the same `summarizeEvent`/`groupIntoBatches`/filter/search code.
 
-Both panels are read-only and share a `useHistoryQuery` hook + a `HistoryList`/`HistoryGroupRow` presentational component in `src/client/features/history/` to avoid duplication.
+The server-backed Change history and Campaign panels are read-only and share a
+`useHistoryQuery` hook plus `HistoryList`/`HistoryGroupRow` presentation in
+`src/client/features/history/`; the local Roll history panel deliberately does not
+use that data path.
 
 ---
 
@@ -201,6 +215,10 @@ Modify:
 - `src/server/services/syncDispatch.ts` — wrap dispatchers in `withAudit` and thread the `tx` into `patchEntity`/each `dispatch*` (replacing bare `getDb()` writes); carry `batchId` in the dispatch context. `src/server/routes/sync.ts` — read `op.batchId` into the context.
 - `src/server/routes/{campaigns,invitations,campaignLibrary,adventureLog}.ts` — set `app.actor_id` on mutating handlers.
 - `src/client/features/characters/CharacterSheetPage.tsx` — add `History` tab.
+- `src/client/features/characters/sections/HistoryPanel.tsx` — host the default
+  Change history and device-only Roll history sub-tabs.
+- `src/client/features/characters/sections/RollHistoryPanel.tsx` and
+  `rollHistory.ts` — browse and retain at most 250 per-character local rolls.
 - `src/client/features/characters/sections/InventoryPanel.tsx` — wrap bulk moves in `runBatch`.
 - `src/client/features/campaigns/CampaignDetailPage.tsx` — add History view.
 - `AGENTS.md` / `README` — baseline convention.
@@ -222,7 +240,11 @@ Modify:
 1. **Migration:** `npm run db:migrate` on a fresh DB; confirm `entity_history` + triggers exist (`\d entity_history`, `pg_trigger`).
 2. **Unit:** `bun test src/shared/history` (summarizer over crafted old/new rows incl. temp-boost, add/remove/move, campaign settings, membership). `bun test src/server` for endpoint authz (extend `sync.test.ts` style) and the enforcement guards.
 3. **Server integration:** with `app.actor_id` set, run a character field patch + a 3-item inventory batch through `dispatchOperation`; assert 1 + 3 `entity_history` rows, correct `actor_user_id`, shared `batch_id` for the three, correct `scope`/`character_id`/`campaign_id`. Run a campaign settings PATCH → one `scope='campaign'` row.
-4. **Client:** Vitest for `HistoryPanel` (mock the query): renders one-liners, folds a batch, local search/filter narrows the list without refetch. `runBatch` tags ops with one id.
+4. **Client:** Vitest for `HistoryPanel` (mock the query): Change history is the
+   default, the Roll history sub-tab browses device-only entries, one-liners and
+   batches still render, and local search/filter narrows the audit list without
+   refetch. `rollHistory` drops the oldest entry on writes beyond 250; `runBatch`
+   tags sync ops with one id.
 5. **Access:** assert `GET /characters/:id/history` 403s for a minimal-view member and 200s for owner + GM; `GET /campaigns/:id/history` returns only `scope='campaign'` rows.
 6. **E2E (Playwright):** GM opens campaign → History shows campaign changes but no character edits; GM opens a member character → History tab shows that character's edits; a multi-item inventory move appears as one foldable entry.
 7. **Lint/types:** `npm run lint && npm run typecheck`.

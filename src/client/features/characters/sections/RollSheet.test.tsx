@@ -6,7 +6,7 @@
 
 import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RollHistoryStrip } from './RollHistoryStrip.tsx';
+import { RollHistoryPanel } from './RollHistoryPanel.tsx';
 import { RollSheet } from './RollSheet.tsx';
 import { __resetRollHistoryForTests, useRollHistory } from './rollHistory.ts';
 import type { RollRequest } from './rollTypes.ts';
@@ -45,7 +45,7 @@ describe('RollSheet', () => {
       history.unmount();
       __resetRollHistoryForTests();
       localStorage.setItem('gurps:rollHistory:mage', stored);
-      render(<RollHistoryStrip characterId="mage" />);
+      render(<RollHistoryPanel characterId="mage" />);
       expect(Boolean(screen.queryByText('disaster'))).toBe(notice === 'spectacular disaster');
       if (notice === 'spectacular disaster')
         expect(screen.getByText('disaster')).toHaveAttribute(

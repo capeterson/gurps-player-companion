@@ -1,7 +1,7 @@
 /**
  * CombatTab — the live-gameplay surface, rendered as the first tab on
- * the character sheet. Pools, DR summary, maneuver, defenses, attacks,
- * and a roll log, all inline on `/characters/:id` so the player taps
+ * the character sheet. Pools, DR summary, maneuver, defenses, and attacks
+ * stay inline on `/characters/:id` so the player taps
  * between live combat and the editable sheet without a route hop.
  *
  * Full-width status, attacks, armor and tracker sections avoid independent
@@ -16,7 +16,6 @@ import { useState } from 'react';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
-import { RollHistoryStrip } from '../RollHistoryStrip.tsx';
 import { RollSheet } from '../RollSheet.tsx';
 import { hpVarFor } from '../hpColor.ts';
 import type { RollRequest } from '../rollTypes.ts';
@@ -70,8 +69,6 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
         bumpHp={bumpers.bumpHp}
       />
       <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
-
-      <RollHistoryStrip characterId={character.id} />
 
       {/* Sticky bottom bar, mobile only. Shares the SAME usePoolBumpers
           instance as PoolsCard (lifted above) — a second instance here
