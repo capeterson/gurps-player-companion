@@ -80,9 +80,6 @@ export function GmCampaignDashboardPage() {
             <Link to={`/campaigns/${id}/library`} className="btn btn-ghost btn-sm">
               Library
             </Link>
-            <Link to={`/campaigns/${id}`} className="btn btn-ghost btn-sm">
-              Adventure log
-            </Link>
             <button
               type="button"
               className="btn btn-ghost btn-sm"

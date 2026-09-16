@@ -4,7 +4,9 @@ import { characterCanCast, hasMagery } from '../../../../shared/domain/spellCalc
 import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
+import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
+import { FoldSection } from '../../../components/ui/FoldSection.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
@@ -448,6 +450,16 @@ function SpellRow({
         }}
         onCancel={() => setConfirmDelete(false)}
       />
+      {spell.notes && (
+        <FoldSection
+          preferenceKey={`${spell.id}:description`}
+          title="Description"
+          defaultOpen={false}
+          className="col-span-full mt-2 text-xs"
+        >
+          <Markdown source={spell.notes} className="mt-2" />
+        </FoldSection>
+      )}
     </li>
   );
 }

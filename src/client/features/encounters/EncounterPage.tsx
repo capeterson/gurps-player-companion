@@ -136,6 +136,19 @@ export function EncounterPage() {
   if (!id || !encounterId) return <p className="alert alert-error">Missing encounter.</p>;
   if (encounter.isLoading || campaign.isLoading)
     return <p className="text-sm text-base-content/60">Loading encounter...</p>;
+  if (!campaign.data?.experimentalTurnTracker)
+    return (
+      <section className="card p-5 space-y-3">
+        <h1 className="font-display text-xl">Turn tracker is disabled</h1>
+        <p className="text-sm">
+          The campaign owner can enable this experimental feature in campaign settings. Saved
+          encounters are kept.
+        </p>
+        <Link className="btn btn-sm" to={`/campaigns/${id}`}>
+          Back to campaign
+        </Link>
+      </section>
+    );
   if (!encounter.data)
     return (
       <p className="alert alert-error">{problem(encounter.error) || 'Encounter not found.'}</p>

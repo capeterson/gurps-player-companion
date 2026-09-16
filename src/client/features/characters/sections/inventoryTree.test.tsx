@@ -4,6 +4,7 @@ import {
   buildTree,
   descendantsOf,
   eligibleContainers,
+  filterInventoryTree,
   flattenDFS,
   validateReparent,
 } from './inventoryTree.ts';
@@ -96,6 +97,56 @@ describe('flattenDFS', () => {
     const { byParent } = buildTree(items);
     const roots = byParent.get(null) ?? [];
     expect(flattenDFS(roots, byParent).map((i) => i.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+});
+
+describe('filterInventoryTree', () => {
+  it('keeps matching nested items and only the containers needed to reach them', () => {
+    const items = [
+      item('pack', null, 'Backpack', true),
+      item('apple', 'pack', 'Apple'),
+      item('pouch', 'pack', 'Small pouch', true),
+      item('gem', 'pouch', 'Moon Gem'),
+      item('sword', 'pack', 'Broadsword'),
+      item('tent', null, 'Tent'),
+    ];
+
+    const filtered = filterInventoryTree(items, 'GEM', 'all');
+
+    expect([...filtered.matchedIds]).toEqual(['gem']);
+    expect(filtered.byParent.get(null)?.map((entry) => entry.id)).toEqual(['pack']);
+    expect(filtered.byParent.get('pack')?.map((entry) => entry.id)).toEqual(['pouch']);
+    expect(filtered.byParent.get('pouch')?.map((entry) => entry.id)).toEqual(['gem']);
+    expect(filtered.byId.has('apple')).toBe(false);
+    expect(filtered.byId.has('sword')).toBe(false);
+    expect(filtered.byId.has('tent')).toBe(false);
+  });
+
+  it('combines name and tag filters without revealing a matching container contents', () => {
+    const pack = item('pack', null, 'Weapon pack', true);
+    const sword = item('sword', 'pack', 'Broadsword');
+    sword.weaponData = {
+      damage: 'sw+1 cut',
+      reach: '1',
+      parry: '0',
+      stRequired: 10,
+      skill: 'Broadsword',
+      db: null,
+      ranged: null,
+      notes: null,
+      alternateModes: [],
+    };
+    const armor = item('armor', 'pack', 'Weapon harness');
+    armor.isArmor = true;
+
+    const weapons = filterInventoryTree([pack, sword, armor], 'sword', 'weapon');
+    expect([...weapons.matchedIds]).toEqual(['sword']);
+    expect(weapons.byParent.get(null)?.map((entry) => entry.id)).toEqual(['pack']);
+    expect(weapons.byParent.get('pack')?.map((entry) => entry.id)).toEqual(['sword']);
+
+    const matchingContainer = filterInventoryTree([pack, sword, armor], 'pack', 'container');
+    expect([...matchingContainer.matchedIds]).toEqual(['pack']);
+    expect(matchingContainer.byParent.get('pack')).toBeUndefined();
   });
 });
 

@@ -31,6 +31,7 @@ describe('useMirrorCampaigns', () => {
       enforceAttributeCaps: true,
       shareCharacterSheets: true,
       allowGmCharacterEditing: false,
+      experimentalTurnTracker: true,
       members: [],
       createdAt: '2026-09-13T01:43:28.831Z',
       updatedAt: '2026-09-13T01:43:28.831Z',
@@ -40,12 +41,14 @@ describe('useMirrorCampaigns', () => {
     await getLocalDb().campaigns.put({
       ...campaign,
       houseRules: campaignHouseRules.parse({}),
+      experimentalTurnTracker: false,
     });
 
     renderHook(() => useMirrorCampaigns([campaign]));
 
     await waitFor(async () => {
       expect((await getLocalDb().campaigns.get(CAMPAIGN_ID))?.houseRules).toEqual(houseRules);
+      expect((await getLocalDb().campaigns.get(CAMPAIGN_ID))?.experimentalTurnTracker).toBe(true);
     });
   });
 });

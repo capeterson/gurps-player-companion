@@ -30,6 +30,7 @@ describe('ManeuverCard', () => {
       </Wrap>,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
     fireEvent.click(screen.getByRole('button', { name: 'Attack' }));
     expect(patchCombat).toHaveBeenCalledWith('maneuver', 'Attack');
   });
@@ -46,6 +47,7 @@ describe('ManeuverCard', () => {
       </Wrap>,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Change' }));
     fireEvent.click(screen.getByRole('button', { name: 'Attack' }));
     expect(patchCombat).toHaveBeenCalledWith('maneuver', null);
   });

@@ -16,6 +16,8 @@ export interface InventoryRowProps {
   canEdit: boolean;
   skillNames?: readonly string[];
   fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
+  /** Filtering forces matching descendants open inside their ancestor containers. */
+  expandContainers?: boolean;
   drag?: InventoryDragApi;
   // Stashed items don't count against encumbrance, so the row renders the
   // raw weight directly instead of the encumbrance-effective number plus a
@@ -59,6 +61,7 @@ export function InventoryRow(props: InventoryRowProps) {
     canEdit,
     skillNames = [],
     fetchEnchantmentOptions,
+    expandContainers = false,
     drag,
     inStashed,
   } = props;
@@ -66,6 +69,7 @@ export function InventoryRow(props: InventoryRowProps) {
   const isRoot = item.parentId === null;
   const hasChildren = item.isContainer && children.length > 0;
   const [open, setOpen] = useState(true);
+  const contentsOpen = expandContainers || open;
   const sel = isSelected(item.id);
   const [section, setSection] = useState<ItemSection | null>(null);
   const [visited, setVisited] = useState<ItemSection[]>([]);
@@ -202,18 +206,24 @@ export function InventoryRow(props: InventoryRowProps) {
           >
             <span className="flex items-center gap-2">
               {hasChildren ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    stop(e);
-                    setOpen((o) => !o);
-                  }}
-                  className="btn btn-ghost btn-xs px-1 text-base-content/50"
-                  aria-expanded={open}
-                  aria-label={open ? 'Collapse contents' : 'Expand contents'}
-                >
-                  {open ? '▾' : '▸'}
-                </button>
+                expandContainers ? (
+                  <span className="inline-block w-5 text-center text-base-content/50" aria-hidden>
+                    ▾
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      stop(e);
+                      setOpen((o) => !o);
+                    }}
+                    className="btn btn-ghost btn-xs px-1 text-base-content/50"
+                    aria-expanded={contentsOpen}
+                    aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
+                  >
+                    {contentsOpen ? '▾' : '▸'}
+                  </button>
+                )
               ) : (
                 <span className="inline-block w-5" aria-hidden />
               )}
@@ -435,7 +445,7 @@ export function InventoryRow(props: InventoryRowProps) {
         </tr>
       )}
       {hasChildren &&
-        open &&
+        contentsOpen &&
         children.map((child) => (
           <InventoryRow key={child.id} {...props} item={child} depth={depth + 1} />
         ))}

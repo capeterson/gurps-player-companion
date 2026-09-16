@@ -458,6 +458,7 @@ export const campaigns = pgTable('campaigns', {
   })
     .notNull()
     .default('block'),
+  experimentalTurnTracker: boolean('experimental_turn_tracker').notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   revision: revision(),

@@ -8,6 +8,7 @@ import {
 } from '../../../../../shared/domain/encounterEffects.ts';
 import { advanceTurn, previousTurn } from '../../../../../shared/domain/encounterTurns.ts';
 import type { EffectDuration } from '../../../../../shared/schemas/encounter.ts';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { type LocalSoloEncounter, getLocalDb } from '../../../../db/dexie.ts';
 
 export function SoloTrackerCard({
@@ -112,7 +113,7 @@ export function SoloTrackerCard({
   }
 
   return (
-    <section className="card space-y-3 p-5">
+    <FoldSection preferenceKey={`${characterId}:SoloTrackerCard`} title="Turn tracker">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="label-eyebrow">Solo tracker</p>
@@ -354,6 +355,6 @@ export function SoloTrackerCard({
           </section>
         </>
       )}
-    </section>
+    </FoldSection>
   );
 }

@@ -127,3 +127,29 @@ it('preserves the J Talisar bundle when moving from the named set to Custom', as
     ),
   );
 });
+
+it('requires owner opt-in for experimental tracking and keeps the choice after a failed save', async () => {
+  vi.mocked(api).mockRejectedValueOnce(new Error('Offline')).mockResolvedValue(campaign);
+  const view = setup();
+  const tracker = screen.getByRole('checkbox', { name: /Enable turn tracker/ });
+  expect(tracker).not.toBeChecked();
+  fireEvent.click(tracker);
+  view.rerender(view.component({ ...campaign, experimentalTurnTracker: false }));
+  expect(tracker).toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  await screen.findByText('Save failed');
+  expect(tracker).toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  await waitFor(() => expect(view.onClose).toHaveBeenCalled());
+  expect(api).toHaveBeenLastCalledWith(
+    '/campaigns/campaign',
+    expect.objectContaining({
+      body: expect.objectContaining({ experimentalTurnTracker: true }),
+    }),
+  );
+});
+
+it('does not let managers enable experimental tracking', () => {
+  setup('manager');
+  expect(screen.getByRole('checkbox', { name: /Enable turn tracker/ })).toBeDisabled();
+});

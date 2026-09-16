@@ -14,6 +14,7 @@ import {
   effectiveDrAgainstAttack,
   woundingMultiplier,
 } from '../../../../../shared/domain/injuryCalc.ts';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
 import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
@@ -90,9 +91,9 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
     : 0;
 
   return (
-    <section className="card p-4 sm:p-5 space-y-4" aria-label="Armor coverage">
+    <FoldSection preferenceKey={`${character.id}:DrSummaryCard`} title="Armor & incoming damage">
       <div>
-        <h2 className="label-eyebrow">Effective DR</h2>
+        <p className="text-sm font-medium">Effective DR</p>
         <p className="text-xs text-muted mt-1">
           Select a location to inspect armor, innate protection, and incoming damage.
         </p>
@@ -252,9 +253,6 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
                                 >
                                   {entry.sourceName}
                                 </span>
-                                {entry.status === 'winning' && (
-                                  <span className="badge badge-success badge-xs ml-2">winning</span>
-                                )}
                                 {entry.status === 'suppressed' && (
                                   <small className="ml-2">
                                     suppressed
@@ -322,8 +320,11 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
           )}
         </div>
       </div>
-      <details className="border-t border-base-300 pt-3">
-        <summary className="cursor-pointer text-sm text-muted">All locations and DR types</summary>
+      <FoldSection
+        preferenceKey={`${character.id}:all-location-dr`}
+        title="All locations and DR types"
+        defaultOpen={false}
+      >
         <ul
           className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-sm"
           aria-label="All location DR"
@@ -347,7 +348,7 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
               );
             })}
         </ul>
-      </details>
+      </FoldSection>
       {damageOpen && bumpHp && hpMax != null && (
         <IncomingDamageDialog
           open
@@ -361,6 +362,6 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
           initialDivisor={divisor}
         />
       )}
-    </section>
+    </FoldSection>
   );
 }

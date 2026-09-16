@@ -17,6 +17,7 @@ import {
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
@@ -147,18 +148,16 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
 
   if (weapons.length === 0) {
     return (
-      <section className="card space-y-2 p-5">
-        <p className="label-eyebrow">Attacks</p>
+      <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks">
         <p className="text-sm text-base-content/60">
           No equipped weapons — equip items in the Inventory tab.
         </p>
-      </section>
+      </FoldSection>
     );
   }
 
   return (
-    <section className="card space-y-3 p-5">
-      <p className="label-eyebrow">Attacks</p>
+    <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks">
       {!effectsKnown && (
         <p className="text-xs text-warning">
           ST-based damage is unavailable until linked library effects load.
@@ -411,6 +410,6 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
           );
         })}
       </div>
-    </section>
+    </FoldSection>
   );
 }

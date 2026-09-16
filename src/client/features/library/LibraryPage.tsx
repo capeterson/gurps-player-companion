@@ -1,3 +1,7 @@
+import { Markdown } from '../../components/markdown/Markdown.tsx';
+import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
+import { FoldSection } from '../../components/ui/FoldSection.tsx';
+import { matchesLibrarySearch } from './librarySearch.ts';
 /**
  * Campaign library viewer + YAML import/export.  GMs (campaign owners)
  * can add/edit/delete individual entries and replace or merge a library
@@ -97,6 +101,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   }, [campaignId, campaigns.data, me.data]);
 
   const [section, setSection] = useState<SectionKey>('traits');
+  const [search, setSearch] = useState('');
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const [applyCampaignSettings, setApplyCampaignSettings] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -118,16 +123,6 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   const [enchantmentsAddOpen, setEnchantmentsAddOpen] = useState(false);
   const [enchantmentsEditId, setEnchantmentsEditId] = useState<string | null>(null);
   const [enchantmentsDeleteId, setEnchantmentsDeleteId] = useState<string | null>(null);
-  const [enchantmentSearch, setEnchantmentSearch] = useState('');
-  const filteredEnchantments = useMemo(() => {
-    const needle = enchantmentSearch.trim().toLowerCase();
-    if (!needle) return library.data?.enchantments ?? [];
-    return (library.data?.enchantments ?? []).filter((entry) =>
-      [entry.name, entry.description ?? '', entry.source ?? '', ...entry.tags].some((value) =>
-        value.toLowerCase().includes(needle),
-      ),
-    );
-  }, [enchantmentSearch, library.data?.enchantments]);
 
   // Trait mutations
   const createTrait = useMutation({
@@ -412,57 +407,62 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       )}
 
       {campaignId && isOwner && (
-        <section className="card grid gap-3 p-card">
-          <h2 className="font-display text-xl font-semibold">Import YAML</h2>
-          <p className="text-sm text-muted">
-            Upload a campaign-library YAML document. <strong>Merge</strong> upserts entries by
-            natural key (kind+name for traits, name for skills/items) and never deletes;{' '}
-            <strong>Replace</strong> performs the same upserts and then deletes any existing entry
-            not present in the uploaded file.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="form-control">
-              <span className="label-text">Mode</span>
-              <select
-                className="select select-bordered select-sm"
-                value={importMode}
-                onChange={(e) => setImportMode(e.target.value as 'merge' | 'replace')}
-              >
-                <option value="merge">Merge (additive)</option>
-                <option value="replace">Replace (sync exact)</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 self-end pb-1.5">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm"
-                checked={applyCampaignSettings}
-                onChange={(e) => setApplyCampaignSettings(e.target.checked)}
-              />
-              <span className="label-text">
-                Apply campaign settings from the file (description, point target, caps, mana level —
-                never the name)
-              </span>
-            </label>
-            <label className="form-control">
-              <span className="label-text">YAML file</span>
-              <input
-                type="file"
-                className="file-input file-input-bordered file-input-sm"
-                accept=".yaml,.yml,text/yaml,application/yaml,text/plain"
-                disabled={importMutation.isPending}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void onFileSelected(file);
-                  e.target.value = '';
-                }}
-              />
-            </label>
-            {importMutation.isPending && <span className="text-sm text-muted">Importing…</span>}
+        <FoldSection
+          preferenceKey={`${campaignId}:library-import`}
+          title="Import YAML"
+          defaultOpen={false}
+        >
+          <div className="space-y-3">
+            <p className="text-sm text-muted">
+              Upload a campaign-library YAML document. <strong>Merge</strong> upserts entries by
+              natural key (kind+name for traits, name for skills/items) and never deletes;{' '}
+              <strong>Replace</strong> performs the same upserts and then deletes any existing entry
+              not present in the uploaded file.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="form-control">
+                <span className="label-text">Mode</span>
+                <select
+                  className="select select-bordered select-sm"
+                  value={importMode}
+                  onChange={(e) => setImportMode(e.target.value as 'merge' | 'replace')}
+                >
+                  <option value="merge">Merge (additive)</option>
+                  <option value="replace">Replace (sync exact)</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2 self-end pb-1.5">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={applyCampaignSettings}
+                  onChange={(e) => setApplyCampaignSettings(e.target.checked)}
+                />
+                <span className="label-text">
+                  Apply campaign settings from the file (description, point target, caps, mana level
+                  — never the name)
+                </span>
+              </label>
+              <label className="form-control">
+                <span className="label-text">YAML file</span>
+                <input
+                  type="file"
+                  className="file-input file-input-bordered file-input-sm"
+                  accept=".yaml,.yml,text/yaml,application/yaml,text/plain"
+                  disabled={importMutation.isPending}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void onFileSelected(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {importMutation.isPending && <span className="text-sm text-muted">Importing…</span>}
+            </div>
+            {importError && <p className="alert alert-error text-sm">{importError}</p>}
+            {importMessage && <p className="alert alert-success text-sm">{importMessage}</p>}
           </div>
-          {importError && <p className="alert alert-error text-sm">{importError}</p>}
-          {importMessage && <p className="alert alert-success text-sm">{importMessage}</p>}
-        </section>
+        </FoldSection>
       )}
 
       <div className="flex flex-wrap gap-2">
@@ -503,14 +503,52 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         </button>
       </div>
 
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex-1 min-w-0">
+          <span className="label-eyebrow block mb-1">Search library</span>
+          <input
+            type="search"
+            className="input input-bordered input-sm w-full"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Name, description, source, college…"
+          />
+        </label>
+        {search && (
+          <button type="button" className="btn btn-sm" onClick={() => setSearch('')}>
+            Clear search
+          </button>
+        )}
+      </div>
+      {library.data && (
+        <output className="text-xs text-muted">
+          {
+            (library.data[section] ?? []).filter((entry) => matchesLibrarySearch(entry, search))
+              .length
+          }{' '}
+          of {counts[section]} {section}
+          {search.trim() ? ' match' : ''}. {search.trim() && 'Entries being edited stay visible.'}
+        </output>
+      )}
+      {library.data &&
+        counts[section] > 0 &&
+        !(library.data[section] ?? []).some((entry) => matchesLibrarySearch(entry, search)) && (
+          <p className="text-sm text-muted">No matches. Try another search or category.</p>
+        )}
+
       {library.isLoading && campaignId && <p className="text-muted">Loading library…</p>}
 
       {library.data && (
         <div className="flex flex-col gap-3">
           {/* ── Traits ── */}
-          {section === 'traits' && (
-            <>
-              {library.data.traits.map((t) =>
+          <div hidden={section !== 'traits'} className="space-y-3">
+            {(library.data.traits ?? [])
+              .filter(
+                (entry) =>
+                  entry.id === traitsEditId ||
+                  (section === 'traits' && matchesLibrarySearch(entry, search)),
+              )
+              .map((t) =>
                 traitsEditId === t.id ? (
                   <TraitForm
                     key={t.id}
@@ -529,11 +567,11 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   />
                 ) : (
                   <article key={t.id} className="card p-card">
-                    <div className="mb-1 flex items-start justify-between gap-2">
+                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <span className="min-w-0 break-words font-display text-lg font-semibold">
                         {t.name}
                       </span>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                         <span className="num text-xs uppercase tracking-widest text-dim">
                           {t.kind} · {t.basePoints} pt
                         </span>
@@ -560,7 +598,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                         )}
                       </div>
                     </div>
-                    {t.description && <p className="text-sm text-muted">{t.description}</p>}
+                    {t.description && (
+                      <Markdown source={t.description} className="text-sm text-muted" />
+                    )}
                     {t.source && <p className="text-xs text-dim">Source · {t.source}</p>}
                     {t.availableModifiers.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
@@ -584,43 +624,47 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   </article>
                 ),
               )}
-              {isOwner && traitsAddOpen && (
-                <TraitForm
-                  isPending={createTrait.isPending}
-                  error={
-                    createTrait.error instanceof ApiError
-                      ? createTrait.error.message
-                      : createTrait.error
-                        ? 'Save failed'
-                        : null
-                  }
-                  onSubmit={(body) => createTrait.mutate(body)}
-                  onCancel={() => setTraitsAddOpen(false)}
-                  libraryItems={library.data.items}
-                />
-              )}
-              {counts.traits === 0 && !traitsAddOpen && (
-                <p className="text-center text-muted">No traits in the library yet.</p>
-              )}
-              {isOwner && !traitsAddOpen && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm self-start"
-                  onClick={() => {
-                    setTraitsAddOpen(true);
-                    setTraitsEditId(null);
-                  }}
-                >
-                  + Add trait
-                </button>
-              )}
-            </>
-          )}
+            {isOwner && traitsAddOpen && (
+              <TraitForm
+                isPending={createTrait.isPending}
+                error={
+                  createTrait.error instanceof ApiError
+                    ? createTrait.error.message
+                    : createTrait.error
+                      ? 'Save failed'
+                      : null
+                }
+                onSubmit={(body) => createTrait.mutate(body)}
+                onCancel={() => setTraitsAddOpen(false)}
+                libraryItems={library.data.items}
+              />
+            )}
+            {counts.traits === 0 && !traitsAddOpen && (
+              <p className="text-center text-muted">No traits in the library yet.</p>
+            )}
+            {isOwner && !traitsAddOpen && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                onClick={() => {
+                  setTraitsAddOpen(true);
+                  setTraitsEditId(null);
+                }}
+              >
+                + Add trait
+              </button>
+            )}
+          </div>
 
           {/* ── Skills ── */}
-          {section === 'skills' && (
-            <>
-              {library.data.skills.map((s) =>
+          <div hidden={section !== 'skills'} className="space-y-3">
+            {(library.data.skills ?? [])
+              .filter(
+                (entry) =>
+                  entry.id === skillsEditId ||
+                  (section === 'skills' && matchesLibrarySearch(entry, search)),
+              )
+              .map((s) =>
                 skillsEditId === s.id ? (
                   <SkillForm
                     key={s.id}
@@ -639,9 +683,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   />
                 ) : (
                   <article key={s.id} className="card p-card">
-                    <div className="mb-1 flex items-start justify-between gap-2">
+                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <span className="font-display text-lg font-semibold">{s.name}</span>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                         <span className="num text-xs uppercase tracking-widest text-dim">
                           {s.attribute}/{s.difficulty}
                           {s.techLevelPolicy?.kind === 'required'
@@ -673,7 +717,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                         )}
                       </div>
                     </div>
-                    {s.description && <p className="text-sm text-muted">{s.description}</p>}
+                    {s.description && (
+                      <Markdown source={s.description} className="text-sm text-muted" />
+                    )}
                     {s.specializationPolicy.kind !== 'none' && (
                       <p className="text-xs text-dim">
                         Specialization ·{' '}
@@ -705,43 +751,47 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   </article>
                 ),
               )}
-              {isOwner && skillsAddOpen && (
-                <SkillForm
-                  isPending={createSkill.isPending}
-                  error={
-                    createSkill.error instanceof ApiError
-                      ? createSkill.error.message
-                      : createSkill.error
-                        ? 'Save failed'
-                        : null
-                  }
-                  onSubmit={(body) => createSkill.mutate(body)}
-                  onCancel={() => setSkillsAddOpen(false)}
-                  libraryItems={library.data.items}
-                />
-              )}
-              {counts.skills === 0 && !skillsAddOpen && (
-                <p className="text-center text-muted">No skills in the library yet.</p>
-              )}
-              {isOwner && !skillsAddOpen && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm self-start"
-                  onClick={() => {
-                    setSkillsAddOpen(true);
-                    setSkillsEditId(null);
-                  }}
-                >
-                  + Add skill
-                </button>
-              )}
-            </>
-          )}
+            {isOwner && skillsAddOpen && (
+              <SkillForm
+                isPending={createSkill.isPending}
+                error={
+                  createSkill.error instanceof ApiError
+                    ? createSkill.error.message
+                    : createSkill.error
+                      ? 'Save failed'
+                      : null
+                }
+                onSubmit={(body) => createSkill.mutate(body)}
+                onCancel={() => setSkillsAddOpen(false)}
+                libraryItems={library.data.items}
+              />
+            )}
+            {counts.skills === 0 && !skillsAddOpen && (
+              <p className="text-center text-muted">No skills in the library yet.</p>
+            )}
+            {isOwner && !skillsAddOpen && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                onClick={() => {
+                  setSkillsAddOpen(true);
+                  setSkillsEditId(null);
+                }}
+              >
+                + Add skill
+              </button>
+            )}
+          </div>
 
           {/* ── Spells ── */}
-          {section === 'spells' && (
-            <>
-              {(library.data.spells ?? []).map((s) =>
+          <div hidden={section !== 'spells'} className="space-y-3">
+            {(library.data.spells ?? [])
+              .filter(
+                (entry) =>
+                  entry.id === spellsEditId ||
+                  (section === 'spells' && matchesLibrarySearch(entry, search)),
+              )
+              .map((s) =>
                 spellsEditId === s.id ? (
                   <SpellForm
                     key={s.id}
@@ -759,9 +809,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   />
                 ) : (
                   <article key={s.id} className="card p-card">
-                    <div className="mb-1 flex items-start justify-between gap-2">
+                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <span className="font-display text-lg font-semibold">{s.name}</span>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                         <span className="num text-xs uppercase tracking-widest text-dim">
                           {s.college ? `${s.college} · ` : ''}IQ/{s.difficulty} · {s.baseEnergyCost}{' '}
                           FP
@@ -800,47 +850,53 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                     {s.prerequisites && (
                       <p className="text-xs text-dim">Prerequisites · {s.prerequisites}</p>
                     )}
-                    {s.description && <p className="text-sm text-muted">{s.description}</p>}
+                    {s.description && (
+                      <Markdown source={s.description} className="text-sm text-muted" />
+                    )}
                     {s.source && <p className="text-xs text-dim">Source · {s.source}</p>}
                   </article>
                 ),
               )}
-              {isOwner && spellsAddOpen && (
-                <SpellForm
-                  isPending={createSpell.isPending}
-                  error={
-                    createSpell.error instanceof ApiError
-                      ? createSpell.error.message
-                      : createSpell.error
-                        ? 'Save failed'
-                        : null
-                  }
-                  onSubmit={(body) => createSpell.mutate(body)}
-                  onCancel={() => setSpellsAddOpen(false)}
-                />
-              )}
-              {counts.spells === 0 && !spellsAddOpen && (
-                <p className="text-center text-muted">No spells in the library yet.</p>
-              )}
-              {isOwner && !spellsAddOpen && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm self-start"
-                  onClick={() => {
-                    setSpellsAddOpen(true);
-                    setSpellsEditId(null);
-                  }}
-                >
-                  + Add spell
-                </button>
-              )}
-            </>
-          )}
+            {isOwner && spellsAddOpen && (
+              <SpellForm
+                isPending={createSpell.isPending}
+                error={
+                  createSpell.error instanceof ApiError
+                    ? createSpell.error.message
+                    : createSpell.error
+                      ? 'Save failed'
+                      : null
+                }
+                onSubmit={(body) => createSpell.mutate(body)}
+                onCancel={() => setSpellsAddOpen(false)}
+              />
+            )}
+            {counts.spells === 0 && !spellsAddOpen && (
+              <p className="text-center text-muted">No spells in the library yet.</p>
+            )}
+            {isOwner && !spellsAddOpen && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                onClick={() => {
+                  setSpellsAddOpen(true);
+                  setSpellsEditId(null);
+                }}
+              >
+                + Add spell
+              </button>
+            )}
+          </div>
 
           {/* ── Items ── */}
-          {section === 'items' && (
-            <>
-              {library.data.items.map((i) =>
+          <div hidden={section !== 'items'} className="space-y-3">
+            {(library.data.items ?? [])
+              .filter(
+                (entry) =>
+                  entry.id === itemsEditId ||
+                  (section === 'items' && matchesLibrarySearch(entry, search)),
+              )
+              .map((i) =>
                 itemsEditId === i.id ? (
                   <ItemForm
                     key={i.id}
@@ -859,9 +915,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   />
                 ) : (
                   <article key={i.id} className="card p-card">
-                    <div className="mb-1 flex items-start justify-between gap-2">
+                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <span className="font-display text-lg font-semibold">{i.name}</span>
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                         <span className="num text-xs uppercase tracking-widest text-dim">
                           {i.category} · {i.weightLbs} lb · ${i.cost}
                         </span>
@@ -893,50 +949,47 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   </article>
                 ),
               )}
-              {isOwner && itemsAddOpen && (
-                <ItemForm
-                  isPending={createItem.isPending}
-                  error={
-                    createItem.error instanceof ApiError
-                      ? createItem.error.message
-                      : createItem.error
-                        ? 'Save failed'
-                        : null
-                  }
-                  onSubmit={(body) => createItem.mutate(body)}
-                  onCancel={() => setItemsAddOpen(false)}
-                  definitions={library.data.enchantments}
-                />
-              )}
-              {counts.items === 0 && !itemsAddOpen && (
-                <p className="text-center text-muted">No items in the library yet.</p>
-              )}
-              {isOwner && !itemsAddOpen && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm self-start"
-                  onClick={() => {
-                    setItemsAddOpen(true);
-                    setItemsEditId(null);
-                  }}
-                >
-                  + Add item
-                </button>
-              )}
-            </>
-          )}
-
-          {section === 'enchantments' && (
-            <>
-              <input
-                type="search"
-                className="input input-bordered input-sm w-full"
-                aria-label="Search enchantments"
-                placeholder="Search name, source, description, or tags"
-                value={enchantmentSearch}
-                onChange={(event) => setEnchantmentSearch(event.target.value)}
+            {isOwner && itemsAddOpen && (
+              <ItemForm
+                isPending={createItem.isPending}
+                error={
+                  createItem.error instanceof ApiError
+                    ? createItem.error.message
+                    : createItem.error
+                      ? 'Save failed'
+                      : null
+                }
+                onSubmit={(body) => createItem.mutate(body)}
+                onCancel={() => setItemsAddOpen(false)}
+                definitions={library.data.enchantments}
               />
-              {filteredEnchantments.map((entry) =>
+            )}
+            {counts.items === 0 && !itemsAddOpen && (
+              <p className="text-center text-muted">No items in the library yet.</p>
+            )}
+            {isOwner && !itemsAddOpen && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                onClick={() => {
+                  setItemsAddOpen(true);
+                  setItemsEditId(null);
+                }}
+              >
+                + Add item
+              </button>
+            )}
+          </div>
+
+          {/* ── Enchantments ── */}
+          <div hidden={section !== 'enchantments'} className="space-y-3">
+            {(library.data.enchantments ?? [])
+              .filter(
+                (entry) =>
+                  entry.id === enchantmentsEditId ||
+                  (section === 'enchantments' && matchesLibrarySearch(entry, search)),
+              )
+              .map((entry) =>
                 enchantmentsEditId === entry.id ? (
                   <EnchantmentForm
                     key={entry.id}
@@ -1001,37 +1054,36 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   </article>
                 ),
               )}
-              {isOwner && enchantmentsAddOpen && (
-                <EnchantmentForm
-                  isPending={createEnchantment.isPending}
-                  error={
-                    createEnchantment.error instanceof ApiError
-                      ? createEnchantment.error.message
-                      : createEnchantment.error
-                        ? 'Save failed'
-                        : null
-                  }
-                  onSubmit={(body) => createEnchantment.mutate(body)}
-                  onCancel={() => setEnchantmentsAddOpen(false)}
-                />
-              )}
-              {counts.enchantments === 0 && !enchantmentsAddOpen && (
-                <p className="text-center text-muted">No enchantment definitions yet.</p>
-              )}
-              {isOwner && !enchantmentsAddOpen && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm self-start"
-                  onClick={() => {
-                    setEnchantmentsAddOpen(true);
-                    setEnchantmentsEditId(null);
-                  }}
-                >
-                  + Add enchantment
-                </button>
-              )}
-            </>
-          )}
+            {isOwner && enchantmentsAddOpen && (
+              <EnchantmentForm
+                isPending={createEnchantment.isPending}
+                error={
+                  createEnchantment.error instanceof ApiError
+                    ? createEnchantment.error.message
+                    : createEnchantment.error
+                      ? 'Save failed'
+                      : null
+                }
+                onSubmit={(body) => createEnchantment.mutate(body)}
+                onCancel={() => setEnchantmentsAddOpen(false)}
+              />
+            )}
+            {counts.enchantments === 0 && !enchantmentsAddOpen && (
+              <p className="text-center text-muted">No enchantment definitions yet.</p>
+            )}
+            {isOwner && !enchantmentsAddOpen && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm self-start"
+                onClick={() => {
+                  setEnchantmentsAddOpen(true);
+                  setEnchantmentsEditId(null);
+                }}
+              >
+                + Add enchantment
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -1159,7 +1211,7 @@ function TraitForm({
   return (
     <fieldset disabled={isPending} className="card p-card space-y-3 border border-primary/30">
       <div className="flex flex-wrap gap-3">
-        <label className="form-control min-w-[10rem] flex-1">
+        <label className="form-control w-full sm:min-w-[12rem] sm:flex-1">
           <span className="label-text">Name *</span>
           <input
             type="text"
@@ -1205,15 +1257,15 @@ function TraitForm({
           />
         </label>
       </div>
-      <label className="form-control">
+      <div className="form-control" inert={isPending}>
         <span className="label-text">Description</span>
-        <textarea
-          className="textarea textarea-bordered textarea-sm"
-          rows={2}
+        <RichTextEditor
+          aria-label="Description"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
+          placeholder="Description (Markdown supported)…"
         />
-      </label>
+      </div>
       <ModifierSubEditor modifiers={modifiers} onChange={setModifiers} />
       <EffectsEditor
         effects={effects}
@@ -1523,7 +1575,7 @@ function SkillForm({
   return (
     <fieldset disabled={isPending} className="card p-card space-y-3 border border-primary/30">
       <div className="flex flex-wrap gap-3">
-        <label className="form-control min-w-[10rem] flex-1">
+        <label className="form-control w-full sm:min-w-[12rem] sm:flex-1">
           <span className="label-text">Name *</span>
           <input
             type="text"
@@ -1695,21 +1747,20 @@ function SkillForm({
               >
                 Remove
               </button>
-              <textarea
-                aria-label={`Specialization ${index + 1} description`}
-                className="textarea textarea-bordered textarea-sm"
-                value={option.description ?? ''}
-                placeholder="Description override (optional)"
-                onChange={(event) =>
-                  setSpecializations((current) =>
-                    current.map((item, itemIndex) =>
-                      itemIndex === index
-                        ? { ...item, description: event.target.value || null }
-                        : item,
-                    ),
-                  )
-                }
-              />
+              <div inert={isPending}>
+                <RichTextEditor
+                  aria-label={`Specialization ${index + 1} description`}
+                  value={option.description ?? ''}
+                  placeholder="Description override (optional)"
+                  onChange={(markdown) =>
+                    setSpecializations((current) =>
+                      current.map((item, itemIndex) =>
+                        itemIndex === index ? { ...item, description: markdown || null } : item,
+                      ),
+                    )
+                  }
+                />
+              </div>
               <textarea
                 aria-label={`Specialization ${index + 1} prerequisites`}
                 className="textarea textarea-bordered textarea-sm"
@@ -1784,15 +1835,15 @@ function SkillForm({
           </label>
         </div>
       </div>
-      <label className="form-control">
+      <div className="form-control" inert={isPending}>
         <span className="label-text">Description</span>
-        <textarea
-          className="textarea textarea-bordered textarea-sm"
-          rows={2}
+        <RichTextEditor
+          aria-label="Description"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
+          placeholder="Description (Markdown supported)…"
         />
-      </label>
+      </div>
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -1871,7 +1922,7 @@ function SpellForm({ initial, isPending, error, onSubmit, onCancel }: SpellFormP
   return (
     <div className="card p-card space-y-3 border border-primary/30">
       <div className="flex flex-wrap gap-3">
-        <label className="form-control min-w-[10rem] flex-1">
+        <label className="form-control w-full sm:min-w-[12rem] sm:flex-1">
           <span className="label-text">Name *</span>
           <input
             type="text"
@@ -1975,15 +2026,15 @@ function SpellForm({ initial, isPending, error, onSubmit, onCancel }: SpellFormP
           />
         </label>
       </div>
-      <label className="form-control">
+      <div className="form-control" inert={isPending}>
         <span className="label-text">Description</span>
-        <textarea
-          className="textarea textarea-bordered textarea-sm"
-          rows={2}
+        <RichTextEditor
+          aria-label="Description"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={setDescription}
+          placeholder="Description (Markdown supported)…"
         />
-      </label>
+      </div>
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -2062,7 +2113,7 @@ function ItemForm({ initial, isPending, error, onSubmit, onCancel, definitions }
   return (
     <div className="card p-card space-y-3 border border-primary/30">
       <div className="flex flex-wrap gap-3">
-        <label className="form-control min-w-[10rem] flex-1">
+        <label className="form-control w-full sm:min-w-[12rem] sm:flex-1">
           <span className="label-text">Name *</span>
           <input
             type="text"

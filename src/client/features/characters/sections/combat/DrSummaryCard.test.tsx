@@ -267,9 +267,9 @@ describe('DrSummaryCard', () => {
     expect(within(breakdown).getByText('Fortify I').closest('li')).toHaveTextContent(
       /suppressed — Fortify III wins.*\+1 DR/,
     );
-    expect(within(breakdown).getByText('Fortify III').closest('li')).toHaveTextContent(
-      /winning.*\+3 DR/,
-    );
+    const applied = within(breakdown).getByText('Fortify III').closest('li');
+    expect(applied).toHaveTextContent(/\+3 DR/);
+    expect(applied).not.toHaveTextContent('winning');
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
   });
 
@@ -307,11 +307,11 @@ describe('DrSummaryCard', () => {
     render(<DrSummaryCard character={character} />);
 
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
-    expect(
-      within(screen.getByRole('list', { name: 'Armor 0 DR breakdown' }))
-        .getByText('Fortify')
-        .closest('li'),
-    ).toHaveTextContent(/winning.*\+3 DR/);
+    const applied = within(screen.getByRole('list', { name: 'Armor 0 DR breakdown' }))
+      .getByText('Fortify')
+      .closest('li');
+    expect(applied).toHaveTextContent(/\+3 DR/);
+    expect(applied).not.toHaveTextContent('winning');
     expect(
       within(screen.getByRole('list', { name: 'Armor 1 DR breakdown' }))
         .getByText('Fortify')

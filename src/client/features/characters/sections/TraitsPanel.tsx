@@ -5,7 +5,9 @@ import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { type TraitEffect, traitEffect } from '../../../../shared/schemas/effects.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts';
+import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
+import { FoldSection } from '../../../components/ui/FoldSection.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import {
   LibraryModifierPicker,
@@ -373,9 +375,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
             })}
           </select>
           {selectedVariant?.description && (
-            <span className="mt-1 text-[11px] text-dim leading-snug">
-              {selectedVariant.description}
-            </span>
+            <Markdown
+              source={selectedVariant.description}
+              className="mt-1 text-[11px] text-dim leading-snug"
+            />
           )}
         </label>
       )}
@@ -553,19 +556,33 @@ function TraitRow({ characterId, trait, inventory, canWrite }: TraitRowProps) {
           )}
         </p>
         {canWrite ? (
-          <textarea
-            aria-label={`${trait.name} notes`}
-            className={`${DRAFT_FIELD_CLASS} textarea textarea-ghost textarea-sm w-full mt-1 text-xs`}
-            placeholder="Notes…"
-            value={notesField.value}
-            onChange={(e) => notesField.setValue(e.target.value)}
-            onBlur={notesField.inputProps.onBlur}
-            data-flashing={notesField.inputProps['data-flashing']}
-            data-flash-parity={notesField.inputProps['data-flash-parity']}
-            rows={1}
-          />
+          <>
+            <textarea
+              aria-label={`${trait.name} notes`}
+              className={`${DRAFT_FIELD_CLASS} textarea textarea-ghost textarea-sm w-full mt-1 text-xs`}
+              placeholder="Notes…"
+              value={notesField.value}
+              onChange={(e) => notesField.setValue(e.target.value)}
+              onBlur={notesField.inputProps.onBlur}
+              data-flashing={notesField.inputProps['data-flashing']}
+              data-flash-parity={notesField.inputProps['data-flash-parity']}
+              rows={1}
+            />
+            {notesField.value && (
+              <FoldSection
+                preferenceKey={`${trait.id}:description-preview`}
+                title="Preview description"
+                defaultOpen={false}
+                className="text-xs"
+              >
+                <Markdown source={notesField.value} />
+              </FoldSection>
+            )}
+          </>
         ) : (
-          trait.notes && <p className="text-xs text-base-content/60 mt-1">{trait.notes}</p>
+          trait.notes && (
+            <Markdown source={trait.notes} className="text-xs text-base-content/60 mt-1" />
+          )
         )}
       </div>
       <div className="text-right">
