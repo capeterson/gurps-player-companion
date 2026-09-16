@@ -5,7 +5,7 @@
  * between live combat and the editable sheet without a route hop.
  *
  * Full-width status, attacks, armor and tracker sections avoid independent
- * columns growing lopsided. Maneuver and defenses share one responsive row.
+ * columns growing lopsided. Each section folds independently on this device.
  *
  * `usePoolBumpers` is lifted here so the in-grid PoolsCard and the
  * sticky mobile bottom bar share one instance — a second instance would
@@ -31,9 +31,14 @@ import { SoloTrackerCard } from './SoloTrackerCard.tsx';
 export interface CombatTabProps {
   character: CharacterDetail;
   canWrite: boolean;
+  experimentalTurnTracker?: boolean;
 }
 
-export function CombatTab({ character, canWrite }: CombatTabProps) {
+export function CombatTab({
+  character,
+  canWrite,
+  experimentalTurnTracker = false,
+}: CombatTabProps) {
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
   const patchCombat = useCombatPatch(character);
   const bumpers = usePoolBumpers(character, canWrite, patchCombat);
@@ -56,7 +61,7 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
         bumpers={bumpers}
         openRoll={openRoll}
       />
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-3">
         <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
         <DefensesCard character={character} openRoll={openRoll} />
       </div>
@@ -68,7 +73,9 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
         hpMax={bumpers.hpMax}
         bumpHp={bumpers.bumpHp}
       />
-      <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
+      {experimentalTurnTracker && (
+        <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
+      )}
 
       {/* Sticky bottom bar, mobile only. Shares the SAME usePoolBumpers
           instance as PoolsCard (lifted above) — a second instance here

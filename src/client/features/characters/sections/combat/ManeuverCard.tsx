@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MANEUVERS } from '../../../../../shared/constants/combat.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
 
@@ -23,6 +24,7 @@ export interface ManeuverCardProps {
 export function ManeuverCard({ character, canWrite, patchCombat }: ManeuverCardProps) {
   const stored = character.combat?.maneuver ?? null;
   const [customOpen, setCustomOpen] = useState(false);
+  const [choosing, setChoosing] = useState(false);
 
   const active = MANEUVERS.find(
     (m) => stored != null && m.label.toLowerCase() === stored.trim().toLowerCase(),
@@ -45,47 +47,66 @@ export function ManeuverCard({ character, canWrite, patchCombat }: ManeuverCardP
     if (!canWrite) return;
     const isActive = active?.label === label;
     void patchCombat('maneuver', isActive ? null : label);
+    setChoosing(false);
   }
 
   return (
-    <section className="card space-y-3 p-5">
+    <FoldSection
+      preferenceKey={`${character.id}:maneuver`}
+      title="Maneuver"
+      summary={stored ?? 'None'}
+    >
       <div className="flex items-baseline justify-between">
-        <p className="label-eyebrow">Maneuver</p>
+        <span className="text-sm font-medium">{stored ?? 'No maneuver'}</span>
         {canWrite && (
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs"
-            onClick={() => setCustomOpen((o) => !o)}
-          >
-            {customOpen ? 'Presets' : 'Custom…'}
-          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              aria-expanded={choosing}
+              onClick={() => setChoosing(!choosing)}
+            >
+              Change
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={() => {
+                setCustomOpen((o) => !o);
+                setChoosing(true);
+              }}
+            >
+              {customOpen ? 'Presets' : 'Custom…'}
+            </button>
+          </div>
         )}
       </div>
 
-      {customOpen && canWrite ? (
-        <input
-          aria-label="custom maneuver"
-          className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full`}
-          placeholder="e.g. Ready — draw sword"
-          {...maneuverField.inputProps}
-        />
-      ) : (
-        <>
-          <div className="flex flex-wrap gap-1.5">
-            {MANEUVERS.map((m) => (
-              <ConditionChip
-                key={m.id}
-                label={m.label}
-                active={active?.id === m.id}
-                onClick={() => pick(m.label)}
-                disabled={!canWrite}
-              />
-            ))}
-          </div>
-          {active && <p className="text-xs text-base-content/70">{active.blurb}</p>}
-          {!active && stored && <p className="text-xs text-base-content/70">Custom: {stored}</p>}
-        </>
-      )}
-    </section>
+      <div hidden={!choosing} className="pt-3">
+        {customOpen && canWrite ? (
+          <input
+            aria-label="custom maneuver"
+            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full`}
+            placeholder="e.g. Ready — draw sword"
+            {...maneuverField.inputProps}
+          />
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {MANEUVERS.map((m) => (
+                <ConditionChip
+                  key={m.id}
+                  label={m.label}
+                  active={active?.id === m.id}
+                  onClick={() => pick(m.label)}
+                  disabled={!canWrite}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+      {active && <p className="mt-2 text-xs text-base-content/70">{active.blurb}</p>}
+    </FoldSection>
   );
 }

@@ -77,6 +77,7 @@ function campaignToOut(row: DbCampaign, members: readonly MemberRow[]) {
     enforceAttributeCaps: row.enforceAttributeCaps,
     shareCharacterSheets: row.shareCharacterSheets,
     allowGmCharacterEditing: row.allowGmCharacterEditing,
+    experimentalTurnTracker: row.experimentalTurnTracker,
     members: members.map((m) => ({
       userId: m.userId,
       email: m.email,
@@ -176,6 +177,7 @@ router.openapi(
         .insert(campaigns)
         .values({
           name: body.name,
+          experimentalTurnTracker: body.experimentalTurnTracker ?? false,
           description: body.description ?? null,
           ownerId: user.id,
           pointTarget: body.pointTarget ?? null,

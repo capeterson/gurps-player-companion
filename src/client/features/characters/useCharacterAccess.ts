@@ -34,6 +34,7 @@ export interface CampaignSummary {
   enforceAttributeCaps: boolean;
   shareCharacterSheets: boolean;
   allowGmCharacterEditing: boolean;
+  experimentalTurnTracker?: boolean;
   viewerRole?: 'owner' | 'manager' | 'member';
   members?: CampaignMemberOut[];
   createdAt: string;
@@ -101,6 +102,7 @@ function toCampaignSummary(row: LocalCampaign): CampaignSummary {
     enforceAttributeCaps: row.enforceAttributeCaps ?? true,
     shareCharacterSheets: row.shareCharacterSheets ?? true,
     allowGmCharacterEditing: row.allowGmCharacterEditing ?? false,
+    experimentalTurnTracker: row.experimentalTurnTracker ?? false,
     ...(row.viewerRole !== undefined ? { viewerRole: row.viewerRole } : {}),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

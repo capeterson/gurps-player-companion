@@ -170,3 +170,64 @@ describe('campaign house rules', () => {
     }
   });
 });
+
+describe('experimental turn tracker setting', () => {
+  it('defaults off, validates owner opt-in, and retains the setting in REST, sync and audit history', async () => {
+    const owner = await user();
+    const member = await user();
+    const campaign = (await (
+      await request(owner.accessToken, '/campaigns', 'POST', { name: 'Experimental tracking' })
+    ).json()) as CampaignOut;
+    expect(campaign.experimentalTurnTracker).toBe(false);
+    await request(owner.accessToken, `/campaigns/${campaign.id}/members`, 'POST', {
+      email: member.email,
+    });
+    expect(
+      (
+        await request(member.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+          experimentalTurnTracker: true,
+        })
+      ).status,
+    ).toBe(403);
+    const invalid = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+      experimentalTurnTracker: 'true',
+    });
+    expect(invalid.status).toBeGreaterThanOrEqual(400);
+    expect(invalid.status).toBeLessThan(500);
+    const changed = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+      experimentalTurnTracker: true,
+    });
+    expect(changed.status).toBe(200);
+    expect(await changed.json()).toMatchObject({ experimentalTurnTracker: true });
+    expect(
+      await (await request(member.accessToken, `/campaigns/${campaign.id}`)).json(),
+    ).toMatchObject({ experimentalTurnTracker: true });
+    const cursor = await request(member.accessToken, '/sync/cursor', 'POST', {
+      cursors: [{ entityClass: 'campaign', sinceRevision: campaign.revision }],
+    });
+    expect(
+      ((await cursor.json()) as SyncCursorResponse).changes.find(
+        (change) => change.entityId === campaign.id,
+      ),
+    ).toMatchObject({ data: { experimentalTurnTracker: true } });
+    const events = await getDb()
+      .select()
+      .from(entityHistory)
+      .where(eq(entityHistory.entityId, campaign.id));
+    expect(
+      events.some(
+        (event) =>
+          event.actorUserId === campaign.ownerId &&
+          (event.newRow as { experimental_turn_tracker?: boolean } | null)
+            ?.experimental_turn_tracker === true,
+      ),
+    ).toBe(true);
+    expect(
+      await (
+        await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+          experimentalTurnTracker: false,
+        })
+      ).json(),
+    ).toMatchObject({ experimentalTurnTracker: false });
+  });
+});

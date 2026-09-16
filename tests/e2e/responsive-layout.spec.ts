@@ -2,6 +2,13 @@ import { expect, test } from '@playwright/test';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
+async function enableTurnTracker(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: /settings/i }).click();
+  await page.getByRole('checkbox', { name: /Enable turn tracker/i }).check();
+  await page.getByRole('button', { name: /^save$/i }).click();
+  await expect(page.getByRole('button', { name: /new encounter/i })).toBeVisible();
+}
+
 test('long campaign cards do not create page-level horizontal overflow at 320px', async ({
   page,
 }) => {
@@ -285,6 +292,64 @@ test('inline inventory categories toggle and retain populated advanced fields on
     .toBe(true);
 });
 
+test('inventory filters keep matching item ancestry without showing unrelated contents', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const email = `responsive-inventory-filter-${suffix()}@example.com`;
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Inventory filter QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill('Filtered Inventory');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Inventory/ })
+    .click();
+
+  const addForm = page.getByLabel('Item name').locator('xpath=ancestor::form');
+  await page.getByLabel('Item name').fill('Backpack');
+  await addForm.getByRole('button', { name: 'More options' }).click();
+  await addForm.getByRole('button', { name: '+ Container', exact: true }).click();
+  await addForm.getByRole('button', { name: /^add$/i }).click();
+  await expect(page.getByText('Backpack', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Item name').fill('Apple');
+  await addForm.getByLabel('Parent container').selectOption({ label: 'in Backpack' });
+  await addForm.getByRole('button', { name: /^add$/i }).click();
+  await expect(page.getByText('Apple', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Item name').fill('Broadsword');
+  await addForm.getByLabel('Parent container').selectOption({ label: 'in Backpack' });
+  await addForm.getByRole('button', { name: 'More options' }).click();
+  await addForm.getByRole('button', { name: '+ Weapon', exact: true }).click();
+  await addForm.getByRole('button', { name: /^add$/i }).click();
+  await expect(page.getByText('Broadsword', { exact: true })).toBeVisible();
+
+  const search = page.getByRole('searchbox', { name: 'Filter inventory' });
+  await search.fill('sword');
+  await expect(page.getByText('Backpack', { exact: true })).toBeVisible();
+  await expect(page.getByText('Broadsword', { exact: true })).toBeVisible();
+  await expect(page.getByText('Apple', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('1 of 3', { exact: true })).toBeVisible();
+
+  await search.fill('');
+  await page.getByLabel('Filter inventory by tag').selectOption('weapon');
+  await expect(page.getByText('Backpack', { exact: true })).toBeVisible();
+  await expect(page.getByText('Broadsword', { exact: true })).toBeVisible();
+  await expect(page.getByText('Apple', { exact: true })).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+});
+
 test('detailed NPC dialog keeps its actions reachable on a short mobile viewport', async ({
   page,
 }) => {
@@ -303,6 +368,7 @@ test('detailed NPC dialog keeps its actions reachable on a short mobile viewport
   await page.getByLabel(/campaign name/i).fill('Responsive NPC encounter');
   await page.getByRole('button', { name: /^create$/i }).click();
   await page.getByRole('link', { name: 'Responsive NPC encounter' }).click();
+  await enableTurnTracker(page);
   await page.getByRole('button', { name: /new encounter/i }).click();
   await page.getByRole('button', { name: 'Detailed NPC' }).click();
 
@@ -333,6 +399,7 @@ test('effect dialog keeps its actions reachable on a short mobile viewport', asy
   await page.getByLabel(/campaign name/i).fill('Responsive effect dialog');
   await page.getByRole('button', { name: /^create$/i }).click();
   await page.getByRole('link', { name: 'Responsive effect dialog' }).click();
+  await enableTurnTracker(page);
   await page.getByRole('button', { name: /new encounter/i }).click();
   await page.getByRole('button', { name: 'Detailed NPC' }).click();
 
@@ -516,6 +583,8 @@ test('attribute modifier popovers keep their actions reachable on a short mobile
   await page.getByLabel(/new character name/i).fill('Narrow modifier sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
+  const overview = page.getByRole('button', { name: /Sheet overview/ });
+  if ((await overview.getAttribute('aria-expanded')) === 'false') await overview.click();
   await page.getByRole('button', { name: 'Edit IQ modifiers' }).click();
 
   const apply = page.getByRole('dialog', { name: 'Modifiers for IQ' }).getByRole('button', {

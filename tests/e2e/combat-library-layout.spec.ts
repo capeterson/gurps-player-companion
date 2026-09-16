@@ -1,0 +1,128 @@
+import { type Page, expect, test } from '@playwright/test';
+
+async function register(page: Page) {
+  await page.goto('/register');
+  await page
+    .getByLabel(/email/i)
+    .fill(`compact-library-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`);
+  await page.getByLabel(/display name/i).fill('Layout player');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /create account/i }).click();
+  await expect(page).toHaveURL(/(\/|\/characters)$/, { timeout: 15_000 });
+}
+async function api(page: Page, path: string, data: object) {
+  const token = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
+  );
+  const response = await page.request.post(`/api/v1${path}`, {
+    data,
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  return response.json();
+}
+
+for (const width of [320, 1280]) {
+  test(`combat stays compact and remembers folds at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await register(page);
+    const character = await api(page, '/characters', { name: 'Compact hero' });
+    await page.goto(`/characters/${character.id}`);
+    const overview = page.getByRole('button', { name: /^Sheet overview/ });
+    await expect(overview).toHaveAttribute('aria-expanded', 'false');
+    const hp = page.getByRole('group', { name: 'Hit points', exact: true });
+    await expect(hp).toBeVisible();
+    expect((await hp.boundingBox())?.y).toBeLessThan(700);
+    await expect(page.getByRole('button', { name: /^Armor & incoming damage/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await expect(page.getByRole('button', { name: /^Attack$/, exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Change', exact: true }).click();
+    await page.getByRole('button', { name: 'Attack', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Attack', exact: true })).toBeHidden();
+    await page.getByRole('button', { name: 'Edit conditions' }).click();
+    await page.getByRole('button', { name: 'Stunned', exact: true }).click();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stunned', pressed: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sleeping', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: /^Defense details/ }).click();
+    await expect(page.getByLabel('Defense hit location')).toBeVisible();
+    const armor = page.getByRole('button', { name: /^Armor & incoming damage/ });
+    await armor.click();
+    await page.getByRole('button', { name: /^HP & FP/ }).click();
+    await page.reload();
+    await expect(page.getByRole('button', { name: /^HP & FP/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    await expect(armor).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('button', { name: /^Defense details/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await page.getByRole('button', { name: /^HP & FP/ }).click();
+    await armor.click();
+    await expect(page.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(width);
+  });
+}
+
+test('library search and markdown toolbar retain drafts and render formatted descriptions', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 900 });
+  await register(page);
+  const campaign = await api(page, '/campaigns', { name: 'Markdown campaign' });
+  await api(page, `/campaigns/${campaign.id}/library/traits`, {
+    name: 'Night Vision',
+    kind: 'advantage',
+    basePoints: 1,
+    description: '**Darkness** vision',
+    source: 'B71',
+  });
+  await api(page, `/campaigns/${campaign.id}/library/traits`, {
+    name: 'Fearfulness',
+    kind: 'disadvantage',
+    basePoints: -2,
+  });
+  await page.goto(`/campaigns/${campaign.id}/library`);
+  const search = page.getByRole('searchbox', { name: 'Search library' });
+  await search.fill('darkness B71');
+  await expect(page.getByText('Night Vision', { exact: true })).toBeVisible();
+  await expect(page.getByText('Fearfulness', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.markdown-body strong')).toHaveText('Darkness');
+  await page.getByRole('button', { name: /Edit/ }).click();
+  await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit raw markdown' }).click();
+  const editor = page.getByRole('textbox', { name: 'Description', exact: true });
+  await editor.fill('**Updated** description\n\n- First item\n- Second item');
+  await search.fill('Fearfulness');
+  await expect(editor).toHaveValue(/Updated/);
+  await page.getByRole('button', { name: /^Skills \d/ }).click();
+  await page.getByRole('button', { name: /^Traits \d/ }).click();
+  await expect(editor).toHaveValue(/Updated/);
+  await page.getByRole('button', { name: 'Back to rich text' }).click();
+  await expect(page.locator('[contenteditable] strong')).toHaveText('Updated');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await page.getByRole('button', { name: 'Clear search' }).click();
+  await expect(page.locator('.markdown-body strong')).toHaveText('Updated');
+  await expect(page.locator('.markdown-body li')).toHaveCount(2);
+  const titleBox = await page.getByText('Fearfulness', { exact: true }).boundingBox();
+  expect(titleBox?.height).toBeLessThan(80);
+  for (const category of ['Skills', 'Spells']) {
+    await page.getByRole('button', { name: new RegExp(`^${category} \\d`) }).click();
+    await page
+      .getByRole('button', {
+        name: new RegExp(`Add ${category === 'Skills' ? 'skill' : 'spell'}`, 'i'),
+      })
+      .click();
+    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  }
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(375);
+});

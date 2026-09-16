@@ -88,6 +88,23 @@ touches mid-session, front-loaded so one tap lands there; on a
 read-only view of a non-magical character the Magic tab is hidden, and
 on any sheet the viewer can edit — their own — it always shows).
 
+- **Compact combat view and folding.** Combat uses a smaller identity header and
+  folds the shared sheet overview (attributes, secondary stats, status, ledger,
+  encumbrance and conditional effects) by default. The folded overview shows
+  effective ST/DX/IQ/HT. Other tabs keep an independently remembered overview
+  preference. Every sheet panel and main Combat section has a keyboard-accessible
+  folding header; armor remains inline and open by default. `FoldSection` saves
+  open/closed preferences per character/section in device-local `localStorage`
+  (`gpc:fold:*`), never the server. Content stays mounted while folded so drafts,
+  pending saves, roll state and selections survive folding. Storage failures do
+  not prevent folding. Recovery/thresholds, the point ledger, defense breakdowns, and the full DR
+  location list start folded.
+- **Markdown descriptions.** Library traits, skills and spells render sanitized
+  CommonMark/GFM descriptions; their spacious add/edit forms (including skill
+  specialization description overrides) use the shared formatting toolbar and
+  raw-markdown mode. Character skill/spell copied notes have expandable markdown
+  descriptions. Trait notes render markdown for readers and offer a markdown
+  preview beside the compact source editor for owners.
 - **Identity tab.** Name, height, weight, age, **birthdate** (free-form
   text, e.g. "3/7/0402"), campaign assignment, and
   an **appearance/notes** field. No per-character "player" field is
@@ -300,12 +317,17 @@ on any sheet the viewer can edit — their own — it always shows).
   Each cast/maintenance gesture shares one audit batch across its
   FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
-  encumbrance, armor and weapon data, cost/weight rollups. Equipped
+  encumbrance, armor and weapon data, cost/weight rollups. A compact filter
+  combines case-insensitive item-name substring matching with a category/status
+  tag (weapon, armor, container, powerstone, magic item, enchanted, worn, or
+  equipped). Results retain the ancestor containers needed to locate matching
+  nested items while hiding every non-matching sibling and descendant. Equipped
   armor and active innate DR are aggregated per hit location on the Combat tab's Effective DR
   card. Each enchanted armor layer expands its base DR into nested enchantment
   contributions; highest-only conflicts are resolved across every equipped layer
-  covering the selected hit location, label the applied source as winning, and
-  retain suppressed sources visibly for an auditable total. Non-overlapping armor
+  covering the selected hit location and retain suppressed sources visibly for an
+  auditable total; the applied source needs no redundant "winning" badge.
+  Non-overlapping armor
   resolves independently, so a stronger coif enchantment does not suppress boots.
   **Inline inventory editors** replace the item edit modal. Clicking a
   category chip (Armor, Weapon/Shield, Container, Powerstone, Magic item, or
@@ -348,15 +370,17 @@ on any sheet the viewer can edit — their own — it always shows).
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
-  hop. Full-width Pools put HP, FP, and posture/conditions side by side on wide
-  screens. Maneuver and Defenses share a row; Attacks, armor coverage, and the Solo
-  tracker each use the full width below. Sections stack on
-  mobile instead of accumulating into two independent, uneven columns.
-  - **Pools** — HP/FP with bumpers/reset, posture chips, and all 12
-    common-condition chips (normalized against legacy Capitalized entries
+  hop. Compact HP/FP pools remain side by side on narrow screens. Posture/conditions,
+  maneuver, Move/defense rolls, attacks, armor coverage and the optional tracker
+  each fold independently in a single column, with responsive grids inside sections.
+  - **Pools** — compact HP/FP meters with ±1 controls; ±5, reset and threshold
+    reference text live under **Recovery & thresholds**. Death-check actions and
+    the FP-floor warning remain visible. **Posture & conditions** shows the current
+    posture and active conditions; tap the posture or **Edit conditions** to choose
+    from the full lists. All 12 common-condition chips (normalized against legacy Capitalized entries
     so old data still lights the right chip). Surfaces reeling
     *and* death-check thresholds (B419/B423) in one caption, pulses a
-    "suggested" highlight on the Reeling chip when HP drops below ⅓ max
+    "suggested" highlight on the Reeling chip in the condition chooser when HP drops below ⅓ max
     and it isn't set yet — never auto-applied — and tracks HP down to
     the certain-death floor at −5×HP. Each FP lost below zero also costs
     one HP, including a decrement crossing zero (B426); FP stops at −FP,
@@ -429,11 +453,15 @@ on any sheet the viewer can edit — their own — it always shows).
     destruction requires at least twice the crippling amount. The hint describes
     severing for cutting damage and generic destruction for other damage types. Conditions
     remain manual. Torso, skull, and eye-to-brain injuries are uncapped.
-  - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
-    chip shows its blurb; tapping it again clears to no maneuver), plus
+  - **Maneuver** — shows the current choice and blurb, with **Change** opening
+    one-tap chips for all 13 B363-366 maneuvers (tapping the active chip clears
+    it; choosing closes the picker), plus
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
-  - **Defenses** — Move (read-only, net of encumbrance and combat restrictions), Dodge (with
+  - **Move & defenses** — a compact wrapping grid of tappable defense values.
+    **Defense details** folds the incoming location/facing selectors and source
+    breakdowns; current restrictions and All-Out Defense choices remain visible.
+    Move (read-only, net of encumbrance and combat restrictions), Dodge (with
     the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is
     resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
@@ -597,6 +625,13 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   the local Dexie character model, plus a five-second character-history feed.
    Newly observed changes remain highlighted for 30 seconds. Cards open the full
    sheet in a new tab; a dense-display toggle fits larger parties.
+- **Experimental turn tracking**: the owner enables **Campaign settings →
+  Experimental features → Enable turn tracker** (`experimentalTurnTracker`).
+  Defaults off for existing/new campaigns; campaignless characters also hide
+  their local tracker. Missing pre-upgrade/offline settings count as off.
+  Disabling hides campaign encounter UI (including bookmarked encounter pages)
+  and the character scratchpad without deleting data. This is a UI feature
+  switch; existing encounter API permissions are unchanged.
 - **Encounter tracker foundation**: the online-only REST aggregate under
   `/campaigns/:id/encounters` stores campaign encounter state, PC/NPC
    combatants, turn order, and timed effects. Members can read a privacy-aware
@@ -625,6 +660,10 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   local-first outbox. REST and sync use the same central write decision.
 
 ### Cross-cutting UI
+- **Logged-in home**: a compact welcome and the four most recently updated
+  characters. Global Sheet, Campaign, Log, and Library destinations stay in the
+  persistent header instead of being repeated as homepage buttons or shortcut
+  cards.
 - **Sync status indicator and log** (header): honest pending/syncing/offline/error
   state, and an `error` badge always names its reason (in the tooltip and in a
   banner at the top of the log) rather than pointing at a toast that may never
@@ -695,8 +734,11 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
-      library/   LibraryPage plus EffectsEditor and typed enchantment authoring;
-                 ordered effect UI shared with character-owned trait mechanics
+      library/   LibraryPage (markdown descriptions, live category search,
+                 draft-preserving category switches, and typed enchantment
+                 authoring), librarySearch (human-readable-field matcher), plus
+                 EffectsEditor, the reusable ordered effect authoring UI shared
+                 with character-owned trait mechanics
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
@@ -720,7 +762,8 @@ src/
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...
-    components/  Shared UI (sync indicator/log, notifications bell,
+    components/  Shared UI (FoldSection: device-persisted folding without unmounting,
+                 sync indicator/log, notifications bell,
                  SwUpdatePrompt (new-build toast), ui/*, markdown/ —
                  sanitized markdown renderer + Tiptap WYSIWYG markdown
                  editor used by the adventure log)

@@ -75,6 +75,9 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   const [skillPrerequisitePolicy, setSkillPrerequisitePolicy] = useState(
     campaign.skillPrerequisitePolicy ?? 'block',
   );
+  const [experimentalTurnTracker, setExperimentalTurnTracker] = useState(
+    campaign.experimentalTurnTracker ?? false,
+  );
   const [houseRules, setHouseRules] = useState<CampaignHouseRules>(() =>
     campaignHouseRules.parse(campaign.houseRules ?? {}),
   );
@@ -103,6 +106,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     setShareSheets(campaign.shareCharacterSheets);
     setAllowGmEditing(campaign.allowGmCharacterEditing);
     setSkillPrerequisitePolicy(campaign.skillPrerequisitePolicy ?? 'block');
+    setExperimentalTurnTracker(campaign.experimentalTurnTracker ?? false);
     setHouseRules(campaignHouseRules.parse(campaign.houseRules ?? {}));
     setError(null);
   }, [open, campaign]);
@@ -174,6 +178,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       shareCharacterSheets: shareSheets,
       allowGmCharacterEditing: allowGmEditing,
       skillPrerequisitePolicy,
+      experimentalTurnTracker,
       houseRules,
     });
   };
@@ -344,6 +349,29 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
               </span>
             </label>
           )}
+
+          <fieldset
+            disabled={viewerRole !== 'owner' || update.isPending}
+            className="border-t border-base-300 pt-3"
+          >
+            <legend className="label-eyebrow">Experimental features</legend>
+            <label className="flex items-start gap-3 pt-2">
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm mt-0.5"
+                checked={experimentalTurnTracker}
+                onChange={(e) => setExperimentalTurnTracker(e.target.checked)}
+              />
+              <span>
+                <span className="block text-sm font-medium">Enable turn tracker</span>
+                <span className="block text-xs text-base-content/60">
+                  Unfinished, experimental tools for campaign encounters and character turn
+                  tracking. Off by default. Turning this off keeps saved encounters and local
+                  tracker data.
+                </span>
+              </span>
+            </label>
+          </fieldset>
 
           <fieldset
             className="border-t border-base-300 pt-3 space-y-3"

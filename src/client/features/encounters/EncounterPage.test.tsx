@@ -9,7 +9,10 @@ import { EncounterPage } from './EncounterPage.tsx';
 import { cleanupLinkedSheetEffect } from './effectSheetCleanup.ts';
 import { encountersApi } from './encountersApi.ts';
 
-const encounter = vi.hoisted(() => ({ data: null as EncounterOut | null }));
+const encounter = vi.hoisted(() => ({
+  data: null as EncounterOut | null,
+  trackerEnabled: true as boolean | undefined,
+}));
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: () => [] }));
 vi.mock('../characters/useCharacterDetail.ts', () => ({ useCampaignCharactersList: () => [] }));
@@ -37,7 +40,11 @@ vi.mock('../../lib/api.ts', () => ({
   api: vi.fn(async (path: string) =>
     path === '/auth/me'
       ? { id: 'owner' }
-      : ({ ownerId: 'owner', members: [] } as unknown as CampaignOut),
+      : ({
+          ownerId: 'owner',
+          members: [],
+          experimentalTurnTracker: encounter.trackerEnabled,
+        } as unknown as CampaignOut),
   ),
 }));
 
@@ -100,9 +107,21 @@ function renderPage() {
 }
 
 describe('EncounterPage', () => {
+  it.each([false, undefined])(
+    'hides bookmarked encounters when tracking is %s',
+    async (enabled) => {
+      encounter.trackerEnabled = enabled;
+      renderPage();
+      await screen.findByRole('heading', { name: 'Turn tracker is disabled' });
+      expect(screen.queryByRole('button', { name: 'Next turn' })).not.toBeInTheDocument();
+      expect(encountersApi.update).not.toHaveBeenCalled();
+    },
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     encounter.data = makeEncounter();
+    encounter.trackerEnabled = true;
     vi.mocked(encountersApi.createEffect).mockResolvedValue({});
     vi.mocked(encountersApi.deleteEffect).mockResolvedValue(undefined);
     vi.mocked(encountersApi.updateEffect).mockResolvedValue({});

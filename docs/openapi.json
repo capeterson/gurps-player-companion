@@ -2948,6 +2948,9 @@
                           "warn"
                         ]
                       },
+                      "experimentalTurnTracker": {
+                        "type": "boolean"
+                      },
                       "houseRules": {
                         "type": "object",
                         "properties": {
@@ -3107,6 +3110,7 @@
                       "enforceAttributeCaps",
                       "shareCharacterSheets",
                       "allowGmCharacterEditing",
+                      "experimentalTurnTracker",
                       "members",
                       "createdAt",
                       "updatedAt",
@@ -3304,6 +3308,9 @@
                       "block",
                       "warn"
                     ]
+                  },
+                  "experimentalTurnTracker": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -3383,6 +3390,9 @@
                         "block",
                         "warn"
                       ]
+                    },
+                    "experimentalTurnTracker": {
+                      "type": "boolean"
                     },
                     "houseRules": {
                       "type": "object",
@@ -3543,6 +3553,7 @@
                     "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
+                    "experimentalTurnTracker",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -3668,6 +3679,9 @@
                         "warn"
                       ]
                     },
+                    "experimentalTurnTracker": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -3827,6 +3841,7 @@
                     "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
+                    "experimentalTurnTracker",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -4044,6 +4059,9 @@
                       "block",
                       "warn"
                     ]
+                  },
+                  "experimentalTurnTracker": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -4120,6 +4138,9 @@
                         "block",
                         "warn"
                       ]
+                    },
+                    "experimentalTurnTracker": {
+                      "type": "boolean"
                     },
                     "houseRules": {
                       "type": "object",
@@ -4280,6 +4301,7 @@
                     "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
+                    "experimentalTurnTracker",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -4472,6 +4494,9 @@
                         "warn"
                       ]
                     },
+                    "experimentalTurnTracker": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -4631,6 +4656,7 @@
                     "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
+                    "experimentalTurnTracker",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -4797,6 +4823,9 @@
                         "warn"
                       ]
                     },
+                    "experimentalTurnTracker": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -4956,6 +4985,7 @@
                     "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
+                    "experimentalTurnTracker",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -5176,6 +5206,9 @@
                         "warn"
                       ]
                     },
+                    "experimentalTurnTracker": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -5335,6 +5368,7 @@
                     "enforceAttributeCaps",
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
+                    "experimentalTurnTracker",
                     "members",
                     "createdAt",
                     "updatedAt",

@@ -36,7 +36,13 @@ import { enqueueDeletes, enqueueFieldPatches } from '../../../sync/outbox.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharacterDetail.ts';
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
-import { buildTree, descendantsOf, flattenDFS } from './inventoryTree.ts';
+import {
+  type InventoryFilterTag,
+  buildTree,
+  descendantsOf,
+  filterInventoryTree,
+  flattenDFS,
+} from './inventoryTree.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
 
@@ -75,14 +81,22 @@ export function InventoryPanel({
   const items = character.inventory;
   const toasts = useToasts();
 
+  const [filterText, setFilterText] = useState('');
+  const [filterTag, setFilterTag] = useState<InventoryFilterTag>('all');
+  const filterActive = filterText.trim().length > 0 || filterTag !== 'all';
+
   const tree = useMemo(() => buildTree(items), [items]);
-  const roots = tree.byParent.get(null) ?? [];
+  const filteredTree = useMemo(
+    () => filterInventoryTree(items, filterText, filterTag),
+    [items, filterText, filterTag],
+  );
+  const roots = filteredTree.byParent.get(null) ?? [];
   const wornRoots = roots.filter((r) => r.worn);
   const carriedRoots = roots.filter((r) => !r.worn);
 
   const orderedIds = useMemo(
-    () => flattenDFS([...wornRoots, ...carriedRoots], tree.byParent).map((i) => i.id),
-    [wornRoots, carriedRoots, tree.byParent],
+    () => flattenDFS([...wornRoots, ...carriedRoots], filteredTree.byParent).map((i) => i.id),
+    [wornRoots, carriedRoots, filteredTree.byParent],
   );
   const { selectedIds, isSelected, handleClick, clear, count } = useRangeSelect(orderedIds);
 
@@ -455,12 +469,13 @@ export function InventoryPanel({
         key={r.id}
         item={r}
         depth={0}
-        byParent={tree.byParent}
+        byParent={filteredTree.byParent}
         isSelected={isSelected}
         onRowClick={handleClick}
         canEdit={canWrite}
         skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
         fetchEnchantmentOptions={fetchEnchantments}
+        expandContainers={filterActive}
         {...(canWrite ? { drag: dragApi } : {})}
         {...(opts.inStashed ? { inStashed: true } : {})}
       />
@@ -572,6 +587,57 @@ export function InventoryPanel({
             tip: shift-click to select a range; ⌘/ctrl-click to toggle
           </span>
         </header>
+      )}
+
+      {items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-base-300/60 px-5 py-2">
+          <input
+            type="search"
+            className="input input-bordered input-sm min-w-0 flex-1 sm:max-w-xs"
+            value={filterText}
+            onChange={(event) => {
+              clear();
+              setFilterText(event.target.value);
+            }}
+            placeholder="Filter item names…"
+            aria-label="Filter inventory"
+          />
+          <select
+            className="select select-bordered select-sm w-auto max-w-full"
+            value={filterTag}
+            onChange={(event) => {
+              clear();
+              setFilterTag(event.target.value as InventoryFilterTag);
+            }}
+            aria-label="Filter inventory by tag"
+          >
+            <option value="all">All tags</option>
+            <option value="weapon">Weapon / shield</option>
+            <option value="armor">Armor</option>
+            <option value="container">Container</option>
+            <option value="powerstone">Powerstone</option>
+            <option value="magicItem">Magic item</option>
+            <option value="enchanted">Enchanted</option>
+            <option value="worn">Worn</option>
+            <option value="equipped">Equipped</option>
+          </select>
+          {filterActive && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={() => {
+                clear();
+                setFilterText('');
+                setFilterTag('all');
+              }}
+            >
+              Clear
+            </button>
+          )}
+          <output className="text-xs text-muted" aria-live="polite">
+            {filteredTree.matchedIds.size} of {items.length}
+          </output>
+        </div>
       )}
 
       {canWrite && count > 0 && (
@@ -728,7 +794,9 @@ export function InventoryPanel({
             </div>
             {wornRoots.length === 0 ? (
               <p className="text-base-content/60 text-sm">
-                Nothing worn — encumbrance is 0. Drop items here to wear them.
+                {filterActive
+                  ? 'No matching items on the player.'
+                  : 'Nothing worn — encumbrance is 0. Drop items here to wear them.'}
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
@@ -803,7 +871,9 @@ export function InventoryPanel({
             </div>
             {carriedRoots.length === 0 ? (
               <p className="text-base-content/60 text-sm">
-                Nothing stashed. Drop items here to set them aside.
+                {filterActive
+                  ? 'No matching stashed items.'
+                  : 'Nothing stashed. Drop items here to set them aside.'}
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">

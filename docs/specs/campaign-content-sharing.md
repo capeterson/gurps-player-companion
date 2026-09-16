@@ -116,6 +116,18 @@ The client mirrors the switch into Dexie and tightens the existing draft input
 bounds immediately; the server remains authoritative and an asynchronous sync
 rejection still uses the standard toast + rollback flash path.
 
+### Experimental turn tracking
+
+`experimentalTurnTracker` is an owner-controlled campaign setting, default false
+for both existing and new campaigns (migration 0046). It appears under
+**Experimental features → Enable turn tracker**. Enabling exposes campaign
+encounters and local character turn scratchpads. Disabling hides those surfaces,
+including bookmarked encounter pages, while preserving stored data. It is a UI
+feature switch, not an additional encounter API authorization boundary.
+The read-only campaign cursor and REST mirror carry it into Dexie so character
+sheets honor the saved preference offline; absent settings and campaignless
+characters keep tracking hidden. Campaign PATCH remains online-only and audited.
+
 ### Invitations
 
 Joining is invite-based (`src/server/routes/invitations.ts`):
@@ -524,6 +536,26 @@ name match can never be shadowed by a differently-cased row created through
 the CRUD editor. A case-insensitive import match updates the existing row in
 place (preserving its id) and adopts the incoming `name` spelling/casing along
 with its other fields.
+
+## Library search and description editing
+
+The YAML import section folds closed by default and remembers its state on this
+device. Entry titles take their own row on mobile, with metadata/actions beneath.
+The library management UI filters the current Traits, Skills, Spells or Items
+category as the user types in **Search library**. Matching is case-insensitive:
+every query word must appear in the human-readable fields (name, description,
+source, kind, attribute/difficulty, college, prerequisites or specialization
+policy). Category totals and the matching count remain visible, with an explicit
+empty result and Clear search. Search changes never affect exports or imports.
+An entry being edited stays visible even when it does not match; category changes
+hide rather than unmount editors, preserving unsaved drafts and save failures.
+
+Trait, skill and spell descriptions render through the existing sanitized
+`Markdown` component. Add/edit descriptions and skill specialization description
+overrides use `RichTextEditor`, with formatting toolbar and raw markdown mode.
+The stored/API/YAML value remains a markdown string; no new schema or HTML field
+is introduced. Pending description submissions disable editor interaction.
+Copied descriptions on character sheets render with the same sanitizer.
 
 ## Adventure log
 

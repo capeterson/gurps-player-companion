@@ -7,11 +7,12 @@
  * instance tracking its own override window. Pool writes compose in Dexie.
  */
 
+import { useState } from 'react';
 import { COMMON_CONDITIONS, POSTURES } from '../../../../../shared/constants/combat.ts';
 import { conditionLabel, conditionsInclude } from '../../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
-import { Bumper } from '../../../../components/ui/Bumper.tsx';
 import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { InfoTooltip } from '../../../../components/ui/InfoTooltip.tsx';
 import { OverflowBadge } from '../../../../components/ui/OverflowBadge.tsx';
 import { PoolMeter } from '../../../../components/ui/PoolMeter.tsx';
@@ -35,7 +36,7 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
   const combat = character.combat;
   const posture = combat?.posture ?? 'standing';
   const { conditions, toggle } = useConditionsToggle(character, canWrite, patchCombat);
-  const { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp, flashHp } = bumpers;
+  const { hp, fp, hpMax, fpMax, bumpHp, bumpFp, resetHp, resetFp } = bumpers;
   const hpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentHp'));
   const fpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentFp'));
 
@@ -54,183 +55,212 @@ export function PoolsCard({ character, canWrite, patchCombat, bumpers, openRoll 
     void patchCombat('posture', p);
   }
 
+  const [chooseConditions, setChooseConditions] = useState(false);
+  const [choosePosture, setChoosePosture] = useState(false);
   return (
-    <section className="card space-y-4 p-5">
-      <p className="label-eyebrow">Pools</p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
-        <fieldset
-          aria-label="Hit points"
-          {...hpFlash.flashProps}
-          className={`field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4 ${flashHp ? 'flash' : ''}`}
-        >
-          <div className="mb-2 flex items-baseline justify-between gap-2">
-            <span className="flex items-center gap-2">
-              <span className="label-eyebrow">Hit Points</span>
-              {hp > hpMax && <OverflowBadge amount={hp - hpMax} />}
-            </span>
-          </div>
-          <div className="mb-2 flex items-baseline gap-1.5">
-            <span
-              className={`num font-bold leading-none ${flashHp ? 'num-tween' : ''}`}
-              style={{ fontSize: '3.5rem', color: hpColor, letterSpacing: '-0.03em' }}
+    <>
+      <FoldSection
+        preferenceKey={`${character.id}:pools`}
+        title="HP & FP"
+        summary={`HP ${hp}/${hpMax} · FP ${fp}/${fpMax}`}
+      >
+        <div className="grid grid-cols-2 gap-3">
+          {(
+            [
+              {
+                label: 'Hit points',
+                short: 'HP',
+                value: hp,
+                max: hpMax,
+                bump: bumpHp,
+                reset: resetHp,
+                color: hpColor,
+                flash: hpFlash,
+                tone: 'hp',
+              },
+              {
+                label: 'Fatigue points',
+                short: 'FP',
+                value: fp,
+                max: fpMax,
+                bump: bumpFp,
+                reset: resetFp,
+                color: fpColor,
+                flash: fpFlash,
+                tone: 'fp',
+              },
+            ] as const
+          ).map((pool) => (
+            <fieldset
+              key={pool.short}
+              aria-label={pool.label}
+              {...pool.flash.flashProps}
+              className="field-rollback-flash min-w-0 space-y-2"
             >
-              {hp}
-            </span>
-            <span className="num text-xl text-dim">/ {hpMax}</span>
-          </div>
-          <PoolMeter current={hp} max={hpMax} tone="hp" height="lg" ariaLabel="Hit points" />
-          <p className="num mt-2 text-[11px] text-dim">
-            reeling at {reelingThreshold} · death checks from −{hpMax} · certain death at −
-            {5 * hpMax} (B419/B423)
-          </p>
-          {deathCheckRequired && (
-            <div className="mt-2">
-              <RollableRow
-                label="Death check"
-                baseTarget={character.derived.effectiveHt}
-                openRoll={openRoll}
-                sublabel={
-                  <span className="block text-[11px] text-base-content/60">HT roll — B419</span>
-                }
+              <div className="flex items-baseline gap-1 flex-wrap">
+                <span className="label-eyebrow mr-auto">{pool.short}</span>
+                <span className="num text-2xl font-bold" style={{ color: pool.color }}>
+                  {pool.value}
+                </span>
+                <span className="num text-xs text-muted">/ {pool.max}</span>
+                {pool.value > pool.max && <OverflowBadge amount={pool.value - pool.max} />}
+              </div>
+              <PoolMeter
+                current={pool.value}
+                max={pool.max}
+                tone={pool.tone}
+                height="md"
+                ariaLabel={pool.label}
               />
-            </div>
-          )}
-          {canWrite && (
-            <>
-              <div className="mt-3 flex gap-1.5">
-                <Bumper tone="dmg" onClick={() => bumpHp(-5)} ariaLabel="HP -5">
-                  −5
-                </Bumper>
-                <Bumper tone="dmg" onClick={() => bumpHp(-1)} ariaLabel="HP -1">
-                  −1
-                </Bumper>
-                <Bumper tone="heal" onClick={() => bumpHp(+1)} ariaLabel="HP +1">
-                  +1
-                </Bumper>
-                <Bumper tone="heal" onClick={() => bumpHp(+5)} ariaLabel="HP +5">
-                  +5
-                </Bumper>
-              </div>
-              <button
-                type="button"
-                className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                onClick={resetHp}
-              >
-                Reset to {hpMax}
-              </button>
-            </>
-          )}
-        </fieldset>
-
-        <fieldset
-          aria-label="Fatigue points"
-          {...fpFlash.flashProps}
-          className="field-rollback-flash min-w-0 rounded-2xl border border-base-300/60 p-4"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="label-eyebrow">Fatigue</span>
-              {fp > fpMax && <OverflowBadge amount={fp - fpMax} />}
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span
-                className="num font-bold leading-none"
-                style={{ fontSize: '1.75rem', color: fpColor }}
-              >
-                {fp}
-              </span>
-              <span className="num text-sm text-dim">/ {fpMax}</span>
-            </div>
-          </div>
-          <PoolMeter current={fp} max={fpMax} tone="fp" height="md" ariaLabel="Fatigue points" />
-          <p className="num mt-2 text-[11px] text-dim">
-            below 0, each FP lost also costs 1 HP; at −{fpMax}, loss is HP-only (B426)
-          </p>
-          {fp === -fpMax && (
-            <p className="mt-1 text-[11px] text-warning">
-              FP floor reached — further fatigue costs 1 HP per FP (B426)
-            </p>
-          )}
-          {canWrite && (
-            <>
-              <div className="mt-2.5 flex gap-1.5">
-                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-5)}>
-                  −5
-                </button>
-                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(-1)}>
-                  −1
-                </button>
-                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+1)}>
-                  +1
-                </button>
-                <button type="button" className="btn btn-sm flex-1" onClick={() => bumpFp(+5)}>
-                  +5
-                </button>
-              </div>
-              {fp !== fpMax && (
-                <button
-                  type="button"
-                  className="mt-2 w-full rounded-field border border-dashed border-border-strong py-1.5 text-xs text-muted transition hover:bg-base-200"
-                  onClick={resetFp}
-                >
-                  Reset to {fpMax}
-                </button>
+              {canWrite && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm flex-1 min-h-11"
+                    aria-label={`${pool.short} -1`}
+                    onClick={() => pool.bump(-1)}
+                  >
+                    −1
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm flex-1 min-h-11"
+                    aria-label={`${pool.short} +1`}
+                    onClick={() => pool.bump(1)}
+                  >
+                    +1
+                  </button>
+                </div>
               )}
-            </>
-          )}
-        </fieldset>
-
-        <div className="space-y-4 sm:col-span-2 xl:col-span-1">
-          <div>
-            <p className="label-eyebrow mb-1.5">Posture</p>
-            <div className="flex flex-wrap gap-1">
-              {POSTURES.map((p) => (
-                <ConditionChip
-                  key={p}
-                  label={p}
-                  active={posture === p}
-                  onClick={() => setPosture(p)}
-                  disabled={!canWrite}
-                  className="capitalize"
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="label-eyebrow">Conditions</span>
-              <span className="num text-[10px] text-dim">{conditions.length} active</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {COMMON_CONDITIONS.map((id) => {
-                const active = conditionsInclude(conditions, id);
-                const suggest = id === 'reeling' && reelingSuggested && !active;
-                return (
-                  <ConditionChip
-                    key={id}
-                    label={conditionLabel(id)}
-                    active={active}
-                    onClick={() => toggle(id)}
-                    disabled={!canWrite}
-                    className={suggest ? 'animate-pulse ring-2 ring-warning/70' : ''}
-                  />
-                );
-              })}
-            </div>
-            {reelingSuggested && (
-              <p className="mt-1.5 text-[11px] text-warning">
-                <InfoTooltip
-                  content={`HP (${hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; the Reeling chip is a manual reminder and adds no extra penalty. The reduction ends when HP reaches at least one-third of maximum.`}
-                >
-                  Reeling suggested
-                </InfoTooltip>{' '}
-                — B419
-              </p>
-            )}
-          </div>
+            </fieldset>
+          ))}
         </div>
-      </div>
-    </section>
+        {deathCheckRequired && (
+          <div className="mt-2">
+            <RollableRow
+              label="Death check"
+              baseTarget={character.derived.effectiveHt}
+              openRoll={openRoll}
+            />
+          </div>
+        )}
+        {fp === -fpMax && (
+          <p className="mt-2 text-xs text-warning">
+            FP floor reached — further fatigue costs 1 HP per FP (B426)
+          </p>
+        )}
+        <div className="mt-3">
+          <FoldSection
+            preferenceKey={`${character.id}:pool-details`}
+            title="Recovery & thresholds"
+            defaultOpen={false}
+          >
+            <p className="text-xs text-muted mb-3">
+              HP: reeling at {reelingThreshold} · death checks from −{hpMax} · certain death at −
+              {5 * hpMax} (B419/B423). Below 0 FP, each FP lost also costs 1 HP; at −{fpMax}, loss
+              is HP-only (B426).
+            </p>
+            {canWrite && (
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { short: 'HP', max: hpMax, bump: bumpHp, reset: resetHp },
+                  { short: 'FP', max: fpMax, bump: bumpFp, reset: resetFp },
+                ].map((pool) => (
+                  <div key={pool.short} className="space-y-2">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm flex-1"
+                        aria-label={`${pool.short} -5`}
+                        onClick={() => pool.bump(-5)}
+                      >
+                        −5 {pool.short}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm flex-1"
+                        aria-label={`${pool.short} +5`}
+                        onClick={() => pool.bump(5)}
+                      >
+                        +5 {pool.short}
+                      </button>
+                    </div>
+                    <button type="button" className="btn btn-sm w-full" onClick={pool.reset}>
+                      Reset {pool.short} to {pool.max}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </FoldSection>
+        </div>
+      </FoldSection>
+      <FoldSection
+        preferenceKey={`${character.id}:conditions`}
+        title="Posture & conditions"
+        summary={`${posture} · ${conditions.length} active`}
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            className="btn btn-sm capitalize"
+            disabled={!canWrite}
+            aria-expanded={choosePosture}
+            onClick={() => setChoosePosture(!choosePosture)}
+          >
+            Posture: {posture}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={!canWrite}
+            aria-expanded={chooseConditions}
+            onClick={() => setChooseConditions(!chooseConditions)}
+          >
+            {chooseConditions ? 'Done' : 'Edit conditions'}
+          </button>
+        </div>
+        <div hidden={!choosePosture} className="flex flex-wrap gap-1 mt-2">
+          {POSTURES.map((p) => (
+            <ConditionChip
+              key={p}
+              label={p}
+              active={posture === p}
+              onClick={() => {
+                setPosture(p);
+                setChoosePosture(false);
+              }}
+              disabled={!canWrite}
+              className="capitalize"
+            />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {COMMON_CONDITIONS.filter(
+            (id) => chooseConditions || conditionsInclude(conditions, id),
+          ).map((id) => (
+            <ConditionChip
+              key={id}
+              label={conditionLabel(id)}
+              active={conditionsInclude(conditions, id)}
+              onClick={() => toggle(id)}
+              disabled={!canWrite}
+            />
+          ))}
+          {!chooseConditions && conditions.length === 0 && (
+            <span className="text-xs text-muted">No active conditions</span>
+          )}
+        </div>
+        {reelingSuggested && (
+          <p className="mt-2 text-xs text-warning">
+            <InfoTooltip
+              content={`HP (${hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; the Reeling chip is a manual reminder and adds no extra penalty. The reduction ends when HP reaches at least one-third of maximum.`}
+            >
+              Reeling suggested
+            </InfoTooltip>
+          </p>
+        )}
+      </FoldSection>
+    </>
   );
 }

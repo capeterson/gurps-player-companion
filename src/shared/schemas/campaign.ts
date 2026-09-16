@@ -79,6 +79,8 @@ export const campaignOut = z.object({
   /** Allow campaign owners and managers to edit member-owned characters. */
   allowGmCharacterEditing: z.boolean(),
   skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
+  /** Experimental campaign encounters and character turn scratchpads; opt-in. */
+  experimentalTurnTracker: z.boolean(),
   houseRules: campaignHouseRules.default({}),
   members: z.array(campaignMemberOut),
   ...timestamps,
@@ -98,6 +100,7 @@ export const campaignCreate = z.object({
   shareCharacterSheets: z.boolean().optional(),
   allowGmCharacterEditing: z.boolean().optional(),
   skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
+  experimentalTurnTracker: z.boolean().optional(),
 });
 
 export const campaignUpdate = campaignCreate.partial();

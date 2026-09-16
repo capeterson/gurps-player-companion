@@ -646,6 +646,16 @@ describe('summarizeEvent campaign', () => {
     expect(summary).toContain('125');
   });
 
+  it('describes the experimental turn tracker toggle', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { experimentalTurnTracker: false },
+      newRow: { experimentalTurnTracker: true },
+    });
+    expect(summary).toBe('Experimental turn tracker enabled');
+  });
+
   it('describes the attribute-cap campaign toggle', () => {
     const { summary } = summarizeEvent({
       entityClass: 'campaign',

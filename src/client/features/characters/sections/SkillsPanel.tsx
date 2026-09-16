@@ -11,7 +11,9 @@ import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
+import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
+import { FoldSection } from '../../../components/ui/FoldSection.tsx';
 import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
@@ -548,6 +550,16 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
         }}
         onCancel={() => setConfirmDelete(false)}
       />
+      {skill.notes && (
+        <FoldSection
+          preferenceKey={`${skill.id}:description`}
+          title="Description"
+          defaultOpen={false}
+          className="col-span-full mt-2 text-xs"
+        >
+          <Markdown source={skill.notes} className="mt-2" />
+        </FoldSection>
+      )}
     </li>
   );
 }
