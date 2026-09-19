@@ -1,8 +1,8 @@
 /**
  * Combat tab — HP/FP pools, posture, and conditions.
  *
- * Shares ONE `usePoolBumpers` instance with the Combat tab's sticky mobile
- * bottom bar (lifted to CombatTab) so rapid taps across both UIs
+ * Shares ONE `usePoolBumpers` instance with the Combat tab's floating top
+ * bar (lifted to CombatTab) so rapid changes across both UIs
  * share soft-cap override state instead of a second
  * instance tracking its own override window. Pool writes compose in Dexie.
  */

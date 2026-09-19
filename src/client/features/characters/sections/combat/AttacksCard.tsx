@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatDamageDice, parseDerivedDamage } from '../../../../../shared/constants/damage.ts';
 import {
   HIT_LOCATIONS,
@@ -18,8 +19,13 @@ import {
 } from '../../../../../shared/domain/defenseCalc.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
-import { RollableRow } from '../RollableRow.tsx';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
+import {
+  type AttackSort,
+  type AttackTablePreferences,
+  readAttackTablePreferences,
+  saveAttackTablePreferences,
+} from './attackTablePreferences.ts';
 
 function capitalize(s: string): string {
   return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
@@ -115,6 +121,30 @@ export interface AttacksCardProps {
 }
 
 export function AttacksCard({ character, openRoll }: AttacksCardProps) {
+  // A route change must not carry the previous character's presentation state.
+  return <AttackTable key={character.id} character={character} openRoll={openRoll} />;
+}
+
+function AttackTable({ character, openRoll }: AttacksCardProps) {
+  const [preferences, setPreferences] = useState(() => readAttackTablePreferences(character.id));
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+
+  function save(next: AttackTablePreferences) {
+    setPreferences(next);
+    setSaveFailed(!saveAttackTablePreferences(character.id, next));
+  }
+
+  function sortBy(sort: AttackSort) {
+    save({
+      ...preferences,
+      sort,
+      descending: sort === preferences.sort && sort !== 'custom' ? !preferences.descending : false,
+    });
+  }
+
   const state = combatAdjustments({
     hp: character.combat?.currentHp ?? character.derived.hp,
     maxHp: character.derived.hp,
@@ -137,6 +167,75 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
     level: s.effectiveLevel ?? s.level,
   }));
 
+  const customOrder = [
+    ...preferences.order.filter((id) => weapons.some((weapon) => weapon.id === id)),
+    ...weapons
+      .filter((weapon) => !preferences.order.includes(weapon.id))
+      .map((weapon) => weapon.id),
+  ];
+  const sortedWeapons = [...weapons].sort((a, b) => {
+    if (preferences.sort === 'custom') return customOrder.indexOf(a.id) - customOrder.indexOf(b.id);
+    function value(weapon: (typeof weapons)[number]): string {
+      if (preferences.sort === 'weapon') return weapon.name;
+      if (preferences.sort === 'skill') {
+        const resolution = resolveWeaponSkill(
+          weapon.name,
+          weapon.weaponData?.skill,
+          skillCandidates,
+        );
+        return resolution.kind === 'matched' ? resolution.name : (weapon.weaponData?.skill ?? '');
+      }
+      return damageLinesFor(weapon.name, weapon.weaponData ?? { alternateModes: [] })
+        .flatMap((line) =>
+          line.damage ? parseDamageSpec(line.damage).map((mode) => mode.type ?? '') : [],
+        )
+        .sort()
+        .join('/');
+    }
+    const comparison = value(a).localeCompare(value(b), undefined, {
+      sensitivity: 'base',
+      numeric: true,
+    });
+    return (
+      (preferences.descending ? -comparison : comparison) ||
+      customOrder.indexOf(a.id) - customOrder.indexOf(b.id)
+    );
+  });
+
+  function moveWeapon(id: string, targetId: string) {
+    const from = customOrder.indexOf(id);
+    const to = customOrder.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...customOrder];
+    next.splice(from, 1);
+    next.splice(to, 0, id);
+    // Keep unequipped IDs so putting a weapon away does not discard its preference.
+    const hiddenIds = preferences.order.filter((savedId) => !customOrder.includes(savedId));
+    save({ order: [...next, ...hiddenIds], sort: 'custom', descending: false });
+    setAnnouncement(
+      `${weapons.find((weapon) => weapon.id === id)?.name ?? 'Attack'} moved to position ${to + 1}.`,
+    );
+  }
+
+  function sortHeader(label: string, sort: Exclude<AttackSort, 'custom'>) {
+    const active = preferences.sort === sort;
+    return (
+      <th
+        scope="col"
+        aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
+      >
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs -ml-2 whitespace-nowrap"
+          onClick={() => sortBy(sort)}
+        >
+          {label}{' '}
+          <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
+        </button>
+      </th>
+    );
+  }
+
   if (weapons.length === 0) {
     return (
       <section className="card space-y-2 p-5">
@@ -149,131 +248,268 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
   }
 
   return (
-    <section className="card space-y-3 p-5">
-      <p className="label-eyebrow">Attacks</p>
+    <section className="card min-w-0 space-y-3 p-3 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+        <p className="label-eyebrow">
+          Attacks <span className="text-base-content/50">({weapons.length})</span>
+        </p>
+        <label className="flex items-center gap-2 text-xs text-base-content/60">
+          Order
+          <select
+            aria-label="Attack order"
+            className="select select-sm w-36"
+            value={preferences.sort}
+            onChange={(event) => sortBy(event.target.value as AttackSort)}
+          >
+            <option value="custom">Custom</option>
+            <option value="weapon">Weapon</option>
+            <option value="skill">Governing skill</option>
+            <option value="type">Damage type</option>
+          </select>
+        </label>
+      </div>
+      <p className="text-xs text-base-content/50">
+        Tap a skill to attack or dice to roll damage.
+        {preferences.sort === 'custom' &&
+          ' Drag the handles to reorder; use ↑/↓ with a keyboard. Order is saved on this device.'}
+      </p>
+      {saveFailed && (
+        <output className="text-xs text-warning">
+          This browser could not save the attack order. It will reset when you leave this page.
+        </output>
+      )}
+      <output className="sr-only">{announcement}</output>
       {!effectsKnown && (
         <p className="text-xs text-warning">
           ST-based damage is unavailable until linked library effects load.
         </p>
       )}
-      <div className="space-y-3">
-        {weapons.map((w) => {
-          const wd = w.weaponData;
-          if (!wd) return null;
-          const lines = damageLinesFor(w.name, wd);
-          const parsedByLine = lines.map((line) => ({
-            line,
-            modes: line.damage ? parseDamageSpec(line.damage) : [],
-          }));
-          const allModes = parsedByLine.flatMap((p) => p.modes);
-          const stPenalty = stShortfallPenalty(
-            wd.stRequired,
-            state.strength(character.derived.effectiveSt),
-          );
-          const resolution = resolveWeaponSkill(w.name, wd.skill, skillCandidates);
-          // Only offer the vitals/eye presets when at least one of the
-          // weapon's parsed damage modes -- across EVERY attack mode --
-          // can target them (B399). A weapon with no parseable modes at
-          // all (free-text homebrew damage) keeps the full preset list
-          // rather than being punished for not parsing.
-          const canHitVitals =
-            allModes.length === 0 || allModes.some((m) => canTargetVitals(m.type));
-          const locationPresets = canHitVitals
-            ? HIT_LOCATION_PRESETS
-            : HIT_LOCATION_PRESETS_NO_VITALS;
-          // Ranged weapons get Aim (+Acc) and the speed/range penalties
-          // ahead of hit locations. Single-select like every preset —
-          // range + location stacking composes via the ± steppers.
-          const ranged = wd.ranged;
-          const presets: readonly RollPreset[] = ranged
-            ? [
-                ...(ranged.acc != null ? [{ label: `Aim (+${ranged.acc})`, mod: ranged.acc }] : []),
-                ...RANGE_PRESETS,
-                ...locationPresets,
-              ]
-            : locationPresets;
+      <div className="overflow-x-auto">
+        <table className="table table-sm w-full">
+          <caption className="sr-only">
+            Equipped weapon attacks. Sort columns or choose Custom to reorder weapons.
+          </caption>
+          <thead>
+            <tr>
+              {preferences.sort === 'custom' && (
+                <th scope="col" className="w-9">
+                  <span className="sr-only">Reorder</span>
+                </th>
+              )}
+              {sortHeader('Weapon', 'weapon')}
+              {sortHeader('Governing skill', 'skill')}
+              <th scope="col">Damage</th>
+              {sortHeader('Type', 'type')}
+              <th scope="col">Reach</th>
+            </tr>
+          </thead>
+          {sortedWeapons.map((w, weaponIndex) => {
+            const wd = w.weaponData;
+            if (!wd) return null;
+            const lines = damageLinesFor(w.name, wd);
+            const parsedByLine = lines.map((line) => ({
+              line,
+              modes: line.damage ? parseDamageSpec(line.damage) : [],
+            }));
+            const allModes = parsedByLine.flatMap((p) => p.modes);
+            const stPenalty = stShortfallPenalty(
+              wd.stRequired,
+              state.strength(character.derived.effectiveSt),
+            );
+            const resolution = resolveWeaponSkill(w.name, wd.skill, skillCandidates);
+            // Only offer the vitals/eye presets when at least one of the
+            // weapon's parsed damage modes -- across EVERY attack mode --
+            // can target them (B399). A weapon with no parseable modes at
+            // all (free-text homebrew damage) keeps the full preset list
+            // rather than being punished for not parsing.
+            const canHitVitals =
+              allModes.length === 0 || allModes.some((m) => canTargetVitals(m.type));
+            const locationPresets = canHitVitals
+              ? HIT_LOCATION_PRESETS
+              : HIT_LOCATION_PRESETS_NO_VITALS;
+            // Ranged weapons get Aim (+Acc) and the speed/range penalties
+            // ahead of hit locations. Single-select like every preset —
+            // range + location stacking composes via the ± steppers.
+            const ranged = wd.ranged;
+            const presets: readonly RollPreset[] = ranged
+              ? [
+                  ...(ranged.acc != null
+                    ? [{ label: `Aim (+${ranged.acc})`, mod: ranged.acc }]
+                    : []),
+                  ...RANGE_PRESETS,
+                  ...locationPresets,
+                ]
+              : locationPresets;
 
-          return (
-            <div key={w.id} className="space-y-1.5 rounded-lg border border-base-300/60 p-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="font-medium">{w.name}</span>
-                {stPenalty > 0 && (
-                  <span className="badge badge-warning badge-outline text-[10px]">
-                    ST {wd.stRequired} (−{stPenalty})
-                  </span>
-                )}
-              </div>
-              {parsedByLine.map(({ line, modes }) => (
-                <div
-                  key={line.key}
-                  className="num flex flex-wrap items-center gap-1.5 text-xs text-base-content/70"
-                >
-                  {line.modeName && <span className="label-eyebrow not-num">{line.modeName}</span>}
-                  {modes.length > 0 ? (
-                    modes.map((m) => {
-                      const resolved = resolveDamage(m, thrust, swing);
-                      if (!resolved) return <span key={`${line.key}:${m.raw}`}>{m.raw}</span>;
-                      const dice = formatDamageDice(resolved.dice);
-                      const type = resolved.type ? ` ${resolved.type}` : '';
-                      const divisor = resolved.armorDivisor ? ` (${resolved.armorDivisor})` : '';
-                      const display = `${dice}${type}${divisor}`;
-                      const rollLabel = line.modeName
-                        ? `${w.name} (${line.modeName}) damage`
-                        : `${w.name} damage`;
-                      return (
-                        <button
-                          key={`${line.key}:${m.raw}`}
-                          type="button"
-                          className="chip"
-                          onClick={() =>
-                            openRoll({
-                              label: rollLabel,
-                              baseTarget: 0,
-                              damage: {
-                                dice: resolved.dice,
-                                damageType: resolved.type,
-                                armorDivisor: resolved.armorDivisor,
-                              },
-                            })
-                          }
-                        >
-                          {display}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <span>{line.damage ?? '—'}</span>
-                  )}
-                  {line.reach ? <span>· reach {line.reach}</span> : null}
-                </div>
-              ))}
-              {ranged && rangedStatLine(ranged) !== '' && (
-                <p className="num text-xs text-base-content/70">{rangedStatLine(ranged)}</p>
-              )}
-              {resolution.kind === 'matched' ? (
-                <RollableRow
-                  label={resolution.name}
-                  baseTarget={resolution.level - stPenalty}
-                  presets={presets}
-                  openRoll={openRoll}
-                  sublabel={
-                    stPenalty > 0 ? (
-                      <span className="block text-[11px] text-base-content/60">
-                        {resolution.name} {resolution.level} − {stPenalty} ST
-                      </span>
-                    ) : undefined
+            const rows = parsedByLine.flatMap(({ line, modes }) =>
+              (modes.length ? modes : [null]).map((mode, index) => ({
+                line,
+                mode,
+                key: `${line.key}:${index}`,
+              })),
+            );
+            return (
+              <tbody
+                key={w.id}
+                aria-label={w.name}
+                className={`border-t border-base-300/60 ${draggingId === w.id ? 'opacity-40' : ''} ${dropTarget === w.id ? 'bg-base-200' : ''}`}
+                onDragEnter={(event) => {
+                  if (draggingId) {
+                    event.preventDefault();
+                    setDropTarget(w.id);
                   }
-                />
-              ) : resolution.kind === 'missing' ? (
-                <p className="text-[11px] text-base-content/50">
-                  Skill '{resolution.skillName}' not on sheet — add it in the Skills tab.
-                </p>
-              ) : (
-                <p className="text-[11px] text-base-content/50">No matching skill on sheet.</p>
-              )}
-            </div>
-          );
-        })}
+                }}
+                onDragOver={(event) => {
+                  if (draggingId) {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                  }
+                }}
+                onDrop={(event) => {
+                  if (!draggingId) return;
+                  event.preventDefault();
+                  moveWeapon(draggingId, w.id);
+                  setDraggingId(null);
+                  setDropTarget(null);
+                }}
+              >
+                {rows.map(({ line, mode, key }, rowIndex) => {
+                  const resolved = mode ? resolveDamage(mode, thrust, swing) : null;
+                  const dice = resolved ? formatDamageDice(resolved.dice) : null;
+                  const divisor = resolved?.armorDivisor ? ` (${resolved.armorDivisor})` : '';
+                  return (
+                    <tr key={key} className="border-0">
+                      {rowIndex === 0 && preferences.sort === 'custom' && (
+                        <td rowSpan={rows.length} className="align-top px-1">
+                          <button
+                            type="button"
+                            draggable
+                            aria-label={`Reorder attack ${weaponIndex + 1}`}
+                            title="Drag to reorder, or focus and use the up/down arrow keys"
+                            className="btn btn-ghost btn-xs cursor-grab px-1 text-base-content/40 active:cursor-grabbing"
+                            onDragStart={(event) => {
+                              event.dataTransfer.setData('text/plain', w.id);
+                              event.dataTransfer.effectAllowed = 'move';
+                              setDraggingId(w.id);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingId(null);
+                              setDropTarget(null);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+                              event.preventDefault();
+                              const target =
+                                sortedWeapons[weaponIndex + (event.key === 'ArrowUp' ? -1 : 1)];
+                              if (target) moveWeapon(w.id, target.id);
+                            }}
+                          >
+                            <span aria-hidden="true">⠿</span>
+                          </button>
+                        </td>
+                      )}
+                      {rowIndex === 0 && (
+                        <>
+                          <th
+                            scope="rowgroup"
+                            rowSpan={rows.length}
+                            className="min-w-32 max-w-64 align-top font-normal"
+                          >
+                            <span className="block font-medium">{w.name}</span>
+                            {stPenalty > 0 && (
+                              <span className="badge badge-warning badge-outline badge-xs mt-1 whitespace-nowrap">
+                                ST {wd.stRequired} (−{stPenalty})
+                              </span>
+                            )}
+                            {ranged && rangedStatLine(ranged) !== '' && (
+                              <p className="num mt-1 text-[11px] text-base-content/50">
+                                {rangedStatLine(ranged)}
+                              </p>
+                            )}
+                          </th>
+                          <td rowSpan={rows.length} className="align-top">
+                            {resolution.kind === 'matched' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm h-auto min-h-8 gap-2 px-2 py-1 text-left font-normal"
+                                  onClick={() =>
+                                    openRoll({
+                                      label: resolution.name,
+                                      baseTarget: resolution.level - stPenalty,
+                                      presets,
+                                    })
+                                  }
+                                >
+                                  <span className="max-w-40 text-xs">{resolution.name}</span>
+                                  <span className="num text-base font-bold">
+                                    {resolution.level - stPenalty}
+                                  </span>
+                                </button>
+                                {stPenalty > 0 && (
+                                  <span className="mt-1 block text-[11px] text-base-content/50">
+                                    {resolution.level} − {stPenalty} ST
+                                  </span>
+                                )}
+                              </>
+                            ) : resolution.kind === 'missing' ? (
+                              <p className="max-w-44 text-xs text-base-content/50">
+                                Skill '{resolution.skillName}' not on sheet — add it in the Skills
+                                tab.
+                              </p>
+                            ) : (
+                              <p className="text-xs text-base-content/50">
+                                No matching skill on sheet.
+                              </p>
+                            )}
+                          </td>
+                        </>
+                      )}
+                      <td className="whitespace-nowrap">
+                        {line.modeName && (
+                          <span className="mb-0.5 block text-[10px] text-base-content/50">
+                            {line.modeName}
+                          </span>
+                        )}
+                        {resolved ? (
+                          <button
+                            type="button"
+                            className="btn btn-sm num h-8 min-h-8 px-2"
+                            aria-label={`${dice}${resolved.type ? ` ${resolved.type}` : ''}${divisor}`}
+                            onClick={() =>
+                              openRoll({
+                                label: line.modeName
+                                  ? `${w.name} (${line.modeName}) damage`
+                                  : `${w.name} damage`,
+                                baseTarget: 0,
+                                damage: {
+                                  dice: resolved.dice,
+                                  damageType: resolved.type,
+                                  armorDivisor: resolved.armorDivisor,
+                                },
+                              })
+                            }
+                          >
+                            {dice}
+                            {divisor}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-base-content/60">
+                            {mode?.raw ?? line.damage ?? '—'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="num text-xs text-base-content/70">{mode?.type ?? '—'}</td>
+                      <td className="num whitespace-nowrap text-xs text-base-content/70">
+                        {line.reach ?? '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            );
+          })}
+        </table>
       </div>
     </section>
   );

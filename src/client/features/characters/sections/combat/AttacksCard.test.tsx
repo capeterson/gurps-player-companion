@@ -5,13 +5,14 @@
  * impaling or piercing weapon must.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeDerived } from '../../../../../shared/domain/characterCalc.ts';
 import { applyEffectsToAttrs, resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { AttacksCard } from './AttacksCard.tsx';
+import { clearAllAttackTablePreferences } from './attackTablePreferences.ts';
 
 /** Pull the `presets` array out of an openRoll mock's first call. */
 function presetsFrom(openRoll: ReturnType<typeof vi.fn>): readonly { label: string }[] {
@@ -50,6 +51,114 @@ function makeCharacter(damage: string, overrides: WeaponOverrides = {}): Charact
 }
 
 describe('AttacksCard', () => {
+  beforeEach(() => clearAllAttackTablePreferences());
+
+  function withMultipleWeapons() {
+    const character = makeCharacter('sw+1 cut', { name: 'Sword', skill: 'Broadsword' });
+    const sword = character.inventory[0];
+    if (!sword?.weaponData) throw new Error('Missing weapon fixture');
+    character.inventory = [
+      sword,
+      {
+        ...sword,
+        id: 'w2',
+        name: 'Bow',
+        weaponData: { ...sword.weaponData, damage: '1d imp', skill: 'Bow' },
+      },
+      {
+        ...sword,
+        id: 'w3',
+        name: 'Axe',
+        weaponData: { ...sword.weaponData, damage: '2d cr', skill: 'Axe/Mace' },
+      },
+    ];
+    return character;
+  }
+
+  function weaponOrder() {
+    return screen
+      .getAllByRole('rowgroup')
+      .filter((row) => row.hasAttribute('aria-label'))
+      .map((row) => row.getAttribute('aria-label'));
+  }
+
+  it('sorts weapon, governing skill and damage type in either direction without losing custom order', () => {
+    render(<AttacksCard character={withMultipleWeapons()} openRoll={vi.fn()} />);
+    expect(weaponOrder()).toEqual(['Sword', 'Bow', 'Axe']);
+    fireEvent.click(screen.getByRole('button', { name: 'Weapon' }));
+    expect(weaponOrder()).toEqual(['Axe', 'Bow', 'Sword']);
+    fireEvent.click(screen.getByRole('button', { name: 'Weapon' }));
+    expect(weaponOrder()).toEqual(['Sword', 'Bow', 'Axe']);
+    fireEvent.click(screen.getByRole('button', { name: 'Governing skill' }));
+    expect(weaponOrder()).toEqual(['Axe', 'Bow', 'Sword']);
+    fireEvent.click(screen.getByRole('button', { name: 'Type' }));
+    expect(weaponOrder()).toEqual(['Axe', 'Sword', 'Bow']);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Attack order' }), {
+      target: { value: 'custom' },
+    });
+    expect(weaponOrder()).toEqual(['Sword', 'Bow', 'Axe']);
+  });
+
+  it('persists keyboard custom ordering across remounts and keeps preferences separate per character', () => {
+    const character = withMultipleWeapons();
+    const view = render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    const bow = screen.getByRole('rowgroup', { name: 'Bow' });
+    fireEvent.keyDown(within(bow).getByRole('button', { name: /Reorder/ }), { key: 'ArrowUp' });
+    expect(weaponOrder()).toEqual(['Bow', 'Sword', 'Axe']);
+    view.unmount();
+    const remount = render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(weaponOrder()).toEqual(['Bow', 'Sword', 'Axe']);
+    remount.rerender(
+      <AttacksCard character={{ ...character, id: 'another-character' }} openRoll={vi.fn()} />,
+    );
+    expect(weaponOrder()).toEqual(['Sword', 'Bow', 'Axe']);
+    remount.rerender(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(weaponOrder()).toEqual(['Bow', 'Sword', 'Axe']);
+  });
+
+  it('drags a weapon and all its modes together, then restores that order after a reload', () => {
+    const character = withMultipleWeapons();
+    const view = render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(
+      within(screen.getByRole('rowgroup', { name: 'Axe' })).getByRole('button', {
+        name: /Reorder/,
+      }),
+      { dataTransfer },
+    );
+    fireEvent.dragEnter(screen.getByRole('rowgroup', { name: 'Sword' }), { dataTransfer });
+    fireEvent.dragOver(screen.getByRole('rowgroup', { name: 'Sword' }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('rowgroup', { name: 'Sword' }), { dataTransfer });
+    expect(weaponOrder()).toEqual(['Axe', 'Sword', 'Bow']);
+    view.unmount();
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(weaponOrder()).toEqual(['Axe', 'Sword', 'Bow']);
+  });
+
+  it('appends newly equipped weapons and tolerates removed IDs or invalid saved preferences', () => {
+    localStorage.setItem(
+      'gurps:attackTable:char-1',
+      JSON.stringify({ order: ['gone', 'w2', 'w2', 5], sort: 'custom' }),
+    );
+    const character = withMultipleWeapons();
+    const view = render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(weaponOrder()).toEqual(['Bow', 'Sword', 'Axe']);
+    view.unmount();
+    localStorage.setItem('gurps:attackTable:char-1', 'invalid JSON');
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(weaponOrder()).toEqual(['Sword', 'Bow', 'Axe']);
+  });
+
+  it('clears local attack preferences at logout without deleting unrelated storage', () => {
+    localStorage.setItem('gurps:attackTable:char-1', '{}');
+    localStorage.setItem('gurps:attackTable:char-2', '{}');
+    localStorage.setItem('test-unrelated-setting', 'keep');
+    clearAllAttackTablePreferences();
+    expect(localStorage.getItem('gurps:attackTable:char-1')).toBeNull();
+    expect(localStorage.getItem('gurps:attackTable:char-2')).toBeNull();
+    expect(localStorage.getItem('test-unrelated-setting')).toBe('keep');
+    localStorage.removeItem('test-unrelated-setting');
+  });
   it('withholds ST-based damage while effects are unknown, keeping fixed dice usable', () => {
     const character = {
       ...makeCharacter('thr+1 imp / sw+1 cut / 2d pi'),
@@ -330,10 +439,9 @@ describe('AttacksCard', () => {
     // Two impulse damage chips (thrust + thrown) at ST 10 (thr = 1d-2).
     expect(screen.getAllByRole('button', { name: '1d-2 imp' })).toHaveLength(2);
 
-    // A mode with its own reach shows that reach; an unset one inherits the
-    // weapon's "1". Each reach renders as "· reach <value>" in one span.
-    expect(screen.getByText(/reach 2/)).toBeInTheDocument();
-    expect(screen.getAllByText(/reach 1/)).toHaveLength(2);
+    // Dedicated reach cells align each mode's inherited or overridden reach.
+    expect(screen.getByRole('cell', { name: '2' })).toBeInTheDocument();
+    expect(screen.getAllByRole('cell', { name: '1' })).toHaveLength(2);
 
     // Rolling the thrust mode labels the roll with "Rapier (Thrust)".
     const thrustChips = screen.getAllByRole('button', { name: '1d-2 imp' });

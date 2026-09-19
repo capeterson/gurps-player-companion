@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import { type ArmorFacing, resolveArmorDb } from '../../../../../shared/domain/armorDr.ts';
 import {
   type AllOutDefenseOption,
@@ -18,11 +17,13 @@ import {
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import type { RollRequest } from '../rollTypes.ts';
-import { locationLabel } from './armorViewOptions.ts';
 
 export interface DefensesCardProps {
   character: CharacterDetail;
   openRoll: (req: RollRequest) => void;
+  /** Shared with Defense & Damage Resistance so armor DB uses its selected hit context. */
+  hitLocation?: string;
+  facing?: ArmorFacing | undefined;
 }
 
 interface ParryRow {
@@ -38,10 +39,13 @@ function modifierCaption(value: number): string {
   return value ? ` ${value > 0 ? '+' : '−'} ${Math.abs(value)} defense modifiers` : '';
 }
 
-export function DefensesCard({ character, openRoll }: DefensesCardProps) {
+export function DefensesCard({
+  character,
+  openRoll,
+  hitLocation = 'torso',
+  facing,
+}: DefensesCardProps) {
   const [defenseOption, setDefenseOption] = useState<AllOutDefenseOption>(null);
-  const [hitLocation, setHitLocation] = useState('torso');
-  const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changing character or maneuver ends this local turn option.
   useEffect(() => {
     setDefenseOption(null);
@@ -57,16 +61,6 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   });
   const equippedItems = character.inventory.filter((i) => i.equipped);
   const weapons = equippedItems.filter((i) => i.weaponData != null);
-  const customArmorLocations = [
-    ...new Set(
-      character.inventory.flatMap(
-        (item) =>
-          item.armor?.locations.filter((location) => !HIT_LOCATIONS.includes(location as never)) ??
-          [],
-      ),
-    ),
-  ].sort();
-
   // Shield DB is its own source. Armor contributes only the highest
   // equipped layer covering this incoming hit; armor DB never stacks.
   const shield = pickShield(equippedItems);
@@ -194,49 +188,18 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-2" aria-label="Incoming hit for defense rolls">
-        <label className="flex flex-col gap-1">
-          <span className="label-eyebrow">Hit location</span>
-          <select
-            aria-label="Defense hit location"
-            className="select select-sm select-bordered"
-            value={hitLocation}
-            onChange={(event) => setHitLocation(event.target.value)}
-          >
-            {[...HIT_LOCATIONS, ...customArmorLocations].map((location) => (
-              <option key={location} value={location}>
-                {locationLabel(location)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="label-eyebrow">Facing</span>
-          <select
-            aria-label="Defense facing"
-            className="select select-sm select-bordered"
-            value={facing ?? ''}
-            onChange={(event) =>
-              setFacing(event.target.value === '' ? undefined : (event.target.value as ArmorFacing))
-            }
-          >
-            <option value="">Unknown</option>
-            <option value="front">Front</option>
-            <option value="back">Back</option>
-          </select>
-        </label>
-      </div>
-
       {/* GURPS defenses share the 3d6-vs-target shape with skill rolls but
           use a different "critical" table (auto success on 3-4, auto
           failure on 17-18, independent of score). We route them through
           the same evaluateRoll as skills anyway — an accepted
           simplification for this pass rather than a second rules table. */}
 
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-base-300/60 px-3 py-2">
-        <span className="min-w-0 truncate text-sm font-medium">Move</span>
-        <span className="num shrink-0 text-sm text-base-content">
-          {moveNet}
+      <div className="grid gap-2 sm:grid-cols-2" aria-label="Move and defense actions">
+        <div className="rounded-lg border border-base-300/60 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium">Move</span>
+            <strong className="num shrink-0 text-2xl text-base-content">{moveNet}</strong>
+          </div>
           {(moveNet !== encumberedMove || state.maneuver) && (
             <span className="block text-[11px] text-base-content/60">
               {encumberedMove} before pool, posture, and maneuver limits
@@ -245,69 +208,71 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
           {moveCaption && (
             <span className="block text-[11px] text-base-content/60">{moveCaption}</span>
           )}
-        </span>
-      </div>
+        </div>
 
-      <RollableRow
-        label="Dodge"
-        baseTarget={dodge ?? 0}
-        unavailableReason={state.reason('dodge')}
-        openRoll={openRoll}
-        sublabel={
-          dodgeCaption ? (
-            <span className="block text-[11px] text-base-content/60">{dodgeCaption}</span>
-          ) : undefined
-        }
-      />
-
-      {parryRows.map((row) =>
-        row.value != null ? (
-          <RollableRow
-            key={row.key}
-            label={`Parry (${row.name})`}
-            baseTarget={state.defense('parry', row.value, defenseOption, db) ?? 0}
-            unavailableReason={state.reason('parry')}
-            openRoll={openRoll}
-            sublabel={<span className="block text-[11px] text-base-content/60">{row.caption}</span>}
-          />
-        ) : (
-          <div
-            key={row.key}
-            className="flex items-center justify-between gap-3 rounded-lg border border-base-300/60 px-3 py-2"
-          >
-            <span className="min-w-0 truncate text-sm font-medium">
-              Parry ({row.name})
-              {row.caption && (
-                <span className="block text-[11px] text-base-content/60">{row.caption}</span>
-              )}
-            </span>
-            <span className="num shrink-0 text-sm text-base-content/70">{row.raw}</span>
-          </div>
-        ),
-      )}
-
-      {shield && blockResolution && blockResolution.kind === 'matched' && (
         <RollableRow
-          label={`Block (${shield.name})`}
-          baseTarget={
-            state.defense(
-              'block',
-              blockFromSkill(blockResolution.level, character.derived.blockMod),
-              defenseOption,
-              db,
-            ) ?? 0
-          }
-          unavailableReason={state.reason('block')}
+          label="Dodge"
+          baseTarget={dodge ?? 0}
+          unavailableReason={state.reason('dodge')}
           openRoll={openRoll}
           sublabel={
-            <span className="block text-[11px] text-base-content/60">
-              via {blockResolution.name}–{blockResolution.level}
-              {modifierCaption(character.derived.blockMod)}
-              {dbCaption}
-            </span>
+            dodgeCaption ? (
+              <span className="block text-[11px] text-base-content/60">{dodgeCaption}</span>
+            ) : undefined
           }
         />
-      )}
+
+        {parryRows.map((row) =>
+          row.value != null ? (
+            <RollableRow
+              key={row.key}
+              label={`Parry (${row.name})`}
+              baseTarget={state.defense('parry', row.value, defenseOption, db) ?? 0}
+              unavailableReason={state.reason('parry')}
+              openRoll={openRoll}
+              sublabel={
+                <span className="block text-[11px] text-base-content/60">{row.caption}</span>
+              }
+            />
+          ) : (
+            <div
+              key={row.key}
+              className="flex items-center justify-between gap-3 rounded-lg border border-base-300/60 px-3 py-2"
+            >
+              <span className="min-w-0 truncate text-sm font-medium">
+                Parry ({row.name})
+                {row.caption && (
+                  <span className="block text-[11px] text-base-content/60">{row.caption}</span>
+                )}
+              </span>
+              <span className="num shrink-0 text-sm text-base-content/70">{row.raw}</span>
+            </div>
+          ),
+        )}
+
+        {shield && blockResolution && blockResolution.kind === 'matched' && (
+          <RollableRow
+            label={`Block (${shield.name})`}
+            baseTarget={
+              state.defense(
+                'block',
+                blockFromSkill(blockResolution.level, character.derived.blockMod),
+                defenseOption,
+                db,
+              ) ?? 0
+            }
+            unavailableReason={state.reason('block')}
+            openRoll={openRoll}
+            sublabel={
+              <span className="block text-[11px] text-base-content/60">
+                via {blockResolution.name}–{blockResolution.level}
+                {modifierCaption(character.derived.blockMod)}
+                {dbCaption}
+              </span>
+            }
+          />
+        )}
+      </div>
       {shield && blockResolution && blockResolution.kind !== 'matched' && (
         <p className="text-xs text-base-content/60">
           {shield.name} is equipped but has no usable Shield skill —{' '}

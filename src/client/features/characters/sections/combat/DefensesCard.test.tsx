@@ -94,6 +94,13 @@ function targetFor(openRoll: ReturnType<typeof vi.fn>, index: number): number {
 }
 
 describe('DefensesCard', () => {
+  it('keeps the action grid focused on Move and rollable defenses', () => {
+    render(<DefensesCard character={makeCharacter([], [])} openRoll={vi.fn()} />);
+    expect(screen.getByLabelText('Move and defense actions')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Defense hit location')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Defense facing')).not.toBeInTheDocument();
+  });
+
   it.each(['All-Out Attack', 'Move and Attack'])(
     'preserves permanent parry diagnostics during %s',
     (maneuver) => {
@@ -478,14 +485,15 @@ describe('DefensesCard', () => {
         { id: 'head', name: 'Helm', db: 2, locations: ['skull'] },
       ],
     );
-    render(<DefensesCard character={character} openRoll={openRoll} />);
+    const view = render(<DefensesCard character={character} openRoll={openRoll} />);
     fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
     expect(targetFor(openRoll, 0)).toBe(12); // 9 + max(1, 3), never +4
-    fireEvent.change(screen.getByLabelText('Defense hit location'), { target: { value: 'skull' } });
+    view.rerender(<DefensesCard character={character} openRoll={openRoll} hitLocation="skull" />);
     fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
     expect(targetFor(openRoll, 1)).toBe(11);
-    fireEvent.change(screen.getByLabelText('Defense hit location'), { target: { value: 'torso' } });
-    fireEvent.change(screen.getByLabelText('Defense facing'), { target: { value: 'back' } });
+    view.rerender(
+      <DefensesCard character={character} openRoll={openRoll} hitLocation="torso" facing="back" />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
     expect(targetFor(openRoll, 2)).toBe(10);
   });

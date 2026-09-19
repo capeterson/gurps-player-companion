@@ -81,6 +81,14 @@ export function HomePage() {
                     ST {c.st} · DX {c.dx} · IQ {c.iq} · HT {c.ht}
                   </p>
                 </Link>
+                {c.campaignId && c.campaignName && (
+                  <Link
+                    to={`/campaigns/${c.campaignId}`}
+                    className="link link-hover mt-1 truncate text-xs font-medium text-base-content/70"
+                  >
+                    {c.campaignName}
+                  </Link>
+                )}
               </div>
             ))}
           </div>

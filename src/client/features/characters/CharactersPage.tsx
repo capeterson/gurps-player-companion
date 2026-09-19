@@ -93,16 +93,26 @@ export function CharactersPage() {
       <ul className="grid md:grid-cols-2 gap-3">
         {(characters ?? []).map((c) => (
           <li key={c.id}>
-            <Link
-              to={`/characters/${c.id}`}
-              className="card block p-4 transition hover:border-border-strong"
-            >
-              <p className="font-display text-xl">{c.name}</p>
+            <article className="card block p-4 transition hover:border-border-strong">
+              <Link
+                to={`/characters/${c.id}`}
+                className="link link-hover font-display text-xl font-semibold"
+              >
+                {c.name}
+              </Link>
+              {c.campaignId && c.campaignName && (
+                <p className="mt-0.5 text-sm text-base-content/70">
+                  Campaign:{' '}
+                  <Link to={`/campaigns/${c.campaignId}`} className="link link-hover font-medium">
+                    {c.campaignName}
+                  </Link>
+                </p>
+              )}
               <p className="text-sm text-base-content/70">
                 <span className="num">ST {c.st}</span> · <span className="num">DX {c.dx}</span> ·{' '}
                 <span className="num">IQ {c.iq}</span> · <span className="num">HT {c.ht}</span>
               </p>
-            </Link>
+            </article>
           </li>
         ))}
         {characters && characters.length === 0 && (

@@ -2,13 +2,16 @@
 import { useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import {
+  type ArmorFacing,
   aggregateDrByLocation,
   armorCoversLocation,
   effectiveDrByLocation,
   innateDrCoversLocation,
   naturalSkullDr,
+  resolveArmorDb,
   resolveDr,
 } from '../../../../../shared/domain/armorDr.ts';
+import { pickShield } from '../../../../../shared/domain/defenseCalc.ts';
 import {
   effectiveDrAgainstAttack,
   woundingMultiplier,
@@ -24,13 +27,37 @@ export interface DrSummaryCardProps {
   canWrite?: boolean;
   hpMax?: number;
   bumpHp?: (delta: number) => void;
+  location?: string;
+  facing?: ArmorFacing | undefined;
+  onLocationChange?: (location: string) => void;
+  onFacingChange?: (facing: ArmorFacing | undefined) => void;
 }
 
-export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: DrSummaryCardProps) {
-  const [location, setLocation] = useState('torso');
+export function DrSummaryCard({
+  character,
+  canWrite = false,
+  hpMax,
+  bumpHp,
+  location: controlledLocation,
+  facing,
+  onLocationChange,
+  onFacingChange,
+}: DrSummaryCardProps) {
+  const [localLocation, setLocalLocation] = useState('torso');
+  const [localFacing, setLocalFacing] = useState<ArmorFacing | undefined>(undefined);
   const [type, setType] = useState('cr');
   const [divisor, setDivisor] = useState('');
   const [damageOpen, setDamageOpen] = useState(false);
+  const location = controlledLocation ?? localLocation;
+  const selectedFacing = facing ?? localFacing;
+  const setLocation = (next: string) => {
+    setLocalLocation(next);
+    onLocationChange?.(next);
+  };
+  const setFacing = (next: ArmorFacing | undefined) => {
+    setLocalFacing(next);
+    onFacingChange?.(next);
+  };
   const known = character.libraryEffectsKnown !== false && character.houseRulesKnown !== false;
   const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
   const map = known ? effectiveDrByLocation(character.inventory, character.effects) : new Map();
@@ -38,6 +65,10 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
   const dr = resolveDr(type, map.get(location));
   const effective = effectiveDrAgainstAttack(type, map.get(location), divisor, protectNaturalDr);
   const multiplier = woundingMultiplier(type, location);
+  const shield = pickShield(character.inventory.filter((item) => item.equipped));
+  const shieldDb = shield?.db ?? 0;
+  const armorDb = resolveArmorDb(character.inventory, location, selectedFacing);
+  const totalDb = shieldDb + (armorDb?.db ?? 0);
   const layers = known
     ? character.inventory.filter(
         (item) =>
@@ -56,11 +87,11 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
     : 0;
 
   return (
-    <section className="card p-4 sm:p-5 space-y-4" aria-label="Armor coverage">
+    <section className="card space-y-4 p-4 sm:p-5" aria-label="Defense and damage resistance">
       <div>
-        <h2 className="label-eyebrow">Effective DR</h2>
+        <h2 className="label-eyebrow">Defense &amp; Damage Resistance</h2>
         <p className="text-xs text-muted mt-1">
-          Select a location to inspect armor, innate protection, and incoming damage.
+          One hit context for armor defense bonus, damage resistance, and incoming damage.
         </p>
       </div>
       {!known && (
@@ -79,7 +110,7 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
           onSelect={setLocation}
         />
         <div className="space-y-4 min-w-0">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="flex flex-col gap-1 min-w-0">
               <span className="label-eyebrow">Hit location</span>
               <select
@@ -92,6 +123,23 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
                     {locationLabel(loc)}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="label-eyebrow">Facing</span>
+              <select
+                aria-label="Armor facing"
+                className="select select-sm select-bordered w-full"
+                value={selectedFacing ?? ''}
+                onChange={(event) =>
+                  setFacing(
+                    event.target.value === '' ? undefined : (event.target.value as ArmorFacing),
+                  )
+                }
+              >
+                <option value="">Unknown</option>
+                <option value="front">Front</option>
+                <option value="back">Back</option>
               </select>
             </label>
             <label className="flex flex-col gap-1 min-w-0">
@@ -152,6 +200,19 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
               The location modifier replaces the damage-type modifier; it does not multiply it
               again.
             </p>
+            <div className="mt-3 border-t border-base-300 pt-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-medium">Defense bonus</span>
+                <strong className="num text-lg">{totalDb > 0 ? `+${totalDb}` : '—'}</strong>
+              </div>
+              <p className="text-xs text-muted">
+                {armorDb
+                  ? `Armor DB +${armorDb.db} from ${armorDb.itemName}`
+                  : 'No armor DB for this location and facing'}
+                {shieldDb > 0 && shield ? ` · Shield DB +${shieldDb} from ${shield.name}` : ''}.
+                Applied to Dodge, Parry, and Block; DB never reduces damage.
+              </p>
+            </div>
           </div>
           {known && (
             <div>
@@ -186,8 +247,8 @@ export function DrSummaryCard({ character, canWrite = false, hpMax, bumpHp }: Dr
             </div>
           )}
           <p className="text-xs text-muted">
-            Use the attack’s effective divisor after Hardened DR or other special defenses.
-            Front-only and back-only armor are currently combined.
+            Use the attack’s effective divisor after Hardened DR or other special defenses. Facing
+            filters armor DB; front-only and back-only DR are currently combined.
           </p>
           {bumpHp && hpMax != null && canWrite && (
             <button
