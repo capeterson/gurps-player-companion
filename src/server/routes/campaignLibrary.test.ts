@@ -708,7 +708,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 10');
+    expect(yaml).toContain('version: 11');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
@@ -1182,7 +1182,7 @@ library:
     expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
 
     const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(firstYaml).toContain('version: 10');
+    expect(firstYaml).toContain('version: 11');
     expect(firstYaml).toContain('enchantments:');
 
     const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 /**
  * Reactive read hooks backed by Dexie via `useLiveQuery`.
  *
@@ -37,7 +38,8 @@ export function useCharacterDetail(
   id: string | undefined,
   options: UseCharacterDetailOptions = {},
 ): CharacterDetailResult {
-  return useLiveQuery(async () => {
+  const [clock, setClock] = useState(() => Date.now());
+  const result = useLiveQuery(async () => {
     if (!id) return null;
     const db = getLocalDb();
     const character = await db.characters.get(id);
@@ -55,6 +57,7 @@ export function useCharacterDetail(
       ]);
     const joined = joinCharacterMechanics(character.campaignId, traits, skills, options);
     const detail = buildCharacterDetail({
+      now: clock,
       character,
       traits: joined.traits,
       skills: joined.skills,
@@ -75,7 +78,27 @@ export function useCharacterDetail(
         : null,
     });
     return { ...detail, libraryEffectsKnown: joined.libraryEffectsKnown };
-  }, [id, options.libraryTraitEffects, options.librarySkillEffects]);
+  }, [id, clock, options.libraryTraitEffects, options.librarySkillEffects]);
+  const nextExpiry = result?.activeEffects
+    ?.filter((e) => e.state === 'active' && e.expiresAt && Date.parse(e.expiresAt) > clock)
+    .map((e) => Date.parse(e.expiresAt as string))
+    .sort((a, b) => a - b)[0];
+  useEffect(() => {
+    const refresh = () => setClock(Date.now());
+    const timer =
+      nextExpiry === undefined
+        ? undefined
+        : setTimeout(
+            refresh,
+            Math.min(2147483647, Math.max(1, nextExpiry - Math.max(Date.now(), clock))),
+          );
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [nextExpiry, clock]);
+  return result;
 }
 
 export type CharacterListResult = CharacterListItem[] | undefined;

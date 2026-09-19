@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
+import { activeEffectsField, capabilityEffect } from './activeEffects.ts';
 import { campaignHouseRules } from './campaign.ts';
 import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
@@ -140,6 +141,16 @@ export const characterAttributesShape = {
   moveMod: mod.default(0),
 
   tempEffects: tempEffectsField.default([]),
+  activeEffects: activeEffectsField.default([]),
+  activeConditionGroups: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z][a-z0-9_]*$/)
+        .max(40),
+    )
+    .max(100)
+    .default([]),
 } as const;
 
 export const characterIdentityShape = {
@@ -219,7 +230,7 @@ export const derivedStatsOut = z.object({
  * for UI breakdowns.
  */
 export const resolvedEffectOut = z.object({
-  sourceKind: z.enum(['trait', 'skill', 'item']),
+  sourceKind: z.enum(['trait', 'skill', 'item', 'active_effect']),
   sourceName: z.string(),
   sourceId: uuid,
   target: effectTarget,
@@ -283,6 +294,9 @@ export const characterListItem = z.object({
 });
 
 export const characterDetail = z.object({
+  capabilities: z
+    .array(z.object({ sourceId: uuid, sourceName: z.string(), capability: capabilityEffect }))
+    .default([]),
   /** Discriminator so the client can switch between full and minimal views. */
   view: z.literal('full').default('full'),
   id: uuid,

@@ -248,3 +248,12 @@ Modify:
 5. **Access:** assert `GET /characters/:id/history` 403s for a minimal-view member and 200s for owner + GM; `GET /campaigns/:id/history` returns only `scope='campaign'` rows.
 6. **E2E (Playwright):** GM opens campaign → History shows campaign changes but no character edits; GM opens a member character → History tab shows that character's edits; a multi-item inventory move appears as one foldable entry.
 7. **Lint/types:** `npm run lint && npm run typecheck`.
+
+## Active effects and procedures
+
+The `campaign_library_active_effects` table has the campaign-family audit trigger
+and `SYNCABLE_TABLES` registration. Applying, changing state, removing, or updating
+character effects uses the existing character trigger with readable array-change
+summaries. One array gesture is one outbox patch/history event; definition refresh
+and detachment remain inside the library writer's audit transaction. Skill
+procedure changes travel with the existing library and owned-mechanics audit rows.

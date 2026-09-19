@@ -21,6 +21,7 @@ requirement — not optional documentation.**
   - `campaign-content-sharing.md` — roles, invitations, the share gate /
     minimal view, and the YAML library.
   - `history-tracking.md` — the append-only audit log.
+  - `active-effects-skill-procedures.md` — active effect instances and declarative skill procedures.
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
     schema; a new JSON-typed field is incomplete without a schema and a
     catalog row.

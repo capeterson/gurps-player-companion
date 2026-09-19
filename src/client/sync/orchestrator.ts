@@ -1,3 +1,7 @@
+import {
+  activeEffectDefinitionOut,
+  activeEffectsField,
+} from '../../shared/schemas/activeEffects.ts';
 /**
  * Sync orchestrator -- the long-lived singleton that:
  *   - drains the Dexie outbox into POST /sync/operations,
@@ -1757,6 +1761,15 @@ class SyncOrchestrator {
     switch (entityClass) {
       case 'character': {
         const existing = await db.characters.get(id);
+        if (merged.activeEffects !== undefined)
+          merged.activeEffects = activeEffectsField
+            .parse(merged.activeEffects)
+            .map((entry) =>
+              entry.definitionId &&
+              entry.sourceCampaignId !== (merged.campaignId ?? existing?.campaignId ?? null)
+                ? { ...entry, definitionId: null }
+                : entry,
+            );
         await db.characters.put({ ...(existing ?? {}), ...merged } as LocalCharacter);
         return;
       }
@@ -1814,6 +1827,10 @@ class SyncOrchestrator {
         return;
       }
       case 'campaign': {
+        if (merged.activeEffectDefinitions !== undefined)
+          merged.activeEffectDefinitions = activeEffectDefinitionOut
+            .array()
+            .parse(merged.activeEffectDefinitions);
         const existing = await db.campaigns.get(id);
         await db.campaigns.put({ ...(existing ?? {}), ...merged } as Record<
           string,
@@ -1951,6 +1968,7 @@ class SyncOrchestrator {
             speedQuarterMod: 0,
             moveMod: 0,
             tempEffects: [],
+            activeEffects: [],
             dismissedWarnings: [],
             activeConditionGroups: [],
             updatedAt: now,

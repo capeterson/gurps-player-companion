@@ -1,3 +1,7 @@
+import type {
+  ActiveEffectDefinitionOut,
+  ActiveEffectInstance,
+} from '../../shared/schemas/activeEffects.ts';
 /**
  * Local Dexie database — the source of truth for the UI.
  *
@@ -67,6 +71,7 @@ export interface LocalCharacter {
    * since) may lack this column; readers default missing values to
    * `[]`. Not indexed -- no store version bump needed. */
   tempEffects?: TempEffect[];
+  activeEffects?: ActiveEffectInstance[];
   dismissedWarnings: string[];
   /** Trait/skill effect condition groups currently toggled ON. */
   activeConditionGroups: string[];
@@ -217,6 +222,7 @@ export interface LocalCharacterCombat {
 }
 
 export interface LocalCampaign {
+  activeEffectDefinitions?: ActiveEffectDefinitionOut[];
   id: string;
   name: string;
   description: string | null;

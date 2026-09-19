@@ -247,6 +247,18 @@ function summarizeCharacter(
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Character updated';
   const c = changes[0] as FieldChange;
+  if (c.field === 'activeEffects') {
+    const before = (c.oldValue ?? []) as Array<{ id: string; name: string; state: string }>;
+    const after = (c.newValue ?? []) as typeof before;
+    const changes = [
+      ...after.filter((e) => !before.some((b) => b.id === e.id)).map((e) => `Applied ${e.name}`),
+      ...before.filter((e) => !after.some((b) => b.id === e.id)).map((e) => `Removed ${e.name}`),
+      ...after
+        .filter((e) => before.some((b) => b.id === e.id && b.state !== e.state))
+        .map((e) => `${e.name}: ${e.state}`),
+    ];
+    return changes.join('; ') || 'Updated active effect mechanics, duration or notes';
+  }
   if (c.field === 'tempEffects') return summarizeTempEffects(c.oldValue, c.newValue);
   // Temp boost: delta-style label
   if (c.field in TEMP_ATTR_LABELS) {
@@ -687,6 +699,14 @@ export function summarizeEvent(event: {
       break;
     case 'campaign_library_style':
       summary = summarizeLibraryStyle(op, oldRow, newRow);
+      break;
+    case 'campaign_library_active_effect':
+      summary =
+        op === 'insert'
+          ? `Added active effect definition ${newRow?.name}`
+          : op === 'delete'
+            ? `Removed active effect definition ${oldRow?.name}`
+            : describeFieldChanges('Library active effect', diffRows(oldRow, newRow));
       break;
     case 'campaign_library_enchantment':
       summary = summarizeLibraryEnchantment(op, oldRow, newRow);

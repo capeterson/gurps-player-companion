@@ -130,3 +130,13 @@ name fallback, which still requires non-null `inventory_items.library_item_id`.
    the schema.
 4. Mirror the type on the Dexie interface if the entity is sync-backed.
 5. Add a row to the table above.
+
+## Active effects and skill procedures
+
+| Field | Zod schema and write boundaries |
+|---|---|
+| `characters.active_effects` | `activeEffectsField` (`activeEffects.ts`), typed `ActiveEffectInstance[]`; character create/update/sync schemas, authoritative source hydration, library refresh, and transactional client writes. Cursor application validates too. |
+| `campaign_library_active_effects.tags`, `.effects`, `.capabilities`, `.duration`, `.stacking` | Corresponding fields of `activeEffectDefinitionCreate`; Drizzle types derive from `ActiveEffectDefinition`. Library CRUD/YAML validate, and refresh reparses `activeEffectsField`. |
+| `campaign_library_skills.procedures` | `skillProcedures` (`skillProcedures.ts`), typed `SkillProcedures`; library CRUD/YAML and owned-snapshot parsing. |
+| `character_skills.library_mechanics.skillRules.procedures` | Optional `skillProcedures` within `ownedSkillRules`; captured, refreshed and retained with existing owned mechanics. |
+| Dexie `campaigns.activeEffectDefinitions` | Read-only `activeEffectDefinitionOut[]` cursor projection; validated at emission/application, retained by campaign mirrors, purged with campaigns. No additional server JSON column. |

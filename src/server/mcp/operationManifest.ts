@@ -33,6 +33,8 @@ const effectsOperations = new Set([
   'gpc_update_library_trait',
   'gpc_create_library_skill',
   'gpc_update_library_skill',
+  'gpc_create_library_active_effect',
+  'gpc_update_library_active_effect',
   'gpc_create_library_enchantment',
   'gpc_update_library_enchantment',
   'gpc_export_campaign_library',
@@ -203,6 +205,24 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
     'PATCH',
     '/api/v1/campaigns/{id}/library/items/{itemId}',
     'gpc_update_library_item',
+    'gpc:write',
+  ),
+  tool(
+    'POST',
+    '/api/v1/campaigns/{id}/library/active-effects',
+    'gpc_create_library_active_effect',
+    'gpc:write',
+  ),
+  tool(
+    'DELETE',
+    '/api/v1/campaigns/{id}/library/active-effects/{effectId}',
+    'gpc_delete_library_active_effect',
+    'gpc:manage',
+  ),
+  tool(
+    'PATCH',
+    '/api/v1/campaigns/{id}/library/active-effects/{effectId}',
+    'gpc_update_library_active_effect',
     'gpc:write',
   ),
   tool(

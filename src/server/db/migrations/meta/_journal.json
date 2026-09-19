@@ -344,6 +344,20 @@
       "when": 1800003000000,
       "tag": "0048_experimental_turn_tracker",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1800004000000,
+      "tag": "0049_skill_procedures",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1800005000000,
+      "tag": "0050_active_effects",
+      "breakpoints": true
     }
   ]
 }

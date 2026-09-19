@@ -1,6 +1,9 @@
+import type { ActiveEffectDefinitionOut } from '../../../shared/schemas/activeEffects.ts';
+import { skillProcedures } from '../../../shared/schemas/skillProcedures.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
+import { ActiveEffectLibrary } from './ActiveEffectLibrary.tsx';
 import { matchesLibrarySearch } from './librarySearch.ts';
 /**
  * Campaign library viewer + YAML import/export.  GMs (campaign owners)
@@ -48,9 +51,10 @@ interface LibraryPayload {
   spells: LibrarySpellOut[];
   items: LibraryItemOut[];
   enchantments: LibraryEnchantmentOut[];
+  activeEffects?: ActiveEffectDefinitionOut[];
 }
 
-type SectionKey = 'traits' | 'skills' | 'spells' | 'items' | 'enchantments';
+type SectionKey = 'traits' | 'skills' | 'spells' | 'items' | 'enchantments' | 'activeEffects';
 
 /**
  * Top-level library page.  Mirrors LogPage: when the parent route
@@ -306,6 +310,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       spells: lib?.spells?.length ?? 0,
       items: lib?.items.length ?? 0,
       enchantments: lib?.enchantments.length ?? 0,
+      activeEffects: lib?.activeEffects?.length ?? 0,
     };
   }, [library.data]);
 
@@ -500,6 +505,13 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           className={`chip ${section === 'enchantments' ? 'on' : ''}`}
         >
           Enchantments <span className="num text-dim ml-1">{counts.enchantments}</span>
+        </button>
+        <button
+          type="button"
+          className={`chip ${section === 'activeEffects' ? 'on' : ''}`}
+          onClick={() => setSection('activeEffects')}
+        >
+          Active Effects <span className="num">{counts.activeEffects}</span>
         </button>
       </div>
 
@@ -982,6 +994,14 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           </div>
 
           {/* ── Enchantments ── */}
+          <div hidden={section !== 'activeEffects'}>
+            <ActiveEffectLibrary
+              campaignId={campaignId ?? ''}
+              entries={library.data.activeEffects ?? []}
+              isOwner={isOwner}
+              search={search}
+            />
+          </div>
           <div hidden={section !== 'enchantments'} className="space-y-3">
             {(library.data.enchantments ?? [])
               .filter(
@@ -1491,6 +1511,9 @@ function SkillForm({
   );
   const [groups, setGroups] = useState((initial?.groups ?? []).join(', '));
   const [tags, setTags] = useState((initial?.tags ?? []).join(', '));
+  const [procedures, setProcedures] = useState(
+    JSON.stringify(initial?.procedures ?? { modifiers: [], actions: [], benefits: [] }, null, 2),
+  );
   const [rulesError, setRulesError] = useState<string | null>(null);
   const [defaultSpecialization, setDefaultSpecialization] = useState(
     initial?.defaultSpecialization ?? '',
@@ -1518,11 +1541,13 @@ function SkillForm({
     const tl = techLevel.trim() !== '' ? Number.parseInt(techLevel, 10) : null;
     let structuredPrerequisites: LibrarySkillCreate['prerequisiteRules'];
     let structuredDefaults: LibrarySkillCreate['defaults'];
+    let parsedProcedures: LibrarySkillCreate['procedures'];
     try {
+      parsedProcedures = skillProcedures.parse(JSON.parse(procedures));
       structuredPrerequisites = prerequisiteRules.trim() ? JSON.parse(prerequisiteRules) : null;
       structuredDefaults = defaults.trim() ? JSON.parse(defaults) : null;
-    } catch {
-      setRulesError('Prerequisite and default rules must be valid JSON.');
+    } catch (error) {
+      setRulesError(`Invalid skill rules: ${(error as Error).message}`);
       return;
     }
     const specializationPolicy: LibrarySkillSpecializationPolicy =
@@ -1567,6 +1592,7 @@ function SkillForm({
         .split(',')
         .map((value) => value.trim())
         .filter(Boolean),
+      procedures: parsedProcedures,
       situationalModifiers: initial?.situationalModifiers ?? [],
       effects,
     });
@@ -1700,6 +1726,23 @@ function SkillForm({
           )}
         </div>
       </div>
+      <details className="rounded border border-base-300 p-3">
+        <summary>Modifiers, actions and level benefits</summary>
+        <p className="text-xs">
+          Define bounded rules using modifiers, actions and benefits. Source text remains alongside
+          each rule. Unknown context is always left for the player to choose.
+        </p>
+        <label className="block">
+          Structured skill rules
+          <textarea
+            aria-label="Structured skill rules"
+            className="textarea textarea-bordered w-full font-mono"
+            rows={12}
+            value={procedures}
+            onChange={(e) => setProcedures(e.target.value)}
+          />
+        </label>
+      </details>
       {(specializationKind === 'required_catalog' || specializationKind === 'optional_catalog') && (
         <div className="space-y-2 rounded border border-base-300 p-3">
           <div className="flex items-center justify-between">

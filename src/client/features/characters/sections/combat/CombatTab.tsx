@@ -21,6 +21,7 @@ import { hpVarFor } from '../hpColor.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { useCombatPatch } from '../useCombatPatch.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
+import { ActiveEffectsPanel } from './ActiveEffectsPanel.tsx';
 import { AttacksCard } from './AttacksCard.tsx';
 import { DefensesCard } from './DefensesCard.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
@@ -65,6 +66,7 @@ export function CombatTab({
         <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
         <DefensesCard character={character} openRoll={openRoll} />
       </div>
+      <ActiveEffectsPanel character={character} canWrite={canWrite} />
       <AttacksCard character={character} openRoll={openRoll} />
       <DrSummaryCard
         key={character.id}

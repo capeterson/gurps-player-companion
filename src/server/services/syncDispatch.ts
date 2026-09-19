@@ -1,3 +1,4 @@
+import { prepareActiveEffects } from './activeEffects.ts';
 import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
 /**
  * Per-operation dispatcher for /api/v1/sync/operations.
@@ -116,6 +117,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_library_technique: null,
   campaign_library_style: null,
   campaign_library_enchantment: null,
+  campaign_library_active_effect: null,
   adventure_log: null,
 };
 
@@ -440,6 +442,7 @@ async function dispatchCharacter(
       enforceAttributeCaps = campaign.enforceAttributeCaps;
     }
     assertAttributeCaps(enforceAttributeCaps, body);
+    await prepareActiveEffects(tx, ctx.userId, null, body.campaignId ?? null, body);
     // Honor a client-supplied id so the local Dexie row keeps its
     // identity after the create round-trips.  If the id is already
     // taken, the unique index returns conflict via isUniqueViolation.
@@ -493,7 +496,18 @@ async function dispatchCharacter(
     entityClass: 'character',
     tx,
     table: characters,
-    prepareUpdates: (updates) => detachLibraryReferencesForTransfer(tx, op.entityId, updates),
+    prepareUpdates: async (updates) => {
+      await prepareActiveEffects(
+        tx,
+        ctx.userId,
+        op.entityId,
+        updates.campaignId === undefined
+          ? access.character.campaignId
+          : (updates.campaignId as string | null),
+        updates,
+      );
+      await detachLibraryReferencesForTransfer(tx, op.entityId, updates);
+    },
     childWhere: () => eq(characters.id, op.entityId),
     valueTransform: (field, value) => {
       if (field === 'campaignId' && value !== null && value !== undefined) {

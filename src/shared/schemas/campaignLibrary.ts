@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
+import { activeEffectDefinitionCreate } from './activeEffects.ts';
 import { campaignHouseRules } from './campaign.ts';
 import { timestamps, uuid } from './common.ts';
 import { libraryTraitEffect } from './effects.ts';
@@ -22,6 +23,7 @@ import {
   skillPrerequisites,
   skillTechLevelPolicy,
 } from './skill.ts';
+import { skillProcedures } from './skillProcedures.ts';
 import { spellDifficulty } from './spell.ts';
 import { techniqueDifficulty } from './technique.ts';
 import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
@@ -162,6 +164,7 @@ export const librarySkillOut = z.object({
   prerequisiteRules: skillPrerequisites.optional(),
   groups: tagList,
   tags: tagList,
+  procedures: skillProcedures.optional(),
   situationalModifiers: z.array(situationalModifier).default([]),
   effects: z.array(libraryTraitEffect).default([]),
   ...timestamps,
@@ -183,6 +186,7 @@ export const librarySkillCreate = z
     prerequisiteRules: skillPrerequisites.optional(),
     groups: tagList,
     tags: tagList,
+    procedures: skillProcedures.optional(),
     situationalModifiers: z.array(situationalModifier).default([]),
     effects: z.array(libraryTraitEffect).default([]),
   })
@@ -419,6 +423,7 @@ export const importResult = z.object({
   techniques: importSectionResult,
   styles: importSectionResult,
   enchantments: importSectionResult,
+  activeEffects: importSectionResult,
   /** Whether the opt-in `applyCampaignSettings` flag actually updated the
    * campaigns row (false when the flag was off or the doc had no `campaign`
    * block). */
@@ -449,6 +454,7 @@ export const libraryYamlVersion = z.union([
   z.literal(8),
   z.literal(9),
   z.literal(10),
+  z.literal(11),
 ]);
 
 export const libraryYamlDoc = z
@@ -492,6 +498,7 @@ export const libraryYamlDoc = z
         styles: z.array(libraryStyleCreate).optional(),
         /** Reusable typed enchantment definitions were added in v10. */
         enchantments: z.array(libraryEnchantmentCreate).optional(),
+        activeEffects: z.array(activeEffectDefinitionCreate).optional(),
       })
       .strict(),
   })
@@ -571,6 +578,7 @@ export const libraryPortableFieldManifest = {
     techLevelPolicy: true,
     groups: true,
     tags: true,
+    procedures: true,
     situationalModifiers: true,
     effects: true,
   } satisfies Record<keyof LibrarySkillCreate, true>,

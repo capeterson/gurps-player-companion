@@ -30,8 +30,14 @@ import {
   roll3d6,
   rollDamageDice,
 } from '../../../../shared/domain/diceRoll.ts';
+import {
+  type RuleContext,
+  evaluateActionOutcomes,
+  evaluateModifiers,
+} from '../../../../shared/domain/skillProcedures.ts';
 import { formatSigned } from '../../../../shared/format/number.ts';
 import { newClientId } from '../../../sync/outbox.ts';
+import { SkillRulePreview } from './SkillRulePreview.tsx';
 import { pushRoll } from './rollHistory.ts';
 import type { RollRequest } from './rollTypes.ts';
 
@@ -75,6 +81,26 @@ interface DamageResult {
 
 export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   const [modifier, setModifier] = useState(0);
+  const [context, setContext] = useState<RuleContext>(request.ruleContext ?? {});
+  const [choices, setChoices] = useState<Record<string, number>>({});
+  const contextual = evaluateModifiers(
+    request.rules ?? [],
+    context,
+    choices,
+    Object.fromEntries(
+      Object.entries(choices)
+        .filter(([k]) => k.startsWith('reference:'))
+        .map(([k, v]) => [k.slice(10), v]),
+    ),
+  );
+  const ruleBonus = contextual
+    .filter(
+      (e) =>
+        e.applied &&
+        (e.rule.appliesTo === 'task_roll' ||
+          (request.action?.contest && e.rule.appliesTo === 'contest')),
+    )
+    .reduce((sum, e) => sum + (e.value ?? 0), 0);
   // Single-select: picking a preset REPLACES the modifier with its
   // value; tapping the same preset again clears back to +0. This
   // keeps "aim at the skull, then the face" a one-tap gesture instead
@@ -94,7 +120,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   }, [onClose]);
 
   const damage = request.damage;
-  const effectiveTarget = request.baseTarget + modifier;
+  const effectiveTarget = Math.floor(request.baseTarget + modifier + ruleBonus);
   // For damage rolls the modifier is flat adds on top of the dice.
   const effectiveDice = damage
     ? { dice: damage.dice.dice, adds: damage.dice.adds + modifier }
@@ -216,6 +242,28 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
 
         <h2 className="mb-3 font-display text-2xl font-semibold">{request.label}</h2>
 
+        {(request.rules?.length || request.action) && (
+          <>
+            <SkillRulePreview
+              rules={request.rules ?? []}
+              source={request.label}
+              context={context}
+              choices={choices}
+              onContext={(v) => {
+                setContext(v);
+                setResult(null);
+              }}
+              onChoices={(v) => {
+                setChoices(v);
+                setResult(null);
+              }}
+              {...(request.action ? { action: request.action } : {})}
+            />
+            <p className="text-xs">
+              Base {request.baseTarget} + rules {ruleBonus} + situational {modifier}
+            </p>
+          </>
+        )}
         <div className="mb-3 flex items-baseline justify-center rounded-2xl border border-base-300/60 py-4">
           {damage && effectiveDice ? (
             <span
@@ -336,6 +384,13 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
                 {result.crit === 'success' ? 'Critical success' : 'Critical failure'}
               </span>
             )}
+            {request.action &&
+              evaluateActionOutcomes(request.action, result, context).map((outcome, i) => (
+                <p key={`${outcome.on}:${i}`}>
+                  {outcome.text}
+                  {outcome.amount ? ` (${outcome.resolvedAmount ?? 'Context required'})` : ''}
+                </p>
+              ))}
             {request.spellManaLevel === 'very_high' && !result.success && (
               <p className="text-sm text-error">
                 {result.manaDisaster

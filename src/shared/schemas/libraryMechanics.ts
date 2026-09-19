@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { revision, uuid } from './common.ts';
 import { traitEffect } from './effects.ts';
+import { skillProcedures } from './skillProcedures.ts';
 import { skillDefaults, skillPrerequisites, skillTechLevelPolicy } from './skillRules.ts';
 
 export const ownedSkillRules = z.object({
+  procedures: skillProcedures.optional(),
   techLevelPolicy: skillTechLevelPolicy,
   prerequisites: skillPrerequisites,
   defaults: skillDefaults,

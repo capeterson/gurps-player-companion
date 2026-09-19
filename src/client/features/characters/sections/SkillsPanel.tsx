@@ -22,6 +22,7 @@ import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
+import { ProseActionPreview } from './SkillRulePreview.tsx';
 import { ModifierBreakdownContent, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
@@ -160,6 +161,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
               defaults: resolved.defaults ?? null,
               groups: snap.picked.groups ?? [],
               tags: snap.picked.tags ?? [],
+              procedures: snap.picked.procedures,
             },
           })
         : null,
@@ -523,7 +525,14 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
                 ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
                 : undefined
           }
-          onRoll={(level) => onRoll({ label: displayName, baseTarget: level })}
+          onRoll={(level) =>
+            onRoll({
+              label: displayName,
+              baseTarget: level,
+              rules: skill.procedures?.modifiers.filter((r) => r.appliesTo !== 'base_level') ?? [],
+              ruleContext: skill.procedureContext ?? {},
+            })
+          }
         />
       </div>
       {canWrite && (
@@ -550,6 +559,55 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
         }}
         onCancel={() => setConfirmDelete(false)}
       />
+      {skill.procedures && (
+        <div className="col-span-full space-y-2">
+          {skill.procedures.actions.length > 0 && <h4 className="label-eyebrow">Actions</h4>}
+          {skill.procedures.actions.map((action) => (
+            <div key={action.id} className="rounded border border-base-300 p-2">
+              <p>{action.label}</p>
+              <p className="text-xs">{action.sourceText}</p>
+              {skill.actionTargets?.[action.id] != null ? (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() =>
+                    onRoll({
+                      label: `${displayName}: ${action.label}`,
+                      baseTarget: skill.actionTargets?.[action.id] ?? 0,
+                      rules: (skill.procedures?.modifiers ?? []).filter(
+                        (r) => r.appliesTo !== 'base_level',
+                      ),
+                      ruleContext: skill.procedureContext ?? {},
+                      action,
+                    })
+                  }
+                >
+                  Preview {action.label}
+                </button>
+              ) : (
+                <>
+                  <p className="text-xs">
+                    Prose-only or roll basis unavailable. {action.roll?.notes}
+                  </p>
+                  <ProseActionPreview
+                    action={action}
+                    source={displayName}
+                    context={skill.procedureContext ?? {}}
+                  />
+                </>
+              )}
+            </div>
+          ))}
+          {skill.procedures.benefits.map((benefit) => (
+            <p className="text-xs" key={benefit.id}>
+              {skill.benefitStatus?.find((b) => b.id === benefit.id)?.unlocked
+                ? 'Active'
+                : 'Locked'}
+              : {benefit.label} — {benefit.sourceText}
+            </p>
+          ))}
+        </div>
+      )}
       {skill.notes && (
         <FoldSection
           preferenceKey={`${skill.id}:description`}

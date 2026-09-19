@@ -1,3 +1,7 @@
+import type { ActiveEffectInstance } from '../schemas/activeEffects.ts';
+import { resolveActiveEffects } from './activeEffects.ts';
+import { actionTarget, benefitUnlocked, evaluateModifiers } from './skillProcedures.ts';
+import type { ResolvedEffect } from './traitEffects.ts';
 /**
  * Build the full CharacterDetail response shape from raw row data.
  *
@@ -92,6 +96,7 @@ export interface CharacterDetailInputCharacter {
   /** Optional: stale local Dexie rows and pre-migration server rows
    * may lack this column; adapters default it to `[]`. */
   tempEffects?: TempEffect[];
+  activeEffects?: ActiveEffectInstance[];
   dismissedWarnings: string[];
   /** Optional — defaults to []. Pre-Phase-2 rows may not have this field. */
   activeConditionGroups?: string[];
@@ -242,6 +247,7 @@ export interface CharacterDetailInputCampaign {
 }
 
 export interface CharacterDetailInput {
+  now?: number;
   readonly character: CharacterDetailInputCharacter;
   readonly traits: readonly CharacterDetailInputTrait[];
   readonly skills: readonly CharacterDetailInputSkill[];
@@ -404,6 +410,9 @@ export function buildSkillOut(
     librarySkillId: skill.librarySkillId,
     libraryMechanics: mechanics.success ? mechanics.data : (skill.libraryMechanics ?? null),
     defaults: skill.defaults ?? null,
+    ...(mechanics.success && mechanics.data.skillRules?.procedures
+      ? { procedures: mechanics.data.skillRules.procedures }
+      : {}),
     level,
     // No usable declared default means there is no bonus target to apply against.
     effectiveLevel: level === null ? null : level + skillBonus,
@@ -499,7 +508,10 @@ export function buildSpellOut(
   };
 }
 
-export function buildCharacterDetail(input: CharacterDetailInput): CharacterDetail {
+export function buildCharacterDetail(
+  input: CharacterDetailInput,
+  procedureEffects?: ResolvedEffect[],
+): CharacterDetail {
   const { character, traits, skills, spells, languages, techniques, inventory, combat, campaign } =
     input;
   const baseAttrs = characterAttrsFromRow(character);
@@ -520,7 +532,14 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
       }),
     ]),
   );
+  const activeResolution = resolveActiveEffects(
+    character.activeEffects ?? [],
+    activeGroups,
+    input.now ?? Date.now(),
+  );
   const resolved = [
+    ...(procedureEffects ?? []),
+    ...activeResolution.effects,
     ...resolveEffects(
       traits.map((t) => ({
         id: t.id,
@@ -687,6 +706,134 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
   );
   const combatOut = combat ? buildCombatStateOut(combat) : null;
 
+  // Benefits are evaluated once against the pre-benefit sheet; their own effects
+  // cannot unlock themselves or create a circular attribute/skill feedback loop.
+  if (procedureEffects === undefined) {
+    const extra: ResolvedEffect[] = [];
+    const statuses = new Map<string, Array<{ id: string; unlocked: boolean }>>();
+    const context: Record<string, number | string | boolean> = {
+      'character:ST': derived.effectiveSt,
+      'character:DX': derived.effectiveDx,
+      'character:IQ': derived.effectiveIq,
+      'character:HT': derived.effectiveHt,
+      'character:Will': derived.will,
+      'character:Per': derived.per,
+    };
+    if (campaign?.techLevel != null) context['tech_level:campaign'] = campaign.techLevel;
+    for (const [key, value] of Object.entries(campaign?.houseRules ?? {}))
+      if (['string', 'boolean', 'number'].includes(typeof value))
+        context[`campaign:${key}`] = value as string | number | boolean;
+    for (const trait of traits) context[`trait:${trait.name}`] = trait.level ?? 1;
+    for (const skill of skillsOut)
+      if (skill.effectiveLevel !== null)
+        context[`skill:${skill.name}${skill.specialization ? `/${skill.specialization}` : ''}`] =
+          skill.effectiveLevel;
+    for (const skill of skillsOut) {
+      const rules = skill.procedures;
+      if (!rules) continue;
+      const ownContext = {
+        ...context,
+        'character:points': skill.points,
+        ...(skill.techLevel == null ? {} : { 'tech_level:learned': skill.techLevel }),
+      };
+      const base = evaluateModifiers(
+        rules.modifiers.filter((r) => r.appliesTo === 'base_level'),
+        ownContext,
+      );
+      for (const entry of base)
+        if (entry.applied)
+          extra.push({
+            sourceKind: 'skill',
+            sourceName: `${skill.name}: ${entry.rule.label}`,
+            sourceId: skill.id,
+            target: 'skill',
+            skillName: skill.name,
+            ...(skill.specialization ? { skillSpecialty: skill.specialization } : {}),
+            value: entry.value ?? 0,
+            active: true,
+          });
+      const proceduralLevel =
+        skill.effectiveLevel === null
+          ? null
+          : skill.effectiveLevel +
+            base.filter((e) => e.applied).reduce((sum, e) => sum + (e.value ?? 0), 0);
+      const unlocked = rules.benefits.map((benefit) => ({
+        id: benefit.id,
+        unlocked: benefitUnlocked(
+          benefit,
+          proceduralLevel,
+          attributeLevelFor(skill.attribute, derived),
+          skill.points,
+          skill.specialization,
+        ),
+      }));
+      statuses.set(skill.id, unlocked);
+      for (const benefit of rules.benefits)
+        if (unlocked.find((b) => b.id === benefit.id)?.unlocked)
+          extra.push(
+            ...resolveEffects(
+              [],
+              [
+                {
+                  id: skill.id,
+                  name: `${skill.name}: ${benefit.label}`,
+                  libraryEffects: benefit.effects,
+                },
+              ],
+              activeGroups,
+            ),
+          );
+    }
+    if (extra.length) {
+      const result = buildCharacterDetail(input, extra);
+      result.skills = result.skills.map((s) => ({ ...s, benefitStatus: statuses.get(s.id) ?? [] }));
+      return result;
+    }
+    skillsOut = skillsOut.map((s) => ({ ...s, benefitStatus: statuses.get(s.id) ?? [] }));
+  }
+
+  const procedureAttributes = {
+    ST: derived.effectiveSt,
+    DX: derived.effectiveDx,
+    IQ: derived.effectiveIq,
+    HT: derived.effectiveHt,
+    Will: derived.will,
+    Per: derived.per,
+    Other: 10,
+  };
+  const procedureSkills = Object.fromEntries(
+    skillsOut
+      .filter((s) => s.effectiveLevel !== null)
+      .map((s) => [
+        s.name + (s.specialization ? `/${s.specialization}` : ''),
+        s.effectiveLevel ?? 0,
+      ]),
+  );
+  skillsOut = skillsOut.map((s) => ({
+    ...s,
+    procedureContext: {
+      ...Object.fromEntries(
+        Object.entries(campaign?.houseRules ?? {})
+          .filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v))
+          .map(([k, v]) => [`campaign:${k}`, v as string | number | boolean]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(procedureAttributes).map(([k, v]) => [`character:${k}`, v]),
+      ),
+      ...Object.fromEntries(Object.entries(procedureSkills).map(([k, v]) => [`skill:${k}`, v])),
+      ...Object.fromEntries(traits.map((t) => [`trait:${t.name}`, t.level ?? 1])),
+      ...(campaign?.techLevel == null ? {} : { 'tech_level:campaign': campaign.techLevel }),
+      ...(s.techLevel == null ? {} : { 'tech_level:learned': s.techLevel }),
+      'character:points': s.points,
+    },
+    actionTargets: Object.fromEntries(
+      (s.procedures?.actions ?? []).map((action) => [
+        action.id,
+        actionTarget(action, s.effectiveLevel, procedureAttributes, procedureSkills),
+      ]),
+    ),
+  }));
+
   // Strip the unused `sourceCharacterRecordId` field name — the schema
   // calls it `sourceId` for brevity.  resolveEffects already emits sourceId.
   const weaponMatches = resolveWeaponEffectMatches(resolved, inventoryOut);
@@ -755,6 +902,8 @@ export function buildCharacterDetail(input: CharacterDetailInput): CharacterDeta
     speedQuarterMod: character.speedQuarterMod,
     moveMod: character.moveMod,
     tempEffects: character.tempEffects ?? [],
+    activeEffects: character.activeEffects ?? [],
+    capabilities: activeResolution.capabilities,
     dismissedWarnings: character.dismissedWarnings,
     activeConditionGroups: character.activeConditionGroups ?? [],
     createdAt: toIso(character.createdAt),

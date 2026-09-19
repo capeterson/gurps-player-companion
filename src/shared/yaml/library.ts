@@ -1,3 +1,4 @@
+import type { ActiveEffectDefinition } from '../schemas/activeEffects.ts';
 /**
  * Campaign library YAML codec.  Round-trippable: import → export → diff
  * yields the same bytes (canonical sort + ordered keys).
@@ -33,7 +34,7 @@ import {
  * enchantment definitions and mechanical item snapshots. The parser still accepts
  * v1-v9 docs (new fields absent).
  */
-export const LIBRARY_YAML_VERSION = 10 as const;
+export const LIBRARY_YAML_VERSION = 11 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -113,6 +114,12 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     if (styleKeys.has(k)) throw new LibraryYamlError(`duplicate style (${st.name})`);
     styleKeys.add(k);
   }
+  const effectKeys = new Set<string>();
+  for (const entry of doc.library.activeEffects ?? []) {
+    const key = entry.name.toLowerCase();
+    if (effectKeys.has(key)) throw new LibraryYamlError(`duplicate active effect (${entry.name})`);
+    effectKeys.add(key);
+  }
   const enchantmentKeys = new Set<string>();
   for (const enchantment of doc.library.enchantments ?? []) {
     const key = enchantment.name.toLowerCase();
@@ -132,6 +139,7 @@ export interface LibraryYamlExportInput {
   readonly techniques: readonly LibraryTechniqueCreate[];
   readonly styles: readonly LibraryStyleCreate[];
   readonly enchantments?: readonly LibraryEnchantmentCreate[];
+  readonly activeEffects?: readonly ActiveEffectDefinition[];
 }
 
 /** Stable ordering for byte-stable round trip. */
@@ -207,6 +215,7 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
     techniques,
     styles,
     enchantments,
+    activeEffects: sortedByName(input.activeEffects ?? []).map((entry) => compact(entry)),
   };
 
   const doc = new Document(payload);

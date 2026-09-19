@@ -18,6 +18,7 @@ import {
   characters,
   inventoryItems,
 } from '../db/schema.ts';
+import { refreshActiveEffectDefinition } from './activeEffects.ts';
 
 export async function captureLibraryMechanics(
   tx: AuditTx,
@@ -57,6 +58,7 @@ export async function captureLibraryMechanics(
             defaults: skillSource.defaults,
             groups: skillSource.groups,
             tags: skillSource.tags,
+            procedures: skillSource.procedures,
           },
         }
       : {}),
@@ -71,6 +73,8 @@ export async function refreshOwnedLibraryMechanics(
   sourceId: string,
   detach = false,
 ) {
+  if (kind === 'active-effects')
+    return refreshActiveEffectDefinition(tx, campaignId, sourceId, detach);
   if (kind === 'enchantments') {
     const [source] = await tx
       .select()
@@ -191,6 +195,7 @@ export async function refreshOwnedLibraryMechanics(
           defaults: resolved.defaults ?? null,
           groups: skillSource.groups,
           tags: skillSource.tags,
+          procedures: skillSource.procedures,
           gmPermissions:
             saved.success &&
             saved.data.skillRules?.gmPermissionSpecialization === resolved.specialization
@@ -287,7 +292,7 @@ export async function detachLibraryReferencesForTransfer(
 ) {
   if (updates.campaignId === undefined) return;
   const [parent] = await tx
-    .select({ campaignId: characters.campaignId })
+    .select({ campaignId: characters.campaignId, activeEffects: characters.activeEffects })
     .from(characters)
     .where(eq(characters.id, characterId))
     .for('update');
@@ -297,6 +302,18 @@ export async function detachLibraryReferencesForTransfer(
   // Campaign deletion/member removal may have enumerated this row before it moved.
   if (expectedCampaignId !== undefined && parent.campaignId !== expectedCampaignId.toLowerCase())
     return;
+  const activeEffects = parent.activeEffects.map((entry) => ({ ...entry, definitionId: null }));
+  if (parent.activeEffects.some((entry) => entry.definitionId)) {
+    await tx
+      .update(characters)
+      .set({ activeEffects, updatedAt: new Date() })
+      .where(eq(characters.id, characterId));
+  }
+  if (updates.activeEffects)
+    updates.activeEffects = (updates.activeEffects as typeof activeEffects).map((entry) => ({
+      ...entry,
+      definitionId: null,
+    }));
   const configs = [
     { table: characterTraits, field: 'libraryTraitId' },
     { table: characterSkills, field: 'librarySkillId' },
