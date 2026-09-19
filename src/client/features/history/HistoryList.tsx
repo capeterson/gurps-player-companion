@@ -40,6 +40,8 @@ interface HistoryListProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
+  showDetails?: (event: HistoryEventOut) => boolean;
+  loadDetails?: (event: HistoryEventOut) => Promise<HistoryEventOut>;
 }
 
 export function HistoryList({
@@ -48,6 +50,8 @@ export function HistoryList({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
+  showDetails,
+  loadDetails,
 }: HistoryListProps) {
   const [search, setSearch] = useState('');
   const [entityFilter, setEntityFilter] = useState<string | null>(null);
@@ -120,7 +124,12 @@ export function HistoryList({
       ) : (
         <div className="rounded-lg border border-base-300 bg-base-100 overflow-hidden">
           {groups.map((g) => (
-            <HistoryGroupRow key={g.batchId ?? g.events[0]?.id ?? Math.random()} group={g} />
+            <HistoryGroupRow
+              key={g.batchId ?? g.events[0]?.id ?? Math.random()}
+              group={g}
+              showDetails={showDetails}
+              loadDetails={loadDetails}
+            />
           ))}
         </div>
       )}

@@ -175,6 +175,10 @@ Diff helpers live alongside (`diffRows(old, new, ignoreKeys)` ignoring `revision
 ### Campaign History view
 - Add a `History` section/tab to `src/client/features/campaigns/CampaignDetailPage.tsx` rendering a new `CampaignHistoryPanel.tsx`.
 - Same component shell as `HistoryPanel`, but hits `GET /campaigns/:id/history` (scope `campaign` only — **no character changes**). For the campaign **owner**, optionally include a sub-toggle "Character changes" that switches to `?scope=character` (the GM roll-up). Reuses the same `summarizeEvent`/`groupIntoBatches`/filter/search code.
+- Campaign-library rows render as closed-by-default accordions. Opening a row
+  lazily requests its authorized detail snapshot and shows field-level before/after changes; a nested
+  **Raw** disclosure shows the complete old/new JSON snapshots for diagnosing
+  complex mechanics, prerequisites, effects, and other structured definitions.
 
 The server-backed Change history and Campaign panels are read-only and share a
 `useHistoryQuery` hook plus `HistoryList`/`HistoryGroupRow` presentation in
