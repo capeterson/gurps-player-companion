@@ -206,19 +206,6 @@
   }
 }
 
-/* ---- Combat tab sticky bottom bar (mobile only) ------------- */
-.combat-bottom-bar {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  background: var(--color-base-100);
-  border-top: 1px solid var(--color-base-300);
-  padding: 0.625rem 0.875rem calc(0.625rem + env(safe-area-inset-bottom));
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 /* ---- Adventure log entry body affordance -------------------- */
 /* A subtle inset outline around the rendered markdown body, so
    users can visually distinguish the entry content from the card

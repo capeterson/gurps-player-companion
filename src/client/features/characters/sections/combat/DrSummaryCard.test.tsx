@@ -38,6 +38,23 @@ function makeCharacter(
 }
 
 describe('DrSummaryCard', () => {
+  it('combines defense bonus context with damage resistance controls', () => {
+    const character = makeCharacter([{ dr: 4, locations: ['torso'] }]);
+    const item = character.inventory[0];
+    if (!item?.armor) throw new Error('missing armor fixture');
+    item.name = 'Deflect Plate';
+    item.armor = { ...item.armor, db: 2, frontOnly: true };
+    const onFacingChange = vi.fn();
+    render(<DrSummaryCard character={character} facing="front" onFacingChange={onFacingChange} />);
+    expect(
+      screen.getByRole('heading', { name: 'Defense & Damage Resistance' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Armor DB \+2 from Deflect Plate/)).toBeInTheDocument();
+    expect(screen.getByText(/Applied to Dodge, Parry, and Block/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'back' } });
+    expect(onFacingChange).toHaveBeenCalledWith('back');
+  });
+
   it.each(['cr', 'imp', 'burn', 'cut', ' CUT '])(
     'only describes severing when destruction uses cutting damage (%s)',
     (type) => {

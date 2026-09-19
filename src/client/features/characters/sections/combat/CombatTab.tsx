@@ -8,16 +8,14 @@
  * columns growing lopsided. Each section folds independently on this device.
  *
  * `usePoolBumpers` is lifted here so the in-grid PoolsCard and the
- * sticky mobile bottom bar share one instance — a second instance would
+ * floating top bar share one instance — a second instance would
  * race the first and silently drop a rapid tap (AGENTS.md S3/S10).
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ArmorFacing } from '../../../../../shared/domain/armorDr.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
-import { useFlashState } from '../../../../hooks/useFlashState.ts';
-import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { RollSheet } from '../RollSheet.tsx';
-import { hpVarFor } from '../hpColor.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { useCombatPatch } from '../useCombatPatch.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
@@ -25,6 +23,7 @@ import { ActiveEffectsPanel } from './ActiveEffectsPanel.tsx';
 import { AttacksCard } from './AttacksCard.tsx';
 import { DefensesCard } from './DefensesCard.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
+import { FloatingPoolsBar } from './FloatingPoolsBar.tsx';
 import { ManeuverCard } from './ManeuverCard.tsx';
 import { PoolsCard } from './PoolsCard.tsx';
 import { SoloTrackerCard } from './SoloTrackerCard.tsx';
@@ -41,13 +40,35 @@ export function CombatTab({
   experimentalTurnTracker = false,
 }: CombatTabProps) {
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
+  const [hitLocation, setHitLocation] = useState('torso');
+  const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
+  const [showFloatingPools, setShowFloatingPools] = useState(false);
+  const [floatingTop, setFloatingTop] = useState(64);
+  const tabBoundaryRef = useRef<HTMLSpanElement>(null);
   const patchCombat = useCombatPatch(character);
   const bumpers = usePoolBumpers(character, canWrite, patchCombat);
-  const hpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentHp'));
-  const fpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentFp'));
 
-  const hpRatio = bumpers.hpMax > 0 ? bumpers.hp / bumpers.hpMax : 0;
-  const hpColor = hpVarFor(hpRatio);
+  // The bar is absent while the sheet's tab list is still on screen. Once
+  // this boundary (immediately after that list) passes under the app header,
+  // the pool controls become a fixed top companion for the long Combat tab.
+  useEffect(() => {
+    const update = () => {
+      const boundary = tabBoundaryRef.current;
+      const appHeaderBottom =
+        document.querySelector('header')?.getBoundingClientRect().bottom ?? 64;
+      setFloatingTop(appHeaderBottom);
+      setShowFloatingPools(
+        boundary != null && boundary.getBoundingClientRect().top < appHeaderBottom,
+      );
+    };
+    update();
+    window.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
 
   function openRoll(req: RollRequest) {
     setRollRequest(req);
@@ -55,6 +76,15 @@ export function CombatTab({
 
   return (
     <div className="space-y-4 pb-4">
+      <span ref={tabBoundaryRef} aria-hidden="true" className="block h-px" />
+      {showFloatingPools && (
+        <FloatingPoolsBar
+          character={character}
+          bumpers={bumpers}
+          canWrite={canWrite}
+          top={floatingTop}
+        />
+      )}
       <PoolsCard
         character={character}
         canWrite={canWrite}
@@ -62,9 +92,14 @@ export function CombatTab({
         bumpers={bumpers}
         openRoll={openRoll}
       />
-      <div className="space-y-3">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
-        <DefensesCard character={character} openRoll={openRoll} />
+        <DefensesCard
+          character={character}
+          openRoll={openRoll}
+          hitLocation={hitLocation}
+          facing={facing}
+        />
       </div>
       <ActiveEffectsPanel character={character} canWrite={canWrite} />
       <AttacksCard character={character} openRoll={openRoll} />
@@ -74,53 +109,14 @@ export function CombatTab({
         canWrite={canWrite}
         hpMax={bumpers.hpMax}
         bumpHp={bumpers.bumpHp}
+        location={hitLocation}
+        facing={facing}
+        onLocationChange={setHitLocation}
+        onFacingChange={setFacing}
       />
       {experimentalTurnTracker && (
         <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
       )}
-
-      {/* Sticky bottom bar, mobile only. Shares the SAME usePoolBumpers
-          instance as PoolsCard (lifted above) — a second instance here
-          would race the first and silently drop a rapid tap. */}
-      <div className="combat-bottom-bar md:hidden">
-        <span
-          {...hpFlash.flashProps}
-          className="field-rollback-flash num text-2xl font-bold"
-          style={{ color: hpColor }}
-        >
-          {bumpers.hp}
-        </span>
-        <span className="num text-xs text-dim">/ {bumpers.hpMax}</span>
-        {canWrite && (
-          <div className="ml-auto flex gap-1.5">
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => bumpers.bumpHp(-1)}
-              aria-label="HP -1"
-            >
-              HP −1
-            </button>
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => bumpers.bumpHp(+1)}
-              aria-label="HP +1"
-            >
-              HP +1
-            </button>
-            <button
-              type="button"
-              className="field-rollback-flash btn btn-sm"
-              onClick={() => bumpers.bumpFp(-1)}
-              aria-label="FP -1"
-              {...fpFlash.flashProps}
-            >
-              FP −1
-            </button>
-          </div>
-        )}
-      </div>
 
       {rollRequest && (
         <RollSheet

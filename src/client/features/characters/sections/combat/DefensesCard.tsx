@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import { type ArmorFacing, resolveArmorDb } from '../../../../../shared/domain/armorDr.ts';
 import {
   type AllOutDefenseOption,
@@ -22,7 +21,6 @@ import type {
 } from '../../../../../shared/schemas/character.ts';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { RollRequest } from '../rollTypes.ts';
-import { locationLabel } from './armorViewOptions.ts';
 import {
   ModifierBreakdownContent,
   WeaponEffectDiagnostics,
@@ -34,6 +32,9 @@ import {
 export interface DefensesCardProps {
   character: CharacterDetail;
   openRoll: (req: RollRequest) => void;
+  /** Shared with Defense & Damage Resistance so armor DB uses its selected hit context. */
+  hitLocation?: string;
+  facing?: ArmorFacing | undefined;
 }
 
 interface ParryRow {
@@ -52,11 +53,14 @@ function modifierCaption(value: number): string {
   return value ? ` ${value > 0 ? '+' : '−'} ${Math.abs(value)} defense modifiers` : '';
 }
 
-export function DefensesCard({ character, openRoll }: DefensesCardProps) {
+export function DefensesCard({
+  character,
+  openRoll,
+  hitLocation = 'torso',
+  facing,
+}: DefensesCardProps) {
   const effects = character.effects ?? [];
   const [defenseOption, setDefenseOption] = useState<AllOutDefenseOption>(null);
-  const [hitLocation, setHitLocation] = useState('torso');
-  const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changing character or maneuver ends this local turn option.
   useEffect(() => {
     setDefenseOption(null);
@@ -72,16 +76,6 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
   });
   const equippedItems = character.inventory.filter((i) => i.equipped);
   const weapons = equippedItems.filter((i) => i.weaponData != null);
-  const customArmorLocations = [
-    ...new Set(
-      character.inventory.flatMap(
-        (item) =>
-          item.armor?.locations.filter((location) => !HIT_LOCATIONS.includes(location as never)) ??
-          [],
-      ),
-    ),
-  ].sort();
-
   // Shield DB is its own source. Armor contributes only the highest
   // equipped layer covering this incoming hit; armor DB never stacks.
   const shield = pickShield(equippedItems);
@@ -267,20 +261,33 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
       summary={`Move ${moveNet} · Dodge ${dodge ?? '—'}`}
     >
       <div className="combat-defense-values">
-        <div className="rounded-lg border border-base-300 px-3 py-2 flex items-center justify-between gap-2">
-          <span className="text-sm">Move</span>
-          <span className="num text-xl font-bold">{moveNet}</span>
+        <div className="rounded-lg border border-base-300 px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm">Move</span>
+            <span className="num text-xl font-bold">{moveNet}</span>
+          </div>
+          {(moveNet !== encumberedMove || state.maneuver) && (
+            <span className="block text-[11px] text-base-content/60">
+              {encumberedMove} before pool, posture, and maneuver limits
+            </span>
+          )}
+          {moveCaption && (
+            <span className="block text-[11px] text-base-content/60">{moveCaption}</span>
+          )}
         </div>
         {rows.map((row) => (
           <div key={row.label} className="min-w-0">
             {typeof row.value === 'number' && !row.reason ? (
               <button
                 type="button"
-                className="w-full rounded-lg border border-base-300 px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-base-200"
+                className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border border-base-300 px-3 py-2 text-left hover:bg-base-200"
                 onClick={() => openRoll({ label: row.label, baseTarget: row.value as number })}
               >
                 <span className="text-sm break-words">{row.label}</span>
                 <span className="num text-xl font-bold text-primary">{row.value}</span>
+                {row.detail && (
+                  <div className="col-span-2 text-[11px] text-base-content/60">{row.detail}</div>
+                )}
               </button>
             ) : (
               <div className="rounded-lg border border-base-300 px-3 py-2 text-sm">
@@ -292,6 +299,7 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
                   </>
                 )}
                 {row.reason && <span className="block text-xs text-muted">{row.reason}</span>}
+                {row.detail && <div className="text-[11px] text-base-content/60">{row.detail}</div>}
               </div>
             )}
           </div>
@@ -315,82 +323,32 @@ export function DefensesCard({ character, openRoll }: DefensesCardProps) {
           ))}
         </div>
       )}
-      <div className="mt-3">
-        <FoldSection
-          preferenceKey={`${character.id}:defense-details`}
-          title="Defense details"
-          defaultOpen={false}
-          summary={`${locationLabel(hitLocation)} · ${facing ?? 'unknown facing'}`}
-        >
-          <div className="grid grid-cols-2 gap-2" aria-label="Incoming hit for defense rolls">
-            <label className="min-w-0 text-xs">
-              Hit location
-              <select
-                aria-label="Defense hit location"
-                className="select select-sm select-bordered w-full"
-                value={hitLocation}
-                onChange={(e) => setHitLocation(e.target.value)}
-              >
-                {[...HIT_LOCATIONS, ...customArmorLocations].map((location) => (
-                  <option key={location} value={location}>
-                    {locationLabel(location)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="min-w-0 text-xs">
-              Facing
-              <select
-                aria-label="Defense facing"
-                className="select select-sm select-bordered w-full"
-                value={facing ?? ''}
-                onChange={(e) =>
-                  setFacing(e.target.value === '' ? undefined : (e.target.value as ArmorFacing))
-                }
-              >
-                <option value="">Unknown</option>
-                <option value="front">Front</option>
-                <option value="back">Back</option>
-              </select>
-            </label>
-          </div>
-          <p className="mt-3 text-xs text-muted">
-            Move: {moveNet} · {encumberedMove} before pool, posture, and maneuver limits.{' '}
-            {moveCaption}
-          </p>
-          {rows.map((row) => (
-            <div key={row.label} className="mt-3 text-xs text-muted">
-              <strong>{row.label} breakdown</strong>
-              <div>{row.detail}</div>
-            </div>
-          ))}
-          <WeaponEffectDiagnostics
-            effects={effects.filter((effect) =>
-              ['weapon_parry', 'weapon_block'].includes(effect.target),
-            )}
-            inventory={character.inventory}
-          />
-          {shield && blockResolution && blockResolution.kind !== 'matched' && (
-            <p className="mt-2 text-xs text-muted">
-              {shield.name} is equipped but has no usable Shield skill —{' '}
-              {blockResolution.kind === 'missing'
-                ? `skill '${blockResolution.skillName}' is not on the sheet.`
-                : 'bind its skill in the Inventory tab.'}
-            </p>
-          )}
-          {parryRows.length === 0 && shield == null && (
-            <p className="mt-2 text-xs text-muted">
-              Equip a parryable weapon or shield to add those defenses.
-            </p>
-          )}
-          <p className="mt-3 text-xs text-muted">
-            Active trait bonuses and recorded combat restrictions are included. Add situational
-            modifiers when rolling; shield DB assumes a covered attack. Move includes posture and
-            maneuver limits. Double defense grants a second, different defense after the first
-            fails; it adds no numerical bonus.
-          </p>
-        </FoldSection>
-      </div>
+      {shield && blockResolution && blockResolution.kind !== 'matched' && (
+        <p className="mt-2 text-xs text-base-content/60">
+          {shield.name} is equipped but has no usable Shield skill —{' '}
+          {blockResolution.kind === 'missing'
+            ? `skill '${blockResolution.skillName}' is not on the sheet.`
+            : 'bind its skill in the Inventory tab.'}
+        </p>
+      )}
+
+      {parryRows.length === 0 && shield == null && (
+        <p className="mt-2 text-xs text-base-content/60">
+          Equip a parryable weapon or shield to add those defenses.
+        </p>
+      )}
+      <WeaponEffectDiagnostics
+        effects={effects.filter((effect) =>
+          ['weapon_parry', 'weapon_block'].includes(effect.target),
+        )}
+        inventory={character.inventory}
+      />
+      <p className="mt-3 text-[11px] text-base-content/50">
+        Active trait bonuses and recorded combat restrictions are included. Add situational
+        modifiers when rolling; shield DB assumes a covered attack. Move includes posture and
+        maneuver limits. Double defense grants a second, different defense after the first fails; it
+        adds no numerical bonus.
+      </p>
     </FoldSection>
   );
 }

@@ -89,6 +89,10 @@ touches mid-session, front-loaded so one tap lands there; on a
 read-only view of a non-magical character the Magic tab is hidden, and
 on any sheet the viewer can edit — their own — it always shows).
 
+The home page's recent-character cards and the `/characters` listing resolve
+from the local mirror. Each card links to its character and, when assigned,
+shows the synced campaign name as a separate link to that campaign.
+
 - **Compact combat view and folding.** Combat uses a smaller identity header and
   folds the shared sheet overview (attributes, secondary stats, status, ledger,
   encumbrance and conditional effects) by default. The folded overview shows
@@ -324,8 +328,8 @@ on any sheet the viewer can edit — their own — it always shows).
   tag (weapon, armor, container, powerstone, magic item, enchanted, worn, or
   equipped). Results retain the ancestor containers needed to locate matching
   nested items while hiding every non-matching sibling and descendant. Equipped
-  armor and active innate DR are aggregated per hit location on the Combat tab's Effective DR
-  card. Each enchanted armor layer expands its base DR into nested enchantment
+  armor and active innate DR are aggregated per hit location on the Combat tab's Defense &
+  Damage Resistance card. Each enchanted armor layer expands its base DR into nested enchantment
   contributions; highest-only conflicts are resolved across every equipped layer
   covering the selected hit location and retain suppressed sources visibly for an
   auditable total; the applied source needs no redundant "winning" badge.
@@ -372,9 +376,12 @@ on any sheet the viewer can edit — their own — it always shows).
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
-  hop. Compact HP/FP pools remain side by side on narrow screens. Posture/conditions,
-  maneuver, Move/defense rolls, attacks, armor coverage and the optional tracker
-  each fold independently in a single column, with responsive grids inside sections.
+  hop. Full-width Pools put HP, FP, and posture/conditions side by side on wide
+  screens. Maneuver and Defenses share an asymmetrical row at wide breakpoints
+  (and stack while space is constrained); Attacks, armor coverage, the Solo
+  tracker, and roll history each use the full width below. Sections stack on
+  mobile instead of accumulating into two independent, uneven columns. Main combat
+  sections fold independently, with responsive grids inside them.
   - **Pools** — compact HP/FP meters with ±1 controls; ±5, reset and threshold
     reference text live under **Recovery & thresholds**. Death-check actions and
     the FP-floor warning remain visible. **Posture & conditions** shows the current
@@ -392,11 +399,16 @@ on any sheet the viewer can edit — their own — it always shows).
     with a shared history batch; each field retains ordinary outbox coalescing,
     server settlement and rollback toast/flash behavior. One shared
     `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
-    sticky mobile bottom bar so a fast tap on both UIs never races;
+    floating pool bar so rapid changes across both UIs never race. The bar
+    appears at the top only after the sheet tab list has scrolled away, labels
+    both HP and FP, and opens range popovers with threshold/recovery marks.
+    Derived pool states such as Reeling, Tired, Exhausted, death checks, and
+    Unconscious are visible as badges; exceptional/certain-death bounds are
+    de-emphasized notes rather than primary controls;
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
     so two rapid condition taps before Dexie re-renders don't coalesce
     into one outbox patch and drop the first tap.
-  - **Effective DR** — combines equipped armor, active global/location
+  - **Defense & Damage Resistance** — combines equipped armor, active global/location
     innate DR, and natural skull DR 2 into one map per hit location
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
     hit-location aim presets. A rounded, generic SVG silhouette exposes all 15
@@ -438,7 +450,10 @@ on any sheet the viewer can edit — their own — it always shows).
     damage type's multiplier rather than multiplying it twice. Invalid damage
     and divisor inputs cannot be applied; fatigue damage is directed to FP.
     Hardened must be accounted for in the chosen effective divisor, and
-    directional armor remains combined rather than selecting front/back.
+    directional DR remains combined rather than selecting front/back. The
+    shared hit-location and facing controls also resolve the highest applicable
+    armor DB plus shield DB; that defense-only context feeds Dodge, Parry, and
+    Block while remaining explicitly separate from damage resistance.
     The dialog
     (`IncomingDamageDialog.tsx`) resolves a hit against the
     character's own DR: basic damage − DR(location) with the resolver
@@ -461,9 +476,11 @@ on any sheet the viewer can edit — their own — it always shows).
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
   - **Move & defenses** — a compact wrapping grid of tappable defense values.
-    **Defense details** folds the incoming location/facing selectors and source
-    breakdowns; current restrictions and All-Out Defense choices remain visible.
-    Move (read-only, net of encumbrance and combat restrictions), Dodge (with
+    Source breakdowns live with their corresponding actions, while the shared
+    incoming location/facing selectors and armor DB context live in Defense &
+    Damage Resistance. Current restrictions and All-Out Defense choices remain
+    visible. Move is read-only and net of encumbrance and combat restrictions;
+    Dodge includes
     the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is
     resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
@@ -506,20 +523,28 @@ on any sheet the viewer can edit — their own — it always shows).
     Dodge has no minimum introduced by pool reductions. Changing character/maneuver
     clears that selection. Breakdowns name pool/posture/stun/maneuver adjustments;
     unmodeled tactical situations and custom maneuvers remain player-supplied.
-  - **Attacks** — one row per equipped weapon: resolved damage dice (ST
+  - **Attacks** — a compact table groups equipped weapons and their alternate
+    modes, with aligned governing-skill/target, damage, damage-type, and reach
+    columns. Weapon, governing skill, and damage type headers toggle ascending /
+    descending sorting. **Custom** order exposes drag handles (including touch
+    long-press); focused handles also move with the up/down arrow keys. Sort and
+    custom weapon order are saved per character on this device, survive reloads,
+    and are cleared on logout. These are presentation preferences, not inventory
+    edits, and are not server-synced (`combat/attackTablePreferences.ts`). New
+    equipped weapons append to custom order. Resolved damage dice (ST
     thrust/swing + the weapon's modifiers + weapon-scoped damage effects, or
-    fixed dice + weapon-scoped damage effects) as **tappable chips that
+    fixed dice + weapon-scoped damage effects) are **tappable buttons that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
     1-point floor from B378), reach, an ST-shortfall badge/caption
     (B270, applied to the roll target), a ranged stat line (Acc/Range/
     RoF/Shots/Bulk/Recoil) when the weapon has one, and the resolved
-    skill as a rollable row with hit-location preset chips (aim
+    skill as a compact roll button with hit-location preset chips (aim
     penalties, B398-399) plus, for ranged weapons, an Aim(+Acc) preset
     and the B550 speed/range-penalty presets. Vitals presets appear
     only for impaling and piercing attacks, and the eye preset only for
     impaling, piercing, and tight-beam burning attacks. A weapon with
     **alternate attack modes** (swing/thrust/thrown, `weaponData.alternateModes`)
-    renders each mode as its own labelled damage chip row in addition
+    renders each mode as its own labelled table row in addition
     to the primary line, with an alternate's reach inherited from the
     weapon when unset; vitals/eye presets are offered only when at
     least one mode across every damage line can target them. Attack-mode
@@ -789,7 +814,7 @@ src/
                    penalty, equipped-shield picking), combatAdjustments (pool,
                    posture, stun and maneuver limits on live defenses and Move), injuryCalc (incoming-
                    damage DR/divisor/wounding-multiplier resolution for the
-                   Effective DR card's damage dialog), armorDr (armor + innate DR
+                   Defense & Damage Resistance card's damage dialog), armorDr (armor + innate DR
                    aggregation per hit location + per-damage-type DR
                    resolution via `resolveDr` with typed → crushing →
                    default fallback, and location/facing-aware maximum armor

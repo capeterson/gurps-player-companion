@@ -38,6 +38,7 @@ describe('HomePage', () => {
         id: 'character-1',
         ownerId: 'user-1',
         campaignId: null,
+        campaignName: null,
         name: 'Marin',
         st: 11,
         dx: 12,
@@ -60,5 +61,20 @@ describe('HomePage', () => {
     expect(screen.queryByRole('link', { name: 'Open Sheet' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Adventure Log' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Campaigns' })).not.toBeInTheDocument();
+  });
+
+  it('links the campaign name separately from the character card', async () => {
+    const character = vi.mocked(useCharactersList)()?.[0];
+    if (!character) throw new Error('Missing character fixture');
+    vi.mocked(useCharactersList).mockReturnValue([
+      { ...character, campaignId: 'campaign-1', campaignName: 'The Long March' },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'The Long March' })).toHaveAttribute(
+      'href',
+      '/campaigns/campaign-1',
+    );
   });
 });

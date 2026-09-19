@@ -103,7 +103,14 @@ export function useCharacterDetail(
 
 export type CharacterListResult = CharacterListItem[] | undefined;
 
-export function useCharactersList(): CharacterListResult {
+export type CharacterHomeListItem = CharacterListItem & {
+  /** Resolved from the synced local campaign mirror for offline navigation. */
+  campaignName: string | null;
+};
+
+export type CharacterHomeListResult = CharacterHomeListItem[] | undefined;
+
+export function useCharactersList(): CharacterHomeListResult {
   return useLiveQuery(async () => {
     const db = getLocalDb();
     // Dexie's orderBy uses the index; we want descending updatedAt so
@@ -125,12 +132,14 @@ export function useCharactersList(): CharacterListResult {
     const myId = readUserIdFromToken();
     if (myId === null) return [];
     const minimalIds = characterIdsToMinimize({ viewerId: myId, characters: rows, campaigns });
+    const campaignNames = new Map(campaigns.map((campaign) => [campaign.id, campaign.name]));
     return rows
       .filter((r) => !minimalIds.has(r.id))
-      .map<CharacterListItem>((r) => ({
+      .map<CharacterHomeListItem>((r) => ({
         id: r.id,
         ownerId: r.ownerId,
         campaignId: r.campaignId,
+        campaignName: r.campaignId ? (campaignNames.get(r.campaignId) ?? null) : null,
         name: r.name,
         st: r.st,
         dx: r.dx,

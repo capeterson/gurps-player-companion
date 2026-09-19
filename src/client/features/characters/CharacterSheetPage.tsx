@@ -1041,7 +1041,8 @@ function StatusPanel({
               content={
                 <span>
                   <strong>Trait DR</strong> shows unscoped innate protection. The Combat tab's
-                  Effective DR readout combines it with armor and location-specific effects.
+                  Defense &amp; Damage Resistance readout combines it with armor and
+                  location-specific effects.
                   <EffectSourcesList
                     effects={effects.filter((effect) => !effect.hitLocation)}
                     targets="dr"
