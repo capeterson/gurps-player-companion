@@ -21950,7 +21950,7 @@
                       "sessionNumber": {
                         "type": "integer",
                         "nullable": true,
-                        "minimum": 1
+                        "minimum": 0
                       },
                       "title": {
                         "type": "string",
@@ -22079,7 +22079,7 @@
                   "sessionNumber": {
                     "type": "integer",
                     "nullable": true,
-                    "minimum": 1
+                    "minimum": 0
                   },
                   "title": {
                     "type": "string",
@@ -22166,7 +22166,7 @@
                     "sessionNumber": {
                       "type": "integer",
                       "nullable": true,
-                      "minimum": 1
+                      "minimum": 0
                     },
                     "title": {
                       "type": "string",
@@ -22315,7 +22315,7 @@
                   "sessionNumber": {
                     "type": "integer",
                     "nullable": true,
-                    "minimum": 1
+                    "minimum": 0
                   },
                   "title": {
                     "type": "string",
@@ -22398,7 +22398,7 @@
                     "sessionNumber": {
                       "type": "integer",
                       "nullable": true,
-                      "minimum": 1
+                      "minimum": 0
                     },
                     "title": {
                       "type": "string",

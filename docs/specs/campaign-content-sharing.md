@@ -568,6 +568,9 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   may also **edit** (`PATCH`) and **delete** (`DELETE`) entries; the client
   `LogPage` exposes Edit/Delete controls on entries the viewer may modify.
 - Entries carry `sessionDate`, `title`, `body`, `visibility`, and `xpAwards`.
+  Their optional integer `sessionNumber` starts at zero. Opening the create form
+  suggests zero for the first numbered entry, then one above the greatest
+  visible posted number; authors may freely edit or clear that suggestion.
 - **Body is markdown** (CommonMark + GFM), stored verbatim in the `body` text
   column. Rendering is sanitized at render time only:
   `src/client/components/markdown/markdownProcessor.ts` runs
@@ -583,7 +586,8 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   string — the editor never produces or persists HTML. Strict CommonMark line
   breaks (single newlines do not become `<br>`).
 - Client surface: `LogPage` (single-column `max-w-3xl` layout), also embedded
-  in `CampaignDetailPage`.
+  in `CampaignDetailPage`. Embedded mode is fixed to the parent campaign and
+  therefore does not render the standalone page's campaign selector.
 
 ## Auditing
 

@@ -140,14 +140,22 @@ describe('adventure-log sessionNumber + location', () => {
     expect(updated3.sessionNumber).toBe(4);
   });
 
-  it('rejects out-of-range and over-length values (422)', async () => {
+  it('accepts session zero and rejects negative or over-length values', async () => {
     const { accessToken } = await registerUser('log-validation');
     const campaignId = await createCampaign(accessToken);
+
+    const zero = await app.request(`/api/v1/campaigns/${campaignId}/log`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ sessionDate: '2026-01-15', title: 'T', sessionNumber: 0 }),
+    });
+    expect(zero.status).toBe(201);
+    expect(((await zero.json()) as Record<string, unknown>).sessionNumber).toBe(0);
 
     const badNumber = await app.request(`/api/v1/campaigns/${campaignId}/log`, {
       method: 'POST',
       headers: jsonHeaders(accessToken),
-      body: JSON.stringify({ sessionDate: '2026-01-15', title: 'T', sessionNumber: 0 }),
+      body: JSON.stringify({ sessionDate: '2026-01-15', title: 'T', sessionNumber: -1 }),
     });
     expect(badNumber.status).toBe(422);
 
