@@ -96,16 +96,29 @@ function formatDate(iso: string): string {
   });
 }
 
-function emptyDraft(): AdventureLogCreate {
+function emptyDraft(sessionNumber: number | null = null): AdventureLogCreate {
   return {
     sessionDate: todayIso(),
-    sessionNumber: null,
+    sessionNumber,
     title: '',
     location: '',
     body: '',
     visibility: 'campaign',
     xpAwards: [],
   };
+}
+
+/** The first campaign session is zero; after that, suggest one beyond the
+ * greatest posted session number. Null-numbered notes do not affect the
+ * sequence, and the suggestion remains fully editable in the form. */
+export function nextSessionNumber(entries: readonly AdventureLogOut[]): number {
+  return (
+    entries.reduce(
+      (greatest, entry) =>
+        entry.sessionNumber === null ? greatest : Math.max(greatest, entry.sessionNumber),
+      -1,
+    ) + 1
+  );
 }
 
 function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
@@ -182,6 +195,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   // Collapse the editor whenever the campaign changes so a stale
   // draft from another campaign can't be committed by accident.
   useEffect(() => {
+    void campaignId;
     setEditor({ kind: 'hidden' });
     setDraft(emptyDraft());
     setSaveError(null);
@@ -287,7 +301,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   };
 
   const openCreate = () => {
-    setDraft(emptyDraft());
+    setDraft(emptyDraft(nextSessionNumber(entries.data ?? [])));
     setSaveError(null);
     setEditor({ kind: 'create' });
   };
@@ -348,7 +362,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           </div>
         )}
         <div className="flex items-center gap-2">
-          {campaigns.data && campaigns.data.length > 1 && (
+          {!campaignIdProp && campaigns.data && campaigns.data.length > 1 && (
             <select
               className="select select-bordered select-sm"
               value={campaignId ?? ''}
@@ -370,7 +384,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              disabled={!campaignId}
+              disabled={!campaignId || entries.isLoading}
               onClick={openCreate}
             >
               + New entry
@@ -462,7 +476,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
               <span className="label-text">Session #</span>
               <input
                 type="number"
-                min={1}
+                min={0}
                 className="input input-bordered"
                 value={draft.sessionNumber ?? ''}
                 onChange={(e) =>

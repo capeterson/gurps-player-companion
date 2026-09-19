@@ -638,8 +638,12 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   policies and per-catalog-option rule overrides; portable YAML v11 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
-  session ordinal, e.g. 13) and **location** (free-form text, e.g. "The
+  session ordinal starting at 0, e.g. 13) and **location** (free-form text, e.g. "The
   Hollow Beneath Greymoor"), and an optional **XP award** list per entry.
+  Opening the create form suggests session 0 when no numbered entries exist,
+  otherwise one above the greatest posted session number; the suggestion is
+  editable. The embedded log on a campaign detail page never shows a campaign
+  selector because the route already fixes its campaign.
   The body is **markdown** (CommonMark + GFM) rendered through a sanitized
   pipeline that never interprets raw HTML or scripts. The create/edit form
   offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
@@ -687,8 +691,13 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   local-first outbox. REST and sync use the same central write decision.
 
 ### Cross-cutting UI
+- **Navigational breadcrumbs** (persistent header): character and campaign
+  routes show two clickable levels — `Character › <character name>` and
+  `Campaign › <campaign name>`. The first level returns to its collection and
+  the named level returns to that entity's main page; nested campaign surfaces
+  deliberately do not add a third level.
 - **Logged-in home**: a compact welcome and the four most recently updated
-  characters. Global Sheet, Campaign, Log, and Library destinations stay in the
+  characters. Global Character, Campaign, Log, and Library destinations stay in the
   persistent header instead of being repeated as homepage buttons or shortcut
   cards.
 - **Sync status indicator and log** (header): honest pending/syncing/offline/error

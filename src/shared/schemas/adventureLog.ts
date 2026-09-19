@@ -14,7 +14,7 @@ export const adventureLogOut = z.object({
   authorId: uuid,
   authorDisplayName: z.string(),
   sessionDate: isoDate,
-  sessionNumber: z.number().int().min(1).nullable(),
+  sessionNumber: z.number().int().min(0).nullable(),
   title: z.string().min(1).max(200),
   location: z.string().max(200).nullable(),
   body: z.string().default(''),
@@ -25,7 +25,7 @@ export const adventureLogOut = z.object({
 
 export const adventureLogCreate = z.object({
   sessionDate: isoDate,
-  sessionNumber: z.number().int().min(1).nullable().optional(),
+  sessionNumber: z.number().int().min(0).nullable().optional(),
   title: z.string().min(1).max(200).trim(),
   location: z.string().max(200).trim().nullable().optional(),
   body: z.string().max(200_000).default(''),
