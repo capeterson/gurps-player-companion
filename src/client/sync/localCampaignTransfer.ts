@@ -69,6 +69,16 @@ export async function detachLocalCampaignReferences(
   campaignId: string | null,
 ) {
   const undo: LocalCampaignTransferUndo[] = [];
+  const db = getLocalDb();
+  const character = await db.characters.get(characterId);
+  if (character?.activeEffects?.some((e) => e.definitionId)) {
+    const before = { activeEffects: character.activeEffects };
+    const after = {
+      activeEffects: character.activeEffects.map((e) => ({ ...e, definitionId: null })),
+    };
+    undo.push({ store: db.characters.name, entityId: characterId, campaignId, before, after });
+    await db.characters.update(characterId, after);
+  }
   const stores = campaignTransferStores();
   for (const store of stores) {
     const table = store as unknown as Table<Record<string, unknown>, string>;
@@ -94,9 +104,9 @@ export async function restoreLocalCampaignReferences(
       (typeof campaignId === 'string' ? campaignId.toLowerCase() : campaignId)
     )
       continue;
-    const table = campaignTransferStores().find((store) => store.name === entry.store) as
-      | Table<Record<string, unknown>, string>
-      | undefined;
+    const table = [db.characters, ...campaignTransferStores()].find(
+      (store) => store.name === entry.store,
+    ) as Table<Record<string, unknown>, string> | undefined;
     if (!table) continue;
     const row = await table.get(entry.entityId);
     if (

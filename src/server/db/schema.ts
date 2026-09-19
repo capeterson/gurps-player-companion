@@ -24,6 +24,10 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import type {
+  ActiveEffectDefinition,
+  ActiveEffectInstance,
+} from '../../shared/schemas/activeEffects.ts';
 // Type-only imports: every jsonb column below is typed against the Zod
 // schema that validates it at the API/sync boundary, so the DB layer
 // and the wire contract can't drift apart.  The catalog of jsonb
@@ -52,6 +56,7 @@ import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { SkillPrerequisite, SkillTechLevelPolicy } from '../../shared/schemas/skill.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
+import type { SkillProcedures } from '../../shared/schemas/skillProcedures.ts';
 import { TECHNIQUE_DIFFICULTIES } from '../../shared/schemas/technique.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
 
@@ -576,6 +581,11 @@ export const characters = pgTable(
      * (src/shared/schemas/character.ts) -- see docs/specs/json-fields.md.
      * Replaces the ten `temp_*` scalar columns (see migration 0017). */
     tempEffects: jsonb('temp_effects').$type<TempEffect[]>().notNull().default([]),
+    /** Validated by activeEffectsField. */
+    activeEffects: jsonb('active_effects')
+      .$type<ActiveEffectInstance[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
 
     /** Warning codes the owner dismissed; validated by
      * `dismissedWarningsField` (src/shared/schemas/character.ts). */
@@ -1036,6 +1046,11 @@ export const campaignLibrarySkills = pgTable(
     prerequisiteRules: jsonb('prerequisite_rules').$type<SkillPrerequisite>(),
     groups: jsonb('groups').$type<string[]>().notNull().default([]),
     tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    /** Validated by skillProcedures at library write boundaries. */
+    procedures: jsonb('procedures')
+      .$type<SkillProcedures>()
+      .notNull()
+      .default(sql`'{"modifiers":[],"actions":[],"benefits":[]}'::jsonb`),
     /** Validated by `situationalModifier` (src/shared/schemas/skill.ts). */
     situationalModifiers: jsonb('situational_modifiers')
       .$type<SituationalModifier[]>()
@@ -1374,3 +1389,37 @@ export const entityHistory = pgTable(
 );
 
 export type DbEntityHistory = typeof entityHistory.$inferSelect;
+
+/** Campaign active effects; JSON fields validated by activeEffectDefinitionCreate. */
+export const campaignLibraryActiveEffects = pgTable(
+  'campaign_library_active_effects',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 160 }),
+    tags: jsonb('tags').$type<ActiveEffectDefinition['tags']>().notNull().default(sql`'[]'::jsonb`),
+    effects: jsonb('effects')
+      .$type<ActiveEffectDefinition['effects']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    capabilities: jsonb('capabilities')
+      .$type<ActiveEffectDefinition['capabilities']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    duration: jsonb('duration').$type<ActiveEffectDefinition['duration']>().notNull(),
+    stacking: jsonb('stacking').$type<ActiveEffectDefinition['stacking']>().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    naturalKey: uniqueIndex('campaign_library_active_effects_key').on(
+      t.campaignId,
+      sql`lower(${t.name})`,
+    ),
+  }),
+);

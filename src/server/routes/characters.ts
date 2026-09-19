@@ -18,6 +18,7 @@ import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { campaignMemberships, campaigns, characters } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { prepareActiveEffects } from '../services/activeEffects.ts';
 import { assertAttributeCaps, touchesAttributeCaps } from '../services/attributeCapValidation.ts';
 import { resolveCharacterView } from '../services/characterAccess.ts';
 import { loadCharacterDetail } from '../services/characterSummary.ts';
@@ -177,12 +178,13 @@ router.openapi(
       enforceAttributeCaps = campaign.enforceAttributeCaps;
     }
     assertAttributeCaps(enforceAttributeCaps, body);
-    const [created] = await withAudit(user.id, undefined, (tx) =>
-      tx
+    const [created] = await withAudit(user.id, undefined, async (tx) => {
+      await prepareActiveEffects(tx, user.id, null, body.campaignId ?? null, body);
+      return tx
         .insert(characters)
         .values(characterInsertValues(body, { ownerId: user.id }))
-        .returning(),
-    );
+        .returning();
+    });
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return c.json(await loadCharacterDetail(created.id), 201);
   },
@@ -257,6 +259,13 @@ router.openapi(
     }
     const updates = buildPatchSet(body);
     await withAudit(user.id, undefined, async (tx) => {
+      await prepareActiveEffects(
+        tx,
+        user.id,
+        id,
+        body.campaignId === undefined ? access.character.campaignId : body.campaignId,
+        updates,
+      );
       await detachLibraryReferencesForTransfer(tx, id, updates);
       await tx.update(characters).set(updates).where(eq(characters.id, id));
     });

@@ -24,6 +24,7 @@ export const entityClass = z.enum([
   'campaign_library_technique',
   'campaign_library_style',
   'campaign_library_enchantment',
+  'campaign_library_active_effect',
   'adventure_log',
 ]);
 export type EntityClass = z.infer<typeof entityClass>;

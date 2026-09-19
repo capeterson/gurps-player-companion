@@ -21,34 +21,40 @@ export function useMirrorCampaigns(campaigns: CampaignOut[] | undefined): void {
     if (!campaigns || campaigns.length === 0) return;
     const db = getLocalDb();
     const viewerId = readUserIdFromToken();
-    void db.campaigns.bulkPut(
-      campaigns.map((c) => {
-        const memberRole = c.members?.find((member) => member.userId === viewerId)?.role;
-        return {
-          id: c.id,
-          name: c.name,
-          description: c.description,
-          ownerId: c.ownerId,
-          pointTarget: c.pointTarget,
-          disadvantageCap: c.disadvantageCap,
-          quirkCap: c.quirkCap,
-          manaLevel: c.manaLevel,
-          houseRules: c.houseRules,
-          techLevel: c.techLevel,
-          enforceAttributeCaps: c.enforceAttributeCaps,
-          shareCharacterSheets: c.shareCharacterSheets,
-          allowGmCharacterEditing: c.allowGmCharacterEditing,
-          experimentalTurnTracker: c.experimentalTurnTracker,
-          ...(c.ownerId === viewerId
-            ? { viewerRole: 'owner' as const }
-            : memberRole
-              ? { viewerRole: memberRole }
+    void db.transaction('rw', db.campaigns, async () => {
+      const stored = await db.campaigns.bulkGet(campaigns.map((c) => c.id));
+      await db.campaigns.bulkPut(
+        campaigns.map((c, index) => {
+          const memberRole = c.members?.find((member) => member.userId === viewerId)?.role;
+          return {
+            ...(stored[index]?.activeEffectDefinitions
+              ? { activeEffectDefinitions: stored[index].activeEffectDefinitions }
               : {}),
-          createdAt: c.createdAt,
-          updatedAt: c.updatedAt,
-          revision: c.revision,
-        };
-      }),
-    );
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            ownerId: c.ownerId,
+            pointTarget: c.pointTarget,
+            disadvantageCap: c.disadvantageCap,
+            quirkCap: c.quirkCap,
+            manaLevel: c.manaLevel,
+            houseRules: c.houseRules,
+            techLevel: c.techLevel,
+            enforceAttributeCaps: c.enforceAttributeCaps,
+            shareCharacterSheets: c.shareCharacterSheets,
+            allowGmCharacterEditing: c.allowGmCharacterEditing,
+            experimentalTurnTracker: c.experimentalTurnTracker,
+            ...(c.ownerId === viewerId
+              ? { viewerRole: 'owner' as const }
+              : memberRole
+                ? { viewerRole: memberRole }
+                : {}),
+            createdAt: c.createdAt,
+            updatedAt: c.updatedAt,
+            revision: c.revision,
+          };
+        }),
+      );
+    });
   }, [campaigns]);
 }

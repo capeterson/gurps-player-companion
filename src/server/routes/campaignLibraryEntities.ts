@@ -1,3 +1,10 @@
+import { withLegacyModifiers } from '../../shared/domain/skillProcedures.ts';
+import {
+  activeEffectDefinitionCreate,
+  activeEffectDefinitionOut,
+  activeEffectDefinitionUpdate,
+} from '../../shared/schemas/activeEffects.ts';
+import { campaignLibraryActiveEffects } from '../db/schema.ts';
 /**
  * Per-entity configuration for the four campaign-library kinds (traits,
  * skills, spells, items).  `campaignLibraryCrud.ts` consumes these configs
@@ -108,7 +115,8 @@ export interface LibraryEntityConfig<
     | 'languages'
     | 'techniques'
     | 'styles'
-    | 'enchantments';
+    | 'enchantments'
+    | 'activeEffects';
   readonly table: TTable;
   /** List ordering for `GET /campaigns/{id}/library`. */
   readonly orderBy: readonly SQL[];
@@ -256,6 +264,7 @@ function skillEditableFields(body: LibrarySkillCreate) {
     prerequisiteRules: body.prerequisiteRules ?? null,
     groups: body.groups ?? [],
     tags: body.tags ?? [],
+    procedures: body.procedures ?? withLegacyModifiers(undefined, body.situationalModifiers ?? []),
     situationalModifiers: body.situationalModifiers ?? [],
     effects: body.effects ?? [],
   } satisfies Record<Exclude<keyof LibrarySkillCreate, 'name'>, unknown>;
@@ -300,6 +309,7 @@ export const skillEntity: LibraryEntityConfig<
       prerequisiteRules: row.prerequisiteRules,
       groups: row.groups,
       tags: row.tags,
+      procedures: row.procedures,
       situationalModifiers: row.situationalModifiers ?? [],
       effects: row.effects ?? [],
       createdAt: row.createdAt.toISOString(),
@@ -334,8 +344,16 @@ export const skillEntity: LibraryEntityConfig<
     ...skillEditableFields(body),
   }),
   toUpdateValues: (body) => skillEditableFields(body),
+  prepareValues: async (_tx, _campaignId, body, existing) =>
+    body.situationalModifiers !== undefined && body.procedures === undefined
+      ? {
+          ...body,
+          procedures: withLegacyModifiers(existing?.procedures, body.situationalModifiers),
+        }
+      : body,
   normalizePatch: (body) => {
     const normalized = { ...body } as Record<string, unknown>;
+
     if (body.techLevelPolicy !== undefined) {
       normalized.techLevel =
         body.techLevelPolicy.kind === 'fixed' ? body.techLevelPolicy.techLevel : null;
@@ -363,6 +381,7 @@ export const skillEntity: LibraryEntityConfig<
       prerequisiteRules: row.prerequisiteRules ?? undefined,
       groups: row.groups ?? [],
       tags: row.tags ?? [],
+      procedures: row.procedures,
       situationalModifiers: row.situationalModifiers ?? [],
       effects: row.effects ?? [],
     }),
@@ -804,6 +823,54 @@ export const styleEntity: LibraryEntityConfig<
     }),
 };
 
+/** Reusable campaign effects; character instances retain owned mechanics. */
+export const activeEffectEntity: LibraryEntityConfig<
+  typeof campaignLibraryActiveEffects,
+  z.infer<typeof activeEffectDefinitionCreate>,
+  z.infer<typeof activeEffectDefinitionUpdate>,
+  z.infer<typeof activeEffectDefinitionOut>,
+  'effectId'
+> = {
+  pathSegment: 'active-effects',
+  paramName: 'effectId',
+  entityLabel: 'active effect',
+  yamlKey: 'activeEffects',
+  table: campaignLibraryActiveEffects,
+  orderBy: [asc(campaignLibraryActiveEffects.name)],
+  createSchema: activeEffectDefinitionCreate,
+  updateSchema: activeEffectDefinitionUpdate,
+  outSchema: activeEffectDefinitionOut,
+  summaries: {
+    post: 'Add a library active effect (owner only)',
+    patch: 'Update a library active effect (owner only)',
+    delete: 'Delete a library active effect (owner only)',
+  },
+  toOut: (row) =>
+    activeEffectDefinitionOut.parse({
+      ...row,
+      revision: Number(row.revision),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  keyOf: (input) => input.name.toLowerCase(),
+  toInsertValues: (campaignId, body) => ({
+    ...body,
+    description: body.description ?? null,
+    source: body.source ?? null,
+    campaignId,
+  }),
+  toUpdateValues: (body) => ({ ...body }),
+  rowToCreate: (row) =>
+    activeEffectDefinitionCreate.parse(
+      Object.fromEntries(
+        Object.keys(activeEffectDefinitionCreate.shape).map((key) => [
+          key,
+          row[key as keyof typeof row],
+        ]),
+      ),
+    ),
+};
+
 /** All entity configs, in the order routes/list/export/import must process them. */
 export const libraryEntities = [
   traitEntity,
@@ -814,4 +881,5 @@ export const libraryEntities = [
   techniqueEntity,
   styleEntity,
   enchantmentEntity,
+  activeEffectEntity,
 ] as const;

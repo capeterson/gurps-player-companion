@@ -183,7 +183,7 @@ clear result for partial/bulk failures consistent with the underlying operation.
 ## Operation execution and parity evidence
 
 `src/server/mcp/operationManifest.ts` is the exact mapping for every OpenAPI
-method/path. It exposes 88 player-domain tools and gives each excluded
+method/path. It exposes 94 player-domain tools and gives each excluded
 infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
@@ -310,7 +310,16 @@ The implementation is released only with evidence for these gates:
    Publish a completed operation coverage report. Update overview, architecture,
    sync, sharing, history and JSON specs to describe the implemented state.
 
-The checked-in evidence includes the generated 88-tool catalog, per-operation
+The checked-in evidence includes the generated 94-tool catalog, per-operation
 successful REST/MCP differential and scope-denial fixtures, OAuth boundary and
 transport tests, transaction/idempotency regressions, client consent/Settings
 tests, and the Playwright browser authorization acceptance flow.
+
+## Active effects and skill procedures
+
+The manifest also includes `gpc_create_library_active_effect`,
+`gpc_update_library_active_effect`, and `gpc_delete_library_active_effect`. Character
+active effects and condition groups use the existing character write tools. Skill
+procedure schemas and owned snapshots are exposed by the existing library/skill
+operations. All share REST validation and authorization; the per-operation parity
+matrix includes active-effect CRUD and the generated catalogs reflect YAML v11.

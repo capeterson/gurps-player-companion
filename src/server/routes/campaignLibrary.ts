@@ -1,3 +1,4 @@
+import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
 /**
  * Campaign library CRUD + YAML import/export.
  *
@@ -53,6 +54,7 @@ import {
 import { buildPatchSet } from '../services/patchSet.ts';
 import { registerLibraryCrud, selectLibrarySection, upsertByKey } from './campaignLibraryCrud.ts';
 import {
+  activeEffectEntity,
   enchantmentEntity,
   itemEntity,
   languageEntity,
@@ -90,6 +92,7 @@ router.openapi(
               techniques: z.array(libraryTechniqueOut),
               styles: z.array(libraryStyleOut),
               enchantments: z.array(libraryEnchantmentOut),
+              activeEffects: z.array(activeEffectDefinitionOut),
             }),
           },
         },
@@ -111,6 +114,7 @@ router.openapi(
     const techniques = await selectLibrarySection(db, techniqueEntity, id);
     const styles = await selectLibrarySection(db, styleEntity, id);
     const enchantments = await selectLibrarySection(db, enchantmentEntity, id);
+    const activeEffects = await selectLibrarySection(db, activeEffectEntity, id);
     return c.json(
       {
         traits: traits.map(traitEntity.toOut),
@@ -121,6 +125,7 @@ router.openapi(
         techniques: techniques.map(techniqueEntity.toOut),
         styles: styles.map(styleEntity.toOut),
         enchantments: enchantments.map(enchantmentEntity.toOut),
+        activeEffects: activeEffects.map(activeEffectEntity.toOut),
       },
       200,
     );
@@ -137,6 +142,7 @@ registerLibraryCrud(router, languageEntity);
 registerLibraryCrud(router, techniqueEntity);
 registerLibraryCrud(router, styleEntity);
 registerLibraryCrud(router, enchantmentEntity);
+registerLibraryCrud(router, activeEffectEntity);
 
 // ===================== YAML EXPORT =====================
 
@@ -187,6 +193,7 @@ router.openapi(
         const techniques = await selectLibrarySection(tx, techniqueEntity, id);
         const styles = await selectLibrarySection(tx, styleEntity, id);
         const enchantments = await selectLibrarySection(tx, enchantmentEntity, id);
+        const activeEffects = await selectLibrarySection(tx, activeEffectEntity, id);
         return {
           campaign,
           traits,
@@ -197,12 +204,23 @@ router.openapi(
           techniques,
           styles,
           enchantments,
+          activeEffects,
         };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
     );
-    const { campaign, traits, skills, spells, items, languages, techniques, styles, enchantments } =
-      snapshot;
+    const {
+      campaign,
+      traits,
+      skills,
+      spells,
+      items,
+      languages,
+      techniques,
+      styles,
+      enchantments,
+      activeEffects,
+    } = snapshot;
     const yamlText = emitLibraryYaml({
       campaign: {
         name: campaign.name,
@@ -224,6 +242,7 @@ router.openapi(
       techniques: techniques.map(techniqueEntity.rowToCreate),
       styles: styles.map(styleEntity.rowToCreate),
       enchantments: enchantments.map(enchantmentEntity.rowToCreate),
+      activeEffects: activeEffects.map(activeEffectEntity.rowToCreate),
     });
     return c.body(yamlText, 200, {
       'content-type': 'application/yaml; charset=utf-8',
@@ -361,6 +380,14 @@ router.openapi(
         mode,
       );
 
+      const activeEffects = await upsertByKey(
+        tx,
+        activeEffectEntity,
+        id,
+        doc.library.activeEffects,
+        mode,
+      );
+
       // Opt-in campaign-settings apply (validated above): only fields
       // actually present in the doc get copied (undefined = leave
       // alone); `name` is never touched.  `campaignSettingsApplied`
@@ -386,6 +413,7 @@ router.openapi(
         techniques,
         styles,
         enchantments,
+        activeEffects,
         campaignSettingsApplied,
       };
     });

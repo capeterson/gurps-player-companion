@@ -594,3 +594,15 @@ inside `withAudit(...)` so the DB history triggers attribute it — the campaign
 `?scope=character` roll-up across member characters. See
 [history-tracking.md](history-tracking.md); campaign-family REST files that add
 a new mutating route must be added to the guard test's `MUTATING_ROUTE_FILES`.
+
+## Active-effect library and skill procedures (YAML v11)
+
+Library owners can create, search, edit and delete active-effect definitions at
+`/library/active-effects`; members read them in the aggregate library. YAML v11 adds
+optional `library.activeEffects` and skill `procedures` (modifiers/actions/benefits).
+Omitting the new library section during replace import preserves existing definitions.
+Applied character effects keep owned mechanics on source deletion or campaign
+transfer, while edits refresh live links transactionally. Their private instances
+are excluded from minimal detail/list/cursor/history surfaces. Campaign cursor rows
+carry only reusable definitions, which are visible to campaign members.
+See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).

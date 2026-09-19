@@ -46,7 +46,7 @@ export interface CharacterSkillWithEffects {
 
 export interface ResolvedEffect {
   /** Distinguishes trait vs. skill source for UI grouping. */
-  readonly sourceKind: 'trait' | 'skill' | 'item';
+  readonly sourceKind: 'trait' | 'skill' | 'item' | 'active_effect';
   /** Display label, e.g. "Combat Reflexes" or "Animal Handling". */
   readonly sourceName: string;
   /** Stable id of the character_trait / character_skill row. */

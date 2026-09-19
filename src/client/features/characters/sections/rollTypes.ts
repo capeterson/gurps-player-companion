@@ -5,6 +5,8 @@
 
 import type { DamageDice } from '../../../../shared/constants/damage.ts';
 import type { ManaLevel } from '../../../../shared/constants/magic.ts';
+import type { RuleContext } from '../../../../shared/domain/skillProcedures.ts';
+import type { SkillAction, SkillModifierRule } from '../../../../shared/schemas/skillProcedures.ts';
 
 export interface RollPreset {
   readonly label: string;
@@ -20,6 +22,9 @@ export interface DamageRollSpec {
 }
 
 export interface RollRequest {
+  readonly rules?: readonly SkillModifierRule[];
+  readonly ruleContext?: RuleContext;
+  readonly action?: SkillAction;
   /** Spell checks apply the ambient mana's failure consequences. */
   readonly spellManaLevel?: ManaLevel;
   readonly label: string;

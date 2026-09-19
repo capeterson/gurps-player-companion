@@ -340,3 +340,12 @@ Key PG18 / trigger machinery, layered by migration:
   origins, Resend key, environment). `.env.example` documents the surface.
 - Seed: `bun run db:seed` (`src/server/db/seed.ts`) creates the idempotent
   "Sample" campaign and imports `bootstrap/sample_library.yaml`.
+
+## Active effects and skill procedures
+
+Campaign active-effect definitions use the generic library factory and an audited
+Postgres table. Character instances use the root `active_effects` JSONB field and
+its existing outbox/history lifecycle; validated read/modify/write transactions
+retain concurrent local gestures. Skill procedures are JSONB on library skills and
+part of their owned mechanics snapshots. All calculation is shared pure TypeScript.
+See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).

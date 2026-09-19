@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../../../../db/dexie.ts';
+import { ToastProvider } from '../../../../lib/toast.tsx';
 import { SoloTrackerCard } from './SoloTrackerCard.tsx';
 
 afterEach(async () => {
@@ -9,7 +10,11 @@ afterEach(async () => {
 
 describe('SoloTrackerCard', () => {
   it('creates an isolated device-only tracker keyed by the displayed character', async () => {
-    render(<SoloTrackerCard characterId="character-a" canWrite={true} />);
+    render(
+      <ToastProvider>
+        <SoloTrackerCard characterId="character-a" canWrite={true} />
+      </ToastProvider>,
+    );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Start tracker' }));
 
@@ -24,7 +29,11 @@ describe('SoloTrackerCard', () => {
   });
 
   it('adds template and manual effects locally without creating outbox work', async () => {
-    render(<SoloTrackerCard characterId="character-a" canWrite={true} />);
+    render(
+      <ToastProvider>
+        <SoloTrackerCard characterId="character-a" canWrite={true} />
+      </ToastProvider>,
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Start tracker' }));
 
     fireEvent.change(await screen.findByLabelText('Effect template'), {
@@ -73,7 +82,11 @@ describe('SoloTrackerCard', () => {
       ],
       updatedAt: new Date().toISOString(),
     });
-    render(<SoloTrackerCard characterId="character-a" canWrite={true} />);
+    render(
+      <ToastProvider>
+        <SoloTrackerCard characterId="character-a" canWrite={true} />
+      </ToastProvider>,
+    );
 
     expect(
       await screen.findByText('Expired: resolve or acknowledge this effect.'),

@@ -425,6 +425,7 @@ describe('delegated operation behavioral parity', () => {
           effects: [{ target: 'weapon_attack', value: 1 }],
         },
       ],
+      ['active_effect', { name: `Effect ${suffix}`, stacking: { kind: 'additive', key: 'test' } }],
       ['language', { name: `Language ${suffix}` }],
       ['technique', { name: `Technique ${suffix}`, defaultSkillName: 'Broadsword' }],
       ['style', { name: `Style ${suffix}` }],
@@ -435,6 +436,7 @@ describe('delegated operation behavioral parity', () => {
       spell: 'spellId',
       item: 'itemId',
       enchantment: 'enchantmentId',
+      active_effect: 'effectId',
       language: 'languageId',
       technique: 'techniqueId',
       style: 'styleId',
@@ -841,7 +843,7 @@ describe('delegated operation behavioral parity', () => {
   });
 
   // Manifest anchor: effects-authoring-parity.
-  it('preserves library and owned effects, YAML v10 portability, retries and refinement errors', async () => {
+  it('preserves library and owned effects, YAML v11 portability, retries and refinement errors', async () => {
     const [client] = await getDb()
       .insert(oauthClients)
       .values({
@@ -963,7 +965,7 @@ describe('delegated operation behavioral parity', () => {
     });
     const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaign.id));
     const yaml = parseLibraryYaml(exported.body);
-    expect(yaml.version).toBe(10);
+    expect(yaml.version).toBe(11);
     expect(exported.body).not.toContain('libraryItemId');
     expect(yaml.library.traits[0]?.effects).toEqual([
       portableEffects[1],

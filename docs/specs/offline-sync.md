@@ -753,3 +753,14 @@ natural-DR policy. `buildCharacterDetail` marks missing campaign settings as
 `houseRulesKnown: false`; the armor map and damage dialog hold calculations
 until settings are available. Known settings survive reopening offline and
 update reactively in player and GM views when the campaign cursor changes.
+
+## Active effects
+
+`characters.activeEffects` is a validated root-field outbox surface, independent
+of manual `tempEffects`. Its transactional helper composes current local arrays
+before enqueueing. Condition groups now use the outbox too. Existing character
+cursor protection, toast/flash rejection, transfer undo, privacy masking and purge
+apply. Campaign cursor rows additionally carry read-only active-effect definitions
+for offline selection; calculation uses each instance's owned snapshot. Wall-clock
+expiry is reconciled on reading/foreground return, never by an assumed closed-app
+timer. [Detailed lifecycle](active-effects-skill-procedures.md).

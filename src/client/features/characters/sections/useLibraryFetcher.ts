@@ -1,3 +1,4 @@
+import { getLocalDb } from '../../../db/dexie.ts';
 /**
  * Fetch a campaign's library (traits + skills + spells + items +
  * languages + techniques) once via the
@@ -21,6 +22,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
+import type { ActiveEffectDefinitionOut } from '../../../../shared/schemas/activeEffects.ts';
 import type {
   LibraryEnchantmentOut,
   LibraryItemOut,
@@ -32,7 +34,15 @@ import type {
 } from '../../../../shared/schemas/campaignLibrary.ts';
 import { ApiError, api } from '../../../lib/api.ts';
 
-type Kind = 'traits' | 'skills' | 'spells' | 'items' | 'languages' | 'techniques' | 'enchantments';
+type Kind =
+  | 'traits'
+  | 'skills'
+  | 'spells'
+  | 'items'
+  | 'languages'
+  | 'techniques'
+  | 'enchantments'
+  | 'activeEffects';
 
 type LibraryEntry =
   | LibraryTraitOut
@@ -41,7 +51,8 @@ type LibraryEntry =
   | LibraryItemOut
   | LibraryLanguageOut
   | LibraryTechniqueOut
-  | LibraryEnchantmentOut;
+  | LibraryEnchantmentOut
+  | ActiveEffectDefinitionOut;
 
 interface LibraryPayload {
   readonly traits: LibraryTraitOut[];
@@ -54,6 +65,7 @@ interface LibraryPayload {
   /** Optional: servers from before the technique library omit it. */
   readonly techniques?: LibraryTechniqueOut[];
   readonly enchantments?: LibraryEnchantmentOut[];
+  readonly activeEffects?: ActiveEffectDefinitionOut[];
 }
 
 const EMPTY_LIBRARY: LibraryPayload = {
@@ -102,7 +114,11 @@ export function useLibraryFetcher<T extends LibraryEntry>(
       // The caller's `T` is one of the union members; the kind arg
       // discriminates which array we want. TS can't narrow through
       // the indexed access so this cast is necessary at the boundary.
-      const list = (payload[kind] ?? []) as unknown as readonly T[];
+      const durable =
+        kind === 'activeEffects' && campaignId
+          ? (await getLocalDb().campaigns.get(campaignId))?.activeEffectDefinitions
+          : undefined;
+      const list = (durable ?? payload[kind] ?? []) as unknown as readonly T[];
       if (q.length === 0) return list.slice(0, 20);
       const needle = q.toLowerCase();
       const ranked = list
@@ -123,7 +139,7 @@ export function useLibraryFetcher<T extends LibraryEntry>(
         .map((r) => r.opt);
       return ranked;
     },
-    [query.data, kind],
+    [query.data, kind, campaignId],
   );
 
   return { fetchOptions, isLoading: query.isLoading };

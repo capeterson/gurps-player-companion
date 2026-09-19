@@ -28,6 +28,7 @@ to confirm the original or destination campaign in the sync log before replay.
 
 | Doc | Covers |
 |---|---|
+| [active-effects-skill-procedures.md](active-effects-skill-procedures.md) | Campaign active effects, owned character instances, contextual skill modifiers, actions and level benefits. |
 | **overview.md** (this file) | Product surface, feature catalog, codebase map, orientation notes. |
 | [architecture.md](architecture.md) | Stack, process model, request lifecycle, data model, auth, testing, deploy. |
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
@@ -162,6 +163,7 @@ on any sheet the viewer can edit — their own — it always shows).
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
+- **Active effects and skill procedures.** Campaign-defined or custom effects can be applied, activated, deactivated, expired, detached and removed from Combat. Owned mechanics and saved campaign templates work offline; capabilities/senses/resistances have typed labels. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v11. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -608,7 +610,7 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
   Library skill forms also author first-class free-form/catalog specialization
-  policies and per-catalog-option rule overrides; portable YAML v10 retains them.
+  policies and per-catalog-option rule overrides; portable YAML v11 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal, e.g. 13) and **location** (free-form text, e.g. "The
@@ -774,7 +776,7 @@ src/
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text
-     domain/      GURPS math (characterCalc, skillCalc, spellCalc, itemEnchantments,
+     domain/      GURPS math (characterCalc, skillCalc, spellCalc, itemEnchantments, activeEffects, skillProcedures,
                   techniqueCalc (level from default skill + points offset for
                   A/H difficulty), encumbrance,
                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +

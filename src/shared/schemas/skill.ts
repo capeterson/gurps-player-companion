@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../constants/skills.ts';
 import { timestamps, uuid } from './common.ts';
 import { libraryMechanics } from './libraryMechanics.ts';
+import { skillProcedures } from './skillProcedures.ts';
 import { skillDefaults } from './skillRules.ts';
 
 export {
@@ -33,6 +34,10 @@ export const situationalModifier = z
   .strict();
 
 export const skillOut = z.object({
+  procedures: skillProcedures.optional(),
+  procedureContext: z.record(z.union([z.number(), z.string(), z.boolean()])).optional(),
+  actionTargets: z.record(z.number().nullable()).optional(),
+  benefitStatus: z.array(z.object({ id: z.string(), unlocked: z.boolean() })).optional(),
   id: uuid,
   characterId: uuid,
   name: z.string().min(1).max(160),
