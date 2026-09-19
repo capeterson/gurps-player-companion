@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HistoryList } from '../history/HistoryList.tsx';
-import { useCampaignHistory } from '../history/useHistoryQuery.ts';
+import { fetchCampaignHistoryEventDetail, useCampaignHistory } from '../history/useHistoryQuery.ts';
 
 interface CampaignHistoryPanelProps {
   campaignId: string;
@@ -43,6 +43,8 @@ export function CampaignHistoryPanel({ campaignId, isOwner }: CampaignHistoryPan
         hasNextPage={hasNextPage ?? false}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={fetchNextPage}
+        showDetails={(event) => event.entityClass.startsWith('campaign_library_')}
+        loadDetails={(event) => fetchCampaignHistoryEventDetail(campaignId, event)}
       />
     </div>
   );

@@ -591,7 +591,9 @@ Every campaign-family write (settings, membership, library, adventure log) runs
 inside `withAudit(...)` so the DB history triggers attribute it — the campaign
 **History view** (`CampaignHistoryPanel`) reads
 `GET /campaigns/{id}/history` (`scope='campaign'`), plus an owner-only
-`?scope=character` roll-up across member characters. See
+`?scope=character` roll-up across member characters. Library events expand to
+field-level before/after details and a nested raw old/new JSON view for structured
+definition changes. See
 [history-tracking.md](history-tracking.md); campaign-family REST files that add
 a new mutating route must be added to the guard test's `MUTATING_ROUTE_FILES`.
 

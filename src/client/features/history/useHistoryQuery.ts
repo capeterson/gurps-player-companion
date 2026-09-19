@@ -54,3 +54,22 @@ export function useCampaignHistory(
     ...(refetchInterval !== undefined ? { refetchInterval } : {}),
   });
 }
+
+/** Fetch one already-visible campaign event's authorized snapshots on demand. */
+export async function fetchCampaignHistoryEventDetail(
+  campaignId: string,
+  event: HistoryEventOut,
+): Promise<HistoryEventOut> {
+  const params = new URLSearchParams({
+    // History pagination is strict `< before`; revisions are integer and globally
+    // ordered, so the next integer asks for a page beginning with this event.
+    before: String(event.revision + 1),
+    limit: '1',
+    scope: event.scope,
+    detail: '1',
+  });
+  const items = await api<HistoryEventOut[]>(`/campaigns/${campaignId}/history?${params}`);
+  const detailed = items.find((candidate) => candidate.id === event.id);
+  if (!detailed) throw new Error('History details are no longer available.');
+  return detailed;
+}
