@@ -16,15 +16,41 @@ none of it flows through the offline outbox (campaigns are pulled read-only
 into Dexie for the share gate, campaign names, mana, and house rules). See
 [offline-sync.md](offline-sync.md) S0.
 
+The same player-domain operations are available to delegated MCP clients.
+OAuth scope is an additional ceiling; it never replaces current campaign role,
+membership, private-log, hidden-encounter, GM-edit, or character-share checks.
+MCP results pass through the same list/detail/history projections. Membership
+revocation takes effect on the next tool call.
+
 ## House rules
 
-Campaign settings include a House rules section, editable by the owner and
-readable by managers. `houseRules.protectNaturalDr` defaults to true for both
-existing and new campaigns. It exempts innate DR (all active `dr` effects,
-including tough skin) and natural skull DR from armor-piercing divisors and
-Ignore DR. Worn armor still divides, rounded down. Turning it off restores
-standard B378/M63 penetration of the full DR total. Fractional divisors below
-1 still increase all protection, with final DR 1 for unprotected targets.
+Campaign settings include a House rule set selector, editable by the owner and
+readable by managers. Its choices are **None**, **J Talisar**, and **Custom**.
+Selecting None or J Talisar deliberately loads that named bundle. Selecting
+Custom changes only `houseRules.ruleSet`: every currently loaded option remains
+unchanged so a GM can start with J Talisar and alter one or two rulings instead
+of rebuilding the set. Changing an individual option also records the set as
+Custom without changing any sibling option. The preset identity is persisted
+alongside the values rather than inferred from value equality, so an unchanged
+copy of J Talisar can still remain explicitly Custom.
+
+The J Talisar bundle enables every option documented in the E'arles campaign
+house-rules source: enchanted-item pricing; the eye-miss location; advancement
+rites for magical advantages; Medium and material spirits; shield damage;
+Bravery; layered Deflect and Fortify; prohibited Distant Blow and acid magic;
+spell ingredients; Hide Thoughts and Sunbolt interpretations; Path casting,
+curse, dispel, Mystic Symbol, and charm rulings; shield-ready timing; and the
+supplemental perks. Each control carries a concise explanation in the settings
+dialog. None disables every option. The default-on `enforceAttributeCaps`
+campaign rule is stored separately and is therefore enabled regardless of
+which house-rule set is selected.
+
+`houseRules.protectNaturalDr` remains on in the legacy/default Custom state. It
+exempts innate DR (all active `dr` effects, including tough skin) and natural
+skull DR from armor-piercing divisors and Ignore DR. Worn armor still divides,
+rounded down. Turning it off restores standard B378/M63 penetration of the full
+DR total. Fractional divisors below 1 still increase all protection, with final
+DR 1 for unprotected targets.
 
 This is an explicit house rule, not an inferred trait-name mechanic. The
 setting saves with the rest of the settings form through owner-only REST,
@@ -73,10 +99,34 @@ costs, grants mages next-turn recovery of personal FP spent casting on their own
 critical), `techLevel` (the campaign's tech
 level, resolved onto every member character's `CharacterDetail.techLevel`
 the same way `manaLevel` is — characters no longer set their own),
-`shareCharacterSheets`, and the default-off `allowGmCharacterEditing`
+the default-on `enforceAttributeCaps` rule, `shareCharacterSheets`, and the
+default-off `allowGmCharacterEditing`
 switch. The latter grants owners/managers normal sheet editing through
 the character outbox and server `assertWrite` path; it does not create a
 dashboard-specific mutation path.
+
+`enforceAttributeCaps` applies the Basic Set's purchased-stat ceilings on both
+character write doors (REST and `/sync/operations`): DX, IQ, and HT may not
+exceed 20; purchased Will and Per (`IQ + permanent modifier`) may not exceed
+20. ST is deliberately exempt because B14 explicitly allows it well beyond
+20, and temporary/trait effects are not purchases. The switch defaults true
+for new campaigns and migration `0041_campaign_attribute_caps.sql` enables it
+for every existing campaign. Campaignless characters have no campaign rule.
+The client mirrors the switch into Dexie and tightens the existing draft input
+bounds immediately; the server remains authoritative and an asynchronous sync
+rejection still uses the standard toast + rollback flash path.
+
+### Experimental turn tracking
+
+`experimentalTurnTracker` is an owner-controlled campaign setting, default false
+for both existing and new campaigns (migration 0046). It appears under
+**Experimental features → Enable turn tracker**. Enabling exposes campaign
+encounters and local character turn scratchpads. Disabling hides those surfaces,
+including bookmarked encounter pages, while preserving stored data. It is a UI
+feature switch, not an additional encounter API authorization boundary.
+The read-only campaign cursor and REST mirror carry it into Dexie so character
+sheets honor the saved preference offline; absent settings and campaignless
+characters keep tracking hidden. Campaign PATCH remains online-only and audited.
 
 ### Invitations
 
@@ -260,11 +310,11 @@ campaign's past-encounter list with an on-page final-round summary.
 
 ## The campaign library
 
-A per-campaign catalog of reusable content, backed by seven tables:
+A per-campaign catalog of reusable content, backed by eight tables:
 `campaign_library_traits`, `campaign_library_skills`,
 `campaign_library_spells`, `campaign_library_items`,
-`campaign_library_languages`, `campaign_library_techniques`, and
-`campaign_library_styles`. It's what lets a GM define campaign-specific
+`campaign_library_languages`, `campaign_library_techniques`,
+`campaign_library_styles`, and `campaign_library_enchantments`. It's what lets a GM define campaign-specific
 advantages, skills, spells, gear, languages, and martial-arts content
 once and have players pull them onto their sheets.
 
@@ -275,9 +325,9 @@ seeds the character row's written fluency to `n/a`.
 
 - **Read** (`GET /campaigns/{id}/library`): any campaign **member**.
 - **Write** (per-entity CRUD): campaign **owner** only. Endpoints are
-  `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|languages|techniques|styles}[/{id}]`
+  `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|enchantments|languages|techniques|styles}[/{id}]`
   in `src/server/routes/campaignLibrary.ts`. These back the library editor UI
-  (traits/skills/spells/items have dedicated editor forms; the
+  (traits/skills/spells/items/enchantments have dedicated editor forms; the
   languages/techniques/styles routes are primarily exercised via the YAML
   import flow and consumed on the character sheet — the editor's own tabs
   do not yet render those kinds); library mutations do **not** go through
@@ -286,15 +336,49 @@ seeds the character row's written fluency to `n/a`.
   and the top-nav `LibraryPage` (`/library`, the primary home for YAML
   import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
   character sheet, which let a player search the campaign library when adding a
-  trait/skill/spell/item/language/technique.
+  trait/skill/spell/item/enchantment/language/technique.
 
-Picking a library skill copies its base name, attribute, difficulty, default
-specialization and learned TL into the character row, with description, source
-and prerequisites in notes. This snapshot is queued durably through the character
+Library enchantments declare `weapon`, `armor`, `shield`, or `any` applicability;
+typed flat effects; optional level-specific effects; and either additive stacking
+or a highest-only stacking key. Library items and character inventory items can
+attach definitions. The server verifies same-campaign scope and applicability and
+requires current library membership before hydrating a linked definition, then
+stores an authoritative name/source/revision/mechanics snapshot. Character-local
+typed instances omit the definition ID. Weapon/armor/shield combat effects require
+`equipped`; weight effects require a worn root; legacy
+spell-name/category/note entries remain valid and non-mechanical. Definition edits
+refresh every live snapshot in the audited transaction. Deletes and campaign
+transfers detach live IDs but preserve the last owned snapshot. Persisted armor and
+weapon blocks always remain the editable base layer; detail payloads expose their
+derived base-plus-effect values separately, without applying persistence caps to
+the derived totals. A DB effect can enhance an existing shield or armor DB but
+does not turn an ordinary weapon into a shield.
+
+Library skills declare a first-class `specializationPolicy`: `none`, required or
+optional free-form, or required or optional catalog. Catalog options carry a
+canonical name plus optional description, prerequisites, and defaults overrides.
+The editor exposes policy and catalog authoring. Picking a library skill requires
+the appropriate free-form/catalog choice and copies its base name, attribute,
+difficulty, resolved specialization and learned TL into the character row, with
+the resolved description, source and prerequisites in notes. The shared server
+reference handler canonicalizes the specialty and applies its defaults/notes when
+REST, sync, or MCP creates a linked skill, so non-UI clients get the same snapshot.
+Definitions may additionally declare `techLevelPolicy`, structured
+`prerequisiteRules`, natural-name `groups`/`tags`, and conditional group/tag
+defaults. The reference handler is authoritative for REST, sync, and MCP: it
+rejects unresolved required `/TL` values and, under the campaign's `block`
+policy, unmet/unknown prerequisites on adds or point increases. `warn` accepts
+the edit and the shared detail builder exposes the failed clauses. Selected
+specialization rules and durable campaign-owner GM-permission grants are retained
+in `character_skills.library_mechanics`; refresh and detach operations preserve
+the selected specialization's overrides rather than replacing them with base rules.
+This snapshot is queued durably through the character
 outbox. Changing the campaign TL does not rewrite learned skill TL. Editing the
 add form's name detaches its selected definition; a pending save cannot clear a
 newer selection, even one with the same base name. Sheet rows, rolls, roll history and
-GM lookup identify specialized skills by `skillDisplayName`; the GM lookup keeps
+GM lookup identify specialized skills by `skillDisplayName` in the compact
+`Name/Specialization` form; legacy parenthesized weapon and technique references
+remain resolvable. The GM lookup keeps
 each specialty selectable and reports its effective level.
 
 Trait/skill effect declarations are materialized on the owned character rows,
@@ -352,12 +436,20 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 6`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 10`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
-  parser unions on the literal `version` field and newer fields
-  default/absent on older docs.
+  v5 (item enchantments), v6 (explicit skill defaults), and v7
+  (weapon-scoped effects) also parse. v8 adds skill specialization policies,
+  catalog option overrides, and structured `exact`/`same`/`any` specialization
+  matching for skill defaults. v9 adds TL policies, structured prerequisites,
+  conditional group/tag defaults, and the campaign prerequisite policy. v10 adds
+  portable mechanical enchantment definitions and structured owned item snapshots;
+  campaign-local definition UUIDs are removed on export while source revision and
+  mechanics remain. The
+  parser unions on the literal `version` field and newer fields default/absent
+  on older docs.
 - **Item fields (v3):** library items carry the same container/powerstone/
   magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):
   `isContainer`, `hideawayCapacityLbs`, `weightReductionPercent`,
@@ -381,14 +473,19 @@ mechanism for sharing content between campaigns or seeding a new one.
   style survives a round trip into a campaign that has no matching technique
   rows yet. Both sections follow the same optional-section rule as
   `languages`.
-- **Item enchantments (v5):** `library.items` entries carry an optional
+- **Item enchantments (v5/v10):** `library.items` entries carry an optional
   `enchantments: []` list (`enchantmentRef[]`: spellName, spellLevel?, category?,
-  notes?) which copies onto character inventory items upon add.
+  notes?) which copies onto character inventory items upon add. v10 extends an
+  entry with optional definition revision/source, selected level, and a complete
+  typed mechanics snapshot while preserving the v5 note-only shape.
 - **Skill defaults (v6):** `library.skills[].defaults` stores attribute/skill
   plus offset candidates, including an optional skill specialization. `[]`
   explicitly means no default and is retained on export; null/absent means
   unknown and is the migration policy for older rows. Picks copy declarations
   onto the character; later library changes do not silently rewrite that copy.
+- **Weapon effects (v7):** adds weapon-scoped effects. Library-item selectors export their stable
+  normalized name but omit the campaign-local UUID; after import they match only
+  inventory rows with library provenance, never unrelated same-name custom items.
   Older YAML versions still parse; omitted defaults remain unknown.
 - **Campaign block `manaLevel`/`techLevel` (v3):** export always includes the
   campaign's ambient `manaLevel` (Basic Set p. 235) and `techLevel` (Basic Set
@@ -398,9 +495,12 @@ mechanism for sharing content between campaigns or seeding a new one.
 - **House rules:** optional `campaign.houseRules` shares the campaign schema.
   Export includes it; opt-in settings import applies it when present. Older
   files that omit it leave the destination rules unchanged.
+- **Campaign block `enforceAttributeCaps` (v6):** export always includes the
+  default-on B14-B16 purchased-attribute rule. Older documents omit it and
+  therefore leave the target campaign's current setting unchanged on import.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
-  campaign settings, and all seven library sections are read on one read-only
+  campaign settings, and all eight library sections are read on one read-only
   `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
   document assembled from different database moments.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. Two modes:
@@ -415,8 +515,8 @@ mechanism for sharing content between campaigns or seeding a new one.
   - **`applyCampaignSettings`** (boolean, default `false`): opt-in. When
     true and the document carries a `campaign` block, `description`,
     `pointTarget`, `disadvantageCap`, `quirkCap`, `manaLevel`,
-    `techLevel`, and optional `houseRules` are copied onto the campaigns row —
-    only the fields
+    `techLevel`, optional `houseRules`, and `enforceAttributeCaps` are copied
+    onto the campaigns row — only the fields
     actually present in the
     document (an omitted field leaves the current value alone); `name` is
     never touched by import. The response's `campaignSettingsApplied`
@@ -427,8 +527,8 @@ mechanism for sharing content between campaigns or seeding a new one.
   campaign by `db:seed`.
 
 Keys used for upsert matching: traits by `kind::lower(name)`; skills, spells,
-items, languages, techniques, and styles by `lower(name)`. The natural-key
-unique indexes on all seven `campaign_library_*` tables are
+items, enchantments, languages, techniques, and styles by `lower(name)`. The natural-key
+unique indexes on all eight `campaign_library_*` tables are
 **case-insensitive** (`UNIQUE (campaign_id,
 lower(name))`, traits additionally scoped by `kind`; see migration 0021), so
 `POST`/`PATCH` reject a case-insensitive duplicate with `409` and an import's
@@ -436,6 +536,26 @@ name match can never be shadowed by a differently-cased row created through
 the CRUD editor. A case-insensitive import match updates the existing row in
 place (preserving its id) and adopts the incoming `name` spelling/casing along
 with its other fields.
+
+## Library search and description editing
+
+The YAML import section folds closed by default and remembers its state on this
+device. Entry titles take their own row on mobile, with metadata/actions beneath.
+The library management UI filters the current Traits, Skills, Spells or Items
+category as the user types in **Search library**. Matching is case-insensitive:
+every query word must appear in the human-readable fields (name, description,
+source, kind, attribute/difficulty, college, prerequisites or specialization
+policy). Category totals and the matching count remain visible, with an explicit
+empty result and Clear search. Search changes never affect exports or imports.
+An entry being edited stays visible even when it does not match; category changes
+hide rather than unmount editors, preserving unsaved drafts and save failures.
+
+Trait, skill and spell descriptions render through the existing sanitized
+`Markdown` component. Add/edit descriptions and skill specialization description
+overrides use `RichTextEditor`, with formatting toolbar and raw markdown mode.
+The stored/API/YAML value remains a markdown string; no new schema or HTML field
+is introduced. Pending description submissions disable editor interaction.
+Copied descriptions on character sheets render with the same sanitizer.
 
 ## Adventure log
 
@@ -474,3 +594,15 @@ inside `withAudit(...)` so the DB history triggers attribute it — the campaign
 `?scope=character` roll-up across member characters. See
 [history-tracking.md](history-tracking.md); campaign-family REST files that add
 a new mutating route must be added to the guard test's `MUTATING_ROUTE_FILES`.
+
+## Active-effect library and skill procedures (YAML v11)
+
+Library owners can create, search, edit and delete active-effect definitions at
+`/library/active-effects`; members read them in the aggregate library. YAML v11 adds
+optional `library.activeEffects` and skill `procedures` (modifiers/actions/benefits).
+Omitting the new library section during replace import preserves existing definitions.
+Applied character effects keep owned mechanics on source deletion or campaign
+transfer, while edits refresh live links transactionally. Their private instances
+are excluded from minimal detail/list/cursor/history surfaces. Campaign cursor rows
+carry only reusable definitions, which are visible to campaign members.
+See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).

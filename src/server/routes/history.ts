@@ -17,7 +17,7 @@ import { historyEventOut, historyQueryParams } from '../../shared/schemas/histor
 import { requireActiveUser } from '../auth/middleware.ts';
 import { loadCampaignOr403 } from '../auth/permissions.ts';
 import { getDb } from '../db/client.ts';
-import { characters, entityHistory, users } from '../db/schema.ts';
+import { characters, entityHistory, oauthClients, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { resolveCharacterView } from '../services/characterAccess.ts';
 
@@ -45,6 +45,9 @@ const historyEventColumns = {
   newRow: entityHistory.newRow,
   createdAt: entityHistory.createdAt,
   actorDisplayName: users.displayName,
+  agentClientId: entityHistory.agentClientId,
+  agentGrantId: entityHistory.agentGrantId,
+  agentClientName: oauthClients.name,
 };
 
 /** Base select+join shared by both endpoints; callers add `.where()`, `.orderBy()`, `.limit()`. */
@@ -52,7 +55,8 @@ function baseHistorySelect(batchSize: SQL<number> | SQL.Aliased<number>) {
   return getDb()
     .select({ ...historyEventColumns, batchSize })
     .from(entityHistory)
-    .leftJoin(users, eq(users.id, entityHistory.actorUserId));
+    .leftJoin(users, eq(users.id, entityHistory.actorUserId))
+    .leftJoin(oauthClients, eq(oauthClients.id, entityHistory.agentClientId));
 }
 
 type HistoryEventRow = Awaited<ReturnType<typeof baseHistorySelect>>[number];
@@ -81,6 +85,9 @@ function toHistoryEvent(row: HistoryEventRow, detail: boolean): z.infer<typeof h
     campaignId: row.campaignId,
     actorUserId: row.actorUserId,
     actorDisplayName: row.actorDisplayName ?? null,
+    agentClientId: row.agentClientId,
+    agentGrantId: row.agentGrantId,
+    agentClientName: row.agentClientName ?? null,
     batchId: row.batchId,
     batchSize: Number(row.batchSize ?? 0),
     summary,

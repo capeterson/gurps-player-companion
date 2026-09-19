@@ -28,11 +28,22 @@ async function createCampaign(page: import('@playwright/test').Page, name: strin
   await expect(campaign).toBeVisible();
   await campaign.click();
   await expect(page).toHaveURL(/\/campaigns\/[a-f0-9-]+$/, { timeout: 10_000 });
+  // Tracking is experimental and must be explicitly enabled by the owner.
+  await expect(page.getByRole('button', { name: /new encounter/i })).toHaveCount(0);
+  await page.getByRole('button', { name: /settings/i }).click();
+  const tracker = page.getByRole('checkbox', { name: /Enable turn tracker/ });
+  await expect(tracker).not.toBeChecked();
+  await tracker.check();
+  await page.getByRole('button', { name: /Save/ }).click();
+  await expect(page.getByRole('button', { name: /new encounter/i })).toBeVisible();
   return page.url().split('/').at(-1) ?? '';
 }
 
 async function accessToken(page: import('@playwright/test').Page) {
-  return page.evaluate(() => localStorage.getItem('gpc.access'));
+  return page.evaluate(() => {
+    const pair = localStorage.getItem('gpc.tokenPair.v1');
+    return pair ? (JSON.parse(pair) as { accessToken: string }).accessToken : null;
+  });
 }
 
 async function api(
@@ -152,4 +163,43 @@ test('player encounter view omits a hidden NPC', async ({ browser }) => {
 
   await gmContext.close();
   await playerContext.close();
+});
+
+test('mobile combat preserves an opt-in tracker across disabling', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  const id = suffix();
+  await register(page, `e2e-combat-compact-${id}@example.com`, 'Mobile player');
+  const campaignId = await createCampaign(page, `Compact combat ${id}`);
+  const response = await api(page, '/characters', {
+    method: 'POST',
+    data: { name: 'Mobile hero', campaignId },
+  });
+  expect(response.status()).toBe(201);
+  const character = (await response.json()) as { id: string };
+  await page.goto(`/characters/${character.id}`);
+  await expect(page.getByRole('button', { name: 'Start tracker' })).toBeVisible();
+  await page.getByRole('button', { name: 'Start tracker' }).click();
+  await expect(page.getByRole('button', { name: 'Next turn' })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(375);
+
+  await api(page, `/campaigns/${campaignId}`, {
+    method: 'PATCH',
+    data: { experimentalTurnTracker: false },
+  });
+  await page.reload();
+  await expect(page.locator('.panel-tabs')).toBeVisible();
+  await expect(page.getByText('Solo tracker', { exact: true })).toHaveCount(0);
+
+  await api(page, `/campaigns/${campaignId}`, {
+    method: 'PATCH',
+    data: { experimentalTurnTracker: true },
+  });
+  await page.reload();
+  await page
+    .locator('.panel-tab')
+    .filter({ hasText: /^Combat$/ })
+    .click();
+  await expect(page.getByRole('button', { name: 'Next turn' })).toBeVisible();
 });

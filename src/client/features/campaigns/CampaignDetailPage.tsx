@@ -129,7 +129,9 @@ export function CampaignDetailPage() {
         )}
       </section>
 
-      <CampaignEncounterPanel campaignId={c.id} canManage={canManage} />
+      {c.experimentalTurnTracker && (
+        <CampaignEncounterPanel campaignId={c.id} canManage={canManage} />
+      )}
 
       {/* Embedded adventure log scoped to this campaign. */}
       <LogPage campaignId={c.id} />

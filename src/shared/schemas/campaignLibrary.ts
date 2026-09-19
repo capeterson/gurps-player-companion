@@ -1,11 +1,16 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
+import { activeEffectDefinitionCreate } from './activeEffects.ts';
 import { campaignHouseRules } from './campaign.ts';
 import { timestamps, uuid } from './common.ts';
-import { traitEffect } from './effects.ts';
+import { libraryTraitEffect } from './effects.ts';
 import {
   armorData,
+  enchantmentApplicability,
+  enchantmentEffect,
+  enchantmentLevels,
   enchantmentRef,
+  enchantmentStackingPolicy,
   magicItemData,
   powerstoneData,
   weaponData,
@@ -15,12 +20,83 @@ import {
   skillAttributeEnum,
   skillDefaults,
   skillDifficultyEnum,
+  skillPrerequisites,
+  skillTechLevelPolicy,
 } from './skill.ts';
+import { skillProcedures } from './skillProcedures.ts';
 import { spellDifficulty } from './spell.ts';
 import { techniqueDifficulty } from './technique.ts';
 import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
 
-const tagList = z.array(z.string().min(1).max(40)).default([]);
+export const tagList = z.array(z.string().min(1).max(40)).max(100).default([]);
+
+export const librarySkillSpecialization = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    description: z.string().max(20_000).nullable().optional(),
+    prerequisites: z.string().max(20_000).nullable().optional(),
+    prerequisiteRules: skillPrerequisites.optional(),
+    defaults: skillDefaults.optional(),
+  })
+  .strict();
+
+const specializationCatalog = z
+  .array(librarySkillSpecialization)
+  .min(1)
+  .max(100)
+  .superRefine((options, ctx) => {
+    const seen = new Set<string>();
+    options.forEach((option, index) => {
+      const key = option.name.trim().replace(/\s+/g, ' ').toLowerCase();
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'name'],
+          message: 'specialization names must be unique',
+        });
+      }
+      seen.add(key);
+    });
+  });
+
+/** Whether a copied library skill accepts or requires a specialization. */
+export const librarySkillSpecializationPolicy = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z.object({ kind: z.literal('required_freeform') }).strict(),
+  z.object({ kind: z.literal('optional_freeform') }).strict(),
+  z.object({ kind: z.literal('required_catalog'), options: specializationCatalog }).strict(),
+  z.object({ kind: z.literal('optional_catalog'), options: specializationCatalog }).strict(),
+]);
+export type LibrarySkillSpecializationPolicy = z.infer<typeof librarySkillSpecializationPolicy>;
+
+export const libraryEnchantmentOut = z.object({
+  id: uuid,
+  campaignId: uuid,
+  name: z.string().min(1).max(160),
+  description: z.string().max(20_000).nullable(),
+  source: z.string().max(40).nullable(),
+  tags: tagList,
+  applicability: enchantmentApplicability,
+  effects: z.array(enchantmentEffect).max(30),
+  levels: enchantmentLevels,
+  stackingPolicy: enchantmentStackingPolicy,
+  revision: z.number().int().min(0),
+  ...timestamps,
+});
+
+export const libraryEnchantmentCreate = z
+  .object({
+    name: z.string().min(1).max(160).trim(),
+    description: z.string().max(20_000).nullable().optional(),
+    source: z.string().max(40).trim().nullable().optional(),
+    tags: tagList,
+    applicability: enchantmentApplicability.default('any'),
+    effects: z.array(enchantmentEffect).max(30).default([]),
+    levels: enchantmentLevels.default([]),
+    stackingPolicy: enchantmentStackingPolicy.default({ kind: 'stack' }),
+  })
+  .strict();
+export const libraryEnchantmentUpdate = libraryEnchantmentCreate.partial();
 
 // ---------- Library entities (server-side persisted shape) ----------
 
@@ -48,7 +124,7 @@ export const libraryTraitOut = z.object({
    * and before per-instance modifiers.
    */
   variants: z.array(traitVariant).default([]),
-  effects: z.array(traitEffect).default([]),
+  effects: z.array(libraryTraitEffect).default([]),
   tags: tagList,
   ...timestamps,
 });
@@ -64,7 +140,7 @@ export const libraryTraitCreate = z
     source: z.string().max(40).trim().nullable().optional(),
     availableModifiers: z.array(traitModifier).default([]),
     variants: z.array(traitVariant).default([]),
-    effects: z.array(traitEffect).default([]),
+    effects: z.array(libraryTraitEffect).default([]),
     tags: tagList,
   })
   .strict();
@@ -78,13 +154,19 @@ export const librarySkillOut = z.object({
   attribute: skillAttributeEnum,
   difficulty: skillDifficultyEnum,
   techLevel: z.number().int().min(0).max(12).nullable(),
+  techLevelPolicy: skillTechLevelPolicy.optional(),
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
   defaultSpecialization: z.string().max(160).nullable(),
+  specializationPolicy: librarySkillSpecializationPolicy,
   defaults: skillDefaults.optional(),
   prerequisites: z.string().max(20_000).nullable(),
+  prerequisiteRules: skillPrerequisites.optional(),
+  groups: tagList,
+  tags: tagList,
+  procedures: skillProcedures.optional(),
   situationalModifiers: z.array(situationalModifier).default([]),
-  effects: z.array(traitEffect).default([]),
+  effects: z.array(libraryTraitEffect).default([]),
   ...timestamps,
 });
 
@@ -94,13 +176,19 @@ export const librarySkillCreate = z
     attribute: skillAttributeEnum,
     difficulty: skillDifficultyEnum,
     techLevel: z.number().int().min(0).max(12).nullable().optional(),
+    techLevelPolicy: skillTechLevelPolicy.optional(),
     description: z.string().max(20_000).nullable().optional(),
     source: z.string().max(40).nullable().optional(),
     defaultSpecialization: z.string().max(160).nullable().optional(),
+    specializationPolicy: librarySkillSpecializationPolicy.optional(),
     defaults: skillDefaults.optional(),
     prerequisites: z.string().max(20_000).nullable().optional(),
+    prerequisiteRules: skillPrerequisites.optional(),
+    groups: tagList,
+    tags: tagList,
+    procedures: skillProcedures.optional(),
     situationalModifiers: z.array(situationalModifier).default([]),
-    effects: z.array(traitEffect).default([]),
+    effects: z.array(libraryTraitEffect).default([]),
   })
   .strict();
 
@@ -287,7 +375,7 @@ export const libraryItemOut = z.object({
   weightReductionPercent: z.number().int().min(0).max(100),
   powerstoneData: powerstoneData.nullable(),
   magicItemData: magicItemData.nullable(),
-  /** Non-mechanical enchantment list carried onto inventory copies. */
+  /** Enchantment instances and owned mechanical snapshots carried onto inventory copies. */
   enchantments: z.array(enchantmentRef).max(50).default([]),
   ...timestamps,
 });
@@ -334,6 +422,8 @@ export const importResult = z.object({
   languages: importSectionResult,
   techniques: importSectionResult,
   styles: importSectionResult,
+  enchantments: importSectionResult,
+  activeEffects: importSectionResult,
   /** Whether the opt-in `applyCampaignSettings` flag actually updated the
    * campaigns row (false when the flag was off or the doc had no `campaign`
    * block). */
@@ -346,7 +436,9 @@ export const importResult = z.object({
  * v1 docs (pre-effects), v2 docs (effects on traits/skills), v3 docs
  * (container/powerstone/magic-item item fields + campaign.manaLevel), v4
  * docs (languages + techniques + styles sections), v5 docs (item enchantments),
- * and v6 docs (explicit skill defaults) all parse. Schema unions on a literal version
+ * v6 docs (explicit skill defaults), v7 docs (weapon-scoped effects), and v8
+ * docs (skill specialization policies and structured default matchers) all parse.
+ * Schema unions on a literal version
  * field so older library files keep round-tripping without mutation.
  * Older docs that omit the newer fields get their defaults (empty
  * array / false / null) via the library*Create schemas.
@@ -358,6 +450,11 @@ export const libraryYamlVersion = z.union([
   z.literal(4),
   z.literal(5),
   z.literal(6),
+  z.literal(7),
+  z.literal(8),
+  z.literal(9),
+  z.literal(10),
+  z.literal(11),
 ]);
 
 export const libraryYamlDoc = z
@@ -375,6 +472,9 @@ export const libraryYamlDoc = z
         houseRules: campaignHouseRules.optional(),
         /** Campaign-wide tech level (Basic Set p. 513). */
         techLevel: z.number().int().min(0).max(12).nullable().optional(),
+        skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
+        /** Purchased-attribute cap enforcement (Basic Set pp. B14-B16). */
+        enforceAttributeCaps: z.boolean().optional(),
       })
       .strict()
       .optional(),
@@ -396,6 +496,9 @@ export const libraryYamlDoc = z
         techniques: z.array(libraryTechniqueCreate).optional(),
         /** Optional for the same reason as `languages`. */
         styles: z.array(libraryStyleCreate).optional(),
+        /** Reusable typed enchantment definitions were added in v10. */
+        enchantments: z.array(libraryEnchantmentCreate).optional(),
+        activeEffects: z.array(activeEffectDefinitionCreate).optional(),
       })
       .strict(),
   })
@@ -422,6 +525,9 @@ export type LibraryLanguageUpdate = z.infer<typeof libraryLanguageUpdate>;
 export type LibraryItemOut = z.infer<typeof libraryItemOut>;
 export type LibraryItemCreate = z.infer<typeof libraryItemCreate>;
 export type LibraryItemUpdate = z.infer<typeof libraryItemUpdate>;
+export type LibraryEnchantmentOut = z.infer<typeof libraryEnchantmentOut>;
+export type LibraryEnchantmentCreate = z.infer<typeof libraryEnchantmentCreate>;
+export type LibraryEnchantmentUpdate = z.infer<typeof libraryEnchantmentUpdate>;
 export type ImportMode = z.infer<typeof importMode>;
 export type ImportResult = z.infer<typeof importResult>;
 export type LibraryYamlDoc = z.infer<typeof libraryYamlDoc>;
@@ -441,6 +547,8 @@ export const libraryPortableFieldManifest = {
     manaLevel: true,
     houseRules: true,
     techLevel: true,
+    skillPrerequisitePolicy: true,
+    enforceAttributeCaps: true,
   } satisfies Record<keyof NonNullable<LibraryYamlDoc['campaign']>, true>,
   traits: {
     name: true,
@@ -463,8 +571,14 @@ export const libraryPortableFieldManifest = {
     description: true,
     source: true,
     defaultSpecialization: true,
+    specializationPolicy: true,
     defaults: true,
     prerequisites: true,
+    prerequisiteRules: true,
+    techLevelPolicy: true,
+    groups: true,
+    tags: true,
+    procedures: true,
     situationalModifiers: true,
     effects: true,
   } satisfies Record<keyof LibrarySkillCreate, true>,
@@ -498,6 +612,16 @@ export const libraryPortableFieldManifest = {
     magicItemData: true,
     enchantments: true,
   } satisfies Record<keyof LibraryItemCreate, true>,
+  enchantments: {
+    name: true,
+    description: true,
+    source: true,
+    tags: true,
+    applicability: true,
+    effects: true,
+    levels: true,
+    stackingPolicy: true,
+  } satisfies Record<keyof LibraryEnchantmentCreate, true>,
   languages: {
     name: true,
     description: true,

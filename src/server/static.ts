@@ -16,6 +16,30 @@ import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { AppEnv } from './openapi/app.ts';
 
 const ROOT = resolve('dist/client');
+const REVALIDATED_STATIC_PATHS = new Set([
+  '/admin.html',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/registerSW.js',
+  '/sw.js',
+]);
+const REVALIDATION_HEADERS = {
+  'cache-control': 'no-store, no-cache, must-revalidate',
+  'cdn-cache-control': 'no-store',
+  pragma: 'no-cache',
+} as const;
+
+export function shouldRevalidateStaticPath(pathname: string): boolean {
+  return REVALIDATED_STATIC_PATHS.has(pathname);
+}
+
+function staticResponse(file: ReturnType<typeof Bun.file>, revalidate: boolean): Response {
+  const headers = new Headers({ 'content-type': file.type });
+  if (revalidate) {
+    for (const [name, value] of Object.entries(REVALIDATION_HEADERS)) headers.set(name, value);
+  }
+  return new Response(file, { headers });
+}
 
 /**
  * Resolve a request path under `base`, rejecting anything that escapes
@@ -44,7 +68,12 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
     // of whether the static bundle has been built.  This must run BEFORE
     // the missing-bundle 503 check so tests and API consumers see a
     // proper JSON 404 even in environments without `dist/client/`.
-    if (url.pathname.startsWith('/api/')) {
+    const protocolPath =
+      url.pathname === '/mcp' ||
+      url.pathname.startsWith('/mcp/') ||
+      url.pathname.startsWith('/.well-known/') ||
+      (url.pathname.startsWith('/oauth/') && url.pathname !== '/oauth/consent');
+    if (url.pathname.startsWith('/api/') || protocolPath) {
       return c.json({ error: 'not_found' }, 404);
     }
     if (!existsSync(ROOT)) {
@@ -59,7 +88,7 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
         const s = await stat(asFile);
         if (s.isFile()) {
           const file = Bun.file(asFile);
-          return new Response(file);
+          return staticResponse(file, shouldRevalidateStaticPath(url.pathname));
         }
       } catch {
         // fall through to index.html
@@ -69,9 +98,7 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
     // (admin.html) so the regular client bundle stays admin-free.
     const isAdmin = url.pathname === '/admin' || url.pathname.startsWith('/admin/');
     const fallbackPath = join(ROOT, isAdmin ? 'admin.html' : 'index.html');
-    return new Response(Bun.file(fallbackPath), {
-      headers: { 'content-type': 'text/html; charset=utf-8' },
-    });
+    return staticResponse(Bun.file(fallbackPath), true);
   });
   return app;
 }

@@ -16,6 +16,7 @@ export const integrationTestConfig: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   appBaseUrl: undefined,
+  oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,
   // Most route suites share a synthetic transport and create many fixtures.

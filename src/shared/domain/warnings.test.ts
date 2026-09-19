@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { evaluateWarnings, listWarningCodes } from './warnings.ts';
+import { evaluateWarnings, getWarningLabel, listWarningCodes } from './warnings.ts';
 import type { CampaignCaps } from './warnings.ts';
 
 const noCaps: CampaignCaps = {
@@ -36,6 +36,7 @@ describe('listWarningCodes', () => {
   it('contains stable codes', () => {
     const codes = listWarningCodes();
     expect(codes).toContain('attr.st.below_minimum');
+    expect(codes).toContain('attr.st.very_high');
     expect(codes).toContain('attr.dx.very_high');
     expect(codes).toContain('encumbrance.heavy');
     expect(codes).toContain('encumbrance.x-heavy');
@@ -43,6 +44,28 @@ describe('listWarningCodes', () => {
     expect(codes).toContain('quirks.over_cap');
     expect(codes).toContain('points.over_target');
     expect(codes).toContain('points.under_target');
+  });
+});
+
+describe('getWarningLabel', () => {
+  it('gives every registered API code an intentional human label', () => {
+    const labels = new Map(listWarningCodes().map((code) => [code, getWarningLabel(code)]));
+
+    expect(labels.get('points.over_target')).toBe('Point target exceeded');
+    expect(labels.get('points.under_target')).toBe('Unspent points');
+    expect(labels.get('disadvantages.over_cap')).toBe('Disadvantage cap exceeded');
+    expect(labels.get('quirks.over_cap')).toBe('Quirk cap exceeded');
+    expect(labels.get('encumbrance.over_carry_cap')).toBe('Carry limit exceeded');
+    expect(labels.get('hp.mod_out_of_range')).toBe('HP modifier out of range');
+    expect(labels.get('fp.mod_out_of_range')).toBe('FP modifier out of range');
+    for (const [code, label] of labels) {
+      expect(label.trim().length).toBeGreaterThan(0);
+      expect(label).not.toBe(code);
+    }
+  });
+
+  it('humanizes unknown persisted codes instead of leaking API syntax', () => {
+    expect(getWarningLabel('legacy.some_old-warning')).toBe('Legacy: Some old warning');
   });
 });
 
@@ -77,6 +100,16 @@ describe('evaluateWarnings', () => {
     });
     const warning = ws.find((w) => w.code === 'attr.iq.very_high');
     expect(warning?.severity).toBe('note');
+  });
+
+  it('does not flag ST above 20 because B14 explicitly exempts it', () => {
+    const ws = evaluateWarnings({
+      attrs: { st: 30, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
+      points: okPoints,
+      encumbrance: okEnc,
+      campaign: noCaps,
+    });
+    expect(ws.find((w) => w.code === 'attr.st.very_high')).toBeUndefined();
   });
 
   it('warns when encumbrance level is Heavy', () => {

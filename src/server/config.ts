@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type OAuthClientConfig, oauthClientConfigList } from '../shared/schemas/oauth.ts';
 
 const placeholderSecrets = new Set([
   'replace-me-with-output-of-openssl-rand-hex-32',
@@ -23,6 +24,42 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
   APP_BASE_URL: z.string().url().optional(),
+  OAUTH_CLIENTS: z
+    .string()
+    .default('[]')
+    .transform((raw, ctx) => {
+      try {
+        return oauthClientConfigList.parse(JSON.parse(raw));
+      } catch (error) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `OAUTH_CLIENTS is invalid: ${String(error)}`,
+        });
+        return z.NEVER;
+      }
+    })
+    .superRefine((clients, ctx) => {
+      const ids = new Set<string>();
+      for (const client of clients) {
+        if (ids.has(client.clientId))
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `duplicate OAuth client id: ${client.clientId}`,
+          });
+        ids.add(client.clientId);
+        for (const value of client.redirectUris) {
+          const uri = new URL(value);
+          const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(uri.hostname);
+          const safeProtocol = uri.protocol === 'https:' || (uri.protocol === 'http:' && loopback);
+          if (!safeProtocol || uri.username || uri.password || uri.hash) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `unsafe OAuth redirect URI for ${client.clientId}`,
+            });
+          }
+        }
+      }
+    }),
   TRUST_PROXY: z
     .enum(['true', 'false'])
     .default('false')
@@ -72,6 +109,7 @@ export type AppConfig = {
   resendApiKey: string | undefined;
   resendFromEmail: string | undefined;
   appBaseUrl: string | undefined;
+  oauthClients: OAuthClientConfig[];
   trustProxy: boolean;
   authRateLimitWindowSeconds: number;
   authRateLimitLoginMax: number;
@@ -97,6 +135,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     RESEND_API_KEY: env.RESEND_API_KEY,
     RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL,
     APP_BASE_URL: env.APP_BASE_URL,
+    OAUTH_CLIENTS: env.OAUTH_CLIENTS,
     TRUST_PROXY: env.TRUST_PROXY,
     AUTH_RATE_LIMIT_WINDOW_SECONDS: env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
     AUTH_RATE_LIMIT_LOGIN_MAX: env.AUTH_RATE_LIMIT_LOGIN_MAX,
@@ -104,6 +143,27 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     AUTH_RATE_LIMIT_RESET_MAX: env.AUTH_RATE_LIMIT_RESET_MAX,
     AUTH_RATE_LIMIT_CHALLENGE_MAX: env.AUTH_RATE_LIMIT_CHALLENGE_MAX,
   });
+  if (parsed.ENVIRONMENT === 'production' && !parsed.APP_BASE_URL) {
+    throw new Error('APP_BASE_URL is required in production for OAuth');
+  }
+  if (parsed.APP_BASE_URL) {
+    const publicUrl = new URL(parsed.APP_BASE_URL);
+    const safeProtocol =
+      publicUrl.protocol === 'https:' ||
+      (parsed.ENVIRONMENT !== 'production' && publicUrl.protocol === 'http:');
+    if (
+      !safeProtocol ||
+      publicUrl.username ||
+      publicUrl.password ||
+      publicUrl.hash ||
+      publicUrl.search ||
+      publicUrl.pathname !== '/'
+    ) {
+      throw new Error(
+        'APP_BASE_URL must be an origin without path, query, credentials, or fragment; production requires HTTPS',
+      );
+    }
+  }
 
   cached = {
     environment: parsed.ENVIRONMENT,
@@ -118,6 +178,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     resendApiKey: parsed.RESEND_API_KEY,
     resendFromEmail: parsed.RESEND_FROM_EMAIL,
     appBaseUrl: parsed.APP_BASE_URL,
+    oauthClients: parsed.OAUTH_CLIENTS,
     trustProxy: parsed.TRUST_PROXY,
     authRateLimitWindowSeconds: parsed.AUTH_RATE_LIMIT_WINDOW_SECONDS,
     authRateLimitLoginMax: parsed.AUTH_RATE_LIMIT_LOGIN_MAX,

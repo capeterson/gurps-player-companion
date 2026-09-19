@@ -9,7 +9,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeDerived } from '../../../../../shared/domain/characterCalc.ts';
 import { applyEffectsToAttrs, resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
-import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import type {
+  CharacterDetail,
+  ResolvedEffectOut,
+} from '../../../../../shared/schemas/character.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { AttacksCard } from './AttacksCard.tsx';
 import { clearAllAttackTablePreferences } from './attackTablePreferences.ts';
@@ -159,6 +162,148 @@ describe('AttacksCard', () => {
     expect(localStorage.getItem('test-unrelated-setting')).toBe('keep');
     localStorage.removeItem('test-unrelated-setting');
   });
+  it('applies scoped attack, damage, and Accuracy bonuses with source breakdowns', () => {
+    const character = makeCharacter('thr imp', { ranged: { acc: 2 } });
+    character.effects = [
+      {
+        sourceKind: 'trait',
+        sourceName: 'Weapon Bond',
+        sourceId: '11111111-1111-4111-8111-111111111111',
+        target: 'weapon_attack',
+        value: 1,
+        active: true,
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Broadsword' },
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Puissance',
+        sourceId: '22222222-2222-4222-8222-222222222222',
+        target: 'weapon_damage',
+        value: 2,
+        active: true,
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Broadsword' },
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Accuracy',
+        sourceId: '33333333-3333-4333-8333-333333333333',
+        target: 'weapon_accuracy',
+        value: 1,
+        active: true,
+        weaponSelector: { kind: 'weapon_name', weaponName: 'Broadsword' },
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+    ];
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '1d imp' }));
+    expect(openRoll.mock.calls[0]?.[0].damage.dice).toEqual({ dice: 1, adds: 0 });
+    fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
+    expect(openRoll.mock.calls[1]?.[0].baseTarget).toBe(15);
+    expect(openRoll.mock.calls[1]?.[0].presets[0]).toEqual({ label: 'Aim (+3)', mod: 3 });
+    expect(screen.getAllByText('Weapon Bond').length).toBeGreaterThan(0);
+    expect(screen.getByText('Accuracy')).toBeInTheDocument();
+    expect(screen.getByText('Puissance')).toBeInTheDocument();
+  });
+
+  function scopedEffect(
+    target: 'weapon_attack' | 'weapon_damage' | 'weapon_accuracy',
+    value: number,
+    modeName: string,
+  ): ResolvedEffectOut {
+    return {
+      sourceKind: 'trait',
+      sourceId: '11111111-1111-4111-8111-111111111111',
+      sourceName: `${modeName} ${target}`,
+      target,
+      value,
+      active: true,
+      weaponSelector: { kind: 'weapon_name', weaponName: 'Broadsword', modeName },
+      matchedInventoryItemIds: ['w1'],
+      weaponMatchStatus: 'one',
+    };
+  }
+
+  it('keeps alternate-mode attack, damage and Aim bonuses scoped while carrying effective armor divisors', () => {
+    const character = makeCharacter('sw+1 cut', { ranged: { acc: 2 } });
+    const weapon = character.inventory[0];
+    if (!weapon?.weaponData) throw new Error('Missing weapon fixture');
+    weapon.weaponData.alternateModes = [{ name: 'Thrust', damage: 'thr(2) imp' }];
+    weapon.effectiveArmorDivisor = 5;
+    character.effects = [
+      scopedEffect('weapon_attack', 1, 'primary'),
+      scopedEffect('weapon_attack', 3, 'Thrust'),
+      scopedEffect('weapon_accuracy', 2, 'Thrust'),
+      scopedEffect('weapon_damage', 4, 'Thrust'),
+    ];
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Broadsword 15' }));
+    expect(openRoll.mock.calls.at(-1)?.[0]).toMatchObject({
+      baseTarget: 15,
+      presets: expect.arrayContaining([{ label: 'Aim (+2)', mod: 2 }]),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Broadsword · Thrust 17' }));
+    expect(openRoll.mock.calls.at(-1)?.[0]).toMatchObject({
+      baseTarget: 17,
+      presets: expect.arrayContaining([{ label: 'Aim (+4)', mod: 4 }]),
+    });
+    fireEvent.click(screen.getByRole('button', { name: '1d+1 cut (5)' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].damage).toEqual({
+      dice: { dice: 1, adds: 1 },
+      damageType: 'cut',
+      armorDivisor: '5',
+    });
+    fireEvent.click(screen.getByRole('button', { name: '1d+2 imp (5)' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].damage).toEqual({
+      dice: { dice: 1, adds: 2 },
+      damageType: 'imp',
+      armorDivisor: '5',
+    });
+    expect(screen.getByText('Thrust weapon_damage')).toBeInTheDocument();
+  });
+
+  it('offers an unmodified alternate roll when only the primary mode gets an attack bonus', () => {
+    const character = makeCharacter('sw+1 cut');
+    const weapon = character.inventory[0];
+    if (!weapon?.weaponData) throw new Error('Missing weapon fixture');
+    weapon.weaponData.alternateModes = [{ name: 'Thrust', damage: 'thr imp' }];
+    character.effects = [scopedEffect('weapon_attack', 2, 'primary')];
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Broadsword · Thrust 14' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(14);
+  });
+
+  it('retains weapon selector diagnostics alongside the sortable table', () => {
+    const character = withMultipleWeapons();
+    character.effects = [
+      {
+        ...scopedEffect('weapon_attack', 1, 'primary'),
+        weaponMatchStatus: 'zero',
+        matchedInventoryItemIds: [],
+      },
+      {
+        ...scopedEffect('weapon_damage', 1, 'primary'),
+        weaponMatchStatus: 'multiple',
+        matchedInventoryItemIds: ['w1', 'w2'],
+      },
+    ];
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(screen.getByText('Weapon effect matches (2)')).toBeInTheDocument();
+    expect(screen.getByText(/selector matches no equipped weapons/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/selector matches 2 equipped weapons \(Sword, Bow\)/),
+    ).toBeInTheDocument();
+    expect(weaponOrder()).toEqual(['Sword', 'Bow', 'Axe']);
+  });
+
   it('withholds ST-based damage while effects are unknown, keeping fixed dice usable', () => {
     const character = {
       ...makeCharacter('thr+1 imp / sw+1 cut / 2d pi'),
@@ -349,7 +494,7 @@ describe('AttacksCard', () => {
     } as unknown as CharacterDetail;
     render(<AttacksCard character={character} openRoll={openRoll} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Guns \(Rifle\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Guns\/Rifle/ }));
     const call = openRoll.mock.calls[0] as [RollRequest];
     expect(call[0].baseTarget).toBe(12);
   });
@@ -398,6 +543,19 @@ describe('AttacksCard', () => {
       damageType: 'cut',
       armorDivisor: null,
     });
+  });
+
+  it('uses the enchanted armor divisor in both the damage chip and roll payload', () => {
+    const openRoll = vi.fn();
+    const character = makeCharacter('1d(2) pi');
+    const weapon = character.inventory[0];
+    if (!weapon) throw new Error('expected weapon fixture');
+    weapon.effectiveArmorDivisor = 5;
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '1d pi (5)' }));
+    const call = openRoll.mock.calls[0] as [RollRequest];
+    expect(call[0].damage?.armorDivisor).toBe('5');
   });
 
   it('renders each alternate mode as its own damage chip, reach inherited when unset', () => {

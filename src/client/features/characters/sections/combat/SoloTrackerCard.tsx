@@ -8,7 +8,12 @@ import {
 } from '../../../../../shared/domain/encounterEffects.ts';
 import { advanceTurn, previousTurn } from '../../../../../shared/domain/encounterTurns.ts';
 import type { EffectDuration } from '../../../../../shared/schemas/encounter.ts';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { type LocalSoloEncounter, getLocalDb } from '../../../../db/dexie.ts';
+import { useToasts } from '../../../../lib/toast.tsx';
+import { flashBus } from '../../../../sync/flashBus.ts';
+import { campaignTransferStores } from '../../../../sync/localCampaignTransfer.ts';
+import { mutateActiveEffects } from '../activeEffectMutations.ts';
 
 export function SoloTrackerCard({
   characterId,
@@ -41,14 +46,43 @@ export function SoloTrackerCard({
     });
   }
 
+  const { push } = useToasts();
   const stamp = (row: LocalSoloEncounter) => ({ ...row, updatedAt: new Date().toISOString() });
   function turn(direction: 'next' | 'previous') {
-    void update((row) =>
-      stamp({
-        ...row,
-        ...(direction === 'next' ? advanceTurn : previousTurn)(row, row.combatants),
-      }),
-    );
+    void db
+      .transaction(
+        'rw',
+        [db.soloEncounters, db.characters, db.outbox, ...campaignTransferStores()],
+        async () => {
+          const row = await db.soloEncounters.get(characterId);
+          if (!row) return;
+          const next = stamp({
+            ...row,
+            ...(direction === 'next' ? advanceTurn : previousTurn)(row, row.combatants),
+          });
+          await db.soloEncounters.put(next);
+          if (next.round > row.round)
+            await mutateActiveEffects(characterId, 'Advance active effects one round', (entries) =>
+              entries.map((e) =>
+                e.state === 'active' && e.remainingRounds !== null
+                  ? {
+                      ...e,
+                      remainingRounds: Math.max(0, e.remainingRounds - 1),
+                      state: e.remainingRounds <= 1 ? 'expired' : 'active',
+                    }
+                  : e,
+              ),
+            );
+        },
+      )
+      .catch((error) => {
+        push(`Couldn't advance turn — ${error.message}`, { kind: 'error' });
+        flashBus.emit({
+          key: `character:${characterId}:activeEffects`,
+          visualOnly: true,
+          reason: error.message,
+        });
+      });
   }
   function addCombatant() {
     if (!combatantName.trim()) return;
@@ -112,7 +146,7 @@ export function SoloTrackerCard({
   }
 
   return (
-    <section className="card space-y-3 p-5">
+    <FoldSection preferenceKey={`${characterId}:SoloTrackerCard`} title="Turn tracker">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="label-eyebrow">Solo tracker</p>
@@ -354,6 +388,6 @@ export function SoloTrackerCard({
           </section>
         </>
       )}
-    </section>
+    </FoldSection>
   );
 }

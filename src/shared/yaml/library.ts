@@ -1,3 +1,4 @@
+import type { ActiveEffectDefinition } from '../schemas/activeEffects.ts';
 /**
  * Campaign library YAML codec.  Round-trippable: import → export → diff
  * yields the same bytes (canonical sort + ordered keys).
@@ -8,6 +9,7 @@
 
 import { Document, parse, stringify } from 'yaml';
 import {
+  type LibraryEnchantmentCreate,
   type LibraryItemCreate,
   type LibraryLanguageCreate,
   type LibrarySkillCreate,
@@ -24,10 +26,15 @@ import {
  * `effects` arrays to traits/skills (see schemas/effects.ts).  v3 added
  * container/powerstone/magic-item fields on items and `manaLevel` in the
  * campaign block.  v4 added the `languages`, `techniques`, and `styles`
- * library sections. v5 added item `enchantments`; v6 adds explicit skill
- * `defaults`. The parser still accepts v1-v5 docs (new fields default/absent).
+ * library sections. v5 added item `enchantments`; v6 added explicit skill
+ * `defaults` and campaign attribute-cap enforcement. v7 adds item-aware weapon
+ * effects. v8 adds library skill specialization policies and structured skill
+ * default matchers. v9 adds structured prerequisites, TL policies, conditional
+ * family defaults, and campaign enforcement policy. v10 adds reusable
+ * enchantment definitions and mechanical item snapshots. The parser still accepts
+ * v1-v9 docs (new fields absent).
  */
-export const LIBRARY_YAML_VERSION = 6 as const;
+export const LIBRARY_YAML_VERSION = 11 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -107,6 +114,19 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     if (styleKeys.has(k)) throw new LibraryYamlError(`duplicate style (${st.name})`);
     styleKeys.add(k);
   }
+  const effectKeys = new Set<string>();
+  for (const entry of doc.library.activeEffects ?? []) {
+    const key = entry.name.toLowerCase();
+    if (effectKeys.has(key)) throw new LibraryYamlError(`duplicate active effect (${entry.name})`);
+    effectKeys.add(key);
+  }
+  const enchantmentKeys = new Set<string>();
+  for (const enchantment of doc.library.enchantments ?? []) {
+    const key = enchantment.name.toLowerCase();
+    if (enchantmentKeys.has(key))
+      throw new LibraryYamlError(`duplicate enchantment (${enchantment.name})`);
+    enchantmentKeys.add(key);
+  }
 }
 
 export interface LibraryYamlExportInput {
@@ -118,6 +138,8 @@ export interface LibraryYamlExportInput {
   readonly languages: readonly LibraryLanguageCreate[];
   readonly techniques: readonly LibraryTechniqueCreate[];
   readonly styles: readonly LibraryStyleCreate[];
+  readonly enchantments?: readonly LibraryEnchantmentCreate[];
+  readonly activeEffects?: readonly ActiveEffectDefinition[];
 }
 
 /** Stable ordering for byte-stable round trip. */
@@ -154,21 +176,47 @@ function compactCampaign(input: NonNullable<LibraryYamlDoc['campaign']>): Record
 }
 
 export function emitLibraryYaml(input: LibraryYamlExportInput): string {
-  const traits = sortedTraits(input.traits).map((t) => compact(t));
+  const portableEffects = (effects: LibraryTraitCreate['effects']) =>
+    effects.map((effect) => {
+      if (effect.weaponSelector?.kind !== 'library_item') return effect;
+      const { libraryItemId: _libraryItemId, ...weaponSelector } = effect.weaponSelector;
+      return { ...effect, weaponSelector };
+    });
+  const traits = sortedTraits(input.traits).map((t) =>
+    compact({ ...t, effects: portableEffects(t.effects) }),
+  );
   // An empty defaults list means explicitly no default, unlike missing/unknown.
   const skills = sortedByName(input.skills).map((s) => ({
-    ...compact(s),
+    ...compact({ ...s, effects: portableEffects(s.effects) }),
     ...(s.defaults != null ? { defaults: s.defaults } : {}),
   }));
   const spells = sortedByName(input.spells).map((s) => compact(s));
-  const items = sortedByName(input.items).map((i) => compact(i));
+  const items = sortedByName(input.items).map((item) =>
+    compact({
+      ...item,
+      enchantments: item.enchantments.map(({ definitionId: _definitionId, ...entry }) =>
+        compact(entry),
+      ),
+    }),
+  );
   const languages = sortedByName(input.languages).map((l) => compact(l));
   const techniques = sortedByName(input.techniques).map((t) => compact(t));
   const styles = sortedByName(input.styles).map((st) => compact(st));
+  const enchantments = sortedByName(input.enchantments ?? []).map((entry) => compact(entry));
 
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };
   if (input.campaign) payload.campaign = compactCampaign(input.campaign);
-  payload.library = { traits, skills, spells, items, languages, techniques, styles };
+  payload.library = {
+    traits,
+    skills,
+    spells,
+    items,
+    languages,
+    techniques,
+    styles,
+    enchantments,
+    activeEffects: sortedByName(input.activeEffects ?? []).map((entry) => compact(entry)),
+  };
 
   const doc = new Document(payload);
   return stringify(doc, {

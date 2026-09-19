@@ -18,6 +18,82 @@ export interface InventoryTree {
   readonly byId: Map<string, InventoryItemOut>;
 }
 
+export const INVENTORY_FILTER_TAGS = [
+  'all',
+  'weapon',
+  'armor',
+  'container',
+  'powerstone',
+  'magicItem',
+  'enchanted',
+  'worn',
+  'equipped',
+] as const;
+
+export type InventoryFilterTag = (typeof INVENTORY_FILTER_TAGS)[number];
+
+export interface FilteredInventoryTree extends InventoryTree {
+  /** Items matching the filters directly; ancestor containers are not counted. */
+  readonly matchedIds: ReadonlySet<string>;
+}
+
+function hasFilterTag(item: InventoryItemOut, tag: InventoryFilterTag): boolean {
+  switch (tag) {
+    case 'all':
+      return true;
+    case 'weapon':
+      return item.weaponData != null;
+    case 'armor':
+      return item.isArmor;
+    case 'container':
+      return item.isContainer;
+    case 'powerstone':
+      return item.powerstoneData != null;
+    case 'magicItem':
+      return item.magicItemData != null;
+    case 'enchanted':
+      return (item.enchantments?.length ?? 0) > 0;
+    case 'worn':
+      return item.worn;
+    case 'equipped':
+      return item.equipped;
+  }
+}
+
+/**
+ * Filter inventory without losing the hierarchy needed to locate a match.
+ * Only direct matches and their ancestor containers remain; a matching
+ * container does not implicitly reveal any of its non-matching contents.
+ */
+export function filterInventoryTree(
+  items: readonly InventoryItemOut[],
+  query: string,
+  tag: InventoryFilterTag,
+): FilteredInventoryTree {
+  const fullTree = buildTree(items);
+  const needle = query.trim().toLocaleLowerCase();
+  const matchedIds = new Set<string>();
+  const visibleIds = new Set<string>();
+
+  for (const item of items) {
+    if (!item.name.toLocaleLowerCase().includes(needle) || !hasFilterTag(item, tag)) continue;
+    matchedIds.add(item.id);
+    visibleIds.add(item.id);
+
+    let parentId = item.parentId;
+    const seen = new Set<string>();
+    while (parentId !== null && !seen.has(parentId)) {
+      seen.add(parentId);
+      const parent = fullTree.byId.get(parentId);
+      if (!parent) break;
+      visibleIds.add(parent.id);
+      parentId = parent.parentId;
+    }
+  }
+
+  return { ...buildTree(items.filter((item) => visibleIds.has(item.id))), matchedIds };
+}
+
 /**
  * Build a parent→children index. Children are sorted by name (stable).
  *

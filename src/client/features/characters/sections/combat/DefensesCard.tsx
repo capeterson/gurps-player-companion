@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { type ArmorFacing, resolveArmorDb } from '../../../../../shared/domain/armorDr.ts';
 import {
@@ -14,9 +15,19 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
-import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
-import { RollableRow } from '../RollableRow.tsx';
+import type {
+  CharacterDetail,
+  ResolvedEffectOut,
+} from '../../../../../shared/schemas/character.ts';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { RollRequest } from '../rollTypes.ts';
+import {
+  ModifierBreakdownContent,
+  WeaponEffectDiagnostics,
+  effectTotal,
+  skillEffectsForRow,
+  weaponEffectsForRow,
+} from './weaponEffectView.tsx';
 
 export interface DefensesCardProps {
   character: CharacterDetail;
@@ -33,6 +44,9 @@ interface ParryRow {
   readonly value: number | null;
   readonly caption: string | undefined;
   readonly raw: string;
+  readonly baseValue?: number;
+  readonly skillEffects: readonly ResolvedEffectOut[];
+  readonly weaponEffects: readonly ResolvedEffectOut[];
 }
 
 function modifierCaption(value: number): string {
@@ -45,6 +59,7 @@ export function DefensesCard({
   hitLocation = 'torso',
   facing,
 }: DefensesCardProps) {
+  const effects = character.effects ?? [];
   const [defenseOption, setDefenseOption] = useState<AllOutDefenseOption>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: changing character or maneuver ends this local turn option.
   useEffect(() => {
@@ -127,7 +142,15 @@ export function DefensesCard({
       // back to the raw-string row — for 'no' that display is now a
       // deliberate choice, not a parse failure.
       if (parsed == null || parsed.kind === 'no') {
-        return { key: i.id, name: i.name, value: null, caption: undefined, raw };
+        return {
+          key: i.id,
+          name: i.name,
+          value: null,
+          caption: undefined,
+          raw,
+          skillEffects: [],
+          weaponEffects: [],
+        };
       }
       const resolution = resolveWeaponSkill(i.name, wd?.skill, skillCandidates);
       if (resolution.kind === 'matched') {
@@ -136,12 +159,22 @@ export function DefensesCard({
         const adjusted =
           resolution.level -
           stShortfallPenalty(wd?.stRequired, state.strength(character.derived.effectiveSt));
+        const weaponEffects = weaponEffectsForRow(effects, i.id, 'weapon_parry');
+        const skillEffects = skillEffectsForRow(effects, resolution.name);
+        const baseValue = parryFromSkill(adjusted, parsed.mod);
         return {
           key: i.id,
           name: i.name,
-          value: parryFromSkill(adjusted, parsed.mod, character.derived.parryMod),
+          value: parryFromSkill(
+            adjusted,
+            parsed.mod,
+            (character.derived.parryMod ?? 0) + effectTotal(weaponEffects),
+          ),
           caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}${dbCaption}`,
           raw,
+          baseValue,
+          skillEffects,
+          weaponEffects,
         };
       }
       return {
@@ -153,6 +186,8 @@ export function DefensesCard({
             ? `skill '${resolution.skillName}' not on sheet`
             : undefined,
         raw,
+        skillEffects: [],
+        weaponEffects: [],
       };
     });
 
@@ -162,14 +197,119 @@ export function DefensesCard({
     ? resolveWeaponSkill(shield.name, shield.weaponData.skill, skillCandidates)
     : null;
 
+  const rows: {
+    label: string;
+    value: number | string;
+    reason?: string | null;
+    detail?: ReactNode;
+  }[] = [
+    { label: 'Dodge', value: dodge ?? '—', reason: state.reason('dodge'), detail: dodgeCaption },
+    ...parryRows.map((row) => ({
+      label: `Parry (${row.name})`,
+      value:
+        row.value == null ? row.raw : (state.defense('parry', row.value, defenseOption, db) ?? '—'),
+      reason: row.value == null ? null : state.reason('parry'),
+      detail: (
+        <>
+          {row.caption}
+          {row.value != null && (
+            <ModifierBreakdownContent
+              baseLabel="Weapon Parry"
+              baseValue={row.baseValue ?? row.value}
+              inputEffects={row.skillEffects}
+              globalEffects={effects.filter((effect) => effect.target === 'parry' && effect.active)}
+              weaponEffects={row.weaponEffects}
+              finalValue={state.defense('parry', row.value, defenseOption, db) ?? 'unavailable'}
+            />
+          )}
+        </>
+      ),
+    })),
+  ];
+  if (shield && blockResolution?.kind === 'matched') {
+    const weaponEffects = weaponEffectsForRow(effects, shield.id ?? '', 'weapon_block');
+    const final = blockFromSkill(
+      blockResolution.level,
+      (character.derived.blockMod ?? 0) + effectTotal(weaponEffects),
+    );
+    rows.push({
+      label: `Block (${shield.name})`,
+      value: state.defense('block', final, defenseOption, db) ?? '—',
+      reason: state.reason('block'),
+      detail: (
+        <>
+          via {blockResolution.name}–{blockResolution.level}
+          {modifierCaption(character.derived.blockMod)}
+          {dbCaption}
+          <ModifierBreakdownContent
+            baseLabel="Shield Block"
+            baseValue={blockFromSkill(blockResolution.level)}
+            inputEffects={skillEffectsForRow(effects, blockResolution.name)}
+            globalEffects={effects.filter((effect) => effect.target === 'block' && effect.active)}
+            weaponEffects={weaponEffects}
+            finalValue={state.defense('block', final, defenseOption, db) ?? 'unavailable'}
+          />
+        </>
+      ),
+    });
+  }
+
   return (
-    <section className="card space-y-2 p-5">
-      <p className="label-eyebrow">Defenses</p>
+    <FoldSection
+      preferenceKey={`${character.id}:defenses`}
+      title="Move & defenses"
+      summary={`Move ${moveNet} · Dodge ${dodge ?? '—'}`}
+    >
+      <div className="combat-defense-values">
+        <div className="rounded-lg border border-base-300 px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm">Move</span>
+            <span className="num text-xl font-bold">{moveNet}</span>
+          </div>
+          {(moveNet !== encumberedMove || state.maneuver) && (
+            <span className="block text-[11px] text-base-content/60">
+              {encumberedMove} before pool, posture, and maneuver limits
+            </span>
+          )}
+          {moveCaption && (
+            <span className="block text-[11px] text-base-content/60">{moveCaption}</span>
+          )}
+        </div>
+        {rows.map((row) => (
+          <div key={row.label} className="min-w-0">
+            {typeof row.value === 'number' && !row.reason ? (
+              <button
+                type="button"
+                className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-lg border border-base-300 px-3 py-2 text-left hover:bg-base-200"
+                onClick={() => openRoll({ label: row.label, baseTarget: row.value as number })}
+              >
+                <span className="text-sm break-words">{row.label}</span>
+                <span className="num text-xl font-bold text-primary">{row.value}</span>
+                {row.detail && (
+                  <div className="col-span-2 text-[11px] text-base-content/60">{row.detail}</div>
+                )}
+              </button>
+            ) : (
+              <div className="rounded-lg border border-base-300 px-3 py-2 text-sm">
+                {row.reason ? (
+                  <span>{row.label} — unavailable</span>
+                ) : (
+                  <>
+                    <span>{row.label}</span> — <span>{row.value}</span>
+                  </>
+                )}
+                {row.reason && <span className="block text-xs text-muted">{row.reason}</span>}
+                {row.detail && <div className="text-[11px] text-base-content/60">{row.detail}</div>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
       {state.notes.length > 0 && (
-        <p className="text-xs text-base-content/70">{state.notes.join(' · ')}</p>
+        <p className="mt-2 text-xs text-base-content/70">{state.notes.join(' · ')}</p>
       )}
       {state.allOutDefense && (
-        <div className="flex flex-wrap gap-2" aria-label="All-Out Defense option">
+        <div className="mt-2 flex flex-wrap gap-2" aria-label="All-Out Defense option">
           {(['dodge', 'parry', 'block', 'double'] as const).map((option) => (
             <button
               key={option}
@@ -181,100 +321,10 @@ export function DefensesCard({
               {option === 'double' ? 'Double defense' : `+2 ${option}`}
             </button>
           ))}
-          <p className="w-full text-xs text-base-content/60">
-            Choose for these rolls. Double defense grants a second, different defense after the
-            first fails; it adds no numerical bonus.
-          </p>
         </div>
       )}
-
-      {/* GURPS defenses share the 3d6-vs-target shape with skill rolls but
-          use a different "critical" table (auto success on 3-4, auto
-          failure on 17-18, independent of score). We route them through
-          the same evaluateRoll as skills anyway — an accepted
-          simplification for this pass rather than a second rules table. */}
-
-      <div className="grid gap-2 sm:grid-cols-2" aria-label="Move and defense actions">
-        <div className="rounded-lg border border-base-300/60 px-3 py-2">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-medium">Move</span>
-            <strong className="num shrink-0 text-2xl text-base-content">{moveNet}</strong>
-          </div>
-          {(moveNet !== encumberedMove || state.maneuver) && (
-            <span className="block text-[11px] text-base-content/60">
-              {encumberedMove} before pool, posture, and maneuver limits
-            </span>
-          )}
-          {moveCaption && (
-            <span className="block text-[11px] text-base-content/60">{moveCaption}</span>
-          )}
-        </div>
-
-        <RollableRow
-          label="Dodge"
-          baseTarget={dodge ?? 0}
-          unavailableReason={state.reason('dodge')}
-          openRoll={openRoll}
-          sublabel={
-            dodgeCaption ? (
-              <span className="block text-[11px] text-base-content/60">{dodgeCaption}</span>
-            ) : undefined
-          }
-        />
-
-        {parryRows.map((row) =>
-          row.value != null ? (
-            <RollableRow
-              key={row.key}
-              label={`Parry (${row.name})`}
-              baseTarget={state.defense('parry', row.value, defenseOption, db) ?? 0}
-              unavailableReason={state.reason('parry')}
-              openRoll={openRoll}
-              sublabel={
-                <span className="block text-[11px] text-base-content/60">{row.caption}</span>
-              }
-            />
-          ) : (
-            <div
-              key={row.key}
-              className="flex items-center justify-between gap-3 rounded-lg border border-base-300/60 px-3 py-2"
-            >
-              <span className="min-w-0 truncate text-sm font-medium">
-                Parry ({row.name})
-                {row.caption && (
-                  <span className="block text-[11px] text-base-content/60">{row.caption}</span>
-                )}
-              </span>
-              <span className="num shrink-0 text-sm text-base-content/70">{row.raw}</span>
-            </div>
-          ),
-        )}
-
-        {shield && blockResolution && blockResolution.kind === 'matched' && (
-          <RollableRow
-            label={`Block (${shield.name})`}
-            baseTarget={
-              state.defense(
-                'block',
-                blockFromSkill(blockResolution.level, character.derived.blockMod),
-                defenseOption,
-                db,
-              ) ?? 0
-            }
-            unavailableReason={state.reason('block')}
-            openRoll={openRoll}
-            sublabel={
-              <span className="block text-[11px] text-base-content/60">
-                via {blockResolution.name}–{blockResolution.level}
-                {modifierCaption(character.derived.blockMod)}
-                {dbCaption}
-              </span>
-            }
-          />
-        )}
-      </div>
       {shield && blockResolution && blockResolution.kind !== 'matched' && (
-        <p className="text-xs text-base-content/60">
+        <p className="mt-2 text-xs text-base-content/60">
           {shield.name} is equipped but has no usable Shield skill —{' '}
           {blockResolution.kind === 'missing'
             ? `skill '${blockResolution.skillName}' is not on the sheet.`
@@ -283,16 +333,22 @@ export function DefensesCard({
       )}
 
       {parryRows.length === 0 && shield == null && (
-        <p className="text-xs text-base-content/60">
+        <p className="mt-2 text-xs text-base-content/60">
           Equip a parryable weapon or shield to add those defenses.
         </p>
       )}
-
-      <p className="text-[11px] text-base-content/50">
+      <WeaponEffectDiagnostics
+        effects={effects.filter((effect) =>
+          ['weapon_parry', 'weapon_block'].includes(effect.target),
+        )}
+        inventory={character.inventory}
+      />
+      <p className="mt-3 text-[11px] text-base-content/50">
         Active trait bonuses and recorded combat restrictions are included. Add situational
         modifiers when rolling; shield DB assumes a covered attack. Move includes posture and
-        maneuver limits.
+        maneuver limits. Double defense grants a second, different defense after the first fails; it
+        adds no numerical bonus.
       </p>
-    </section>
+    </FoldSection>
   );
 }

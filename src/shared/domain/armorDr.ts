@@ -22,7 +22,7 @@
 
 import { HIT_LOCATIONS } from '../constants/hitLocations.ts';
 import type { ResolvedEffectOut } from '../schemas/character.ts';
-import type { ArmorData } from '../schemas/inventory.ts';
+import type { ArmorData, InventoryItemOut } from '../schemas/inventory.ts';
 
 export interface ArmorItemRow {
   readonly id?: string;
@@ -30,6 +30,18 @@ export interface ArmorItemRow {
   readonly equipped: boolean;
   readonly isArmor: boolean;
   readonly armor: ArmorData | null;
+  /** Present on resolved character-detail rows; absent on raw legacy callers. */
+  readonly baseArmor?: ArmorData | null | undefined;
+  readonly enchantmentBreakdown?: InventoryItemOut['enchantmentBreakdown'] | undefined;
+}
+
+export interface LayeredArmorDrContribution {
+  readonly itemKey: string;
+  readonly sourceName: string;
+  readonly value: number;
+  readonly stackingKey: string | null;
+  readonly status: 'applied' | 'winning' | 'suppressed' | 'inactive';
+  readonly winnerName?: string;
 }
 
 /**
@@ -107,22 +119,185 @@ function mergeTypedDr(
   return result as unknown as TypedDrTotals;
 }
 
+function armorItemKey(item: ArmorItemRow, index: number): string {
+  return item.id ?? `${item.name ?? 'armor'}:${index}`;
+}
+
+function canDecomposeArmor(item: ArmorItemRow): boolean {
+  return item.baseArmor !== undefined && item.enchantmentBreakdown !== undefined;
+}
+
+function armorForAggregation(item: ArmorItemRow): ArmorData | null {
+  return canDecomposeArmor(item) ? (item.baseArmor ?? null) : item.armor;
+}
+
+/**
+ * Resolve highest-only armor DR enchantments across every equipped layer that
+ * covers one location. A Fortify on boots must not suppress a Fortify on a
+ * coif, while two Fortifies covering the skull compete as one stack.
+ */
+export function layeredArmorDrContributions(
+  items: readonly ArmorItemRow[],
+  location: string,
+): LayeredArmorDrContribution[] {
+  const grouped = new Map<
+    string,
+    {
+      itemKey: string;
+      sourceName: string;
+      value: number;
+      stackingKey: string | null;
+      active: boolean;
+      decomposable: boolean;
+      suppressedByItemStacking: boolean;
+    }
+  >();
+  for (const [index, item] of items.entries()) {
+    if (!item.equipped || !item.isArmor) continue;
+    const coverage = armorForAggregation(item);
+    if (!coverage || !armorCoversLocation(coverage, location)) continue;
+    const itemKey = armorItemKey(item, index);
+    for (const contribution of item.enchantmentBreakdown ?? []) {
+      if (contribution.target !== 'dr') continue;
+      const key = [
+        itemKey,
+        contribution.instanceKey ??
+          `legacy:${contribution.sourceName}:${contribution.suppressedByStacking ? 'suppressed' : 'eligible'}`,
+        contribution.stackingKey ?? '',
+        contribution.active ? 'active' : 'inactive',
+      ].join('|');
+      const previous = grouped.get(key);
+      grouped.set(key, {
+        itemKey,
+        sourceName: contribution.sourceName,
+        value: (previous?.value ?? 0) + contribution.value,
+        stackingKey: contribution.stackingKey,
+        active: contribution.active,
+        decomposable: canDecomposeArmor(item),
+        suppressedByItemStacking:
+          (previous?.suppressedByItemStacking ?? false) || contribution.suppressedByStacking,
+      });
+    }
+  }
+  const lines = [...grouped.values()];
+  const byStack = new Map<string, typeof lines>();
+  for (const line of lines) {
+    if (!line.active || !line.decomposable || line.suppressedByItemStacking || !line.stackingKey)
+      continue;
+    const entries = byStack.get(line.stackingKey) ?? [];
+    entries.push(line);
+    byStack.set(line.stackingKey, entries);
+  }
+  const winnerByStack = new Map<string, (typeof lines)[number]>();
+  for (const [stackingKey, entries] of byStack) {
+    entries.sort(
+      (left, right) =>
+        right.value - left.value ||
+        left.sourceName.localeCompare(right.sourceName) ||
+        left.itemKey.localeCompare(right.itemKey),
+    );
+    const winner = entries[0];
+    if (winner) winnerByStack.set(stackingKey, winner);
+  }
+  return lines.map((entry) => {
+    const { active, decomposable, suppressedByItemStacking, ...line } = entry;
+    if (!active) return { ...line, status: 'inactive' };
+    // Without both the persisted base snapshot and a breakdown, the item's
+    // effective armor is indivisible. Keep its annotation informational rather
+    // than claiming another layer suppressed a bonus that remains in the total.
+    if (!decomposable) {
+      if (!suppressedByItemStacking) return { ...line, status: 'applied' };
+      const localWinner = lines
+        .filter(
+          (candidate) =>
+            candidate.itemKey === line.itemKey &&
+            candidate.active &&
+            !candidate.suppressedByItemStacking &&
+            candidate.stackingKey === line.stackingKey,
+        )
+        .sort(
+          (left, right) =>
+            right.value - left.value || left.sourceName.localeCompare(right.sourceName),
+        )[0];
+      return {
+        ...line,
+        status: 'suppressed',
+        ...(localWinner ? { winnerName: localWinner.sourceName } : {}),
+      };
+    }
+    const winner = line.stackingKey ? winnerByStack.get(line.stackingKey) : undefined;
+    if (suppressedByItemStacking)
+      return {
+        ...line,
+        status: 'suppressed',
+        ...(winner ? { winnerName: winner.sourceName } : {}),
+      };
+    if (!line.stackingKey || !winnerByStack.has(line.stackingKey))
+      return { ...line, status: 'applied' };
+    if (winner === undefined || winner === entry)
+      return {
+        ...line,
+        status:
+          lines.filter(
+            (candidate) =>
+              candidate.active &&
+              candidate.decomposable &&
+              candidate.stackingKey === line.stackingKey,
+          ).length > 1
+            ? 'winning'
+            : 'applied',
+      };
+    return {
+      ...line,
+      status: 'suppressed',
+      winnerName: winner.sourceName,
+    };
+  });
+}
+
 export function aggregateDrByLocation(items: readonly ArmorItemRow[]): DrByLocationMap {
   const map: DrByLocationMap = new Map();
+  const locations = new Set<string>();
   for (const item of items) {
-    if (!item.equipped || !item.isArmor || item.armor == null) continue;
-    const armor = item.armor;
-    const locations = new Set(armor.locations);
-    if (locations.has('torso')) locations.add('vitals');
-    for (const loc of locations) {
-      const prev = map.get(loc);
-      const dr = (prev?.dr ?? 0) + armor.dr;
+    if (!item.equipped || !item.isArmor) continue;
+    const armor = armorForAggregation(item);
+    if (!armor) continue;
+    for (const location of armor.locations) locations.add(location);
+    if (armor.locations.includes('torso')) locations.add('vitals');
+  }
+  for (const location of locations) {
+    const appliedByItem = new Map<string, number>();
+    for (const line of layeredArmorDrContributions(items, location)) {
+      if (line.status !== 'applied' && line.status !== 'winning') continue;
+      appliedByItem.set(line.itemKey, (appliedByItem.get(line.itemKey) ?? 0) + line.value);
+    }
+    for (const [index, item] of items.entries()) {
+      if (!item.equipped || !item.isArmor) continue;
+      const hasDecomposition = canDecomposeArmor(item);
+      const armor = armorForAggregation(item);
+      if (!armor || !armorCoversLocation(armor, location)) continue;
+      const modifier = hasDecomposition ? (appliedByItem.get(armorItemKey(item, index)) ?? 0) : 0;
+      const layerDr = Math.max(0, armor.dr + modifier);
+      const previous = map.get(location);
+      const dr = (previous?.dr ?? 0) + layerDr;
+      const layerCrushing =
+        armor.drCrushing == null ? null : Math.max(0, armor.drCrushing + modifier);
       const drCrushing =
-        armor.drCrushing != null || prev?.drCrushing != null
-          ? (prev?.drCrushing ?? prev?.dr ?? 0) + (armor.drCrushing ?? armor.dr)
+        layerCrushing != null || previous?.drCrushing != null
+          ? (previous?.drCrushing ?? previous?.dr ?? 0) + (layerCrushing ?? layerDr)
           : null;
-      const typedDr = mergeTypedDr(prev?.typedDr, armor);
-      map.set(loc, { dr, drCrushing, typedDr });
+      const effectiveArmor = {
+        ...armor,
+        dr: layerDr,
+        typedDr: Object.fromEntries(
+          Object.entries(armor.typedDr ?? {}).map(([key, value]) => [
+            key,
+            value == null ? value : Math.max(0, value + modifier),
+          ]),
+        ),
+      };
+      const typedDr = mergeTypedDr(previous?.typedDr, effectiveArmor);
+      map.set(location, { dr, drCrushing, typedDr });
     }
   }
   return map;

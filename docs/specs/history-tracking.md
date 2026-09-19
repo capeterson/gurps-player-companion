@@ -6,10 +6,16 @@ GURPS Player Companion is a local-first PWA (React 19 + Dexie/IndexedDB) backed 
 
 The **append-only history/audit log**:
 - Captures every mutation to characters (attributes incl. **temporary stat boosts**, traits, skills, spells, inventory, combat) and to campaign-level data (settings, membership, library, adventure log).
-- Surfaces a **History tab** on the character sheet (one-line summaries; foldable detail for batched changes) and a **History view** on the campaign page (campaign-level changes only).
+- Surfaces a **History tab** on the character sheet. Its default Change history
+  sub-tab shows one-line audit summaries and foldable detail for batched changes;
+  a sibling Roll history sub-tab browses device-only rolls without adding them to
+  the server audit log. The campaign page retains its campaign-level History view.
 - Provides **local filtering & search** over loaded history.
 
 - Becomes a **required baseline**: every new syncable table must participate in history capture, enforced by an automated test.
+- Records nullable OAuth client and grant provenance for delegated writes; the UI
+  renders `Player via Client` while retaining the player as the actor. The API
+  fields are `agentClientId`, `agentGrantId`, and `agentClientName`.
 
 Library trait/skill updates and deletions also update owned `library_mechanics`
 and child revisions in the same audited transaction (`ownedLibraryMechanics.ts`,
@@ -19,6 +25,11 @@ retained rules after detachment, cleared rules, and unresolved copies. The campa
 library event records the definition edit too; transfers retain the source version.
 Member removal detaches the removed member's library copies in its audited transaction,
 so character history records retained rules and the actor who ended the live link.
+Mechanical enchantment definition edits likewise refresh linked library-item and
+character-inventory snapshots inside the definition writer's audit transaction.
+The definition row records `campaign_library_enchantment` history, while affected
+item rows record the exact old/new owned snapshot; deletion preserves mechanics and
+records the live-ID detachment.
 
 Chosen approach: **Postgres triggers** for capture, **paginated REST endpoints** for delivery, **indefinite retention**.
 
@@ -42,7 +53,9 @@ Columns:
 - `id` uuid PK default `gen_random_uuid()`
 - `revision` bigint NOT NULL default `next_sync_revision()` (migration `0040`; originally `nextval('revisions_seq')`) — reuses the shared global sequence behind a transaction advisory fence so history is commit-ordered against other changes and paginates without late-commit gaps.
 - `scope` text NOT NULL — `'character'` or `'campaign'` (the discriminator that keeps the two views separate).
-- `entity_class` text NOT NULL — `character` | `character_trait` | `character_skill` | `character_spell` | `character_inventory` | `character_combat` | `campaign` | `campaign_membership` | `campaign_library_trait` | `campaign_library_skill` | `campaign_library_item` | `adventure_log` (the existing `entityClass` enum from `src/shared/schemas/sync.ts`).
+- `entity_class` text NOT NULL — the existing `entityClass` enum from
+  `src/shared/schemas/sync.ts`, including character children and campaign content
+  such as `campaign_library_enchantment`.
 - `entity_id` uuid NOT NULL.
 - `op` text NOT NULL — `create` | `patch` | `delete` (matches `operationCommand`).
 - `character_id` uuid NULL — set for `scope='character'` rows (the parent character), so per-character queries are a single indexed lookup. NULL for campaign scope.
@@ -129,7 +142,7 @@ New module `src/shared/history/summarize.ts` — pure functions, unit-testable, 
 - Examples it must handle:
   - Attribute change: `"ST 10 → 12"`, `"IQ 12 → 13"`.
   - **Temporary effects** (`characters.temp_effects`, a JSONB list since migration 0017): `"Temporary effect added: Might (ST +2, HT +1)"`, `"Temporary effect removed: Might"`, `"Temporary effects cleared"`, `"Temporary adjustment: ST +2"` (the reserved `manual` sentinel entry the ✦ popovers write to). Pre-migration history rows still carry the old per-stat scalar columns (`tempSt`, `tempDx`, …) in their jsonb snapshot forever — `TEMP_ATTR_LABELS` keeps those readable as `"Temp DX +2"` / `"Temp DX boost cleared"`.
-  - Skill/spell/trait: `"Added skill Broadsword (DX/A)"`, `"Removed spell Fireball"`, `"Acrobatics points 2 → 4"`.
+  - Skill/spell/trait: `"Added skill Broadsword (DX/A)"`, `"Removed spell Fireball"`, `"Acrobatics points 2 → 4"`. Character-owned trait mechanics summarize as `"Weapon Mastery: 2 custom effects saved"` rather than dumping JSON.
   - Inventory: `"Added Torch ×2"`, `"Moved Sword into Backpack"`, `"Removed Rations"`.
   - Campaign: `"Point target 100 → 125"`, `"Disadvantage cap changed"`.
   - Membership: `"Promoted Alice to manager"`, `"Removed Bob from campaign"`.
@@ -144,18 +157,29 @@ Diff helpers live alongside (`diffRows(old, new, ignoreKeys)` ignoring `revision
 ## UI
 
 ### Character History tab
-- Add `'History'` to `SHEET_TABS` in `src/client/features/characters/CharacterSheetPage.tsx` and render a new `sections/HistoryPanel.tsx`.
-- `HistoryPanel` (props `{ characterId, canRead }`):
+- `'History'` in `SHEET_TABS` renders `sections/HistoryPanel.tsx`, which contains
+  two sub-tabs. **Change history is the default** and preserves the existing
+  server-backed audit view. **Roll history** mounts `RollHistoryPanel` and reads
+  only the selected character's browser-local roll log.
+- The Change history view:
   - `useInfiniteQuery` → `GET /characters/:id/history`; runs `groupIntoBatches(summarizeEvent(...))`.
   - Renders a vertical list reusing the row styling from `sections/SkillsPanel.tsx` (grid rows, border-b). Each group is **one line**: timestamp (relative), summary, actor name. The timestamp carries a `title` tooltip with the full localized date/time down to the second (`HistoryGroupRow.tsx`'s `formatAbsolute`), for when the relative label ("3h ago") isn't precise enough.
   - **Foldable batches:** groups with >1 child render a disclosure arrow, reusing existing expand patterns already in this file — the `▸`/`▾` toggle in PointsPanel (CharacterSheetPage.tsx:1062) and the `<details>` pattern in WarningsPanel (~:1303); expanding fetches `?detail=1` for that `batchId` and shows each child's `old → new` per field.
   - **Local filter & search:** a search box + filter chips (by entity type: Attributes/Skills/Spells/Inventory/Combat; by op: added/changed/removed; optional date range) that filter the already-loaded list **in memory** (no server round-trip), matching against the summary line and field names. "Load older" button triggers the next page.
+- `RollHistoryPanel` renders check and damage rolls newest first, including their
+  local timestamps. `rollHistory.ts` persists them per character in `localStorage`
+  and prunes the oldest entries whenever a new roll would exceed 250. It never
+  uses TanStack Query, the outbox, a sync entity, an API route, or MCP. Logout
+  clears every roll-history key to prevent cross-account leakage on a shared device.
 
 ### Campaign History view
 - Add a `History` section/tab to `src/client/features/campaigns/CampaignDetailPage.tsx` rendering a new `CampaignHistoryPanel.tsx`.
 - Same component shell as `HistoryPanel`, but hits `GET /campaigns/:id/history` (scope `campaign` only — **no character changes**). For the campaign **owner**, optionally include a sub-toggle "Character changes" that switches to `?scope=character` (the GM roll-up). Reuses the same `summarizeEvent`/`groupIntoBatches`/filter/search code.
 
-Both panels are read-only and share a `useHistoryQuery` hook + a `HistoryList`/`HistoryGroupRow` presentational component in `src/client/features/history/` to avoid duplication.
+The server-backed Change history and Campaign panels are read-only and share a
+`useHistoryQuery` hook plus `HistoryList`/`HistoryGroupRow` presentation in
+`src/client/features/history/`; the local Roll history panel deliberately does not
+use that data path.
 
 ---
 
@@ -191,6 +215,10 @@ Modify:
 - `src/server/services/syncDispatch.ts` — wrap dispatchers in `withAudit` and thread the `tx` into `patchEntity`/each `dispatch*` (replacing bare `getDb()` writes); carry `batchId` in the dispatch context. `src/server/routes/sync.ts` — read `op.batchId` into the context.
 - `src/server/routes/{campaigns,invitations,campaignLibrary,adventureLog}.ts` — set `app.actor_id` on mutating handlers.
 - `src/client/features/characters/CharacterSheetPage.tsx` — add `History` tab.
+- `src/client/features/characters/sections/HistoryPanel.tsx` — host the default
+  Change history and device-only Roll history sub-tabs.
+- `src/client/features/characters/sections/RollHistoryPanel.tsx` and
+  `rollHistory.ts` — browse and retain at most 250 per-character local rolls.
 - `src/client/features/characters/sections/InventoryPanel.tsx` — wrap bulk moves in `runBatch`.
 - `src/client/features/campaigns/CampaignDetailPage.tsx` — add History view.
 - `AGENTS.md` / `README` — baseline convention.
@@ -212,7 +240,20 @@ Modify:
 1. **Migration:** `npm run db:migrate` on a fresh DB; confirm `entity_history` + triggers exist (`\d entity_history`, `pg_trigger`).
 2. **Unit:** `bun test src/shared/history` (summarizer over crafted old/new rows incl. temp-boost, add/remove/move, campaign settings, membership). `bun test src/server` for endpoint authz (extend `sync.test.ts` style) and the enforcement guards.
 3. **Server integration:** with `app.actor_id` set, run a character field patch + a 3-item inventory batch through `dispatchOperation`; assert 1 + 3 `entity_history` rows, correct `actor_user_id`, shared `batch_id` for the three, correct `scope`/`character_id`/`campaign_id`. Run a campaign settings PATCH → one `scope='campaign'` row.
-4. **Client:** Vitest for `HistoryPanel` (mock the query): renders one-liners, folds a batch, local search/filter narrows the list without refetch. `runBatch` tags ops with one id.
+4. **Client:** Vitest for `HistoryPanel` (mock the query): Change history is the
+   default, the Roll history sub-tab browses device-only entries, one-liners and
+   batches still render, and local search/filter narrows the audit list without
+   refetch. `rollHistory` drops the oldest entry on writes beyond 250; `runBatch`
+   tags sync ops with one id.
 5. **Access:** assert `GET /characters/:id/history` 403s for a minimal-view member and 200s for owner + GM; `GET /campaigns/:id/history` returns only `scope='campaign'` rows.
 6. **E2E (Playwright):** GM opens campaign → History shows campaign changes but no character edits; GM opens a member character → History tab shows that character's edits; a multi-item inventory move appears as one foldable entry.
 7. **Lint/types:** `npm run lint && npm run typecheck`.
+
+## Active effects and procedures
+
+The `campaign_library_active_effects` table has the campaign-family audit trigger
+and `SYNCABLE_TABLES` registration. Applying, changing state, removing, or updating
+character effects uses the existing character trigger with readable array-change
+summaries. One array gesture is one outbox patch/history event; definition refresh
+and detachment remain inside the library writer's audit transaction. Skill
+procedure changes travel with the existing library and owned-mechanics audit rows.

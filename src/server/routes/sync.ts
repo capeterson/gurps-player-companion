@@ -1,3 +1,5 @@
+import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
+import { campaignLibraryActiveEffects } from '../db/schema.ts';
 /**
  * /api/v1/sync/operations and /api/v1/sync/cursor.
  *
@@ -15,6 +17,7 @@
 
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq, gt, inArray, or } from 'drizzle-orm';
+import { campaignHouseRules } from '../../shared/schemas/campaign.ts';
 import {
   type EntityClass,
   type OperationEnvelope,
@@ -639,9 +642,31 @@ async function fetchClassUpserts(args: {
         )
         .orderBy(asc(campaigns.revision))
         .limit(limit);
+      const definitions = rows.length
+        ? await db
+            .select()
+            .from(campaignLibraryActiveEffects)
+            .where(
+              inArray(
+                campaignLibraryActiveEffects.campaignId,
+                rows.map((r) => r.campaign.id),
+              ),
+            )
+        : [];
       return rows.map(({ campaign, viewerRole }) =>
         upsertChange('campaign', campaign.id, Number(campaign.revision), {
           ...campaign,
+          activeEffectDefinitions: definitions
+            .filter((d) => d.campaignId === campaign.id)
+            .map((d) =>
+              activeEffectDefinitionOut.parse({
+                ...d,
+                revision: Number(d.revision),
+                createdAt: d.createdAt.toISOString(),
+                updatedAt: d.updatedAt.toISOString(),
+              }),
+            ),
+          houseRules: campaignHouseRules.parse(campaign.houseRules),
           viewerRole: campaign.ownerId === userId ? 'owner' : viewerRole,
         }),
       );
@@ -775,6 +800,7 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     // player's named/manual temp effects or dismissed warnings, so
     // these collapse to empty rather than passing the real lists through.
     tempEffects: [],
+    activeEffects: [],
     dismissedWarnings: [],
     activeConditionGroups: [],
     createdAt: row.createdAt,

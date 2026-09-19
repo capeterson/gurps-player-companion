@@ -127,7 +127,16 @@ it('membership and role changes advance the campaign projection cursor', async (
   await assertAdvanced();
 });
 
-it.each(['traits', 'skills', 'spells', 'items', 'languages', 'techniques', 'styles'])(
+it.each([
+  'traits',
+  'skills',
+  'spells',
+  'items',
+  'languages',
+  'techniques',
+  'styles',
+  'enchantments',
+])(
   '%s CRUD and YAML import advance the campaign HTTP cursor without any owned copies',
   async (kind) => {
     const owner = await registerUser(`cursor-${kind}`);
@@ -338,6 +347,253 @@ describe('library item CRUD', () => {
   });
 });
 
+describe('mechanical enchantment lifecycle', () => {
+  it('hydrates authoritative snapshots, refreshes owned copies, and detaches without losing effects', async () => {
+    const owner = await registerUser('enchantment-lifecycle');
+    const campaign = await createCampaign(owner.accessToken);
+    const definitionResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/enchantments`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name: 'Fortify',
+          source: 'M66',
+          tags: ['armor'],
+          applicability: 'armor',
+          effects: [{ target: 'dr', value: 1 }],
+          levels: [{ level: 2, effects: [{ target: 'dr', value: 2 }] }],
+          stackingPolicy: { kind: 'highest', key: 'fortify' },
+        }),
+      },
+    );
+    expect(definitionResponse.status).toBe(201);
+    const definition = (await definitionResponse.json()) as { id: string; revision: number };
+
+    const incompatibleResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/items`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name: 'Plain rope',
+          enchantments: [{ spellName: 'Forged', definitionId: definition.id }],
+        }),
+      },
+    );
+    expect(incompatibleResponse.status).toBe(400);
+
+    const otherCampaign = await createCampaign(owner.accessToken);
+    const foreignDefinitionResponse = await app.request(
+      `/api/v1/campaigns/${otherCampaign.id}/library/enchantments`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name: 'Foreign Fortify',
+          applicability: 'armor',
+          effects: [{ target: 'dr', value: 5 }],
+        }),
+      },
+    );
+    expect(foreignDefinitionResponse.status).toBe(201);
+    const foreignDefinition = (await foreignDefinitionResponse.json()) as { id: string };
+    const foreignReferenceResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/items`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name: 'Foreign mail',
+          isArmor: true,
+          armor: { locations: ['torso'], dr: 3 },
+          enchantments: [{ spellName: 'Forged', definitionId: foreignDefinition.id }],
+        }),
+      },
+    );
+    expect(foreignReferenceResponse.status).toBe(403);
+
+    const templateResponse = await app.request(`/api/v1/campaigns/${campaign.id}/library/items`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Library mail',
+        isArmor: true,
+        armor: { locations: ['torso'], dr: 3 },
+        enchantments: [{ spellName: 'Forged template name', definitionId: definition.id }],
+      }),
+    });
+    expect(templateResponse.status).toBe(201);
+    const template = (await templateResponse.json()) as {
+      enchantments: Array<{ spellName: string; definitionRevision: number }>;
+    };
+    expect(template.enchantments[0]).toMatchObject({
+      spellName: 'Fortify',
+      definitionRevision: definition.revision,
+    });
+
+    const characterResponse = await app.request('/api/v1/characters', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Armored hero', campaignId: campaign.id }),
+    });
+    expect(characterResponse.status).toBe(201);
+    const character = (await characterResponse.json()) as { id: string };
+    const itemResponse = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Mail',
+        worn: true,
+        equipped: true,
+        isArmor: true,
+        armor: { locations: ['torso'], dr: 3 },
+        enchantments: [
+          {
+            spellName: 'Forged client name',
+            level: 2,
+            definitionId: definition.id,
+            mechanics: {
+              applicability: 'armor',
+              effects: [{ target: 'dr', value: 99 }],
+              levels: [],
+              stackingPolicy: { kind: 'stack' },
+            },
+          },
+        ],
+      }),
+    });
+    expect(itemResponse.status).toBe(201);
+
+    const detail = async () =>
+      (await (
+        await app.request(`/api/v1/characters/${character.id}`, {
+          headers: bearer(owner.accessToken),
+        })
+      ).json()) as {
+        inventory: Array<{
+          armor: { dr: number } | null;
+          baseArmor: { dr: number } | null;
+          enchantments: Array<{
+            spellName: string;
+            definitionId: string | null;
+            definitionRevision: number;
+            mechanics: { effects: Array<{ target: string; value: number }> };
+          }>;
+        }>;
+      };
+    const first = (await detail()).inventory[0];
+    expect(first).toMatchObject({ armor: { dr: 6 }, baseArmor: { dr: 3 } });
+    expect(first?.enchantments[0]).toMatchObject({
+      spellName: 'Fortify',
+      definitionId: definition.id,
+      definitionRevision: definition.revision,
+      mechanics: { effects: [{ target: 'dr', value: 1 }] },
+    });
+
+    const updatedResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/enchantments/${definition.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name: 'Greater Fortify',
+          effects: [{ target: 'dr', value: 4 }],
+          levels: [{ level: 2, effects: [{ target: 'dr', value: 3 }] }],
+        }),
+      },
+    );
+    expect(updatedResponse.status).toBe(200);
+    const updated = (await updatedResponse.json()) as { revision: number };
+    const refreshed = (await detail()).inventory[0];
+    expect(refreshed?.armor?.dr).toBe(10);
+    expect(refreshed?.enchantments[0]).toMatchObject({
+      spellName: 'Greater Fortify',
+      definitionId: definition.id,
+      definitionRevision: updated.revision,
+      mechanics: { effects: [{ target: 'dr', value: 4 }] },
+    });
+    const refreshedLibrary = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+        headers: bearer(owner.accessToken),
+      })
+    ).json()) as {
+      items: Array<{ name: string; enchantments: Array<{ spellName: string }> }>;
+    };
+    expect(
+      refreshedLibrary.items.find((item) => item.name === 'Library mail')?.enchantments[0],
+    ).toMatchObject({ spellName: 'Greater Fortify' });
+
+    const deleteResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/enchantments/${definition.id}`,
+      { method: 'DELETE', headers: bearer(owner.accessToken) },
+    );
+    expect(deleteResponse.status).toBe(204);
+    const detached = (await detail()).inventory[0];
+    expect(detached?.armor?.dr).toBe(10);
+    expect(detached?.enchantments[0]).toMatchObject({
+      spellName: 'Greater Fortify',
+      definitionId: null,
+      definitionRevision: updated.revision,
+    });
+    const detachedLibrary = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}/library`, {
+        headers: bearer(owner.accessToken),
+      })
+    ).json()) as {
+      items: Array<{ name: string; enchantments: Array<{ definitionId: string | null }> }>;
+    };
+    expect(
+      detachedLibrary.items.find((item) => item.name === 'Library mail')?.enchantments[0]
+        ?.definitionId,
+    ).toBeNull();
+  });
+
+  it('does not hydrate campaign definitions after the character owner loses membership', async () => {
+    const owner = await registerUser('enchantment-membership-owner');
+    const player = await registerUser('enchantment-membership-player');
+    const campaign = await createCampaign(owner.accessToken);
+    const playerId = await addMember(owner.accessToken, campaign.id as string, player.email);
+    const definitionResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library/enchantments`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name: 'Secret Edge',
+          applicability: 'weapon',
+          effects: [{ target: 'weapon_damage', value: 2 }],
+        }),
+      },
+    );
+    expect(definitionResponse.status).toBe(201);
+    const definition = (await definitionResponse.json()) as { id: string };
+    const characterResponse = await app.request('/api/v1/characters', {
+      method: 'POST',
+      headers: jsonHeaders(player.accessToken),
+      body: JSON.stringify({ name: 'Former member', campaignId: campaign.id }),
+    });
+    expect(characterResponse.status).toBe(201);
+    const character = (await characterResponse.json()) as { id: string };
+    const removalResponse = await app.request(
+      `/api/v1/campaigns/${campaign.id}/members/${playerId}`,
+      { method: 'DELETE', headers: bearer(owner.accessToken) },
+    );
+    expect(removalResponse.status).toBe(204);
+
+    const attachResponse = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(player.accessToken),
+      body: JSON.stringify({
+        name: 'Sword',
+        weaponData: { damage: '1d cut' },
+        enchantments: [{ spellName: 'Known name', definitionId: definition.id }],
+      }),
+    });
+    expect(attachResponse.status).toBe(403);
+  });
+});
+
 // ===================== READ / PERMISSION GATES =====================
 
 describe('GET /campaigns/{id}/library', () => {
@@ -452,7 +708,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 6');
+    expect(yaml).toContain('version: 11');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
@@ -466,6 +722,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken, { manaLevel: 'high' });
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
     expect(yaml).toContain('manaLevel: high');
+    expect(yaml).toContain('enforceAttributeCaps: true');
   });
 
   it('re-importing the same export into the same campaign (mode=merge, the default) updates existing rows in place and does not duplicate them', async () => {
@@ -685,7 +942,7 @@ describe('YAML export/import round trip', () => {
     expect(res.status).toBe(400);
   });
 
-  it('applyCampaignSettings=false (default) leaves the campaign row untouched; true applies description/pointTarget/disadvantageCap/quirkCap/manaLevel but never name', async () => {
+  it('applyCampaignSettings=false (default) leaves the campaign row untouched; true applies campaign rules but never name', async () => {
     const owner = await registerUser('apply-settings');
     const campaign = await createCampaign(owner.accessToken, {
       description: 'Original description',
@@ -693,6 +950,7 @@ describe('YAML export/import round trip', () => {
       disadvantageCap: 40,
       quirkCap: 5,
       manaLevel: 'normal',
+      enforceAttributeCaps: true,
     });
     const yaml = `version: 3
 campaign:
@@ -702,6 +960,7 @@ campaign:
   disadvantageCap: 60
   quirkCap: 10
   manaLevel: high
+  enforceAttributeCaps: false
 library:
   traits: []
   skills: []
@@ -722,6 +981,7 @@ library:
     ).json()) as Record<string, unknown>;
     expect(afterNoApply.description).toBe('Original description');
     expect(afterNoApply.manaLevel).toBe('normal');
+    expect(afterNoApply.enforceAttributeCaps).toBe(true);
 
     const applyRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
       method: 'POST',
@@ -740,6 +1000,7 @@ library:
     expect(afterApply.disadvantageCap).toBe(60);
     expect(afterApply.quirkCap).toBe(10);
     expect(afterApply.manaLevel).toBe('high');
+    expect(afterApply.enforceAttributeCaps).toBe(false);
     expect(afterApply.name).toBe(campaign.name); // `name` is never touched by import
   });
 
@@ -921,7 +1182,7 @@ library:
     expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
 
     const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(firstYaml).toContain('version: 6');
+    expect(firstYaml).toContain('version: 11');
     expect(firstYaml).toContain('enchantments:');
 
     const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {

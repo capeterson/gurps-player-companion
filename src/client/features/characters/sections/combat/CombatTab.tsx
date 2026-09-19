@@ -1,11 +1,11 @@
 /**
  * CombatTab — the live-gameplay surface, rendered as the first tab on
- * the character sheet. Pools, DR summary, maneuver, defenses, attacks,
- * and a roll log, all inline on `/characters/:id` so the player taps
+ * the character sheet. Pools, DR summary, maneuver, defenses, and attacks
+ * stay inline on `/characters/:id` so the player taps
  * between live combat and the editable sheet without a route hop.
  *
  * Full-width status, attacks, armor and tracker sections avoid independent
- * columns growing lopsided. Maneuver and defenses share one responsive row.
+ * columns growing lopsided. Each section folds independently on this device.
  *
  * `usePoolBumpers` is lifted here so the in-grid PoolsCard and the
  * floating top bar share one instance — a second instance would
@@ -15,11 +15,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ArmorFacing } from '../../../../../shared/domain/armorDr.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
-import { RollHistoryStrip } from '../RollHistoryStrip.tsx';
 import { RollSheet } from '../RollSheet.tsx';
 import type { RollRequest } from '../rollTypes.ts';
 import { useCombatPatch } from '../useCombatPatch.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
+import { ActiveEffectsPanel } from './ActiveEffectsPanel.tsx';
 import { AttacksCard } from './AttacksCard.tsx';
 import { DefensesCard } from './DefensesCard.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
@@ -31,9 +31,14 @@ import { SoloTrackerCard } from './SoloTrackerCard.tsx';
 export interface CombatTabProps {
   character: CharacterDetail;
   canWrite: boolean;
+  experimentalTurnTracker?: boolean;
 }
 
-export function CombatTab({ character, canWrite }: CombatTabProps) {
+export function CombatTab({
+  character,
+  canWrite,
+  experimentalTurnTracker = false,
+}: CombatTabProps) {
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
   const [hitLocation, setHitLocation] = useState('torso');
   const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
@@ -96,6 +101,7 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
           facing={facing}
         />
       </div>
+      <ActiveEffectsPanel character={character} canWrite={canWrite} />
       <AttacksCard character={character} openRoll={openRoll} />
       <DrSummaryCard
         key={character.id}
@@ -108,9 +114,9 @@ export function CombatTab({ character, canWrite }: CombatTabProps) {
         onLocationChange={setHitLocation}
         onFacingChange={setFacing}
       />
-      <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
-
-      <RollHistoryStrip characterId={character.id} />
+      {experimentalTurnTracker && (
+        <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
+      )}
 
       {rollRequest && (
         <RollSheet

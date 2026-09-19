@@ -29,39 +29,8 @@ export function HomePage() {
           <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
             {me.data?.displayName ?? 'Adventurer'}
           </h1>
-          <p className="text-sm text-muted">
-            Sheets, the adventure log, and your campaigns — all one tab away.
-          </p>
-          <div className="flex flex-wrap gap-2.5 pt-2">
-            <Link to="/characters" className="btn btn-primary">
-              Open Sheet
-            </Link>
-            <Link to="/log" className="btn">
-              Adventure Log
-            </Link>
-            <Link to="/campaigns" className="btn btn-ghost">
-              Campaigns
-            </Link>
-          </div>
+          <p className="text-sm text-muted">Pick up where you left off.</p>
         </div>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link to="/characters" className="card p-card transition hover:border-border-strong">
-          <p className="label-eyebrow">Your characters</p>
-          <p className="font-display num text-3xl font-semibold">{characters?.length ?? '—'}</p>
-          <p className="text-sm text-muted">Open sheets, create heroes, track advancement.</p>
-        </Link>
-        <Link to="/log" className="card p-card transition hover:border-border-strong">
-          <p className="label-eyebrow">Adventure Log</p>
-          <p className="font-display text-3xl font-semibold">Latest</p>
-          <p className="text-sm text-muted">Session notes, private threads, and shared recaps.</p>
-        </Link>
-        <Link to="/campaigns" className="card p-card transition hover:border-border-strong">
-          <p className="label-eyebrow">Campaigns</p>
-          <p className="font-display text-3xl font-semibold">Workspaces</p>
-          <p className="text-sm text-muted">Members, point targets, and shared libraries.</p>
-        </Link>
       </section>
 
       {recent.length > 0 && (

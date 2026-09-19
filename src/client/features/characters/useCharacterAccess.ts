@@ -31,8 +31,10 @@ export interface CampaignSummary {
   quirkCap: number | null;
   manaLevel: 'none' | 'low' | 'normal' | 'high' | 'very_high';
   techLevel: number | null;
+  enforceAttributeCaps: boolean;
   shareCharacterSheets: boolean;
   allowGmCharacterEditing: boolean;
+  experimentalTurnTracker?: boolean;
   viewerRole?: 'owner' | 'manager' | 'member';
   members?: CampaignMemberOut[];
   createdAt: string;
@@ -97,8 +99,10 @@ function toCampaignSummary(row: LocalCampaign): CampaignSummary {
     // field is missing (see `sharesSheets`/mana-level fallbacks above).
     manaLevel: row.manaLevel ?? 'normal',
     techLevel: row.techLevel ?? null,
+    enforceAttributeCaps: row.enforceAttributeCaps ?? true,
     shareCharacterSheets: row.shareCharacterSheets ?? true,
     allowGmCharacterEditing: row.allowGmCharacterEditing ?? false,
+    experimentalTurnTracker: row.experimentalTurnTracker ?? false,
     ...(row.viewerRole !== undefined ? { viewerRole: row.viewerRole } : {}),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

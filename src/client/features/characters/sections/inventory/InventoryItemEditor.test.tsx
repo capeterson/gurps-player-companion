@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildInventoryItemOut } from '../../../../../shared/domain/characterDetail.ts';
+import type { LibraryEnchantmentOut } from '../../../../../shared/schemas/campaignLibrary.ts';
 import {
   type InventoryItemOut,
   armorData,
@@ -47,12 +49,18 @@ function item(overrides: Partial<InventoryItemOut> = {}): InventoryItemOut {
   });
 }
 const selection = vi.fn();
-function Harness({ canEdit = true }: { canEdit?: boolean }) {
+function Harness({
+  canEdit = true,
+  fetchEnchantmentOptions,
+}: {
+  canEdit?: boolean;
+  fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
+}) {
   const items =
     useLiveQuery(
       async () =>
         (await getLocalDb().characterInventory.toArray()).map((row) =>
-          inventoryItemOut.parse({ ...row, effectiveWeightLbs: row.weightLbs * row.quantity }),
+          buildInventoryItemOut(row, new Map()),
         ),
       [],
     ) ?? [];
@@ -70,6 +78,7 @@ function Harness({ canEdit = true }: { canEdit?: boolean }) {
               isSelected={() => false}
               onRowClick={selection}
               canEdit={canEdit}
+              {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})}
             />
           ))}
         </tbody>
@@ -77,9 +86,15 @@ function Harness({ canEdit = true }: { canEdit?: boolean }) {
     </ToastProvider>
   );
 }
-async function setup(overrides: Partial<InventoryItemOut> = {}, canEdit = true) {
+async function setup(
+  overrides: Partial<InventoryItemOut> = {},
+  canEdit = true,
+  fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>,
+) {
   await getLocalDb().characterInventory.put({ ...item(overrides), revision: 1 });
-  render(<Harness canEdit={canEdit} />);
+  render(
+    <Harness canEdit={canEdit} {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})} />,
+  );
   await screen.findByText('Coat');
   return userEvent.setup();
 }
@@ -132,6 +147,31 @@ describe('inline inventory editing', () => {
     await waitFor(async () => expect((await stored()).armor?.dr).toBe(5));
     await armorEditor(user);
     expect(screen.getByRole('textbox', { name: 'DR' })).toHaveValue('5');
+  });
+
+  it('edits persisted base armor without baking in an enchantment bonus', async () => {
+    const user = await setup({
+      armor: armorData.parse({ dr: 3, flexible: false, locations: ['torso'] }),
+      enchantments: [
+        {
+          spellName: 'Fortify',
+          mechanics: {
+            applicability: 'armor',
+            effects: [{ target: 'dr', value: 3 }],
+            levels: [],
+            stackingPolicy: { kind: 'stack' },
+          },
+        },
+      ],
+    });
+    const editor = await armorEditor(user);
+    expect(editor.getByRole('textbox', { name: 'DR' })).toHaveValue('3');
+    await user.click(editor.getByRole('button', { name: 'More options' }));
+    await user.click(editor.getByRole('checkbox', { name: 'Flexible armor' }));
+    await waitFor(async () => {
+      expect((await stored()).armor).toMatchObject({ dr: 3, flexible: true });
+    });
+    expect(screen.getByText('Armor DR 6')).toBeVisible();
   });
 
   it('promotes individual populated advanced fields, including zero; cleared fields can hide again', async () => {
@@ -268,6 +308,55 @@ describe('inline inventory editing', () => {
       category: '+3',
       notes: 'Old runes',
     });
+  });
+
+  it('attaches campaign definitions as owned snapshots and allows custom typed mechanics', async () => {
+    const definition: LibraryEnchantmentOut = {
+      id: '0193b3c0-f1f0-7000-8000-00000000e001',
+      campaignId: '0193b3c0-f1f0-7000-8000-00000000c002',
+      name: 'Fortify',
+      description: null,
+      source: 'M66',
+      tags: ['armor'],
+      applicability: 'armor',
+      effects: [{ target: 'dr', value: 1 }],
+      levels: [],
+      stackingPolicy: { kind: 'highest', key: 'fortify' },
+      revision: 7,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const fetchOptions = vi.fn(async () => [definition]);
+    const user = await setup({ enchantments: [{ spellName: 'Legacy note' }] }, true, fetchOptions);
+    await user.click(screen.getByRole('button', { name: 'Enchantments settings for Coat' }));
+    const name = screen.getByLabelText('New enchantment name');
+    await user.type(name, 'Fort');
+    await user.click(await screen.findByRole('option', { name: /Fortify/ }));
+    await user.click(screen.getByRole('button', { name: 'Add enchantment' }));
+    await waitFor(async () =>
+      expect((await stored()).enchantments[1]).toMatchObject({
+        spellName: 'Fortify',
+        definitionId: definition.id,
+        definitionRevision: 7,
+        mechanics: {
+          applicability: 'armor',
+          effects: [{ target: 'dr', value: 1 }],
+        },
+      }),
+    );
+
+    await user.type(screen.getByLabelText('New enchantment name'), 'Local ward');
+    await user.selectOptions(screen.getByLabelText('Custom enchantment effect'), 'dr');
+    const value = screen.getByLabelText('Custom enchantment value');
+    await user.clear(value);
+    await user.type(value, '2');
+    await user.click(screen.getByRole('button', { name: 'Add enchantment' }));
+    await waitFor(async () =>
+      expect((await stored()).enchantments[2]).toMatchObject({
+        spellName: 'Local ward',
+        mechanics: { effects: [{ target: 'dr', value: 2 }] },
+      }),
+    );
   });
 
   it('renders category summaries without edit controls for read-only viewers', async () => {

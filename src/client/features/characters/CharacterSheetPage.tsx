@@ -2,6 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
+  maxIqWithMentalSecondaryCaps,
+  maxMentalSecondaryModifier,
+} from '../../../shared/domain/attributeCaps.ts';
+import {
   ATTR_INFLUENCE,
   SECONDARY_INFO,
   type SecondaryModKey,
@@ -10,7 +14,9 @@ import {
   secondarySpent,
 } from '../../../shared/domain/attributeTooltips.ts';
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
+import { getWarningLabel } from '../../../shared/domain/warnings.ts';
 import { formatScaled } from '../../../shared/format/number.ts';
+import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import {
   MANUAL_TEMP_EFFECT_ID,
   TEMP_STAT_AXES,
@@ -19,6 +25,7 @@ import {
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { EffectSourcesList } from '../../components/ui/EffectSourcesList.tsx';
+import { FoldSection } from '../../components/ui/FoldSection.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
@@ -204,6 +211,7 @@ function ModifierButton({
   permField,
   permValue,
   permCostLabel,
+  permMax,
   displayScale,
 }: {
   label: string;
@@ -223,6 +231,8 @@ function ModifierButton({
   permField?: AttrField;
   permValue?: number;
   permCostLabel?: string;
+  /** Optional campaign-rule maximum for the permanent modifier. */
+  permMax?: number | undefined;
   displayScale?: number | undefined;
 }) {
   const buildSave = useCharacterFieldSave(characterId);
@@ -279,7 +289,7 @@ function ModifierButton({
                     void permSaver.onSave(v);
                   },
                   min: -50,
-                  max: 50,
+                  max: permMax ?? 50,
                 }
               : undefined
           }
@@ -352,6 +362,7 @@ function PrimaryAttrCell({
   tempEffects,
   effective,
   min,
+  max,
   characterId,
   canWrite,
 }: {
@@ -362,6 +373,7 @@ function PrimaryAttrCell({
   tempEffects: TempEffectsApi;
   effective: number;
   min: number;
+  max: number;
   characterId: string;
   canWrite: boolean;
 }) {
@@ -399,7 +411,7 @@ function PrimaryAttrCell({
                 characterId={characterId}
                 canWrite={canWrite}
                 min={min}
-                max={99}
+                max={max}
                 width="w-12 sm:w-9"
                 size="sm"
               />
@@ -414,7 +426,7 @@ function PrimaryAttrCell({
             characterId={characterId}
             canWrite={canWrite}
             min={min}
-            max={99}
+            max={max}
             width="w-14"
             size="lg"
           />
@@ -454,6 +466,7 @@ function SecondaryModCell({
   modScale,
   infoKey,
   characterId,
+  permMax,
   canWrite,
 }: {
   label: string;
@@ -468,6 +481,7 @@ function SecondaryModCell({
   modScale?: number;
   infoKey: SecondaryModKey;
   characterId: string;
+  permMax?: number | undefined;
   canWrite: boolean;
 }) {
   const info = SECONDARY_INFO[infoKey];
@@ -526,6 +540,7 @@ function SecondaryModCell({
             permField={modField}
             permValue={modValue}
             permCostLabel={info.nextCostLabel}
+            permMax={permMax}
             displayScale={modScale}
           />
         )}
@@ -720,10 +735,12 @@ function AttributesPanel({
   character,
   canWrite,
   tempEffects,
+  enforceAttributeCaps,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
   tempEffects: TempEffectsApi;
+  enforceAttributeCaps: boolean;
 }) {
   const tempActive = canWrite && TEMP_STAT_AXES.some((axis) => tempEffects.totals[axis] !== 0);
   return (
@@ -737,6 +754,7 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveSt}
           min={1}
+          max={99}
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -748,6 +766,7 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveDx}
           min={1}
+          max={enforceAttributeCaps ? 20 : 99}
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -759,6 +778,11 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveIq}
           min={1}
+          max={
+            enforceAttributeCaps
+              ? maxIqWithMentalSecondaryCaps(character.willMod, character.perMod)
+              : 99
+          }
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -770,6 +794,7 @@ function AttributesPanel({
           tempEffects={tempEffects}
           effective={character.derived.effectiveHt}
           min={1}
+          max={enforceAttributeCaps ? 20 : 99}
           characterId={character.id}
           canWrite={canWrite}
         />
@@ -791,10 +816,12 @@ function SecondaryModsPanel({
   character,
   canWrite,
   tempEffects,
+  enforceAttributeCaps,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
   tempEffects: TempEffectsApi;
+  enforceAttributeCaps: boolean;
 }) {
   return (
     <StatCard title="Secondary" points={character.points.secondary}>
@@ -819,6 +846,7 @@ function SecondaryModsPanel({
           derived={character.derived.will}
           infoKey="will"
           characterId={character.id}
+          permMax={enforceAttributeCaps ? maxMentalSecondaryModifier(character.iq) : undefined}
           canWrite={canWrite}
         />
         <SecondaryModCell
@@ -830,6 +858,7 @@ function SecondaryModsPanel({
           derived={character.derived.per}
           infoKey="per"
           characterId={character.id}
+          permMax={enforceAttributeCaps ? maxMentalSecondaryModifier(character.iq) : undefined}
           canWrite={canWrite}
         />
         <SecondaryModCell
@@ -1089,27 +1118,9 @@ function PointsPanel({
   pointTarget: number | null;
 }) {
   const p = character.points;
-  const [open, setOpen] = useState(false);
   const unspent = pointTarget != null ? pointTarget - p.total : null;
   return (
-    <StatCard
-      title="Point ledger"
-      points={p.total}
-      headerExtra={
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="btn btn-ghost btn-xs px-1 text-base-content/50"
-          aria-expanded={open}
-          aria-label={open ? 'Collapse point ledger' : 'Expand point ledger'}
-        >
-          {open ? '▾' : '▸'}
-        </button>
-      }
-    >
-      {/* Shown whether the breakdown is folded or not — see the header's
-          ▸/▾ toggle above; the campaign point target line stays visible
-          either way. */}
+    <StatCard title="Point ledger" points={p.total}>
       {unspent != null && unspent !== 0 && (
         <p className="flex justify-between text-sm mb-1">
           <span className="text-base-content/60">{unspent < 0 ? 'Over' : 'Unspent'}</span>
@@ -1121,56 +1132,54 @@ function PointsPanel({
           </span>
         </p>
       )}
-      {open && (
-        <ul className="text-sm space-y-1">
-          <li className="flex justify-between">
-            <span>Attributes</span>
-            <span className="num">{p.attributes}</span>
+      <ul className="text-sm space-y-1">
+        <li className="flex justify-between">
+          <span>Attributes</span>
+          <span className="num">{p.attributes}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Secondary</span>
+          <span className="num">{p.secondary}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Advantages</span>
+          <span className="num">{p.advantages}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Disadvantages</span>
+          <span className="num">{p.disadvantages}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Quirks</span>
+          <span className="num">{p.quirks}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Languages</span>
+          <span className="num">{p.languages}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Skills</span>
+          <span className="num">{p.skills}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Techniques</span>
+          <span className="num">{p.techniques}</span>
+        </li>
+        <li className="flex justify-between">
+          <span>Spells</span>
+          <span className="num">{p.spells}</span>
+        </li>
+        <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
+          <span>Total</span>
+          <span className="num">{p.total}</span>
+        </li>
+        {character.campaignId !== null && character.points.unspent !== 0 && (
+          <li className="flex justify-between text-base-content/70">
+            <span>{p.unspent > 0 ? 'Unspent' : 'Over target'}</span>
+            <span className="num">{p.unspent > 0 ? p.unspent : -p.unspent}</span>
           </li>
-          <li className="flex justify-between">
-            <span>Secondary</span>
-            <span className="num">{p.secondary}</span>
-          </li>
-          <li className="flex justify-between">
-            <span>Advantages</span>
-            <span className="num">{p.advantages}</span>
-          </li>
-          <li className="flex justify-between">
-            <span>Disadvantages</span>
-            <span className="num">{p.disadvantages}</span>
-          </li>
-          <li className="flex justify-between">
-            <span>Quirks</span>
-            <span className="num">{p.quirks}</span>
-          </li>
-          <li className="flex justify-between">
-            <span>Languages</span>
-            <span className="num">{p.languages}</span>
-          </li>
-          <li className="flex justify-between">
-            <span>Skills</span>
-            <span className="num">{p.skills}</span>
-          </li>
-          <li className="flex justify-between">
-            <span>Techniques</span>
-            <span className="num">{p.techniques}</span>
-          </li>
-          <li className="flex justify-between">
-            <span>Spells</span>
-            <span className="num">{p.spells}</span>
-          </li>
-          <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
-            <span>Total</span>
-            <span className="num">{p.total}</span>
-          </li>
-          {character.campaignId !== null && character.points.unspent !== 0 && (
-            <li className="flex justify-between text-base-content/70">
-              <span>{p.unspent > 0 ? 'Unspent' : 'Over target'}</span>
-              <span className="num">{p.unspent > 0 ? p.unspent : -p.unspent}</span>
-            </li>
-          )}
-        </ul>
-      )}
+        )}
+      </ul>
     </StatCard>
   );
 }
@@ -1367,7 +1376,7 @@ function WarningsPanel({
           <li key={w.code}>
             <WarningBanner
               severity={w.severity === 'warn' ? 'warn' : 'info'}
-              title={w.code}
+              title={getWarningLabel(w.code)}
               onDismiss={
                 canWrite ? () => dismiss.mutate({ code: w.code, dismissed: true }) : undefined
               }
@@ -1385,7 +1394,7 @@ function WarningsPanel({
           <ul className="mt-1 space-y-1">
             {character.dismissedWarnings.map((code) => (
               <li key={code} className="flex justify-between gap-3">
-                <span className="text-base-content/60">{code}</span>
+                <span className="text-base-content/60">{getWarningLabel(code)}</span>
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs"
@@ -1416,10 +1425,12 @@ function IdentityHero({
   character,
   pointTarget,
   canWrite,
+  compact = false,
 }: {
   character: CharacterDetail;
   pointTarget: number | null;
   canWrite: boolean;
+  compact?: boolean;
 }) {
   const buildSave = useCharacterFieldSave(character.id);
   const nameField = useDraftField<string>({
@@ -1441,19 +1452,25 @@ function IdentityHero({
   const remaining = pointTarget != null ? pointTarget - total : null;
 
   return (
-    <div className="grid items-end gap-6 sm:grid-cols-[1fr_auto]">
+    <div
+      className={`grid items-end ${compact ? 'grid-cols-[minmax(0,1fr)_auto] gap-3' : 'gap-6 sm:grid-cols-[1fr_auto]'}`}
+    >
       <div className="min-w-0">
         <p className="label-eyebrow">Player Character · 4e</p>
         {canWrite ? (
           <input
             aria-label="character name"
-            className={`${DRAFT_FIELD_CLASS} font-name w-full bg-transparent border-0 outline-0 px-0 text-5xl leading-tight focus:ring-2 focus:ring-primary/40 rounded`}
+            className={`${DRAFT_FIELD_CLASS} font-name w-full bg-transparent border-0 outline-0 px-0 ${compact ? 'text-2xl' : 'text-5xl'} leading-tight focus:ring-2 focus:ring-primary/40 rounded`}
             {...nameField.inputProps}
           />
         ) : (
-          <h1 className="font-name text-5xl leading-tight">{character.name}</h1>
+          <h1 className={`font-name ${compact ? 'text-2xl' : 'text-5xl'} leading-tight`}>
+            {character.name}
+          </h1>
         )}
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted">
+        <div
+          className={`${compact ? 'hidden sm:flex mt-1' : 'mt-3 flex'} flex-wrap gap-x-5 gap-y-1.5 text-sm text-muted`}
+        >
           {chips.map(([k, v]) => (
             <span key={k}>
               <span className="label-eyebrow mr-1.5 inline">{k}</span>
@@ -1503,7 +1520,7 @@ export function CharacterSheetPage() {
   // this REST call.
   const campaigns = useQuery({
     queryKey: ['campaigns'],
-    queryFn: () => api<CampaignSummary[]>('/campaigns'),
+    queryFn: () => api<CampaignOut[]>('/campaigns'),
     // Always fetch when the user is known so the Identity panel can offer
     // the full campaign list — even for characters not yet in a campaign.
     enabled: !!me.data,
@@ -1611,27 +1628,76 @@ export function CharacterSheetPage() {
         )}
       </nav>
 
-      <IdentityHero character={character} pointTarget={pointTarget} canWrite={canWrite} />
+      <IdentityHero
+        character={character}
+        pointTarget={pointTarget}
+        canWrite={canWrite}
+        compact={tab === 'Combat'}
+      />
 
       {character.libraryEffectsKnown === false && <MechanicsUnavailable />}
       {character.libraryEffectsKnown !== false && (
         <>
-          <WarningsPanel character={character} canWrite={canWrite} />
+          {(character.warnings.length > 0 || character.dismissedWarnings.length > 0) && (
+            <FoldSection
+              preferenceKey={`${character.id}:warnings`}
+              title="Warnings"
+              summary={`${character.warnings.length} active`}
+            >
+              <WarningsPanel character={character} canWrite={canWrite} />
+            </FoldSection>
+          )}
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <AttributesPanel character={character} canWrite={canWrite} tempEffects={tempEffects} />
-            <SecondaryModsPanel
-              character={character}
-              canWrite={canWrite}
-              tempEffects={tempEffects}
-            />
-            <StatusPanel character={character} canWrite={canWrite} />
-            <div className="grid grid-cols-1 gap-4">
-              <PointsPanel character={character} pointTarget={pointTarget} />
-              <EncumbrancePanel character={character} />
-              <ActiveConditionsPanel character={character} canWrite={canWrite} />
+          <FoldSection
+            preferenceKey={`${character.id}:overview:${tab === 'Combat' ? 'combat' : 'sheet'}`}
+            title="Sheet overview"
+            defaultOpen={tab !== 'Combat'}
+            summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
+          >
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FoldSection preferenceKey={`${character.id}:AttributesPanel`} title="Attributes">
+                <AttributesPanel
+                  character={character}
+                  canWrite={canWrite}
+                  tempEffects={tempEffects}
+                  enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                />
+              </FoldSection>
+              <FoldSection
+                preferenceKey={`${character.id}:SecondaryModsPanel`}
+                title="Secondary attributes"
+              >
+                <SecondaryModsPanel
+                  character={character}
+                  canWrite={canWrite}
+                  tempEffects={tempEffects}
+                  enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                />
+              </FoldSection>
+              <FoldSection preferenceKey={`${character.id}:StatusPanel`} title="Status">
+                <StatusPanel character={character} canWrite={canWrite} />
+              </FoldSection>
+              <div className="grid grid-cols-1 gap-4">
+                <FoldSection
+                  preferenceKey={`${character.id}:PointsPanel`}
+                  title="Point ledger"
+                  defaultOpen={false}
+                  summary={`${character.points.total} pts`}
+                >
+                  <PointsPanel character={character} pointTarget={pointTarget} />
+                </FoldSection>
+                <FoldSection preferenceKey={`${character.id}:EncumbrancePanel`} title="Encumbrance">
+                  <EncumbrancePanel character={character} />
+                </FoldSection>
+                <FoldSection
+                  preferenceKey={`${character.id}:ActiveConditionsPanel`}
+                  title="Conditional effects"
+                >
+                  <ActiveConditionsPanel character={character} canWrite={canWrite} />
+                </FoldSection>
+              </div>
             </div>
-          </div>
+          </FoldSection>
         </>
       )}
       <div className="panel-tabs">
@@ -1653,33 +1719,67 @@ export function CharacterSheetPage() {
 
       <div>
         {tab === 'Combat' && character.libraryEffectsKnown !== false && (
-          <CombatTab character={character} canWrite={canWrite} />
-        )}
-        {tab === 'Identity' && (
-          <IdentityPanel
+          <CombatTab
             character={character}
             canWrite={canWrite}
-            campaigns={campaigns.data ?? []}
+            experimentalTurnTracker={campaign?.experimentalTurnTracker === true}
           />
         )}
-        {tab === 'Traits' && <TraitsPanel character={character} canWrite={canWrite} />}
+        {tab === 'Identity' && (
+          <FoldSection preferenceKey={`${character.id}:IdentityPanel`} title="Identity">
+            <IdentityPanel
+              character={character}
+              canWrite={canWrite}
+              campaigns={campaigns.data ?? []}
+            />
+          </FoldSection>
+        )}
+        {tab === 'Traits' && (
+          <FoldSection preferenceKey={`${character.id}:TraitsPanel`} title="Traits">
+            <TraitsPanel character={character} canWrite={canWrite} />
+          </FoldSection>
+        )}
         {tab === 'Skills' && character.libraryEffectsKnown !== false && (
           <div className="space-y-4">
-            <SkillsPanel character={character} canWrite={canWrite} />
-            <TechniquesPanel character={character} canWrite={canWrite} />
-            <LanguagesPanel character={character} canWrite={canWrite} />
+            <FoldSection preferenceKey={`${character.id}:SkillsPanel`} title="Skills">
+              <SkillsPanel character={character} canWrite={canWrite} />
+            </FoldSection>
+            <FoldSection preferenceKey={`${character.id}:TechniquesPanel`} title="Techniques">
+              <TechniquesPanel character={character} canWrite={canWrite} />
+            </FoldSection>
+            <FoldSection preferenceKey={`${character.id}:LanguagesPanel`} title="Languages">
+              <LanguagesPanel character={character} canWrite={canWrite} />
+            </FoldSection>
           </div>
         )}
         {tab === 'Magic' && character.libraryEffectsKnown !== false && (
           <div className="space-y-4">
-            <SpellsPanel character={character} canWrite={canWrite} />
-            <PowerstonesPanel character={character} canWrite={canWrite} />
-            <MagicItemsPanel character={character} canWrite={canWrite} />
+            <FoldSection preferenceKey={`${character.id}:SpellsPanel`} title="Spells">
+              <SpellsPanel character={character} canWrite={canWrite} />
+            </FoldSection>
+            <FoldSection preferenceKey={`${character.id}:PowerstonesPanel`} title="Powerstones">
+              <PowerstonesPanel character={character} canWrite={canWrite} />
+            </FoldSection>
+            <FoldSection preferenceKey={`${character.id}:MagicItemsPanel`} title="Magic items">
+              <MagicItemsPanel character={character} canWrite={canWrite} />
+            </FoldSection>
           </div>
         )}
-        {tab === 'Inventory' && <InventoryPanel character={character} canWrite={canWrite} />}
-        {tab === 'Notes' && <NotesPanel character={character} canWrite={canWrite} />}
-        {tab === 'History' && <HistoryPanel characterId={character.id} />}
+        {tab === 'Inventory' && (
+          <FoldSection preferenceKey={`${character.id}:InventoryPanel`} title="Inventory">
+            <InventoryPanel character={character} canWrite={canWrite} />
+          </FoldSection>
+        )}
+        {tab === 'Notes' && (
+          <FoldSection preferenceKey={`${character.id}:NotesPanel`} title="Notes">
+            <NotesPanel character={character} canWrite={canWrite} />
+          </FoldSection>
+        )}
+        {tab === 'History' && (
+          <FoldSection preferenceKey={`${character.id}:HistoryPanel`} title="History">
+            <HistoryPanel characterId={character.id} />
+          </FoldSection>
+        )}
       </div>
     </div>
   );

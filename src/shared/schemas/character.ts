@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
+import { activeEffectsField, capabilityEffect } from './activeEffects.ts';
 import { campaignHouseRules } from './campaign.ts';
 import { combatStateOut } from './combat.ts';
 import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
-import { effectTarget } from './effects.ts';
+import { effectTarget, weaponSelector } from './effects.ts';
 import { inventoryItemOut } from './inventory.ts';
 import { languageOut } from './language.ts';
 import { skillOut } from './skill.ts';
@@ -140,6 +141,16 @@ export const characterAttributesShape = {
   moveMod: mod.default(0),
 
   tempEffects: tempEffectsField.default([]),
+  activeEffects: activeEffectsField.default([]),
+  activeConditionGroups: z
+    .array(
+      z
+        .string()
+        .regex(/^[a-z][a-z0-9_]*$/)
+        .max(40),
+    )
+    .max(100)
+    .default([]),
 } as const;
 
 export const characterIdentityShape = {
@@ -219,7 +230,7 @@ export const derivedStatsOut = z.object({
  * for UI breakdowns.
  */
 export const resolvedEffectOut = z.object({
-  sourceKind: z.enum(['trait', 'skill']),
+  sourceKind: z.enum(['trait', 'skill', 'item', 'active_effect']),
   sourceName: z.string(),
   sourceId: uuid,
   target: effectTarget,
@@ -227,6 +238,9 @@ export const resolvedEffectOut = z.object({
   skillName: z.string().optional(),
   skillSpecialty: z.string().optional(),
   hitLocation: z.string().optional(),
+  weaponSelector: weaponSelector.optional(),
+  matchedInventoryItemIds: z.array(uuid).optional(),
+  weaponMatchStatus: z.enum(['zero', 'one', 'multiple']).optional(),
   conditionGroup: z.string().optional(),
   conditionLabel: z.string().optional(),
   active: z.boolean(),
@@ -280,6 +294,9 @@ export const characterListItem = z.object({
 });
 
 export const characterDetail = z.object({
+  capabilities: z
+    .array(z.object({ sourceId: uuid, sourceName: z.string(), capability: capabilityEffect }))
+    .default([]),
   /** Discriminator so the client can switch between full and minimal views. */
   view: z.literal('full').default('full'),
   id: uuid,

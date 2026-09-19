@@ -1,3 +1,7 @@
+import type {
+  ActiveEffectDefinitionOut,
+  ActiveEffectInstance,
+} from '../../shared/schemas/activeEffects.ts';
 /**
  * Local Dexie database — the source of truth for the UI.
  *
@@ -33,6 +37,7 @@ import {
   type TempEffect,
   type TempStatAxis,
 } from '../../shared/schemas/character.ts';
+import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
 import { inferLegacyCampaignOrder, legacyReferenceFields } from './legacyCampaignDependencies.ts';
@@ -66,6 +71,7 @@ export interface LocalCharacter {
    * since) may lack this column; readers default missing values to
    * `[]`. Not indexed -- no store version bump needed. */
   tempEffects?: TempEffect[];
+  activeEffects?: ActiveEffectInstance[];
   dismissedWarnings: string[];
   /** Trait/skill effect condition groups currently toggled ON. */
   activeConditionGroups: string[];
@@ -99,6 +105,8 @@ export interface LocalCharacterTrait {
   libraryTraitId: string | null;
   /** Validated read-only declaration projection from the sync cursor; absent on legacy rows. */
   libraryMechanics?: LibraryMechanics | null;
+  /** Character-owned effect declarations; absent on pre-migration local rows. */
+  customEffects?: TraitEffect[];
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -214,6 +222,7 @@ export interface LocalCharacterCombat {
 }
 
 export interface LocalCampaign {
+  activeEffectDefinitions?: ActiveEffectDefinitionOut[];
   id: string;
   name: string;
   description: string | null;
@@ -221,6 +230,7 @@ export interface LocalCampaign {
   pointTarget: number | null;
   disadvantageCap: number | null;
   quirkCap: number | null;
+  skillPrerequisitePolicy?: 'block' | 'warn' | undefined;
   /** Optional: rows synced before the mana column existed lack it;
    * readers default missing values to 'normal'. */
   houseRules?: import('../../shared/schemas/campaign.ts').CampaignHouseRules;
@@ -228,6 +238,8 @@ export interface LocalCampaign {
   /** Optional: rows synced before the tech-level column existed lack it;
    * readers default missing values to `null`. */
   techLevel?: number | null;
+  /** Missing on older rows; campaigns default to enforcing the canonical caps. */
+  enforceAttributeCaps?: boolean;
   /**
    * When false, non-owner members see the minimal "readily apparent"
    * view of other players' character sheets instead of the full
@@ -238,6 +250,7 @@ export interface LocalCampaign {
   shareCharacterSheets?: boolean;
   /** Missing on older rows; defaults to disabled. */
   allowGmCharacterEditing?: boolean;
+  experimentalTurnTracker?: boolean;
   /** Viewer-specific role mirrored from the authenticated campaigns response. */
   viewerRole?: 'owner' | 'manager' | 'member';
   createdAt: string;

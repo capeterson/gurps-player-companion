@@ -9,9 +9,10 @@
 ## What this is
 
 GURPS Player Companion is a **local-first Progressive Web App** for running
-GURPS 4e player characters, campaigns, and shared campaign content. It is a
-single Bun process that serves the HTTP API, a WebSocket push channel, the
-OpenAPI document, and the React PWA client — all on one origin, one port.
+GURPS 4e player characters, campaigns, shared campaign content, and delegated
+agent access. It is a single Bun process that serves the HTTP API, OAuth and
+MCP, a WebSocket push channel, the OpenAPI document, and the React PWA client —
+all on one origin, one port.
 
 The defining product promise is **edits never disappear**. Every character
 mutation is written to IndexedDB and journaled to a durable outbox *before*
@@ -27,11 +28,13 @@ to confirm the original or destination campaign in the sync log before replay.
 
 | Doc | Covers |
 |---|---|
+| [active-effects-skill-procedures.md](active-effects-skill-procedures.md) | Campaign active effects, owned character instances, contextual skill modifiers, actions and level benefits. |
 | **overview.md** (this file) | Product surface, feature catalog, codebase map, orientation notes. |
 | [architecture.md](architecture.md) | Stack, process model, request lifecycle, data model, auth, testing, deploy. |
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
 | [campaign-content-sharing.md](campaign-content-sharing.md) | Campaigns, roles, invitations, the share gate / minimal view, and the YAML library. |
 | [history-tracking.md](history-tracking.md) | The append-only audit-log subsystem (character + campaign history). |
+| [mcp-agent-access.md](mcp-agent-access.md) | Same-process MCP/OAuth delegation, player API coverage, and parity gates. |
 | [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
 
 The **rules of engagement** (invariants you must not break, and the multi-site
@@ -41,6 +44,19 @@ checklists for extending sync/history) live in
 "Maintaining these docs" below.
 
 ---
+
+## Delegated agent access
+
+[MCP agent access](mcp-agent-access.md) provides remote Streamable HTTP at `/mcp`
+and OAuth delegation on the same app server. Settings lists and revokes connected
+clients, while `/oauth/consent` grants plain-language read/write/manage scopes.
+Authorization discovery supports ChatGPT-style Client ID Metadata Documents and
+Claude-compatible Dynamic Client Registration, so supported public clients need
+no per-client server configuration or shared secret.
+Every player-domain raw API operation has a stable tool; security, administration,
+replication, and transport endpoints have exact checked-in exclusions. MCP commits
+use the same route graph, validation, authorization, audit, revisions, and
+invalidation behavior as REST.
 
 ## User-facing features
 
@@ -77,6 +93,23 @@ The home page's recent-character cards and the `/characters` listing resolve
 from the local mirror. Each card links to its character and, when assigned,
 shows the synced campaign name as a separate link to that campaign.
 
+- **Compact combat view and folding.** Combat uses a smaller identity header and
+  folds the shared sheet overview (attributes, secondary stats, status, ledger,
+  encumbrance and conditional effects) by default. The folded overview shows
+  effective ST/DX/IQ/HT. Other tabs keep an independently remembered overview
+  preference. Every sheet panel and main Combat section has a keyboard-accessible
+  folding header; armor remains inline and open by default. `FoldSection` saves
+  open/closed preferences per character/section in device-local `localStorage`
+  (`gpc:fold:*`), never the server. Content stays mounted while folded so drafts,
+  pending saves, roll state and selections survive folding. Storage failures do
+  not prevent folding. Recovery/thresholds, the point ledger, defense breakdowns, and the full DR
+  location list start folded.
+- **Markdown descriptions.** Library traits, skills and spells render sanitized
+  CommonMark/GFM descriptions; their spacious add/edit forms (including skill
+  specialization description overrides) use the shared formatting toolbar and
+  raw-markdown mode. Character skill/spell copied notes have expandable markdown
+  descriptions. Trait notes render markdown for readers and offer a markdown
+  preview beside the compact source editor for owners.
 - **Identity tab.** Name, height, weight, age, **birthdate** (free-form
   text, e.g. "3/7/0402"), campaign assignment, and
   an **appearance/notes** field. No per-character "player" field is
@@ -103,7 +136,9 @@ shows the synced campaign name as a separate link to that campaign.
   Lift rounds to the nearest whole number once it reaches 10 (B15). All
   GURPS math is pure and shared (`src/shared/domain/`).
 - **Point ledger.** Live point totals vs the campaign point target, with
-  disadvantage / quirk cap warnings.
+  disadvantage / quirk cap warnings. Warning codes stay stable for API and
+  dismissal persistence, while every active and dismissed warning is presented
+  with a human-readable label; legacy unknown codes receive a readable fallback.
 - **Offline mechanical definitions.** Trait/skill cursor rows carry validated
   `libraryMechanics` declarations with source ID, campaign, revision and explicit
   availability. Both player and GM readers derive from these durable rows, with
@@ -128,6 +163,11 @@ shows the synced campaign name as a separate link to that campaign.
   write path share `services/libraryReferences.ts`. Removing a member detaches
   live references while preserving owned rules; unavailable sources produce visible
   rejections, including a toast and add-form flash for each character entry type.
+  Inventory enchantment references use the same campaign check: the server replaces
+  caller-supplied mechanics with the definition's current revision and complete owned
+  snapshot. Definition edits refresh linked library/character items; deletion or
+  campaign transfer clears only the live ID, leaving offline mechanics intact.
+- **Active effects and skill procedures.** Campaign-defined or custom effects can be applied, activated, deactivated, expired, detached and removed from Combat. Owned mechanics and saved campaign templates work offline; capabilities/senses/resistances have typed labels. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v11. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -154,16 +194,57 @@ shows the synced campaign name as a separate link to that campaign.
   normalized). Unqualified names cover every specialty; `*` matches any name
   or specialty in its own field. Legacy `Name (Specialty)` effects retain
   that restriction unless an explicit `skillSpecialty` overrides it.
+  Campaign owners author ordered declarative effects directly in trait and
+  skill library forms: add, duplicate, reorder and delete rows; choose flat or
+  per-level scaling; and supply target-aware skill, DR, condition, or weapon
+  fields. Inline previews and field errors keep invalid drafts visible.
+  Character owners can expand **Custom effects** on any trait and use the same
+  editor. Those declarations are saved on the owned trait through the local-first
+  outbox; this is also where an effect can safely bind one exact inventory item.
+  Item-aware targets cover weapon attack, Parry, Block, damage and Accuracy.
+  Selectors are deterministic: an exact local inventory id for owned mechanics,
+  or portable exact normalized weapon name, governing skill/specialty, or
+  library-item provenance. Optional `Primary`/alternate-mode restrictions apply
+  only to attack, damage and Accuracy; global item effects reach each mode once.
 - **Skills** with attribute/difficulty relative levels. A skill
   copied from the library retains its specialization, learned tech level,
   description, source, and prerequisites (the latter three in notes).
-  Specialized skills have distinct sheet and roll labels; long selected-library
-  captions wrap inside the add form without displacing its controls. Learned TL is
+  Library definitions explicitly declare whether specialization is forbidden,
+  optional, or required and whether it is free-form or selected from a catalog.
+  Catalog choices can override description, prerequisites, and defaults. The
+  REST, sync, and MCP copy paths enforce the policy, canonicalize catalog names,
+  and materialize the selected option's defaults and generated notes.
+  Specialized skills use the compact `Name/Specialization` format consistently
+  across sheet rows, rolls, history, combat bindings, and GM lookup. An applied
+  skill modifier is marked by a small warning-colored `✦` beside the skill name;
+  hovering, focusing, or tapping it opens the source breakdown in a tooltip rather
+  than expanding the row. Long selected-library captions wrap inside the add form
+  without displacing its controls. Learned TL is
   independent of later campaign TL changes. Skill **defaults** are copied
   declarations: attribute plus offset or another trained skill plus offset.
   An empty list means no default; absent/null legacy definitions mean unknown,
   shown with an explanatory tooltip and no invented roll target at zero points.
-  Defaults are authored through library YAML/API and character REST/sync fields.
+  Defaults are authored through library YAML/API and character REST/sync fields;
+  skill-source declarations support exact, same-specialty, and any-specialty matching.
+  Library skills also carry an explicit TL policy: not applicable, fixed, or
+  required `/TL`. A required definition cannot be learned until the player
+  chooses a concrete TL; fixed definitions canonicalize the learned value.
+  The shared cross-TL helper applies the asymmetric IQ-based table: higher-TL
+  use is -5/-10/-15 at +1/+2/+3 TL and impossible at +4, while lower-TL use is
+  -1/-3/-5/-7 and then -2 per further TL; non-IQ technological skills use
+  -1 per TL in either direction. Defaults may select exact
+  skills, campaign-owned groups, or tags and may declare task, campaign-rule,
+  character-fact, and same-specialization-dimension conditions. Unknown
+  conditions remain visible candidates but never contribute an automatic level.
+  Structured prerequisites form nested AND/OR trees over skills (level,
+  relative level, points, and specialization), traits/levels, attributes, TL,
+  campaign rules, and explicit GM permission. A campaign owner grants a named
+  GM gate by adding the skill; that grant is retained in the owned snapshot so
+  later point changes and offline warnings remain stable. Campaigns either block learning
+  and point increases or allow them with persistent sheet warnings; unrelated
+  later edits never delete an existing skill. Prose remains beside the typed
+  rule for source fidelity. All rule data is captured in the owned library
+  snapshot so offline calculation and warnings match the server.
   Difficulty never decides whether a default exists, including Very Hard skills.
   Basic-attribute defaults cap their source ST/DX/IQ/HT at 20 before applying
   the listed penalty (B173). Purchased levels and learned-skill defaults remain
@@ -179,7 +260,9 @@ shows the synced campaign name as a separate link to that campaign.
   its listed target skills only. A computed level is a
   tappable roll target: it opens the same roll sheet used everywhere
   else on the character (dispatch only, so read-only viewers can roll
-  too); null-level rows stay plain text.
+  too); null-level rows stay plain text. On narrow screens, each skill
+  becomes a labeled card row so its name keeps the full content width instead
+  of being squeezed by the attribute, points, level, and action columns.
 - **Point ledger** with one bucket per source: attributes, secondary
   characteristics, advantages, disadvantages, quirks, languages, skills,
   spells, and techniques, plus a derived `unspent`
@@ -199,12 +282,15 @@ shows the synced campaign name as a separate link to that campaign.
   written penalty doesn't expose the full skill level as a roll target
   until points are bought up. The default skill
   is resolved by name against the sheet — bare name or
-  `Name (Specialization)` — using the skill's *effective* level, so
+  `Name/Specialization` (while accepting legacy parenthesized references) — using
+  the skill's *effective* level, so
   Talents flow through; an unresolvable default renders an em dash with
   a "Skill 'X' not on sheet" tooltip instead of guessing. The default
   line and points are editable per row. A resolved
   level is a tappable roll target like a skill's. Rendered on the Skills
-  tab. Martial-arts **styles** live in the campaign library only
+  tab. Its add form and rows reflow into labeled two-column mobile layouts;
+  the desktop column header is hidden rather than forcing horizontal scroll.
+  Martial-arts **styles** live in the campaign library only
   (name + technique/perk/skill lists); a character adopts one by adding
   its pieces, so there is no per-character style row.
 - **Languages** (`character_languages`, sync-backed) with independent
@@ -214,9 +300,13 @@ shows the synced campaign name as a separate link to that campaign.
   tongue and a house-ruled cost are both expressible. They bill to their
   own **languages** bucket in the point ledger rather than inflating
   advantages, and the add form autocompletes against the campaign's
-  language library. Rendered on the Skills tab under the skills table.
+  language library. Rendered on the Skills tab under the skills table, with
+  the same labeled mobile-card treatment as skills and techniques.
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
+  On mobile, the add form, spell fields, stored-energy controls, magic-item
+  controls, and cast-dialog resource rows stack in place with visible labels;
+  the spell list never falls back to a desktop-width horizontal scroller.
   Spells have no default: a 0-point (legacy) spell row has a null level,
   gets no energy discount, and its Cast/Maintain actions are held. The
   cast dialog suggests drawing from a single powerstone and warns when
@@ -233,9 +323,19 @@ shows the synced campaign name as a separate link to that campaign.
   Each cast/maintenance gesture shares one audit batch across its
   FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
-  encumbrance, armor and weapon data, cost/weight rollups. Equipped
+  encumbrance, armor and weapon data, cost/weight rollups. A compact filter
+  combines case-insensitive item-name substring matching with a category/status
+  tag (weapon, armor, container, powerstone, magic item, enchanted, worn, or
+  equipped). Results retain the ancestor containers needed to locate matching
+  nested items while hiding every non-matching sibling and descendant. Equipped
   armor and active innate DR are aggregated per hit location on the Combat tab's Defense &
-  Damage Resistance card. **Inline inventory editors** replace the item edit modal. Clicking a
+  Damage Resistance card. Each enchanted armor layer expands its base DR into nested enchantment
+  contributions; highest-only conflicts are resolved across every equipped layer
+  covering the selected hit location and retain suppressed sources visibly for an
+  auditable total; the applied source needs no redundant "winning" badge.
+  Non-overlapping armor
+  resolves independently, so a stronger coif enchantment does not suppress boots.
+  **Inline inventory editors** replace the item edit modal. Clicking a
   category chip (Armor, Weapon/Shield, Container, Powerstone, Magic item, or
   Enchantments) opens its editor immediately below the row; clicking that same
   chip again collapses it. The pencil opens basic item details in the same
@@ -257,7 +357,11 @@ shows the synced campaign name as a separate link to that campaign.
   Armor retains every canonical and custom hit location. Weapons retain
   damage, reach, parry, governing skill, optional ranged stats and alternate
   attack modes. Powerstones and magic items retain their charge/energy state
-  and shared validation. Enchantments remain non-mechanical display metadata.
+  and shared validation. Legacy enchantment rows remain display metadata, while
+  typed campaign or character-local enchantments contribute attack, damage, Accuracy,
+  Parry/Block/DB, DR, armor divisor, weight reduction, or skill modifiers only under
+  their equipped/worn rule. Rows show the base-to-effective contribution breakdown,
+  including inactive and highest-policy-suppressed effects.
   Library templates still populate the quick-add form, and its small optional
   category/equipped/worn controls remain available; detailed editing uses the
   new item's category chips. Implementation lives under
@@ -276,12 +380,16 @@ shows the synced campaign name as a separate link to that campaign.
   screens. Maneuver and Defenses share an asymmetrical row at wide breakpoints
   (and stack while space is constrained); Attacks, armor coverage, the Solo
   tracker, and roll history each use the full width below. Sections stack on
-  mobile instead of accumulating into two independent, uneven columns.
-  - **Pools** — HP/FP with bumpers/reset, posture chips, and all 12
-    common-condition chips (normalized against legacy Capitalized entries
+  mobile instead of accumulating into two independent, uneven columns. Main combat
+  sections fold independently, with responsive grids inside them.
+  - **Pools** — compact HP/FP meters with ±1 controls; ±5, reset and threshold
+    reference text live under **Recovery & thresholds**. Death-check actions and
+    the FP-floor warning remain visible. **Posture & conditions** shows the current
+    posture and active conditions; tap the posture or **Edit conditions** to choose
+    from the full lists. All 12 common-condition chips (normalized against legacy Capitalized entries
     so old data still lights the right chip). Surfaces reeling
     *and* death-check thresholds (B419/B423) in one caption, pulses a
-    "suggested" highlight on the Reeling chip when HP drops below ⅓ max
+    "suggested" highlight on the Reeling chip in the condition chooser when HP drops below ⅓ max
     and it isn't set yet — never auto-applied — and tracks HP down to
     the certain-death floor at −5×HP. Each FP lost below zero also costs
     one HP, including a decrement crossing zero (B426); FP stops at −FP,
@@ -362,12 +470,17 @@ shows the synced campaign name as a separate link to that campaign.
     destruction requires at least twice the crippling amount. The hint describes
     severing for cutting damage and generic destruction for other damage types. Conditions
     remain manual. Torso, skull, and eye-to-brain injuries are uncapped.
-  - **Maneuver** — one-tap chips for all 13 B363-366 maneuvers (active
-    chip shows its blurb; tapping it again clears to no maneuver), plus
+  - **Maneuver** — shows the current choice and blurb, with **Change** opening
+    one-tap chips for all 13 B363-366 maneuvers (tapping the active chip clears
+    it; choosing closes the picker), plus
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
-  - **Defenses** — a compact two-column action grid for Move (read-only, net of
-    encumbrance and combat restrictions), Dodge (with
+  - **Move & defenses** — a compact wrapping grid of tappable defense values.
+    Source breakdowns live with their corresponding actions, while the shared
+    incoming location/facing selectors and armor DB context live in Defense &
+    Damage Resistance. Current restrictions and All-Out Defense choices remain
+    visible. Move is read-only and net of encumbrance and combat restrictions;
+    Dodge includes
     the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is
     resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
@@ -419,7 +532,8 @@ shows the synced campaign name as a separate link to that campaign.
     and are cleared on logout. These are presentation preferences, not inventory
     edits, and are not server-synced (`combat/attackTablePreferences.ts`). New
     equipped weapons append to custom order. Resolved damage dice (ST
-    thrust/swing + the weapon's modifiers) are **tappable buttons that
+    thrust/swing + the weapon's modifiers + weapon-scoped damage effects, or
+    fixed dice + weapon-scoped damage effects) are **tappable buttons that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
     1-point floor from B378), reach, an ST-shortfall badge/caption
     (B270, applied to the roll target), a ranged stat line (Acc/Range/
@@ -433,7 +547,11 @@ shows the synced campaign name as a separate link to that campaign.
     renders each mode as its own labelled table row in addition
     to the primary line, with an alternate's reach inherited from the
     weapon when unset; vitals/eye presets are offered only when at
-    least one mode across every damage line can target them.
+    least one mode across every damage line can target them. Attack-mode
+    bonuses apply once per matching primary or named alternate mode. Affected
+    rows expose expandable base/global/weapon/final modifier breakdowns;
+    unmatched and multi-match selectors are diagnosed visibly instead of
+    becoming global.
   - **Roll sheet** — an ephemeral bottom-sheet/dialog roller with two
     variants sharing one shell. The default **check** variant: modifier
     stepper (−25..+10 — deep enough that a 200 yd range preset, B550,
@@ -451,21 +569,20 @@ shows the synced campaign name as a separate link to that campaign.
     roll sheet (`.RollSheet` / `RollableRow` live under `sections/`) so
     tapping a skill/spell level in those tables opens the identical
     roller.
-  - **Roll history strip** — a collapsible log of this character's
-    recent rolls (newest first, capped at 100 entries per character),
-    rendering both check entries (target/margin/crit) and damage
-    entries (dice + total + type) distinctly; entries persisted before
-    damage rolls existed have no `kind` and deserialize as checks.
-    Persisted to `localStorage` (keyed `gurps:rollHistory:<characterId>`)
-    so the log survives page reloads, but **not sync'd to the server**
-    and carrying no sync/purge/history obligations. Cleared on logout
-    (`clearAllRollHistory`) so account switching on the same device
-    doesn't leak roll labels.
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
   and carried weight past the 10×BL carry cap.
-- **History tab**: per-character audit log (see history-tracking.md).
+- **History tab**: defaults to the per-character server audit log (see
+  history-tracking.md) and provides a second **Roll history** sub-tab for browsing
+  this character's rolls. Roll history is newest first and capped at 250 entries
+  per character; adding a roll prunes the oldest entries beyond that limit. Check
+  entries show target/dice/total/margin/crit and damage entries show dice/total/type.
+  Entries persisted before damage rolls existed have no `kind` and deserialize as
+  checks. Rolls live only in `localStorage` under
+  `gurps:rollHistory:<characterId>`: they survive reloads but are never sent through
+  the outbox, sync API, history API, or MCP. Logout calls `clearAllRollHistory` so
+  account switching on the same device cannot expose prior roll labels.
 
 Every editable input on the sheet is **draft-on-blur** and never silently
 loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
@@ -478,11 +595,17 @@ roster for the campaign — every member character in the campaign is listed
 there, regardless of the share gate; rows a viewer only sees minimally deep-link
 to `/characters/:id`, which renders `CharacterMinimalView`.
 
-- Owner-editable **House rules** in campaign settings; natural DR penetration
-  immunity defaults on and can be disabled for standard rules. Settings save
-  through the campaign REST path and are mirrored read-only for offline combat.
+- Owner-editable **House rule sets** in campaign settings: None, J Talisar, or
+  Custom. Named sets load their bundles; moving to Custom preserves all loaded
+  values, and changing one option never resets its siblings. Every rule includes
+  an in-app explanation. Natural DR penetration immunity remains enabled in the
+  legacy/default Custom state. Settings save through the campaign REST path and
+  are mirrored read-only with character mechanics.
 - Create/edit campaigns with **point target, disadvantage cap, quirk cap,
-  mana level, tech level**, and the **share-character-sheets** toggle. Tech
+  mana level, tech level**, the default-on **enforce attribute caps** rule,
+  and the **share-character-sheets** toggle. Attribute-cap enforcement blocks
+  purchased DX/IQ/HT above 20 and purchased Will/Per totals above 20; ST and
+  temporary bonuses are exempt (B14-B16). Tech
   level is campaign-wide (not per character); every character in the
   campaign displays it read-only, resolved the same way `manaLevel` is.
 - **Roles**: `owner` (GM), `manager`, `member`.
@@ -499,9 +622,9 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
-  items, languages, techniques, and styles. The in-app catalog editor
+  items, enchantments, languages, techniques, and styles. The in-app catalog editor
   (`/campaigns/:id/library`) offers dedicated CRUD forms for **traits,
-  skills, spells, and items**; **languages, techniques, and styles** are
+  skills, spells, items, and mechanical enchantments**; **languages, techniques, and styles** are
   authored via the versioned YAML import/export flow (or the owner-only
   `.../library/{languages|techniques|styles}` REST routes the generic
   factory registers) — the dedicated character-sheet Languages and
@@ -511,6 +634,8 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   for sharing between campaigns. The top-nav **Library** page (`/library`,
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow.
+  Library skill forms also author first-class free-form/catalog specialization
+  policies and per-catalog-option rule overrides; portable YAML v11 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal, e.g. 13) and **location** (free-form text, e.g. "The
@@ -527,6 +652,13 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   the local Dexie character model, plus a five-second character-history feed.
    Newly observed changes remain highlighted for 30 seconds. Cards open the full
    sheet in a new tab; a dense-display toggle fits larger parties.
+- **Experimental turn tracking**: the owner enables **Campaign settings →
+  Experimental features → Enable turn tracker** (`experimentalTurnTracker`).
+  Defaults off for existing/new campaigns; campaignless characters also hide
+  their local tracker. Missing pre-upgrade/offline settings count as off.
+  Disabling hides campaign encounter UI (including bookmarked encounter pages)
+  and the character scratchpad without deleting data. This is a UI feature
+  switch; existing encounter API permissions are unchanged.
 - **Encounter tracker foundation**: the online-only REST aggregate under
   `/campaigns/:id/encounters` stores campaign encounter state, PC/NPC
    combatants, turn order, and timed effects. Members can read a privacy-aware
@@ -555,6 +687,10 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   local-first outbox. REST and sync use the same central write decision.
 
 ### Cross-cutting UI
+- **Logged-in home**: a compact welcome and the four most recently updated
+  characters. Global Sheet, Campaign, Log, and Library destinations stay in the
+  persistent header instead of being repeated as homepage buttons or shortcut
+  cards.
 - **Sync status indicator and log** (header): honest pending/syncing/offline/error
   state, and an `error` badge always names its reason (in the tooltip and in a
   banner at the top of the log) rather than pointing at a toast that may never
@@ -569,9 +705,16 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
   button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
+- **Styled error recovery**: unknown routes and unexpected router/render errors
+  use the Arcane app shell rather than React Router's developer fallback. The
+  page offers home/reload actions and shows a unique error reference, server
+  request ID when available, current-user ID when available, route, and time for
+  support correlation without exposing raw error details.
 - **Themeable** (light/dark; "Arcane" DaisyUI theme), installable PWA, works
   offline for the character surface.
-- **Settings** page: profile, password, passkeys, API keys.
+- **Settings** page: profile, password, passkeys, API keys. Long credential and
+  connected-app names wrap inside their cards, with destructive actions stacked
+  below them on narrow screens rather than overlapping the metadata.
 
 ### Admin (separate bundle)
 A **separate Vite entry** (`src/client/admin/`, served at `/admin/*`) — not
@@ -585,7 +728,7 @@ player client.
 
 ```
 src/
-  server/        Bun process — Hono routes, auth, Drizzle, OpenAPI, WS
+  server/        Bun process — Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,
@@ -598,9 +741,13 @@ src/
     auth/        jwt, password, webauthn (passkeys), apiKey, session,
                  middleware, permissions (the authz helpers, incl.
                  tryLoadCampaignRole)
+    oauth/       client configuration sync, PKCE authorization/grants,
+                 opaque token rotation/revocation, discovery + consent routes
+    mcp/         exact operation manifest/catalog, SDK transport, checked
+                 snapshot, and same-process shared-handler executor
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary
                  libraryReferences (transactional source authorization for all
-                 six character reference types), ownedLibraryMechanics (saved
+                 six character reference types plus nested item enchantments), ownedLibraryMechanics (saved
                  declarations, live updates and detachment),
                  (incl. loadCharacterDetail, the shared character-detail
                  loader), characterAccess (resolveCharacterView, the
@@ -614,6 +761,11 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
+      library/   LibraryPage (markdown descriptions, live category search,
+                 draft-preserving category switches, and typed enchantment
+                 authoring), librarySearch (human-readable-field matcher), plus
+                 EffectsEditor, the reusable ordered effect authoring UI shared
+                 with character-owned trait mechanics
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
@@ -625,8 +777,9 @@ src/
                  useClampedJsonbBumper (powerstone/magic-item charge
                   steppers), useTempEffects (the temporary-effects list
                   backing the Attributes panel's modifier popovers), shared
-                  RollSheet/RollableRow/rollHistory (per-character
-                  localStorage roll log) primitives, and combat/
+                 RollSheet/RollableRow/rollHistory (per-character
+                  localStorage roll log) primitives, RollHistoryPanel (the History
+                  sub-tab browser), and combat/
                   (CombatTab + Pools/Maneuver/Defenses/Attacks/DrSummary cards,
                    ArmorLocationMap + IncomingDamageDialog)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
@@ -636,7 +789,8 @@ src/
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...
-    components/  Shared UI (sync indicator/log, notifications bell,
+    components/  Shared UI (FoldSection: device-persisted folding without unmounting,
+                 sync indicator/log, notifications bell,
                  SwUpdatePrompt (new-build toast), ui/*, markdown/ —
                  sanitized markdown renderer + Tiptap WYSIWYG markdown
                  editor used by the adventure log)
@@ -647,7 +801,7 @@ src/
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text
-     domain/      GURPS math (characterCalc, skillCalc, spellCalc,
+     domain/      GURPS math (characterCalc, skillCalc, spellCalc, itemEnchantments, activeEffects, skillProcedures,
                   techniqueCalc (level from default skill + points offset for
                   A/H difficulty), encumbrance,
                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
@@ -673,9 +827,11 @@ src/
     yaml/        library.ts — round-trippable campaign-library YAML codec
     history/     summarize.ts — shared history one-liner formatter
   sw/            Service worker registration and app-shell precache. It never
-                 caches authenticated API responses and does not replay the
-                 outbox — that lives in the page orchestrator, see
-                 src/sw/registerSW.ts.
+                 caches authenticated API responses, does not replay the
+                 outbox, and excludes API/MCP/OAuth/discovery routes from its
+                 navigation fallback. Mutable worker/bootstrap/HTML entrypoints
+                 are served no-store; hashed assets remain cacheable. Outbox
+                 replay lives in the page orchestrator; see src/sw/registerSW.ts.
 docs/
   specs/         These design specs
   prototypes/    Standalone design studies, outside the app build:
@@ -694,8 +850,8 @@ contract and the bugs they exist to prevent.
 
 ## Architecture at a glance
 
-- **One process, one origin.** The Bun server hosts HTTP + WebSocket + OpenAPI
-  + static client. Do not split it.
+- **One process, one origin.** The Bun server hosts HTTP + OAuth + MCP +
+  WebSocket + OpenAPI + static client. Do not split it.
 - **Postgres 18 only.** No SQLite, no cross-DB shims. IDs are `uuidv7()`
   server-defaults (the concrete PG18 dependency); the schema also uses
   `GENERATED ALWAYS AS … STORED` columns. `AGENTS.md` frames PG18 as headroom
@@ -760,9 +916,9 @@ Things that repeatedly surprise people working in this repo:
    follow the `AGENTS.md` S6 and H1–H5 checklists end-to-end or you get silent
    data loss.
 
-5. **Two write paths, one audit chokepoint.** Character writes funnel through
-   `dispatchOperation()` in `syncDispatch.ts`; campaign writes go through
-   separate REST routes. Both must run inside `withAudit(...)` so DB triggers
+5. **REST and sync share primitives, not every handler.** Sync writes use
+   `dispatchOperation()` in `syncDispatch.ts`; REST routes also perform writes
+   directly using shared services. Both must run inside `withAudit(...)` so DB triggers
    can attribute the change. History capture sits *below* both via Postgres
    triggers.
 
@@ -782,6 +938,11 @@ Things that repeatedly surprise people working in this repo:
    covers e2e. `npm run check` = lint + typecheck + **`bun test`
    (server+shared only)** + OpenAPI drift — it does **not** run the client
    vitest or Playwright suites, so run those separately for client changes.
+   Per-PR GitHub CI includes client tests and the production build but
+   intentionally omits browser installation/automation. PR authors run relevant
+   Playwright coverage locally; promotion to a named image release runs the
+   delegated OAuth/MCP/offline Chromium acceptance against the selected source
+   image before creating any release tags or aliases.
 
 8. **When in doubt, read the file's top comment and the relevant `AGENTS.md`
    rule** before editing — most invariants are annotated at the call site

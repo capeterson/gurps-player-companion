@@ -24,26 +24,39 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import type {
+  ActiveEffectDefinition,
+  ActiveEffectInstance,
+} from '../../shared/schemas/activeEffects.ts';
 // Type-only imports: every jsonb column below is typed against the Zod
 // schema that validates it at the API/sync boundary, so the DB layer
 // and the wire contract can't drift apart.  The catalog of jsonb
 // columns and their owning schemas lives in docs/specs/json-fields.md.
 import type { XpAward } from '../../shared/schemas/adventureLog.ts';
 import type { CampaignHouseRules } from '../../shared/schemas/campaign.ts';
-import type { StyleTechniqueRef } from '../../shared/schemas/campaignLibrary.ts';
+import type {
+  LibrarySkillSpecializationPolicy,
+  StyleTechniqueRef,
+} from '../../shared/schemas/campaignLibrary.ts';
 import type { TempEffect } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { CombatantConditionsField, EffectDuration } from '../../shared/schemas/encounter.ts';
 import type {
   ArmorData,
+  EnchantmentApplicability,
+  EnchantmentEffect,
+  EnchantmentLevel,
   EnchantmentRef,
+  EnchantmentStackingPolicy,
   MagicItemData,
   PowerstoneData,
   WeaponData,
 } from '../../shared/schemas/inventory.ts';
 import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import type { SkillPrerequisite, SkillTechLevelPolicy } from '../../shared/schemas/skill.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
+import type { SkillProcedures } from '../../shared/schemas/skillProcedures.ts';
 import { TECHNIQUE_DIFFICULTIES } from '../../shared/schemas/technique.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
 
@@ -254,6 +267,158 @@ export const apiKeys = pgTable(
   }),
 );
 
+// ---------- delegated OAuth ----------
+
+export const oauthClients = pgTable(
+  'oauth_clients',
+  {
+    id: id(),
+    clientId: text('client_id').notNull(),
+    name: varchar('name', { length: 120 }).notNull(),
+    redirectUris: text('redirect_uris').array().notNull(),
+    allowedScopes: text('allowed_scopes').array().notNull(),
+    registrationMethod: varchar('registration_method', { length: 20 })
+      .$type<'configured' | 'cimd' | 'dynamic'>()
+      .notNull()
+      .default('configured'),
+    metadataExpiresAt: timestamp('metadata_expires_at', { withTimezone: true }),
+    disabledAt: timestamp('disabled_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({ clientIdKey: uniqueIndex('oauth_clients_client_id_key').on(t.clientId) }),
+);
+
+export const oauthGrants = pgTable(
+  'oauth_grants',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    scopes: text('scopes').array().notNull(),
+    resource: text('resource').notNull(),
+    authVersion: integer('auth_version').notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    userIdx: index('oauth_grants_user_idx').on(t.userId),
+    clientIdx: index('oauth_grants_client_idx').on(t.clientId),
+  }),
+);
+
+export const oauthAuthorizationRequests = pgTable(
+  'oauth_authorization_requests',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    csrfHash: varchar('csrf_hash', { length: 64 }).notNull(),
+    requestHash: varchar('request_hash', { length: 64 }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({ csrfKey: uniqueIndex('oauth_authorization_requests_csrf_key').on(t.csrfHash) }),
+);
+
+export const oauthAuthorizationCodes = pgTable(
+  'oauth_authorization_codes',
+  {
+    id: id(),
+    grantId: uuid('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: 'cascade' }),
+    codeHash: varchar('code_hash', { length: 64 }).notNull(),
+    redirectUri: text('redirect_uri').notNull(),
+    codeChallenge: varchar('code_challenge', { length: 128 }).notNull(),
+    scopes: text('scopes').array().notNull(),
+    resource: text('resource').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({ codeKey: uniqueIndex('oauth_authorization_codes_code_key').on(t.codeHash) }),
+);
+
+export const oauthAccessTokens = pgTable(
+  'oauth_access_tokens',
+  {
+    id: id(),
+    grantId: uuid('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    scopes: text('scopes').array().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({ tokenKey: uniqueIndex('oauth_access_tokens_token_key').on(t.tokenHash) }),
+);
+
+export const oauthRefreshTokens = pgTable(
+  'oauth_refresh_tokens',
+  {
+    id: id(),
+    grantId: uuid('grant_id')
+      .notNull()
+      .references(() => oauthGrants.id, { onDelete: 'cascade' }),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull(),
+    familyId: uuid('family_id').notNull().default(sql`uuidv7()`),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    rotationRequestId: varchar('rotation_request_id', { length: 200 }),
+    replacementTokenHash: varchar('replacement_token_hash', { length: 64 }),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    tokenKey: uniqueIndex('oauth_refresh_tokens_token_key').on(t.tokenHash),
+    familyIdx: index('oauth_refresh_tokens_family_idx').on(t.familyId),
+  }),
+);
+
+export const mutationIdempotency = pgTable(
+  'mutation_idempotency',
+  {
+    id: id(),
+    actorUserId: uuid('actor_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientKey: varchar('client_key', { length: 200 }).notNull(),
+    operationKey: varchar('operation_key', { length: 300 }).notNull(),
+    idempotencyKey: varchar('idempotency_key', { length: 200 }).notNull(),
+    inputHash: varchar('input_hash', { length: 64 }).notNull(),
+    permissionHash: varchar('permission_hash', { length: 64 }).notNull(),
+    responseStatus: integer('response_status'),
+    responseContentType: varchar('response_content_type', { length: 200 }),
+    responseBody: text('response_body'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    key: uniqueIndex('mutation_idempotency_key').on(
+      t.actorUserId,
+      t.clientKey,
+      t.operationKey,
+      t.idempotencyKey,
+    ),
+    expiryIdx: index('mutation_idempotency_expiry_idx').on(t.expiresAt),
+  }),
+);
+
 // ---------- campaigns ----------
 
 export const campaigns = pgTable('campaigns', {
@@ -279,6 +444,8 @@ export const campaigns = pgTable('campaigns', {
     .default('normal'),
   /** Campaign-wide tech level (Basic Set p. 513); characters no longer set their own. */
   techLevel: smallint('tech_level'),
+  /** Enforce purchased DX/IQ/HT and Will/Per caps from Basic Set pp. B14-B16. */
+  enforceAttributeCaps: boolean('enforce_attribute_caps').notNull().default(true),
   /**
    * When false, non-owner members fetching `/characters/{id}` get the
    * minimal "readily apparent" view (race / height / weight / age /
@@ -289,6 +456,14 @@ export const campaigns = pgTable('campaigns', {
   shareCharacterSheets: boolean('share_character_sheets').notNull().default(true),
   /** Owner/manager edits of member-owned character sheets; opt-in. */
   allowGmCharacterEditing: boolean('allow_gm_character_editing').notNull().default(false),
+  /** Authoritative handling of unmet structured skill prerequisites. */
+  skillPrerequisitePolicy: varchar('skill_prerequisite_policy', {
+    length: 8,
+    enum: ['block', 'warn'],
+  })
+    .notNull()
+    .default('block'),
+  experimentalTurnTracker: boolean('experimental_turn_tracker').notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   revision: revision(),
@@ -406,6 +581,11 @@ export const characters = pgTable(
      * (src/shared/schemas/character.ts) -- see docs/specs/json-fields.md.
      * Replaces the ten `temp_*` scalar columns (see migration 0017). */
     tempEffects: jsonb('temp_effects').$type<TempEffect[]>().notNull().default([]),
+    /** Validated by activeEffectsField. */
+    activeEffects: jsonb('active_effects')
+      .$type<ActiveEffectInstance[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
 
     /** Warning codes the owner dismissed; validated by
      * `dismissedWarningsField` (src/shared/schemas/character.ts). */
@@ -449,6 +629,8 @@ export const characterTraits = pgTable(
     modifiers: jsonb('modifiers').$type<TraitModifier[]>().notNull().default([]),
     libraryTraitId: uuid('library_trait_id'),
     libraryMechanics: jsonb('library_mechanics').$type<LibraryMechanics>(),
+    /** User-authored mechanics; validated by traitEffect in trait create/update. */
+    customEffects: jsonb('custom_effects').$type<TraitEffect[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -846,12 +1028,29 @@ export const campaignLibrarySkills = pgTable(
     attribute: skillAttributeEnum('attribute').notNull(),
     difficulty: skillDifficultyEnum('difficulty').notNull(),
     techLevel: smallint('tech_level'),
+    techLevelPolicy: jsonb('tech_level_policy')
+      .$type<SkillTechLevelPolicy>()
+      .notNull()
+      .default({ kind: 'not_applicable' }),
     description: text('description'),
     source: varchar('source', { length: 40 }),
     defaultSpecialization: varchar('default_specialization', { length: 160 }),
+    /** Validated by librarySkillSpecializationPolicy (campaignLibrary.ts). */
+    specializationPolicy: jsonb('specialization_policy')
+      .$type<LibrarySkillSpecializationPolicy>()
+      .notNull()
+      .default({ kind: 'none' }),
     /** skillDefaults in shared/schemas/skill.ts. */
     defaults: jsonb('defaults').$type<import('../../shared/schemas/skill.ts').SkillDefaults>(),
     prerequisites: text('prerequisites'),
+    prerequisiteRules: jsonb('prerequisite_rules').$type<SkillPrerequisite>(),
+    groups: jsonb('groups').$type<string[]>().notNull().default([]),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    /** Validated by skillProcedures at library write boundaries. */
+    procedures: jsonb('procedures')
+      .$type<SkillProcedures>()
+      .notNull()
+      .default(sql`'{"modifiers":[],"actions":[],"benefits":[]}'::jsonb`),
     /** Validated by `situationalModifier` (src/shared/schemas/skill.ts). */
     situationalModifiers: jsonb('situational_modifiers')
       .$type<SituationalModifier[]>()
@@ -1001,6 +1200,42 @@ export const campaignLibraryStyles = pgTable(
   }),
 );
 
+export const campaignLibraryEnchantments = pgTable(
+  'campaign_library_enchantments',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 40 }),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    applicability: varchar('applicability', {
+      length: 16,
+      enum: ['weapon', 'armor', 'shield', 'any'],
+    })
+      .$type<EnchantmentApplicability>()
+      .notNull()
+      .default('any'),
+    effects: jsonb('effects').$type<EnchantmentEffect[]>().notNull().default([]),
+    levels: jsonb('levels').$type<EnchantmentLevel[]>().notNull().default([]),
+    stackingPolicy: jsonb('stacking_policy')
+      .$type<EnchantmentStackingPolicy>()
+      .notNull()
+      .default({ kind: 'stack' }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    naturalKey: uniqueIndex('campaign_library_enchantments_key').on(
+      t.campaignId,
+      sql`lower(${t.name})`,
+    ),
+  }),
+);
+
 export const campaignLibraryItems = pgTable(
   'campaign_library_items',
   {
@@ -1063,6 +1298,7 @@ export type DbAdventureLogEntry = typeof adventureLogEntries.$inferSelect;
 export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
 export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
 export type DbCampaignLibrarySpell = typeof campaignLibrarySpells.$inferSelect;
+export type DbCampaignLibraryEnchantment = typeof campaignLibraryEnchantments.$inferSelect;
 export type DbCampaignLibraryItem = typeof campaignLibraryItems.$inferSelect;
 export type DbCampaignLibraryLanguage = typeof campaignLibraryLanguages.$inferSelect;
 export type DbCampaignLibraryTechnique = typeof campaignLibraryTechniques.$inferSelect;
@@ -1128,6 +1364,10 @@ export const entityHistory = pgTable(
     campaignId: uuid('campaign_id'),
     ownerUserId: uuid('owner_user_id').notNull(),
     actorUserId: uuid('actor_user_id'),
+    agentClientId: uuid('agent_client_id').references(() => oauthClients.id, {
+      onDelete: 'set null',
+    }),
+    agentGrantId: uuid('agent_grant_id').references(() => oauthGrants.id, { onDelete: 'set null' }),
     batchId: uuid('batch_id'),
     oldRow: jsonb('old_row'),
     newRow: jsonb('new_row'),
@@ -1149,3 +1389,37 @@ export const entityHistory = pgTable(
 );
 
 export type DbEntityHistory = typeof entityHistory.$inferSelect;
+
+/** Campaign active effects; JSON fields validated by activeEffectDefinitionCreate. */
+export const campaignLibraryActiveEffects = pgTable(
+  'campaign_library_active_effects',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 160 }),
+    tags: jsonb('tags').$type<ActiveEffectDefinition['tags']>().notNull().default(sql`'[]'::jsonb`),
+    effects: jsonb('effects')
+      .$type<ActiveEffectDefinition['effects']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    capabilities: jsonb('capabilities')
+      .$type<ActiveEffectDefinition['capabilities']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    duration: jsonb('duration').$type<ActiveEffectDefinition['duration']>().notNull(),
+    stacking: jsonb('stacking').$type<ActiveEffectDefinition['stacking']>().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    naturalKey: uniqueIndex('campaign_library_active_effects_key').on(
+      t.campaignId,
+      sql`lower(${t.name})`,
+    ),
+  }),
+);

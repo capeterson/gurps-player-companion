@@ -121,7 +121,7 @@ describe('durable public auth rate limits', () => {
       expect((await request(`blocked-${i}@example.com`)).status).toBe(429);
     }
     expect((await request('one@example.com')).status).toBe(429);
-    const rows = await getDb().execute(sql`select key from auth_rate_limits`);
+    const rows = await getDb().execute(sql`select key from auth_rate_limits where scope = 'login'`);
     expect(rows.rows).toHaveLength(3); // one source, two admitted accounts
     expect((await request('one@example.com', '198.51.100.2')).status).toBe(200);
   });
@@ -138,7 +138,7 @@ describe('durable public auth rate limits', () => {
     );
     expect(responses.filter((response) => response.status === 200)).toHaveLength(2);
     expect(responses.filter((response) => response.status === 429)).toHaveLength(18);
-    const rows = await getDb().execute(sql`select key from auth_rate_limits`);
+    const rows = await getDb().execute(sql`select key from auth_rate_limits where scope = 'login'`);
     expect(rows.rows).toHaveLength(3);
   });
 });

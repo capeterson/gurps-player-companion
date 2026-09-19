@@ -1,3 +1,4 @@
+import { prepareActiveEffects } from './activeEffects.ts';
 import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
 /**
  * Per-operation dispatcher for /api/v1/sync/operations.
@@ -53,6 +54,11 @@ import {
   combatStates,
   inventoryItems,
 } from '../db/schema.ts';
+import {
+  type AttributeCapPatch,
+  assertAttributeCaps,
+  touchesAttributeCaps,
+} from './attributeCapValidation.ts';
 import { characterAttrsFromRow } from './characterSummary.ts';
 import {
   characterInsertValues,
@@ -110,6 +116,8 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_library_language: null,
   campaign_library_technique: null,
   campaign_library_style: null,
+  campaign_library_enchantment: null,
+  campaign_library_active_effect: null,
   adventure_log: null,
 };
 
@@ -428,9 +436,13 @@ async function dispatchCharacter(
 ): Promise<OperationOutcome> {
   if (op.command === 'create') {
     const body = characterCreate.parse(op.attemptedValue);
+    let enforceAttributeCaps = false;
     if (body.campaignId) {
-      await loadCampaignOr403(body.campaignId, ctx.userId);
+      const { campaign } = await loadCampaignOr403(body.campaignId, ctx.userId);
+      enforceAttributeCaps = campaign.enforceAttributeCaps;
     }
+    assertAttributeCaps(enforceAttributeCaps, body);
+    await prepareActiveEffects(tx, ctx.userId, null, body.campaignId ?? null, body);
     // Honor a client-supplied id so the local Dexie row keeps its
     // identity after the create round-trips.  If the id is already
     // taken, the unique index returns conflict via isUniqueViolation.
@@ -461,13 +473,41 @@ async function dispatchCharacter(
   // even though the REST PATCH route forbids it.
   const access = await loadCharacterOr403(op.entityId, ctx.userId);
   assertWrite(access);
+  if (!op.fieldPath) {
+    const body = characterSyncPatch.parse(op.attemptedValue) as AttributeCapPatch;
+    await assertCharacterPatchCaps(ctx.userId, access.character, body);
+  } else if (
+    op.fieldPath === 'campaignId' ||
+    op.fieldPath === 'dx' ||
+    op.fieldPath === 'iq' ||
+    op.fieldPath === 'ht' ||
+    op.fieldPath === 'willMod' ||
+    op.fieldPath === 'perMod'
+  ) {
+    const shape = characterSyncPatch.shape as Record<string, z.ZodTypeAny>;
+    const parsed = shape[op.fieldPath]?.parse(op.attemptedValue);
+    await assertCharacterPatchCaps(ctx.userId, access.character, {
+      [op.fieldPath]: parsed,
+    } as AttributeCapPatch);
+  }
   return await patchEntity({
     op,
     userId: ctx.userId,
     entityClass: 'character',
     tx,
     table: characters,
-    prepareUpdates: (updates) => detachLibraryReferencesForTransfer(tx, op.entityId, updates),
+    prepareUpdates: async (updates) => {
+      await prepareActiveEffects(
+        tx,
+        ctx.userId,
+        op.entityId,
+        updates.campaignId === undefined
+          ? access.character.campaignId
+          : (updates.campaignId as string | null),
+        updates,
+      );
+      await detachLibraryReferencesForTransfer(tx, op.entityId, updates);
+    },
     childWhere: () => eq(characters.id, op.entityId),
     valueTransform: (field, value) => {
       if (field === 'campaignId' && value !== null && value !== undefined) {
@@ -476,6 +516,17 @@ async function dispatchCharacter(
       return value;
     },
   });
+}
+
+async function assertCharacterPatchCaps(
+  userId: string,
+  current: typeof characters.$inferSelect,
+  patch: AttributeCapPatch,
+): Promise<void> {
+  if (!touchesAttributeCaps(patch)) return;
+  const campaignId = patch.campaignId === undefined ? current.campaignId : patch.campaignId;
+  const campaign = campaignId ? (await loadCampaignOr403(campaignId, userId)).campaign : null;
+  assertAttributeCaps(campaign?.enforceAttributeCaps ?? false, current, patch);
 }
 
 // ---------- character_trait ----------

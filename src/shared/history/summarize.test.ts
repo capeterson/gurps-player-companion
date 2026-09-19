@@ -235,6 +235,19 @@ describe('summarizeEvent character tempEffects', () => {
 // ---------- summarizeEvent — character_trait ----------
 
 describe('summarizeEvent character_trait', () => {
+  it('summarizes character-owned effect edits', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_trait',
+      op: 'update',
+      oldRow: { name: 'Weapon Mastery', custom_effects: [] },
+      newRow: {
+        name: 'Weapon Mastery',
+        custom_effects: [{ target: 'weapon_attack', value: 1 }],
+      },
+    });
+    expect(summary).toBe('Weapon Mastery: 1 custom effect saved');
+  });
+
   it('insert: "Added advantage Acute Vision"', () => {
     const { summary } = summarizeEvent({
       entityClass: 'character_trait',
@@ -279,6 +292,23 @@ describe('summarizeEvent character_skill', () => {
       newRow: { name: 'Acrobatics', points: 4 },
     });
     expect(summary).toContain('Acrobatics');
+  });
+
+  it('formats specializations with a slash', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character_skill',
+      op: 'insert',
+      oldRow: null,
+      newRow: {
+        name: 'Current Affairs',
+        specialization: 'Popular Culture',
+        attribute: 'IQ',
+        difficulty: 'E',
+        points: 1,
+      },
+    });
+    expect(summary).toContain('Current Affairs/Popular Culture');
+    expect(summary).not.toContain('Current Affairs (Popular Culture)');
   });
 });
 
@@ -489,6 +519,33 @@ describe('summarizeEvent campaign library techniques and styles', () => {
   });
 });
 
+describe('summarizeEvent campaign_library_enchantment', () => {
+  it('names creates, mechanics updates, and deletes', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_enchantment',
+        op: 'insert',
+        newRow: { name: 'Fortify', effects: [{ target: 'dr', value: 1 }] },
+      }).summary,
+    ).toBe('Added library enchantment Fortify');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_enchantment',
+        op: 'update',
+        oldRow: { name: 'Fortify', effects: [{ target: 'dr', value: 1 }] },
+        newRow: { name: 'Fortify', effects: [{ target: 'dr', value: 2 }] },
+      }).summary,
+    ).toContain('Effects');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_enchantment',
+        op: 'delete',
+        oldRow: { name: 'Fortify' },
+      }).summary,
+    ).toBe('Removed library enchantment Fortify');
+  });
+});
+
 // ---------- summarizeEvent — character_inventory ----------
 
 describe('summarizeEvent character_inventory', () => {
@@ -587,6 +644,26 @@ describe('summarizeEvent campaign', () => {
     });
     expect(summary).toContain('100');
     expect(summary).toContain('125');
+  });
+
+  it('describes the experimental turn tracker toggle', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { experimentalTurnTracker: false },
+      newRow: { experimentalTurnTracker: true },
+    });
+    expect(summary).toBe('Experimental turn tracker enabled');
+  });
+
+  it('describes the attribute-cap campaign toggle', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { enforceAttributeCaps: true },
+      newRow: { enforceAttributeCaps: false },
+    });
+    expect(summary).toBe('Attribute caps disabled');
   });
 });
 
@@ -891,4 +968,15 @@ it('summarizes a campaign house rule change from DB history', () => {
       newRow: { house_rules: { protectNaturalDr: false } },
     }).summary,
   ).toBe('Natural DR penetration immunity disabled (house rule)');
+});
+
+it('summarizes a named campaign house-rule set selection', () => {
+  expect(
+    summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { house_rules: { ruleSet: 'custom', protectNaturalDr: true } },
+      newRow: { house_rules: { ruleSet: 'j_talisar', protectNaturalDr: true } },
+    }).summary,
+  ).toBe('House rule set changed to J Talisar');
 });

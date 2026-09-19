@@ -40,4 +40,5 @@ jobs:
       - run: bun run test
       - run: bun run test:client
       - run: bun run openapi:check
+      - run: bun run mcp:check
       - run: bun run build

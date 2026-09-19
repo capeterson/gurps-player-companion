@@ -4,6 +4,7 @@
  * client-side (for detail expansion).  No imports from server or client code.
  */
 
+import { skillDisplayName, skillReferenceDisplayName } from '../domain/defenseCalc.ts';
 import { formatSigned } from '../format/number.ts';
 import { MANUAL_TEMP_EFFECT_ID } from '../schemas/character.ts';
 import type { HistoryEventOut } from '../schemas/history.ts';
@@ -67,8 +68,10 @@ const CAMPAIGN_FIELD_LABELS: Record<string, string> = {
   pointTarget: 'Point target',
   disadvantageCap: 'Disadvantage cap',
   quirkCap: 'Quirk cap',
+  enforceAttributeCaps: 'Attribute caps',
   shareCharacterSheets: 'Sheet sharing',
   allowGmCharacterEditing: 'GM character editing',
+  experimentalTurnTracker: 'Experimental turn tracker',
   ownerId: 'Owner',
 };
 
@@ -244,6 +247,18 @@ function summarizeCharacter(
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Character updated';
   const c = changes[0] as FieldChange;
+  if (c.field === 'activeEffects') {
+    const before = (c.oldValue ?? []) as Array<{ id: string; name: string; state: string }>;
+    const after = (c.newValue ?? []) as typeof before;
+    const changes = [
+      ...after.filter((e) => !before.some((b) => b.id === e.id)).map((e) => `Applied ${e.name}`),
+      ...before.filter((e) => !after.some((b) => b.id === e.id)).map((e) => `Removed ${e.name}`),
+      ...after
+        .filter((e) => before.some((b) => b.id === e.id && b.state !== e.state))
+        .map((e) => `${e.name}: ${e.state}`),
+    ];
+    return changes.join('; ') || 'Updated active effect mechanics, duration or notes';
+  }
   if (c.field === 'tempEffects') return summarizeTempEffects(c.oldValue, c.newValue);
   // Temp boost: delta-style label
   if (c.field in TEMP_ATTR_LABELS) {
@@ -292,6 +307,10 @@ function summarizeCharacterTrait(
   if (c.field === 'points') return `${name} points ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'level') return `${name} level ${c.oldValue} → ${c.newValue}`;
   if (c.field === 'name') return `Renamed trait to ${c.newValue}`;
+  if (c.field === 'customEffects') {
+    const count = Array.isArray(c.newValue) ? c.newValue.length : 0;
+    return `${name}: ${count} custom ${count === 1 ? 'effect' : 'effects'} saved`;
+  }
   return describeFieldChanges(String(name), changes);
 }
 
@@ -304,9 +323,15 @@ function summarizeCharacterSkill(
   const attr = next?.attribute ?? old?.attribute ?? '';
   const diff = next?.difficulty ?? old?.difficulty ?? '';
   const spec = next?.specialization ?? old?.specialization;
-  const fullName = spec ? `${name} (${spec})` : name;
+  const fullName = skillDisplayName(String(name), typeof spec === 'string' ? spec : null);
   if (op === 'insert') return `Added skill ${fullName} (${attr}/${diff})`;
-  if (op === 'delete') return `Removed skill ${old?.name ?? ''}`;
+  if (op === 'delete') {
+    const oldSpec = old?.specialization;
+    return `Removed skill ${skillDisplayName(
+      String(old?.name ?? ''),
+      typeof oldSpec === 'string' ? oldSpec : null,
+    )}`;
+  }
   const mechanics = summarizeOwnedMechanics(fullName, old, next);
   if (mechanics) return mechanics;
   const changes = diffRows(old, next);
@@ -358,8 +383,12 @@ function summarizeCharacterTechnique(
 ): string {
   const name = next?.name ?? old?.name ?? 'technique';
   const defaultSkill = next?.defaultSkillName ?? old?.defaultSkillName;
+  const displayedDefault =
+    typeof defaultSkill === 'string' ? skillReferenceDisplayName(defaultSkill) : null;
   if (op === 'insert') {
-    return defaultSkill ? `Added technique ${name} (${defaultSkill})` : `Added technique ${name}`;
+    return displayedDefault
+      ? `Added technique ${name} (${displayedDefault})`
+      : `Added technique ${name}`;
   }
   if (op === 'delete') return `Removed technique ${old?.name ?? ''}`;
   const changes = diffRows(old, next);
@@ -367,7 +396,9 @@ function summarizeCharacterTechnique(
   const c = changes[0] as FieldChange;
   if (c.field === 'points') return `${name} ${c.oldValue} → ${c.newValue} pts`;
   if (c.field === 'difficulty') return `${name} difficulty ${c.oldValue} → ${c.newValue}`;
-  if (c.field === 'defaultSkillName') return `${name} now defaults from ${c.newValue}`;
+  if (c.field === 'defaultSkillName') {
+    return `${name} now defaults from ${skillReferenceDisplayName(String(c.newValue))}`;
+  }
   if (c.field === 'maxLevel') return `${name} max level ${displayValue(c.newValue)}`;
   if (c.field === 'name') return `Renamed technique to ${c.newValue}`;
   return `${name} updated`;
@@ -432,12 +463,35 @@ function summarizeCampaign(
     if (c.field === 'shareCharacterSheets') {
       msgs.push(`Sheet sharing ${c.newValue ? 'enabled' : 'disabled'}`);
     } else if (c.field === 'houseRules') {
-      const rules = c.newValue as { protectNaturalDr?: boolean } | null;
-      msgs.push(
-        `Natural DR penetration immunity ${rules?.protectNaturalDr !== false ? 'enabled' : 'disabled'} (house rule)`,
-      );
+      const oldRules = c.oldValue as
+        | { ruleSet?: string; protectNaturalDr?: boolean }
+        | null
+        | undefined;
+      const rules = c.newValue as
+        | { ruleSet?: string; protectNaturalDr?: boolean }
+        | null
+        | undefined;
+      if (rules?.ruleSet && rules.ruleSet !== oldRules?.ruleSet) {
+        const setLabel =
+          rules.ruleSet === 'j_talisar'
+            ? 'J Talisar'
+            : rules.ruleSet === 'none'
+              ? 'None'
+              : 'Custom';
+        msgs.push(`House rule set changed to ${setLabel}`);
+      } else if (rules?.protectNaturalDr !== oldRules?.protectNaturalDr) {
+        msgs.push(
+          `Natural DR penetration immunity ${rules?.protectNaturalDr !== false ? 'enabled' : 'disabled'} (house rule)`,
+        );
+      } else {
+        msgs.push('House rules customized');
+      }
     } else if (c.field === 'allowGmCharacterEditing') {
       msgs.push(`GM character editing ${c.newValue ? 'enabled' : 'disabled'}`);
+    } else if (c.field === 'experimentalTurnTracker') {
+      msgs.push(`Experimental turn tracker ${c.newValue ? 'enabled' : 'disabled'}`);
+    } else if (c.field === 'enforceAttributeCaps') {
+      msgs.push(`Attribute caps ${c.newValue ? 'enabled' : 'disabled'}`);
     } else {
       msgs.push(`${label} ${displayValue(c.oldValue)} → ${displayValue(c.newValue)}`);
     }
@@ -545,6 +599,17 @@ function summarizeLibraryItem(
   return describeFieldChanges(`Library item ${name}`, diffRows(old, next));
 }
 
+function summarizeLibraryEnchantment(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'enchantment';
+  if (op === 'insert') return `Added library enchantment ${name}`;
+  if (op === 'delete') return `Removed library enchantment ${old?.name ?? ''}`;
+  return describeFieldChanges(`Library enchantment ${name}`, diffRows(old, next));
+}
+
 function summarizeAdventureLog(
   op: string,
   old: Record<string, unknown> | null,
@@ -634,6 +699,17 @@ export function summarizeEvent(event: {
       break;
     case 'campaign_library_style':
       summary = summarizeLibraryStyle(op, oldRow, newRow);
+      break;
+    case 'campaign_library_active_effect':
+      summary =
+        op === 'insert'
+          ? `Added active effect definition ${newRow?.name}`
+          : op === 'delete'
+            ? `Removed active effect definition ${oldRow?.name}`
+            : describeFieldChanges('Library active effect', diffRows(oldRow, newRow));
+      break;
+    case 'campaign_library_enchantment':
+      summary = summarizeLibraryEnchantment(op, oldRow, newRow);
       break;
     case 'adventure_log':
       summary = summarizeAdventureLog(op, oldRow, newRow);

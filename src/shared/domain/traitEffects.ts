@@ -21,8 +21,15 @@
  * caller (server in characterDetail.ts; client in useCharacterDetail).
  */
 
-import type { EffectTarget, TraitEffect } from '../schemas/effects.ts';
+import {
+  type EffectTarget,
+  type TraitEffect,
+  WEAPON_EFFECT_TARGETS,
+  type WeaponEffectTarget,
+  type WeaponSelector,
+} from '../schemas/effects.ts';
 import type { CharacterAttrs } from './characterCalc.ts';
+import { splitSkillReference } from './defenseCalc.ts';
 
 export interface CharacterTraitWithEffects {
   readonly id: string;
@@ -39,7 +46,7 @@ export interface CharacterSkillWithEffects {
 
 export interface ResolvedEffect {
   /** Distinguishes trait vs. skill source for UI grouping. */
-  readonly sourceKind: 'trait' | 'skill';
+  readonly sourceKind: 'trait' | 'skill' | 'item' | 'active_effect';
   /** Display label, e.g. "Combat Reflexes" or "Animal Handling". */
   readonly sourceName: string;
   /** Stable id of the character_trait / character_skill row. */
@@ -50,6 +57,7 @@ export interface ResolvedEffect {
   readonly skillName?: string;
   readonly skillSpecialty?: string;
   readonly hitLocation?: string;
+  readonly weaponSelector?: WeaponSelector;
   readonly conditionGroup?: string;
   readonly conditionLabel?: string;
   /**
@@ -127,6 +135,7 @@ export function resolveEffects(
     if (eff.skillName !== undefined) base.skillName = eff.skillName;
     if (eff.skillSpecialty !== undefined) base.skillSpecialty = eff.skillSpecialty;
     if (eff.hitLocation !== undefined) base.hitLocation = eff.hitLocation;
+    if (eff.weaponSelector !== undefined) base.weaponSelector = eff.weaponSelector;
     if (eff.conditionGroup !== undefined) base.conditionGroup = eff.conditionGroup;
     if (eff.conditionLabel !== undefined) base.conditionLabel = eff.conditionLabel;
     return base as unknown as ResolvedEffect;
@@ -144,6 +153,128 @@ export function resolveEffects(
     }
   }
   return out;
+}
+
+export type WeaponMatchStatus = 'zero' | 'one' | 'multiple';
+
+export interface WeaponEffectMatch {
+  readonly effect: ResolvedEffect & { readonly target: WeaponEffectTarget };
+  readonly matchedInventoryItemIds: readonly string[];
+  readonly matchStatus: WeaponMatchStatus;
+}
+
+interface WeaponItemForEffects {
+  readonly id: string;
+  readonly name: string;
+  readonly equipped: boolean;
+  readonly libraryItemId?: string | null;
+  readonly weaponData?: {
+    readonly skill?: string | null | undefined;
+    readonly alternateModes?: ReadonlyArray<{ readonly name: string }> | undefined;
+  } | null;
+}
+
+export function normalizeMechanicalName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function splitSkillName(value: string): { name: string; specialty: string } {
+  const parsed = splitSkillReference(value);
+  return {
+    name: normalizeMechanicalName(parsed.name),
+    specialty: normalizeMechanicalName(parsed.specialization),
+  };
+}
+
+function selectorMatchesItem(selector: WeaponSelector, item: WeaponItemForEffects): boolean {
+  if (!item.equipped || !item.weaponData) return false;
+  let matches = false;
+  switch (selector.kind) {
+    case 'inventory_item':
+      matches = item.id === selector.inventoryItemId;
+      break;
+    case 'library_item': {
+      matches = selector.libraryItemId
+        ? item.libraryItemId === selector.libraryItemId
+        : item.libraryItemId != null &&
+          normalizeMechanicalName(item.name) === normalizeMechanicalName(selector.libraryItemName);
+      break;
+    }
+    case 'weapon_name':
+      matches = normalizeMechanicalName(item.name) === normalizeMechanicalName(selector.weaponName);
+      break;
+    case 'weapon_skill': {
+      if (!item.weaponData.skill) break;
+      const candidate = splitSkillName(item.weaponData.skill);
+      const wanted = splitSkillName(selector.skillName);
+      const wantedName = wanted.name;
+      const wantedSpecialty = normalizeMechanicalName(selector.skillSpecialty ?? wanted.specialty);
+      matches =
+        (wantedName === '*' || candidate.name === wantedName) &&
+        (!wantedSpecialty || wantedSpecialty === '*' || candidate.specialty === wantedSpecialty);
+      break;
+    }
+  }
+  if (!matches || !selector.modeName) return matches;
+  const wantedMode = normalizeMechanicalName(selector.modeName);
+  if (wantedMode === 'primary') return true;
+  return (item.weaponData.alternateModes ?? []).some(
+    (mode) => normalizeMechanicalName(mode.name) === wantedMode,
+  );
+}
+
+/** Resolve every active or inactive weapon declaration against equipped rows. */
+export function resolveWeaponEffectMatches(
+  effects: ReadonlyArray<ResolvedEffect>,
+  inventory: ReadonlyArray<WeaponItemForEffects>,
+): WeaponEffectMatch[] {
+  return effects.flatMap((effect) => {
+    if (
+      !WEAPON_EFFECT_TARGETS.includes(effect.target as WeaponEffectTarget) ||
+      !effect.weaponSelector
+    ) {
+      return [];
+    }
+    const ids = inventory
+      .filter((item) => selectorMatchesItem(effect.weaponSelector as WeaponSelector, item))
+      .map((item) => item.id)
+      .sort();
+    return [
+      {
+        effect: effect as ResolvedEffect & { target: WeaponEffectTarget },
+        matchedInventoryItemIds: ids,
+        matchStatus: ids.length === 0 ? 'zero' : ids.length === 1 ? 'one' : 'multiple',
+      },
+    ];
+  });
+}
+
+/**
+ * Active effects for one item/mode. Item-level declarations flow to every
+ * mode once; a modeName narrows them by normalized exact match.
+ */
+export function weaponEffectsFor(
+  matches: ReadonlyArray<WeaponEffectMatch>,
+  inventoryItemId: string,
+  target: WeaponEffectTarget,
+  modeName?: string | null,
+): ResolvedEffect[] {
+  const normalizedMode = normalizeMechanicalName(modeName ?? 'primary');
+  return matches.flatMap((match) => {
+    if (
+      match.effect.target !== target ||
+      !match.effect.active ||
+      !match.matchedInventoryItemIds.includes(inventoryItemId)
+    ) {
+      return [];
+    }
+    const wantedMode = normalizeMechanicalName(match.effect.weaponSelector?.modeName ?? '');
+    return wantedMode && wantedMode !== normalizedMode ? [] : [match.effect];
+  });
+}
+
+export function sumResolvedEffects(effects: ReadonlyArray<ResolvedEffect>): number {
+  return effects.reduce((total, effect) => total + effect.value, 0);
 }
 
 /**
@@ -260,8 +391,9 @@ export function applyEffectsToAttrs(
 /**
  * Sum ACTIVE skill bonuses matching name and specialization. Unqualified
  * effects cover every specialty; explicit specialties match exactly. `*`
- * matches any name/specialty in its own field. Legacy "Name (Specialty)"
- * strings retain their specialty; a separate specialty field takes priority.
+ * matches any name/specialty in its own field. Current "Name/Specialty" and
+ * legacy "Name (Specialty)" strings retain their specialty; a separate
+ * specialty field takes priority.
  */
 export function skillBonusFor(
   skillName: string,
@@ -270,10 +402,10 @@ export function skillBonusFor(
 ): { total: number; sources: ReadonlyArray<ResolvedEffect> } {
   const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
   function split(name: string, specialty?: string | null) {
-    const match = name.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
+    const parsed = splitSkillReference(name);
     return {
-      name: normalize(match?.[1] ?? name),
-      specialty: normalize(specialty?.trim() || match?.[2] || ''),
+      name: normalize(parsed.name),
+      specialty: normalize(specialty?.trim() || parsed.specialization),
     };
   }
   const wanted = split(skillName, specialization);

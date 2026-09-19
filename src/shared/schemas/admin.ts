@@ -49,6 +49,7 @@ export const adminCampaignSummary = z.object({
   ownerEmail: email,
   memberCount: z.number().int().nonnegative(),
   characterCount: z.number().int().nonnegative(),
+  enforceAttributeCaps: z.boolean(),
   shareCharacterSheets: z.boolean(),
   createdAt: isoTimestamp,
 });
@@ -71,6 +72,7 @@ export const adminCampaignDetail = z.object({
   pointTarget: z.number().int().nullable(),
   disadvantageCap: z.number().int().nullable(),
   quirkCap: z.number().int().nullable(),
+  enforceAttributeCaps: z.boolean(),
   shareCharacterSheets: z.boolean(),
   createdAt: isoTimestamp,
   members: z.array(adminCampaignMember),

@@ -29,6 +29,44 @@ test('registers a new user and lands on the authenticated shell', async ({ page 
   await expect(page.getByRole('navigation')).toBeVisible();
 });
 
+test('roll history moves from Combat into the History tab and survives reload locally', async ({
+  page,
+}) => {
+  const email = `e2e-roll-history-${TIMESTAMP_SUFFIX()}@example.com`;
+
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Roll History QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill('Local Roller');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
+
+  await page.getByRole('button', { name: /^Dodge \d+$/ }).click();
+  const rollDialog = page.getByRole('dialog', { name: 'Roll Dodge' });
+  await rollDialog.getByRole('button', { name: 'Roll 3d6' }).click();
+  await rollDialog.getByRole('button', { name: 'Close' }).last().click();
+
+  const historyTab = page.locator('.panel-tab').filter({ hasText: /^History$/ });
+  await historyTab.click();
+  await expect(page.getByRole('tab', { name: 'Change history' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await page.getByRole('tab', { name: 'Roll history' }).click();
+  await expect(page.getByRole('list', { name: 'Roll history entries' })).toContainText('Dodge');
+  await expect(page.getByText(/saved on this device only and never synced/i)).toBeVisible();
+
+  await page.reload();
+  await historyTab.click();
+  await page.getByRole('tab', { name: 'Roll history' }).click();
+  await expect(page.getByRole('list', { name: 'Roll history entries' })).toContainText('Dodge');
+});
+
 test('campaign sub-menu stays inside a 320px viewport', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('/register');

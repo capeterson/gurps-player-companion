@@ -15,16 +15,23 @@ requirement — not optional documentation.**
   LLM) should read it before scanning the tree. The set is:
   - `overview.md` — product surface + codebase map + orientation notes.
   - `architecture.md` — stack, process model, request lifecycle, data model.
+  - `mcp-agent-access.md` — same-process MCP/OAuth subsystem and mandatory
+    raw-API parity acceptance criteria.
   - `offline-sync.md` — the local-first / outbox / cursor / WS system.
   - `campaign-content-sharing.md` — roles, invitations, the share gate /
     minimal view, and the YAML library.
   - `history-tracking.md` — the append-only audit log.
+  - `active-effects-skill-procedures.md` — active effect instances and declarative skill procedures.
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
     schema; a new JSON-typed field is incomplete without a schema and a
     catalog row.
 - **These docs describe *what exists*; this file (`AGENTS.md`) prescribes
   *what you must keep true*.** When they disagree with the code, the code is
   the truth and the spec is a bug — fix it.
+- When extending agent access, `mcp-agent-access.md`'s shared-handler,
+  exact API coverage/exclusion, schema, authorization, audit, sync, and CI parity
+  requirements are mandatory. Update mappings, tools, tests and specs together;
+  do not mark MCP complete until its release gates pass.
 - **Update the relevant spec in the same change** whenever you alter:
   user-facing features, the offline-sync architecture, campaign
   content-sharing behaviour, the history subsystem, the codebase layout, or
@@ -34,6 +41,17 @@ requirement — not optional documentation.**
 - **Adding a spec-worthy subsystem** (a new key area, not a small feature)
   means adding a new `docs/specs/*.md` and linking it from `overview.md`'s
   document map and this section.
+
+## Isolate Docker Compose per worktree
+
+An agent working in a Git worktree MUST create and use that worktree's own
+Docker Compose stack. Give it a stable, worktree-specific project name (for
+example with `docker compose -p <unique-worktree-name>`) so containers,
+networks, and named volumes are never shared with another agent's stack.
+Assign worktree-specific host ports as well, or omit host port publishing when
+the services are accessed only inside Compose. Never recreate, migrate, stop,
+or run tests in a stack belonging to another checkout; tear down only the exact
+project created for the current worktree.
 
 ## Interaction design rules
 
@@ -389,6 +407,25 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   to `http://localhost:3001` and Postgres to host port `5434` so it remains
   isolated from the other workspace.
 - Frontend HMR runs through the same Bun process via Vite middleware.
+
+## Pull requests
+
+- Before opening a PR, fetch the remote and update the branch against its
+  current merge target (normally `origin/main`). Resolve conflicts and rerun
+  the appropriate validation before pushing and creating the PR; do not rely
+  on a stale local target branch.
+- Browser automation is intentionally excluded from the per-PR GitHub CI job.
+  When authoring a PR that can affect browser or runtime behaviour, agents MUST
+  run the relevant Playwright coverage locally before handoff. Changes touching
+  delegated OAuth, MCP, offline convergence, the service worker, or production
+  serving MUST run `tests/e2e/mcp-oauth.spec.ts` with Chromium against both the
+  development server and the production build; use `MCP_E2E_START_SERVER=1`
+  and add `MCP_E2E_BUILT_SERVER=1` for the built pass.
+- Named image promotion is the mandatory remote browser gate. The promotion
+  workflow MUST run the delegated OAuth/MCP/offline Playwright acceptance test
+  against the selected source image before it creates a git tag, image version
+  aliases (including `latest`), or a GitHub Release. Do not bypass or reorder
+  that gate.
 
 ## Database backend
 

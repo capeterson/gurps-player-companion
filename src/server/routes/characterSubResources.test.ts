@@ -51,6 +51,73 @@ async function createCharacter(
 // ===================== TRAITS =====================
 
 describe('trait sub-resource CRUD', () => {
+  it('round-trips owned effects and accepts exact weapon bindings through sync', async () => {
+    const { accessToken } = await registerUser('trait-owned-effects');
+    const character = await createCharacter(accessToken);
+    const create = await app.request(`/api/v1/characters/${character.id}/traits`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        kind: 'advantage',
+        name: 'Weapon Mastery',
+        customEffects: [{ target: 'dx', value: 1, scaling: 'flat' }],
+      }),
+    });
+    expect(create.status).toBe(201);
+    const created = (await create.json()) as {
+      trait: { id: string; customEffects: unknown[] };
+      character: { effects: Array<{ target: string; value: number }> };
+    };
+    expect(created.trait.customEffects).toHaveLength(1);
+    expect(created.character.effects).toContainEqual(
+      expect.objectContaining({ target: 'dx', value: 1 }),
+    );
+
+    const inventoryItemId = crypto.randomUUID();
+    const customEffects = [
+      {
+        target: 'weapon_attack',
+        value: 2,
+        scaling: 'flat',
+        weaponSelector: { kind: 'inventory_item', inventoryItemId },
+      },
+    ];
+    const sync = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: crypto.randomUUID(),
+            entityClass: 'character_trait',
+            entityId: created.trait.id,
+            parentId: character.id,
+            command: 'patch',
+            fieldPath: 'customEffects',
+            attemptedValue: customEffects,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(sync.status).toBe(200);
+    expect((await sync.json()) as unknown).toMatchObject({ outcomes: [{ status: 'applied' }] });
+
+    const reload = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(accessToken),
+    });
+    expect(reload.status).toBe(200);
+    const detail = (await reload.json()) as {
+      traits: Array<{ customEffects: unknown[] }>;
+      effects: Array<{ target: string; weaponMatchStatus?: string }>;
+    };
+    expect(detail.traits[0]?.customEffects).toEqual(customEffects);
+    expect(detail.effects).toContainEqual(
+      expect.objectContaining({ target: 'weapon_attack', weaponMatchStatus: 'zero' }),
+    );
+  });
+
   it('persists level zero through REST and sync without granting a per-level bonus', async () => {
     const { accessToken } = await registerUser('trait-zero');
     const campaignResponse = await app.request('/api/v1/campaigns', {

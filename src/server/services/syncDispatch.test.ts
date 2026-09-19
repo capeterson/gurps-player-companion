@@ -150,17 +150,61 @@ async function registerUser(suffix: string) {
   return { accessToken: body.accessToken };
 }
 
-async function createCharacter(accessToken: string): Promise<{ id: string; revision: number }> {
+async function createCampaign(accessToken: string): Promise<{ id: string }> {
+  const res = await app.request('/api/v1/campaigns', {
+    method: 'POST',
+    headers: jsonHeaders(accessToken),
+    body: JSON.stringify({ name: `Sync caps campaign ${Date.now()}-${Math.random()}` }),
+  });
+  return (await res.json()) as { id: string };
+}
+
+async function createCharacter(
+  accessToken: string,
+  overrides: Record<string, unknown> = {},
+): Promise<{ id: string; revision: number }> {
   const res = await app.request('/api/v1/characters', {
     method: 'POST',
     headers: jsonHeaders(accessToken),
-    body: JSON.stringify({ name: `Sync dispatch test ${Date.now()}-${Math.random()}` }),
+    body: JSON.stringify({
+      name: `Sync dispatch test ${Date.now()}-${Math.random()}`,
+      ...overrides,
+    }),
   });
   const body = (await res.json()) as { id: string; revision: number };
   return body;
 }
 
 describe('POST /api/v1/sync/operations -- character field writability parity', () => {
+  it('rejects a field patch that exceeds an enabled campaign cap', async () => {
+    const { accessToken } = await registerUser('attribute-cap');
+    const campaign = await createCampaign(accessToken);
+    const character = await createCharacter(accessToken, { campaignId: campaign.id, iq: 18 });
+    const res = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: crypto.randomUUID(),
+            entityClass: 'character',
+            entityId: character.id,
+            command: 'patch',
+            fieldPath: 'willMod',
+            attemptedValue: 3,
+            baseRevision: character.revision,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcomes: Array<{ status: string; reason?: string }> };
+    expect(body.outcomes[0]?.status).toBe('rejected');
+    expect(body.outcomes[0]?.reason).toContain('Will');
+  });
+
   it('accepts a valid tempEffects array patch', async () => {
     const { accessToken } = await registerUser('temp-effects-ok');
     const character = await createCharacter(accessToken);

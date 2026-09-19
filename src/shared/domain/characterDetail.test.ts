@@ -112,6 +112,12 @@ describe('very high mana up-front spell costs', () => {
     expect(out.effectiveCost).toBe(0);
     expect(out.effectiveMaintenanceCost).toBeNull();
   });
+  it('applies declarative skill bonuses to spell level and energy discount', () => {
+    const base = buildSpellOut(spell, 12, 0, 'normal');
+    const talented = buildSpellOut(spell, 12, 0, 'normal', 2);
+    expect(talented.level).toBe((base.level ?? 0) + 2);
+    expect(talented.effectiveCost).toBeLessThanOrEqual(base.effectiveCost);
+  });
 });
 
 describe('character skill effect specialization', () => {
@@ -222,6 +228,7 @@ describe('character skill effect specialization', () => {
           ? {
               ...skill,
               points: 0,
+              techLevel: 9,
               defaults: [
                 { kind: 'skill' as const, name: 'Guns', specialization: 'Pistol', modifier: -2 },
               ],
@@ -230,6 +237,6 @@ describe('character skill effect specialization', () => {
       ),
     });
     // FAQ: Talent is applied after defaults and only to its listed skills.
-    expect(defaulted.skills.map((skill) => skill.effectiveLevel)).toEqual([14, 10]);
+    expect(defaulted.skills.map((skill) => skill.effectiveLevel)).toEqual([14, 9]);
   });
 });

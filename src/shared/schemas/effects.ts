@@ -40,22 +40,103 @@ export const EFFECT_TARGETS = [
   // flat adds to final ST-based thrust/swing dice, after temporary ST
   'damage_thrust',
   'damage_swing',
+  // item-aware weapon effects (require weaponSelector)
+  'weapon_attack',
+  'weapon_parry',
+  'weapon_block',
+  'weapon_damage',
+  'weapon_accuracy',
 ] as const;
 
-export const effectTarget = z.enum(EFFECT_TARGETS);
+export const effectTarget = z
+  .enum(EFFECT_TARGETS)
+  .describe(
+    'Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName.',
+  );
 export type EffectTarget = (typeof EFFECT_TARGETS)[number];
 
-export const effectScaling = z.enum(['flat', 'per_level']);
+export const effectScaling = z
+  .enum(['flat', 'per_level'])
+  .describe('flat applies once; per_level multiplies by the owning character trait level.');
 export type EffectScaling = z.infer<typeof effectScaling>;
+
+export const WEAPON_EFFECT_TARGETS = [
+  'weapon_attack',
+  'weapon_parry',
+  'weapon_block',
+  'weapon_damage',
+  'weapon_accuracy',
+] as const satisfies readonly EffectTarget[];
+
+export const weaponEffectTarget = z.enum(WEAPON_EFFECT_TARGETS);
+export type WeaponEffectTarget = z.infer<typeof weaponEffectTarget>;
+
+const modeName = z.string().trim().min(1).max(40).optional();
+
+/**
+ * Deterministic weapon binding. Portable definitions use semantic selectors;
+ * an owned/local declaration may instead bind one exact inventory row.
+ * Mechanical matching is always normalized exact matching -- never fuzzy.
+ */
+export const weaponSelector = z
+  .discriminatedUnion('kind', [
+    z
+      .object({ kind: z.literal('inventory_item'), inventoryItemId: z.string().uuid(), modeName })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('library_item'),
+        /** Same-campaign fast path. Name is the portable YAML/re-import fallback. */
+        libraryItemId: z.string().uuid().optional(),
+        libraryItemName: z.string().trim().min(1).max(160),
+        modeName,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('weapon_skill'),
+        skillName: z.string().trim().min(1).max(160),
+        skillSpecialty: z.string().trim().min(1).max(160).optional(),
+        modeName,
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('weapon_name'),
+        weaponName: z.string().trim().min(1).max(160),
+        modeName,
+      })
+      .strict(),
+  ])
+  .describe(
+    'Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block.',
+  );
+export type WeaponSelector = z.infer<typeof weaponSelector>;
 
 export const traitEffect = z
   .object({
     target: effectTarget,
-    value: z.number().int().min(-100).max(100),
+    value: z.number().int().min(-100).max(100).describe('Signed integer modifier.'),
     scaling: effectScaling.default('flat'),
-    skillName: z.string().min(1).max(160).optional(),
-    skillSpecialty: z.string().min(1).max(160).optional(),
-    hitLocation: z.string().min(1).max(40).optional(),
+    skillName: z
+      .string()
+      .min(1)
+      .max(160)
+      .optional()
+      .describe("Exact normalized skill name, or '*' wildcard, for a skill target."),
+    skillSpecialty: z
+      .string()
+      .min(1)
+      .max(160)
+      .optional()
+      .describe("Exact normalized specialty, or '*' wildcard; only valid with a skill target."),
+    hitLocation: z
+      .string()
+      .min(1)
+      .max(40)
+      .optional()
+      .describe('Optional exact DR hit-location scope; only valid for a DR target.'),
+    weaponSelector: weaponSelector.optional(),
     conditionGroup: z
       .string()
       .min(1)
@@ -94,6 +175,46 @@ export const traitEffect = z
         message: 'conditionLabel requires conditionGroup',
       });
     }
-  });
+    const weaponTarget = WEAPON_EFFECT_TARGETS.includes(eff.target as WeaponEffectTarget);
+    if (weaponTarget && !eff.weaponSelector) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['weaponSelector'],
+        message: `weaponSelector is required when target='${eff.target}'`,
+      });
+    }
+    if (!weaponTarget && eff.weaponSelector) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['weaponSelector'],
+        message: 'weaponSelector is only allowed for weapon targets',
+      });
+    }
+    if (
+      (eff.target === 'weapon_parry' || eff.target === 'weapon_block') &&
+      eff.weaponSelector?.modeName
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['weaponSelector', 'modeName'],
+        message: `${eff.target} applies to the item defense and cannot select an attack mode`,
+      });
+    }
+  })
+  .describe('A validated declarative character mechanic with source attribution at resolution.');
 
 export type TraitEffect = z.infer<typeof traitEffect>;
+
+/** Campaign/YAML declarations must remain portable between characters. */
+export const libraryTraitEffect = traitEffect
+  .superRefine((effect, ctx) => {
+    if (effect.weaponSelector?.kind === 'inventory_item') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['weaponSelector', 'kind'],
+        message: 'campaign-library effects cannot bind a character inventory item',
+      });
+    }
+  })
+  .describe('Portable trait/skill library mechanic; exact character inventory IDs are forbidden.');
+export type LibraryTraitEffect = z.infer<typeof libraryTraitEffect>;

@@ -7,6 +7,7 @@ import {
   armorCoversLocation,
   effectiveDrByLocation,
   innateDrCoversLocation,
+  layeredArmorDrContributions,
   naturalSkullDr,
   resolveArmorDb,
   resolveDr,
@@ -16,6 +17,7 @@ import {
   effectiveDrAgainstAttack,
   woundingMultiplier,
 } from '../../../../../shared/domain/injuryCalc.ts';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
 import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
@@ -31,6 +33,39 @@ export interface DrSummaryCardProps {
   facing?: ArmorFacing | undefined;
   onLocationChange?: (location: string) => void;
   onFacingChange?: (facing: ArmorFacing | undefined) => void;
+}
+
+interface ArmorDrEnchantmentLine {
+  sourceName: string;
+  value: number;
+  stackingKey: string | null;
+  status: 'applied' | 'winning' | 'suppressed' | 'inactive';
+  winnerName?: string;
+}
+
+function enchantmentLabel(itemName: string, sourceName: string): string {
+  const prefix = `${itemName}: `;
+  return sourceName.startsWith(prefix) ? sourceName.slice(prefix.length) : sourceName;
+}
+
+export function armorDrEnchantmentLines(
+  item: CharacterDetail['inventory'][number],
+  layers: readonly CharacterDetail['inventory'][number][],
+  location: string,
+): ArmorDrEnchantmentLine[] {
+  return layeredArmorDrContributions(layers, location)
+    .filter((line) => line.itemKey === item.id)
+    .map((line) => ({
+      sourceName: enchantmentLabel(item.name, line.sourceName),
+      value: line.value,
+      stackingKey: line.stackingKey,
+      status: line.status,
+      ...(line.winnerName ? { winnerName: enchantmentLabel(item.name, line.winnerName) } : {}),
+    }));
+}
+
+function signed(value: number): string {
+  return value >= 0 ? `+${value}` : String(value);
 }
 
 export function DrSummaryCard({
@@ -218,14 +253,99 @@ export function DrSummaryCard({
             <div>
               <h3 className="label-eyebrow mb-2">Protection before penetration</h3>
               <ul className="divide-y divide-base-300 text-sm" aria-label="Protection layers">
-                {layers.map((item) => (
-                  <li className="flex justify-between gap-3 py-2" key={item.id}>
-                    <span>{item.name}</span>
-                    <span className="num shrink-0">
-                      {resolveDr(type, aggregateDrByLocation([item]).get(location))} DR
-                    </span>
-                  </li>
-                ))}
+                {layers.map((item) => {
+                  const enchantments = armorDrEnchantmentLines(item, layers, location);
+                  const baseArmor =
+                    item.enchantmentBreakdown !== undefined ? item.baseArmor : undefined;
+                  const baseDr = baseArmor
+                    ? resolveDr(
+                        type,
+                        aggregateDrByLocation([
+                          { equipped: true, isArmor: true, armor: baseArmor },
+                        ]).get(location),
+                      )
+                    : null;
+                  const appliedEnchantmentDr = enchantments
+                    .filter((entry) => entry.status === 'applied' || entry.status === 'winning')
+                    .reduce((sum, entry) => sum + entry.value, 0);
+                  const floorAdjustment =
+                    baseDr === null ? 0 : Math.max(0, -(baseDr + appliedEnchantmentDr));
+                  const layerDr =
+                    baseDr === null
+                      ? resolveDr(type, aggregateDrByLocation([item]).get(location))
+                      : Math.max(0, baseDr + appliedEnchantmentDr);
+                  return (
+                    <li className="py-2" key={item.id}>
+                      <div className="flex justify-between gap-3">
+                        <span>{item.name}</span>
+                        <span className="num shrink-0">{layerDr} DR</span>
+                      </div>
+                      {enchantments.length > 0 && (
+                        <ul
+                          className="ml-3 mt-1 space-y-1 border-l border-base-300 pl-3 text-xs"
+                          aria-label={`${item.name} DR breakdown`}
+                        >
+                          {baseDr === null ? (
+                            <li className="flex justify-between gap-3 text-muted">
+                              <span>Base armor unavailable</span>
+                            </li>
+                          ) : (
+                            <li className="flex justify-between gap-3 text-muted">
+                              <span>Base armor</span>
+                              <span className="num shrink-0">{baseDr} DR</span>
+                            </li>
+                          )}
+                          {enchantments.map((entry, index) => (
+                            <li
+                              key={`${entry.sourceName}:${entry.stackingKey ?? 'stack'}:${index}`}
+                              className={`flex justify-between gap-3 ${
+                                entry.status === 'suppressed' || entry.status === 'inactive'
+                                  ? 'text-muted'
+                                  : ''
+                              }`}
+                            >
+                              <span>
+                                <span
+                                  className={
+                                    entry.status === 'suppressed' || entry.status === 'inactive'
+                                      ? 'line-through'
+                                      : undefined
+                                  }
+                                >
+                                  {entry.sourceName}
+                                </span>
+                                {entry.status === 'suppressed' && (
+                                  <small className="ml-2">
+                                    suppressed
+                                    {entry.winnerName ? ` — ${entry.winnerName} wins` : ''}
+                                  </small>
+                                )}
+                                {entry.status === 'inactive' && (
+                                  <small className="ml-2">inactive</small>
+                                )}
+                              </span>
+                              <span
+                                className={`num shrink-0 ${
+                                  entry.status === 'suppressed' || entry.status === 'inactive'
+                                    ? 'line-through'
+                                    : ''
+                                }`}
+                              >
+                                {signed(entry.value)} DR
+                              </span>
+                            </li>
+                          ))}
+                          {floorAdjustment > 0 && (
+                            <li className="flex justify-between gap-3 text-muted">
+                              <span>Minimum DR floor</span>
+                              <span className="num shrink-0">+{floorAdjustment} DR</span>
+                            </li>
+                          )}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
                 {innate !== 0 && (
                   <li className="flex justify-between gap-3 py-2">
                     <span>Active innate DR</span>
@@ -261,8 +381,11 @@ export function DrSummaryCard({
           )}
         </div>
       </div>
-      <details className="border-t border-base-300 pt-3">
-        <summary className="cursor-pointer text-sm text-muted">All locations and DR types</summary>
+      <FoldSection
+        preferenceKey={`${character.id}:all-location-dr`}
+        title="All locations and DR types"
+        defaultOpen={false}
+      >
         <ul
           className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-sm"
           aria-label="All location DR"
@@ -286,7 +409,7 @@ export function DrSummaryCard({
               );
             })}
         </ul>
-      </details>
+      </FoldSection>
       {damageOpen && bumpHp && hpMax != null && (
         <IncomingDamageDialog
           open

@@ -18,6 +18,7 @@ import {
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
+import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
 import {
@@ -26,6 +27,13 @@ import {
   readAttackTablePreferences,
   saveAttackTablePreferences,
 } from './attackTablePreferences.ts';
+import {
+  ModifierBreakdown,
+  WeaponEffectDiagnostics,
+  effectTotal,
+  skillEffectsForRow,
+  weaponEffectsForRow,
+} from './weaponEffectView.tsx';
 
 function capitalize(s: string): string {
   return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
@@ -126,6 +134,7 @@ export function AttacksCard({ character, openRoll }: AttacksCardProps) {
 }
 
 function AttackTable({ character, openRoll }: AttacksCardProps) {
+  const effects = character.effects ?? [];
   const [preferences, setPreferences] = useState(() => readAttackTablePreferences(character.id));
   const [saveFailed, setSaveFailed] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -238,20 +247,19 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
 
   if (weapons.length === 0) {
     return (
-      <section className="card space-y-2 p-5">
-        <p className="label-eyebrow">Attacks</p>
+      <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks">
         <p className="text-sm text-base-content/60">
           No equipped weapons — equip items in the Inventory tab.
         </p>
-      </section>
+      </FoldSection>
     );
   }
 
   return (
-    <section className="card min-w-0 space-y-3 p-3 sm:p-5">
+    <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
         <p className="label-eyebrow">
-          Attacks <span className="text-base-content/50">({weapons.length})</span>
+          <span className="text-base-content/50">{weapons.length} equipped weapons</span>
         </p>
         <label className="flex items-center gap-2 text-xs text-base-content/60">
           Order
@@ -284,6 +292,12 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
           ST-based damage is unavailable until linked library effects load.
         </p>
       )}
+      <WeaponEffectDiagnostics
+        effects={effects.filter((effect) =>
+          ['weapon_attack', 'weapon_damage', 'weapon_accuracy'].includes(effect.target),
+        )}
+        inventory={character.inventory}
+      />
       <div className="overflow-x-auto">
         <table className="table table-sm w-full">
           <caption className="sr-only">
@@ -331,15 +345,20 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
             // ahead of hit locations. Single-select like every preset —
             // range + location stacking composes via the ± steppers.
             const ranged = wd.ranged;
-            const presets: readonly RollPreset[] = ranged
-              ? [
-                  ...(ranged.acc != null
-                    ? [{ label: `Aim (+${ranged.acc})`, mod: ranged.acc }]
-                    : []),
-                  ...RANGE_PRESETS,
-                  ...locationPresets,
-                ]
-              : locationPresets;
+            const primaryAttackEffects = weaponEffectsForRow(
+              effects,
+              w.id,
+              'weapon_attack',
+              'primary',
+            );
+            const primaryAccuracyEffects = weaponEffectsForRow(
+              effects,
+              w.id,
+              'weapon_accuracy',
+              'primary',
+            );
+            const skillEffects =
+              resolution.kind === 'matched' ? skillEffectsForRow(effects, resolution.name) : [];
 
             const rows = parsedByLine.flatMap(({ line, modes }) =>
               (modes.length ? modes : [null]).map((mode, index) => ({
@@ -374,9 +393,64 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                 }}
               >
                 {rows.map(({ line, mode, key }, rowIndex) => {
+                  const modeName = line.modeName ?? 'primary';
+                  const damageEffects = weaponEffectsForRow(
+                    effects,
+                    w.id,
+                    'weapon_damage',
+                    modeName,
+                  );
+                  const attackEffects = weaponEffectsForRow(
+                    effects,
+                    w.id,
+                    'weapon_attack',
+                    modeName,
+                  );
+                  const accuracyEffects = weaponEffectsForRow(
+                    effects,
+                    w.id,
+                    'weapon_accuracy',
+                    modeName,
+                  );
+                  const accuracy = (ranged?.acc ?? 0) + effectTotal(accuracyEffects);
+                  const presets: readonly RollPreset[] = ranged
+                    ? [
+                        ...(ranged.acc != null || accuracyEffects.length > 0
+                          ? [
+                              {
+                                label: `Aim (${accuracy >= 0 ? '+' : ''}${accuracy})`,
+                                mod: accuracy,
+                              },
+                            ]
+                          : []),
+                        ...RANGE_PRESETS,
+                        ...locationPresets,
+                      ]
+                    : locationPresets;
+                  const firstOfLine = rows[rowIndex - 1]?.line.key !== line.key;
+                  const showSkill =
+                    rowIndex === 0 ||
+                    (firstOfLine &&
+                      line.modeName &&
+                      (attackEffects.length > 0 ||
+                        accuracyEffects.length > 0 ||
+                        primaryAttackEffects.length > 0 ||
+                        primaryAccuracyEffects.length > 0));
+                  const attackLabel =
+                    resolution.kind === 'matched'
+                      ? `${resolution.name}${line.modeName ? ` · ${line.modeName}` : ''}`
+                      : '';
+                  const finalTarget =
+                    resolution.kind === 'matched'
+                      ? resolution.level - stPenalty + effectTotal(attackEffects)
+                      : 0;
                   const resolved = mode ? resolveDamage(mode, thrust, swing) : null;
-                  const dice = resolved ? formatDamageDice(resolved.dice) : null;
-                  const divisor = resolved?.armorDivisor ? ` (${resolved.armorDivisor})` : '';
+                  const finalDice = resolved
+                    ? { ...resolved.dice, adds: resolved.dice.adds + effectTotal(damageEffects) }
+                    : null;
+                  const dice = finalDice ? formatDamageDice(finalDice) : null;
+                  const effectiveDivisor = w.effectiveArmorDivisor ?? resolved?.armorDivisor;
+                  const divisor = effectiveDivisor ? ` (${effectiveDivisor})` : '';
                   return (
                     <tr key={key} className="border-0">
                       {rowIndex === 0 && preferences.sort === 'custom' && (
@@ -409,69 +483,81 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                         </td>
                       )}
                       {rowIndex === 0 && (
-                        <>
-                          <th
-                            scope="rowgroup"
-                            rowSpan={rows.length}
-                            className="min-w-32 max-w-64 align-top font-normal"
-                          >
-                            <span className="block font-medium">{w.name}</span>
-                            {stPenalty > 0 && (
-                              <span className="badge badge-warning badge-outline badge-xs mt-1 whitespace-nowrap">
-                                ST {wd.stRequired} (−{stPenalty})
-                              </span>
-                            )}
-                            {ranged && rangedStatLine(ranged) !== '' && (
-                              <p className="num mt-1 text-[11px] text-base-content/50">
-                                {rangedStatLine(ranged)}
-                              </p>
-                            )}
-                          </th>
-                          <td rowSpan={rows.length} className="align-top">
-                            {resolution.kind === 'matched' ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="btn btn-sm h-auto min-h-8 gap-2 px-2 py-1 text-left font-normal"
-                                  onClick={() =>
-                                    openRoll({
-                                      label: resolution.name,
-                                      baseTarget: resolution.level - stPenalty,
-                                      presets,
-                                    })
-                                  }
-                                >
-                                  <span className="max-w-40 text-xs">{resolution.name}</span>
-                                  <span className="num text-base font-bold">
-                                    {resolution.level - stPenalty}
-                                  </span>
-                                </button>
-                                {stPenalty > 0 && (
-                                  <span className="mt-1 block text-[11px] text-base-content/50">
-                                    {resolution.level} − {stPenalty} ST
-                                  </span>
-                                )}
-                              </>
-                            ) : resolution.kind === 'missing' ? (
-                              <p className="max-w-44 text-xs text-base-content/50">
-                                Skill '{resolution.skillName}' not on sheet — add it in the Skills
-                                tab.
-                              </p>
-                            ) : (
-                              <p className="text-xs text-base-content/50">
-                                No matching skill on sheet.
-                              </p>
-                            )}
-                          </td>
-                        </>
+                        <th
+                          scope="rowgroup"
+                          rowSpan={rows.length}
+                          className="min-w-32 max-w-64 align-top font-normal"
+                        >
+                          <span className="block font-medium">{w.name}</span>
+                          {stPenalty > 0 && (
+                            <span className="badge badge-warning badge-outline badge-xs mt-1 whitespace-nowrap">
+                              ST {wd.stRequired} (−{stPenalty})
+                            </span>
+                          )}
+                          {ranged && rangedStatLine(ranged) !== '' && (
+                            <p className="num mt-1 text-[11px] text-base-content/50">
+                              {rangedStatLine(ranged)}
+                            </p>
+                          )}
+                        </th>
                       )}
+                      <td className="align-top">
+                        {showSkill &&
+                          (resolution.kind === 'matched' ? (
+                            <>
+                              <button
+                                type="button"
+                                className="btn btn-sm h-auto min-h-8 gap-2 px-2 py-1 text-left font-normal"
+                                onClick={() =>
+                                  openRoll({
+                                    label: attackLabel,
+                                    baseTarget: finalTarget,
+                                    presets,
+                                  })
+                                }
+                              >
+                                <span className="max-w-40 text-xs">{attackLabel}</span>
+                                <span className="num text-base font-bold">{finalTarget}</span>
+                              </button>
+                              {stPenalty > 0 && (
+                                <span className="mt-1 block text-[11px] text-base-content/50">
+                                  {resolution.level} − {stPenalty} ST
+                                </span>
+                              )}
+                              <ModifierBreakdown
+                                baseLabel="Skill after ST"
+                                baseValue={resolution.level - stPenalty - effectTotal(skillEffects)}
+                                globalEffects={skillEffects}
+                                weaponEffects={attackEffects}
+                                finalValue={finalTarget}
+                              />
+                              {ranged && (
+                                <ModifierBreakdown
+                                  baseLabel="Accuracy"
+                                  baseValue={ranged.acc ?? 0}
+                                  weaponEffects={accuracyEffects}
+                                  finalValue={accuracy}
+                                />
+                              )}
+                            </>
+                          ) : resolution.kind === 'missing' ? (
+                            <p className="max-w-44 text-xs text-base-content/50">
+                              Skill '{resolution.skillName}' not on sheet — add it in the Skills
+                              tab.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-base-content/50">
+                              No matching skill on sheet.
+                            </p>
+                          ))}
+                      </td>
                       <td className="whitespace-nowrap">
                         {line.modeName && (
                           <span className="mb-0.5 block text-[10px] text-base-content/50">
                             {line.modeName}
                           </span>
                         )}
-                        {resolved ? (
+                        {resolved && finalDice ? (
                           <button
                             type="button"
                             className="btn btn-sm num h-8 min-h-8 px-2"
@@ -483,9 +569,10 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                                   : `${w.name} damage`,
                                 baseTarget: 0,
                                 damage: {
-                                  dice: resolved.dice,
+                                  dice: finalDice,
                                   damageType: resolved.type,
-                                  armorDivisor: resolved.armorDivisor,
+                                  armorDivisor:
+                                    effectiveDivisor == null ? null : String(effectiveDivisor),
                                 },
                               })
                             }
@@ -497,6 +584,14 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                           <span className="text-xs text-base-content/60">
                             {mode?.raw ?? line.damage ?? '—'}
                           </span>
+                        )}
+                        {resolved && finalDice && (
+                          <ModifierBreakdown
+                            baseLabel="Parsed damage"
+                            baseValue={formatDamageDice(resolved.dice)}
+                            weaponEffects={damageEffects}
+                            finalValue={formatDamageDice(finalDice)}
+                          />
                         )}
                       </td>
                       <td className="num text-xs text-base-content/70">{mode?.type ?? '—'}</td>
@@ -511,6 +606,6 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
           })}
         </table>
       </div>
-    </section>
+    </FoldSection>
   );
 }

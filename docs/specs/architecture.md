@@ -13,22 +13,68 @@ whose `startServer` factory is also used by real HTTP/WebSocket tests)
 serves everything:
 
 - the HTTP JSON API under `/api/v1/*`,
+- OAuth metadata, authorization, token, and revocation under `/.well-known/*`
+  and `/oauth/*`,
+- MCP 2025-11-25 Streamable HTTP at `/mcp`,
 - the WebSocket push channel at `/api/v1/sync/ws`,
 - the OpenAPI document at `/api/v1/openapi.json` (non-production only),
 - and, in production, the built React client + SPA fallback (`static.ts`).
 
 Do **not** split this into separate API/web services (`AGENTS.md` — "One
 process"). `createApp()` in `src/server/app.ts` composes it: CORS (if
-configured) → the per-resource sub-routers mounted under `/api/v1` → the WS
+configured) → OAuth and the per-resource sub-routers → the WS
 handler (registered *before* `syncRouter` so its `requireActiveUser` guard
-doesn't reject the token-in-query handshake) → OpenAPI doc → error handler →
+doesn't reject the token-in-query handshake) → raw bounded MCP transport →
+OpenAPI doc → error handler →
 static/SPA fallback (last, so it never shadows `/api/*`).
+
+Every request receives a server-generated UUID in `X-Request-ID`; incoming
+values are never trusted. Unhandled server failures log that request ID, the
+verified user ID when authentication already resolved, the method, and the
+pathname. The typed client preserves response-header request IDs on `ApiError`
+without changing REST/MCP JSON-body parity. React Router uses the app-styled
+`AppErrorPage` for unmatched routes and render/navigation failures; it shows a
+client error reference, the server request ID when the error has one, and the
+locally available current-user ID. Raw error details remain in the correlated browser
+log rather than being rendered to the player.
+
+The static handler marks `sw.js`, its registration bootstrap, the manifest, and
+both HTML entrypoints `no-store` for browsers and CDNs; content-hashed assets
+remain cacheable. The service worker's navigation fallback excludes `/api/*`,
+`/admin/*`, `/mcp`, `/.well-known/*`, and the OAuth protocol endpoints. This is
+a routing boundary as well as an offline policy: a stale app shell must never
+turn an OAuth authorization request or MCP discovery request into a React route.
 
 Deployment is Docker Compose (`docker-compose.yml` for prod; `.dev.yml` for
 dev; unraid variants included). Three services: `db` (Postgres 18), a one-shot
 `migrate`, and `app`. `app` waits for `migrate` to exit 0. In dev, Vite (via
 `@hono/vite-dev-server`) owns the SPA and HMR; the same Bun process serves the
 Hono API on the same port — see `dev-entry.ts` and `vite.config.ts`.
+
+## MCP and delegated authorization
+
+[MCP agent access](mcp-agent-access.md) defines the `/mcp` Streamable HTTP
+adapter and OAuth authorization server in this same Bun process. The SDK's
+web-standard stateless transport negotiates MCP 2025-11-25. An in-process
+executor sends a Request through the same OpenAPI handler graph; a private
+object-identity capability supplies the trusted OAuth actor, so no token is
+forwarded and external requests cannot inject one. App JWTs/API keys remain
+distinct from audience-bound, scoped, revocable OAuth credentials.
+
+Authorization-server discovery advertises Client ID Metadata Documents and a
+Dynamic Client Registration endpoint. CIMD metadata retrieval pins a public DNS
+address for an HTTPS-only, no-redirect, size/time-bounded request; DCR creates
+public clients only and issues no secret. Operator-defined `OAUTH_CLIENTS` are an
+optional compatibility path and do not disable self-registered clients.
+
+Migration 0042 stores clients, grants, one-time codes, hashed access/refresh
+tokens, and mutation idempotency outcomes. The outer idempotency transaction
+and nested `withAudit` savepoints commit writes, cached outcomes, history, and
+post-commit effects together. Audit context includes actor, OAuth client, and
+grant. `docs/mcp-tools.json` and `mcp:check` guard exact route coverage and live
+tool schema/catalog drift.
+Migration 0044 records whether a client is operator-configured, CIMD-resolved,
+or dynamically registered and stores CIMD cache expiry.
 
 ## Stack
 
@@ -66,6 +112,11 @@ lives in the **page** orchestrator, not the service worker — see below.)
   - `constants/` — GURPS reference data (attributes, skills, traits, combat,
     hit locations, magic).
   - `yaml/library.ts` — the round-trippable campaign-library YAML codec.
+  - `domain/traitEffects.ts` — the pure shared resolver for global, skill, and
+    deterministic item-aware weapon effects. Server and Dexie-built character
+    details use this same path and annotate weapon selectors with zero/one/multiple
+    equipped-row matches for UI diagnostics. It merges immutable owned library
+    declarations with the character trait's user-authored `customEffects`.
   - `history/summarize.ts` — shared history one-liner formatter.
 - **`src/server/`** — the Bun process (routes, auth, Drizzle, services, DB,
   OpenAPI).
@@ -127,7 +178,8 @@ newer one still gets through.
    bearer token — either a JWT access token or a `gpc_`-prefixed API key — into
    `c.get('user')`, and rejects suspended users. The WS channel authenticates
    via `?token=` query string because the browser WebSocket API can't set
-   headers.
+   headers. `/mcp` resolves a scoped, audience-bound OAuth access token and
+   supplies the same actor through a private Request identity capability.
 3. **Authorization.** Centralized helpers in `auth/permissions.ts`
    (`loadCampaignOr403`, `requireCampaignOwner/Admin/Member`,
    `loadCharacterOr403`, `assertWrite`, `requireSuperuser`) are the single
@@ -136,11 +188,14 @@ newer one still gets through.
 4. **Write path + audit.** All DB writes run inside
    `withAudit(actorId, batchId, fn)` (`db/auditContext.ts`), which opens a
    transaction and sets transaction-local `app.actor_id` / `app.batch_id` GUCs
-   so DB triggers can attribute the change. Character writes funnel through the
-   single chokepoint `dispatchOperation()` in `services/syncDispatch.ts`;
-   campaign writes go through their REST routes. Both wrap in `withAudit`.
-5. **Response / propagation.** Sync writes emit WebSocket `sync_invalidate`
-   nudges via `services/wsBus.ts` so other viewers pull sooner.
+   so DB triggers can attribute the change. Sync writes use `dispatchOperation()` in `services/syncDispatch.ts`;
+   character and campaign REST routes also write using shared services and
+   their own handlers. Both paths wrap in `withAudit`.
+   Delegated mutations add a durable idempotency reservation and response in
+   the same outer transaction and set OAuth client/grant audit provenance.
+5. **Response / propagation.** Shared mutation middleware takes pre/post access
+   snapshots and emits post-commit WebSocket `sync_invalidate` nudges for REST
+   and delegated writes so every affected viewer pulls sooner.
 
 ## Data model (Postgres 18)
 
@@ -191,9 +246,21 @@ Tables (grouped):
 - **Campaign content**: `adventure_log_entries`, `campaign_library_traits`,
   `campaign_library_skills`, `campaign_library_spells`,
   `campaign_library_items`, `campaign_library_languages`,
-  `campaign_library_techniques`, `campaign_library_styles`, plus
+  `campaign_library_techniques`, `campaign_library_styles`,
+  `campaign_library_enchantments`, plus
   online-only live-session `encounters`, `encounter_combatants`, and
   `encounter_effects`.
+  `campaign_library_skills.specialization_policy` is JSONB validated by the
+  shared discriminated-union schema; it stores free-form/catalog requirements
+  and per-specialty rule overrides.
+  Skill definitions also persist validated JSONB TL policies, recursive
+  prerequisite expressions, defaults with three-valued conditions, and
+  natural-name group/tag selectors. `domain/skillRules.ts` is the pure shared
+  evaluator used by authoritative REST/sync writes and offline character detail.
+  Enchantment definitions persist typed applicability, effect/level declarations,
+  tags, and stacking policy. Item references carry the live definition UUID plus
+  a revisioned owned snapshot; `domain/itemEnchantments.ts` resolves that snapshot
+  identically in server and browser character-detail builds.
 - **Sync/audit infra**: `entity_tombstones` (deletes for cursor backfill),
   `entity_history` (append-only audit log).
 
@@ -255,6 +322,13 @@ Key PG18 / trigger machinery, layered by migration:
   (**server + shared only**) + `openapi:check` (contract drift). It does **not**
   run the client vitest or Playwright suites — run those separately for client
   changes. This is the baseline gate before finishing a change.
+- Per-PR GitHub CI runs lint, typechecking, server/shared tests, client tests,
+  contract drift checks, and the production build; it deliberately does not
+  install Playwright or a browser. PR authors run relevant browser automation
+  locally. The heavyweight delegated OAuth/MCP/offline Chromium acceptance is a
+  mandatory named-image promotion gate: it runs against the selected source
+  image and must pass before any version tag, image alias, or GitHub Release is
+  created.
 - **Guard tests** enforce the extension invariants: `historyTriggers.test.ts`
   (every syncable table has a history trigger), `auditContext.test.ts` (no bare
   `getDb().insert/update/delete` in mutating route files). A forgotten step in
@@ -266,3 +340,12 @@ Key PG18 / trigger machinery, layered by migration:
   origins, Resend key, environment). `.env.example` documents the surface.
 - Seed: `bun run db:seed` (`src/server/db/seed.ts`) creates the idempotent
   "Sample" campaign and imports `bootstrap/sample_library.yaml`.
+
+## Active effects and skill procedures
+
+Campaign active-effect definitions use the generic library factory and an audited
+Postgres table. Character instances use the root `active_effects` JSONB field and
+its existing outbox/history lifecycle; validated read/modify/write transactions
+retain concurrent local gestures. Skill procedures are JSONB on library skills and
+part of their owned mechanics snapshots. All calculation is shared pure TypeScript.
+See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).

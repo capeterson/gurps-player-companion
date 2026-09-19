@@ -75,6 +75,8 @@ export function characterInsertValues(
     speedQuarterMod: body.speedQuarterMod,
     moveMod: body.moveMod,
     tempEffects: body.tempEffects ?? [],
+    activeEffects: body.activeEffects ?? [],
+    activeConditionGroups: body.activeConditionGroups ?? [],
   };
 }
 
@@ -94,6 +96,7 @@ export function traitInsertValues(
     notes: body.notes ?? null,
     modifiers: body.modifiers ?? [],
     libraryTraitId: body.libraryTraitId ?? null,
+    customEffects: body.customEffects ?? [],
   };
 }
 
@@ -111,9 +114,9 @@ export function skillInsertValues(
     points: body.points ?? 1,
     techLevel: body.techLevel ?? null,
     specialization: body.specialization ?? null,
-    notes: body.notes ?? null,
+    ...(body.notes !== undefined ? { notes: body.notes } : {}),
     librarySkillId: body.librarySkillId ?? null,
-    defaults: body.defaults ?? null,
+    ...(body.defaults !== undefined ? { defaults: body.defaults } : {}),
   };
 }
 

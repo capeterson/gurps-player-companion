@@ -43,6 +43,7 @@ import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
   apiKeys,
+  oauthGrants,
   passkeyCredentials,
   passwordResetTokens,
   refreshTokens,
@@ -621,6 +622,10 @@ router.openapi(
       await tx
         .delete(passwordResetTokens)
         .where(and(eq(passwordResetTokens.userId, user.id), isNull(passwordResetTokens.usedAt)));
+      await tx
+        .update(oauthGrants)
+        .set({ revokedAt: now, updatedAt: now })
+        .where(and(eq(oauthGrants.userId, user.id), isNull(oauthGrants.revokedAt)));
     });
     return c.body(null, 204);
   },
@@ -640,9 +645,7 @@ router.openapi(
     },
   }),
   async (c) => {
-    const auth = c.req.header('authorization');
-    const principal = await resolveAuthHeader(auth);
-    if (!principal) throw new HTTPException(401, { message: 'unauthorized' });
+    const principal = c.get('user');
     const rows = await getDb().select().from(users).where(eq(users.id, principal.id));
     const user = rows[0];
     if (!user) throw new HTTPException(401, { message: 'unknown_user' });
@@ -792,6 +795,10 @@ router.openapi(
         .set({ revokedAt: now, updatedAt: now })
         .where(and(eq(apiKeys.userId, token.userId), isNull(apiKeys.revokedAt)));
       await tx.delete(passkeyCredentials).where(eq(passkeyCredentials.userId, token.userId));
+      await tx
+        .update(oauthGrants)
+        .set({ revokedAt: now, updatedAt: now })
+        .where(and(eq(oauthGrants.userId, token.userId), isNull(oauthGrants.revokedAt)));
       return token.userId;
     });
 

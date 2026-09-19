@@ -96,7 +96,8 @@ describe('resolveDefaultSkillLevel', () => {
     expect(resolveDefaultSkillLevel('  Broadsword  ', skills)).toBe(14);
   });
 
-  it('matches the "Name (Specialization)" display form', () => {
+  it('matches current and legacy specialization-qualified forms', () => {
+    expect(resolveDefaultSkillLevel('Savoir-Faire/Dojo', skills)).toBe(11);
     expect(resolveDefaultSkillLevel('Savoir-Faire (Dojo)', skills)).toBe(11);
   });
 
@@ -105,7 +106,7 @@ describe('resolveDefaultSkillLevel', () => {
   });
 
   it('still targets one specialization exactly when named', () => {
-    expect(resolveDefaultSkillLevel('Knife (Thrown)', skills)).toBe(13);
+    expect(resolveDefaultSkillLevel('Knife/Thrown', skills)).toBe(13);
   });
 
   it('skips skills with no usable level (0-point Very Hard)', () => {

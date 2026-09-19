@@ -6,10 +6,12 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
+import { AppErrorPage } from './components/AppErrorPage.tsx';
 import { SwUpdatePrompt } from './components/SwUpdatePrompt.tsx';
 import { AboutPage } from './features/about/AboutPage.tsx';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
+import { OAuthConsentPage } from './features/auth/OAuthConsentPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
@@ -28,6 +30,7 @@ import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessi
 import { applyTheme, readStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
+import { RequireSessionOnly } from './routes/RequireSessionOnly.tsx';
 import './styles/theme.css';
 
 applyTheme(readStoredTheme());
@@ -50,29 +53,38 @@ window.addEventListener('contextmenu', (e) => {
 const queryClient = createSessionQueryClient();
 
 const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
-  { path: '/forgot-password', element: <ForgotPasswordPage /> },
-  { path: '/reset-password', element: <ResetPasswordPage /> },
-  { path: '/suspended', element: <SuspendedPage /> },
   {
-    element: <RequireAuth />,
+    errorElement: <AppErrorPage />,
     children: [
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
+      { path: '/suspended', element: <SuspendedPage /> },
       {
-        element: <App />,
+        element: <RequireSessionOnly />,
+        children: [{ path: '/oauth/consent', element: <OAuthConsentPage /> }],
+      },
+      {
+        element: <RequireAuth />,
         children: [
-          { path: '/', element: <HomePage /> },
-          { path: '/characters', element: <CharactersPage /> },
-          { path: '/characters/:id', element: <CharacterSheetPage /> },
-          { path: '/campaigns', element: <CampaignsPage /> },
-          { path: '/campaigns/:id', element: <CampaignDetailPage /> },
-          { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },
-          { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
-          { path: '/campaigns/:id/encounters/:encounterId', element: <EncounterPage /> },
-          { path: '/log', element: <LogPage /> },
-          { path: '/library', element: <LibraryPage /> },
-          { path: '/about', element: <AboutPage /> },
-          { path: '/settings', element: <SettingsPage /> },
+          {
+            element: <App />,
+            children: [
+              { path: '/', element: <HomePage /> },
+              { path: '/characters', element: <CharactersPage /> },
+              { path: '/characters/:id', element: <CharacterSheetPage /> },
+              { path: '/campaigns', element: <CampaignsPage /> },
+              { path: '/campaigns/:id', element: <CampaignDetailPage /> },
+              { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },
+              { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
+              { path: '/campaigns/:id/encounters/:encounterId', element: <EncounterPage /> },
+              { path: '/log', element: <LogPage /> },
+              { path: '/library', element: <LibraryPage /> },
+              { path: '/about', element: <AboutPage /> },
+              { path: '/settings', element: <SettingsPage /> },
+            ],
+          },
         ],
       },
     ],

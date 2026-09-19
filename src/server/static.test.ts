@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { resolve } from 'node:path';
-import { safeJoin } from './static.ts';
+import { safeJoin, shouldRevalidateStaticPath } from './static.ts';
 
 const BASE = resolve('/srv/dist/client');
 
@@ -36,5 +36,20 @@ describe('safeJoin', () => {
   it('rejects malformed percent-encoding', () => {
     // %ZZ is not valid percent-encoding -> decodeURIComponent throws.
     expect(safeJoin(BASE, '/%ZZ')).toBeNull();
+  });
+});
+
+describe('static cache policy', () => {
+  it('forces mutable worker and app-shell entrypoints to revalidate', () => {
+    expect(shouldRevalidateStaticPath('/sw.js')).toBe(true);
+    expect(shouldRevalidateStaticPath('/registerSW.js')).toBe(true);
+    expect(shouldRevalidateStaticPath('/manifest.webmanifest')).toBe(true);
+    expect(shouldRevalidateStaticPath('/index.html')).toBe(true);
+    expect(shouldRevalidateStaticPath('/admin.html')).toBe(true);
+  });
+
+  it('leaves content-hashed assets cacheable', () => {
+    expect(shouldRevalidateStaticPath('/assets/main-QpTixWqe.js')).toBe(false);
+    expect(shouldRevalidateStaticPath('/icon-192.png')).toBe(false);
   });
 });

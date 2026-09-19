@@ -1,9 +1,13 @@
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { resolveLibrarySkillSpecialization } from '../../shared/domain/librarySkillSpecializations.ts';
+import { enchantmentRef } from '../../shared/schemas/inventory.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { traitKindEnum } from '../../shared/schemas/trait.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
+  campaignLibraryEnchantments,
+  campaignLibraryItems,
   campaignLibrarySkills,
   campaignLibraryTraits,
   characterLanguages,
@@ -14,6 +18,7 @@ import {
   characters,
   inventoryItems,
 } from '../db/schema.ts';
+import { refreshActiveEffectDefinition } from './activeEffects.ts';
 
 export async function captureLibraryMechanics(
   tx: AuditTx,
@@ -39,11 +44,24 @@ export async function captureLibraryMechanics(
     throw new HTTPException(403, {
       message: 'Library reference is unavailable in this character campaign',
     });
+  const skillSource = source as typeof campaignLibrarySkills.$inferSelect;
   return libraryMechanics.parse({
     sourceId,
     campaignId: parent?.campaignId ?? null,
     sourceRevision: source ? Number(source.revision) : null,
     effects: source?.effects ?? null,
+    ...(kind === 'skills'
+      ? {
+          skillRules: {
+            techLevelPolicy: skillSource.techLevelPolicy,
+            prerequisites: skillSource.prerequisiteRules,
+            defaults: skillSource.defaults,
+            groups: skillSource.groups,
+            tags: skillSource.tags,
+            procedures: skillSource.procedures,
+          },
+        }
+      : {}),
   });
 }
 
@@ -55,6 +73,70 @@ export async function refreshOwnedLibraryMechanics(
   sourceId: string,
   detach = false,
 ) {
+  if (kind === 'active-effects')
+    return refreshActiveEffectDefinition(tx, campaignId, sourceId, detach);
+  if (kind === 'enchantments') {
+    const [source] = await tx
+      .select()
+      .from(campaignLibraryEnchantments)
+      .where(
+        and(
+          eq(campaignLibraryEnchantments.id, sourceId),
+          eq(campaignLibraryEnchantments.campaignId, campaignId),
+        ),
+      )
+      .for('update');
+    if (!source) return;
+    const refresh = (entries: unknown) => {
+      const parsed = enchantmentRef.array().safeParse(entries);
+      if (!parsed.success) return null;
+      let changed = false;
+      const next = parsed.data.map((entry) => {
+        if (entry.definitionId !== sourceId) return entry;
+        changed = true;
+        if (detach) return { ...entry, definitionId: null };
+        return enchantmentRef.parse({
+          ...entry,
+          spellName: source.name,
+          definitionRevision: Number(source.revision),
+          definitionSource: source.source,
+          mechanics: {
+            applicability: source.applicability,
+            effects: source.effects,
+            levels: source.levels,
+            stackingPolicy: source.stackingPolicy,
+          },
+        });
+      });
+      return changed ? next : null;
+    };
+    const libraryItems = await tx
+      .select()
+      .from(campaignLibraryItems)
+      .where(eq(campaignLibraryItems.campaignId, campaignId));
+    for (const item of libraryItems) {
+      const enchantments = refresh(item.enchantments);
+      if (enchantments)
+        await tx
+          .update(campaignLibraryItems)
+          .set({ enchantments, updatedAt: new Date() })
+          .where(eq(campaignLibraryItems.id, item.id));
+    }
+    const ownedItems = await tx
+      .select({ id: inventoryItems.id, enchantments: inventoryItems.enchantments })
+      .from(inventoryItems)
+      .innerJoin(characters, eq(inventoryItems.characterId, characters.id))
+      .where(eq(characters.campaignId, campaignId));
+    for (const item of ownedItems) {
+      const enchantments = refresh(item.enchantments);
+      if (enchantments)
+        await tx
+          .update(inventoryItems)
+          .set({ enchantments, updatedAt: new Date() })
+          .where(eq(inventoryItems.id, item.id));
+    }
+    return;
+  }
   if (kind !== 'traits' && kind !== 'skills') return;
   const sourceTable = kind === 'traits' ? campaignLibraryTraits : campaignLibrarySkills;
   const [source] = await tx
@@ -63,6 +145,77 @@ export async function refreshOwnedLibraryMechanics(
     .where(and(eq(sourceTable.id, sourceId), eq(sourceTable.campaignId, campaignId)))
     .for('update');
   if (!source) return;
+  const skillSource = source as typeof campaignLibrarySkills.$inferSelect;
+  if (kind === 'skills') {
+    const children = await tx
+      .select({
+        id: characterSkills.id,
+        specialization: characterSkills.specialization,
+        libraryMechanics: characterSkills.libraryMechanics,
+      })
+      .from(characterSkills)
+      .innerJoin(characters, eq(characterSkills.characterId, characters.id))
+      .where(
+        and(eq(characterSkills.librarySkillId, sourceId), eq(characters.campaignId, campaignId)),
+      );
+    for (const child of children) {
+      const saved = libraryMechanics.safeParse(child.libraryMechanics);
+      let resolved: ReturnType<typeof resolveLibrarySkillSpecialization>;
+      try {
+        resolved = resolveLibrarySkillSpecialization(skillSource, child.specialization);
+      } catch {
+        const retained =
+          saved.success && saved.data.sourceId === sourceId && saved.data.campaignId === campaignId
+            ? saved.data
+            : {
+                sourceId,
+                campaignId,
+                sourceRevision: null,
+                effects: null,
+                detached: true,
+              };
+        await tx
+          .update(characterSkills)
+          .set({
+            librarySkillId: null,
+            libraryMechanics: libraryMechanics.parse({ ...retained, detached: true }),
+            updatedAt: new Date(),
+          })
+          .where(eq(characterSkills.id, child.id));
+        continue;
+      }
+      const snapshot = libraryMechanics.parse({
+        sourceId,
+        campaignId,
+        sourceRevision: Number(skillSource.revision),
+        effects: skillSource.effects,
+        skillRules: {
+          techLevelPolicy: skillSource.techLevelPolicy,
+          prerequisites: resolved.prerequisiteRules,
+          defaults: resolved.defaults ?? null,
+          groups: skillSource.groups,
+          tags: skillSource.tags,
+          procedures: skillSource.procedures,
+          gmPermissions:
+            saved.success &&
+            saved.data.skillRules?.gmPermissionSpecialization === resolved.specialization
+              ? (saved.data.skillRules.gmPermissions ?? [])
+              : [],
+          gmPermissionSpecialization: resolved.specialization,
+        },
+        ...(detach ? { detached: true } : {}),
+      });
+      await tx
+        .update(characterSkills)
+        .set({
+          libraryMechanics: snapshot,
+          updatedAt: new Date(),
+          ...(detach ? { librarySkillId: null } : {}),
+        })
+        .where(eq(characterSkills.id, child.id));
+    }
+    return;
+  }
   const childTable = kind === 'traits' ? characterTraits : characterSkills;
   const reference =
     kind === 'traits' ? characterTraits.libraryTraitId : characterSkills.librarySkillId;
@@ -139,7 +292,7 @@ export async function detachLibraryReferencesForTransfer(
 ) {
   if (updates.campaignId === undefined) return;
   const [parent] = await tx
-    .select({ campaignId: characters.campaignId })
+    .select({ campaignId: characters.campaignId, activeEffects: characters.activeEffects })
     .from(characters)
     .where(eq(characters.id, characterId))
     .for('update');
@@ -149,6 +302,18 @@ export async function detachLibraryReferencesForTransfer(
   // Campaign deletion/member removal may have enumerated this row before it moved.
   if (expectedCampaignId !== undefined && parent.campaignId !== expectedCampaignId.toLowerCase())
     return;
+  const activeEffects = parent.activeEffects.map((entry) => ({ ...entry, definitionId: null }));
+  if (parent.activeEffects.some((entry) => entry.definitionId)) {
+    await tx
+      .update(characters)
+      .set({ activeEffects, updatedAt: new Date() })
+      .where(eq(characters.id, characterId));
+  }
+  if (updates.activeEffects)
+    updates.activeEffects = (updates.activeEffects as typeof activeEffects).map((entry) => ({
+      ...entry,
+      definitionId: null,
+    }));
   const configs = [
     { table: characterTraits, field: 'libraryTraitId' },
     { table: characterSkills, field: 'librarySkillId' },
@@ -165,8 +330,20 @@ export async function detachLibraryReferencesForTransfer(
       .for('update');
     for (const row of rows) {
       const sourceId = (row as unknown as Record<string, unknown>)[field];
-      if (typeof sourceId !== 'string') continue;
-      const patch: Record<string, unknown> = { [field]: null, updatedAt: new Date() };
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (table === inventoryItems && 'enchantments' in row) {
+        const parsed = enchantmentRef.array().safeParse(row.enchantments);
+        if (parsed.success && parsed.data.some((entry) => entry.definitionId))
+          patch.enchantments = parsed.data.map((entry) =>
+            entry.definitionId ? { ...entry, definitionId: null } : entry,
+          );
+      }
+      if (typeof sourceId !== 'string') {
+        if (patch.enchantments !== undefined)
+          await tx.update(table).set(patch).where(eq(table.id, row.id));
+        continue;
+      }
+      patch[field] = null;
       if ('libraryMechanics' in row) {
         const saved = libraryMechanics.safeParse(row.libraryMechanics);
         const trusted =

@@ -6,6 +6,17 @@ This document describes how it works today. The **extension rules** (what you
 must keep true when touching it) are `AGENTS.md` S0–S11 and the tenets in the
 README — this spec is the descriptive companion; read both.
 
+## Service-worker boundary
+
+The service worker owns only the app-shell precache and navigation fallback; it
+does not cache authenticated API data or replay the outbox. Its navigation
+fallback excludes `/api/*`, `/admin/*`, `/mcp`, `/.well-known/*`, and OAuth
+protocol endpoints so those requests always reach the Bun server. The mutable
+`sw.js`, registration bootstrap, manifest, and HTML shells are served with
+browser/CDN `no-store` headers, while content-hashed assets remain cacheable.
+This prevents a deployed but edge-cached old worker from serving the player SPA
+for a newly introduced server route.
+
 ## Scope — what is actually sync-backed
 
 The outbox + cursor system covers **only the character family**:
@@ -20,18 +31,50 @@ Everything else is either read-only in the local store or fully online:
 
 - **Campaigns** are pulled **READ-ONLY** through `/sync/cursor` (rows land in
   Dexie so the minimal-view sweep can evaluate `shareCharacterSheets` and
-  `useCharacterDetail` can resolve campaign names offline) but have **no outbox
-  path** — campaign *mutations* go through REST.
+  character inputs can resolve campaign names and the default-on
+  `enforceAttributeCaps` rule offline) but have **no outbox path** — campaign
+  *mutations* go through REST.
 - **Online-only** (HTTP + React Query, no offline support): the campaign
   library, adventure log, invitations, notifications, settings, admin.
+
+Delegated MCP calls are online server operations. They never fabricate Dexie
+rows or enter a browser outbox, and they cannot see unsynced browser edits.
+They use the same handlers, revisions, tombstones, history, and post-commit
+invalidations as REST. Browsers converge through the ordinary cursor pull;
+pending local fields remain protected and replay or conflict normally even
+when a WebSocket nudge is missed.
 
 Library editing remains online-only, but calculation no longer depends on its
 React Query cache. Trait/skill rows persist `libraryMechanics` in Postgres and
 Dexie: source ID, source campaign, source revision, raw effect declarations, and
-an optional `detached` flag. `effects: []` is known empty; `effects: null` is
+an optional `detached` flag. Effect declarations include deterministic weapon
+selectors and are resolved against the same mirrored inventory rows in local and
+server builds; unequipped rows do not match. `effects: []` is known empty; `effects: null` is
 unresolved. Server and client derive from the same owned copy; the cursor reads
 it after the character share gate without fetching live source data. The field
 is read-only and never accepted as an outbox patch or caller-supplied snapshot.
+
+Character traits additionally carry writable `customEffects`. The trait editor
+commits the validated whole array as a normal coalesced `character_trait` field
+patch, so exact inventory-item bindings work offline and receive the standard
+rejection toast and rollback flash. The shared detail builder merges these after
+the read-only library declarations on both server and client.
+
+Inventory rows keep mechanical enchantments inside the existing sync-backed
+`enchantments` field. A linked instance carries a campaign definition UUID plus
+the authoritative source revision/name/source and complete typed mechanics;
+character-local instances omit the UUID. The pure shared item resolver consumes
+only this owned snapshot, so DR, DB, attack/damage/Accuracy, Parry/Block, armor
+divisor, weight reduction, and skill effects remain identical offline. The item
+field still uses the normal coalesced outbox patch, pending-field protection,
+rejection toast, and row flash. Campaign enchantment definitions themselves stay
+online-only with the rest of the library. Library edits refresh linked inventory
+snapshots and their revisions in the same audited transaction; delete/transfer
+clears live IDs without deleting the snapshot. An optimistic offline campaign
+transfer performs the same nested-ID detachment in its character/outbox
+transaction and restores it on rollback only when no later item edit superseded
+that field. Editors and delete rollback snapshots always use the raw Dexie base
+row, never the derived base-plus-enchantment detail value.
 
 Selecting an already loaded definition also seeds validated local-only declarations
 into the speculative create row, in the same Dexie transaction as its outbox entry.
@@ -612,6 +655,9 @@ rule that has been broken at least once.
 Campaign assignment patches detach all six child library references in the same
 IndexedDB transaction as the parent edit and outbox operation. Trait and skill
 declarations remain available as retained copies while offline, after reload,
+including structured prerequisites, TL policy, group/tag provenance, and
+conditional defaults plus durable GM-permission grants inside the validated
+owned skill-rule snapshot,
 and if an acknowledged transfer is followed by a failed cursor pull. Local-only
 undo data on the operation restores links when the transfer is rejected or
 explicitly discarded, preserves unrelated child edits, and follows coalesced
@@ -697,9 +743,24 @@ orchestrator test files are the working references.
 ### Campaign house rules
 
 The read-only campaign mirror also carries `houseRules` for combat resolution.
+Both the cursor pull and the character page's REST campaign-list refresh preserve
+that complete settings object when writing Dexie; the REST mirror must never
+replace a synced campaign row with a partial projection that makes known rules
+appear unavailable.
 No new outbox class or store is involved. Migration 0037 advances each existing
 campaign revision once so clients with an old cursor receive the default-on
 natural-DR policy. `buildCharacterDetail` marks missing campaign settings as
 `houseRulesKnown: false`; the armor map and damage dialog hold calculations
 until settings are available. Known settings survive reopening offline and
 update reactively in player and GM views when the campaign cursor changes.
+
+## Active effects
+
+`characters.activeEffects` is a validated root-field outbox surface, independent
+of manual `tempEffects`. Its transactional helper composes current local arrays
+before enqueueing. Condition groups now use the outbox too. Existing character
+cursor protection, toast/flash rejection, transfer undo, privacy masking and purge
+apply. Campaign cursor rows additionally carry read-only active-effect definitions
+for offline selection; calculation uses each instance's owned snapshot. Wall-clock
+expiry is reconciled on reading/foreground return, never by an assumed closed-app
+timer. [Detailed lifecycle](active-effects-skill-procedures.md).

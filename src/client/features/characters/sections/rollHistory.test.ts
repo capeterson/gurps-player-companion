@@ -1,6 +1,6 @@
 /**
  * rollHistory — per-character roll log persisted to localStorage.
- * Verifies: newest-first ordering, the 100-entry cap dropping the
+ * Verifies: newest-first ordering, the 250-entry cap dropping the
  * oldest, per-character isolation, and logout clearing.
  */
 
@@ -44,16 +44,16 @@ describe('rollHistory', () => {
     expect(result.current.map((r) => r.id)).toEqual(['b', 'a']);
   });
 
-  it('caps at 100 entries, dropping the oldest', () => {
+  it('caps at 250 entries when adding a new roll, dropping the oldest', () => {
     const { result } = renderHook(() => useRollHistory('char-1'));
 
     act(() => {
-      for (let i = 0; i < 105; i++) pushRoll(entry(`r${i}`));
+      for (let i = 0; i < 255; i++) pushRoll(entry(`r${i}`));
     });
 
-    expect(result.current.length).toBe(100);
-    expect(result.current[0]?.id).toBe('r104');
-    expect(result.current[99]?.id).toBe('r5');
+    expect(result.current.length).toBe(250);
+    expect(result.current[0]?.id).toBe('r254');
+    expect(result.current[249]?.id).toBe('r5');
   });
 
   it('isolates rolls per character', () => {

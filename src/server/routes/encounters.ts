@@ -156,18 +156,19 @@ export async function projectEncounterForViewer(
   canManageCharacters: boolean,
 ) {
   const db = getDb();
-  const [[campaign], combatants, effects] = await Promise.all([
-    db
-      .select({ shareCharacterSheets: campaigns.shareCharacterSheets })
-      .from(campaigns)
-      .where(eq(campaigns.id, row.campaignId)),
-    db
-      .select()
-      .from(encounterCombatants)
-      .where(eq(encounterCombatants.encounterId, row.id))
-      .orderBy(asc(encounterCombatants.orderKey), asc(encounterCombatants.createdAt)),
-    db.select().from(encounterEffects).where(eq(encounterEffects.encounterId, row.id)),
-  ]);
+  const [campaign] = await db
+    .select({ shareCharacterSheets: campaigns.shareCharacterSheets })
+    .from(campaigns)
+    .where(eq(campaigns.id, row.campaignId));
+  const combatants = await db
+    .select()
+    .from(encounterCombatants)
+    .where(eq(encounterCombatants.encounterId, row.id))
+    .orderBy(asc(encounterCombatants.orderKey), asc(encounterCombatants.createdAt));
+  const effects = await db
+    .select()
+    .from(encounterEffects)
+    .where(eq(encounterEffects.encounterId, row.id));
   if (!campaign) throw new HTTPException(404, { message: 'campaign not found' });
   const pcCharacterIds = combatants.flatMap((combatant) =>
     combatant.kind === 'pc' && combatant.characterId ? [combatant.characterId] : [],
@@ -392,19 +393,18 @@ router.openapi(
       .from(encounters)
       .where(eq(encounters.campaignId, id))
       .orderBy(asc(encounters.createdAt));
-    return c.json(
-      await Promise.all(
-        rows.map((row) =>
-          projectEncounterForViewer(
-            row,
-            user.id,
-            isAdmin(access.role),
-            canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
-          ),
+    const projected: Awaited<ReturnType<typeof projectEncounterForViewer>>[] = [];
+    for (const row of rows) {
+      projected.push(
+        await projectEncounterForViewer(
+          row,
+          user.id,
+          isAdmin(access.role),
+          canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
         ),
-      ),
-      200,
-    );
+      );
+    }
+    return c.json(projected, 200);
   },
 );
 
@@ -460,14 +460,17 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await requireCampaignAdmin(id, user.id);
     assertUniquePcCombatants(body.combatants);
-    const rows = await Promise.all(
-      body.combatants.map(async (combatant, index) => {
-        const orderKey = String((index + 1) * 10);
-        return combatant.kind === 'pc'
+    const rows: Array<
+      (Awaited<ReturnType<typeof pcValues>> & { orderKey: string }) | ReturnType<typeof npcValues>
+    > = [];
+    for (const [index, combatant] of body.combatants.entries()) {
+      const orderKey = String((index + 1) * 10);
+      rows.push(
+        combatant.kind === 'pc'
           ? { ...(await pcValues(combatant.characterId, id)), orderKey }
-          : npcValues(combatant, '', orderKey);
-      }),
-    );
+          : npcValues(combatant, '', orderKey),
+      );
+    }
     const created = await withAudit(user.id, undefined, async (tx) => {
       const [encounter] = await tx
         .insert(encounters)

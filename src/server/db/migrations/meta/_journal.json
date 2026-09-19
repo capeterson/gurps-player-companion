@@ -288,6 +288,76 @@
       "when": 1789202000000,
       "tag": "0040_commit_safe_revisions",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0041_campaign_attribute_caps",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790001000000,
+      "tag": "0042_delegated_oauth",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1799712000000,
+      "tag": "0043_character_trait_custom_effects",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1799713000000,
+      "tag": "0044_oauth_client_registration",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1800000000000,
+      "tag": "0045_library_skill_specializations",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1800001000000,
+      "tag": "0046_structured_skill_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1800002000000,
+      "tag": "0047_mechanical_enchantments",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1800003000000,
+      "tag": "0048_experimental_turn_tracker",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1800004000000,
+      "tag": "0049_skill_procedures",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1800005000000,
+      "tag": "0050_active_effects",
+      "breakpoints": true
     }
   ]
 }

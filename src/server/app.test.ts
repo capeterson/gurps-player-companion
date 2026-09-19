@@ -15,6 +15,7 @@ const testConfig: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   appBaseUrl: undefined,
+  oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,
   authRateLimitLoginMax: 10,
@@ -29,8 +30,21 @@ describe('healthz', () => {
   it('returns ok', async () => {
     const res = await app.request('/api/v1/healthz');
     expect(res.status).toBe(200);
+    expect(res.headers.get('x-request-id')).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
+  });
+
+  it('assigns a new trusted correlation ID to each request', async () => {
+    const suppliedId = '00000000-0000-4000-8000-000000000000';
+    const first = await app.request('/api/v1/healthz', {
+      headers: { 'x-request-id': suppliedId },
+    });
+    const second = await app.request('/api/v1/healthz');
+    expect(first.headers.get('x-request-id')).not.toBe(suppliedId);
+    expect(first.headers.get('x-request-id')).not.toBe(second.headers.get('x-request-id'));
   });
 
   it('404s unknown routes under /api', async () => {
@@ -58,4 +72,32 @@ describe('/sync/ws routing', () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('missing token');
   });
+});
+
+describe('configured browser OAuth CORS', () => {
+  const origin = 'https://agent.example';
+  const app = createApp({ ...testConfig, corsOrigins: [origin] });
+
+  for (const [method, path] of [
+    ['GET', '/.well-known/oauth-protected-resource/mcp'],
+    ['GET', '/.well-known/oauth-authorization-server'],
+    ['POST', '/oauth/token'],
+    ['POST', '/oauth/revoke'],
+    ['POST', '/oauth/register'],
+    ['POST', '/mcp'],
+  ] as const) {
+    it(`answers ${path} preflight for an allowed browser client`, async () => {
+      const response = await app.request(path, {
+        method: 'OPTIONS',
+        headers: {
+          origin,
+          'access-control-request-method': method,
+          'access-control-request-headers': 'content-type',
+        },
+      });
+      expect(response.status).toBe(204);
+      expect(response.headers.get('access-control-allow-origin')).toBe(origin);
+      expect(response.headers.get('access-control-allow-credentials')).toBeNull();
+    });
+  }
 });

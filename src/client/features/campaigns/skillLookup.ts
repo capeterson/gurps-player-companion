@@ -1,5 +1,5 @@
 import type { SkillAttribute } from '../../../shared/constants/skills.ts';
-import { skillDisplayName } from '../../../shared/domain/defenseCalc.ts';
+import { skillDisplayName, skillReferencesMatch } from '../../../shared/domain/defenseCalc.ts';
 import { attributeLevelFor } from '../../../shared/domain/skillCalc.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 
@@ -23,8 +23,8 @@ export function resolveSkillLookup(
   if (isStatName(lookup)) {
     return { label: lookup, level: attributeLevelFor(lookup, character.derived) };
   }
-  const skill = character.skills.find(
-    (s) => skillDisplayName(s.name, s.specialization).toLowerCase() === lookup.trim().toLowerCase(),
+  const skill = character.skills.find((s) =>
+    skillReferencesMatch(skillDisplayName(s.name, s.specialization), lookup),
   );
   if (!skill) return null;
   return { label: skillDisplayName(skill.name, skill.specialization), level: skill.effectiveLevel };

@@ -1,3 +1,4 @@
+import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
 /**
  * Campaign library CRUD + YAML import/export.
  *
@@ -24,10 +25,12 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, type sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
 import { campaignUpdate } from '../../shared/schemas/campaign.ts';
 import {
   importMode,
   importResult,
+  libraryEnchantmentOut,
   libraryItemOut,
   libraryLanguageOut,
   librarySkillOut,
@@ -51,6 +54,8 @@ import {
 import { buildPatchSet } from '../services/patchSet.ts';
 import { registerLibraryCrud, selectLibrarySection, upsertByKey } from './campaignLibraryCrud.ts';
 import {
+  activeEffectEntity,
+  enchantmentEntity,
   itemEntity,
   languageEntity,
   skillEntity,
@@ -86,6 +91,8 @@ router.openapi(
               languages: z.array(libraryLanguageOut),
               techniques: z.array(libraryTechniqueOut),
               styles: z.array(libraryStyleOut),
+              enchantments: z.array(libraryEnchantmentOut),
+              activeEffects: z.array(activeEffectDefinitionOut),
             }),
           },
         },
@@ -99,15 +106,15 @@ router.openapi(
     const { id } = c.req.valid('param');
     await requireCampaignMember(id, user.id);
     const db = getDb();
-    const [traits, skills, spells, items, languages, techniques, styles] = await Promise.all([
-      selectLibrarySection(db, traitEntity, id),
-      selectLibrarySection(db, skillEntity, id),
-      selectLibrarySection(db, spellEntity, id),
-      selectLibrarySection(db, itemEntity, id),
-      selectLibrarySection(db, languageEntity, id),
-      selectLibrarySection(db, techniqueEntity, id),
-      selectLibrarySection(db, styleEntity, id),
-    ]);
+    const traits = await selectLibrarySection(db, traitEntity, id);
+    const skills = await selectLibrarySection(db, skillEntity, id);
+    const spells = await selectLibrarySection(db, spellEntity, id);
+    const items = await selectLibrarySection(db, itemEntity, id);
+    const languages = await selectLibrarySection(db, languageEntity, id);
+    const techniques = await selectLibrarySection(db, techniqueEntity, id);
+    const styles = await selectLibrarySection(db, styleEntity, id);
+    const enchantments = await selectLibrarySection(db, enchantmentEntity, id);
+    const activeEffects = await selectLibrarySection(db, activeEffectEntity, id);
     return c.json(
       {
         traits: traits.map(traitEntity.toOut),
@@ -117,6 +124,8 @@ router.openapi(
         languages: languages.map(languageEntity.toOut),
         techniques: techniques.map(techniqueEntity.toOut),
         styles: styles.map(styleEntity.toOut),
+        enchantments: enchantments.map(enchantmentEntity.toOut),
+        activeEffects: activeEffects.map(activeEffectEntity.toOut),
       },
       200,
     );
@@ -132,6 +141,8 @@ registerLibraryCrud(router, itemEntity);
 registerLibraryCrud(router, languageEntity);
 registerLibraryCrud(router, techniqueEntity);
 registerLibraryCrud(router, styleEntity);
+registerLibraryCrud(router, enchantmentEntity);
+registerLibraryCrud(router, activeEffectEntity);
 
 // ===================== YAML EXPORT =====================
 
@@ -181,11 +192,35 @@ router.openapi(
         const languages = await selectLibrarySection(tx, languageEntity, id);
         const techniques = await selectLibrarySection(tx, techniqueEntity, id);
         const styles = await selectLibrarySection(tx, styleEntity, id);
-        return { campaign, traits, skills, spells, items, languages, techniques, styles };
+        const enchantments = await selectLibrarySection(tx, enchantmentEntity, id);
+        const activeEffects = await selectLibrarySection(tx, activeEffectEntity, id);
+        return {
+          campaign,
+          traits,
+          skills,
+          spells,
+          items,
+          languages,
+          techniques,
+          styles,
+          enchantments,
+          activeEffects,
+        };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
     );
-    const { campaign, traits, skills, spells, items, languages, techniques, styles } = snapshot;
+    const {
+      campaign,
+      traits,
+      skills,
+      spells,
+      items,
+      languages,
+      techniques,
+      styles,
+      enchantments,
+      activeEffects,
+    } = snapshot;
     const yamlText = emitLibraryYaml({
       campaign: {
         name: campaign.name,
@@ -196,6 +231,8 @@ router.openapi(
         manaLevel: campaign.manaLevel,
         houseRules: campaign.houseRules,
         techLevel: campaign.techLevel,
+        skillPrerequisitePolicy: campaign.skillPrerequisitePolicy,
+        enforceAttributeCaps: campaign.enforceAttributeCaps,
       },
       traits: traits.map(traitEntity.rowToCreate),
       skills: skills.map(skillEntity.rowToCreate),
@@ -204,6 +241,8 @@ router.openapi(
       languages: languages.map(languageEntity.rowToCreate),
       techniques: techniques.map(techniqueEntity.rowToCreate),
       styles: styles.map(styleEntity.rowToCreate),
+      enchantments: enchantments.map(enchantmentEntity.rowToCreate),
+      activeEffects: activeEffects.map(activeEffectEntity.rowToCreate),
     });
     return c.body(yamlText, 200, {
       'content-type': 'application/yaml; charset=utf-8',
@@ -221,7 +260,7 @@ const importBody = z.object({
     .max(20 * 1024 * 1024),
   mode: importMode.default('merge'),
   /** Opt-in: apply the doc's `campaign` block (description/pointTarget/
-   * disadvantageCap/quirkCap/manaLevel/techLevel) to the campaigns row.  Never
+   * disadvantageCap/quirkCap/manaLevel/techLevel/enforceAttributeCaps) to the campaigns row. Never
    * touches `name`.  Default off so a routine content import can't
    * silently rewrite campaign settings. */
   applyCampaignSettings: z.boolean().default(false),
@@ -279,7 +318,9 @@ router.openapi(
         quirkCap,
         manaLevel,
         techLevel,
+        skillPrerequisitePolicy,
         houseRules,
+        enforceAttributeCaps,
       } = doc.campaign;
       const checked = campaignUpdate.safeParse({
         description,
@@ -288,7 +329,9 @@ router.openapi(
         quirkCap,
         manaLevel,
         techLevel,
+        skillPrerequisitePolicy,
         houseRules,
+        enforceAttributeCaps,
       });
       if (!checked.success) {
         throw new HTTPException(400, {
@@ -298,7 +341,17 @@ router.openapi(
             .join('; ')}`,
         });
       }
-      campaignSettings = checked.data;
+      campaignSettings = {
+        ...checked.data,
+        ...(checked.data.houseRules === undefined
+          ? {}
+          : {
+              houseRules: applyHouseRuleSet(
+                checked.data.houseRules,
+                checked.data.houseRules.ruleSet,
+              ),
+            }),
+      };
     }
 
     const result = await withAudit(user.id, undefined, async (tx) => {
@@ -319,6 +372,21 @@ router.openapi(
       const languages = await upsertByKey(tx, languageEntity, id, doc.library.languages, mode);
       const techniques = await upsertByKey(tx, techniqueEntity, id, doc.library.techniques, mode);
       const styles = await upsertByKey(tx, styleEntity, id, doc.library.styles, mode);
+      const enchantments = await upsertByKey(
+        tx,
+        enchantmentEntity,
+        id,
+        doc.library.enchantments,
+        mode,
+      );
+
+      const activeEffects = await upsertByKey(
+        tx,
+        activeEffectEntity,
+        id,
+        doc.library.activeEffects,
+        mode,
+      );
 
       // Opt-in campaign-settings apply (validated above): only fields
       // actually present in the doc get copied (undefined = leave
@@ -344,6 +412,8 @@ router.openapi(
         languages,
         techniques,
         styles,
+        enchantments,
+        activeEffects,
         campaignSettingsApplied,
       };
     });

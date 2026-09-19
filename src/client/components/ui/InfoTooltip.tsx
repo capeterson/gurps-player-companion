@@ -19,9 +19,17 @@ interface InfoTooltipProps {
   children: ReactNode;
   content: ReactNode;
   side?: 'top' | 'bottom';
+  ariaLabel?: string;
+  triggerClassName?: string;
 }
 
-export function InfoTooltip({ children, content, side = 'top' }: InfoTooltipProps) {
+export function InfoTooltip({
+  children,
+  content,
+  side = 'top',
+  ariaLabel,
+  triggerClassName,
+}: InfoTooltipProps) {
   const [open, setOpen] = useState(false);
   const [shiftX, setShiftX] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -50,13 +58,17 @@ export function InfoTooltip({ children, content, side = 'top' }: InfoTooltipProp
       <button
         ref={triggerRef}
         type="button"
+        aria-label={ariaLabel}
         aria-describedby={open ? id : undefined}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
         onClick={() => setOpen((v) => !v)}
-        className="cursor-help rounded-sm border-b border-dotted border-base-content/30 px-1 -mx-1 hover:bg-accent-soft hover:text-base-content hover:border-base-content/60 transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+        className={
+          triggerClassName ??
+          'cursor-help rounded-sm border-b border-dotted border-base-content/30 px-1 -mx-1 hover:bg-accent-soft hover:text-base-content hover:border-base-content/60 transition-colors focus-visible:outline-2 focus-visible:outline-primary'
+        }
       >
         {children}
       </button>

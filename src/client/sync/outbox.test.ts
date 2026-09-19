@@ -120,13 +120,31 @@ describe('enqueueFieldPatch', () => {
           entityClass: 'character_inventory',
           entityId: (row as { id: string }).id,
           characterId: CHAR_ID,
-          prevValue: row,
         })),
       ),
     ).rejects.toThrow('storage unavailable');
 
     expect(await db.characterInventory.bulkGet([firstId, secondId])).toEqual(rows);
     expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('captures the raw local inventory row for delete rollback', async () => {
+    const db = getLocalDb();
+    const entityId = '0193b3c0-f1f0-7000-8000-00000000d103';
+    const row = {
+      id: entityId,
+      characterId: CHAR_ID,
+      name: 'Fortified mail',
+      revision: 1,
+      armor: { dr: 3, locations: ['torso'] },
+      enchantments: [{ spellName: 'Fortify', mechanics: { effects: [] } }],
+    };
+    await db.characterInventory.put(row as never);
+
+    await enqueueDeletes([{ entityClass: 'character_inventory', entityId, characterId: CHAR_ID }]);
+
+    expect(await db.characterInventory.get(entityId)).toBeUndefined();
+    expect((await db.outbox.toArray())[0]?.prevValue).toEqual(row);
   });
 
   it('rejects mismatched local create declarations atomically', async () => {

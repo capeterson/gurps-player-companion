@@ -28,26 +28,31 @@ The two deliberate exceptions (`notifications.payload`,
 
 | Table.column | Shape schema (`src/shared/schemas/`) | Validated at |
 |---|---|---|
-| `character_traits.library_mechanics`, `character_skills.library_mechanics` | `libraryMechanics` (libraryMechanics.ts), nullable: source UUID, campaign UUID/null, source revision/null, effect declarations/null, optional detached flag | Read-only owned copy; `captureLibraryMechanics`, `refreshOwnedLibraryMechanics`, and transfer helper validate every application write through Zod in the audited transaction. REST and sync use the same helpers; caller-supplied snapshots are not writable. Migration 0036 backfills from existing validated source fields only within the character campaign; legacy trait kind mismatches preserve effects as detached copies. |
-| `campaigns.house_rules` | `campaignHouseRules` (campaign.ts): strict `{ protectNaturalDr: boolean }`, default true; armor-piercing divisors/Ignore DR spare innate and skull DR when enabled | Campaign REST create/update and opt-in YAML settings import share the Zod schema; DB default matches it. Drizzle `$type<CampaignHouseRules>`, campaign cursor/Dexie mirror, and character detail carry the setting. |
+| `character_traits.library_mechanics`, `character_skills.library_mechanics` | `libraryMechanics` (libraryMechanics.ts), nullable: source UUID, campaign UUID/null, source revision/null, effect declarations/null, optional detached flag; skill copies additionally carry validated `ownedSkillRules` (TL policy, prerequisite tree, defaults, groups, tags, and durable GM-permission grants scoped to their approved specialization) | Read-only owned copy; `captureLibraryMechanics`, `refreshOwnedLibraryMechanics`, and transfer helper validate every application write through Zod in the audited transaction. REST and sync use the same helpers; caller-supplied snapshots are not writable. Migration 0036 backfills from existing validated source fields only within the character campaign; legacy trait kind mismatches preserve effects as detached copies. |
+| `campaigns.house_rules` | `campaignHouseRules` (campaign.ts): strict preset identity (`none`, `j_talisar`, or `custom`) plus the complete boolean option bundle; omitted legacy keys normalize through per-key defaults | Campaign REST create/update and opt-in YAML settings import share the Zod schema. `applyHouseRuleSet` replaces values for named presets but preserves them when selecting Custom. Drizzle `$type<CampaignHouseRules>`, campaign cursor/Dexie mirror, and character detail carry the normalized setting. |
 | `characters.dismissed_warnings` | `dismissedWarningsField` (character.ts) — `string[]` of warning codes | REST `/characters/{id}/warnings/dismiss` (`dismissWarningRequest`, one code at a time); sync patch `fieldPath: 'dismissedWarnings'` via `characterSyncPatch` |
 | `characters.temp_effects` | `tempEffectsField` (character.ts) — `TempEffect[]`, max 40, `{ id, name, mods }` with `mods` a strict per-axis object (`TEMP_STAT_AXES`); `superRefine` enforces unique ids and a per-axis SUM across all effects within [-50, 50]. The `id: 'manual'` sentinel (`MANUAL_TEMP_EFFECT_ID`) is the entry the ✦ modifier popovers write to; other ids are client uuids for named effects. | REST character create/update (`characterCreate` / `characterUpdate`, via `characterAttributesShape`); sync patch `fieldPath: 'tempEffects'` (whole-array replace) via `characterSyncPatch`. Share-gate masked to `[]` for minimal-view characters (`projectCharacterRow` in `routes/sync.ts`). |
 | `character_traits.modifiers` | `traitModifier[]` (trait.ts) | REST trait create/update (`traitCreate` / `traitUpdate`); sync per-field validator |
-| `character_skills.defaults` | `skillDefaults` (skill.ts): null = unknown legacy declaration, [] = no default, otherwise up to 20 strict attribute/skill plus modifier records; skill references may specify specialization | REST skill create/update, sync create/per-field/whole-body validators; copied by the library picker and mirrored in Dexie |
-| `campaign_library_skills.defaults` | `skillDefaults` (skill.ts), same nullable declaration list | Library REST CRUD and YAML import/export |
+| `character_traits.custom_effects` | `traitEffect[]` (effects.ts), max 50; unlike portable library declarations this may use an exact `inventory_item` selector | REST trait create/update and the local-first sync patch path; the character trait effect editor validates the full array before enqueueing it. Migration 0043 defaults existing rows to `[]`. |
+| `character_skills.defaults` | `skillDefaults` (skill.ts): null = unknown legacy declaration, [] = no default, otherwise up to 20 strict attribute/skill plus modifier records; skill references may use a legacy exact-specialization string or structured `exact`, `same`, or `any` matching | REST skill create/update, sync create/per-field/whole-body validators; copied by the library picker and mirrored in Dexie |
+| `campaign_library_skills.defaults` | `skillDefaults` (skill.ts), nullable list of attribute, skill, skill-group, or skill-tag candidates with specialization matching and explicit three-valued applicability conditions | Library REST CRUD and YAML v10 import/export; owned snapshots drive offline calculation |
+| `campaign_library_skills.tech_level_policy` | `skillTechLevelPolicy` (skill.ts): `not_applicable`, required `/TL` with suggestion source, or fixed TL | Library REST/MCP CRUD and YAML v10; shared reference handler validates character REST/sync creates |
+| `campaign_library_skills.prerequisite_rules` | recursive `skillPrerequisite` (skill.ts): nested all/any groups and typed skill, trait, attribute, TL, campaign-rule, or GM-permission leaves | Library REST/MCP CRUD and YAML v10; authoritative add/point-increase enforcement and offline warnings |
+| `campaign_library_skills.groups`, `campaign_library_skills.tags` | `tagList` (campaignLibrary.ts), natural-name selector metadata | Library REST/MCP CRUD and YAML v10; snapshotted onto learned skills |
+| `campaign_library_skills.specialization_policy` | `librarySkillSpecializationPolicy` (campaignLibrary.ts): `none`, required/optional free-form, or required/optional catalog; catalog options have unique normalized names and optional description, prerequisites, and `skillDefaults` overrides | Library REST CRUD + YAML v10 import/export; character REST/sync reference validation; library editor and character picker |
 | `inventory_items.armor` | `armorData` (inventory.ts), nullable; nests `typedDr` (`typedArmorDr` — per-damage-type DR overrides for cut/imp/pi/pi−/pi+/pi++/burn/corr/fat/tox, defaults to `{}`; `aggregateDrByLocation` builds the per-location type total from each layer's override when present, else that layer's base `dr`, so a base-DR 4 jacket plus a DR 2 coif with `cut: 5` resolves cut DR 9 — the override replaces the affected layer's contribution, never the whole stack; `resolveDr` falls back to `drCrushing` for `cr` then `dr`; torso coverage also protects vitals, with repeated or explicit torso/vitals entries counted once per layer) plus an optional `db` (armor Defense Bonus from Deflect enchantments; `resolveArmorDb` chooses the highest equipped covering item for the selected location/facing, then that one value stacks with shield DB) | REST inventory create/update (`inventoryItemCreate` / `inventoryItemUpdate`); sync per-field validator |
 | `inventory_items.weapon_data` | `weaponData` (inventory.ts), nullable; nests `rangedData` (`ranged`, null = melee-only) plus `skill` (governing-skill name), `db` (shield Defense Bonus, non-null = shield), and `alternateModes` (`weaponMode[]`, max 10, defaults to `[]` — extra attack rows beyond the primary `damage`/`reach`/`parry`, e.g. swing + thrust + thrown) | same as `armor` |
 | `inventory_items.powerstone_data` | `powerstoneData` (inventory.ts), nullable; refinement: `currentEnergy <= maxEnergy` | same as `armor` |
 | `inventory_items.magic_item_data` | `magicItemData` (inventory.ts), nullable; refinement: `chargesCurrent <= chargesMax` | same as `armor` |
-| `inventory_items.enchantments` | `enchantmentRef[]` (inventory.ts), max 50, defaults to `[]` — `{ spellName (1–160), spellLevel? (0–40), category? (1–80), notes? (≤2000) }`. Multi-enchantment metadata ("Fortify +3" + "Deflect +2"); non-mechanical, nothing consumes it in combat math yet | REST inventory create/update (`inventoryItemCreate` / `inventoryItemUpdate`); sync per-field validator (whitelist derived from `inventoryItemUpdate`) |
+| `inventory_items.enchantments` | `enchantmentRef[]` (inventory.ts), max 50. The legacy `{ spellName, spellLevel?, category?, notes? }` shape remains non-mechanical. A typed instance may add selected `level`, nullable definition UUID/revision/source, and `enchantmentMechanics`: applicability, flat effects, optional level effects, and stack/highest policy. | REST and sync inventory writes share authoritative same-campaign definition hydration; local-only definitions are validated by `inventoryItemUpdate`. `itemEnchantments.ts` consumes owned snapshots in both detail builders. |
 | `combat_states.conditions` | `combatStateUpdate.conditions` (combat.ts) — `string[]`, each 1–80 chars, max 64 | REST combat patch; sync per-field validator |
 | `adventure_log_entries.xp_awards` | `xpAward[]` (adventureLog.ts) — `{ characterId, amount }`, max 50 | REST log create/update (`adventureLogCreate` / `adventureLogUpdate`) |
 | `campaign_library_traits.available_modifiers` | `traitModifier[]` (trait.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
 | `campaign_library_traits.tags` | `tagList` (campaignLibrary.ts) — `string[]`, each 1–40 chars | REST library CRUD + YAML import |
 | `campaign_library_traits.variants` | `traitVariant[]` (trait.ts) | REST library CRUD + YAML import (`libraryTraitCreate`) |
-| `campaign_library_traits.effects` | `traitEffect[]` (effects.ts); active `dr` effects retain optional `hitLocation` in the effective protection map. Unscoped innate DR excludes eyes; explicit eye/custom locations are supported; torso-scoped effects also protect vitals. | REST library CRUD + YAML import (`libraryTraitCreate`) |
+| `campaign_library_traits.effects` | `libraryTraitEffect[]` (effects.ts); global/stat/skill effects plus weapon attack/Parry/Block/damage/Accuracy targets. Weapon targets require a deterministic portable selector (governing skill + optional specialty, exact normalized weapon name, or library-item provenance); attack/damage/Accuracy may narrow to `Primary` or an exact alternate-mode name. Character-local `inventory_item` selectors exist only in the broader owned `traitEffect` schema and are rejected here. Active `dr` effects retain optional `hitLocation`. | REST library CRUD + YAML v10 import (`libraryTraitCreate`) |
 | `campaign_library_skills.situational_modifiers` | `situationalModifier[]` (skill.ts) | REST library CRUD + YAML import (`librarySkillCreate`) |
-| `campaign_library_skills.effects` | `traitEffect[]` (effects.ts); same DR location semantics as trait effects | REST library CRUD + YAML import (`librarySkillCreate`) |
+| `campaign_library_skills.effects` | `libraryTraitEffect[]` (effects.ts); same target-aware validation and portable weapon-selector rules as trait effects. Skill-definition authoring exposes flat effects because skills have no purchased trait level. | REST library CRUD + YAML v10 import (`librarySkillCreate`) |
 | `campaign_library_styles.techniques` | `styleTechniqueRef[]` (campaignLibrary.ts) — `{ name, defaultSkillName, difficulty, maxLevel? }`, max 100. Denormalized (no technique id) so a style survives a YAML round trip into a campaign whose technique rows don't exist yet | REST library CRUD + YAML import (`libraryStyleCreate`) |
 | `campaign_library_styles.perks` / `.skills` | `styleNameList` (campaignLibrary.ts) — `string[]`, each 1–160 chars, max 100 | REST library CRUD + YAML import (`libraryStyleCreate`) |
 | `campaign_library_items.armor` | `armorData` (inventory.ts), nullable — same shape as `inventory_items.armor` incl. `typedDr` / `db` | REST library CRUD + YAML import (`libraryItemCreate`) |
@@ -57,6 +62,10 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_items.powerstone_data` | `powerstoneData` (inventory.ts), nullable; refinement: `currentEnergy <= maxEnergy` — same shape as `inventory_items.powerstone_data` | REST library CRUD + YAML import |
 | `campaign_library_items.magic_item_data` | `magicItemData` (inventory.ts), nullable; refinement: `chargesCurrent <= chargesMax` — same shape as `inventory_items.magic_item_data` | REST library CRUD + YAML import |
 | `campaign_library_items.enchantments` | `enchantmentRef[]` (inventory.ts), max 50, defaults to `[]` — same shape as `inventory_items.enchantments`; carried onto inventory copies via the InventoryPanel library pick | REST library CRUD + YAML import (`libraryItemCreate`) |
+| `campaign_library_enchantments.tags` | `tagList` (campaignLibrary.ts), max 100 normalized authoring/search labels | Owner-only library REST/MCP CRUD and YAML v10 import/export |
+| `campaign_library_enchantments.effects` | `enchantmentEffect[]` (inventory.ts): typed attack/damage/Accuracy/Parry/Block/armor-divisor/DR/DB/weight-reduction/skill flat contributions; skill target requires `skillName` | Owner-only library REST/MCP CRUD and YAML v10 import/export; snapshotted onto linked items |
+| `campaign_library_enchantments.levels` | `enchantmentLevel[]` (inventory.ts): unique selectable integer levels, optional label, and typed effect arrays | Same definition boundaries; the selected item instance level activates its matching row in addition to base effects |
+| `campaign_library_enchantments.stacking_policy` | `enchantmentStackingPolicy` (inventory.ts): strict `stack` or `highest` plus a non-empty combination key | Same definition boundaries; the shared resolver chooses the highest aggregate contribution per instance/target/key |
 | `notifications.payload` | Per-type: `campaignInvitationNotificationPayload` (notification.ts) for `type='campaign_invitation'` | Emit site (`invitations.ts` parses before insert); consume site (`NotificationsBell` `safeParse`s) |
 | `entity_history.old_row` / `new_row` | *Intentionally schemaless* — raw `to_jsonb(OLD/NEW)` row snapshots written by DB triggers | Read-only; exposed as `z.record(z.unknown())` in `historyEventOut` and only with `?detail=1` + full access (see history-tracking.md) |
 
@@ -93,11 +102,23 @@ The remaining sync bookkeeping rows are client-internal (never sent verbatim to 
 entries are re-validated server-side per field) so TypeScript interfaces in
 `dexie.ts` are their schema documents.
 
+Migration 0042 adds OAuth and mutation-idempotency tables using PostgreSQL
+arrays and scalar/text columns. It adds no JSON/JSONB field: idempotent response
+bodies are serialized text and returned only after the current actor/grant is
+validated.
+
 For both library effect arrays, `damage_thrust` / `damage_swing` values are
 signed flat adds to the corresponding final ST-based damage dice. Scaling
 and active conditions apply before summation; temporary ST changes the base
 table lookup first. Weapon adds then apply once; explicit weapon dice do not
 receive these ST-based bonuses.
+
+Weapon-scoped declarations are copied into the same owned mechanics snapshots.
+Resolved character-detail effects add `matchedInventoryItemIds` and a
+`weaponMatchStatus` (`zero`, `one`, or `multiple`) for presentation only; those
+diagnostic fields are derived, not persisted. Runtime `library_item` matching
+uses its UUID when present. YAML export removes that local UUID and retains the
+name fallback, which still requires non-null `inventory_items.library_item_id`.
 
 ## Checklist for adding a new JSON field
 
@@ -109,3 +130,13 @@ receive these ST-based bonuses.
    the schema.
 4. Mirror the type on the Dexie interface if the entity is sync-backed.
 5. Add a row to the table above.
+
+## Active effects and skill procedures
+
+| Field | Zod schema and write boundaries |
+|---|---|
+| `characters.active_effects` | `activeEffectsField` (`activeEffects.ts`), typed `ActiveEffectInstance[]`; character create/update/sync schemas, authoritative source hydration, library refresh, and transactional client writes. Cursor application validates too. |
+| `campaign_library_active_effects.tags`, `.effects`, `.capabilities`, `.duration`, `.stacking` | Corresponding fields of `activeEffectDefinitionCreate`; Drizzle types derive from `ActiveEffectDefinition`. Library CRUD/YAML validate, and refresh reparses `activeEffectsField`. |
+| `campaign_library_skills.procedures` | `skillProcedures` (`skillProcedures.ts`), typed `SkillProcedures`; library CRUD/YAML and owned-snapshot parsing. |
+| `character_skills.library_mechanics.skillRules.procedures` | Optional `skillProcedures` within `ownedSkillRules`; captured, refreshed and retained with existing owned mechanics. |
+| Dexie `campaigns.activeEffectDefinitions` | Read-only `activeEffectDefinitionOut[]` cursor projection; validated at emission/application, retained by campaign mirrors, purged with campaigns. No additional server JSON column. |

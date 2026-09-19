@@ -29,6 +29,7 @@ import {
   buildTraitOut as buildTraitOutShared,
 } from '../../shared/domain/characterDetail.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
+import type { AuditTx } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
   type DbCampaign,
@@ -121,55 +122,50 @@ export function buildCharacterDetail(input: SummaryInput) {
  * `characterDetail` after a read or a write calls this rather than
  * re-selecting the same six tables itself.
  */
-export async function loadCharacterDetail(id: string) {
-  const db = getDb();
+export async function loadCharacterDetail(
+  id: string,
+  db: ReturnType<typeof getDb> | AuditTx = getDb(),
+) {
   const [c] = await db.select().from(characters).where(eq(characters.id, id));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
-  const [traits, skills, spells, languages, techniques, inventory, combat, campaign] =
-    await Promise.all([
-      db
-        .select()
-        .from(characterTraits)
-        .where(eq(characterTraits.characterId, id))
-        .orderBy(asc(characterTraits.kind), asc(characterTraits.name)),
-      db
-        .select()
-        .from(characterSkills)
-        .where(eq(characterSkills.characterId, id))
-        .orderBy(asc(characterSkills.name)),
-      db
-        .select()
-        .from(characterSpells)
-        .where(eq(characterSpells.characterId, id))
-        .orderBy(asc(characterSpells.name)),
-      db
-        .select()
-        .from(characterLanguages)
-        .where(eq(characterLanguages.characterId, id))
-        .orderBy(asc(characterLanguages.name)),
-      db
-        .select()
-        .from(characterTechniques)
-        .where(eq(characterTechniques.characterId, id))
-        .orderBy(asc(characterTechniques.name)),
-      db
-        .select()
-        .from(inventoryItems)
-        .where(eq(inventoryItems.characterId, id))
-        .orderBy(asc(inventoryItems.name)),
-      db
-        .select()
-        .from(combatStates)
-        .where(eq(combatStates.characterId, id))
-        .then((r) => r[0] ?? null),
-      c.campaignId
-        ? db
-            .select()
-            .from(campaigns)
-            .where(eq(campaigns.id, c.campaignId))
-            .then((r) => r[0] ?? null)
-        : Promise.resolve(null),
-    ]);
+  // Delegated operations intentionally run the whole shared handler on one
+  // transaction/connection. Keep these queries sequential; node-postgres does
+  // not support concurrent query execution on a single client.
+  const traits = await db
+    .select()
+    .from(characterTraits)
+    .where(eq(characterTraits.characterId, id))
+    .orderBy(asc(characterTraits.kind), asc(characterTraits.name));
+  const skills = await db
+    .select()
+    .from(characterSkills)
+    .where(eq(characterSkills.characterId, id))
+    .orderBy(asc(characterSkills.name));
+  const spells = await db
+    .select()
+    .from(characterSpells)
+    .where(eq(characterSpells.characterId, id))
+    .orderBy(asc(characterSpells.name));
+  const languages = await db
+    .select()
+    .from(characterLanguages)
+    .where(eq(characterLanguages.characterId, id))
+    .orderBy(asc(characterLanguages.name));
+  const techniques = await db
+    .select()
+    .from(characterTechniques)
+    .where(eq(characterTechniques.characterId, id))
+    .orderBy(asc(characterTechniques.name));
+  const inventory = await db
+    .select()
+    .from(inventoryItems)
+    .where(eq(inventoryItems.characterId, id))
+    .orderBy(asc(inventoryItems.name));
+  const combat =
+    (await db.select().from(combatStates).where(eq(combatStates.characterId, id)))[0] ?? null;
+  const campaign = c.campaignId
+    ? ((await db.select().from(campaigns).where(eq(campaigns.id, c.campaignId)))[0] ?? null)
+    : null;
   return buildCharacterDetail({
     character: c,
     traits,

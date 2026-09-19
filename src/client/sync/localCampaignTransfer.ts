@@ -1,4 +1,5 @@
 import type { Table } from 'dexie';
+import { enchantmentRef } from '../../shared/schemas/inventory.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { type LocalCampaignTransferUndo, getLocalDb } from '../db/dexie.ts';
 
@@ -30,10 +31,24 @@ export function localCampaignReferenceUndo(
 ): LocalCampaignTransferUndo | null {
   const index = campaignTransferStores().findIndex((table) => table.name === store);
   const field = fields[index];
-  if (!field || typeof row[field] !== 'string') return null;
-  const before: Record<string, unknown> = { [field]: row[field] };
-  const after: Record<string, unknown> = { [field]: null };
-  if (index < 2) {
+  if (!field) return null;
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
+  if (typeof row[field] === 'string') {
+    before[field] = row[field];
+    after[field] = null;
+  }
+  if (index === 3) {
+    const parsed = enchantmentRef.array().safeParse(row.enchantments ?? []);
+    if (parsed.success && parsed.data.some((entry) => entry.definitionId)) {
+      before.enchantments = parsed.data;
+      after.enchantments = parsed.data.map((entry) =>
+        entry.definitionId ? { ...entry, definitionId: null } : entry,
+      );
+    }
+  }
+  if (Object.keys(after).length === 0) return null;
+  if (index < 2 && typeof row[field] === 'string') {
     before.libraryMechanics = row.libraryMechanics ?? null;
     const saved = libraryMechanics.safeParse(row.libraryMechanics);
     const trusted =
@@ -54,6 +69,16 @@ export async function detachLocalCampaignReferences(
   campaignId: string | null,
 ) {
   const undo: LocalCampaignTransferUndo[] = [];
+  const db = getLocalDb();
+  const character = await db.characters.get(characterId);
+  if (character?.activeEffects?.some((e) => e.definitionId)) {
+    const before = { activeEffects: character.activeEffects };
+    const after = {
+      activeEffects: character.activeEffects.map((e) => ({ ...e, definitionId: null })),
+    };
+    undo.push({ store: db.characters.name, entityId: characterId, campaignId, before, after });
+    await db.characters.update(characterId, after);
+  }
   const stores = campaignTransferStores();
   for (const store of stores) {
     const table = store as unknown as Table<Record<string, unknown>, string>;
@@ -79,9 +104,9 @@ export async function restoreLocalCampaignReferences(
       (typeof campaignId === 'string' ? campaignId.toLowerCase() : campaignId)
     )
       continue;
-    const table = campaignTransferStores().find((store) => store.name === entry.store) as
-      | Table<Record<string, unknown>, string>
-      | undefined;
+    const table = [db.characters, ...campaignTransferStores()].find(
+      (store) => store.name === entry.store,
+    ) as Table<Record<string, unknown>, string> | undefined;
     if (!table) continue;
     const row = await table.get(entry.entityId);
     if (

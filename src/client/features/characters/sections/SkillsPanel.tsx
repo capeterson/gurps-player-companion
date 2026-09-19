@@ -1,10 +1,20 @@
 import { useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
+import {
+  type ResolvedLibrarySkillSpecialization,
+  effectiveSpecializationPolicy,
+  initialLibrarySkillSpecialization,
+  librarySkillCopyNotes,
+  resolveLibrarySkillSpecialization,
+} from '../../../../shared/domain/librarySkillSpecializations.ts';
 import type { LibrarySkillOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
+import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
+import { FoldSection } from '../../../components/ui/FoldSection.tsx';
+import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
@@ -12,6 +22,8 @@ import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
+import { ProseActionPreview } from './SkillRulePreview.tsx';
+import { ModifierBreakdownContent, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
@@ -40,7 +52,15 @@ interface SkillSnapshot {
   points: number;
   pointsRaw: string;
   picked: LibrarySkillOut | null;
+  specialization: string;
+  techLevel: number | null;
   nameVersion: number;
+}
+
+function fixedPickedTechLevel(skill: LibrarySkillOut | null): number | null {
+  if (!skill) return null;
+  if (skill.techLevelPolicy?.kind === 'fixed') return skill.techLevelPolicy.techLevel;
+  return skill.techLevelPolicy == null ? skill.techLevel : null;
 }
 
 function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) {
@@ -49,11 +69,18 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   const [difficulty, setDifficulty] = useState<SkillDifficulty>('A');
   const [points, setPoints] = useState('1');
   const [picked, setPicked] = useState<LibrarySkillOut | null>(null);
+  const [specialization, setSpecialization] = useState('');
+  const [techLevel, setTechLevel] = useState('');
+  const pickedPolicy = picked
+    ? effectiveSpecializationPolicy(picked.specializationPolicy, picked.defaultSpecialization)
+    : null;
   const nameVersion = useRef(0);
   const editName = (value: string) => {
     setName(value);
     nameVersion.current++;
     setPicked(null);
+    setSpecialization('');
+    setTechLevel('');
   };
 
   const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
@@ -65,13 +92,28 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   } = useAddEntityForm({
     entityClass: 'character_skill',
     characterId,
-    label: `skill "${skillDisplayName(name, picked?.defaultSpecialization)}"`,
+    label: `skill "${skillDisplayName(name, specialization)}"`,
   });
 
   async function submit(snap: SkillSnapshot) {
     if (snap.picked && snap.picked.campaignId !== campaignId) {
       reject('Campaign changed — select a skill from the current campaign library');
       return;
+    }
+    let resolved: ResolvedLibrarySkillSpecialization = {
+      specialization: snap.specialization.trim() || null,
+      description: null,
+      prerequisites: null,
+      prerequisiteRules: null,
+      defaults: null,
+    };
+    if (snap.picked) {
+      try {
+        resolved = resolveLibrarySkillSpecialization(snap.picked, snap.specialization);
+      } catch (error) {
+        reject((error as Error).message);
+        return;
+      }
     }
     await submitEntity(
       {
@@ -81,17 +123,10 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         points: snap.points,
         characterId,
         librarySkillId: snap.picked?.id ?? null,
-        defaults: snap.picked?.defaults ?? null,
-        specialization: snap.picked?.defaultSpecialization ?? null,
-        techLevel: snap.picked?.techLevel ?? null,
-        notes:
-          [
-            snap.picked?.description,
-            snap.picked?.source ? `Source: ${snap.picked.source}` : null,
-            snap.picked?.prerequisites ? `Prerequisites: ${snap.picked.prerequisites}` : null,
-          ]
-            .filter(Boolean)
-            .join('\n\n') || null,
+        defaults: resolved.defaults,
+        specialization: resolved.specialization,
+        techLevel: snap.techLevel,
+        notes: librarySkillCopyNotes(snap.picked?.source, resolved),
       },
       () => {
         // Per AGENTS.md (rule 1: never silently discard user edits): only
@@ -105,6 +140,8 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         if (nameVersion.current === snap.nameVersion) {
           setName((cur) => (cur === snap.nameRaw ? '' : cur));
           setPicked((cur) => (cur === snap.picked ? null : cur));
+          setSpecialization((cur) => (cur === snap.specialization ? '' : cur));
+          setTechLevel('');
         }
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
       },
@@ -114,6 +151,18 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
             campaignId: snap.picked.campaignId,
             sourceRevision: null,
             effects: snap.picked.effects ?? null,
+            skillRules: {
+              techLevelPolicy:
+                snap.picked.techLevelPolicy ??
+                (snap.picked.techLevel == null
+                  ? { kind: 'not_applicable' }
+                  : { kind: 'fixed', techLevel: snap.picked.techLevel }),
+              prerequisites: resolved.prerequisiteRules ?? null,
+              defaults: resolved.defaults ?? null,
+              groups: snap.picked.groups ?? [],
+              tags: snap.picked.tags ?? [],
+              procedures: snap.picked.procedures,
+            },
           })
         : null,
     );
@@ -137,6 +186,8 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           points: Number.isFinite(pParsed) && pParsed >= 0 ? pParsed : 1,
           pointsRaw: points,
           picked,
+          specialization,
+          techLevel: fixedPickedTechLevel(picked) ?? (techLevel.trim() ? Number(techLevel) : null),
           nameVersion: nameVersion.current,
         });
       }}
@@ -155,14 +206,20 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
               setDifficulty(opt.difficulty as SkillDifficulty);
               nameVersion.current++;
               setPicked(opt);
+              setSpecialization(initialLibrarySkillSpecialization(opt) ?? '');
+              setTechLevel(fixedPickedTechLevel(opt)?.toString() ?? '');
             }}
             fetchOptions={fetchOptions}
             getOptionKey={(o) => o.id}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">
                 <span className="truncate">
-                  {skillDisplayName(o.name, o.defaultSpecialization)}
-                  {o.techLevel != null ? ` / TL${o.techLevel}` : ''}
+                  {o.name}
+                  {o.techLevelPolicy?.kind === 'required'
+                    ? ' / TL'
+                    : o.techLevel != null
+                      ? ` / TL${o.techLevel}`
+                      : ''}
                 </span>
                 <span className="num text-xs text-base-content/70">
                   {o.attribute}/{o.difficulty}
@@ -183,11 +240,67 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
         )}
         {picked && (
           <span className="min-w-0 break-words text-xs text-base-content/70">
-            {skillDisplayName(picked.name, picked.defaultSpecialization)}
-            {picked.techLevel != null ? ` / TL${picked.techLevel}` : ''}
+            {skillDisplayName(picked.name, specialization)}
+            {picked.techLevelPolicy?.kind === 'required'
+              ? ' / TL'
+              : picked.techLevel != null
+                ? ` / TL${picked.techLevel}`
+                : ''}
           </span>
         )}
       </div>
+      {pickedPolicy?.kind === 'required_catalog' || pickedPolicy?.kind === 'optional_catalog' ? (
+        <label className="form-control min-w-36">
+          <span className="label-text text-xs">Specialization</span>
+          <select
+            aria-label="Specialization"
+            className="select select-bordered select-sm"
+            value={specialization}
+            onChange={(event) => {
+              setSpecialization(event.target.value);
+              nameVersion.current++;
+            }}
+          >
+            {pickedPolicy.kind === 'optional_catalog' && <option value="">None</option>}
+            {pickedPolicy.options.map((option) => (
+              <option key={option.name} value={option.name}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : pickedPolicy?.kind === 'required_freeform' ||
+        pickedPolicy?.kind === 'optional_freeform' ? (
+        <label className="form-control min-w-36">
+          <span className="label-text text-xs">Specialization</span>
+          <input
+            aria-label="Specialization"
+            className="input input-bordered input-sm"
+            value={specialization}
+            maxLength={160}
+            required={pickedPolicy.kind === 'required_freeform'}
+            onChange={(event) => {
+              setSpecialization(event.target.value);
+              nameVersion.current++;
+            }}
+          />
+        </label>
+      ) : null}
+      {picked?.techLevelPolicy?.kind === 'required' && (
+        <label className="form-control w-20">
+          <span className="label-text text-xs">TL *</span>
+          <input
+            aria-label="Skill Tech Level"
+            className="input input-bordered input-sm num"
+            type="number"
+            min={0}
+            max={12}
+            required
+            value={techLevel}
+            onChange={(event) => setTechLevel(event.target.value)}
+          />
+        </label>
+      )}
       <label className="form-control">
         <span className="label-text text-xs">Attr</span>
         <select
@@ -220,7 +333,17 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           onChange={(e) => setPoints(e.target.value)}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+      <button
+        type="submit"
+        className="btn btn-sm btn-primary"
+        disabled={
+          creating ||
+          ((pickedPolicy?.kind === 'required_catalog' ||
+            pickedPolicy?.kind === 'required_freeform') &&
+            !specialization.trim()) ||
+          (picked?.techLevelPolicy?.kind === 'required' && !techLevel.trim())
+        }
+      >
         {creating ? 'Adding…' : 'Add'}
       </button>
     </form>
@@ -232,13 +355,57 @@ interface SkillRowProps {
   skill: SkillOut;
   canWrite: boolean;
   onRoll: (req: RollRequest) => void;
+  effects: CharacterDetail['effects'];
 }
 
-function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
+function SkillModifierTooltip({
+  displayName,
+  baseValue,
+  effects,
+  finalValue,
+}: {
+  displayName: string;
+  baseValue: number | null;
+  effects: CharacterDetail['effects'];
+  finalValue: number | null;
+}) {
+  if (effects.length === 0) return null;
+  return (
+    <InfoTooltip
+      ariaLabel={`View ${displayName} modifiers`}
+      side="bottom"
+      triggerClassName="num shrink-0 cursor-help rounded border border-warning px-1 text-[10px] text-warning transition-colors hover:bg-warning/10 focus-visible:outline-2 focus-visible:outline-primary"
+      content={
+        <div>
+          <div className="label-eyebrow mb-2">{displayName} modifiers</div>
+          <ModifierBreakdownContent
+            baseLabel="Base skill"
+            baseValue={baseValue ?? '—'}
+            globalEffects={effects}
+            finalValue={finalValue ?? '—'}
+          />
+        </div>
+      }
+    >
+      <span aria-hidden="true">✦</span>
+    </InfoTooltip>
+  );
+}
+
+function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const displayName = skillDisplayName(skill.name, skill.specialization);
+  const bonusEffects = skillEffectsForRow(effects, skill.name, skill.specialization);
+  const modifierTooltip = (
+    <SkillModifierTooltip
+      displayName={displayName}
+      baseValue={skill.level}
+      effects={bonusEffects}
+      finalValue={skill.effectiveLevel}
+    />
+  );
   const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, displayName);
 
   const nameField = useEntityNameField(rowPatch, skill.name);
@@ -265,61 +432,113 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
   };
 
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_minmax(3.5rem,4rem)_minmax(3rem,4rem)_minmax(3rem,4rem)_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 items-center py-2 border-b border-base-300 last:border-0">
-      {canWrite ? (
-        <div className="min-w-0">
-          <input
-            aria-label={`${displayName} name`}
-            className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 font-medium`}
-            {...nameField.inputProps}
-          />
-          {(skill.specialization || skill.techLevel != null) && (
-            <span className="block break-words text-xs text-base-content/70">
-              {skill.specialization ? `(${skill.specialization})` : ''}
-              {skill.techLevel != null ? ` TL${skill.techLevel}` : ''}
+    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:items-center sm:gap-2 sm:py-2">
+      <div className="col-span-2 min-w-0 sm:col-span-1">
+        {canWrite ? (
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1.5 font-medium">
+              <span className="flex min-w-0 items-center">
+                <input
+                  aria-label={`${displayName} name`}
+                  className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm min-w-[1ch] max-w-full shrink px-0 font-medium [field-sizing:content]`}
+                  {...nameField.inputProps}
+                />
+                {skill.specialization && (
+                  <span className="min-w-0 break-words">/{skill.specialization}</span>
+                )}
+              </span>
+              {modifierTooltip}
+            </div>
+            {skill.techLevel != null && (
+              <span className="block break-words text-xs text-base-content/70">
+                TL{skill.techLevel}
+              </span>
+            )}
+            {skill.prerequisiteStatus && skill.prerequisiteStatus !== 'met' && (
+              <span className="block break-words text-xs text-warning">
+                {skill.prerequisiteStatus === 'unknown' ? 'Check prerequisites' : 'Unmet'}:{' '}
+                {skill.prerequisiteMessages?.join('; ')}
+              </span>
+            )}
+            {skill.defaultConditionMessages?.length ? (
+              <span className="block break-words text-xs text-base-content/70">
+                Defaults: {skill.defaultConditionMessages.join('; ')}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <span className="min-w-0">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="min-w-0 break-words font-medium">
+                {displayName}
+                {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+              </span>
+              {modifierTooltip}
             </span>
-          )}
-        </div>
-      ) : (
-        <span className="min-w-0 break-words font-medium">
-          {displayName}
-          {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+            {skill.prerequisiteStatus && skill.prerequisiteStatus !== 'met' ? (
+              <span className="block break-words text-xs text-warning">
+                {skill.prerequisiteStatus === 'unknown' ? 'Check prerequisites' : 'Unmet'}:{' '}
+                {skill.prerequisiteMessages?.join('; ')}
+              </span>
+            ) : null}
+            {skill.defaultConditionMessages?.length ? (
+              <span className="block break-words text-xs text-base-content/70">
+                Defaults: {skill.defaultConditionMessages.join('; ')}
+              </span>
+            ) : null}
+          </span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block sm:hidden">Attr/Diff</span>
+        <span className="num block text-xs text-base-content/70 sm:text-center">
+          {skill.attribute}/{skill.difficulty}
         </span>
-      )}
-      <span className="text-xs text-base-content/70 num text-center">
-        {skill.attribute}/{skill.difficulty}
-      </span>
-      {canWrite ? (
-        <input
-          aria-label={`${displayName} points`}
-          className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right`}
-          {...pointsField.inputProps}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block sm:hidden">Pts</span>
+        {canWrite ? (
+          <input
+            aria-label={`${displayName} points`}
+            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
+            {...pointsField.inputProps}
+          />
+        ) : (
+          <span className="num block text-right">{skill.points}</span>
+        )}
+      </div>
+      <div className="min-w-0">
+        <span className="label-eyebrow mb-1 block sm:hidden">Lvl</span>
+        <RollLevelChip
+          level={skill.effectiveLevel ?? skill.level}
+          name={displayName}
+          title={
+            skill.points <= 0
+              ? skill.defaults == null
+                ? 'Defaults unknown — add the skill definition'
+                : skill.defaults.length === 0
+                  ? 'This skill has no default'
+                  : 'Best available declared default (B173)'
+              : skill.effectiveLevel != null &&
+                  skill.level != null &&
+                  skill.effectiveLevel !== skill.level
+                ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
+                : undefined
+          }
+          onRoll={(level) =>
+            onRoll({
+              label: displayName,
+              baseTarget: level,
+              rules: skill.procedures?.modifiers.filter((r) => r.appliesTo !== 'base_level') ?? [],
+              ruleContext: skill.procedureContext ?? {},
+            })
+          }
         />
-      ) : (
-        <span className="num text-right">{skill.points}</span>
-      )}
-      <RollLevelChip
-        level={skill.effectiveLevel ?? skill.level}
-        name={displayName}
-        title={
-          skill.points <= 0
-            ? skill.defaults == null
-              ? 'Defaults unknown — add the skill definition'
-              : skill.defaults.length === 0
-                ? 'This skill has no default'
-                : 'Best available declared default (B173)'
-            : skill.effectiveLevel != null &&
-                skill.level != null &&
-                skill.effectiveLevel !== skill.level
-              ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
-              : undefined
-        }
-        onRoll={(level) => onRoll({ label: displayName, baseTarget: level })}
-      />
+      </div>
       {canWrite && (
         <button
           type="button"
-          className="btn btn-ghost btn-xs"
+          className="btn btn-ghost btn-xs justify-self-end self-end sm:self-center"
           onClick={() => setConfirmDelete(true)}
           aria-label={`Delete skill ${displayName}`}
         >
@@ -340,6 +559,65 @@ function SkillRow({ characterId, skill, canWrite, onRoll }: SkillRowProps) {
         }}
         onCancel={() => setConfirmDelete(false)}
       />
+      {skill.procedures && (
+        <div className="col-span-full space-y-2">
+          {skill.procedures.actions.length > 0 && <h4 className="label-eyebrow">Actions</h4>}
+          {skill.procedures.actions.map((action) => (
+            <div key={action.id} className="rounded border border-base-300 p-2">
+              <p>{action.label}</p>
+              <p className="text-xs">{action.sourceText}</p>
+              {skill.actionTargets?.[action.id] != null ? (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() =>
+                    onRoll({
+                      label: `${displayName}: ${action.label}`,
+                      baseTarget: skill.actionTargets?.[action.id] ?? 0,
+                      rules: (skill.procedures?.modifiers ?? []).filter(
+                        (r) => r.appliesTo !== 'base_level',
+                      ),
+                      ruleContext: skill.procedureContext ?? {},
+                      action,
+                    })
+                  }
+                >
+                  Preview {action.label}
+                </button>
+              ) : (
+                <>
+                  <p className="text-xs">
+                    Prose-only or roll basis unavailable. {action.roll?.notes}
+                  </p>
+                  <ProseActionPreview
+                    action={action}
+                    source={displayName}
+                    context={skill.procedureContext ?? {}}
+                  />
+                </>
+              )}
+            </div>
+          ))}
+          {skill.procedures.benefits.map((benefit) => (
+            <p className="text-xs" key={benefit.id}>
+              {skill.benefitStatus?.find((b) => b.id === benefit.id)?.unlocked
+                ? 'Active'
+                : 'Locked'}
+              : {benefit.label} — {benefit.sourceText}
+            </p>
+          ))}
+        </div>
+      )}
+      {skill.notes && (
+        <FoldSection
+          preferenceKey={`${skill.id}:description`}
+          title="Description"
+          defaultOpen={false}
+          className="col-span-full mt-2 text-xs"
+        >
+          <Markdown source={skill.notes} className="mt-2" />
+        </FoldSection>
+      )}
     </li>
   );
 }
@@ -357,8 +635,8 @@ export function SkillsPanel({
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
 
   return (
-    <section className="card space-y-3 p-5">
-      <header className="flex items-baseline justify-between">
+    <section className="card space-y-3 p-4 sm:p-5">
+      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div>
           <p className="label-eyebrow">Skills</p>
           <h2 className="font-display text-2xl">Skills & abilities</h2>
@@ -378,7 +656,7 @@ export function SkillsPanel({
         <p className="text-sm text-base-content/60">No skills yet.</p>
       ) : (
         <>
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(3.5rem,4rem)_minmax(3rem,4rem)_minmax(3rem,4rem)_auto] gap-1 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:gap-2 label-eyebrow border-b border-base-300 pb-1">
+          <div className="label-eyebrow hidden grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] gap-2 border-b border-base-300 pb-1 sm:grid">
             <span>Skill</span>
             <span className="text-center">Attr/Dif</span>
             <span className="text-right">Pts</span>
@@ -393,6 +671,7 @@ export function SkillsPanel({
                 skill={s}
                 canWrite={canWrite}
                 onRoll={setRollRequest}
+                effects={character.effects}
               />
             ))}
           </ul>

@@ -121,6 +121,32 @@ export const weaponData = z
   })
   .strict();
 
+// Effective values are derived, never accepted at a persistence boundary. A
+// valid base plus several valid enchantments can exceed the authoring caps.
+const effectiveDr = z.number().int().min(0);
+const effectiveDb = z.number().int().min(0);
+export const effectiveTypedArmorDr = typedArmorDr.extend({
+  cut: effectiveDr.nullable().optional(),
+  imp: effectiveDr.nullable().optional(),
+  pi: effectiveDr.nullable().optional(),
+  pi_minus: effectiveDr.nullable().optional(),
+  pi_plus: effectiveDr.nullable().optional(),
+  pi_pp: effectiveDr.nullable().optional(),
+  burn: effectiveDr.nullable().optional(),
+  corr: effectiveDr.nullable().optional(),
+  fat: effectiveDr.nullable().optional(),
+  tox: effectiveDr.nullable().optional(),
+});
+export const effectiveArmorData = armorData.extend({
+  dr: effectiveDr,
+  drCrushing: effectiveDr.nullable().optional(),
+  typedDr: effectiveTypedArmorDr,
+  db: effectiveDb.nullable().optional(),
+});
+export const effectiveWeaponData = weaponData.extend({
+  db: effectiveDb.nullable().optional(),
+});
+
 /**
  * Powerstone metadata -- attached to an inventory item that stores
  * castable energy.  `currentEnergy` is mutable game state; recharges
@@ -158,13 +184,87 @@ export const powerstoneData = z
  */
 export const magicItemMode = z.enum(['charged', 'powered', 'continuous']);
 
+export const enchantmentApplicability = z.enum(['weapon', 'armor', 'shield', 'any']);
+export const enchantmentEffectTarget = z.enum([
+  'weapon_attack',
+  'weapon_damage',
+  'weapon_accuracy',
+  'weapon_parry',
+  'weapon_block',
+  'armor_divisor',
+  'dr',
+  'db',
+  'weight_reduction_percent',
+  'skill',
+]);
+export const enchantmentEffect = z
+  .object({
+    target: enchantmentEffectTarget,
+    value: z.number().int().min(-100).max(100),
+    skillName: z.string().trim().min(1).max(160).optional(),
+  })
+  .strict()
+  .superRefine((effect, ctx) => {
+    if (effect.target === 'skill' && !effect.skillName)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['skillName'],
+        message: "skillName is required when target='skill'",
+      });
+    if (effect.target !== 'skill' && effect.skillName)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['skillName'],
+        message: "skillName is only allowed when target='skill'",
+      });
+  });
+export const enchantmentStackingPolicy = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('stack') }).strict(),
+  z
+    .object({
+      kind: z.literal('highest'),
+      key: z.string().trim().min(1).max(80),
+    })
+    .strict(),
+]);
+export const enchantmentLevel = z
+  .object({
+    level: z.number().int().min(1).max(100),
+    label: z.string().trim().min(1).max(80).optional(),
+    effects: z.array(enchantmentEffect).max(30).default([]),
+  })
+  .strict();
+export const enchantmentLevels = z
+  .array(enchantmentLevel)
+  .max(20)
+  .superRefine((levels, ctx) => {
+    const seen = new Set<number>();
+    for (const [index, entry] of levels.entries()) {
+      if (seen.has(entry.level))
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, 'level'],
+          message: 'enchantment levels must be unique',
+        });
+      seen.add(entry.level);
+    }
+  });
+export const enchantmentMechanics = z
+  .object({
+    applicability: enchantmentApplicability.default('any'),
+    effects: z.array(enchantmentEffect).max(30).default([]),
+    levels: enchantmentLevels.default([]),
+    stackingPolicy: enchantmentStackingPolicy.default({ kind: 'stack' }),
+  })
+  .strict();
+
 /**
  * One enchantment on an inventory item (B262 enchantment economy, the
  * veteran sheet's "Fortify +3" / "Deflect +2" / "Cornucopia" rows).
- * Multiple enchantments stack on one item, so this is a list on the
- * item row rather than a separate magicItemData block (which models a
- * single *castable* spell). Non-mechanical metadata: nothing consumes
- * it in combat math yet; it records what the enchantments are.
+ * Legacy entries contain only the four original metadata fields. Structured
+ * entries additionally carry a same-campaign definition link plus a complete
+ * owned mechanics snapshot, so character calculation remains deterministic
+ * offline and after source deletion.
  */
 export const enchantmentRef = z
   .object({
@@ -176,6 +276,11 @@ export const enchantmentRef = z
     /** Free-text category label, e.g. "Fortify +3" or "Deflect +2". */
     category: z.string().max(80).nullable().optional(),
     notes: z.string().max(2000).nullable().optional(),
+    level: z.number().int().min(1).max(100).nullable().optional(),
+    definitionId: uuid.nullable().optional(),
+    definitionRevision: z.number().int().min(0).nullable().optional(),
+    definitionSource: z.string().max(40).nullable().optional(),
+    mechanics: enchantmentMechanics.nullable().optional(),
   })
   .strict();
 
@@ -201,6 +306,17 @@ export const magicItemData = z
     },
   );
 
+export const enchantmentContribution = z.object({
+  /** Optional for compatibility with character details cached before this field existed. */
+  instanceKey: z.string().min(1).max(240).optional(),
+  sourceName: z.string().min(1).max(322),
+  target: enchantmentEffectTarget,
+  value: z.number(),
+  active: z.boolean(),
+  stackingKey: z.string().max(80).nullable(),
+  suppressedByStacking: z.boolean(),
+});
+
 export const inventoryItemOut = z.object({
   id: uuid,
   characterId: uuid,
@@ -217,11 +333,17 @@ export const inventoryItemOut = z.object({
   hideawayCapacityLbs: z.number().min(0).max(1_000_000),
   weightReductionPercent: z.number().int().min(0).max(100),
   isArmor: z.boolean(),
-  armor: armorData.nullable(),
-  weaponData: weaponData.nullable(),
+  armor: effectiveArmorData.nullable(),
+  weaponData: effectiveWeaponData.nullable(),
   powerstoneData: powerstoneData.nullable(),
   magicItemData: magicItemData.nullable(),
   enchantments: z.array(enchantmentRef).max(50).default([]),
+  /** Base persisted stat blocks are retained for auditable base-plus-effect UI. */
+  baseArmor: armorData.nullable().optional(),
+  baseWeaponData: weaponData.nullable().optional(),
+  effectiveArmorDivisor: z.number().positive().nullable().optional(),
+  effectiveWeightReductionPercent: z.number().min(0).max(100).optional(),
+  enchantmentBreakdown: z.array(enchantmentContribution).optional(),
   libraryItemId: uuid.nullable(),
   /** Server-computed convenience field. */
   effectiveWeightLbs: z.number(),
@@ -264,3 +386,9 @@ export type PowerstoneData = z.infer<typeof powerstoneData>;
 export type MagicItemData = z.infer<typeof magicItemData>;
 export type MagicItemMode = z.infer<typeof magicItemMode>;
 export type EnchantmentRef = z.infer<typeof enchantmentRef>;
+export type EnchantmentEffect = z.infer<typeof enchantmentEffect>;
+export type EnchantmentEffectTarget = z.infer<typeof enchantmentEffectTarget>;
+export type EnchantmentMechanics = z.infer<typeof enchantmentMechanics>;
+export type EnchantmentApplicability = z.infer<typeof enchantmentApplicability>;
+export type EnchantmentLevel = z.infer<typeof enchantmentLevel>;
+export type EnchantmentStackingPolicy = z.infer<typeof enchantmentStackingPolicy>;

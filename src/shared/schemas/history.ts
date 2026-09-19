@@ -22,6 +22,9 @@ export const historyEventOut = z.object({
   campaignId: uuid.nullable(),
   actorUserId: uuid.nullable(),
   actorDisplayName: z.string().nullable(),
+  agentClientId: uuid.nullable().optional(),
+  agentGrantId: uuid.nullable().optional(),
+  agentClientName: z.string().nullable().optional(),
   batchId: uuid.nullable(),
   // Total number of rows sharing this batchId in the requested history-feed
   // scope, including rows outside the current pagination page. This lets
@@ -73,5 +76,13 @@ export const SYNCABLE_TABLES: Record<string, { table: string; family: 'character
     campaign_library_language: { table: 'campaign_library_languages', family: 'campaign' },
     campaign_library_technique: { table: 'campaign_library_techniques', family: 'campaign' },
     campaign_library_style: { table: 'campaign_library_styles', family: 'campaign' },
+    campaign_library_active_effect: {
+      table: 'campaign_library_active_effects',
+      family: 'campaign',
+    },
+    campaign_library_enchantment: {
+      table: 'campaign_library_enchantments',
+      family: 'campaign',
+    },
     adventure_log: { table: 'adventure_log_entries', family: 'campaign' },
   };

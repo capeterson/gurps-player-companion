@@ -16,7 +16,7 @@ export interface AuthenticatedUser {
   readonly email: string;
   readonly displayName: string;
   readonly suspendedAt: Date | null;
-  readonly authMethod: 'jwt' | 'api_key';
+  readonly authMethod: 'jwt' | 'api_key' | 'oauth';
   readonly authVersion: number;
   /** Unix seconds for the last primary credential ceremony; refresh does not advance it. */
   readonly authenticatedAt: number | null;

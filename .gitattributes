@@ -5,6 +5,10 @@
 # producing endless phantom diffs.
 * text=auto eol=lf
 
+# Generated API contracts remain checked for drift; collapse them in PR reviews.
+docs/openapi.json linguist-generated=true
+docs/mcp-tools.json linguist-generated=true
+
 # Keep binary assets byte-identical.
 *.png binary
 *.jpg binary

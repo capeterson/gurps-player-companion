@@ -33,7 +33,13 @@ import {
 } from '../constants/skills.ts';
 import type { SkillDefaults } from '../schemas/skill.ts';
 import type { DerivedStats } from './characterCalc.ts';
-import { skillDisplayName } from './defenseCalc.ts';
+import { skillDisplayName, splitSkillReference } from './defenseCalc.ts';
+import {
+  type DefaultConditionContext,
+  conditionsProven,
+  crossTechLevelPenalty,
+  evaluateSkillDefaultConditions,
+} from './skillRules.ts';
 
 /**
  * Offset for an invested skill, per the B170 ladder.  Callers must
@@ -80,8 +86,81 @@ function defaultAttributeLevel(attribute: SkillAttribute, derived: DerivedStats)
 export interface TrainedSkillDefaultSource {
   name: string;
   specialization: string | null;
+  groups?: readonly string[];
+  tags?: readonly string[];
+  techLevel?: number | null;
   /** Learned source level before Talent; caller must exclude dependency cycles. */
   level: number;
+}
+
+function sourceConditionContext(
+  declaration: Extract<
+    NonNullable<SkillDefaults>[number],
+    { kind: 'skill' | 'skill_group' | 'skill_tag' }
+  >,
+  source: TrainedSkillDefaultSource,
+  targetSpecialization: string | null | undefined,
+  context: DefaultConditionContext | undefined,
+): DefaultConditionContext {
+  const normalize = (value: string | null | undefined) =>
+    value?.trim().replace(/\s+/g, ' ').toLowerCase() ?? '';
+  const dimensions = Object.fromEntries(
+    (declaration.conditions ?? [])
+      .filter((condition) => condition.kind === 'same_specialization_dimension')
+      .map((condition) => [
+        condition.dimension,
+        source.specialization && targetSpecialization
+          ? normalize(source.specialization) === normalize(targetSpecialization)
+          : undefined,
+      ]),
+  );
+  return {
+    ...context,
+    specializationDimensions: {
+      ...dimensions,
+      ...context?.specializationDimensions,
+    },
+  };
+}
+
+function skillDefaultMatches(
+  declaration: Extract<
+    NonNullable<SkillDefaults>[number],
+    { kind: 'skill' | 'skill_group' | 'skill_tag' }
+  >,
+  source: TrainedSkillDefaultSource,
+  targetSpecialization: string | null | undefined,
+): boolean {
+  const normalize = (value: string | null | undefined) =>
+    value?.trim().replace(/\s+/g, ' ').toLowerCase() ?? '';
+  if (
+    declaration.kind === 'skill_group' &&
+    !source.groups?.some((group) => normalize(group) === normalize(declaration.group))
+  )
+    return false;
+  if (
+    declaration.kind === 'skill_tag' &&
+    !source.tags?.some((tag) => normalize(tag) === normalize(declaration.tag))
+  )
+    return false;
+  const legacy =
+    declaration.kind === 'skill'
+      ? splitSkillReference(declaration.name)
+      : { name: source.name, specialization: null };
+  const sourceReference = splitSkillReference(skillDisplayName(source.name, source.specialization));
+  if (normalize(sourceReference.name) !== normalize(legacy.name)) return false;
+  const matcher = declaration.specialization;
+  if (matcher === undefined) {
+    return normalize(sourceReference.specialization) === normalize(legacy.specialization);
+  }
+  if (typeof matcher === 'string') {
+    return normalize(sourceReference.specialization) === normalize(matcher);
+  }
+  if (matcher.kind === 'any') return true;
+  if (matcher.kind === 'same') {
+    return normalize(sourceReference.specialization) === normalize(targetSpecialization);
+  }
+  return normalize(sourceReference.specialization) === normalize(matcher.value);
 }
 
 /** Point value of a default on the target skill's own learning ladder. */
@@ -105,20 +184,33 @@ export function computeSkillLevel(
   derived: DerivedStats,
   defaults: SkillDefaults = null,
   trainedSkills: readonly TrainedSkillDefaultSource[] = [],
+  targetSpecialization?: string | null,
+  conditionContext?: DefaultConditionContext,
+  targetTechLevel?: number | null,
 ): number | null {
   const attr = attributeLevelFor(attribute, derived);
   let best = points > 0 ? attr + skillOffset(difficulty, points) : null;
-  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
   for (const candidate of defaults ?? []) {
     const levels =
       candidate.kind === 'attribute'
-        ? [defaultAttributeLevel(candidate.attribute, derived) + candidate.modifier]
+        ? conditionsProven(candidate.conditions, conditionContext)
+          ? [defaultAttributeLevel(candidate.attribute, derived) + candidate.modifier]
+          : []
         : trainedSkills
-            .filter((source) => {
-              const wanted = normalize(skillDisplayName(candidate.name, candidate.specialization));
-              return normalize(skillDisplayName(source.name, source.specialization)) === wanted;
-            })
-            .map((source) => source.level + candidate.modifier);
+            .filter((source) => skillDefaultMatches(candidate, source, targetSpecialization))
+            .filter((source) =>
+              conditionsProven(
+                candidate.conditions,
+                sourceConditionContext(candidate, source, targetSpecialization, conditionContext),
+              ),
+            )
+            .flatMap((source) => {
+              const tlPenalty =
+                source.techLevel != null && targetTechLevel != null
+                  ? crossTechLevelPenalty(attribute, source.techLevel, targetTechLevel)
+                  : 0;
+              return tlPenalty === null ? [] : [source.level + candidate.modifier + tlPenalty];
+            });
     for (const level of levels) {
       let improved = level;
       if (points > 0) {
@@ -140,6 +232,9 @@ interface DefaultableSkill {
   attribute: SkillAttribute;
   difficulty: SkillDifficulty;
   points: number;
+  techLevel?: number | null;
+  groups?: readonly string[];
+  tags?: readonly string[];
   defaults?: SkillDefaults;
 }
 
@@ -152,9 +247,13 @@ interface DefaultableSkill {
 export function resolveSkillLevels(
   skills: readonly DefaultableSkill[],
   derived: DerivedStats,
+  conditionContext?: DefaultConditionContext,
 ): Map<string, number | null> {
   const ordered = [...skills].sort((a, b) => a.id.localeCompare(b.id));
-  type SkillSource = Extract<NonNullable<SkillDefaults>[number], { kind: 'skill' }>;
+  type SkillSource = Extract<
+    NonNullable<SkillDefaults>[number],
+    { kind: 'skill' | 'skill_group' | 'skill_tag' }
+  >;
   const selected = new Map<string, { source: DefaultableSkill; declaration: SkillSource }>();
   const levels = new Map<string, number | null>();
   const levelFor = (skill: DefaultableSkill): number | null => {
@@ -173,9 +272,15 @@ export function resolveSkillLevels(
               name: parent.source.name,
               specialization: parent.source.specialization,
               level: sourceLevel,
+              ...(parent.source.groups ? { groups: parent.source.groups } : {}),
+              ...(parent.source.tags ? { tags: parent.source.tags } : {}),
+              techLevel: parent.source.techLevel ?? null,
             },
           ]
         : [],
+      skill.specialization,
+      conditionContext,
+      skill.techLevel,
     );
     levels.set(skill.id, level);
     return level;
@@ -195,7 +300,7 @@ export function resolveSkillLevels(
       let best = levelFor(skill);
       let choice = selected.get(skill.id);
       for (const declaration of skill.defaults ?? []) {
-        if (declaration.kind !== 'skill') continue;
+        if (declaration.kind === 'attribute') continue;
         for (const source of ordered) {
           if (source.points <= 0 || wouldCycle(skill.id, source.id)) continue;
           const sourceLevel = levelFor(source);
@@ -206,7 +311,19 @@ export function resolveSkillLevels(
             skill.points,
             derived,
             [declaration],
-            [{ name: source.name, specialization: source.specialization, level: sourceLevel }],
+            [
+              {
+                name: source.name,
+                specialization: source.specialization,
+                level: sourceLevel,
+                ...(source.groups ? { groups: source.groups } : {}),
+                ...(source.tags ? { tags: source.tags } : {}),
+                techLevel: source.techLevel ?? null,
+              },
+            ],
+            skill.specialization,
+            conditionContext,
+            skill.techLevel,
           );
           if (candidate !== null && (best === null || candidate > best)) {
             best = candidate;
@@ -223,4 +340,38 @@ export function resolveSkillLevels(
   }
   for (const skill of ordered) levelFor(skill);
   return levels;
+}
+
+/** Explain conditional candidates that cannot currently apply. Unknown context
+ * is intentionally visible rather than silently treated as false. */
+export function unresolvedDefaultConditionMessages(
+  defaults: SkillDefaults,
+  trainedSkills: readonly TrainedSkillDefaultSource[],
+  targetSpecialization: string | null | undefined,
+  context?: DefaultConditionContext,
+): string[] {
+  const messages = new Set<string>();
+  for (const candidate of defaults ?? []) {
+    if (!candidate.conditions?.length) continue;
+    const evaluations =
+      candidate.kind === 'attribute'
+        ? [evaluateSkillDefaultConditions(candidate.conditions, context)]
+        : trainedSkills
+            .filter((source) => skillDefaultMatches(candidate, source, targetSpecialization))
+            .map((source) =>
+              evaluateSkillDefaultConditions(
+                candidate.conditions,
+                sourceConditionContext(candidate, source, targetSpecialization, context),
+              ),
+            );
+    if (evaluations.some((group) => group.every((result) => result.truth === 'met'))) continue;
+    const attempted = evaluations.length
+      ? evaluations.flat()
+      : evaluateSkillDefaultConditions(candidate.conditions, context);
+    for (const result of attempted) {
+      if (result.truth !== 'met')
+        messages.add(`${result.truth === 'unknown' ? 'Unknown' : 'Unmet'}: ${result.message}`);
+    }
+  }
+  return [...messages];
 }
