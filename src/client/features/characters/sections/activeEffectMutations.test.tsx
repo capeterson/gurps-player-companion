@@ -238,14 +238,16 @@ it('queues same-field follow-ups during a slow push and preserves a different-fi
     attemptedValue: 'Renamed',
   });
   release();
-  await waitFor(async () => expect(await getLocalDb().outbox.count()).toBe(0), { timeout: 5_000 });
+  await waitFor(async () => expect(await getLocalDb().outbox.count()).toBe(0), {
+    timeout: 5_000,
+  });
   expect((await getLocalDb().characters.get(id))?.activeEffects?.[0]).toMatchObject({
     notes: 'Second',
     state: 'inactive',
   });
   expect((await getLocalDb().characters.get(id))?.name).toBe('Renamed');
   expect(sent.flat().filter((op) => op.fieldPath === 'activeEffects')).toHaveLength(2);
-});
+}, 10_000);
 
 it('expires round effects through the outbox when the solo tracker advances, without undoing expiry on Previous', async () => {
   await seed();

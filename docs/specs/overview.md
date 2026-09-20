@@ -377,9 +377,8 @@ shows the synced campaign name as a separate link to that campaign.
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
   hop. Full-width Pools put HP, FP, and posture/conditions side by side on wide
-  screens. Maneuver and Defenses share an asymmetrical row at wide breakpoints
-  (and stack while space is constrained); Attacks, armor coverage, the Solo
-  tracker, and roll history each use the full width below. Sections stack on
+  screens. Maneuver, Attacks, the combined defense/armor workspace, the Solo
+  tracker, and roll history each use the full width. Sections stack on
   mobile instead of accumulating into two independent, uneven columns. Main combat
   sections fold independently, with responsive grids inside them.
   - **Pools** — compact HP/FP meters with ±1 controls; ±5, reset and threshold
@@ -401,21 +400,25 @@ shows the synced campaign name as a separate link to that campaign.
     `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
     floating pool bar so rapid changes across both UIs never race. The bar
     appears at the top only after the sheet tab list has scrolled away, labels
-    both HP and FP, and opens range popovers with threshold/recovery marks.
+    both HP and FP, and opens one range popover at a time with threshold/recovery
+    marks. On mobile the open panel is fixed within the viewport rather than
+    overflowing from its trigger; Escape or an outside tap dismisses it.
     Derived pool states such as Reeling, Tired, Exhausted, death checks, and
     Unconscious are visible as badges; exceptional/certain-death bounds are
     de-emphasized notes rather than primary controls;
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
     so two rapid condition taps before Dexie re-renders don't coalesce
     into one outbox patch and drop the first tap.
-  - **Defense & Damage Resistance** — combines equipped armor, active global/location
-    innate DR, and natural skull DR 2 into one map per hit location
+  - **Defense & Damage Resistance** — combines Move, active defenses, equipped armor,
+    active global/location innate DR, and natural skull DR 2 in one workspace
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
     hit-location aim presets. A rounded, generic SVG silhouette exposes all 15
     standard locations with clickable zones, keyboard selection, and linked
     DR labels. The location picker also includes custom armor/innate locations.
     Damage-type and penetration controls update the whole map and the selected
-    location's layer breakdown. Unprotected locations remain selectable; unknown
+    location's layer breakdown. The same location/facing selection supplies armor
+    DB to Dodge, Parry, and Block, so the displayed defense scores and armor context
+    cannot drift apart. Unprotected locations remain selectable; unknown
     protection is shown as unavailable, not zero. Torso armor also protects vitals;
     explicitly listing both never counts a layer twice. Per-damage-type DR overrides
     (`armorData.typedDr` — e.g. a hauberk with 6 vs cut, 4 vs imp) and
@@ -475,11 +478,12 @@ shows the synced campaign name as a separate link to that campaign.
     it; choosing closes the picker), plus
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
-  - **Move & defenses** — a compact wrapping grid of tappable defense values.
-    Source breakdowns live with their corresponding actions, while the shared
-    incoming location/facing selectors and armor DB context live in Defense &
-    Damage Resistance. Current restrictions and All-Out Defense choices remain
-    visible. Move is read-only and net of encumbrance and combat restrictions;
+  - **Move & active defenses** — a compact, horizontally scrollable table inside
+    **Defense & Damage Resistance**, with sortable Defense, Governing skill, and
+    Final columns plus a device-local custom order that supports drag-and-drop and
+    keyboard arrow reordering. Source breakdowns stay collapsed on their rows;
+    current restrictions and All-Out Defense choices remain visible. Move is
+    read-only and net of encumbrance and combat restrictions;
     Dodge includes
     the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is

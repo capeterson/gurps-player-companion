@@ -211,7 +211,9 @@ works offline.**
    `navigator.locks` lease serializes the normal drain across tabs (lock order
    is always DRAIN → CURSOR); the atomic claim is the storage-level guard that
    prevents duplicate sends even when a lock is unavailable or two callers
-   race.
+   race. Outbox wake signals are latched while a drain request is in flight, so
+   follow-up edits queued during that request start the next drain immediately;
+   they cannot lose the signal and wait for the five-second safety poll.
 3. **Dispatch.** The server processes each op **independently** — one bad op
    never poisons the batch. HTTP status is always 200; per-op outcomes live in
    `outcomes[].status`. Optimistic concurrency uses `baseRevision`; a mismatch

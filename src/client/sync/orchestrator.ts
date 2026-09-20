@@ -235,6 +235,8 @@ interface OrchestratorEvents {
 class SyncOrchestrator {
   private started = false;
   private running = false;
+  /** Latches signals that arrive while a drain cycle is still running. */
+  private wakeRequested = false;
   private wakeUpResolve: (() => void) | null = null;
   private periodicTimer: ReturnType<typeof setInterval> | null = null;
   private outboxLiveSub: { unsubscribe(): void } | null = null;
@@ -741,19 +743,33 @@ class SyncOrchestrator {
   };
 
   private wake(): void {
+    // A signal can arrive while maybeDrainOnce is awaiting the network,
+    // before waitForSignal has installed its resolver. Remember it so a
+    // same-field follow-up queued during that request drains immediately
+    // after the current cycle instead of sleeping for the 5s safety poll.
+    this.wakeRequested = true;
     if (this.wakeUpResolve) {
-      this.wakeUpResolve();
+      const resolve = this.wakeUpResolve;
       this.wakeUpResolve = null;
+      resolve();
     }
   }
 
   private async waitForSignal(timeoutMs: number): Promise<void> {
+    if (this.wakeRequested) {
+      this.wakeRequested = false;
+      return;
+    }
     await new Promise<void>((resolve) => {
-      this.wakeUpResolve = resolve;
+      const finish = () => {
+        this.wakeRequested = false;
+        resolve();
+      };
+      this.wakeUpResolve = finish;
       setTimeout(() => {
-        if (this.wakeUpResolve === resolve) {
+        if (this.wakeUpResolve === finish) {
           this.wakeUpResolve = null;
-          resolve();
+          finish();
         }
       }, timeoutMs);
     });

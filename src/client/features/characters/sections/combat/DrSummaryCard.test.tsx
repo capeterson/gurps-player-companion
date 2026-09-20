@@ -40,6 +40,20 @@ function makeCharacter(
 describe('DrSummaryCard', () => {
   it('combines defense bonus context with damage resistance controls', () => {
     const character = makeCharacter([{ dr: 4, locations: ['torso'] }]);
+    character.derived = {
+      hp: 10,
+      fp: 10,
+      dodge: 9,
+      basicMove: 5,
+      effectiveSt: 10,
+    } as CharacterDetail['derived'];
+    character.encumbrance = {
+      dodgePenalty: 0,
+      moveMultiplier: 1,
+      label: 'None',
+      ratio: 1,
+    } as CharacterDetail['encumbrance'];
+    character.skills = [];
     const item = character.inventory[0];
     if (!item?.armor) throw new Error('missing armor fixture');
     item.name = 'Deflect Plate';
@@ -48,6 +62,12 @@ describe('DrSummaryCard', () => {
     render(<DrSummaryCard character={character} facing="front" onFacingChange={onFacingChange} />);
     expect(
       screen.getByRole('heading', { name: 'Defense & Damage Resistance' }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Defense and damage resistance' })).getByRole(
+        'table',
+        { name: 'Defenses' },
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/Armor DB \+2 from Deflect Plate/)).toBeInTheDocument();
     expect(screen.getByText(/Applied to Dodge, Parry, and Block/)).toBeInTheDocument();
