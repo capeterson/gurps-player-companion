@@ -568,6 +568,9 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   may also **edit** (`PATCH`) and **delete** (`DELETE`) entries; the client
   `LogPage` exposes Edit/Delete controls on entries the viewer may modify.
 - Entries carry `sessionDate`, `title`, `body`, `visibility`, and `xpAwards`.
+  Their optional integer `sessionNumber` starts at zero. Opening the create form
+  suggests zero for the first numbered entry, then one above the greatest
+  visible posted number; authors may freely edit or clear that suggestion.
 - **Body is markdown** (CommonMark + GFM), stored verbatim in the `body` text
   column. Rendering is sanitized at render time only:
   `src/client/components/markdown/markdownProcessor.ts` runs
@@ -583,7 +586,8 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   string — the editor never produces or persists HTML. Strict CommonMark line
   breaks (single newlines do not become `<br>`).
 - Client surface: `LogPage` (single-column `max-w-3xl` layout), also embedded
-  in `CampaignDetailPage`.
+  in `CampaignDetailPage`. Embedded mode is fixed to the parent campaign and
+  therefore does not render the standalone page's campaign selector.
 
 ## Auditing
 
@@ -591,7 +595,9 @@ Every campaign-family write (settings, membership, library, adventure log) runs
 inside `withAudit(...)` so the DB history triggers attribute it — the campaign
 **History view** (`CampaignHistoryPanel`) reads
 `GET /campaigns/{id}/history` (`scope='campaign'`), plus an owner-only
-`?scope=character` roll-up across member characters. See
+`?scope=character` roll-up across member characters. Library events expand to
+field-level before/after details and a nested raw old/new JSON view for structured
+definition changes. See
 [history-tracking.md](history-tracking.md); campaign-family REST files that add
 a new mutating route must be added to the guard test's `MUTATING_ROUTE_FILES`.
 

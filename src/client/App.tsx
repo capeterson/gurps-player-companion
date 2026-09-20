@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAppEntityBreadcrumb } from './components/AppBreadcrumbs.ts';
 import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
@@ -11,8 +12,6 @@ import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } fr
 import type { ThemeName } from './lib/theme.ts';
 import { tokenStore } from './lib/tokenStore.ts';
 import { getSyncOrchestrator } from './sync/orchestrator.ts';
-
-const NAV_TABS = [{ to: '/characters', label: 'Sheet' }] as const;
 
 const CAMPAIGN_ROOT = '/campaigns';
 const CAMPAIGN_SUBNAV = [
@@ -33,7 +32,11 @@ export function App() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const location = useLocation();
-  const campaignActive = CAMPAIGN_PATHS.has(location.pathname);
+  const entityBreadcrumb = useAppEntityBreadcrumb(location.pathname);
+  const characterActive =
+    location.pathname === '/characters' || entityBreadcrumb?.kind === 'character';
+  const campaignActive =
+    CAMPAIGN_PATHS.has(location.pathname) || entityBreadcrumb?.kind === 'campaign';
   const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
   const campaignMenuRef = useRef<HTMLDetailsElement>(null);
   const userMenuRef = useRef<HTMLDetailsElement>(null);
@@ -113,43 +116,69 @@ export function App() {
               Player Companion
             </span>
           </Link>
-          <nav className="flex items-center gap-1">
-            {NAV_TABS.map((tab) => (
-              <NavLink
-                key={tab.to}
-                to={tab.to}
-                className={({ isActive }) =>
-                  `rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
-                    isActive
-                      ? 'bg-base-200 text-base-content'
-                      : 'text-muted hover:bg-base-200 hover:text-base-content'
-                  }`
-                }
-              >
-                {tab.label}
-              </NavLink>
-            ))}
+          <nav aria-label="Primary navigation" className="flex min-w-0 items-center gap-1">
             <div
-              className={`flex items-center rounded-field transition ${
+              className={`flex min-w-0 items-center rounded-field transition ${
+                characterActive ? 'bg-base-200' : ''
+              }`}
+            >
+              <Link
+                to="/characters"
+                className={`rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                  characterActive
+                    ? 'text-base-content'
+                    : 'text-muted hover:bg-base-200 hover:text-base-content'
+                }`}
+              >
+                Character
+              </Link>
+              {entityBreadcrumb?.kind === 'character' && (
+                <>
+                  <span aria-hidden="true" className="text-dim">
+                    ›
+                  </span>
+                  <Link
+                    to={`/characters/${entityBreadcrumb.id}`}
+                    className="max-w-28 truncate rounded-field px-2 py-2 text-sm font-medium text-base-content transition hover:bg-base-300 sm:max-w-48 lg:max-w-80"
+                    title={entityBreadcrumb.name}
+                  >
+                    {entityBreadcrumb.name ?? 'Loading…'}
+                  </Link>
+                </>
+              )}
+            </div>
+            <div
+              className={`flex min-w-0 items-center rounded-field transition ${
                 campaignActive ? 'bg-base-200' : ''
               }`}
             >
-              <NavLink
+              <Link
                 to={CAMPAIGN_ROOT}
-                end
-                className={({ isActive }) =>
-                  `rounded-l-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
-                    isActive || campaignActive
-                      ? 'text-base-content'
-                      : 'text-muted hover:bg-base-200 hover:text-base-content'
-                  }`
-                }
+                className={`rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                  campaignActive
+                    ? 'text-base-content'
+                    : 'text-muted hover:bg-base-200 hover:text-base-content'
+                }`}
               >
                 Campaign
-              </NavLink>
+              </Link>
+              {entityBreadcrumb?.kind === 'campaign' && (
+                <>
+                  <span aria-hidden="true" className="text-dim">
+                    ›
+                  </span>
+                  <Link
+                    to={`/campaigns/${entityBreadcrumb.id}`}
+                    className="max-w-28 truncate rounded-field px-2 py-2 text-sm font-medium text-base-content transition hover:bg-base-300 sm:max-w-48 lg:max-w-80"
+                    title={entityBreadcrumb.name}
+                  >
+                    {entityBreadcrumb.name ?? 'Loading…'}
+                  </Link>
+                </>
+              )}
               <details ref={campaignMenuRef} className="dropdown dropdown-end relative z-50">
                 <summary
-                  className={`flex cursor-pointer list-none items-center rounded-r-field px-2 py-2 text-sm transition ${
+                  className={`flex cursor-pointer list-none items-center rounded-field px-2 py-2 text-sm transition ${
                     campaignActive
                       ? 'text-base-content'
                       : 'text-muted hover:bg-base-200 hover:text-base-content'

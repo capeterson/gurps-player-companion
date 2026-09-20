@@ -72,10 +72,11 @@ function makeEntry(over: Partial<AdventureLogOut>): AdventureLogOut {
   } as AdventureLogOut;
 }
 
-function renderPage(props?: { campaignId?: string }) {
+function renderPage(props?: { campaignId?: string }, cachedCampaigns?: CampaignOut[]) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  if (cachedCampaigns) queryClient.setQueryData(['campaigns'], cachedCampaigns);
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
@@ -186,15 +187,18 @@ describe('LogPage', () => {
     expect(screen.queryByText(/Session 14/)).not.toBeInTheDocument();
   });
 
-  it('create sends sessionNumber and location; empty boxes send explicit nulls', async () => {
+  it('suggests the next session number and keeps it editable on create', async () => {
     setupResponses();
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: '+ New entry' }));
+    const sessionNumber = screen.getByLabelText('Session number') as HTMLInputElement;
+    expect(sessionNumber.value).toBe('14');
     await user.type(screen.getByPlaceholderText(/Session 13/), 'Session 14');
-    await user.type(screen.getByLabelText('Session number'), '14');
+    await user.clear(sessionNumber);
+    await user.type(sessionNumber, '21');
     await user.type(screen.getByLabelText('Location'), 'Tal Cabal');
     await user.click(screen.getByRole('button', { name: 'Save entry' }));
 
@@ -203,8 +207,26 @@ describe('LogPage', () => {
         .mocked(api)
         .mock.calls.find((c) => c[0] === `/campaigns/${CAMP_ID}/log` && c[1]?.method === 'POST');
       expect(call).toBeDefined();
-      expect(call?.[1]?.body).toMatchObject({ sessionNumber: 14, location: 'Tal Cabal' });
+      expect(call?.[1]?.body).toMatchObject({ sessionNumber: 21, location: 'Tal Cabal' });
     });
+  });
+
+  it('suggests session zero when no numbered log has been posted', async () => {
+    const unnumbered = makeEntry({ id: 'e-unnumbered', sessionNumber: null });
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === '/auth/me') return { id: ME_ID };
+      if (path === '/campaigns') return [campaign];
+      if (path === `/campaigns/${CAMP_ID}`) return campaign;
+      if (path === `/campaigns/${CAMP_ID}/log`) return [unnumbered];
+      return undefined;
+    }) as unknown as typeof api);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: '+ New entry' }));
+
+    expect((screen.getByLabelText('Session number') as HTMLInputElement).value).toBe('0');
   });
 
   it('edit prefills session number and location, and PATCH carries them through', async () => {
@@ -326,7 +348,8 @@ describe('LogPage', () => {
 
   it('embedded mode (campaignId prop) hides the campaign eyebrow title block', async () => {
     setupResponses();
-    renderPage({ campaignId: CAMP_ID });
+    const secondCampaign = { ...campaign, id: 'c2', name: 'Other Campaign' };
+    renderPage({ campaignId: CAMP_ID }, [campaign, secondCampaign]);
     // Embedded mode renders an <h2> "Adventure Log" instead of the
     // h1+eyebrow block (the parent already shows the campaign name).
     await waitFor(() => {
@@ -335,6 +358,9 @@ describe('LogPage', () => {
     });
     // The eyebrow "Campaign · ..." should NOT render in embedded mode.
     expect(screen.queryByText(/Campaign ·/)).not.toBeInTheDocument();
+    // Even if the shared campaigns query is already cached, a campaign detail
+    // route is fixed by its path and must not render a redundant picker.
+    expect(screen.queryByRole('combobox', { name: 'Select campaign' })).not.toBeInTheDocument();
   });
 
   it('hides all row Edit/Delete controls while an editor draft is open', async () => {

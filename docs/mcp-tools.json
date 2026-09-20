@@ -34463,7 +34463,7 @@
                       "anyOf": [
                         {
                           "type": "integer",
-                          "minimum": 1
+                          "minimum": 0
                         },
                         {
                           "type": "null"
@@ -34650,7 +34650,7 @@
                 "anyOf": [
                   {
                     "type": "integer",
-                    "minimum": 1
+                    "minimum": 0
                   },
                   {
                     "type": "null"
@@ -34782,7 +34782,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "minimum": 1
+                        "minimum": 0
                       },
                       {
                         "type": "null"
@@ -35127,7 +35127,7 @@
                 "anyOf": [
                   {
                     "type": "integer",
-                    "minimum": 1
+                    "minimum": 0
                   },
                   {
                     "type": "null"
@@ -35255,7 +35255,7 @@
                     "anyOf": [
                       {
                         "type": "integer",
-                        "minimum": 1
+                        "minimum": 0
                       },
                       {
                         "type": "null"
