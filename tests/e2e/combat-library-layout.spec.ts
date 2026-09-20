@@ -33,10 +33,11 @@ for (const width of [320, 1280]) {
     const hp = page.getByRole('group', { name: 'Hit points', exact: true });
     await expect(hp).toBeVisible();
     expect((await hp.boundingBox())?.y).toBeLessThan(700);
-    await expect(page.getByRole('button', { name: /^Armor & incoming damage/ })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    const defenseAndDr = page.getByRole('region', {
+      name: /Defense and damage resistance/i,
+    });
+    await expect(defenseAndDr).toBeVisible();
+    await expect(page.getByLabel('Armor facing')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Attack$/, exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Change', exact: true }).click();
     await page.getByRole('button', { name: 'Attack', exact: true }).click();
@@ -46,27 +47,51 @@ for (const width of [320, 1280]) {
     await page.getByRole('button', { name: 'Done', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stunned', pressed: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sleeping', exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: /^Defense details/ }).click();
-    await expect(page.getByLabel('Defense hit location')).toBeVisible();
-    const armor = page.getByRole('button', { name: /^Armor & incoming damage/ });
-    await armor.click();
-    await page.getByRole('button', { name: /^HP & FP/ }).click();
+    const pools = page.getByRole('button', { name: /^HP & FP/ });
+    await pools.click();
     await page.reload();
     await expect(page.getByRole('button', { name: /^HP & FP/ })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
-    await expect(armor).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.getByRole('button', { name: /^Defense details/ })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    await expect(defenseAndDr).toBeVisible();
     await page.getByRole('button', { name: /^HP & FP/ }).click();
-    await armor.click();
-    await expect(page.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
+    await expect(defenseAndDr.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBeLessThanOrEqual(width);
+    if (width === 320) {
+      await page.setViewportSize({ width, height: 568 });
+      await defenseAndDr.scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+      const bar = page.getByRole('complementary', { name: 'Current HP and FP' });
+      await expect(bar).toBeVisible();
+      await bar.getByRole('button', { name: 'Adjust HP' }).click();
+      const hpPanel = page.getByRole('group', { name: 'HP adjustment' });
+      await expect(hpPanel).toBeVisible();
+      await expect
+        .poll(async () => {
+          const box = await hpPanel.boundingBox();
+          return box
+            ? box.x >= 0 && box.x + box.width <= width && box.y + box.height <= 568
+            : false;
+        })
+        .toBe(true);
+
+      await bar.getByRole('button', { name: 'Adjust FP' }).click();
+      await expect(hpPanel).toHaveCount(0);
+      const fpPanel = page.getByRole('group', { name: 'FP adjustment' });
+      await expect(fpPanel).toBeVisible();
+      await expect
+        .poll(async () => {
+          const box = await fpPanel.boundingBox();
+          return box
+            ? box.x >= 0 && box.x + box.width <= width && box.y + box.height <= 568
+            : false;
+        })
+        .toBe(true);
+    }
   });
 }
 

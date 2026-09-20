@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useId, useRef, useState } from 'react';
 import { conditionsInclude } from '../../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
@@ -28,6 +28,9 @@ interface PoolRangeProps {
   footnote: string;
   onDelta: (delta: number) => void;
   flashProps: ReturnType<typeof useFlashState>['flashProps'];
+  open: boolean;
+  panelTop: number;
+  onToggle: () => void;
 }
 
 function PoolRange({
@@ -40,8 +43,12 @@ function PoolRange({
   footnote,
   onDelta,
   flashProps,
+  open,
+  panelTop,
+  onToggle,
 }: PoolRangeProps) {
   const listId = useId();
+  const panelId = `${listId}-panel`;
   const lastValue = useRef(current);
   const [displayValue, setDisplayValue] = useState(current);
 
@@ -52,13 +59,22 @@ function PoolRange({
 
   const minimum = -max;
   const sliderValue = Math.max(minimum, Math.min(max, displayValue));
+  const panelStyle = { '--pool-panel-top': `${panelTop}px` } as CSSProperties;
 
   return (
-    <details className={`dropdown ${label === 'HP' ? 'dropdown-start' : 'dropdown-end'}`}>
-      <summary
+    <div
+      className={`dropdown ${label === 'HP' ? 'dropdown-start' : 'dropdown-end'} ${
+        open ? 'dropdown-open' : ''
+      }`}
+    >
+      <button
+        type="button"
         {...flashProps}
-        className="field-rollback-flash btn btn-sm list-none gap-1 px-2.5"
+        className="field-rollback-flash btn btn-sm gap-1 px-2.5"
         aria-label={`Adjust ${label}`}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={onToggle}
       >
         <span className="font-semibold">{label}</span>
         <span className="num text-base">{current}</span>
@@ -66,55 +82,68 @@ function PoolRange({
         <span aria-hidden="true" className="text-[10px] text-base-content/50">
           ▾
         </span>
-      </summary>
-      <div className="dropdown-content z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg">
-        <div className="mb-3 flex items-baseline justify-between gap-3">
-          <div>
-            <p className="font-semibold">{label === 'HP' ? 'Hit Points' : 'Fatigue Points'}</p>
-            <p className="text-xs text-base-content/60">
-              {canWrite ? 'Drag to set the current value.' : 'Current value and thresholds.'}
-            </p>
+      </button>
+      {open && (
+        <fieldset
+          id={panelId}
+          aria-label={`${label} adjustment`}
+          style={panelStyle}
+          className={`dropdown-content fixed inset-x-4 top-[var(--pool-panel-top)] z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-auto overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg sm:absolute sm:inset-x-auto sm:top-full sm:mt-2 sm:w-80 ${
+            label === 'HP' ? 'sm:left-0' : 'sm:right-0'
+          }`}
+        >
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <div>
+              <p className="font-semibold">{label === 'HP' ? 'Hit Points' : 'Fatigue Points'}</p>
+              <p className="text-xs text-base-content/60">
+                {canWrite ? 'Drag to set the current value.' : 'Current value and thresholds.'}
+              </p>
+            </div>
+            <strong className="num text-xl">{displayValue}</strong>
           </div>
-          <strong className="num text-xl">{displayValue}</strong>
-        </div>
-        <input
-          type="range"
-          min={minimum}
-          max={max}
-          step={1}
-          list={listId}
-          value={sliderValue}
-          disabled={!canWrite}
-          aria-label={`Set ${label}`}
-          className={`range range-sm w-full ${label === 'HP' ? 'range-error' : 'range-info'}`}
-          onChange={(event) => {
-            const next = event.currentTarget.valueAsNumber;
-            const delta = next - lastValue.current;
-            lastValue.current = next;
-            setDisplayValue(next);
-            if (delta !== 0) onDelta(delta);
-          }}
-        />
-        <datalist id={listId}>
-          {points.map((point) => (
-            <option key={`${point.value}:${point.label}`} value={point.value} label={point.label} />
-          ))}
-        </datalist>
-        <div className="mt-2 grid grid-cols-4 gap-1 text-[10px] leading-tight text-base-content/60">
-          {points.map((point) => (
-            <span
-              key={`${point.value}:${point.label}`}
-              className="text-center first:text-left last:text-right"
-            >
-              <span className="num block font-semibold text-base-content/80">{point.value}</span>
-              {point.label}
-            </span>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-base-content/70">{recovery}</p>
-        <p className="mt-1 text-[10px] text-base-content/45">{footnote}</p>
-      </div>
-    </details>
+          <input
+            type="range"
+            min={minimum}
+            max={max}
+            step={1}
+            list={listId}
+            value={sliderValue}
+            disabled={!canWrite}
+            aria-label={`Set ${label}`}
+            className={`range range-sm w-full ${label === 'HP' ? 'range-error' : 'range-info'}`}
+            onChange={(event) => {
+              const next = event.currentTarget.valueAsNumber;
+              const delta = next - lastValue.current;
+              lastValue.current = next;
+              setDisplayValue(next);
+              if (delta !== 0) onDelta(delta);
+            }}
+          />
+          <datalist id={listId}>
+            {points.map((point) => (
+              <option
+                key={`${point.value}:${point.label}`}
+                value={point.value}
+                label={point.label}
+              />
+            ))}
+          </datalist>
+          <div className="mt-2 grid grid-cols-4 gap-1 text-[10px] leading-tight text-base-content/60">
+            {points.map((point) => (
+              <span
+                key={`${point.value}:${point.label}`}
+                className="text-center first:text-left last:text-right"
+              >
+                <span className="num block font-semibold text-base-content/80">{point.value}</span>
+                {point.label}
+              </span>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-base-content/70">{recovery}</p>
+          <p className="mt-1 text-[10px] text-base-content/45">{footnote}</p>
+        </fieldset>
+      )}
+    </div>
   );
 }
 
@@ -144,6 +173,8 @@ export function FloatingPoolsBar({
 }: FloatingPoolsBarProps) {
   const hpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentHp'));
   const fpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentFp'));
+  const [openPool, setOpenPool] = useState<'HP' | 'FP' | null>(null);
+  const barRef = useRef<HTMLElement>(null);
   const statuses = poolStatuses(character, bumpers);
   const hpColor = hpVarFor(bumpers.hpMax > 0 ? bumpers.hp / bumpers.hpMax : 0);
 
@@ -160,15 +191,32 @@ export function FloatingPoolsBar({
     { value: bumpers.fpMax, label: 'Rested' },
   ] as const;
 
+  useEffect(() => {
+    if (openPool === null) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (!barRef.current?.contains(event.target as Node)) setOpenPool(null);
+    };
+    const dismissWithEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenPool(null);
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('keydown', dismissWithEscape);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('keydown', dismissWithEscape);
+    };
+  }, [openPool]);
+
   return (
     <aside
+      ref={barRef}
       className="fixed inset-x-0 z-40 border-b border-base-300 bg-base-100/95 shadow-md backdrop-blur"
       style={{ top }}
       aria-label="Current HP and FP"
     >
       <div className="mx-auto flex min-h-12 max-w-[80rem] items-center gap-2 px-4 py-2 sm:px-7">
         <span className="hidden text-xs font-medium text-base-content/60 sm:inline">Current</span>
-        <span style={{ color: hpColor }}>
+        <div style={{ color: hpColor }}>
           <PoolRange
             label="HP"
             current={bumpers.hp}
@@ -179,8 +227,11 @@ export function FloatingPoolsBar({
             footnote={`Outside the slider: certain death is −${5 * bumpers.hpMax} HP. Exceptional survival rules may still apply.`}
             onDelta={bumpers.bumpHp}
             flashProps={hpFlash.flashProps}
+            open={openPool === 'HP'}
+            panelTop={top + 56}
+            onToggle={() => setOpenPool((current) => (current === 'HP' ? null : 'HP'))}
           />
-        </span>
+        </div>
         <PoolRange
           label="FP"
           current={bumpers.fp}
@@ -191,6 +242,9 @@ export function FloatingPoolsBar({
           footnote={`At −${bumpers.fpMax} FP, further fatigue loss is paid from HP instead.`}
           onDelta={bumpers.bumpFp}
           flashProps={fpFlash.flashProps}
+          open={openPool === 'FP'}
+          panelTop={top + 56}
+          onToggle={() => setOpenPool((current) => (current === 'FP' ? null : 'FP'))}
         />
         <div className="ml-auto flex min-w-0 gap-1 overflow-x-auto" aria-label="Pool conditions">
           {statuses.length === 0 ? (

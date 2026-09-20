@@ -401,7 +401,9 @@ shows the synced campaign name as a separate link to that campaign.
     `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
     floating pool bar so rapid changes across both UIs never race. The bar
     appears at the top only after the sheet tab list has scrolled away, labels
-    both HP and FP, and opens range popovers with threshold/recovery marks.
+    both HP and FP, and opens one range popover at a time with threshold/recovery
+    marks. On mobile the open panel is fixed within the viewport rather than
+    overflowing from its trigger; Escape or an outside tap dismisses it.
     Derived pool states such as Reeling, Tired, Exhausted, death checks, and
     Unconscious are visible as badges; exceptional/certain-death bounds are
     de-emphasized notes rather than primary controls;
