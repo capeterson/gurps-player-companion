@@ -34,20 +34,40 @@ import {
   restoreLocalCampaignReferences,
 } from './localCampaignTransfer.ts';
 
-/**
- * Generate a uuidv7-shaped string client-side.  We don't need
- * cryptographic monotonicity; a `crypto.randomUUID()` v4 is sufficient
- * for client identity and the server accepts any uuid in the create
- * dispatcher.
- */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const BROKEN_FALLBACK_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{0,3}-8[0-9a-f]{0,3}-[0-9a-f]{12}$/i;
+
+function formatUuidV4(bytes: Uint8Array): string {
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** Generate an RFC 4122 UUID for local entity, operation, and batch identity. */
 export function newClientId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+  const runtimeCrypto = globalThis.crypto;
+  if (typeof runtimeCrypto?.randomUUID === 'function') {
+    const id = runtimeCrypto.randomUUID();
+    if (UUID_RE.test(id)) return id;
   }
-  // Fallback for very old environments.  Not cryptographically random;
-  // good enough for non-sensitive identity.
-  const r = Math.random().toString(16).slice(2).padEnd(12, '0');
-  return `${r.slice(0, 8)}-${r.slice(8, 12)}-4${r.slice(12, 15)}-8${r.slice(15, 18)}-${r.slice(0, 12)}`;
+
+  const bytes = new Uint8Array(16);
+  if (typeof runtimeCrypto?.getRandomValues === 'function') {
+    runtimeCrypto.getRandomValues(bytes);
+  } else {
+    // Very old/non-browser environments still need a structurally valid id.
+    // These ids are deduplication keys, not authentication secrets.
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  return formatUuidV4(bytes);
+}
+
+function wasGeneratedByBrokenUuidFallback(value: string | undefined): value is string {
+  return value !== undefined && !UUID_RE.test(value) && BROKEN_FALLBACK_UUID_RE.test(value);
 }
 
 export interface EnqueueFieldPatchArgs {
@@ -869,6 +889,64 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
 }
 
 /**
+ * Repair ids emitted by the pre-#132 Math.random fallback. That fallback
+ * repeated a short random fragment and could produce UUID groups shorter
+ * than the wire schema permits. Re-key before selection so an already-stuck
+ * operation retries immediately after a client upgrade instead of requiring
+ * the player to make another edit.
+ */
+async function repairBrokenFallbackIdsInTransaction(): Promise<void> {
+  const db = getLocalDb();
+  const entries = await db.outbox
+    .where('status')
+    .anyOf(['pending', 'transient_retry', 'in_flight'])
+    .toArray();
+  const usedClientIds = new Set(entries.map((entry) => entry.clientOpId));
+  const repairedBatchIds = new Map<string, string>();
+
+  const freshClientId = () => {
+    let id = newClientId();
+    while (usedClientIds.has(id)) id = newClientId();
+    usedClientIds.add(id);
+    return id;
+  };
+
+  for (const entry of entries) {
+    const repairClientId = wasGeneratedByBrokenUuidFallback(entry.clientOpId);
+    const repairBatchId = wasGeneratedByBrokenUuidFallback(entry.batchId);
+    if (!repairClientId && !repairBatchId) continue;
+
+    const nextClientOpId = repairClientId ? freshClientId() : entry.clientOpId;
+    let nextBatchId = entry.batchId;
+    if (repairBatchId && entry.batchId) {
+      nextBatchId = repairedBatchIds.get(entry.batchId);
+      if (!nextBatchId) {
+        nextBatchId = freshClientId();
+        repairedBatchIds.set(entry.batchId, nextBatchId);
+      }
+    }
+    const repaired: OutboxEntry = {
+      ...entry,
+      clientOpId: nextClientOpId,
+      batchId: nextBatchId,
+      status: 'pending',
+      attemptCount: 0,
+      lastAttemptAt: undefined,
+      nextEarliestAttemptAt: undefined,
+      serverReason: undefined,
+      lastError: undefined,
+    };
+
+    if (repairClientId) {
+      await db.outbox.delete(entry.clientOpId);
+      await db.outbox.add(repaired);
+    } else {
+      await db.outbox.put(repaired);
+    }
+  }
+}
+
+/**
  * Select and claim one outbound batch atomically. Enqueue coalescing sees
  * every selected row as `in_flight`; a replacement therefore queues behind
  * it instead of deleting an op whose stale in-memory envelope will be sent.
@@ -877,6 +955,7 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
 export async function claimDrainableOps(limit: number): Promise<OutboxEntry[]> {
   const db = getLocalDb();
   return db.transaction('rw', [db.outbox, db.characters], async () => {
+    await repairBrokenFallbackIdsInTransaction();
     const selected = await readDrainableOps(limit);
     const claimedAt = new Date().toISOString();
     const claimed: OutboxEntry[] = [];

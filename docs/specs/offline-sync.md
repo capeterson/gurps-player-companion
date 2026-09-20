@@ -217,6 +217,12 @@ works offline.**
 2. **Drain.** The orchestrator selects and marks pending outbox ops `in_flight`
    in one short Dexie transaction (`claimDrainableOps`), then sends only those
    claimed rows (up to `DRAIN_BATCH_SIZE`) to `POST /sync/operations`. A
+   client operation and history batch id is always an RFC 4122 UUID, including
+   in browsers that expose `crypto.getRandomValues` but not `randomUUID`, and
+   in older environments without Web Crypto. Before claiming, the client
+   recognizes malformed operation/batch ids produced by the former short
+   `Math.random` fallback, re-keys them transactionally, clears their validation
+   retry backoff, and sends them without requiring another player edit. A
    `navigator.locks` lease serializes the normal drain across tabs (lock order
    is always DRAIN → CURSOR); the atomic claim is the storage-level guard that
    prevents duplicate sends even when a lock is unavailable or two callers

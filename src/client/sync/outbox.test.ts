@@ -5,6 +5,7 @@
 
 import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { uuid } from '../../shared/schemas/common.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { type OutboxEntry, getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
@@ -18,6 +19,7 @@ import {
   enqueueDeletes,
   enqueueFieldPatch,
   enqueueFieldPatches,
+  newClientId,
   readDrainableOps,
   recoverStaleInFlight,
 } from './outbox.ts';
@@ -38,6 +40,33 @@ function jwtForUser(userId: string): string {
 }
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000c001';
+
+describe('newClientId', () => {
+  it('returns a valid UUID when randomUUID is available', () => {
+    expect(uuid.safeParse(newClientId()).success).toBe(true);
+  });
+
+  it('uses random bytes to produce a valid v4 UUID when randomUUID is unavailable', () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (bytes: Uint8Array) => {
+        for (let index = 0; index < bytes.length; index += 1) bytes[index] = index;
+        return bytes;
+      },
+    });
+
+    expect(newClientId()).toBe('00010203-0405-4607-8809-0a0b0c0d0e0f');
+    expect(uuid.safeParse(newClientId()).success).toBe(true);
+  });
+
+  it('still produces a valid v4 UUID when Web Crypto is unavailable', () => {
+    vi.stubGlobal('crypto', undefined);
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    const id = newClientId();
+    expect(id).toBe('80808080-8080-4080-8080-808080808080');
+    expect(uuid.safeParse(id).success).toBe(true);
+  });
+});
 
 async function seedCharacter() {
   const db = getLocalDb();
@@ -1146,6 +1175,53 @@ describe('readDrainableOps', () => {
 });
 
 describe('claimDrainableOps', () => {
+  it('repairs malformed fallback operation and batch ids before retrying them', async () => {
+    const db = getLocalDb();
+    const firstBrokenId = '9543da4e-2312-41-8-9543da4e2312';
+    const secondBrokenId = 'abcdef12-3456-47-8-abcdef123456';
+    const brokenBatchId = 'deadbeef-cafe-4a-8-deadbeefcafe';
+    const future = new Date(Date.now() + 60_000).toISOString();
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: firstBrokenId,
+        batchId: brokenBatchId,
+        status: 'transient_retry',
+        attemptCount: 6,
+        nextEarliestAttemptAt: future,
+        serverReason: 'validation_error',
+        lastError: { message: 'Invalid uuid' },
+      }),
+      opRow({
+        clientOpId: secondBrokenId,
+        batchId: brokenBatchId,
+        coalesceKey: `${CHAR_ID}|dx`,
+        fieldPath: 'dx',
+        attemptedValue: 12,
+        status: 'transient_retry',
+        attemptCount: 6,
+        nextEarliestAttemptAt: future,
+        serverReason: 'validation_error',
+      }),
+    ]);
+
+    const claimed = await claimDrainableOps(50);
+
+    expect(claimed).toHaveLength(2);
+    expect(claimed.every((op) => uuid.safeParse(op.clientOpId).success)).toBe(true);
+    expect(claimed.every((op) => uuid.safeParse(op.batchId).success)).toBe(true);
+    expect(new Set(claimed.map((op) => op.batchId)).size).toBe(1);
+    expect(claimed.map((op) => op.clientOpId)).not.toContain(firstBrokenId);
+    expect(claimed.map((op) => op.clientOpId)).not.toContain(secondBrokenId);
+    expect(claimed.every((op) => op.attemptCount === 0)).toBe(true);
+    expect(await db.outbox.get(firstBrokenId)).toBeUndefined();
+    expect(await db.outbox.get(secondBrokenId)).toBeUndefined();
+    const repaired = await db.outbox.toArray();
+    expect(repaired.every((op) => op.status === 'in_flight')).toBe(true);
+    expect(repaired.every((op) => op.attemptCount === 1)).toBe(true);
+    expect(repaired.every((op) => op.serverReason === undefined)).toBe(true);
+    expect(repaired.every((op) => op.nextEarliestAttemptAt === undefined)).toBe(true);
+  });
+
   it('atomically gives a pending operation to only one concurrent drain', async () => {
     const db = getLocalDb();
     await db.outbox.put(opRow({ clientOpId: 'claim-once' }));
