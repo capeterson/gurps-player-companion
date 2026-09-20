@@ -8,10 +8,15 @@ import { enqueueFieldPatches } from '../../../sync/outbox.ts';
 export type CombatFields = Readonly<Record<string, unknown>>;
 /** Evaluated once against the latest local row inside the write transaction. */
 export type CombatUpdate = (current: Readonly<LocalCharacterCombat>) => CombatFields;
+export interface CombatPatchOptions {
+  /** Keep the local write immediate, but hold its outbox row before network drain. */
+  readonly drainDelayMs?: number;
+}
 export type CombatPatch = (
   field: string | CombatFields | CombatUpdate,
   value?: unknown,
   batchId?: string,
+  options?: CombatPatchOptions,
 ) => Promise<void>;
 
 /**
@@ -27,7 +32,12 @@ export function useCombatPatch(character: CharacterDetail): CombatPatch {
   const defaultFp = character.derived.fp;
 
   return useCallback(
-    async (field: string | CombatFields | CombatUpdate, value?: unknown, batchId?: string) => {
+    async (
+      field: string | CombatFields | CombatUpdate,
+      value?: unknown,
+      batchId?: string,
+      options?: CombatPatchOptions,
+    ) => {
       const db = getLocalDb();
       await db.transaction('rw', db.characterCombat, db.outbox, async () => {
         let current = await db.characterCombat.get(characterId);
@@ -52,6 +62,9 @@ export function useCombatPatch(character: CharacterDetail): CombatPatch {
             : typeof field === 'string'
               ? { [field]: value }
               : field;
+        const nextEarliestAttemptAt = options?.drainDelayMs
+          ? new Date(Date.now() + options.drainDelayMs).toISOString()
+          : undefined;
         await enqueueFieldPatches(
           Object.entries(fields).map(([key, attemptedValue]) => ({
             entityClass: 'character_combat',
@@ -62,6 +75,7 @@ export function useCombatPatch(character: CharacterDetail): CombatPatch {
             flashKey: makeFlashKey('character_combat', characterId, key),
             characterId,
             batchId,
+            nextEarliestAttemptAt,
           })),
         );
       });

@@ -1,8 +1,57 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useEffect } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { getLocalDb, resetLocalDb } from '../../../../db/dexie.ts';
+import { tokenStore } from '../../../../lib/tokenStore.ts';
+import {
+  getSyncOrchestrator,
+  resetSyncOrchestratorForTests,
+} from '../../../../sync/orchestrator.ts';
+import { useCombatPatch } from '../useCombatPatch.ts';
 import type { PoolBumpers } from '../usePoolBumpers.ts';
+import { usePoolBumpers } from '../usePoolBumpers.ts';
 import { FloatingPoolsBar, rangePointPercent } from './FloatingPoolsBar.tsx';
+
+vi.mock('../../../../lib/toast.tsx', () => ({ useToasts: () => ({ push: vi.fn() }) }));
+
+afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  tokenStore.clear();
+  resetSyncOrchestratorForTests();
+  await resetLocalDb();
+});
+
+const LIVE_CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000f001';
+
+function jwtForUser(userId: string): string {
+  const encode = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: userId })}.signature`;
+}
+
+function LivePoolsHarness({ observed }: { observed: number[] }) {
+  const db = getLocalDb();
+  const combat = useLiveQuery(() => db.characterCombat.get(LIVE_CHAR_ID), [db]);
+  const character = {
+    id: LIVE_CHAR_ID,
+    derived: { hp: 10, fp: 12 },
+    combat: combat ?? {
+      currentHp: 10,
+      currentFp: 8,
+      conditions: [],
+      maneuver: null,
+      posture: 'standing',
+    },
+  } as unknown as CharacterDetail;
+  const bumpers = usePoolBumpers(character, true, useCombatPatch(character));
+  useEffect(() => {
+    observed.push(bumpers.fp);
+  }, [bumpers.fp, observed]);
+  return <FloatingPoolsBar character={character} bumpers={bumpers} canWrite />;
+}
 
 function setup(hp = 10, fp = 10, max = 12) {
   const character = {
@@ -11,6 +60,8 @@ function setup(hp = 10, fp = 10, max = 12) {
   } as unknown as CharacterDetail;
   const bumpHp = vi.fn();
   const bumpFp = vi.fn();
+  const setHp = vi.fn();
+  const setFp = vi.fn();
   const bumpers: PoolBumpers = {
     hp,
     fp,
@@ -18,12 +69,24 @@ function setup(hp = 10, fp = 10, max = 12) {
     fpMax: max,
     bumpHp,
     bumpFp,
+    setHp,
+    setFp,
+    commitHpDeltas: vi.fn().mockResolvedValue(hp),
+    commitFpDeltas: vi.fn().mockResolvedValue(fp),
     resetHp: vi.fn(),
     resetFp: vi.fn(),
     flashHp: false,
   };
   const view = render(<FloatingPoolsBar character={character} bumpers={bumpers} canWrite />);
-  return { bumpHp, bumpFp, ...view };
+  const rerenderPools = (nextHp: number, nextFp = fp) =>
+    view.rerender(
+      <FloatingPoolsBar
+        character={character}
+        bumpers={{ ...bumpers, hp: nextHp, fp: nextFp }}
+        canWrite
+      />,
+    );
+  return { bumpHp, bumpFp, setHp, setFp, rerenderPools, ...view };
 }
 
 describe('FloatingPoolsBar', () => {
@@ -102,8 +165,8 @@ describe('FloatingPoolsBar', () => {
     expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);
   });
 
-  it('converts range movement into incremental local-first pool deltas', () => {
-    const { bumpHp, bumpFp } = setup();
+  it('sends range movement as an absolute transactional target', () => {
+    const { setHp, setFp } = setup();
     fireEvent.click(screen.getByLabelText('Adjust HP'));
     fireEvent.change(screen.getByRole('slider', { name: 'Set HP' }), {
       target: { value: '7' },
@@ -112,8 +175,8 @@ describe('FloatingPoolsBar', () => {
     fireEvent.change(screen.getByRole('slider', { name: 'Set FP' }), {
       target: { value: '8' },
     });
-    expect(bumpHp).toHaveBeenCalledWith(-3);
-    expect(bumpFp).toHaveBeenCalledWith(-2);
+    expect(setHp).toHaveBeenCalledWith(7);
+    expect(setFp).toHaveBeenCalledWith(8);
   });
 
   it('offers precise minus-one and plus-one controls for both pools', () => {
@@ -122,19 +185,159 @@ describe('FloatingPoolsBar', () => {
     fireEvent.click(screen.getByLabelText('Adjust HP'));
     expect(screen.getByLabelText('HP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease HP by 1' }));
-    expect(screen.getByLabelText('Current HP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase HP by 1' }));
-    expect(screen.getByLabelText('Current HP')).toHaveTextContent('10');
+    expect(bumpHp).toHaveBeenNthCalledWith(1, -1);
+    expect(bumpHp).toHaveBeenNthCalledWith(2, 1);
 
     fireEvent.click(screen.getByLabelText('Adjust FP'));
     expect(screen.getByLabelText('FP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease FP by 1' }));
-    expect(screen.getByLabelText('Current FP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase FP by 1' }));
-    expect(screen.getByLabelText('Current FP')).toHaveTextContent('10');
+    expect(bumpFp).toHaveBeenNthCalledWith(1, -1);
+    expect(bumpFp).toHaveBeenNthCalledWith(2, 1);
+  });
 
-    expect(bumpHp.mock.calls.map(([delta]) => delta)).toEqual([-1, 1]);
-    expect(bumpFp.mock.calls.map(([delta]) => delta)).toEqual([-1, 1]);
+  it('renders only the durable prop when local observations are skipped or batched', () => {
+    const { rerenderPools } = setup(10, 10, 20);
+    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    rerenderPools(11);
+    expect(screen.getByLabelText('Current HP')).toHaveTextContent('11');
+    rerenderPools(14);
+    expect(screen.getByLabelText('Current HP')).toHaveTextContent('14');
+  });
+
+  it('never decreases rendered FP while an upload and stale cursor settle around later clicks', async () => {
+    const db = getLocalDb();
+    await db.characterCombat.put({
+      id: LIVE_CHAR_ID,
+      characterId: LIVE_CHAR_ID,
+      currentHp: 10,
+      currentFp: 8,
+      conditions: [],
+      maneuver: null,
+      posture: 'standing',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 1,
+    });
+    tokenStore.write({
+      accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    let releaseFirst!: () => void;
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let operationCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('/sync/operations')) {
+          operationCalls += 1;
+          const body = JSON.parse(String(init?.body)) as {
+            operations: Array<{ clientOpId: string }>;
+          };
+          if (operationCalls === 1) await firstHeld;
+          return new Response(
+            JSON.stringify({
+              outcomes: body.operations.map((operation) => ({
+                clientOpId: operation.clientOpId,
+                status: 'applied',
+                newRevision: operationCalls + 1,
+              })),
+            }),
+            { headers: { 'content-type': 'application/json' } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            changes:
+              operationCalls === 0
+                ? []
+                : [
+                    {
+                      entityClass: 'character_combat',
+                      entityId: LIVE_CHAR_ID,
+                      command: 'patch',
+                      revision: operationCalls,
+                      data: {
+                        id: LIVE_CHAR_ID,
+                        characterId: LIVE_CHAR_ID,
+                        currentHp: 10,
+                        currentFp: operationCalls === 1 ? 8 : 9,
+                        conditions: [],
+                        maneuver: null,
+                        posture: 'standing',
+                        revision: operationCalls,
+                      },
+                    },
+                  ],
+            nextCursor: {},
+            hasMore: {},
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+    const observed: number[] = [];
+    render(<LivePoolsHarness observed={observed} />);
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.start();
+    try {
+      fireEvent.click(screen.getByLabelText('Adjust FP'));
+      const increase = screen.getByRole('button', { name: 'Increase FP by 1' });
+      fireEvent.click(increase);
+      await waitFor(() => expect(screen.getByLabelText('Current FP')).toHaveTextContent('9'));
+      await waitFor(() => expect(operationCalls).toBe(1));
+
+      fireEvent.click(increase);
+      fireEvent.click(increase);
+      fireEvent.click(increase);
+      await waitFor(() => expect(screen.getByLabelText('Current FP')).toHaveTextContent('12'));
+
+      releaseFirst();
+      await waitFor(() => expect(operationCalls).toBe(2), { timeout: 5_000 });
+      await waitFor(async () => expect(await db.outbox.count()).toBe(0));
+
+      expect(screen.getByLabelText('Current FP')).toHaveTextContent('12');
+      expect((await db.characterCombat.get(LIVE_CHAR_ID))?.currentFp).toBe(12);
+      expect(observed.at(-1)).toBe(12);
+      expect(
+        observed.every((value, index) => index === 0 || value >= (observed[index - 1] ?? value)),
+      ).toBe(true);
+    } finally {
+      orchestrator.stop();
+    }
+  });
+
+  it('shows the real soft-cap result instead of predicting a value that rolls back', async () => {
+    const db = getLocalDb();
+    await db.characterCombat.put({
+      id: LIVE_CHAR_ID,
+      characterId: LIVE_CHAR_ID,
+      currentHp: 10,
+      currentFp: 12,
+      conditions: [],
+      maneuver: null,
+      posture: 'standing',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 1,
+    });
+    render(<LivePoolsHarness observed={[]} />);
+    await waitFor(() => expect(screen.getByLabelText('Adjust FP')).toHaveTextContent('FP12'));
+    fireEvent.click(screen.getByLabelText('Adjust FP'));
+    const increase = screen.getByRole('button', { name: 'Increase FP by 1' });
+
+    fireEvent.click(increase);
+    await db.transaction('rw', db.characterCombat, db.outbox, () => undefined);
+    expect(screen.getByLabelText('Current FP')).toHaveTextContent('12');
+    expect((await db.characterCombat.get(LIVE_CHAR_ID))?.currentFp).toBe(12);
+
+    fireEvent.click(increase);
+    await waitFor(() => expect(screen.getByLabelText('Current FP')).toHaveTextContent('13'));
+    expect((await db.characterCombat.get(LIVE_CHAR_ID))?.currentFp).toBe(13);
   });
 
   it('keeps one panel viewport-fixed when narrow and trigger-anchored on desktop', () => {

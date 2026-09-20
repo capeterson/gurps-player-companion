@@ -73,6 +73,7 @@ interface PoolAdjustmentPanelProps {
   recovery: string;
   footnote: string;
   onDelta: (delta: number) => void;
+  onSetValue: (value: number) => void;
   panelTop: number;
 }
 
@@ -86,34 +87,20 @@ function PoolAdjustmentPanel({
   recovery,
   footnote,
   onDelta,
+  onSetValue,
   panelTop,
 }: PoolAdjustmentPanelProps) {
   const listId = useId();
-  const lastValue = useRef(current);
-  const [displayValue, setDisplayValue] = useState(current);
-
-  useEffect(() => {
-    lastValue.current = current;
-    setDisplayValue(current);
-  }, [current]);
-
   const minimum = -max;
-  const sliderValue = Math.max(minimum, Math.min(max, displayValue));
+  const sliderValue = Math.max(minimum, Math.min(max, current));
   const panelStyle = { '--pool-panel-top': `${panelTop}px` } as CSSProperties;
-
-  function adjustBy(delta: number) {
-    if (!canWrite) return;
-    lastValue.current += delta;
-    setDisplayValue(lastValue.current);
-    onDelta(delta);
-  }
 
   return (
     <fieldset
       id={id}
       aria-label={`${label} adjustment`}
       style={panelStyle}
-      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg lg:absolute! lg:left-0! lg:right-auto! lg:top-full! lg:mt-2 lg:w-[32rem] lg:max-w-[calc(100dvw_-_2rem)] lg:translate-x-0"
+      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg lg:absolute! lg:left-0! lg:right-auto! lg:top-full! lg:mt-[9px] lg:w-[32rem] lg:max-w-[calc(100dvw_-_2rem)] lg:translate-x-0"
     >
       <div className="mb-3">
         <div className="flex items-start justify-between gap-3">
@@ -123,7 +110,7 @@ function PoolAdjustmentPanel({
               {canWrite ? 'Drag or use −1/+1.' : 'Current value and thresholds.'}
             </p>
           </div>
-          {!canWrite && <strong className="num text-xl">{displayValue}</strong>}
+          {!canWrite && <strong className="num text-xl">{current}</strong>}
         </div>
         {canWrite && (
           <div
@@ -134,7 +121,7 @@ function PoolAdjustmentPanel({
               type="button"
               className="btn btn-sm join-item min-h-11 w-full px-2"
               aria-label={`Decrease ${label} by 1`}
-              onClick={() => adjustBy(-1)}
+              onClick={() => onDelta(-1)}
             >
               −1
             </button>
@@ -142,13 +129,13 @@ function PoolAdjustmentPanel({
               aria-label={`Current ${label}`}
               className="join-item num flex min-h-11 min-w-20 items-center justify-center border-y border-base-300 bg-base-200 px-3 text-xl font-bold"
             >
-              {displayValue}
+              {current}
             </output>
             <button
               type="button"
               className="btn btn-sm join-item min-h-11 w-full px-2"
               aria-label={`Increase ${label} by 1`}
-              onClick={() => adjustBy(1)}
+              onClick={() => onDelta(1)}
             >
               +1
             </button>
@@ -165,13 +152,7 @@ function PoolAdjustmentPanel({
         disabled={!canWrite}
         aria-label={`Set ${label}`}
         className={`range range-sm w-full ${label === 'HP' ? 'range-error' : 'range-info'}`}
-        onChange={(event) => {
-          const next = event.currentTarget.valueAsNumber;
-          const delta = next - lastValue.current;
-          lastValue.current = next;
-          setDisplayValue(next);
-          if (delta !== 0) onDelta(delta);
-        }}
+        onChange={(event) => onSetValue(event.currentTarget.valueAsNumber)}
       />
       <datalist id={listId}>
         {points.map((point) => (
@@ -272,6 +253,7 @@ export function FloatingPoolsBar({
           recovery: 'Recovery: make one HT roll per day; success restores 1 HP (B424).',
           footnote: `Outside the slider: certain death is −${5 * bumpers.hpMax} HP. Exceptional survival rules may still apply.`,
           onDelta: bumpers.bumpHp,
+          onSetValue: bumpers.setHp,
         }
       : openPool === 'FP'
         ? {
@@ -282,6 +264,7 @@ export function FloatingPoolsBar({
             recovery: 'Recovery: normally regain 1 FP per 10 minutes of rest (B426).',
             footnote: `At −${bumpers.fpMax} FP, further fatigue loss is paid from HP instead.`,
             onDelta: bumpers.bumpFp,
+            onSetValue: bumpers.setFp,
           }
         : null;
 

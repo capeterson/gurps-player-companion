@@ -286,7 +286,7 @@ export interface LocalSoloEncounter {
  *                         |   elapses; retries forever, relaxing to a
  *                         |   5-minute cadence past MAX_ATTEMPTS)
  * Rows found `in_flight` while holding the cross-tab drain lock are
- * orphans from a crashed/closed tab and are re-promoted to `pending`
+ * orphans from a crashed/closed tab and are re-promoted to a retry
  * (see `recoverStaleInFlight`).  `failed_permanent` remains in the
  * enum only for rows written by older client versions.
  */
@@ -346,6 +346,10 @@ export interface OutboxEntry {
   attemptCount: number;
   /** ISO timestamp; orchestrator only drains rows whose nextEarliestAttemptAt is in the past. */
   nextEarliestAttemptAt?: string | undefined;
+  /** An older same-field operation that must settle before this row can drain. */
+  predecessorClientOpId?: string | undefined;
+  /** True when POST delivery is ambiguous; false only after an explicit server transient. */
+  deliveryUncertain?: boolean | undefined;
   serverReason?: string | undefined;
   /** Raw network error or per-operation server outcome for sync diagnostics. */
   lastError?: unknown;

@@ -412,7 +412,11 @@ shows the synced campaign name as a separate link to that campaign.
     marks and visible labels positioned from their actual values on the scale.
     Close threshold labels use staggered lanes so they retain their exact anchors
     without colliding. Each popover also has touch-sized −1/+1 controls for precise
-    common adjustments.
+    common adjustments. Every gesture updates Dexie immediately against the latest
+    durable pool value; the panel has no separate speculative counter. A refreshed
+    200 ms deadline debounces only the network drain, allowing the outbox to
+    coalesce rapid same-field changes without delaying or replaying the visible
+    result. Slider targets are rebased inside the same transaction.
     The two triggers share one adjustment panel. On phones and tablets it is
     fixed and centered within the viewport; on desktop it is anchored below the
     active trigger. The desktop panel opens toward the available right side so
