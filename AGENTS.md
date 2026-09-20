@@ -414,6 +414,21 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   current merge target (normally `origin/main`). Resolve conflicts and rerun
   the appropriate validation before pushing and creating the PR; do not rely
   on a stale local target branch.
+- **A focused test run is not the pre-push gate.** Before pushing any code
+  change to a PR, read `.github/workflows/ci.yml` and run every applicable CI
+  `run:` step locally, in workflow order, from the worktree's isolated Docker
+  stack. At the time of writing that means `lint`, `typecheck`, `db:migrate`,
+  server/shared `test`, the complete `test:client` suite, `openapi:check`,
+  `mcp:check`, and `build`. Focused tests are useful while developing, but do
+  not substitute for this full parity run. Do not push while any step is
+  failing.
+- **A pending remote check is not completion.** After every PR push, watch the
+  GitHub checks through completion and do not report the PR ready until all
+  required checks are green and the PR is mergeable. If CI fails, inspect the
+  exact job log, reproduce the failing workflow command locally, fix the root
+  cause, rerun the full local CI sequence, push, and wait again. Do not treat a
+  blind rerun of a flaky failure as validation; remove the nondeterminism or
+  repair the underlying race.
 - Browser automation is intentionally excluded from the per-PR GitHub CI job.
   When authoring a PR that can affect browser or runtime behaviour, agents MUST
   run the relevant Playwright coverage locally before handoff. Changes touching
