@@ -48,11 +48,18 @@ describe('SheetNavigation', () => {
     expect(onSelect).toHaveBeenCalledWith('Skills');
   });
 
-  it('keeps mobile petals unreachable while closed and dismisses on escape/outside', async () => {
+  it('keeps mobile petals unreachable while closed and shows labelled non-tooltip petals when open', async () => {
     installMatchMedia(false);
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    render(<SheetNavigation tabs={SHEET_TABS} active="Combat" counts={{}} onSelect={onSelect} />);
+    render(
+      <SheetNavigation
+        tabs={SHEET_TABS}
+        active="Combat"
+        counts={{ Skills: 3, Inventory: 2 }}
+        onSelect={onSelect}
+      />,
+    );
 
     const navigation = screen.getByRole('navigation', { name: 'Character sections' });
     const toggle = screen.getByRole('button', { name: 'Open character navigation' });
@@ -62,8 +69,29 @@ describe('SheetNavigation', () => {
 
     await user.click(toggle);
     expect(screen.getByRole('button', { name: 'Close character navigation' })).toBeVisible();
-    expect(navigation.querySelectorAll('.sheet-petals button')).toHaveLength(SHEET_TABS.length);
-    expect(screen.getByRole('tooltip', { name: 'Skills' })).toBeInTheDocument();
+    const petalGroups = navigation.querySelectorAll('.sheet-petal');
+    expect(petalGroups).toHaveLength(SHEET_TABS.length);
+    expect(navigation.querySelectorAll('[role="tooltip"]')).toHaveLength(0);
+    for (const tab of SHEET_TABS) {
+      const petal = Array.from(petalGroups).find(
+        (group) => group.querySelector(`button[aria-label="${tab}"]`) !== null,
+      );
+      expect(petal, `${tab} petal`).not.toBeNull();
+      if (!petal) continue;
+      const label = petal.querySelector('.sheet-petal-label');
+      expect(label, `${tab} visible label`).not.toBeNull();
+      expect(label).toBeVisible();
+      expect(label).toHaveTextContent(tab);
+      expect(petal.querySelector('button')).toHaveAttribute('aria-label', tab);
+      if (tab === 'Skills') {
+        expect(petal.querySelector('.sheet-petal-count')).toHaveTextContent('3');
+      }
+    }
+
+    await user.hover(screen.getByRole('button', { name: 'Skills' }));
+    await expect(navigation.querySelector('[role="tooltip"]')).not.toBeInTheDocument();
+    screen.getByRole('button', { name: 'Skills' }).focus();
+    expect(navigation.querySelector('[role="tooltip"]')).not.toBeInTheDocument();
 
     await user.keyboard('{Escape}');
     expect(screen.getByRole('button', { name: 'Open character navigation' })).toHaveFocus();
@@ -74,7 +102,11 @@ describe('SheetNavigation', () => {
     expect(petals).toHaveAttribute('hidden');
 
     await user.click(toggle);
-    await user.click(screen.getByRole('button', { name: 'Identity' }));
+    const identityLabel = Array.from(navigation.querySelectorAll('.sheet-petal'))
+      .find((group) => group.querySelector('button[aria-label="Identity"]') !== null)
+      ?.querySelector('.sheet-petal-label');
+    expect(identityLabel).not.toBeNull();
+    await user.click(identityLabel as HTMLElement);
     expect(onSelect).toHaveBeenCalledWith('Identity');
     expect(petals).toHaveAttribute('hidden');
   });

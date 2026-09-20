@@ -139,22 +139,18 @@ export function SheetNavigation({ tabs, active, counts, onSelect }: SheetNavigat
         </button>
         <div id={id} className="sheet-petals" hidden={!open}>
           {tabs.map((tab, index) => {
-            // Three inner petals and up to five outer petals keep 48px targets apart.
+            // Leave room for permanent labels beneath each 48px icon target.
             const inner = index < 3;
             const angle = inner
               ? 180 - index * 45
               : 180 - ((index - 3) * 90) / Math.max(1, tabs.length - 4);
-            const radius = inner ? 88 : 160;
+            const radius = inner ? 112 : 224;
             const style = {
               '--petal-x': `${Math.cos((angle * Math.PI) / 180) * radius}px`,
               '--petal-y': `${-Math.sin((angle * Math.PI) / 180) * radius}px`,
             } as CSSProperties;
             return (
-              <div key={tab} className="tooltip tooltip-top sheet-petal" style={style}>
-                <span className="tooltip-content" role="tooltip">
-                  {tab}
-                  {counts[tab] !== undefined ? ` · ${counts[tab]}` : ''}
-                </span>
+              <div key={tab} className="sheet-petal" style={style}>
                 <button
                   type="button"
                   className="btn btn-circle"
@@ -163,6 +159,10 @@ export function SheetNavigation({ tabs, active, counts, onSelect }: SheetNavigat
                   onClick={() => select(tab)}
                 >
                   <AppIcon name={SHEET_ICONS[tab]} size={22} />
+                  {counts[tab] !== undefined && (
+                    <span className="sheet-petal-count">{counts[tab]}</span>
+                  )}
+                  <span className="sheet-petal-label">{tab}</span>
                 </button>
               </div>
             );

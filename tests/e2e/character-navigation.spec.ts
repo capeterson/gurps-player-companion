@@ -27,6 +27,7 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
 
   for (const width of widths) {
     const height = width < 768 ? 568 : 900;
+    const subpixelTolerance = 1;
     await page.setViewportSize({ width, height });
     await expectCharacterNavigationReady(page);
 
@@ -45,6 +46,10 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
         const button = dock.getByRole('button', { name: section, exact: true });
         await expect(button).toBeVisible();
         await expect(button).toHaveAttribute('aria-label', section);
+        await expect(button.locator('.dock-label')).toBeVisible();
+        if (['Traits', 'Skills', 'Magic', 'Inventory'].includes(section)) {
+          await expect(button.locator('.sheet-nav-count')).toBeVisible();
+        }
       }
 
       await selectCharacterSection(page, 'Combat');
@@ -70,8 +75,60 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
       const boxes = [] as { x: number; y: number; right: number; bottom: number }[];
       for (const section of CHARACTER_SECTIONS) {
         const button = flower.getByRole('button', { name: section, exact: true });
+        const petal = button.locator('..');
+        const label = petal.locator('.sheet-petal-label');
+        await expect(label).toBeVisible();
+        await expect(label).toContainText(section);
         await expect(button).toBeVisible();
         await expect(button).toHaveAttribute('aria-label', section);
+        if (['Traits', 'Skills', 'Magic', 'Inventory'].includes(section)) {
+          await expect(petal.locator('.sheet-petal-count')).toBeVisible();
+        }
+        await expect(flower.locator('[role="tooltip"]')).toHaveCount(0);
+        const labelBox = await label.boundingBox();
+        expect(labelBox, `${section} label has no layout box at ${width}px`).not.toBeNull();
+        if (labelBox) {
+          expect(labelBox.x).toBeGreaterThanOrEqual(0);
+          expect(labelBox.y).toBeGreaterThanOrEqual(0);
+          expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(width);
+          expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(height);
+        }
+        const groupBox = await petal.boundingBox();
+        expect(groupBox, `${section} group has no layout box at ${width}px`).not.toBeNull();
+        if (groupBox) {
+          expect(groupBox.x).toBeGreaterThanOrEqual(0);
+          expect(groupBox.y).toBeGreaterThanOrEqual(0);
+          expect(groupBox.x + groupBox.width).toBeLessThanOrEqual(width);
+          expect(groupBox.y + groupBox.height).toBeLessThanOrEqual(height);
+          boxes.push({
+            x: groupBox.x,
+            y: groupBox.y,
+            right: groupBox.x + groupBox.width,
+            bottom: groupBox.y + groupBox.height,
+          });
+          if (labelBox) {
+            expect(labelBox.x).toBeGreaterThanOrEqual(groupBox.x - subpixelTolerance);
+            expect(labelBox.y).toBeGreaterThanOrEqual(groupBox.y - subpixelTolerance);
+            expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(
+              groupBox.x + groupBox.width + subpixelTolerance,
+            );
+            expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(
+              groupBox.y + groupBox.height + subpixelTolerance,
+            );
+          }
+          const count = petal.locator('.sheet-petal-count');
+          if (await count.count()) {
+            await expect(count).toBeVisible();
+            const countBox = await count.boundingBox();
+            expect(countBox, `${section} count has no layout box at ${width}px`).not.toBeNull();
+            if (countBox) {
+              expect(countBox.x).toBeGreaterThanOrEqual(0);
+              expect(countBox.y).toBeGreaterThanOrEqual(0);
+              expect(countBox.x + countBox.width).toBeLessThanOrEqual(width);
+              expect(countBox.y + countBox.height).toBeLessThanOrEqual(height);
+            }
+          }
+        }
         const box = await button.boundingBox();
         expect(box, `${section} petal has no layout box at ${width}px`).not.toBeNull();
         if (!box) continue;
@@ -81,7 +138,6 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
         expect(box.y).toBeGreaterThanOrEqual(0);
         expect(box.x + box.width).toBeLessThanOrEqual(width);
         expect(box.y + box.height).toBeLessThanOrEqual(height);
-        boxes.push({ x: box.x, y: box.y, right: box.x + box.width, bottom: box.y + box.height });
       }
       const hub = await flower.locator('.sheet-nav-toggle').boundingBox();
       expect(hub, `navigation hub has no layout box at ${width}px`).not.toBeNull();
@@ -104,12 +160,16 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
 
       const combat = flower.getByRole('button', { name: 'Combat', exact: true });
       await combat.hover();
-      await expect(flower.getByRole('tooltip', { name: /^Combat/ })).toBeVisible();
+      await expect(flower.locator('[role="tooltip"]')).toHaveCount(0);
       const identity = flower.getByRole('button', { name: 'Identity', exact: true });
       await identity.focus();
-      await expect(flower.getByRole('tooltip', { name: /^Identity/ })).toBeVisible();
+      await expect(flower.locator('[role="tooltip"]')).toHaveCount(0);
 
-      await flower.getByRole('button', { name: 'Skills', exact: true }).click();
+      await flower
+        .getByRole('button', { name: 'Skills', exact: true })
+        .locator('..')
+        .locator('.sheet-petal-label')
+        .click();
       await expect(open).toBeVisible();
       await expect(flower.locator('.sheet-petals')).toBeHidden();
       await expect(

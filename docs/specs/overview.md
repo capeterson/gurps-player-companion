@@ -101,7 +101,9 @@ shows the synced campaign name as a separate link to that campaign.
   768px and above replaces the sheet tab bar, with etched outline icons, labels,
   entry counts, and a violet active marker. Below 768px a bottom-right FAB shows
   the active section icon and opens a two-ring flower speed dial with 48px icon
-  buttons for all available destinations. Petals have hover/focus label tooltips;
+  buttons for all available destinations. Each petal has a permanent label below
+  its icon and a separate entry-count badge where applicable, with no tooltip.
+  The wider rings keep labels apart and inside a 320px viewport;
   selecting a section closes the flower and focuses/scrolls its visible heading.
   Escape, outside click, and leaving the navigation close it. Closed petals are
   hidden from keyboard and assistive technology. Safe-area spacing and bottom

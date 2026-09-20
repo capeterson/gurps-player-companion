@@ -513,7 +513,7 @@
 }
 
 /* Character navigation extends daisyUI's four-petal flower to eight destinations.
-   Two radii preserve 48px touch targets even at a 320px viewport. */
+   Two radii leave room for permanent labels even at a 320px viewport. */
 .sheet-with-navigation {
   padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
 }
@@ -605,15 +605,17 @@
 }
 .sheet-petal {
   position: absolute;
-  left: 4px;
-  top: 4px;
-  width: 3rem;
-  height: 3rem;
+  left: -4px;
+  top: -14px;
+  width: 4rem;
+  height: 4.5rem;
   transform: translate(var(--petal-x), var(--petal-y));
   pointer-events: auto;
   animation: sheet-petal-in 160ms ease-out;
 }
 .sheet-petal .btn {
+  position: relative;
+  margin-inline: 8px;
   width: 3rem;
   height: 3rem;
   background: var(--color-base-100);
@@ -628,13 +630,34 @@
   border-color: var(--color-primary);
   background: var(--color-base-200);
 }
-.sheet-petal .tooltip-content {
+.sheet-petal-label {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  background: var(--color-base-100);
+  color: var(--color-base-content);
   white-space: nowrap;
   font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1rem;
+  box-shadow: var(--shadow-1);
 }
-.sheet-petal:hover,
-.sheet-petal:focus-within {
-  z-index: 2;
+.sheet-petal-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  padding: 1px 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 1rem;
+  background: var(--color-base-100);
+  color: var(--text-muted);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1rem;
 }
 @keyframes sheet-petal-in {
   from {
