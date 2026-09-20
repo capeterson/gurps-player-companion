@@ -412,8 +412,9 @@ shows the synced campaign name as a separate link to that campaign.
     marks positioned from their actual values on the scale. Each popover also has
     touch-sized −1/+1 controls for precise common adjustments, and its threshold
     names use a compact two-column legend instead of crowding the numeric scale.
-    On mobile the open panel is fixed within the viewport rather than
-    overflowing from its trigger; Escape or an outside tap dismisses it.
+    The two triggers share one adjustment panel, fixed within the viewport at
+    every breakpoint, so HP and FP cannot overlap or overflow from a trigger;
+    Escape or an outside tap dismisses it.
     Derived pool states such as Reeling, Tired, Exhausted, death checks, and
     Unconscious are visible as badges; exceptional/certain-death bounds are
     de-emphasized notes rather than primary controls;

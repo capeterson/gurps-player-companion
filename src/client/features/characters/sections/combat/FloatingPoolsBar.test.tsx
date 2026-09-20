@@ -35,7 +35,9 @@ describe('FloatingPoolsBar', () => {
 
     setup();
     fireEvent.click(screen.getByLabelText('Adjust HP'));
-    expect(document.querySelector('[data-range-point="0"]')).toHaveStyle({ left: '50%' });
+    expect(document.querySelector('[data-range-point="0"]')).toHaveStyle({
+      left: '50%',
+    });
     expect(document.querySelector('[data-range-point="4"]')).toHaveStyle({
       left: '66.66666666666666%',
     });
@@ -59,6 +61,7 @@ describe('FloatingPoolsBar', () => {
     expect(screen.queryByRole('slider', { name: 'Set HP' })).not.toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Set FP' })).toHaveClass('range');
     expect(screen.getByText(/1 FP per 10 minutes/)).toBeInTheDocument();
+    expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);
   });
 
   it('converts range movement into incremental local-first pool deltas', () => {
@@ -79,12 +82,14 @@ describe('FloatingPoolsBar', () => {
     const { bumpHp, bumpFp } = setup();
 
     fireEvent.click(screen.getByLabelText('Adjust HP'));
+    expect(screen.getByLabelText('HP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease HP by 1' }));
     expect(screen.getByLabelText('Current HP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase HP by 1' }));
     expect(screen.getByLabelText('Current HP')).toHaveTextContent('10');
 
     fireEvent.click(screen.getByLabelText('Adjust FP'));
+    expect(screen.getByLabelText('FP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease FP by 1' }));
     expect(screen.getByLabelText('Current FP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase FP by 1' }));
@@ -94,11 +99,12 @@ describe('FloatingPoolsBar', () => {
     expect(bumpFp.mock.calls.map(([delta]) => delta)).toEqual([-1, 1]);
   });
 
-  it('keeps the mobile panel inside the viewport and dismisses it', () => {
+  it('uses one viewport-fixed panel and dismisses it', () => {
     setup();
     fireEvent.click(screen.getByLabelText('Adjust FP'));
     const panel = screen.getByRole('group', { name: 'FP adjustment' });
-    expect(panel).toHaveClass('fixed!', 'inset-x-4!', 'sm:absolute!');
+    expect(panel).toHaveClass('fixed', 'left-1/2', 'w-[calc(100dvw_-_2rem)]', 'max-w-lg');
+    expect(panel).not.toHaveClass('dropdown-content', 'sm:absolute!');
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'FP adjustment' })).not.toBeInTheDocument();

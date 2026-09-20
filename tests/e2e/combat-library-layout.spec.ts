@@ -22,6 +22,65 @@ async function api(page: Page, path: string, data: object) {
   return response.json();
 }
 
+async function expectFloatingPoolPanelAt(page: Page, width: number) {
+  await page.setViewportSize({ width, height: 568 });
+  await page.keyboard.press('Escape');
+  const defenseAndDr = page.getByRole('region', {
+    name: /Defense and damage resistance/i,
+  });
+  await defenseAndDr.scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+  const bar = page.getByRole('complementary', { name: 'Current HP and FP' });
+  await expect(bar).toBeVisible();
+  const barBox = await bar.boundingBox();
+  expect(barBox).not.toBeNull();
+
+  for (const pool of ['HP', 'FP'] as const) {
+    await bar.getByRole('button', { name: `Adjust ${pool}` }).click();
+    const panel = page.getByRole('group', { name: `${pool} adjustment` });
+    await expect(panel).toBeVisible();
+    await expect(page.getByRole('group', { name: / adjustment$/ })).toHaveCount(1);
+
+    const current = panel.getByLabel(`Current ${pool}`);
+    const before = Number(await current.textContent());
+    const decrease = panel.getByRole('button', {
+      name: `Decrease ${pool} by 1`,
+    });
+    const increase = panel.getByRole('button', {
+      name: `Increase ${pool} by 1`,
+    });
+    await expect(decrease).toBeVisible();
+    await expect(increase).toBeVisible();
+
+    const [panelBox, decreaseBox, increaseBox] = await Promise.all([
+      panel.boundingBox(),
+      decrease.boundingBox(),
+      increase.boundingBox(),
+    ]);
+    expect(panelBox).not.toBeNull();
+    expect(decreaseBox).not.toBeNull();
+    expect(increaseBox).not.toBeNull();
+    if (barBox && panelBox && decreaseBox && increaseBox) {
+      expect(panelBox.x).toBeGreaterThanOrEqual(0);
+      expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width);
+      expect(panelBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
+      expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(568);
+      for (const buttonBox of [decreaseBox, increaseBox]) {
+        expect(buttonBox.width).toBeGreaterThanOrEqual(44);
+        expect(buttonBox.height).toBeGreaterThanOrEqual(44);
+        expect(buttonBox.x).toBeGreaterThanOrEqual(panelBox.x);
+        expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
+      }
+    }
+
+    await decrease.click();
+    await expect(current).toHaveText(String(before - 1));
+    await increase.click();
+    await expect(current).toHaveText(String(before));
+  }
+}
+
 for (const width of [320, 1280]) {
   test(`combat stays compact and remembers folds at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
@@ -76,7 +135,9 @@ for (const width of [320, 1280]) {
       await defenseAndDr.scrollIntoViewIfNeeded();
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
-      const bar = page.getByRole('complementary', { name: 'Current HP and FP' });
+      const bar = page.getByRole('complementary', {
+        name: 'Current HP and FP',
+      });
       await expect(bar).toBeVisible();
       await bar.getByRole('button', { name: 'Adjust HP' }).click();
       const hpPanel = page.getByRole('group', { name: 'HP adjustment' });
@@ -90,7 +151,9 @@ for (const width of [320, 1280]) {
         expect(panelGap).toBeLessThanOrEqual(12);
       }
       const currentHp = hpPanel.getByLabel('Current HP');
-      const decreaseHp = hpPanel.getByRole('button', { name: 'Decrease HP by 1' });
+      const decreaseHp = hpPanel.getByRole('button', {
+        name: 'Decrease HP by 1',
+      });
       const decreaseHpBox = await decreaseHp.boundingBox();
       expect(decreaseHpBox?.width).toBeGreaterThanOrEqual(44);
       expect(decreaseHpBox?.height).toBeGreaterThanOrEqual(44);
@@ -140,6 +203,10 @@ for (const width of [320, 1280]) {
             : false;
         })
         .toBe(true);
+
+      for (const breakpointWidth of [575, 640, 768]) {
+        await expectFloatingPoolPanelAt(page, breakpointWidth);
+      }
     }
   });
 }
@@ -171,7 +238,10 @@ test('library search and markdown toolbar retain drafts and render formatted des
   await page.getByRole('button', { name: /Edit/ }).click();
   await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit raw markdown' }).click();
-  const editor = page.getByRole('textbox', { name: 'Description', exact: true });
+  const editor = page.getByRole('textbox', {
+    name: 'Description',
+    exact: true,
+  });
   await editor.fill('**Updated** description\n\n- First item\n- Second item');
   await search.fill('Fearfulness');
   await expect(editor).toHaveValue(/Updated/);
