@@ -30,6 +30,12 @@ for (const width of [320, 1280]) {
     await page.goto(`/characters/${character.id}`);
     const overview = page.getByRole('button', { name: /^Sheet overview/ });
     await expect(overview).toHaveAttribute('aria-expanded', 'false');
+    await page.getByRole('button', { name: 'Identity', exact: true }).click();
+    await expect(page.getByLabel('current HP')).toHaveCount(0);
+    await expect(page.getByLabel('current FP')).toHaveCount(0);
+    await expect(page.getByLabel('Hit points')).toHaveCount(0);
+    await expect(page.getByLabel('Fatigue points')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Combat', exact: true }).click();
     const hp = page.getByRole('group', { name: 'Hit points', exact: true });
     await expect(hp).toBeVisible();
     expect((await hp.boundingBox())?.y).toBeLessThan(700);
@@ -75,6 +81,44 @@ for (const width of [320, 1280]) {
       await bar.getByRole('button', { name: 'Adjust HP' }).click();
       const hpPanel = page.getByRole('group', { name: 'HP adjustment' });
       await expect(hpPanel).toBeVisible();
+      const [barBox, hpPanelBox] = await Promise.all([bar.boundingBox(), hpPanel.boundingBox()]);
+      expect(barBox).not.toBeNull();
+      expect(hpPanelBox).not.toBeNull();
+      if (barBox && hpPanelBox) {
+        const panelGap = hpPanelBox.y - (barBox.y + barBox.height);
+        expect(panelGap).toBeGreaterThanOrEqual(0);
+        expect(panelGap).toBeLessThanOrEqual(12);
+      }
+      const currentHp = hpPanel.getByLabel('Current HP');
+      const decreaseHp = hpPanel.getByRole('button', { name: 'Decrease HP by 1' });
+      const decreaseHpBox = await decreaseHp.boundingBox();
+      expect(decreaseHpBox?.width).toBeGreaterThanOrEqual(44);
+      expect(decreaseHpBox?.height).toBeGreaterThanOrEqual(44);
+      await decreaseHp.click();
+      await expect(currentHp).toHaveText('9');
+      await hpPanel.getByRole('button', { name: 'Increase HP by 1' }).click();
+      await expect(currentHp).toHaveText('10');
+      const slider = hpPanel.getByRole('slider', { name: 'Set HP' });
+      const maximum = Number(await slider.getAttribute('max'));
+      const reelingEnds = Math.ceil(maximum / 3);
+      for (const [value, percent] of [
+        [-maximum, 0],
+        [0, 0.5],
+        [reelingEnds, (reelingEnds + maximum) / (2 * maximum)],
+        [maximum, 1],
+      ] as const) {
+        const [sliderBox, markerBox] = await Promise.all([
+          slider.boundingBox(),
+          hpPanel.locator(`[data-range-point="${value}"]`).boundingBox(),
+        ]);
+        expect(sliderBox).not.toBeNull();
+        expect(markerBox).not.toBeNull();
+        if (!sliderBox || !markerBox) continue;
+        const markerCenter = markerBox.x + markerBox.width / 2;
+        const thumbRadius = sliderBox.height / 2;
+        const expectedX = sliderBox.x + thumbRadius + percent * (sliderBox.width - 2 * thumbRadius);
+        expect(Math.abs(markerCenter - expectedX)).toBeLessThanOrEqual(1);
+      }
       await expect
         .poll(async () => {
           const box = await hpPanel.boundingBox();

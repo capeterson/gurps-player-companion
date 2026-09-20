@@ -27,11 +27,9 @@ import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { EffectSourcesList } from '../../components/ui/EffectSourcesList.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
-import { PoolMeter } from '../../components/ui/PoolMeter.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
 import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
-import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
@@ -56,9 +54,7 @@ import { SpellsPanel } from './sections/SpellsPanel.tsx';
 import { TechniquesPanel } from './sections/TechniquesPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { CombatTab } from './sections/combat/CombatTab.tsx';
-import { hpVarFor } from './sections/hpColor.ts';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
-import { useCombatPatch } from './sections/useCombatPatch.ts';
 import { type TempEffectsApi, useTempEffects } from './sections/useTempEffects.ts';
 import { type CampaignSummary, useCharacterAccessLocal } from './useCharacterAccess.ts';
 import {
@@ -901,93 +897,14 @@ function SecondaryModsPanel({
   );
 }
 
-/**
- * Status card — current HP/FP pools (editable) plus the derived combat
- * stats that aren't already surfaced by the Secondary card (Dodge,
- * Basic Lift, Thr/Sw). HP/FP editing lives here so the always-visible
- * sheet shows the player's current pools; the Combat tab's PoolsCard
- * is the second editing surface (with ±1/±5 bumpers), both sharing
- * the same `useCombatPatch` path.
- */
-function StatusPanel({
-  character,
-  canWrite,
-}: {
-  character: CharacterDetail;
-  canWrite: boolean;
-}) {
+/** Derived combat stats that aren't already surfaced by the Secondary card. */
+function StatusPanel({ character }: { character: CharacterDetail }) {
   const d = character.derived;
   const effects = character.effects;
-  const combat = character.combat;
-  const currentHp = combat?.currentHp ?? d.hp;
-  const currentFp = combat?.currentFp ?? d.fp;
-
-  const patchCombat = useCombatPatch(character);
-  const hpField = useDraftField<number>({
-    name: 'current HP',
-    serverValue: currentHp,
-    parse: intParser(-1000, 1000),
-    onSave: (v) => patchCombat('currentHp', v),
-    enqueueOnCommit: {
-      readCommitted: async () =>
-        (await getLocalDb().characterCombat.get(character.id))?.currentHp ?? d.hp,
-    },
-    flashKey: makeFlashKey('character_combat', character.id, 'currentHp'),
-  });
-  const fpField = useDraftField<number>({
-    name: 'current FP',
-    serverValue: currentFp,
-    parse: intParser(-1000, 1000),
-    onSave: (v) => patchCombat('currentFp', v),
-    enqueueOnCommit: {
-      readCommitted: async () =>
-        (await getLocalDb().characterCombat.get(character.id))?.currentFp ?? d.fp,
-    },
-    flashKey: makeFlashKey('character_combat', character.id, 'currentFp'),
-  });
-
-  const hpRatio = d.hp > 0 ? currentHp / d.hp : 0;
-  const fpRatio = d.fp > 0 ? currentFp / d.fp : 0;
-  const hpColor = hpVarFor(hpRatio);
-  const fpColor = hpVarFor(fpRatio);
 
   return (
     <StatCard title="Status">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <p className="label-eyebrow">HP</p>
-          <div className="flex items-baseline gap-1">
-            {canWrite ? (
-              <input
-                aria-label="current HP"
-                className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right w-20 ${hpColor} font-display text-2xl`}
-                {...hpField.inputProps}
-              />
-            ) : (
-              <span className={`num font-display text-2xl ${hpColor}`}>{currentHp}</span>
-            )}
-            <span className="text-base-content/60 num">/ {d.hp}</span>
-          </div>
-          <PoolMeter current={currentHp} max={d.hp} tone="hp" ariaLabel="Hit points" />
-        </div>
-        <div className="space-y-1.5">
-          <p className="label-eyebrow">FP</p>
-          <div className="flex items-baseline gap-1">
-            {canWrite ? (
-              <input
-                aria-label="current FP"
-                className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num text-right w-20 ${fpColor} font-display text-2xl`}
-                {...fpField.inputProps}
-              />
-            ) : (
-              <span className={`num font-display text-2xl ${fpColor}`}>{currentFp}</span>
-            )}
-            <span className="text-base-content/60 num">/ {d.fp}</span>
-          </div>
-          <PoolMeter current={currentFp} max={d.fp} tone="fp" ariaLabel="Fatigue points" />
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-4 mt-4">
+      <div className="grid grid-cols-3 gap-4">
         <Stat
           label={
             <InfoTooltip
@@ -1675,7 +1592,7 @@ export function CharacterSheetPage() {
                 />
               </FoldSection>
               <FoldSection preferenceKey={`${character.id}:StatusPanel`} title="Status">
-                <StatusPanel character={character} canWrite={canWrite} />
+                <StatusPanel character={character} />
               </FoldSection>
               <div className="grid grid-cols-1 gap-4">
                 <FoldSection
