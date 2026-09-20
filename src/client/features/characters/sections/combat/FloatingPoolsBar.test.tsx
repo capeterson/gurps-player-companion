@@ -137,12 +137,23 @@ describe('FloatingPoolsBar', () => {
     expect(bumpFp.mock.calls.map(([delta]) => delta)).toEqual([-1, 1]);
   });
 
-  it('uses one viewport-fixed panel and dismisses it', () => {
+  it('keeps one panel viewport-fixed when narrow and trigger-anchored on desktop', () => {
     setup();
     fireEvent.click(screen.getByLabelText('Adjust FP'));
     const panel = screen.getByRole('group', { name: 'FP adjustment' });
-    expect(panel).toHaveClass('fixed', 'left-1/2', 'w-[calc(100dvw_-_2rem)]', 'max-w-lg');
-    expect(panel).not.toHaveClass('dropdown-content', 'sm:absolute!');
+    expect(panel).toHaveClass(
+      'dropdown-content',
+      'fixed!',
+      'left-1/2!',
+      'w-[calc(100dvw_-_2rem)]',
+      'max-w-lg',
+      'lg:absolute!',
+      'lg:left-0!',
+      'lg:top-full!',
+      'lg:translate-x-0',
+    );
+    expect(panel.parentElement).toHaveClass('dropdown', 'dropdown-start', 'dropdown-open');
+    expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'FP adjustment' })).not.toBeInTheDocument();

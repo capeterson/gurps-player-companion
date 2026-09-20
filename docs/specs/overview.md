@@ -413,9 +413,11 @@ shows the synced campaign name as a separate link to that campaign.
     Close threshold labels use staggered lanes so they retain their exact anchors
     without colliding. Each popover also has touch-sized −1/+1 controls for precise
     common adjustments.
-    The two triggers share one adjustment panel, fixed within the viewport at
-    every breakpoint, so HP and FP cannot overlap or overflow from a trigger;
-    Escape or an outside tap dismisses it.
+    The two triggers share one adjustment panel. On phones and tablets it is
+    fixed and centered within the viewport; on desktop it is anchored below the
+    active trigger. The desktop panel opens toward the available right side so
+    FP cannot overflow the viewport's left edge. Escape or an outside tap
+    dismisses it.
     Derived pool states such as Reeling, Tired, Exhausted, death checks, and
     Unconscious are visible as badges; exceptional/certain-death bounds are
     de-emphasized notes rather than primary controls;

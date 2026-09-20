@@ -113,7 +113,7 @@ function PoolAdjustmentPanel({
       id={id}
       aria-label={`${label} adjustment`}
       style={panelStyle}
-      className="fixed left-1/2 top-[var(--pool-panel-top)] z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg"
+      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg lg:absolute! lg:left-0! lg:right-auto! lg:top-full! lg:mt-2 lg:w-[32rem] lg:max-w-[calc(100dvw_-_2rem)] lg:translate-x-0"
     >
       <div className="mb-3">
         <div className="flex items-start justify-between gap-3">
@@ -310,7 +310,10 @@ export function FloatingPoolsBar({
     >
       <div className="mx-auto flex min-h-12 max-w-[80rem] items-center gap-2 px-4 py-2 sm:px-7">
         <span className="hidden text-xs font-medium text-base-content/60 sm:inline">Current</span>
-        <div style={{ color: hpColor }}>
+        <div
+          className={`dropdown dropdown-start ${openPool === 'HP' ? 'dropdown-open' : ''}`}
+          style={{ color: hpColor }}
+        >
           <PoolTrigger
             label="HP"
             current={bumpers.hp}
@@ -320,16 +323,36 @@ export function FloatingPoolsBar({
             panelId={panelId}
             onToggle={() => setOpenPool((current) => (current === 'HP' ? null : 'HP'))}
           />
+          {activePool?.label === 'HP' && (
+            <PoolAdjustmentPanel
+              key={activePool.label}
+              id={panelId}
+              {...activePool}
+              canWrite={canWrite}
+              panelTop={top + 56}
+            />
+          )}
         </div>
-        <PoolTrigger
-          label="FP"
-          current={bumpers.fp}
-          max={bumpers.fpMax}
-          flashProps={fpFlash.flashProps}
-          open={openPool === 'FP'}
-          panelId={panelId}
-          onToggle={() => setOpenPool((current) => (current === 'FP' ? null : 'FP'))}
-        />
+        <div className={`dropdown dropdown-start ${openPool === 'FP' ? 'dropdown-open' : ''}`}>
+          <PoolTrigger
+            label="FP"
+            current={bumpers.fp}
+            max={bumpers.fpMax}
+            flashProps={fpFlash.flashProps}
+            open={openPool === 'FP'}
+            panelId={panelId}
+            onToggle={() => setOpenPool((current) => (current === 'FP' ? null : 'FP'))}
+          />
+          {activePool?.label === 'FP' && (
+            <PoolAdjustmentPanel
+              key={activePool.label}
+              id={panelId}
+              {...activePool}
+              canWrite={canWrite}
+              panelTop={top + 56}
+            />
+          )}
+        </div>
         <div className="ml-auto flex min-w-0 gap-1 overflow-x-auto" aria-label="Pool conditions">
           {statuses.length === 0 ? (
             <span className="badge badge-ghost badge-sm whitespace-nowrap">Stable</span>
@@ -351,15 +374,6 @@ export function FloatingPoolsBar({
           )}
         </div>
       </div>
-      {activePool && (
-        <PoolAdjustmentPanel
-          key={activePool.label}
-          id={panelId}
-          {...activePool}
-          canWrite={canWrite}
-          panelTop={top + 56}
-        />
-      )}
     </aside>
   );
 }

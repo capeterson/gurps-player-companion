@@ -88,7 +88,8 @@ async function expectFloatingPoolPanelAt(page: Page, width: number) {
   expect(barBox).not.toBeNull();
 
   for (const pool of ['HP', 'FP'] as const) {
-    await bar.getByRole('button', { name: `Adjust ${pool}` }).click();
+    const trigger = bar.getByRole('button', { name: `Adjust ${pool}` });
+    await trigger.click();
     const panel = page.getByRole('group', { name: `${pool} adjustment` });
     await expect(panel).toBeVisible();
     await expect(page.getByRole('group', { name: / adjustment$/ })).toHaveCount(1);
@@ -108,19 +109,29 @@ async function expectFloatingPoolPanelAt(page: Page, width: number) {
     await expect(decrease).toBeVisible();
     await expect(increase).toBeVisible();
 
-    const [panelBox, decreaseBox, increaseBox] = await Promise.all([
+    const [triggerBox, panelBox, decreaseBox, increaseBox] = await Promise.all([
+      trigger.boundingBox(),
       panel.boundingBox(),
       decrease.boundingBox(),
       increase.boundingBox(),
     ]);
+    expect(triggerBox).not.toBeNull();
     expect(panelBox).not.toBeNull();
     expect(decreaseBox).not.toBeNull();
     expect(increaseBox).not.toBeNull();
-    if (barBox && panelBox && decreaseBox && increaseBox) {
+    if (barBox && triggerBox && panelBox && decreaseBox && increaseBox) {
       expect(panelBox.x).toBeGreaterThanOrEqual(0);
       expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width);
       expect(panelBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
       expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(568);
+      if (width < 1024) {
+        expect(Math.abs(panelBox.x + panelBox.width / 2 - width / 2)).toBeLessThanOrEqual(1);
+      } else {
+        expect(Math.abs(panelBox.x - triggerBox.x)).toBeLessThanOrEqual(1);
+        const triggerGap = panelBox.y - (triggerBox.y + triggerBox.height);
+        expect(triggerGap).toBeGreaterThanOrEqual(0);
+        expect(triggerGap).toBeLessThanOrEqual(12);
+      }
       for (const buttonBox of [decreaseBox, increaseBox]) {
         expect(buttonBox.width).toBeGreaterThanOrEqual(44);
         expect(buttonBox.height).toBeGreaterThanOrEqual(44);
@@ -249,7 +260,7 @@ for (const width of [320, 1280]) {
         })
         .toBe(true);
 
-      for (const breakpointWidth of [575, 640, 768]) {
+      for (const breakpointWidth of [477, 575, 639, 640, 641, 768, 1023, 1024, 1025, 1280, 1440]) {
         await expectFloatingPoolPanelAt(page, breakpointWidth);
       }
     }
