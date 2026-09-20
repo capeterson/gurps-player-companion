@@ -87,18 +87,30 @@ invalidation behavior as REST.
   can suspend / unsuspend / schedule purge.
 
 ### Character sheet (the core surface)
-Route `/characters/:id`. Tabbed sheet
-(`src/client/features/characters/CharacterSheetPage.tsx`), tabs:
-**Combat, Identity, Traits, Skills, Magic, Inventory, Notes, History**
-(the Combat tab is first — it's the live-gameplay surface a player
-touches mid-session, front-loaded so one tap lands there; on a
-read-only view of a non-magical character the Magic tab is hidden, and
-on any sheet the viewer can edit — their own — it always shows).
+Route `/characters/:id`. Sectioned sheet
+(`src/client/features/characters/CharacterSheetPage.tsx`), destinations:
+**Combat, Identity, Traits, Skills, Magic, Inventory, Notes, History**.
+Combat is the default section for live play. Magic is hidden on a read-only
+view of a non-magical character; owners always have it available to add magic.
 
 The home page's recent-character cards and the `/characters` listing resolve
 from the local mirror. Each card links to its character and, when assigned,
 shows the synced campaign name as a separate link to that campaign.
 
+- **Sheet navigation and icons.** A floating bottom daisyUI dock at widths of
+  768px and above replaces the sheet tab bar, with etched outline icons, labels,
+  entry counts, and a violet active marker. Below 768px a bottom-right FAB shows
+  the active section icon and opens a two-ring flower speed dial with 48px icon
+  buttons for all available destinations. Petals have hover/focus label tooltips;
+  selecting a section closes the flower and focuses/scrolls its visible heading.
+  Escape, outside click, and leaving the navigation close it. Closed petals are
+  hidden from keyboard and assistive technology. Safe-area spacing and bottom
+  content padding protect controls from the dock/FAB; navigation yields to modal
+  dialogs. Reduced motion disables the flower entrance and sync rotation.
+  `SheetNavigation.tsx` owns this responsive control. `AppIcon.tsx` standardizes
+  Lucide icons at a 1.75 stroke weight: swords, portrait, fingerprint, target,
+  book, backpack, quill and history for the sheet, with matching map, bell,
+  sun/moon, edit, shield, and six-sided die icons across related controls.
 - **Narrow-screen navigation.** Character and Campaign navigation groups wrap
   within the available header width; long breadcrumbs remain truncated and
   the campaign dropdown stays attached to its group.
@@ -725,9 +737,12 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   characters. Global Character, Campaign, Log, and Library destinations stay in the
   persistent header instead of being repeated as homepage buttons or shortcut
   cards.
-- **Sync status indicator and log** (header): honest pending/syncing/offline/error
-  state, and an `error` badge always names its reason (in the tooltip and in a
-  banner at the top of the log) rather than pointing at a toast that may never
+- **Sync status indicator and log** (header): a quiet etched arrow orbit replaces
+  filled success/warning badges. Synced uses a still gem and muted ink; syncing
+  rotates violet arrows around the gem; offline uses a neutral pause mark; errors
+  use a copper exclamation and take precedence if the browser is also offline.
+  Hover/focus text and the accessible name describe the state. An error always
+  names its reason (in the tooltip and in a banner at the top of the log) rather than pointing at a toast that may never
   have existed. Clicking it opens the local sync log, with current unsynced
   changes, the latest 1,000 pushed/pulled changes and timestamps, repeatedly
   failing changes with diagnostics and an explicit revert action, plus a
@@ -801,6 +816,7 @@ src/
                  authoring), librarySearch (human-readable-field matcher), plus
                  EffectsEditor, the reusable ordered effect authoring UI shared
                  with character-owned trait mechanics
+      characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
@@ -821,6 +837,7 @@ src/
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth),
                   plus per-character device-only solo tracker scratchpads
+    components/ui/AppIcon.tsx  Shared Lucide icon names, size and stroke conventions
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...

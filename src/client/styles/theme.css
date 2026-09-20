@@ -151,6 +151,7 @@
 
 [data-theme="arcane-dark"] {
   --text-muted: oklch(0.68 0.018 300);
+  --sync-attention: oklch(0.76 0.11 45);
   --text-dim: oklch(0.52 0.022 300);
   --border-strong: oklch(0.46 0.055 300);
   --accent-soft: oklch(0.36 0.1 305 / 0.5);
@@ -186,6 +187,7 @@
 
 [data-theme="arcane-light"] {
   --text-muted: oklch(0.46 0.01 300);
+  --sync-attention: oklch(0.52 0.13 40);
   --text-dim: oklch(0.62 0.012 300);
   --border-strong: oklch(0.78 0.01 300);
   --accent-soft: oklch(0.9 0.05 305 / 0.6);
@@ -215,6 +217,7 @@
 /* Surface Tailwind utilities for the app-level tokens. */
 @theme inline {
   --color-muted: var(--text-muted);
+  --color-sync-attention: var(--sync-attention);
   --color-dim: var(--text-dim);
   --color-border-strong: var(--border-strong);
   --color-accent-soft: var(--accent-soft);

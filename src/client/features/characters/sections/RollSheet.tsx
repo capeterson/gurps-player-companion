@@ -1,3 +1,4 @@
+import { AppIcon } from '../../../components/ui/AppIcon.tsx';
 /**
  * RollSheet — the actual dice roller. Rendered by the Combat tab
  * whenever `rollRequest` is non-null. Bottom sheet on mobile
@@ -229,7 +230,10 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
         }}
       >
         <div className="mb-3 flex items-center justify-between">
-          <p className="label-eyebrow">{damage ? 'Roll damage' : 'Roll'}</p>
+          <p className="label-eyebrow flex items-center gap-2">
+            <AppIcon name="dice" size={18} />
+            {damage ? 'Roll damage' : 'Roll'}
+          </p>
           <button
             type="button"
             onClick={onClose}

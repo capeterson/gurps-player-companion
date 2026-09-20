@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
+import { selectCharacterSection } from './character-navigation';
 
 async function register(page: Page) {
   await page.goto('/register');
@@ -159,12 +160,12 @@ for (const width of [320, 1280]) {
     await page.goto(`/characters/${character.id}`);
     const overview = page.getByRole('button', { name: /^Sheet overview/ });
     await expect(overview).toHaveAttribute('aria-expanded', 'false');
-    await page.getByRole('button', { name: 'Identity', exact: true }).click();
+    await selectCharacterSection(page, 'Identity');
     await expect(page.getByLabel('current HP')).toHaveCount(0);
     await expect(page.getByLabel('current FP')).toHaveCount(0);
     await expect(page.getByLabel('Hit points')).toHaveCount(0);
     await expect(page.getByLabel('Fatigue points')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Combat', exact: true }).click();
+    await selectCharacterSection(page, 'Combat');
     const hp = page.getByRole('group', { name: 'Hit points', exact: true });
     await expect(hp).toBeVisible();
     expect((await hp.boundingBox())?.y).toBeLessThan(700);

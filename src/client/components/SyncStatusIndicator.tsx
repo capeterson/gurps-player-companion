@@ -1,7 +1,7 @@
 /**
  * Toolbar sync indicator.
  *
- * Icon-only badge with a DaisyUI tooltip that surfaces:
+ * Icon-only control with a DaisyUI tooltip that surfaces:
  *   - Current sync state (synced / syncing / error / offline)
  *   - Local IndexedDB storage usage & percentage of browser quota
  *
@@ -21,7 +21,7 @@ import { SyncLogView } from './SyncLogView.tsx';
 
 export function SyncStatusIndicator() {
   const { state, error } = useSyncStatus();
-  const meta = STATE_META[state];
+
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [logOpen, setLogOpen] = useState(false);
   useEffect(() => {
@@ -42,12 +42,14 @@ export function SyncStatusIndicator() {
     refetchInterval: 60_000,
   });
 
+  // A sync failure stays actionable when connectivity also drops.
+  const visualState = state === 'error' ? 'error' : !online ? 'offline' : state;
+  const meta = STATE_META[visualState];
+
   // Build a single-line tooltip: state message · storage info
-  const statusMsg = !online
-    ? '⚠ Offline — changes will sync when reconnected'
-    : error
-      ? `⚠ ${error.reason} — click for details`
-      : meta.tooltip;
+  const statusMsg = error
+    ? `${error.reason}${online ? '' : ' · Offline'} — click for details`
+    : meta.tooltip;
 
   let storageMsg = '';
   if (storage.data) {
@@ -64,22 +66,18 @@ export function SyncStatusIndicator() {
 
   const tip = storageMsg ? `${statusMsg}  ·  ${storageMsg}` : statusMsg;
 
-  const badge = (
-    <span className={`badge ${meta.badgeClass} badge-sm`} aria-hidden="true">
-      {meta.icon}
-    </span>
-  );
-
   return (
     <>
       <span className="tooltip tooltip-bottom" data-tip={tip}>
         <button
           type="button"
-          className="btn btn-ghost btn-xs min-h-0 px-1"
-          aria-label={online ? meta.ariaLabel : `${meta.ariaLabel} (offline)`}
+          className={`btn btn-ghost btn-sm btn-square ${meta.colorClass}`}
+          aria-label={
+            !online && visualState === 'error' ? `${meta.ariaLabel} (offline)` : meta.ariaLabel
+          }
           onClick={() => setLogOpen(true)}
         >
-          {badge}
+          <SyncSymbol state={visualState} />
         </button>
       </span>
       <SyncLogView
@@ -94,84 +92,51 @@ export function SyncStatusIndicator() {
 
 const STATE_META = {
   syncing: {
-    badgeClass: 'badge-info',
+    colorClass: 'text-primary',
     ariaLabel: 'Syncing changes',
     tooltip: 'Saving local changes to the server…',
-    icon: <SpinnerIcon />,
   },
   error: {
-    badgeClass: 'badge-warning',
+    colorClass: 'text-sync-attention',
     ariaLabel: 'Some changes failed to sync',
-    // Fallback only.  The live reason replaces this below -- and the
-    // dialog this badge opens is the durable record, which a toast the
-    // user already dismissed (or never saw) is not.
-    tooltip: "⚠ Sync isn't working — click for details",
-    icon: <WarningIcon />,
+    tooltip: 'Sync needs attention — click for details',
   },
   synced: {
-    badgeClass: 'badge-success',
+    colorClass: 'text-muted',
     ariaLabel: 'All changes saved',
-    tooltip: '✓ All changes saved',
-    icon: <CheckIcon />,
+    tooltip: 'All changes synced',
+  },
+  offline: {
+    colorClass: 'text-muted',
+    ariaLabel: 'Offline — changes saved on this device',
+    tooltip: 'Saved on this device — changes will sync when reconnected',
   },
 } as const;
 
-function SpinnerIcon() {
+/** The same etched orbit in every state; only the center and motion change. */
+function SyncSymbol({ state }: { state: keyof typeof STATE_META }) {
   return (
     <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="animate-spin"
-      aria-hidden="true"
-    >
-      <path d="M21 12a9 9 0 1 1-6.22-8.56" />
-    </svg>
-  );
-}
-
-function WarningIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.4"
+      strokeWidth="1.75"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="20 6 9 17 4 12" />
+      <g className={state === 'syncing' ? 'sync-symbol-orbit' : undefined}>
+        <path d="M4 9a8.3 8.3 0 0 1 14-3l2 2M20 3v5h-5M20 15A8.3 8.3 0 0 1 6 18l-2-2M4 21v-5h5" />
+      </g>
+      {state === 'error' ? (
+        <path d="M12 8v5m0 3h.01" />
+      ) : state === 'offline' ? (
+        <path d="M10 9v6m4-6v6" />
+      ) : (
+        <path d="m12 8 3 4-3 4-3-4Z" />
+      )}
     </svg>
   );
 }

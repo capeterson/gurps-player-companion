@@ -267,7 +267,10 @@ describe('durable character mechanics', () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Identity' })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open character navigation' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
     fireEvent.click(screen.getByRole('button', { name: 'Identity' }));
     await waitFor(() => expect(screen.getByText('Basic Lift')).toBeInTheDocument());
     expect(screen.queryByLabelText('current HP')).not.toBeInTheDocument();

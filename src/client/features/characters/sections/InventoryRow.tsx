@@ -2,6 +2,7 @@ import './inventory/inventory.css';
 import { type DragEvent, Fragment, type MouseEvent, type ReactNode, useRef, useState } from 'react';
 import type { LibraryEnchantmentOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
+import { AppIcon } from '../../../components/ui/AppIcon.tsx';
 import { useFlashState } from '../../../hooks/useFlashState.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
 import { InventoryItemEditor } from './inventory/InventoryItemEditor.tsx';
@@ -31,24 +32,6 @@ function locationSummary(locations: string[]): string {
   const head = locations.slice(0, 3).map(fmt).join(', ');
   const extra = locations.length - 3;
   return extra > 0 ? `${head} +${extra}` : head;
-}
-
-function EditIcon({ className = 'h-4 w-4' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <path d="M14.5 4.5l5 5L9 20H4v-5l10.5-10.5z" />
-      <path d="M13 6l5 5" />
-    </svg>
-  );
 }
 
 export function InventoryRow(props: InventoryRowProps) {
@@ -416,7 +399,7 @@ export function InventoryRow(props: InventoryRowProps) {
                 toggleSection('basics', e.currentTarget);
               }}
             >
-              <EditIcon />
+              <AppIcon name="edit" size={16} />
             </button>
           </td>
         )}

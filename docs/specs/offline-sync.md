@@ -570,6 +570,13 @@ both render as a `<details>` disclosure, **collapsed by default**, holding
 field, before/after values, entity class + id, operation, timing, attempt
 count, and the failure reason. The summary line stays a scannable one-liner.
 
+**Indicator presentation.** The header uses one outline arrow-orbit control:
+muted gem when synced, violet rotating arrows while syncing, a neutral pause
+mark when offline, and a copper exclamation for an error. A known error retains
+priority while offline; its tooltip includes the reason and offline context.
+The offline presentation changes no outbox/replay behavior. The control opens
+the existing sync log in every state; reduced-motion users get static arrows.
+
 **The indicator's `error` state always carries a reason.** `syncStateStore`
 holds a `SyncErrorDetail { reason, at }` alongside the state; use
 `setError(reason)` rather than `set('error')`. The reason drives the badge

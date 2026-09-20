@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
+import { selectCharacterSection } from './character-navigation';
 async function setup(page: Page) {
   await page.goto('/register');
   await page.getByLabel(/email/i).fill(`rules-${Date.now()}@example.com`);
@@ -109,10 +110,12 @@ test('API-seeded campaign effects and skill actions survive offline use and reco
   };
   await update(`/characters/${character.id}`, { activeEffects: [activeEffect] });
   await page.goto(`/characters/${character.id}`);
-  await expect(page.getByRole('button', { name: /^Skills 1$/ })).toBeVisible();
+  // Wait for the owned skill to reach the local mirror before disconnecting.
+  // Navigation is visible before the initial cursor has delivered child rows.
+  await expect(page.getByRole('button', { name: 'Skills', exact: true })).toHaveText(/Skills\s*1/);
   await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toHaveCount(0);
   await context.setOffline(true);
-  await page.getByRole('button', { name: /^Skills 1$/ }).click();
+  await selectCharacterSection(page, 'Skills');
   await page.getByRole('button', { name: 'Preview Jump', exact: true }).click();
   await expect(page.getByLabel('Effective target 10')).toBeVisible();
   await page.getByLabel('Underwater', { exact: true }).selectOption('true');

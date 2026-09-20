@@ -6,6 +6,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 const password = 'CorrectHorseBatteryStaple1';
@@ -189,7 +190,7 @@ test('mobile combat preserves an opt-in tracker across disabling', async ({ page
     data: { experimentalTurnTracker: false },
   });
   await page.reload();
-  await expect(page.locator('.panel-tabs')).toBeVisible();
+  await expectCharacterNavigationReady(page);
   await expect(page.getByText('Solo tracker', { exact: true })).toHaveCount(0);
 
   await api(page, `/campaigns/${campaignId}`, {
@@ -197,9 +198,6 @@ test('mobile combat preserves an opt-in tracker across disabling', async ({ page
     data: { experimentalTurnTracker: true },
   });
   await page.reload();
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Combat$/ })
-    .click();
+  await selectCharacterSection(page, 'Combat');
   await expect(page.getByRole('button', { name: 'Next turn' })).toBeVisible();
 });

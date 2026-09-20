@@ -23,6 +23,16 @@ The [standard seed](../../bootstrap/README.md) now includes an enriched version
 of this campaign and party with stable demo accounts. Its extra equipment,
 mechanics, and play state go beyond these original captures.
 
+Navigation previews captured on 2026-09-20 from `91a9b92` plus the themed-icon
+and responsive-navigation changes use that standard seed, in the isolated
+development stack at `http://localhost:13063`. These are real Chromium captures
+with device scale factor 1 and fictional local data.
+
+| File | Surface | Theme | Image size |
+| --- | --- | --- | --- |
+| `navigation-desktop.png` | Character Combat section with the floating section dock and orbit sync indicator | Dark | 1440 × 1050 |
+| `navigation-mobile.png` | Expanded character navigation flower with the Inventory tooltip | Dark | 390 × 844 |
+
 When refreshing these images:
 
 1. Update from `origin/main` and start the local app following the root README.

@@ -76,12 +76,54 @@ describe('SyncStatusIndicator recovery action', () => {
     const user = userEvent.setup();
     renderIndicator();
 
-    await user.click(screen.getByLabelText('All changes saved (offline)'));
+    await user.click(screen.getByLabelText('Offline — changes saved on this device'));
 
     expect(
       screen.getByRole('button', { name: /abandon local changes and re-sync/i }),
     ).toBeDisabled();
     expect(screen.getByText(/Reconnect before abandoning local changes/i)).toBeInTheDocument();
+    online.mockRestore();
+  });
+
+  it('transitions between synced, syncing, and the device-saved offline state', async () => {
+    const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderIndicator();
+
+    expect(screen.getByLabelText('All changes saved')).toBeInTheDocument();
+    syncStateStore.reset('syncing');
+    await waitFor(() => expect(screen.getByLabelText('Syncing changes')).toBeInTheDocument());
+
+    window.dispatchEvent(new Event('offline'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Offline — changes saved on this device')).toBeInTheDocument(),
+    );
+    syncStateStore.reset('synced');
+    window.dispatchEvent(new Event('online'));
+    await waitFor(() => expect(screen.getByLabelText('All changes saved')).toBeInTheDocument());
+
+    // Keep the interaction exercised in this transition test: the offline
+    // badge opens the same durable sync log as every other state.
+    await user.click(screen.getByLabelText('All changes saved'));
+    expect(screen.getByRole('heading', { name: 'Sync log' })).toBeInTheDocument();
+    online.mockRestore();
+  });
+
+  it('keeps the failure reason visible when connectivity drops', async () => {
+    const online = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(true);
+    syncStateStore.setError('Saving Notes failed');
+    const user = userEvent.setup();
+    renderIndicator();
+
+    window.dispatchEvent(new Event('offline'));
+    const indicator = await screen.findByLabelText('Some changes failed to sync (offline)');
+    expect(indicator.parentElement).toHaveAttribute(
+      'data-tip',
+      expect.stringContaining('Saving Notes failed'),
+    );
+    expect(indicator.parentElement).toHaveAttribute('data-tip', expect.stringContaining('Offline'));
+    await user.click(indicator);
+    expect(screen.getByRole('heading', { name: 'Sync log' })).toBeInTheDocument();
     online.mockRestore();
   });
 
