@@ -19,7 +19,9 @@ import {
 } from '../../../../../shared/domain/injuryCalc.ts';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
+import type { RollRequest } from '../rollTypes.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
+import { DefensesCard } from './DefensesCard.tsx';
 import { IncomingDamageDialog } from './IncomingDamageDialog.tsx';
 import { ARMOR_DIVISORS, DAMAGE_TYPES, locationLabel } from './armorViewOptions.ts';
 import './armor.css';
@@ -29,6 +31,7 @@ export interface DrSummaryCardProps {
   canWrite?: boolean;
   hpMax?: number;
   bumpHp?: (delta: number) => void;
+  openRoll?: (request: RollRequest) => void;
   location?: string;
   facing?: ArmorFacing | undefined;
   onLocationChange?: (location: string) => void;
@@ -73,6 +76,7 @@ export function DrSummaryCard({
   canWrite = false,
   hpMax,
   bumpHp,
+  openRoll = () => {},
   location: controlledLocation,
   facing,
   onLocationChange,
@@ -381,6 +385,16 @@ export function DrSummaryCard({
           )}
         </div>
       </div>
+      {character.derived && character.encumbrance && character.skills && (
+        <div className="border-t border-base-300 pt-4">
+          <DefensesCard
+            character={character}
+            openRoll={openRoll}
+            hitLocation={location}
+            facing={selectedFacing}
+          />
+        </div>
+      )}
       <FoldSection
         preferenceKey={`${character.id}:all-location-dr`}
         title="All locations and DR types"

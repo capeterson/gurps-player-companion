@@ -7,13 +7,14 @@
  */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterAttrs } from '../../../../../shared/domain/characterCalc.ts';
 import { applyEffectsToAttrs, resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { AttacksCard } from './AttacksCard.tsx';
 import { DefensesCard } from './DefensesCard.tsx';
+import { clearAllDefenseTablePreferences } from './defenseTablePreferences.ts';
 
 interface WeaponItem {
   readonly id: string;
@@ -94,6 +95,114 @@ function targetFor(openRoll: ReturnType<typeof vi.fn>, index: number): number {
 }
 
 describe('DefensesCard', () => {
+  beforeEach(() => clearAllDefenseTablePreferences());
+
+  function withMultipleDefenses(): CharacterDetail {
+    return makeCharacter(
+      [
+        { id: 'sword', name: 'Sword', parry: '0', skill: 'Broadsword' },
+        { id: 'bow', name: 'Bow', parry: '0', skill: 'Bow' },
+        { id: 'axe', name: 'Axe', parry: '0', skill: 'Axe/Mace' },
+      ],
+      [
+        { name: 'Broadsword', level: 14 },
+        { name: 'Bow', level: 12 },
+        { name: 'Axe/Mace', level: 13 },
+      ],
+    );
+  }
+
+  function defenseOrder() {
+    return screen
+      .getAllByRole('rowgroup')
+      .filter((row) => row.hasAttribute('aria-label'))
+      .map((row) => row.getAttribute('aria-label'));
+  }
+
+  it('sorts the compact table by defense, governing skill, and final score', () => {
+    render(<DefensesCard character={withMultipleDefenses()} openRoll={vi.fn()} />);
+    expect(defenseOrder()).toEqual([
+      'Move',
+      'Dodge',
+      'Parry (Sword)',
+      'Parry (Bow)',
+      'Parry (Axe)',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Defense' }));
+    expect(defenseOrder()).toEqual([
+      'Dodge',
+      'Move',
+      'Parry (Axe)',
+      'Parry (Bow)',
+      'Parry (Sword)',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Governing skill' }));
+    expect(defenseOrder()).toEqual([
+      'Parry (Axe)',
+      'Move',
+      'Dodge',
+      'Parry (Bow)',
+      'Parry (Sword)',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Final' }));
+    expect(defenseOrder()).toEqual([
+      'Move',
+      'Dodge',
+      'Parry (Bow)',
+      'Parry (Axe)',
+      'Parry (Sword)',
+    ]);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Defense order' }), {
+      target: { value: 'custom' },
+    });
+    expect(defenseOrder()).toEqual([
+      'Move',
+      'Dodge',
+      'Parry (Sword)',
+      'Parry (Bow)',
+      'Parry (Axe)',
+    ]);
+  });
+
+  it('persists keyboard custom ordering per character and clears it at logout', () => {
+    const character = withMultipleDefenses();
+    const view = render(<DefensesCard character={character} openRoll={vi.fn()} />);
+    const dodge = screen.getByRole('rowgroup', { name: 'Dodge' });
+    fireEvent.keyDown(within(dodge).getByRole('button', { name: /Reorder/ }), {
+      key: 'ArrowUp',
+    });
+    expect(defenseOrder().slice(0, 2)).toEqual(['Dodge', 'Move']);
+    view.unmount();
+    const remount = render(<DefensesCard character={character} openRoll={vi.fn()} />);
+    expect(defenseOrder().slice(0, 2)).toEqual(['Dodge', 'Move']);
+    remount.rerender(
+      <DefensesCard character={{ ...character, id: 'another-character' }} openRoll={vi.fn()} />,
+    );
+    expect(defenseOrder().slice(0, 2)).toEqual(['Move', 'Dodge']);
+    remount.unmount();
+    clearAllDefenseTablePreferences();
+    render(<DefensesCard character={character} openRoll={vi.fn()} />);
+    expect(defenseOrder().slice(0, 2)).toEqual(['Move', 'Dodge']);
+  });
+
+  it('drags a defense row into custom order and restores it after remount', () => {
+    const character = withMultipleDefenses();
+    const view = render(<DefensesCard character={character} openRoll={vi.fn()} />);
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(
+      within(screen.getByRole('rowgroup', { name: 'Parry (Axe)' })).getByRole('button', {
+        name: /Reorder/,
+      }),
+      { dataTransfer },
+    );
+    fireEvent.dragOver(screen.getByRole('rowgroup', { name: 'Move' }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('rowgroup', { name: 'Move' }), { dataTransfer });
+    expect(defenseOrder()[0]).toBe('Parry (Axe)');
+    view.unmount();
+    render(<DefensesCard character={character} openRoll={vi.fn()} />);
+    expect(defenseOrder()[0]).toBe('Parry (Axe)');
+  });
+
   it('keeps the action grid focused on Move and rollable defenses', () => {
     render(<DefensesCard character={makeCharacter([], [])} openRoll={vi.fn()} />);
     expect(screen.getByText('Move & defenses')).toBeInTheDocument();
@@ -257,8 +366,8 @@ describe('DefensesCard', () => {
     } as CharacterDetail['combat'];
     const openRoll = vi.fn();
     const view = render(<DefensesCard character={c} openRoll={openRoll} />);
-    const moveRow = () => within(screen.getByText('Move').parentElement as HTMLElement);
-    expect(moveRow().getByText('1')).toBeInTheDocument(); // ceil(encumbered Move 4 / 4)
+    const moveRow = () => within(screen.getByRole('rowgroup', { name: 'Move' }));
+    expect(moveRow().getByText('1', { selector: 'td:last-child span' })).toBeInTheDocument(); // ceil(encumbered Move 4 / 4)
     fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
     expect(targetFor(openRoll, 0)).toBe(4); // ceil((9-1)/4) + DB2
     fireEvent.click(screen.getByRole('button', { name: /^Parry/ }));
@@ -271,14 +380,14 @@ describe('DefensesCard', () => {
       conditions: ['Stunned'],
     } as CharacterDetail['combat'];
     view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
-    expect(moveRow().getByText('0')).toBeInTheDocument();
+    expect(moveRow().getByText('0', { selector: 'td:last-child span' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
     expect(targetFor(openRoll, 2)).toBe(3); // 8+2-3-4
     c.combat = { ...c.combat, posture: 'standing', conditions: [] } as CharacterDetail['combat'];
     view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
     fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
     expect(targetFor(openRoll, 3)).toBe(10);
-    expect(moveRow().getByText('4')).toBeInTheDocument();
+    expect(moveRow().getByText('4', { selector: 'td:last-child span' })).toBeInTheDocument();
   });
 
   it('shows unavailable defenses for All-Out Attack and limits All-Out Defense to a chosen option', () => {

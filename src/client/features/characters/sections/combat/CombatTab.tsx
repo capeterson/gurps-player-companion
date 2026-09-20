@@ -13,7 +13,6 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { ArmorFacing } from '../../../../../shared/domain/armorDr.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { RollSheet } from '../RollSheet.tsx';
 import type { RollRequest } from '../rollTypes.ts';
@@ -21,7 +20,6 @@ import { useCombatPatch } from '../useCombatPatch.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
 import { ActiveEffectsPanel } from './ActiveEffectsPanel.tsx';
 import { AttacksCard } from './AttacksCard.tsx';
-import { DefensesCard } from './DefensesCard.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
 import { FloatingPoolsBar } from './FloatingPoolsBar.tsx';
 import { ManeuverCard } from './ManeuverCard.tsx';
@@ -40,8 +38,6 @@ export function CombatTab({
   experimentalTurnTracker = false,
 }: CombatTabProps) {
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
-  const [hitLocation, setHitLocation] = useState('torso');
-  const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
   const [showFloatingPools, setShowFloatingPools] = useState(false);
   const [floatingTop, setFloatingTop] = useState(64);
   const tabBoundaryRef = useRef<HTMLSpanElement>(null);
@@ -92,15 +88,7 @@ export function CombatTab({
         bumpers={bumpers}
         openRoll={openRoll}
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
-        <DefensesCard
-          character={character}
-          openRoll={openRoll}
-          hitLocation={hitLocation}
-          facing={facing}
-        />
-      </div>
+      <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
       <ActiveEffectsPanel character={character} canWrite={canWrite} />
       <AttacksCard character={character} openRoll={openRoll} />
       <DrSummaryCard
@@ -109,10 +97,7 @@ export function CombatTab({
         canWrite={canWrite}
         hpMax={bumpers.hpMax}
         bumpHp={bumpers.bumpHp}
-        location={hitLocation}
-        facing={facing}
-        onLocationChange={setHitLocation}
-        onFacingChange={setFacing}
+        openRoll={openRoll}
       />
       {experimentalTurnTracker && (
         <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
