@@ -25,6 +25,8 @@ function makeBumpers(hp: number, hpMax: number): PoolBumpers {
     fpMax: 10,
     bumpHp: vi.fn(),
     bumpFp: vi.fn(),
+    commitHpDeltas: vi.fn().mockResolvedValue(hp),
+    commitFpDeltas: vi.fn().mockResolvedValue(hp),
     resetHp: vi.fn(),
     resetFp: vi.fn(),
     flashHp: false,

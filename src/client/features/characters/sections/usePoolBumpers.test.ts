@@ -42,6 +42,90 @@ async function expectPools(hp: number, fp: number) {
 }
 
 describe('usePoolBumpers', () => {
+  it.each([
+    { synced: 15, deltas: [-1, -1, -1, -1, -1], expected: 10 },
+    { synced: 5, deltas: [1, -1, 1, 1, -1], expected: 6 },
+    { synced: 0, deltas: [-5, 1, -1, 3, -2], expected: -4 },
+    { synced: -40, deltas: [-5, -5, 1, -1], expected: -50 },
+  ])(
+    'rebases an ordered HP burst $deltas onto latest synced value $synced',
+    async ({ synced, deltas, expected }) => {
+      const { result, db } = await setup();
+      // This is the value a cursor pull may land while the tooltip is still
+      // collecting relative gestures and therefore has no outbox row yet.
+      await db.characterCombat.update(CHAR_ID, { currentHp: synced, revision: 2 });
+      let committed: number | undefined;
+      await act(async () => {
+        committed = await result.current.commitHpDeltas(
+          deltas.map((delta, index) => ({ delta, at: 1000 + index * 10 })),
+        );
+      });
+
+      expect(committed).toBe(expected);
+      await expectPools(expected, 12);
+      expect(await db.outbox.toArray()).toMatchObject([
+        { fieldPath: 'currentHp', prevValue: synced, attemptedValue: expected },
+      ]);
+    },
+  );
+
+  it('preserves the two-press soft-cap override when the presses share one debounced burst', async () => {
+    const { result, db } = await setup(10, 12);
+    let committed: number | undefined;
+    await act(async () => {
+      committed = await result.current.commitHpDeltas([
+        { delta: 1, at: 1000 },
+        { delta: 1, at: 1100 },
+      ]);
+    });
+
+    expect(committed).toBe(11);
+    await expectPools(11, 12);
+    expect(await db.outbox.toArray()).toMatchObject([
+      { fieldPath: 'currentHp', prevValue: 10, attemptedValue: 11 },
+    ]);
+  });
+
+  it('folds every FP loss in a burst so floor overflow is charged to HP exactly once', async () => {
+    const { result, db } = await setup(7, -10);
+    let committed: number | undefined;
+    await act(async () => {
+      committed = await result.current.commitFpDeltas([
+        { delta: -1, at: 1000 },
+        { delta: -2, at: 1010 },
+        { delta: -5, at: 1020 },
+      ]);
+    });
+
+    expect(committed).toBe(-12);
+    await expectPools(-1, -12);
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(2);
+    expect(ops.find((op) => op.fieldPath === 'currentFp')).toMatchObject({
+      prevValue: -10,
+      attemptedValue: -12,
+    });
+    expect(ops.find((op) => op.fieldPath === 'currentHp')).toMatchObject({
+      prevValue: 7,
+      attemptedValue: -1,
+    });
+  });
+
+  it('does not enqueue a net-zero debounced burst', async () => {
+    const { result, db } = await setup();
+    let committed: number | undefined;
+    await act(async () => {
+      committed = await result.current.commitHpDeltas([
+        { delta: -1, at: 1000 },
+        { delta: 1, at: 1010 },
+      ]);
+    });
+
+    expect(committed).toBe(10);
+    await expectPools(10, 12);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
   it('compounds rapid taps and reset gestures before React receives a new row', async () => {
     const { result } = await setup();
     act(() => {

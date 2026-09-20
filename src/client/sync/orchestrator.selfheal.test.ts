@@ -51,6 +51,74 @@ afterEach(async () => {
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000c001';
 
 describe('applyServerRow local-intent preservation (rule S4)', () => {
+  it.each(['pending', 'in_flight', 'transient_retry'] as const)(
+    'keeps a rebased HP burst while its patch is %s and still accepts unrelated combat fields',
+    async (status) => {
+      const db = getLocalDb();
+      await db.characterCombat.put({
+        id: CHAR_ID,
+        characterId: CHAR_ID,
+        currentHp: 7,
+        currentFp: 8,
+        posture: 'standing',
+        conditions: [],
+        maneuver: null,
+        revision: 1,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      });
+      await db.outbox.put({
+        clientOpId: `hp-${status}`,
+        entityClass: 'character_combat',
+        entityId: CHAR_ID,
+        parentId: CHAR_ID,
+        command: 'patch',
+        coalesceKey: `${CHAR_ID}|currentHp`,
+        fieldPath: 'currentHp',
+        attemptedValue: 7,
+        prevValue: 10,
+        baseRevision: 1,
+        validationVersion: 1,
+        status,
+        enqueuedAt: new Date().toISOString(),
+        attemptCount: status === 'pending' ? 0 : 1,
+      });
+      loginAs('user-1');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          cursorResponse([
+            {
+              entityClass: 'character_combat',
+              entityId: CHAR_ID,
+              command: 'patch',
+              revision: 2,
+              data: {
+                id: CHAR_ID,
+                characterId: CHAR_ID,
+                currentHp: 10,
+                currentFp: 6,
+                posture: 'kneeling',
+                conditions: [],
+                maneuver: null,
+                revision: 2,
+              },
+            },
+          ]),
+        ),
+      );
+
+      await getSyncOrchestrator().triggerCursorPull();
+
+      expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({
+        currentHp: 7,
+        currentFp: 6,
+        posture: 'kneeling',
+        revision: 2,
+      });
+    },
+  );
+
   it('keeps a locally-edited field with a pending outbox op, applies the rest', async () => {
     const db = getLocalDb();
     await db.characters.put({

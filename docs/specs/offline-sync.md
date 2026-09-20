@@ -191,7 +191,16 @@ works offline.**
    This includes
    same-field edits committed while an earlier save is still pending.
    Bumpers use the latest local
-   values, including another input’s edit before React renders it. A local
+   values, including another input’s edit before React renders it. The floating
+   HP/FP popover journals each rapid relative gesture (including its interaction
+   time), waits for a 200 ms quiet period, then folds the ordered burst inside one
+   combat transaction. A cursor value that arrives before that transaction is the
+   burst's new base; once the transaction enqueues its absolute result, ordinary
+   pending/in-flight field protection prevents later pulls from replacing it. A
+   new burst started while the previous one settles is serialized after it, and
+   closing the popover flushes rather than discards the unsaved tail. Recording
+   each timestamp preserves the existing two-press soft-cap override even though
+   the burst produces one field patch. A local
    gesture failure emits a visual-only flash plus a field-specific toast
    without reverting another input’s newer unsaved draft.
    Inventory multi-select equip/wear/move actions and bulk deletes use the same

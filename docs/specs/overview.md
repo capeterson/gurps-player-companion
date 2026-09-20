@@ -412,7 +412,11 @@ shows the synced campaign name as a separate link to that campaign.
     marks and visible labels positioned from their actual values on the scale.
     Close threshold labels use staggered lanes so they retain their exact anchors
     without colliding. Each popover also has touch-sized −1/+1 controls for precise
-    common adjustments.
+    common adjustments. Those controls debounce a rapid burst for 200 ms while
+    retaining every ordered relative gesture. The burst is then folded once against
+    the latest durable local pool value, so a cursor update that lands during the
+    debounce becomes the new base instead of reverting or swallowing later taps.
+    Closing or switching the popover flushes its remaining burst immediately.
     The two triggers share one adjustment panel. On phones and tablets it is
     fixed and centered within the viewport; on desktop it is anchored below the
     active trigger. The desktop panel opens toward the available right side so
