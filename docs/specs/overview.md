@@ -409,9 +409,10 @@ shows the synced campaign name as a separate link to that campaign.
     floating pool bar so rapid changes across both UIs never race. The bar
     appears at the top only after the sheet tab list has scrolled away, labels
     both HP and FP, and opens one range popover at a time with threshold/recovery
-    marks positioned from their actual values on the scale. Each popover also has
-    touch-sized −1/+1 controls for precise common adjustments, and its threshold
-    names use a compact two-column legend instead of crowding the numeric scale.
+    marks and visible labels positioned from their actual values on the scale.
+    Close threshold labels use staggered lanes so they retain their exact anchors
+    without colliding. Each popover also has touch-sized −1/+1 controls for precise
+    common adjustments.
     The two triggers share one adjustment panel, fixed within the viewport at
     every breakpoint, so HP and FP cannot overlap or overflow from a trigger;
     Escape or an outside tap dismisses it.

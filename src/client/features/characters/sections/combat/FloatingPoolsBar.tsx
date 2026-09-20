@@ -180,26 +180,38 @@ function PoolAdjustmentPanel({
       </datalist>
       <div
         aria-hidden="true"
-        className="relative h-2 text-base-content/40"
+        className="relative h-16 text-base-content/40"
         style={{ marginInline: 'calc(var(--size-selector, 0.25rem) * 2.5)' }}
       >
-        {points.map((point) => (
-          <span
-            key={`${point.value}:${point.label}`}
-            data-range-point={point.value}
-            className="absolute top-0 h-1.5 w-px -translate-x-1/2 bg-current"
-            style={{ left: `${rangePointPercent(point.value, minimum, max)}%` }}
-          />
-        ))}
+        {points.map((point, index) => {
+          const percent = rangePointPercent(point.value, minimum, max);
+          const anchor = percent === 0 ? 'start' : percent === 100 ? 'end' : 'center';
+          const alignment =
+            anchor === 'start'
+              ? 'translate-x-0 text-left'
+              : anchor === 'end'
+                ? '-translate-x-full text-right'
+                : '-translate-x-1/2 text-center';
+          return (
+            <div key={`${point.value}:${point.label}`}>
+              <span
+                data-range-point={point.value}
+                className="absolute top-0 h-1.5 w-px -translate-x-1/2 bg-current"
+                style={{ left: `${percent}%` }}
+              />
+              <span
+                data-range-label={point.value}
+                data-range-anchor={anchor}
+                className={`absolute ${index % 2 === 0 ? 'top-2' : 'top-9'} ${alignment} whitespace-nowrap text-[10px] leading-tight text-base-content/60`}
+                style={{ left: `${percent}%` }}
+              >
+                <span className="num block font-semibold text-base-content/80">{point.value}</span>
+                <span>{point.label}</span>
+              </span>
+            </div>
+          );
+        })}
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-box bg-base-200/60 p-2 text-[11px] leading-tight">
-        {points.map((point) => (
-          <div key={`${point.value}:${point.label}`} className="flex justify-between gap-2">
-            <dt className="text-base-content/60">{point.label}</dt>
-            <dd className="num font-semibold text-base-content/80">{point.value}</dd>
-          </div>
-        ))}
-      </dl>
       <p className="mt-2 text-xs text-base-content/70">{recovery}</p>
       <p className="mt-1 text-[10px] text-base-content/45">{footnote}</p>
     </fieldset>

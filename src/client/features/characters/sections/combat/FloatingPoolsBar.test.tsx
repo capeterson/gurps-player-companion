@@ -4,7 +4,7 @@ import type { CharacterDetail } from '../../../../../shared/schemas/character.ts
 import type { PoolBumpers } from '../usePoolBumpers.ts';
 import { FloatingPoolsBar, rangePointPercent } from './FloatingPoolsBar.tsx';
 
-function setup(hp = 10, fp = 10) {
+function setup(hp = 10, fp = 10, max = 12) {
   const character = {
     id: 'character-1',
     combat: { conditions: [] },
@@ -14,33 +14,71 @@ function setup(hp = 10, fp = 10) {
   const bumpers: PoolBumpers = {
     hp,
     fp,
-    hpMax: 12,
-    fpMax: 12,
+    hpMax: max,
+    fpMax: max,
     bumpHp,
     bumpFp,
     resetHp: vi.fn(),
     resetFp: vi.fn(),
     flashHp: false,
   };
-  render(<FloatingPoolsBar character={character} bumpers={bumpers} canWrite />);
-  return { bumpHp, bumpFp };
+  const view = render(<FloatingPoolsBar character={character} bumpers={bumpers} canWrite />);
+  return { bumpHp, bumpFp, ...view };
 }
 
 describe('FloatingPoolsBar', () => {
-  it('positions uneven threshold captions at their corresponding range values', () => {
-    expect(rangePointPercent(-12, -12, 12)).toBe(0);
-    expect(rangePointPercent(0, -12, 12)).toBe(50);
-    expect(rangePointPercent(4, -12, 12)).toBeCloseTo(66.667, 2);
-    expect(rangePointPercent(12, -12, 12)).toBe(100);
+  it('anchors visible uneven-threshold labels at their corresponding range values', () => {
+    // Exhaust every positive maximum the character schema can produce:
+    // base ST/HT (99) + permanent modifier (50) + temporary pool modifier (50).
+    for (let maximum = 1; maximum <= 199; maximum += 1) {
+      expect(rangePointPercent(-maximum, -maximum, maximum)).toBe(0);
+      expect(rangePointPercent(0, -maximum, maximum)).toBe(50);
+      expect(rangePointPercent(Math.ceil(maximum / 3), -maximum, maximum)).toBeCloseTo(
+        ((Math.ceil(maximum / 3) + maximum) / (2 * maximum)) * 100,
+        8,
+      );
+      expect(rangePointPercent(maximum, -maximum, maximum)).toBe(100);
+    }
 
-    setup();
+    setup(0, 8, 15);
     fireEvent.click(screen.getByLabelText('Adjust HP'));
-    expect(document.querySelector('[data-range-point="0"]')).toHaveStyle({
-      left: '50%',
-    });
-    expect(document.querySelector('[data-range-point="4"]')).toHaveStyle({
-      left: '66.66666666666666%',
-    });
+    for (const [value, left, anchor] of [
+      [-15, '0%', 'start'],
+      [0, '50%', 'center'],
+      [5, '66.66666666666666%', 'center'],
+      [15, '100%', 'end'],
+    ] as const) {
+      expect(document.querySelector(`[data-range-point="${value}"]`)).toHaveStyle({ left });
+      expect(document.querySelector(`[data-range-label="${value}"]`)).toHaveStyle({ left });
+      expect(document.querySelector(`[data-range-label="${value}"]`)).toHaveAttribute(
+        'data-range-anchor',
+        anchor,
+      );
+    }
+  });
+
+  it('derives rendered threshold labels from each character pool maximum', () => {
+    for (const maximum of [1, 7, 15, 37, 99, 199]) {
+      const { unmount } = setup(maximum, maximum, maximum);
+      fireEvent.click(screen.getByLabelText('Adjust HP'));
+
+      const threshold = Math.ceil(maximum / 3);
+      const thresholdLabel = screen.getByText('Reeling ends').closest('[data-range-label]');
+      expect(thresholdLabel).toHaveAttribute('data-range-label', String(threshold));
+      expect(thresholdLabel).toHaveStyle({
+        left: `${rangePointPercent(threshold, -maximum, maximum)}%`,
+      });
+      expect(screen.getByText('Death check').closest('[data-range-label]')).toHaveAttribute(
+        'data-range-label',
+        String(-maximum),
+      );
+      expect(screen.getByText('Full').closest('[data-range-label]')).toHaveAttribute(
+        'data-range-label',
+        String(maximum),
+      );
+
+      unmount();
+    }
   });
 
   it('labels and exposes both pools with range controls and recovery notes', () => {
