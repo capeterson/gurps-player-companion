@@ -18,7 +18,6 @@ import { RollSheet } from '../RollSheet.tsx';
 import type { RollRequest } from '../rollTypes.ts';
 import { useCombatPatch } from '../useCombatPatch.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
-import { ActiveEffectsPanel } from './ActiveEffectsPanel.tsx';
 import { AttacksCard } from './AttacksCard.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
 import { FloatingPoolsBar } from './FloatingPoolsBar.tsx';
@@ -89,7 +88,6 @@ export function CombatTab({
         openRoll={openRoll}
       />
       <ManeuverCard character={character} canWrite={canWrite} patchCombat={patchCombat} />
-      <ActiveEffectsPanel character={character} canWrite={canWrite} />
       <AttacksCard character={character} openRoll={openRoll} />
       <DrSummaryCard
         key={character.id}

@@ -118,7 +118,10 @@ export function App() {
               Player Companion
             </span>
           </Link>
-          <nav aria-label="Primary navigation" className="flex min-w-0 items-center gap-1">
+          <nav
+            aria-label="Primary navigation"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-1"
+          >
             <div
               className={`flex min-w-0 items-center rounded-field transition ${
                 characterActive ? 'bg-base-200' : ''

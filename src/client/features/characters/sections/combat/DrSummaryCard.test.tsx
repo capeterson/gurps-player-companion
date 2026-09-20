@@ -105,11 +105,7 @@ describe('DrSummaryCard', () => {
       <DrSummaryCard character={character} canWrite hpMax={10} bumpHp={bumpHp} />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('DR unavailable');
-    expect(
-      within(screen.getByRole('list', { name: 'All location DR', hidden: true })).queryByText(
-        'Skull',
-      ),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('All locations and DR types')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '12' } });
     expect(screen.getByRole('button', { name: 'Damage unavailable' })).toBeDisabled();
@@ -209,13 +205,8 @@ describe('DrSummaryCard', () => {
       }
       render(<Sheet />);
       const label = location === 'torso' ? 'Torso' : location === 'skull' ? 'Skull' : 'Eye';
-      if (dr > 0) {
-        const row = within(screen.getByRole('list', { name: 'All location DR', hidden: true }))
-          .getByText(label)
-          .closest('li');
-        expect(row).not.toBeNull();
-        expect(within(row as HTMLElement).getByText(String(dr))).toBeInTheDocument();
-      }
+      if (dr > 0)
+        expect(screen.getAllByRole('button', { name: `${label}, DR ${dr}` })).toHaveLength(2);
       fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
       fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '6' } });
       fireEvent.change(screen.getByLabelText('Type'), { target: { value: type } });
@@ -508,16 +499,19 @@ describe('DrSummaryCard', () => {
     expect(screen.getAllByRole('button', { name: 'Skull, DR 2' })).toHaveLength(2);
   });
 
-  it('annotates typed DR overrides that differ from the base DR', () => {
+  it('shows typed DR overrides on the graphical armor map', () => {
     render(
       <DrSummaryCard
         character={makeCharacter([{ dr: 4, locations: ['torso'], typedDr: { cut: 7, imp: 10 } }])}
       />,
     );
-    expect(screen.getAllByRole('button', { name: /^Torso, DR/ })).toHaveLength(2);
-    // Torso armor also protects the vitals, so both rows show the typed DR.
-    expect(screen.getAllByText(/7 vs cut/)).toHaveLength(2);
-    expect(screen.getAllByText(/10 vs imp/)).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Torso, DR 4' })).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText('Damage type'), { target: { value: 'cut' } });
+    expect(screen.getAllByRole('button', { name: 'Torso, DR 7' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Vitals, DR 7' })).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText('Damage type'), { target: { value: 'imp' } });
+    expect(screen.getAllByRole('button', { name: 'Torso, DR 10' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Vitals, DR 10' })).toHaveLength(2);
   });
 
   it('resolves typed DR through the incoming-damage dialog', () => {

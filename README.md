@@ -1,273 +1,157 @@
 # GURPS Player Companion
 
-A local-first Progressive Web App for managing GURPS 4e player characters,
-campaigns, and shared libraries. Single Bun process serves the HTTP API,
-WebSocket push channel, OpenAPI doc, and the React PWA client.
+**Your character sheet, combat companion, and campaign notebook — at the table or on the go.**
 
-> Status: **early development** — see [AGENTS.md](AGENTS.md) for
-> architecture invariants and contribution rules.
+Keep your GURPS 4e characters ready for the next session. Roll attacks, see where your armor protects you, track spells and equipment, and share a campaign with your group. Use it on a phone, tablet, or desktop, with light and dark themes and an installable app that keeps character edits available offline.
 
-## Features (target)
+**[Play on the official hosted instance → gurps.abundant.zip](https://gurps.abundant.zip)**
 
-See [AGENTS.md](AGENTS.md) for the architecture invariants and the
-no-lost-edits rules.
+![Desktop armor view showing selectable body locations, mail armor protection, and active defenses.](docs/screenshots/armor-desktop.png)
 
-- Local-first IndexedDB store; works indefinitely offline.
-- Durable edit outbox with explicit conflict / suspend / stale-base
-  reconciliation.
-- WebSocket push for live updates; HTTP cursor backfill on reconnect.
-- Per-campaign trait/skill/item library with versioned YAML import/export.
-- Character sheet with derived stats, point ledger, encumbrance,
-  combat tracker, traits/skills/inventory tabs.
-- Adventure log with per-entry visibility (campaign/private).
+*Choose a hit location on the armor diagram to see its protection, defense bonuses, and incoming-damage options.*
 
-## Stack
+## Keep the game moving
 
-| Layer | Tech |
-|---|---|
-| Runtime | Bun |
-| HTTP | Hono + `@hono/zod-openapi` |
-| Validation | Zod (shared between server, client, service worker) |
-| DB | PostgreSQL 18 + Drizzle ORM |
-| Client | React 19, React Router 7, TanStack Query 5 |
-| Local store | Dexie 4 (IndexedDB) |
-| PWA | vite-plugin-pwa + Workbox |
-| Styling | Tailwind 4 + DaisyUI 5 (Arcane theme) |
-| Tests | Vitest + bun:test + Playwright |
-| Lint/format | Biome |
-| Container | Docker + docker-compose |
+- **Combat at your fingertips.** Adjust HP and FP, choose maneuvers, record posture and conditions, and roll weapon attacks, damage, Dodge, Parry, or Block from the same sheet.
+- **See what stops a hit.** Explore graphical armor coverage by location and damage type, including innate protection and enchantments. The incoming-damage helper previews penetration, wounding modifiers, and injury before you apply HP loss.
+- **Roll with context.** Tap skill and spell levels to open the roller, add situational modifiers, and use hit-location or ranged-attack presets. Revisit recent rolls in the character’s device-local roll history.
+- **Keep temporary bonuses separate.** Record temporary modifiers without changing permanent attributes or character points.
 
-## Quick start (dev)
+| Combat on your phone | Resolve incoming damage |
+| --- | --- |
+| ![Mobile combat sheet with HP and FP controls, posture, and maneuver selection.](docs/screenshots/combat-mobile.png) | ![Mobile incoming-damage dialog showing a cutting hit against mail and its calculated injury.](docs/screenshots/damage-mobile.png) |
 
-Bun, Postgres, and the dev server all run in Docker — nothing is
-required on the host except Docker itself.
+## A character sheet that does the bookkeeping
+
+Build out attributes, advantages, disadvantages, quirks, skills, techniques, languages, and spells. Derived stats, skill levels, a live point ledger, and campaign-limit warnings help you keep the numbers straight.
+
+- **Skills with room for your campaign.** Specializations, defaults, prerequisites, contextual modifiers, and authored skill actions keep the relevant rules beside the roll.
+- **Magic with resources attached.** Track spell costs and maintenance, allocate casting energy, and manage powerstones and magic items.
+- **Equipment that matters.** Organize nested containers with drag-and-drop, filter your pack, and track weight, cost, encumbrance, weapon modes, armor, and mechanical enchantments.
+- **Notes and a change history.** Keep character notes in a rich text or Markdown editor and review saved changes in the History tab.
+
+![Desktop inventory with equipped weapons, worn armor, and supplies organized in a nested trail pack.](docs/screenshots/inventory-desktop.png)
+
+## Bring your campaign together
+
+Invite your players, set campaign point limits, tech level, mana, and house rules, and decide who can see full character sheets. GMs and managers get a party dashboard for checking characters during play; optional GM editing lets them help with player sheets.
+
+Build a shared library of traits, skills, spells, items, enchantments, and active effects. Portable YAML import/export lets you reuse campaign content, including languages, techniques, and styles. Record adventures with formatted session notes, locations, XP awards, and campaign-wide or private visibility.
+
+![Desktop campaign page for The Lantern Coast, with a three-character roster and a formatted adventure log.](docs/screenshots/campaign-desktop.png)
+
+An **experimental turn tracker**, enabled in campaign settings, adds PC/NPC turn order and timed effects. A character also gets a personal initiative scratchpad when that setting is enabled.
+
+## Keep playing when the connection drops
+
+Once you have signed in and synced your characters, character-sheet edits save on your device first and sync when the connection returns. That includes traits, skills, spells, languages, techniques, inventory, and combat state. The sync indicator shows pending work and explains problems when a change needs attention.
+
+Install the app from your browser for quick access. Campaign administration, library editing, adventure logs, invitations, and the shared encounter tracker require an internet connection.
+
+## Connect your assistant
+
+Connect a compatible MCP assistant to **`https://gurps.abundant.zip/mcp`** to work with your characters and campaigns. Approve its read, write, or management permissions through your account, and revoke access at any time in **Settings → Connected apps**. See the [MCP guide](docs/specs/mcp-agent-access.md) for client and protocol details.
+
+*Screenshots use fictional demo characters and campaign content from the current app. [Capture details](docs/screenshots/README.md).*
+
+---
+
+## Set up and run your own instance
+
+You only need **Docker with Docker Compose** on the host. Bun and PostgreSQL 18 run in containers.
+
+### Local development
 
 ```sh
+git clone https://github.com/capeterson/gurps-player-companion.git
+cd gurps-player-companion
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-This starts three services:
+Open **[http://localhost:3001](http://localhost:3001)** and create an account. The development Compose file supplies development credentials, installs dependencies in a shared volume, applies migrations, and starts the app with hot reload. No `.env` is required for this path.
 
-| Service  | Port | What it does                                              |
-|----------|------|-----------------------------------------------------------|
-| `db`     | 5432 | Postgres 18 with a persistent `db_data_dev` volume.       |
-| `migrate`| —    | One-shot: `bun install` + `bun run db:migrate`, then exits. |
-| `app`    | 3000 | Vite dev server (with HMR) hosting the Hono API via `@hono/vite-dev-server`. Single port, single process. |
+| Service | Local address / behavior |
+| --- | --- |
+| App and API | `http://localhost:3001`; container port `3000`. |
+| PostgreSQL 18 | `localhost:5434`; database/user/password are `gurps`; container port `5432`. |
+| Migrations | One-shot `migrate` service; the app waits for it to succeed. |
 
-Open **<http://localhost:3001>** for the UI; the API is on the same
-origin at `/api/v1/...` (e.g.
-[`/api/v1/healthz`](http://localhost:3001/api/v1/healthz)).
+The development Compose project is named `nimble-rocket-29ef18d6`. Its `db_data_dev` volume persists the database, and `bun_modules` holds dependencies.
 
-The `migrate` service populates a shared `bun_modules` volume on first
-boot — subsequent `up` runs reuse it and skip the install.
-
-## Common operations
-
-Seed the "Sample" campaign and bootstrap library (idempotent):
+Useful commands:
 
 ```sh
+# Seed Sample plus The Lantern Coast and its three playable demo characters.
 docker compose -f docker-compose.dev.yml run --rm migrate bun run db:seed
-```
 
-Tail logs from a single service:
-
-```sh
+# Follow app logs.
 docker compose -f docker-compose.dev.yml logs -f app
-```
 
-Open a `psql` shell against the dev database:
-
-```sh
+# Open a database shell.
 docker compose -f docker-compose.dev.yml exec db psql -U gurps gurps
-```
 
-Stop everything but keep data:
-
-```sh
+# Stop the stack and keep its data.
 docker compose -f docker-compose.dev.yml down
 ```
 
-Stop and **wipe** the dev database (the `-v` flag deletes the
-`db_data_dev` volume):
+The optional seed includes **Kestrel Vale, Mira Ashfall, and Bram Stonebridge** with linked libraries, equipment, magic, active effects, session logs, and an encounter. See the [seed guide](bootstrap/README.md) for demo account credentials, scenario coverage, and repeat-run behavior. Adding `-v` to `down` deletes the development database and dependency volumes.
 
-```sh
-docker compose -f docker-compose.dev.yml down -v
-```
+### Production / self-hosting
 
-## Production build
-
-Set a JWT signing key (≥ 32 chars) and the deployment's canonical public
-HTTPS origin in `.env`:
+Copy the environment example, generate a signing key, and edit `.env`:
 
 ```sh
 cp .env.example .env
-echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
-echo "APP_BASE_URL=https://gpc.example.com" >> .env
+openssl rand -hex 32
 ```
 
-Replace the example origin with the URL users and delegated clients will open.
-Production startup rejects HTTP origins, paths, query strings, and fragments,
-so terminate TLS at the application or its reverse proxy. Use the development
-Compose stack above for localhost development.
-
-Build the runtime image and start the stack:
+Replace `JWT_SECRET` with the generated value. Set `APP_BASE_URL` to **your own public HTTPS origin**, such as `https://gurps.example.com`, with no path or query. The official hosted instance is `https://gurps.abundant.zip`; a separate deployment should use its own address.
 
 ```sh
-docker compose up --build -d
+docker compose -f docker-compose.yml up --build -d
+curl -fsS http://localhost:3000/api/v1/healthz
+# {"ok":true}
 ```
 
-The prod compose runs three services: `db`, a one-shot `migrate` that
-applies migrations baked into the image, and `app`. The `app` service
-will not start until `migrate` exits 0. The Bun runtime serves the
-built React client and the API on the same port.
+Production exposes **port 3000**. The stack builds the app, applies migrations, and starts only after they succeed. Put it behind an HTTPS reverse proxy pointing at port 3000; forward WebSocket upgrades and leave `/api/*`, `/mcp`, `/oauth/*`, and `/.well-known/*` uncached. Keep the `db_data` volume backed up. To update, pull the latest code and rerun the build/start command.
 
-Open the configured `APP_BASE_URL`. Verify health through the same origin:
+The supplied Compose files set container variables explicitly: `.env` supplies `${...}` substitutions, **not every container setting automatically**. For options not forwarded in the file, add them to the app service’s `environment` in a Compose override and include that override with `-f`. The production file forwards `JWT_SECRET`, `APP_BASE_URL`, `OAUTH_CLIENTS`, `TRUST_PROXY`, and the `AUTH_RATE_LIMIT_*` settings; database credentials, ports, token lifetimes, and CORS are fixed in that file unless overridden.
+
+### Environment variables
+
+[`.env.example`](.env.example) is the starting template; [server configuration](src/server/config.ts) validates the following runtime settings.
+
+| Variable | Default / requirement | Purpose |
+| --- | --- | --- |
+| `ENVIRONMENT` | `development` | `development`, `test`, or `production`. Production disables the API docs UI and live OpenAPI endpoint. Production Compose sets this to `production`. |
+| `HOST` | `0.0.0.0` | Server bind address. |
+| `PORT` | `3000` | Port inside the container; change Compose port mappings separately. |
+| `DATABASE_URL` | Required | PostgreSQL 18 connection URL. Compose uses `postgres://gurps:gurps@db:5432/gurps`; host tools for the dev database use `localhost:5434`. |
+| `JWT_SECRET` | Required; at least 32 characters | Signing secret; placeholders are rejected. Generate with `openssl rand -hex 32`. |
+| `JWT_ACCESS_TTL_MINUTES` | `15` | Access-token lifetime in minutes. |
+| `JWT_REFRESH_TTL_DAYS` | `14` | Refresh-token lifetime in days. |
+| `API_KEY_PEPPER` | Falls back to `JWT_SECRET` | Optional independent API-key HMAC secret, at least 16 characters. |
+| `APP_BASE_URL` | Required in production | Canonical public origin for OAuth and emailed links. Production requires HTTPS; dev Compose sets `http://localhost:3001`. |
+| `CORS_ORIGINS` | `[]` | JSON array of allowed origins. Empty means same-origin only; both Compose files set `[]`. |
+| `RESEND_API_KEY` | Unset | Enables Resend delivery for password resets and campaign invitations. |
+| `RESEND_FROM_EMAIL` | Unset | Sender email for Resend; configure alongside the API key. |
+| `OAUTH_CLIENTS` | `[]` | Optional JSON array of operator-defined public OAuth clients. Supported clients can register/discover themselves without an entry. See `.env.example` for the shape. |
+| `TRUST_PROXY` | `false` | Trust forwarded client IPs only behind a proxy that overwrites `X-Forwarded-For`. |
+| `AUTH_RATE_LIMIT_WINDOW_SECONDS` | `600` | Shared public-auth rate-limit window in seconds, from 1 to 86,400. |
+| `AUTH_RATE_LIMIT_LOGIN_MAX` | `10` | Login-attempt limit per window. |
+| `AUTH_RATE_LIMIT_REGISTER_MAX` | `5` | Registration-attempt limit per window. |
+| `AUTH_RATE_LIMIT_RESET_MAX` | `3` | Password-recovery attempt limit per window. |
+| `AUTH_RATE_LIMIT_CHALLENGE_MAX` | `10` | Passkey-challenge attempt limit per window. |
+
+Development HMR uses `VITE_HMR_HOST` (default `localhost`), `VITE_HMR_PORT` (default `3000`, set to `3001` by dev Compose), and `VITE_HMR_PROTOCOL` (`ws`, or `wss` for TLS). These control the browser’s hot-reload connection, not the public application URL. Test-runner overrides are documented in [playwright.config.ts](playwright.config.ts).
+
+### Development checks and further reading
 
 ```sh
-curl -fsS https://gpc.example.com/api/v1/healthz
-# => {"ok":true}
+docker compose -f docker-compose.dev.yml exec app bun run check
+docker compose -f docker-compose.dev.yml exec app bun run test:client
 ```
 
-## Layout
+The first command runs lint, type checking, server/shared tests, and API/MCP contract checks. Browser tests use Playwright against the running dev app; see [playwright.config.ts](playwright.config.ts).
 
-```
-src/
-  server/      Bun process: Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
-  client/      React PWA
-  shared/      Pure TypeScript: Zod schemas, GURPS math, YAML codec
-  sw/          Service worker registration (app-shell precache; NOT replay)
-docs/
-  specs/       Design specs (start at docs/specs/overview.md): product
-               surface, architecture, offline sync, campaign sharing, history
-  openapi.json Emitted OpenAPI contract (CI-checked)
-bootstrap/
-  sample_library.yaml    seeded into the "Sample" campaign
-```
-
-## Delegated MCP access
-
-The Bun server exposes MCP 2025-11-25 Streamable HTTP at `/mcp` with OAuth
-authorization code + PKCE delegation. Set `APP_BASE_URL` to the canonical public
-origin. ChatGPT-style Client ID Metadata Documents and Claude-compatible Dynamic
-Client Registration are discovered automatically, so supported public clients
-need no `OAUTH_CLIENTS` entry or shared secret. `OAUTH_CLIENTS` remains optional
-for operator-defined clients; `.env.example` shows the JSON shape. Callback URLs
-must use HTTPS or HTTP on an exact loopback host, and may not contain credentials
-or fragments. Production requires HTTPS. Proxy `/mcp`, `/oauth/*`, and
-`/.well-known/*` to this process without caching them.
-
-Clients discover authorization at `/.well-known/oauth-protected-resource/mcp`.
-Scopes are `gpc:read`, `gpc:write`, and `gpc:manage`. Players approve through
-`/oauth/authorize` and revoke connections in Settings. OAuth tokens work only at
-`/mcp`; app API endpoints continue to require app JWTs/API keys. The exact
-88-tool report is `docs/mcp-tools.json`, checked by `bun run mcp:check`. See
-`docs/specs/mcp-agent-access.md` for protocol, lifecycle, and retention details.
-
-## Offline sync
-
-Character data is **local-first**: reads render from IndexedDB
-(Dexie) and writes commit to IndexedDB before anything leaves the
-browser. Online mode adds active sync and WebSocket nudges on top of
-the same data path; going offline simply pauses sync.
-
-**Scope.** As of this writing the offline-sync system covers
-characters and their child rows — `character`, `character_trait`,
-`character_skill`, `character_inventory`, and `character_combat`. The
-rest of the app (campaign settings, the campaign trait/skill/item
-library, adventure log entries, invitations, notifications, admin)
-still talks to the HTTP API directly via React Query and does not
-work offline. New surfaces are migrated onto the outbox class by
-class; until that work lands for a given surface, treat it as
-online-only. The tenets below describe the system as it applies to
-the sync-backed classes.
-
-### Tenets
-
-1. **The local store is the UI's source of truth.** React reads from
-   Dexie via `useLiveQuery`. The server is a durable mirror, not the
-   render path. A user with a stale browser tab and no network can
-   keep editing indefinitely.
-2. **No edit is silently dropped.** Each mutation is journaled into a
-   durable outbox row in the same Dexie transaction as the local
-   write — it is either fully applied locally *and* queued for
-   replay, or neither. See [AGENTS.md](AGENTS.md) interaction rule 1
-   and [src/client/hooks/useDraftField.ts](src/client/hooks/useDraftField.ts).
-3. **Per-field coalescing, latest wins.** While a save is in flight
-   for field `X`, additional commits to `X` queue (latest value wins);
-   commits to other fields proceed in parallel. Pending outbox rows
-   for the same `(entityId, fieldPath)` are replaced rather than
-   stacked.
-4. **A rollback is a visible UX event.** When the server rejects an
-   op (validation, conflict, stale base, unauthorized), the
-   orchestrator reverts the local row, emits a persistent toast that
-   names the field and the reason, and fires a flash event so the
-   input pulses. Toast + flash are both required.
-5. **Server pulls never clobber local intent.** `/sync/cursor`
-   responses are merged into Dexie, but any field with a `pending`
-   or `in_flight` outbox row for the same `(entityId, fieldPath)` is
-   skipped — the local value wins until the server formally rejects
-   it.
-6. **WebSockets are acceleration, not correctness.** The HTTP cursor
-   pull plus the outbox replay is the source of truth. WS frames
-   carry no row data; they only invalidate so the client pulls
-   sooner. A client that loses WS forever still converges via the
-   periodic pull.
-7. **Bootstrap before UI.** A fresh login pulls the full snapshot
-   into Dexie before the app renders, so the first paint already
-   reflects the user's data. A `bootstrap:<userId>` flag in
-   `syncMeta` short-circuits this on subsequent loads.
-8. **Logout purges.** Switching accounts wipes every Dexie table so
-   a previous user's rows can't leak into a `useLiveQuery`.
-
-### Flow
-
-```
-  ┌──────────┐   write     ┌────────────┐   drain    ┌──────────────┐
-  │  React   │────────────▶│   Dexie    │──────────▶│ /sync/       │
-  │  + Zod   │   (1 txn:   │  (stores + │           │  operations  │
-  │          │   row + op) │   outbox)  │◀──────────│              │
-  └──────────┘             └────────────┘   pull    └──────┬───────┘
-       ▲                          ▲     /sync/cursor       │
-       │ useLiveQuery             │                        │
-       │                          └────────────────────────┘
-       │                            WS sync_invalidate
-       │                                     │
-       └─────────────────────── flashBus ◀───┘
-                  (rollback toast + flash)
-```
-
-- **Mutation handlers** call `enqueueFieldPatch`, `enqueueCreate`, or
-  `enqueueDelete` from [src/client/sync/outbox.ts](src/client/sync/outbox.ts).
-  They never `fetch` directly. The enqueue writes the local row and
-  the outbox entry in one Dexie transaction.
-- **The orchestrator** ([src/client/sync/orchestrator.ts](src/client/sync/orchestrator.ts))
-  is a long-lived singleton. It drains the outbox into
-  `POST /sync/operations`, pulls fresh state via
-  `POST /sync/cursor`, applies outcomes (stamping the new revision
-  on success, rolling back on rejection), and emits sync state to
-  the indicator. A `navigator.locks` lease serializes the drain
-  across tabs.
-- **The server** treats each op in a batch independently — one bad
-  op never poisons the rest. HTTP status is always 200; per-op
-  outcomes (`applied` / `rejected` / `conflict` / `unauthorized` /
-  `suspended` / `stale_base` / `transient`) live in
-  `outcomes[].status`. Optimistic concurrency is enforced via
-  `baseRevision`; a mismatch returns `stale_base` plus the latest
-  entity so the client can reconcile.
-- **The protocol** ([src/shared/schemas/sync.ts](src/shared/schemas/sync.ts))
-  is a closed set of entity classes plus three operation commands
-  (`create`, `patch`, `delete`). Both sides validate every envelope
-  with the same Zod schemas.
-
-### Failure modes
-
-| Outcome          | Local effect                                                   |
-|------------------|----------------------------------------------------------------|
-| `applied`        | Stamp `newRevision` onto the row, drop the outbox op.          |
-| `rejected`       | Revert the field/row, persistent toast + input flash.          |
-| `unauthorized`   | Same as rejected; toast names the permission failure.          |
-| `conflict`       | Server returns `latestEntity`; client adopts it, then flashes. |
-| `stale_base`     | Same as conflict — `baseRevision` was behind the server.       |
-| `transient`      | Backoff with jitter, retry up to `MAX_ATTEMPTS` (8).           |
-| `suspended`      | Permanent fail; toast surfaces the reason.                     |
-| network error    | Whole batch reverts to `transient_retry`; loop retries.        |
+Start with the [application overview](docs/specs/overview.md) and [contribution rules](AGENTS.md) before changing code. Detailed implementation notes live in the [architecture](docs/specs/architecture.md), [offline sync](docs/specs/offline-sync.md), [campaign sharing](docs/specs/campaign-content-sharing.md), and [history](docs/specs/history-tracking.md) guides.

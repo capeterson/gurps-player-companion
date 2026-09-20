@@ -38,6 +38,11 @@ for (const width of [320, 1280]) {
     });
     await expect(defenseAndDr).toBeVisible();
     await expect(page.getByLabel('Armor facing')).toBeVisible();
+    await expect(page.getByText('Active defenses', { exact: true })).toBeVisible();
+    await expect(page.getByRole('rowgroup', { name: 'Move' })).toHaveCount(0);
+    await expect(page.getByRole('combobox', { name: 'Defense order' })).toHaveCount(0);
+    await expect(page.getByText('All locations and DR types', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Attack$/, exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Change', exact: true }).click();
     await page.getByRole('button', { name: 'Attack', exact: true }).click();

@@ -523,8 +523,12 @@ mechanism for sharing content between campaigns or seeding a new one.
     reports whether anything was actually written (false when the flag was
     off, the document had no `campaign` block, or the block had no
     recognized fields).
-- **Seed:** `bootstrap/sample_library.yaml` is imported into the "Sample"
-  campaign by `db:seed`.
+- **Seed:** `db:seed` imports `bootstrap/sample_library.yaml` into Sample and
+  creates The Lantern Coast from `bootstrap/lantern_coast.yaml` plus populated
+  character fixtures. Its owner, manager, and member accounts, private/shared
+  logs, and hidden-NPC encounter exercise the same permissions as normal API
+  writes. Existing Lantern play state is preserved on repeat runs. See the
+  [seed guide](../../bootstrap/README.md).
 
 Keys used for upsert matching: traits by `kind::lower(name)`; skills, spells,
 items, enchantments, languages, techniques, and styles by `lower(name)`. The natural-key

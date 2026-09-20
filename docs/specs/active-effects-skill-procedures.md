@@ -2,10 +2,11 @@
 
 Campaign owners manage reusable active effects in Library → Active Effects. Each
 has description, source, tags, numeric declarations, typed capability declarations,
-duration, and an explicit stacking key/policy. Character owners apply a definition
-or author a custom effect from the Combat tab. Source inventory links are optional;
-applying an effect does not consume the item. A deleted source item remains a
-historical reference and does not prevent subsequent instance edits.
+duration, and an explicit stacking key/policy. Character effect instances remain part
+of the API, MCP, sync and calculation model, but the character sheet has no editor for
+applying or managing them. Source inventory links are optional; applying an effect
+does not consume the item. A deleted source item remains a historical reference and
+does not prevent subsequent instance edits.
 
 ## Persistence and ownership
 

@@ -10,13 +10,21 @@ async function setup(page: Page) {
     () => JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
   );
 }
-test('campaign effects and skill actions survive offline editing and reconnect', async ({
+test('API-seeded campaign effects and skill actions survive offline use and reconnect', async ({
   page,
   context,
 }) => {
   const token = await setup(page);
   async function create(path: string, data: object) {
     const response = await page.request.post(`/api/v1${path}`, {
+      data,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    return response.json();
+  }
+  async function update(path: string, data: object) {
+    const response = await page.request.patch(`/api/v1${path}`, {
       data,
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -78,20 +86,39 @@ test('campaign effects and skill actions survive offline editing and reconnect',
     points: 2,
     librarySkillId: skill.id,
   });
+  const appliedAt = new Date();
+  const activeEffect = {
+    id: crypto.randomUUID(),
+    definitionId: definition.id,
+    sourceRevision: definition.revision,
+    sourceCampaignId: campaign.id,
+    name: definition.name,
+    description: definition.description,
+    source: definition.source,
+    tags: definition.tags,
+    effects: definition.effects,
+    capabilities: definition.capabilities,
+    stacking: definition.stacking,
+    state: 'active',
+    appliedAt: appliedAt.toISOString(),
+    duration: definition.duration,
+    remainingRounds: null,
+    expiresAt: new Date(appliedAt.getTime() + 10 * 60_000).toISOString(),
+    sourceInventoryId: null,
+    notes: 'Used before the battle',
+  };
+  await update(`/characters/${character.id}`, { activeEffects: [activeEffect] });
   await page.goto(`/characters/${character.id}`);
-  await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toBeVisible();
-  // The campaign cursor saves the definitions for offline picking.
-  await page.getByPlaceholder('Apply campaign effect…').fill('Battle');
-  await expect(page.getByRole('option', { name: 'Battle Potion', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Skills 1$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toHaveCount(0);
   await context.setOffline(true);
-  await page.getByRole('option', { name: 'Battle Potion', exact: true }).click();
-  await expect(page.getByLabel('Battle Potion notes')).toBeVisible();
-  await page.getByLabel('Battle Potion notes').fill('Used before the battle');
-  await page.getByLabel('Battle Potion notes').blur();
-  await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Activate', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Activate', exact: true }).click();
-  await expect(page.getByText('True Sight — Battle Potion', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /^Skills 1$/ }).click();
+  await page.getByRole('button', { name: 'Preview Jump', exact: true }).click();
+  await expect(page.getByLabel('Effective target 10')).toBeVisible();
+  await page.getByLabel('Underwater', { exact: true }).selectOption('true');
+  await expect(page.getByLabel('Effective target 7')).toBeVisible();
+  await expect(page.getByText('success: Clear the obstacle')).toBeVisible();
+  await page.getByRole('button', { name: 'Close', exact: true }).last().click();
   await context.setOffline(false);
   await expect
     .poll(async () => {
@@ -106,21 +133,7 @@ test('campaign effects and skill actions survive offline editing and reconnect',
       };
     })
     .toEqual({ st: 12, notes: 'Used before the battle', definitionId: definition.id });
-  await page.getByRole('button', { name: /^Skills 1$/ }).click();
-  await page.getByRole('button', { name: 'Preview Jump', exact: true }).click();
-  await expect(page.getByLabel('Effective target 10')).toBeVisible();
-  await page.getByLabel('Underwater', { exact: true }).selectOption('true');
-  await expect(page.getByLabel('Effective target 7')).toBeVisible();
-  await expect(page.getByText('success: Clear the obstacle')).toBeVisible();
-  await page.getByRole('button', { name: 'Close', exact: true }).last().click();
-  await page.getByRole('button', { name: 'Combat', exact: true }).click();
-  await page.getByRole('button', { name: 'Expire', exact: true }).click();
-  await expect
-    .poll(async () => {
-      const response = await page.request.get(`/api/v1/characters/${character.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return (await response.json()).derived.effectiveSt;
-    })
-    .toBe(10);
+  const expired = { ...activeEffect, state: 'expired' };
+  const detail = await update(`/characters/${character.id}`, { activeEffects: [expired] });
+  expect(detail.derived.effectiveSt).toBe(10);
 });

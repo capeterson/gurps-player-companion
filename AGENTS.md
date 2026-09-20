@@ -3,6 +3,15 @@
 Compact, durable rules for anyone (human or agent) editing this repo. Keep
 it short; add a section only when a rule has been broken at least once.
 
+## Start development from current main
+
+Before starting a new development task on local `main`, inspect the working
+tree, run `git fetch origin`, then `git merge --ff-only origin/main` before
+editing. Preserve existing local changes. If local commits have diverged or
+uncommitted edits block the update, resolve that explicitly without resetting,
+discarding, or automatically stashing the user's work. Re-read any project
+instructions and relevant specs changed by the update.
+
 ## Design specs are a maintained requirement
 
 `docs/specs/` holds the living description of this application's current
@@ -54,6 +63,24 @@ or run tests in a stack belonging to another checkout; tear down only the exact
 project created for the current worktree.
 
 ## Interaction design rules
+
+### Use the official daisyUI skills for UI work
+
+For any UI work in this app, **strongly prefer installing and using the official
+daisyUI skills from [saadeghi/daisyui](https://github.com/saadeghi/daisyui)**.
+Use the installed skills when available; read the main skill and the relevant
+component, usage, and color guides before editing HTML/JSX or styles. Build on
+the app's existing daisyUI components and theme conventions.
+
+### One interaction per utility
+
+Do not add multiple controls or displays for the same utility on a surface.
+Before adding UI, check whether an existing interaction already handles the
+task and extend that interaction when needed. Sortable column headers do not
+need an additional order selector; graphical armor coverage does not need a
+duplicate all-locations DR component. Keep content in its semantic category:
+Move is movement, not a defense. Do not add unsolicited character-sheet
+sections or replacement controls while simplifying an approved surface.
 
 ### 1. Never silently discard user edits — queue them client-side
 

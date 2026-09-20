@@ -17,7 +17,6 @@ import {
   effectiveDrAgainstAttack,
   woundingMultiplier,
 } from '../../../../../shared/domain/injuryCalc.ts';
-import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
@@ -395,35 +394,6 @@ export function DrSummaryCard({
           />
         </div>
       )}
-      <FoldSection
-        preferenceKey={`${character.id}:all-location-dr`}
-        title="All locations and DR types"
-        defaultOpen={false}
-      >
-        <ul
-          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 mt-3 text-sm"
-          aria-label="All location DR"
-        >
-          {known &&
-            [...HIT_LOCATIONS, ...custom].map((loc) => {
-              const entry = map.get(loc);
-              const base = entry?.dr ?? 0;
-              const variants = DAMAGE_TYPES.filter(([key]) => key !== 'burn_tight').flatMap(
-                ([key]) =>
-                  resolveDr(key, entry) !== base ? [`${resolveDr(key, entry)} vs ${key}`] : [],
-              );
-              return (
-                <li key={loc}>
-                  <span>{locationLabel(loc)}</span>
-                  <span className="num float-right ml-2">{base}</span>
-                  {variants.length > 0 && (
-                    <small className="block text-muted">{variants.join(' · ')}</small>
-                  )}
-                </li>
-              );
-            })}
-        </ul>
-      </FoldSection>
       {damageOpen && bumpHp && hpMax != null && (
         <IncomingDamageDialog
           open

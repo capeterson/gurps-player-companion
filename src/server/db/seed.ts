@@ -1,15 +1,14 @@
 /**
- * Seed script: ensures the local database has a "Sample" campaign with
- * the bootstrap library imported.  Idempotent — re-running it just
- * upserts the library entries.
+ * Standard development/test seed: refresh the Sample library and create the
+ * populated Lantern Coast campaign once. Repeat runs preserve Lantern play
+ * state; all seeding is atomic and serialized against other seed runs.
  *
  * Usage: bun run db:seed
  */
 
 import { readFile } from 'node:fs/promises';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { parseLibraryYaml } from '../../shared/yaml/library.ts';
-import { hashPassword } from '../auth/password.ts';
 import { upsertByKey } from '../routes/campaignLibraryCrud.ts';
 import {
   itemEntity,
@@ -18,36 +17,19 @@ import {
   traitEntity,
 } from '../routes/campaignLibraryEntities.ts';
 import { withAudit } from './auditContext.ts';
-import { closeDb, getDb } from './client.ts';
-import { campaignMemberships, campaigns, users } from './schema.ts';
+import { closeDb, getDb, runInDbTransaction } from './client.ts';
+import { campaignMemberships, campaigns } from './schema.ts';
+import { ensureDemoUser } from './seeds/accounts.ts';
+import { seedLanternCoast } from './seeds/lanternCoast.ts';
 
 const SAMPLE_CAMPAIGN_NAME = 'Sample';
 const SEED_USER_EMAIL = 'seed@example.invalid';
 const SEED_USER_DISPLAY_NAME = 'Seed';
-const SEED_USER_PASSWORD = 'change-me-please-this-is-a-seed-account';
-
-async function seedUser(db: ReturnType<typeof getDb>): Promise<string> {
-  const existing = await db.select().from(users).where(eq(users.email, SEED_USER_EMAIL));
-  const existingUser = existing[0];
-  if (existingUser) return existingUser.id;
-  const passwordHash = await hashPassword(SEED_USER_PASSWORD);
-  const [created] = await db
-    .insert(users)
-    .values({
-      email: SEED_USER_EMAIL,
-      passwordHash,
-      displayName: SEED_USER_DISPLAY_NAME,
-    })
-    .returning({ id: users.id });
-  if (!created) throw new Error('failed to insert seed user');
-  return created.id;
-}
-
 async function seedCampaign(db: ReturnType<typeof getDb>, ownerId: string): Promise<string> {
   const existing = await db
     .select()
     .from(campaigns)
-    .where(eq(campaigns.name, SAMPLE_CAMPAIGN_NAME));
+    .where(and(eq(campaigns.name, SAMPLE_CAMPAIGN_NAME), eq(campaigns.ownerId, ownerId)));
   const existingCampaign = existing[0];
   if (existingCampaign) return existingCampaign.id;
   const [created] = await db
@@ -81,7 +63,10 @@ async function seedCampaign(db: ReturnType<typeof getDb>, ownerId: string): Prom
  * became case-insensitive functional indexes (migration 0021).
  */
 async function seedLibrary(actorId: string, campaignId: string): Promise<void> {
-  const yamlText = await readFile('bootstrap/sample_library.yaml', 'utf8');
+  const yamlText = await readFile(
+    new URL('../../../bootstrap/sample_library.yaml', import.meta.url),
+    'utf8',
+  );
   const doc = parseLibraryYaml(yamlText);
 
   await withAudit(actorId, undefined, async (tx) => {
@@ -92,17 +77,28 @@ async function seedLibrary(actorId: string, campaignId: string): Promise<void> {
   });
 }
 
-async function run(): Promise<void> {
-  const db = getDb();
-  const userId = await seedUser(db);
-  const campaignId = await seedCampaign(db, userId);
-  await seedLibrary(userId, campaignId);
-  console.log(`seeded ${SAMPLE_CAMPAIGN_NAME} campaign with library content`);
-  await closeDb();
+export async function seedDatabase(): Promise<void> {
+  await runInDbTransaction(async () => {
+    await getDb().execute(
+      sql`select pg_advisory_xact_lock(hashtextextended('gpc:standard-seed', 0))`,
+    );
+    const user = await ensureDemoUser(SEED_USER_EMAIL, SEED_USER_DISPLAY_NAME);
+    const campaignId = await withAudit(user.id, undefined, () => seedCampaign(getDb(), user.id));
+    await seedLibrary(user.id, campaignId);
+    const lantern = await seedLanternCoast(user.id);
+    console.log(
+      `seeded Sample library; Lantern Coast ${lantern.created ? 'created' : 'already present (preserved)'}`,
+    );
+  });
 }
 
-run().catch(async (err) => {
-  console.error('seed failed', err);
-  await closeDb();
-  process.exit(1);
-});
+if (import.meta.main) {
+  try {
+    await seedDatabase();
+  } catch (err) {
+    console.error('seed failed', err);
+    process.exitCode = 1;
+  } finally {
+    await closeDb();
+  }
+}

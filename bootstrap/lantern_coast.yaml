@@ -1,0 +1,195 @@
+# Fictional campaign fixtures, not an authoritative rules catalog.
+version: 11
+campaign:
+  name: The Lantern Coast
+  description: |
+    An ancient beacon has gone dark. Three companions follow its last light
+    across the coast. A populated test campaign with original adventure content.
+  pointTarget: 250
+  disadvantageCap: 50
+  quirkCap: 5
+  manaLevel: normal
+  techLevel: 3
+  skillPrerequisitePolicy: warn
+  enforceAttributeCaps: true
+  houseRules:
+    ruleSet: none
+    protectNaturalDr: false
+library:
+  traits:
+    - name: Combat Reflexes
+      kind: advantage
+      basePoints: 15
+      effects: [{target: dodge, value: 1}, {target: parry, value: 1}, {target: block, value: 1}]
+    - name: Fit
+      kind: advantage
+      basePoints: 5
+      description: Recovery and endurance reminders; adjudicate unmodeled benefits manually.
+    - name: Acute Vision
+      kind: advantage
+      basePoints: 0
+      pointsPerLevel: 2
+      maxLevel: 5
+      description: Apply to vision tasks, not every Per-based roll.
+    - name: Magery
+      kind: advantage
+      basePoints: 5
+      pointsPerLevel: 10
+      maxLevel: 3
+      effects: [{target: skill, skillName: Thaumatology, value: 1, scaling: per_level}]
+    - name: Stoneblood
+      kind: advantage
+      basePoints: 5
+      description: Campaign-specific innate DR 1, including beneath worn armor.
+      effects: [{target: dr, value: 1}]
+    - name: Sense of Duty
+      kind: disadvantage
+      basePoints: -5
+      description: Never abandon the people of Greyhaven.
+    - name: Curious
+      kind: disadvantage
+      basePoints: -5
+      availableModifiers:
+        - {name: Easier self-control, category: limitation, costType: percent, costValue: -50}
+    - name: Code of Honor
+      kind: disadvantage
+      basePoints: -10
+    - name: Lantern vigil
+      kind: quirk
+      basePoints: -1
+      description: Always light a candle for the lost.
+  skills:
+    - {name: Broadsword, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
+    - {name: Shield, attribute: DX, difficulty: E, defaults: [{kind: attribute, attribute: DX, modifier: -4}]}
+    - {name: Bow, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
+    - {name: Axe/Mace, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
+    - {name: Staff, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
+    - {name: Brawling, attribute: DX, difficulty: E, defaults: []}
+    - name: Stealth
+      attribute: DX
+      difficulty: A
+      defaults: [{kind: attribute, attribute: DX, modifier: -5}]
+      description: '**Move unseen.** The following task modifier is an explicit campaign example.'
+      procedures:
+        modifiers:
+          - id: noisy_ground
+            label: Loose shingle underfoot
+            when: [{input: {domain: environment, key: loose_shingle, label: Loose shingle underfoot}, operator: equals, value: true}]
+            value: {kind: fixed, value: -2}
+            appliesTo: task_roll
+        actions:
+          - id: slip_past
+            label: Slip past the lookout
+            roll: {basis: skill}
+            contest: {kind: quick, opponent: Observation}
+            outcomes: [{on: success, kind: note, text: Reach cover if the contest is won; the GM resolves the opponent.}]
+        benefits:
+          - id: practiced_scout
+            label: Practiced coastal scout
+            when: {minimumRelativeLevel: 2}
+            effects: []
+            sourceText: Narrative campaign milestone; no automatic numerical bonus.
+    - name: Survival
+      attribute: Per
+      difficulty: A
+      specializationPolicy:
+        kind: required_catalog
+        options:
+          - {name: Woodlands, description: Find shelter and supplies inland.}
+          - {name: Island/Beach, description: Read the tides and locate fresh water.}
+      defaults: [{kind: attribute, attribute: Per, modifier: -5}]
+    - {name: Observation, attribute: Per, difficulty: A, defaults: [{kind: attribute, attribute: Per, modifier: -5}]}
+    - {name: Swimming, attribute: HT, difficulty: E, defaults: [{kind: attribute, attribute: HT, modifier: -4}]}
+    - {name: Climbing, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
+    - {name: Thaumatology, attribute: IQ, difficulty: VH, prerequisiteRules: {kind: all, children: [{kind: attribute, attribute: IQ, minimum: 12}, {kind: trait, name: Magery, minimumLevel: 0}]}, defaults: [{kind: attribute, attribute: IQ, modifier: -7}]}
+    - name: First Aid
+      attribute: IQ
+      difficulty: E
+      techLevelPolicy: {kind: required}
+      defaults: [{kind: attribute, attribute: IQ, modifier: -4}]
+      description: Record the learned TL and use the action as a campaign task preview.
+      procedures:
+        actions:
+          - id: dress_wound
+            label: Dress a wound
+            roll: {basis: skill}
+            time: {amount: {kind: constant, value: 1}, unit: minutes}
+            outcomes: [{on: success, kind: note, text: Consult the treatment rules and record the patient's recovery manually.}]
+    - {name: Research, attribute: IQ, difficulty: A, defaults: [{kind: attribute, attribute: IQ, modifier: -5}]}
+    - {name: Diplomacy, attribute: IQ, difficulty: H, defaults: [{kind: attribute, attribute: IQ, modifier: -6}]}
+    - {name: Merchant, attribute: IQ, difficulty: A, defaults: [{kind: attribute, attribute: IQ, modifier: -5}]}
+    - {name: Armoury, attribute: IQ, difficulty: A, techLevelPolicy: {kind: required}, specializationPolicy: {kind: required_freeform}, defaults: [{kind: attribute, attribute: IQ, modifier: -5}]}
+  spells:
+    - {name: Light, college: Light and Darkness, difficulty: H, baseEnergyCost: 1, maintenanceCost: 1, castingTime: 1 second, duration: 1 minute}
+    - {name: Ignite Fire, college: Fire, difficulty: H, baseEnergyCost: 1, castingTime: 1 second, duration: Instant}
+    - {name: Lend Energy, college: Healing, difficulty: H, baseEnergyCost: 2, castingTime: 1 second}
+    - {name: Minor Healing, college: Healing, difficulty: H, baseEnergyCost: 1, castingTime: 1 second}
+    - {name: Major Healing, college: Healing, difficulty: VH, baseEnergyCost: 2, castingTime: 1 second, prerequisites: 'Magery 1, Minor Healing'}
+    - {name: Shield, college: Protection and Warning, difficulty: H, baseEnergyCost: 2, maintenanceCost: 1, castingTime: 1 second, duration: 1 minute}
+  languages:
+    - {name: Coast Common, description: The party's free mother tongue.}
+    - {name: Old Beacon Script, description: Fragmentary language found in the lighthouse archives.}
+    - {name: Harbor Sign, isSignLanguage: true, description: Silent communication between dock crews.}
+  techniques:
+    - {name: Feint, defaultSkillName: Broadsword, difficulty: H, defaultModifier: 0, maxLevel: 4, description: A bought-up feint for sword combat.}
+    - {name: Disarming, defaultSkillName: Axe/Mace, difficulty: H, defaultModifier: 0, maxLevel: 5}
+  styles:
+    - name: Greyhaven Watch
+      description: A fictional coastal watch training package; add its components to a character.
+      skills: [Broadsword, Shield, Observation]
+      techniques: [{name: Feint, defaultSkillName: Broadsword}]
+      perks: []
+  enchantments:
+    - name: Beacon Edge
+      description: Campaign enchantment demonstrating an equipped weapon's damage bonus.
+      applicability: weapon
+      effects: [{target: weapon_damage, value: 1}]
+      stackingPolicy: {kind: stack}
+    - name: Warden's Stitch
+      description: Campaign armor enchantment demonstrating additive DR.
+      applicability: armor
+      effects: [{target: dr, value: 1}]
+      stackingPolicy: {kind: highest, key: wardens_stitch}
+  activeEffects:
+    - name: Beacon Ward
+      description: A campaign blessing with visible remaining rounds.
+      effects: [{target: dr, value: 1}]
+      capabilities: [{kind: resistance, key: sea_chill, label: Sheltered from sea chill, parameters: {notes: Narrative protection; no automatic fatigue recovery.}}]
+      duration: {kind: rounds, amount: 6}
+      stacking: {kind: highest, key: beacon_ward}
+    - name: Lantern Sight
+      description: A persistent sense reminder that can be activated or deactivated.
+      effects: []
+      capabilities: [{kind: sense, key: lantern_sight, label: See beacon markings, parameters: {range: 10}}]
+      duration: {kind: indefinite}
+      stacking: {kind: replace, key: lantern_sight}
+    - name: Rallying Draught
+      description: A short-lived campaign strength boost; advancing rounds does not consume the source item.
+      effects: [{target: st, value: 2}]
+      duration: {kind: rounds, amount: 3}
+      stacking: {kind: additive, key: rallying_draught}
+  items:
+    - name: Wayfarer's sword
+      category: weapon
+      weightLbs: 3
+      cost: 500
+      weaponData:
+        damage: sw+1 cut
+        reach: '1'
+        parry: '0'
+        stRequired: 10
+        skill: Broadsword
+        alternateModes: [{name: Thrust, damage: thr+2 imp}]
+    - {name: Round shield, category: weapon, weightLbs: 8, cost: 60, weaponData: {damage: thr cr, reach: '1', parry: 'No', db: 2, skill: Shield}}
+    - name: Coastal bow
+      category: weapon
+      weightLbs: 2
+      cost: 100
+      weaponData: {damage: thr+1 imp, skill: Bow, stRequired: 10, parry: 'No', ranged: {acc: 2, range: '120/180', rof: '1', shots: '1(2)', bulk: -6, recoil: 1}}
+    - {name: Mail hauberk, category: armor, weightLbs: 16, cost: 230, isArmor: true, armor: {dr: 4, drCrushing: 2, flexible: true, locations: [torso, groin, arm_left, arm_right]}}
+    - {name: Steel cap, category: armor, weightLbs: 2, cost: 100, isArmor: true, armor: {dr: 4, locations: [skull]}}
+    - {name: Leather leggings, category: armor, weightLbs: 4, cost: 40, isArmor: true, armor: {dr: 2, locations: [leg_left, leg_right]}}
+    - {name: Travel boots, category: armor, weightLbs: 3, cost: 80, isArmor: true, armor: {dr: 2, locations: [foot_left, foot_right]}}
+    - {name: Trail pack, category: general, weightLbs: 2, cost: 60, isContainer: true, hideawayCapacityLbs: 40}
+    - {name: Focus crystal, category: magic, weightLbs: 0.1, cost: 500, powerstoneData: {maxEnergy: 8, currentEnergy: 5}}
+    - {name: Tideglass wand, category: magic, weightLbs: 1, cost: 900, magicItemData: {spellName: Light, spellSkillLevel: 15, mode: charged, chargesMax: 10, chargesCurrent: 3}}
