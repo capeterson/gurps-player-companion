@@ -4,13 +4,7 @@ import type { CharacterDetail } from '../../../../../shared/schemas/character.ts
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { hpVarFor } from '../hpColor.ts';
-import type { PoolBumpers, PoolDeltaGesture } from '../usePoolBumpers.ts';
-
-export const POOL_DELTA_DEBOUNCE_MS = 200;
-
-function sumPoolDeltas(gestures: readonly PoolDeltaGesture[]): number {
-  return gestures.reduce((total, gesture) => total + gesture.delta, 0);
-}
+import type { PoolBumpers } from '../usePoolBumpers.ts';
 
 interface FloatingPoolsBarProps {
   character: CharacterDetail;
@@ -78,7 +72,8 @@ interface PoolAdjustmentPanelProps {
   points: readonly RangePoint[];
   recovery: string;
   footnote: string;
-  onDeltas: (gestures: readonly PoolDeltaGesture[]) => Promise<number | undefined>;
+  onDelta: (delta: number) => void;
+  onSetValue: (value: number) => void;
   panelTop: number;
 }
 
@@ -91,143 +86,14 @@ function PoolAdjustmentPanel({
   points,
   recovery,
   footnote,
-  onDeltas,
+  onDelta,
+  onSetValue,
   panelTop,
 }: PoolAdjustmentPanelProps) {
   const listId = useId();
-  const lastValue = useRef(current);
-  const currentValue = useRef(current);
-  const pending = useRef<PoolDeltaGesture[]>([]);
-  const outstanding = useRef<PoolDeltaGesture[]>([]);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mounted = useRef(true);
-  const confirmed = useRef<number | null>(null);
-  const submitted = useRef<
-    Array<{
-      batch: readonly PoolDeltaGesture[];
-      expected: number;
-      observed: boolean;
-    }>
-  >([]);
-  const onDeltasRef = useRef(onDeltas);
-  const commitChain = useRef(Promise.resolve());
-  const flushRef = useRef<() => void>(() => undefined);
-  const [displayValue, setDisplayValue] = useState(current);
-
-  onDeltasRef.current = onDeltas;
-
-  function settle(batch: readonly PoolDeltaGesture[], value: number | undefined) {
-    const settledIndex = submitted.current.findIndex((entry) => entry.batch === batch);
-    const settledEntry = submitted.current[settledIndex];
-    if (value !== undefined && settledEntry) {
-      const shift = value - settledEntry.expected;
-      for (let index = settledIndex + 1; index < submitted.current.length; index += 1) {
-        const entry = submitted.current[index];
-        if (entry && !entry.observed) entry.expected += shift;
-      }
-    }
-    submitted.current = submitted.current.filter((entry) => entry.batch !== batch);
-    const batchSet = new Set(batch);
-    outstanding.current = outstanding.current.filter((gesture) => !batchSet.has(gesture));
-    const base = value ?? currentValue.current;
-    confirmed.current = value ?? null;
-    const projected = base + sumPoolDeltas(outstanding.current);
-    lastValue.current = projected;
-    if (mounted.current) setDisplayValue(projected);
-  }
-
-  function flush() {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    if (pending.current.length === 0) return;
-    const batch = pending.current;
-    pending.current = [];
-    submitted.current.push({ batch, expected: lastValue.current, observed: false });
-    commitChain.current = commitChain.current
-      .catch(() => undefined)
-      .then(async () => {
-        let value: number | undefined;
-        try {
-          value = await onDeltasRef.current(batch);
-        } catch {
-          // The pool helper normally surfaces its own toast/flash. Treat an
-          // unexpected callback rejection as an uncommitted burst too.
-          value = undefined;
-        } finally {
-          settle(batch, value);
-        }
-      });
-  }
-  flushRef.current = flush;
-
-  function queueDelta(delta: number) {
-    if (!canWrite || delta === 0) return;
-    const gesture = { delta, at: Date.now() };
-    pending.current.push(gesture);
-    outstanding.current.push(gesture);
-    lastValue.current += delta;
-    setDisplayValue(lastValue.current);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(flush, POOL_DELTA_DEBOUNCE_MS);
-  }
-
-  useEffect(() => {
-    const previous = currentValue.current;
-    currentValue.current = current;
-    const acknowledgedIndex = submitted.current.findIndex(
-      (entry) => !entry.observed && Object.is(entry.expected, current),
-    );
-    if (acknowledgedIndex >= 0) {
-      for (let index = 0; index <= acknowledgedIndex; index += 1) {
-        const entry = submitted.current[index];
-        if (entry) entry.observed = true;
-      }
-      const acknowledged = new Set(
-        submitted.current.filter((entry) => entry.observed).flatMap((entry) => [...entry.batch]),
-      );
-      const projected =
-        current +
-        outstanding.current.reduce(
-          (total, gesture) => total + (acknowledged.has(gesture) ? 0 : gesture.delta),
-          0,
-        );
-      lastValue.current = projected;
-      setDisplayValue(projected);
-      return;
-    }
-    if (confirmed.current !== null && Object.is(confirmed.current, current)) {
-      confirmed.current = null;
-      const projected = current + sumPoolDeltas(outstanding.current);
-      lastValue.current = projected;
-      setDisplayValue(projected);
-      return;
-    }
-    confirmed.current = null;
-    const shift = current - previous;
-    for (const entry of submitted.current) {
-      if (!entry.observed) entry.expected += shift;
-    }
-    const rebased = lastValue.current + shift;
-    lastValue.current = rebased;
-    setDisplayValue(rebased);
-  }, [current]);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      // Closing or switching the tooltip must not discard the tail of a burst.
-      flushRef.current();
-      mounted.current = false;
-    };
-  }, []);
-
   const minimum = -max;
-  const sliderValue = Math.max(minimum, Math.min(max, displayValue));
+  const sliderValue = Math.max(minimum, Math.min(max, current));
   const panelStyle = { '--pool-panel-top': `${panelTop}px` } as CSSProperties;
-
-  function adjustBy(delta: number) {
-    queueDelta(delta);
-  }
 
   return (
     <fieldset
@@ -244,7 +110,7 @@ function PoolAdjustmentPanel({
               {canWrite ? 'Drag or use −1/+1.' : 'Current value and thresholds.'}
             </p>
           </div>
-          {!canWrite && <strong className="num text-xl">{displayValue}</strong>}
+          {!canWrite && <strong className="num text-xl">{current}</strong>}
         </div>
         {canWrite && (
           <div
@@ -255,7 +121,7 @@ function PoolAdjustmentPanel({
               type="button"
               className="btn btn-sm join-item min-h-11 w-full px-2"
               aria-label={`Decrease ${label} by 1`}
-              onClick={() => adjustBy(-1)}
+              onClick={() => onDelta(-1)}
             >
               −1
             </button>
@@ -263,13 +129,13 @@ function PoolAdjustmentPanel({
               aria-label={`Current ${label}`}
               className="join-item num flex min-h-11 min-w-20 items-center justify-center border-y border-base-300 bg-base-200 px-3 text-xl font-bold"
             >
-              {displayValue}
+              {current}
             </output>
             <button
               type="button"
               className="btn btn-sm join-item min-h-11 w-full px-2"
               aria-label={`Increase ${label} by 1`}
-              onClick={() => adjustBy(1)}
+              onClick={() => onDelta(1)}
             >
               +1
             </button>
@@ -286,11 +152,7 @@ function PoolAdjustmentPanel({
         disabled={!canWrite}
         aria-label={`Set ${label}`}
         className={`range range-sm w-full ${label === 'HP' ? 'range-error' : 'range-info'}`}
-        onChange={(event) => {
-          const next = event.currentTarget.valueAsNumber;
-          const delta = next - lastValue.current;
-          queueDelta(delta);
-        }}
+        onChange={(event) => onSetValue(event.currentTarget.valueAsNumber)}
       />
       <datalist id={listId}>
         {points.map((point) => (
@@ -390,7 +252,8 @@ export function FloatingPoolsBar({
           points: hpPoints,
           recovery: 'Recovery: make one HT roll per day; success restores 1 HP (B424).',
           footnote: `Outside the slider: certain death is −${5 * bumpers.hpMax} HP. Exceptional survival rules may still apply.`,
-          onDeltas: bumpers.commitHpDeltas,
+          onDelta: bumpers.bumpHp,
+          onSetValue: bumpers.setHp,
         }
       : openPool === 'FP'
         ? {
@@ -400,7 +263,8 @@ export function FloatingPoolsBar({
             points: fpPoints,
             recovery: 'Recovery: normally regain 1 FP per 10 minutes of rest (B426).',
             footnote: `At −${bumpers.fpMax} FP, further fatigue loss is paid from HP instead.`,
-            onDeltas: bumpers.commitFpDeltas,
+            onDelta: bumpers.bumpFp,
+            onSetValue: bumpers.setFp,
           }
         : null;
 

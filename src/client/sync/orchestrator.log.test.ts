@@ -431,6 +431,10 @@ describe('applyOutcomes sync-log diagnostics', () => {
           fieldPath: 'st',
           details: { serverReason: 'no outcome returned', attemptCount: 1 },
         });
+        expect((await getLocalDb().outbox.toArray())[0]).toMatchObject({
+          status: 'transient_retry',
+          deliveryUncertain: true,
+        });
       });
     } finally {
       orchestrator.stop();
@@ -477,6 +481,10 @@ describe('applyOutcomes sync-log diagnostics', () => {
       await waitFor(async () => {
         const log = await getLocalDb().syncLog.toArray();
         expect(log.filter((entry) => entry.result === 'retrying')).toHaveLength(1);
+        expect((await getLocalDb().outbox.toArray())[0]).toMatchObject({
+          status: 'transient_retry',
+          deliveryUncertain: false,
+        });
       });
 
       // Force the backoff window closed instead of waiting on the real
@@ -661,6 +669,80 @@ describe('cursor pull sync-log values', () => {
 });
 
 describe('whole-cycle failures', () => {
+  it('retries a delivery-uncertain operation before its newer same-field successor', async () => {
+    await seedCharacter();
+    login();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+    });
+    const sentValues: unknown[][] = [];
+    let operationsCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (!url.includes('/sync/operations')) return cursorResponse();
+        operationsCalls += 1;
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string; attemptedValue: unknown }>;
+        };
+        sentValues.push(body.operations.map((operation) => operation.attemptedValue));
+        if (operationsCalls === 1) throw new TypeError('connection lost after send');
+        return new Response(
+          JSON.stringify({
+            outcomes: body.operations.map((operation) => ({
+              clientOpId: operation.clientOpId,
+              status: 'applied',
+              newRevision: operationsCalls,
+            })),
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.start();
+    try {
+      await waitFor(async () => {
+        expect((await getLocalDb().outbox.toArray())[0]).toMatchObject({
+          status: 'transient_retry',
+          deliveryUncertain: true,
+        });
+      });
+      const db = getLocalDb();
+      const predecessor = (await db.outbox.toArray())[0];
+      expect(predecessor).toBeDefined();
+      await enqueueFieldPatch({
+        entityClass: 'character',
+        entityId: CHAR_ID,
+        fieldPath: 'st',
+        attemptedValue: 13,
+      });
+      const successor = (await db.outbox.toArray()).find(
+        (row) => row.clientOpId !== predecessor?.clientOpId,
+      );
+      expect(successor).toMatchObject({
+        attemptedValue: 13,
+        predecessorClientOpId: predecessor?.clientOpId,
+      });
+
+      await db.outbox.update(predecessor?.clientOpId ?? '', {
+        nextEarliestAttemptAt: undefined,
+      });
+      orchestrator.triggerDrain();
+      await waitFor(async () => expect(await db.outbox.count()).toBe(0), { timeout: 5_000 });
+
+      expect(sentValues).toEqual([[12], [12], [13]]);
+      expect((await db.characters.get(CHAR_ID))?.st).toBe(13);
+    } finally {
+      orchestrator.stop();
+    }
+  });
+
   it('journals a failed pull with its HTTP status and names the reason on the indicator', async () => {
     await seedCharacter();
     login();

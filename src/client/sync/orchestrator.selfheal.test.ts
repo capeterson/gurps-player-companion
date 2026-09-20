@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
+import { enqueueFieldPatch } from './outbox.ts';
 import { syncStateStore } from './state.ts';
 
 function jwtForUser(userId: string): string {
@@ -51,6 +52,182 @@ afterEach(async () => {
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000c001';
 
 describe('applyServerRow local-intent preservation (rule S4)', () => {
+  it('ignores a cursor row older than the locally acknowledged revision', async () => {
+    const db = getLocalDb();
+    await db.characterCombat.put({
+      id: CHAR_ID,
+      characterId: CHAR_ID,
+      currentHp: 10,
+      currentFp: 11,
+      posture: 'standing',
+      conditions: [],
+      maneuver: null,
+      revision: 2,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:01.000Z',
+    });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'character_combat',
+            entityId: CHAR_ID,
+            command: 'patch',
+            revision: 1,
+            data: {
+              id: CHAR_ID,
+              characterId: CHAR_ID,
+              currentHp: 10,
+              currentFp: 9,
+              posture: 'standing',
+              conditions: [],
+              maneuver: null,
+              revision: 1,
+            },
+          },
+        ]),
+      ),
+    );
+
+    await getSyncOrchestrator().triggerCursorPull();
+
+    expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({ currentFp: 11, revision: 2 });
+  });
+
+  it('never stamps an acknowledgement over a concurrently newer revision', async () => {
+    const db = getLocalDb();
+    const orchestrator = getSyncOrchestrator() as unknown as {
+      stampRevision(
+        entityClass: 'character_combat',
+        entityId: string,
+        revision: number,
+      ): Promise<void>;
+    };
+    for (let run = 0; run < 20; run += 1) {
+      await db.characterCombat.put({
+        id: CHAR_ID,
+        characterId: CHAR_ID,
+        currentHp: 10,
+        currentFp: 11,
+        posture: 'standing',
+        conditions: [],
+        maneuver: null,
+        revision: 1,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:01.000Z',
+      });
+
+      await Promise.all([
+        orchestrator.stampRevision('character_combat', CHAR_ID, 2),
+        db.transaction('rw', db.characterCombat, async () => {
+          const current = await db.characterCombat.get(CHAR_ID);
+          if (current && current.revision < 3) {
+            await db.characterCombat.update(CHAR_ID, { revision: 3 });
+          }
+        }),
+      ]);
+
+      expect((await db.characterCombat.get(CHAR_ID))?.revision).toBe(3);
+    }
+  });
+
+  it('does not resurrect a row from an upsert at or below its tombstone revision', async () => {
+    const db = getLocalDb();
+    await db.tombstones.put({
+      entityClass: 'character_combat',
+      entityId: CHAR_ID,
+      revision: 4,
+      deletedAt: '2026-01-01T00:00:04.000Z',
+    });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'character_combat',
+            entityId: CHAR_ID,
+            command: 'patch',
+            revision: 4,
+            data: { id: CHAR_ID, characterId: CHAR_ID, currentFp: 9, revision: 4 },
+          },
+        ]),
+      ),
+    );
+
+    await getSyncOrchestrator().triggerCursorPull();
+
+    expect(await db.characterCombat.get(CHAR_ID)).toBeUndefined();
+    expect(await db.tombstones.get(['character_combat', CHAR_ID])).toMatchObject({ revision: 4 });
+  });
+
+  it('waits for a local debounce deadline without issuing a cursor request', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      id: CHAR_ID,
+      ownerId: 'user-1',
+      name: 'Local',
+      st: 10,
+      revision: 1,
+    } as never);
+    loginAs('user-1');
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+      nextEarliestAttemptAt: new Date(Date.now() + 1_000).toISOString(),
+    });
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const orchestrator = getSyncOrchestrator() as unknown as {
+      maybeDrainOnce(): Promise<number | undefined>;
+    };
+
+    const waitMs = await orchestrator.maybeDrainOnce();
+
+    expect(waitMs).toBeGreaterThan(0);
+    expect(waitMs).toBeLessThanOrEqual(1_000);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('does not miss a debounce deadline that crosses while selecting work', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      id: CHAR_ID,
+      ownerId: 'user-1',
+      name: 'Local',
+      st: 10,
+      revision: 1,
+    } as never);
+    loginAs('user-1');
+    const base = Date.parse('2026-01-01T00:00:00.000Z');
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+      nextEarliestAttemptAt: new Date(base + 200).toISOString(),
+    });
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    vi.spyOn(Date, 'now')
+      // tokenStore.read() checks expiry before the orchestrator captures its
+      // scheduling snapshot.
+      .mockReturnValueOnce(base + 199)
+      .mockReturnValueOnce(base + 199)
+      .mockReturnValue(base + 201);
+    const orchestrator = getSyncOrchestrator() as unknown as {
+      maybeDrainOnce(): Promise<number | undefined>;
+    };
+
+    expect(await orchestrator.maybeDrainOnce()).toBe(1);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await db.outbox.count()).toBe(1);
+  });
+
   it.each(['pending', 'in_flight', 'transient_retry'] as const)(
     'keeps a rebased HP burst while its patch is %s and still accepts unrelated combat fields',
     async (status) => {

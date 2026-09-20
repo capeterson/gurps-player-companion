@@ -20,6 +20,7 @@ import {
   enqueueFieldPatch,
   enqueueFieldPatches,
   newClientId,
+  nextOutboxAttemptDelay,
   readDrainableOps,
   recoverStaleInFlight,
 } from './outbox.ts';
@@ -327,6 +328,160 @@ describe('enqueueFieldPatch', () => {
     // Local row reflects the latest value immediately.
     const row = await db.characters.get(CHAR_ID);
     expect(row?.st).toBe(12);
+  });
+
+  it('refreshes the network debounce deadline when a same-field patch coalesces', async () => {
+    await seedCharacter();
+    const firstDeadline = '2099-01-01T00:00:00.100Z';
+    const secondDeadline = '2099-01-01T00:00:00.200Z';
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+      nextEarliestAttemptAt: firstDeadline,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      nextEarliestAttemptAt: secondDeadline,
+    });
+
+    expect(await getLocalDb().outbox.toArray()).toMatchObject([
+      { attemptedValue: 12, prevValue: 10, nextEarliestAttemptAt: secondDeadline },
+    ]);
+  });
+
+  it('retains delivery-uncertain retries as predecessors of newer intent', async () => {
+    await seedCharacter();
+    const db = getLocalDb();
+    await db.characters.update(CHAR_ID, { st: 11 });
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'uncertain-first',
+        attemptedValue: 11,
+        prevValue: 10,
+        status: 'transient_retry',
+        deliveryUncertain: true,
+        nextEarliestAttemptAt: '2099-01-01T00:00:00.000Z',
+      }),
+    );
+
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+    });
+
+    const rows = await db.outbox.toArray();
+    const newer = rows.find((row) => row.clientOpId !== 'uncertain-first');
+    expect(rows).toHaveLength(2);
+    expect(newer).toMatchObject({
+      attemptedValue: 12,
+      prevValue: 11,
+      predecessorClientOpId: 'uncertain-first',
+    });
+    expect(await readDrainableOps(50)).toEqual([]);
+    await db.outbox.delete('uncertain-first');
+    expect((await readDrainableOps(50)).map((row) => row.clientOpId)).toEqual([newer?.clientOpId]);
+  });
+
+  it('coalesces a server-confirmed transient retry because it cannot have applied', async () => {
+    await seedCharacter();
+    const db = getLocalDb();
+    await db.characters.update(CHAR_ID, { st: 11 });
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'confirmed-transient',
+        attemptedValue: 11,
+        prevValue: 10,
+        status: 'transient_retry',
+        deliveryUncertain: false,
+      }),
+    );
+
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+    });
+
+    expect(await db.outbox.toArray()).toMatchObject([
+      { attemptedValue: 12, prevValue: 10, predecessorClientOpId: undefined },
+    ]);
+  });
+
+  it('follows predecessor ancestry for the confirmed rollback baseline', async () => {
+    await seedCharacter();
+    const db = getLocalDb();
+    await db.characters.update(CHAR_ID, { st: 12 });
+    const sameTime = '2026-01-01T00:00:00.000Z';
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'z-root',
+        attemptedValue: 11,
+        prevValue: 10,
+        status: 'transient_retry',
+        deliveryUncertain: false,
+        enqueuedAt: sameTime,
+      }),
+      opRow({
+        clientOpId: 'a-successor',
+        attemptedValue: 12,
+        prevValue: 11,
+        predecessorClientOpId: 'z-root',
+        enqueuedAt: sameTime,
+      }),
+    ]);
+
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 13,
+    });
+
+    const [survivor] = await db.outbox.toArray();
+    expect(survivor).toMatchObject({ attemptedValue: 13, prevValue: 10 });
+
+    tokenStore.write({
+      accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (!url.includes('/sync/operations')) {
+          return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }));
+        }
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        return new Response(
+          JSON.stringify({
+            outcomes: body.operations.map((operation) => ({
+              clientOpId: operation.clientOpId,
+              status: 'rejected',
+              reason: 'test rejection',
+            })),
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.start();
+    try {
+      await waitFor(async () => expect(await db.outbox.count()).toBe(0));
+      expect((await db.characters.get(CHAR_ID))?.st).toBe(10);
+    } finally {
+      orchestrator.stop();
+    }
   });
 
   it('keeps patches on different fields independent', async () => {
@@ -1034,6 +1189,26 @@ describe('readDrainableOps', () => {
   const TRAIT_ID = '0193b3c0-f1f0-7000-8000-00000000e001';
   const future = new Date(Date.now() + 60_000).toISOString();
 
+  it('reports the nearest strictly-future debounce deadline', async () => {
+    const db = getLocalDb();
+    const now = Date.now();
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'later',
+        nextEarliestAttemptAt: new Date(now + 500).toISOString(),
+      }),
+      opRow({
+        clientOpId: 'sooner',
+        coalesceKey: `${CHAR_ID}|dx`,
+        fieldPath: 'dx',
+        nextEarliestAttemptAt: new Date(now + 200).toISOString(),
+      }),
+    ]);
+
+    expect(await nextOutboxAttemptDelay(now)).toBe(200);
+    expect(await readDrainableOps(50)).toEqual([]);
+  });
+
   it('holds back ops that depend on a create still in backoff', async () => {
     const db = getLocalDb();
     // Trait create backing off after a transient failure…
@@ -1175,6 +1350,60 @@ describe('readDrainableOps', () => {
 });
 
 describe('claimDrainableOps', () => {
+  it('normalizes a legacy uncertain retry ahead of its pending successor', async () => {
+    const db = getLocalDb();
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'legacy-retry',
+        attemptedValue: 11,
+        status: 'transient_retry',
+        deliveryUncertain: undefined,
+        // The wall clock moved backward before the successor was queued.
+        enqueuedAt: '2026-01-01T00:00:02.000Z',
+      }),
+      opRow({
+        clientOpId: 'legacy-successor',
+        attemptedValue: 12,
+        prevValue: 11,
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+    ]);
+
+    expect((await claimDrainableOps(50)).map((row) => row.clientOpId)).toEqual(['legacy-retry']);
+    expect(await db.outbox.get('legacy-retry')).toMatchObject({
+      status: 'in_flight',
+      deliveryUncertain: true,
+    });
+    expect(await db.outbox.get('legacy-successor')).toMatchObject({
+      status: 'pending',
+      predecessorClientOpId: 'legacy-retry',
+    });
+  });
+
+  it('chains a legacy successor behind an interrupted in-flight send', async () => {
+    const db = getLocalDb();
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'legacy-flight',
+        attemptedValue: 11,
+        status: 'in_flight',
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      opRow({
+        clientOpId: 'legacy-after-flight',
+        attemptedValue: 12,
+        prevValue: 11,
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+    ]);
+
+    await recoverStaleInFlight();
+    expect((await claimDrainableOps(50)).map((row) => row.clientOpId)).toEqual(['legacy-flight']);
+    expect(await db.outbox.get('legacy-after-flight')).toMatchObject({
+      predecessorClientOpId: 'legacy-flight',
+    });
+  });
+
   it('repairs malformed fallback operation and batch ids before retrying them', async () => {
     const db = getLocalDb();
     const firstBrokenId = '9543da4e-2312-41-8-9543da4e2312';
@@ -1234,13 +1463,14 @@ describe('claimDrainableOps', () => {
 });
 
 describe('recoverStaleInFlight', () => {
-  it('re-promotes orphaned in_flight rows to pending', async () => {
+  it('re-promotes orphaned in_flight rows as delivery-uncertain retries', async () => {
     const db = getLocalDb();
     await db.outbox.put(opRow({ clientOpId: 'op-stale', status: 'in_flight', attemptCount: 2 }));
     const recovered = await recoverStaleInFlight();
     expect(recovered).toBe(1);
     const row = await db.outbox.get('op-stale');
-    expect(row?.status).toBe('pending');
+    expect(row?.status).toBe('transient_retry');
+    expect(row?.deliveryUncertain).toBe(true);
     // Attempt count survives so backoff keeps escalating on retry.
     expect(row?.attemptCount).toBe(2);
   });

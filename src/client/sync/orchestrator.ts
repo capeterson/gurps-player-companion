@@ -21,7 +21,7 @@ import {
  * for the same (entityId, fieldPath).  See `applyServerRow`.
  */
 
-import { liveQuery } from 'dexie';
+import { type Table, liveQuery } from 'dexie';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type {
   EntityClass,
@@ -63,6 +63,7 @@ import {
   claimDrainableOps,
   countPending,
   enqueueFieldPatch,
+  nextOutboxAttemptDelay,
   recoverStaleInFlight,
   setOutboxStatus,
 } from './outbox.ts';
@@ -779,8 +780,9 @@ class SyncOrchestrator {
     if (this.running) return;
     this.running = true;
     while (this.running) {
+      let nextDelay = 5_000;
       try {
-        await this.maybeDrainOnce();
+        nextDelay = (await this.maybeDrainOnce()) ?? 5_000;
       } catch (err) {
         // Anything the inner handlers didn't already account for --
         // recoverStaleInFlight, readDrainableOps, applyOutcomes, a
@@ -791,11 +793,11 @@ class SyncOrchestrator {
       }
       // Wait for an outbox change, an online event, or 5s, whichever
       // comes first.
-      await this.waitForSignal(5_000);
+      await this.waitForSignal(Math.max(1, Math.min(5_000, nextDelay)));
     }
   }
 
-  private async maybeDrainOnce(): Promise<void> {
+  private async maybeDrainOnce(): Promise<number | undefined> {
     const generation = this.sessionGeneration;
     if (!this.sessionIsCurrent(generation)) return;
     if (this.recoveryInProgress) return;
@@ -818,15 +820,21 @@ class SyncOrchestrator {
     // Acquire an exclusive cross-tab lock so two open tabs don't both
     // POST the same outbox rows.  The other tab still reads from
     // Dexie via useLiveQuery -- we just serialize the outbound flush.
-    await runWithLock(DRAIN_LOCK, async () => {
+    return await runWithLock(DRAIN_LOCK, async () => {
       if (!this.sessionIsCurrent(generation)) return;
       // Under the drain lock no POST can be outstanding anywhere, so
       // any row still `in_flight` was orphaned (crash / tab close /
       // error between marking and settling).  Re-promote it so the
       // edit isn't stranded un-syncable forever.
       await recoverStaleInFlight();
-      const ops = await claimDrainableOps(DRAIN_BATCH_SIZE);
+      // Selection and deadline calculation share one clock snapshot. Otherwise
+      // a deadline crossing between those reads could look neither drainable
+      // nor future and fall through to the five-second safety poll.
+      const schedulingNow = Date.now();
+      const ops = await claimDrainableOps(DRAIN_BATCH_SIZE, schedulingNow);
       if (ops.length === 0) {
+        const delayedBy = await nextOutboxAttemptDelay(schedulingNow);
+        if (delayedBy !== undefined) return delayedBy;
         // Nothing to drain -- but if /sync/cursor hasn't run recently,
         // do that now to keep Dexie fresh.
         await this.triggerCursorPull();
@@ -850,6 +858,7 @@ class SyncOrchestrator {
           await setOutboxStatus(op.clientOpId, 'transient_retry', {
             attemptCount: next,
             nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
+            deliveryUncertain: true,
             serverReason: err instanceof Error ? err.message : 'network error',
             lastError: errorDetails(err),
           });
@@ -911,6 +920,7 @@ class SyncOrchestrator {
         await setOutboxStatus(op.clientOpId, 'transient_retry', {
           attemptCount: next,
           nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
+          deliveryUncertain: true,
           serverReason: 'no outcome returned',
           lastError: { reason: 'no outcome returned', response: outcomes },
         });
@@ -1077,6 +1087,7 @@ class SyncOrchestrator {
           await setOutboxStatus(op.clientOpId, 'transient_retry', {
             attemptCount: next,
             nextEarliestAttemptAt: new Date(Date.now() + backoffMs(next)).toISOString(),
+            deliveryUncertain: false,
             serverReason: outcome.reason,
             lastError: outcome,
           });
@@ -1335,15 +1346,22 @@ class SyncOrchestrator {
     await db.transaction('rw', stores, async () => {
       for (const change of res.changes) {
         const before = await this.readLocalEntity(change.entityClass, change.entityId);
+        const priorTombstone = await db.tombstones.get([change.entityClass, change.entityId]);
+        const localRevision = before?.revision;
+        const staleChange =
+          (typeof localRevision === 'number' && localRevision > change.revision) ||
+          (priorTombstone !== undefined && priorTombstone.revision >= change.revision);
         if (change.command === 'delete') {
-          await this.deleteLocal(change.entityClass, change.entityId);
-          await db.tombstones.put({
-            entityClass: change.entityClass,
-            entityId: change.entityId,
-            revision: change.revision,
-            deletedAt: change.deletedAt ?? new Date().toISOString(),
-          });
-        } else if (change.data && typeof change.data === 'object') {
+          if (!staleChange) {
+            await this.deleteLocal(change.entityClass, change.entityId);
+            await db.tombstones.put({
+              entityClass: change.entityClass,
+              entityId: change.entityId,
+              revision: change.revision,
+              deletedAt: change.deletedAt ?? new Date().toISOString(),
+            });
+          }
+        } else if (!staleChange && change.data && typeof change.data === 'object') {
           await this.applyServerRow(change.entityClass, change.data as Record<string, unknown>, {});
         }
         const after = await this.readLocalEntity(change.entityClass, change.entityId);
@@ -1424,30 +1442,40 @@ class SyncOrchestrator {
     revision: number,
   ): Promise<void> {
     const db = getLocalDb();
+    const stamp = async <T extends { revision: number }>(table: Table<T, string>) => {
+      await db.transaction('rw', table, async () => {
+        await table
+          .where(':id')
+          .equals(entityId)
+          .modify((existing) => {
+            if (existing.revision < revision) existing.revision = revision;
+          });
+      });
+    };
     switch (entityClass) {
       case 'character':
-        await db.characters.update(entityId, { revision });
+        await stamp(db.characters);
         return;
       case 'character_trait':
-        await db.characterTraits.update(entityId, { revision });
+        await stamp(db.characterTraits);
         return;
       case 'character_skill':
-        await db.characterSkills.update(entityId, { revision });
+        await stamp(db.characterSkills);
         return;
       case 'character_spell':
-        await db.characterSpells.update(entityId, { revision });
+        await stamp(db.characterSpells);
         return;
       case 'character_language':
-        await db.characterLanguages.update(entityId, { revision });
+        await stamp(db.characterLanguages);
         return;
       case 'character_technique':
-        await db.characterTechniques.update(entityId, { revision });
+        await stamp(db.characterTechniques);
         return;
       case 'character_inventory':
-        await db.characterInventory.update(entityId, { revision });
+        await stamp(db.characterInventory);
         return;
       case 'character_combat':
-        await db.characterCombat.update(entityId, { revision });
+        await stamp(db.characterCombat);
         return;
       default:
         return;
@@ -1648,7 +1676,14 @@ class SyncOrchestrator {
     const db = getLocalDb();
     await db.transaction(
       'rw',
-      [db.outbox, db.characters, db.campaigns, db.characterCombat, ...campaignTransferStores()],
+      [
+        db.outbox,
+        db.characters,
+        db.campaigns,
+        db.characterCombat,
+        db.tombstones,
+        ...campaignTransferStores(),
+      ],
       () => this.mergeServerRow(entityClass, row, opts),
     );
   }
@@ -1664,6 +1699,23 @@ class SyncOrchestrator {
         ? (row.characterId as string | undefined)
         : (row.id as string | undefined);
     if (!id) return;
+    const existingRow = await this.readLocalEntity(entityClass, id);
+    const incomingRevision = row.revision;
+    const tombstone = await db.tombstones.get([entityClass, id]);
+    if (
+      typeof incomingRevision === 'number' &&
+      ((typeof existingRow?.revision === 'number' && incomingRevision < existingRow.revision) ||
+        (tombstone !== undefined && incomingRevision <= tombstone.revision))
+    ) {
+      return;
+    }
+    if (
+      tombstone !== undefined &&
+      typeof incomingRevision === 'number' &&
+      incomingRevision > tombstone.revision
+    ) {
+      await db.tombstones.delete([entityClass, id]);
+    }
     const merged: Record<string, unknown> = { ...row };
     if (!opts.ignoreOutboxConflict) {
       // `entityId` is indexed on the outbox (Dexie v3).  Do NOT wrap

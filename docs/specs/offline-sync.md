@@ -190,17 +190,15 @@ works offline.**
    the input reads its durable value to include successful edits from other controls.
    This includes
    same-field edits committed while an earlier save is still pending.
-   Bumpers use the latest local
-   values, including another input’s edit before React renders it. The floating
-   HP/FP popover journals each rapid relative gesture (including its interaction
-   time), waits for a 200 ms quiet period, then folds the ordered burst inside one
-   combat transaction. A cursor value that arrives before that transaction is the
-   burst's new base; once the transaction enqueues its absolute result, ordinary
-   pending/in-flight field protection prevents later pulls from replacing it. A
-   new burst started while the previous one settles is serialized after it, and
-   closing the popover flushes rather than discards the unsaved tail. Recording
-   each timestamp preserves the existing two-press soft-cap override even though
-   the burst produces one field patch. A local
+   Bumpers use the latest local values, including another input’s edit before React
+   renders it. Every floating HP/FP popover gesture writes the combat row and
+   outbox immediately in that transaction; the panel renders only the resulting
+   Dexie value and never maintains a second speculative counter. Range changes
+   pass an absolute target that is converted to a delta inside the transaction, so
+   consecutive slider events cannot calculate from a stale render. Each gesture
+   refreshes a 200 ms outbox drain deadline. Same-field coalescing therefore sends
+   one quiet-period result without delaying local durability, and interaction
+   timestamps still preserve the two-press soft-cap override. A local
    gesture failure emits a visual-only flash plus a field-specific toast
    without reverting another input’s newer unsaved draft.
    Inventory multi-select equip/wear/move actions and bulk deletes use the same
@@ -228,7 +226,9 @@ works offline.**
    prevents duplicate sends even when a lock is unavailable or two callers
    race. Outbox wake signals are latched while a drain request is in flight, so
    follow-up edits queued during that request start the next drain immediately;
-   they cannot lose the signal and wait for the five-second safety poll.
+   they cannot lose the signal and wait for the five-second safety poll. A future
+   local debounce deadline schedules the next wake precisely and suppresses an
+   otherwise pointless cursor pull while the gesture is still coalescing.
 3. **Dispatch.** The server processes each op **independently** — one bad op
    never poisons the batch. HTTP status is always 200; per-op outcomes live in
    `outcomes[].status`. Optimistic concurrency uses `baseRevision`; a mismatch
@@ -285,7 +285,11 @@ works offline.**
    bootstrap/from-zero cursor pull from resurrecting a row the user deleted
    locally before the server acknowledges or rejects that delete. The explicit
    conflict/reconciliation path may bypass this protection when it must adopt
-   the server's authoritative row. Periodic
+   the server's authoritative row. Incoming rows and tombstones older than the
+   local row/tombstone revision are ignored, and acknowledgement revision stamps
+   are monotonic. This prevents a cursor request that began before an upload from
+   briefly restoring its captured pre-upload value after that upload settles.
+   Periodic
    pull runs every `PERIODIC_PULL_MS` (30s); WS nudges pull sooner.
 
 ## The protocol
@@ -315,6 +319,16 @@ one, stays out of the drain while that container has an unsettled create. The
 container must be acknowledged and removed first; a transient parent outcome
 therefore cannot turn its dependent into a permanent not-found rejection in
 the same request.
+
+Same-field replay also retains an explicit predecessor only when delivery is
+uncertain. If a whole operations request fails or returns no outcome, the server
+may already have applied that operation; a newer local value stays
+queued behind the original retry until it settles. An explicit server
+`transient` outcome is known not to have applied and remains safely coalescable.
+Legacy retries with no delivery metadata are treated conservatively and upgraded
+into the same chain before selection. This prevents an older retry from replaying
+over a newer value. It is a client replay-order guarantee, not server exactly-once
+execution: `/sync/operations` does not persist outcome receipts by `clientOpId`.
 
 ### Outcome → local effect
 

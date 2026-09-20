@@ -1,26 +1,67 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useEffect } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { getLocalDb, resetLocalDb } from '../../../../db/dexie.ts';
+import { tokenStore } from '../../../../lib/tokenStore.ts';
+import {
+  getSyncOrchestrator,
+  resetSyncOrchestratorForTests,
+} from '../../../../sync/orchestrator.ts';
+import { useCombatPatch } from '../useCombatPatch.ts';
 import type { PoolBumpers } from '../usePoolBumpers.ts';
+import { usePoolBumpers } from '../usePoolBumpers.ts';
 import { FloatingPoolsBar, rangePointPercent } from './FloatingPoolsBar.tsx';
 
-function setup(
-  hp = 10,
-  fp = 10,
-  max = 12,
-  commits?: {
-    hp?: PoolBumpers['commitHpDeltas'];
-    fp?: PoolBumpers['commitFpDeltas'];
-  },
-) {
+vi.mock('../../../../lib/toast.tsx', () => ({ useToasts: () => ({ push: vi.fn() }) }));
+
+afterEach(async () => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  tokenStore.clear();
+  resetSyncOrchestratorForTests();
+  await resetLocalDb();
+});
+
+const LIVE_CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000f001';
+
+function jwtForUser(userId: string): string {
+  const encode = (value: unknown) =>
+    btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `${encode({ alg: 'none', typ: 'JWT' })}.${encode({ sub: userId })}.signature`;
+}
+
+function LivePoolsHarness({ observed }: { observed: number[] }) {
+  const db = getLocalDb();
+  const combat = useLiveQuery(() => db.characterCombat.get(LIVE_CHAR_ID), [db]);
+  const character = {
+    id: LIVE_CHAR_ID,
+    derived: { hp: 10, fp: 12 },
+    combat: combat ?? {
+      currentHp: 10,
+      currentFp: 8,
+      conditions: [],
+      maneuver: null,
+      posture: 'standing',
+    },
+  } as unknown as CharacterDetail;
+  const bumpers = usePoolBumpers(character, true, useCombatPatch(character));
+  useEffect(() => {
+    observed.push(bumpers.fp);
+  }, [bumpers.fp, observed]);
+  return <FloatingPoolsBar character={character} bumpers={bumpers} canWrite />;
+}
+
+function setup(hp = 10, fp = 10, max = 12) {
   const character = {
     id: 'character-1',
     combat: { conditions: [] },
   } as unknown as CharacterDetail;
   const bumpHp = vi.fn();
   const bumpFp = vi.fn();
-  const commitHpDeltas = commits?.hp ?? vi.fn().mockResolvedValue(hp);
-  const commitFpDeltas = commits?.fp ?? vi.fn().mockResolvedValue(fp);
+  const setHp = vi.fn();
+  const setFp = vi.fn();
   const bumpers: PoolBumpers = {
     hp,
     fp,
@@ -28,8 +69,10 @@ function setup(
     fpMax: max,
     bumpHp,
     bumpFp,
-    commitHpDeltas,
-    commitFpDeltas,
+    setHp,
+    setFp,
+    commitHpDeltas: vi.fn().mockResolvedValue(hp),
+    commitFpDeltas: vi.fn().mockResolvedValue(fp),
     resetHp: vi.fn(),
     resetFp: vi.fn(),
     flashHp: false,
@@ -43,7 +86,7 @@ function setup(
         canWrite
       />,
     );
-  return { bumpHp, bumpFp, commitHpDeltas, commitFpDeltas, rerenderPools, ...view };
+  return { bumpHp, bumpFp, setHp, setFp, rerenderPools, ...view };
 }
 
 describe('FloatingPoolsBar', () => {
@@ -122,196 +165,179 @@ describe('FloatingPoolsBar', () => {
     expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);
   });
 
-  it('converts range movement into incremental local-first pool deltas', async () => {
-    const { commitHpDeltas, commitFpDeltas } = setup();
+  it('sends range movement as an absolute transactional target', () => {
+    const { setHp, setFp } = setup();
     fireEvent.click(screen.getByLabelText('Adjust HP'));
     fireEvent.change(screen.getByRole('slider', { name: 'Set HP' }), {
       target: { value: '7' },
     });
     fireEvent.click(screen.getByLabelText('Adjust FP'));
-    await act(async () => undefined);
     fireEvent.change(screen.getByRole('slider', { name: 'Set FP' }), {
       target: { value: '8' },
     });
-    fireEvent.click(screen.getByLabelText('Adjust FP'));
-    await act(async () => undefined);
-    expect(commitHpDeltas).toHaveBeenCalledWith([expect.objectContaining({ delta: -3 })]);
-    expect(commitFpDeltas).toHaveBeenCalledWith([expect.objectContaining({ delta: -2 })]);
+    expect(setHp).toHaveBeenCalledWith(7);
+    expect(setFp).toHaveBeenCalledWith(8);
   });
 
-  it('offers precise minus-one and plus-one controls for both pools', async () => {
-    const { bumpHp, bumpFp, commitHpDeltas, commitFpDeltas } = setup();
+  it('offers precise minus-one and plus-one controls for both pools', () => {
+    const { bumpHp, bumpFp } = setup();
 
     fireEvent.click(screen.getByLabelText('Adjust HP'));
     expect(screen.getByLabelText('HP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease HP by 1' }));
-    expect(screen.getByLabelText('Current HP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase HP by 1' }));
-    expect(screen.getByLabelText('Current HP')).toHaveTextContent('10');
+    expect(bumpHp).toHaveBeenNthCalledWith(1, -1);
+    expect(bumpHp).toHaveBeenNthCalledWith(2, 1);
 
-    // Switching panels unmounts HP and must flush rather than drop its debounced tail.
     fireEvent.click(screen.getByLabelText('Adjust FP'));
-    await act(async () => undefined);
-    expect(commitHpDeltas).toHaveBeenCalledWith([
-      expect.objectContaining({ delta: -1 }),
-      expect.objectContaining({ delta: 1 }),
-    ]);
     expect(screen.getByLabelText('FP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease FP by 1' }));
-    expect(screen.getByLabelText('Current FP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase FP by 1' }));
-    expect(screen.getByLabelText('Current FP')).toHaveTextContent('10');
-    fireEvent.click(screen.getByLabelText('Adjust FP'));
-    await act(async () => undefined);
-    expect(commitFpDeltas).toHaveBeenCalledWith([
-      expect.objectContaining({ delta: -1 }),
-      expect.objectContaining({ delta: 1 }),
-    ]);
-
-    expect(bumpHp).not.toHaveBeenCalled();
-    expect(bumpFp).not.toHaveBeenCalled();
+    expect(bumpFp).toHaveBeenNthCalledWith(1, -1);
+    expect(bumpFp).toHaveBeenNthCalledWith(2, 1);
   });
 
-  it('debounces a mashed step-button burst into one ordered relative commit', async () => {
-    vi.useFakeTimers();
-    try {
-      const commitHpDeltas = vi.fn(async (gestures: readonly { delta: number }[]) =>
-        gestures.reduce((value, gesture) => value + gesture.delta, 10),
-      );
-      setup(10, 10, 20, { hp: commitHpDeltas });
-      fireEvent.click(screen.getByLabelText('Adjust HP'));
-      const decrease = screen.getByRole('button', { name: 'Decrease HP by 1' });
-      for (let index = 0; index < 16; index += 1) fireEvent.click(decrease);
-
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('-6');
-      expect(commitHpDeltas).not.toHaveBeenCalled();
-      await act(async () => vi.advanceTimersByTimeAsync(199));
-      expect(commitHpDeltas).not.toHaveBeenCalled();
-      await act(async () => vi.advanceTimersByTimeAsync(1));
-
-      expect(commitHpDeltas).toHaveBeenCalledTimes(1);
-      expect(commitHpDeltas.mock.calls[0]?.[0].map(({ delta }) => delta)).toEqual(
-        Array.from({ length: 16 }, () => -1),
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+  it('renders only the durable prop when local observations are skipped or batched', () => {
+    const { rerenderPools } = setup(10, 10, 20);
+    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    rerenderPools(11);
+    expect(screen.getByLabelText('Current HP')).toHaveTextContent('11');
+    rerenderPools(14);
+    expect(screen.getByLabelText('Current HP')).toHaveTextContent('14');
   });
 
-  it('rebases an unflushed burst onto a newer synced pool value', async () => {
-    vi.useFakeTimers();
+  it('never decreases rendered FP while an upload and stale cursor settle around later clicks', async () => {
+    const db = getLocalDb();
+    await db.characterCombat.put({
+      id: LIVE_CHAR_ID,
+      characterId: LIVE_CHAR_ID,
+      currentHp: 10,
+      currentFp: 8,
+      conditions: [],
+      maneuver: null,
+      posture: 'standing',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 1,
+    });
+    tokenStore.write({
+      accessToken: jwtForUser('0193b3c0-f1f0-7000-8000-00000000aaaa'),
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    let releaseFirst!: () => void;
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let operationCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('/sync/operations')) {
+          operationCalls += 1;
+          const body = JSON.parse(String(init?.body)) as {
+            operations: Array<{ clientOpId: string }>;
+          };
+          if (operationCalls === 1) await firstHeld;
+          return new Response(
+            JSON.stringify({
+              outcomes: body.operations.map((operation) => ({
+                clientOpId: operation.clientOpId,
+                status: 'applied',
+                newRevision: operationCalls + 1,
+              })),
+            }),
+            { headers: { 'content-type': 'application/json' } },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            changes:
+              operationCalls === 0
+                ? []
+                : [
+                    {
+                      entityClass: 'character_combat',
+                      entityId: LIVE_CHAR_ID,
+                      command: 'patch',
+                      revision: operationCalls,
+                      data: {
+                        id: LIVE_CHAR_ID,
+                        characterId: LIVE_CHAR_ID,
+                        currentHp: 10,
+                        currentFp: operationCalls === 1 ? 8 : 9,
+                        conditions: [],
+                        maneuver: null,
+                        posture: 'standing',
+                        revision: operationCalls,
+                      },
+                    },
+                  ],
+            nextCursor: {},
+            hasMore: {},
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+    const observed: number[] = [];
+    render(<LivePoolsHarness observed={observed} />);
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.start();
     try {
-      let syncedHp = 10;
-      const commitHpDeltas = vi.fn(async (gestures: readonly { delta: number }[]) => {
-        syncedHp += gestures.reduce((sum, gesture) => sum + gesture.delta, 0);
-        return syncedHp;
-      });
-      const { rerenderPools } = setup(10, 10, 20, { hp: commitHpDeltas });
-      fireEvent.click(screen.getByLabelText('Adjust HP'));
-      const decrease = screen.getByRole('button', { name: 'Decrease HP by 1' });
-      fireEvent.click(decrease);
-      fireEvent.click(decrease);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('8');
+      fireEvent.click(screen.getByLabelText('Adjust FP'));
+      const increase = screen.getByRole('button', { name: 'Increase FP by 1' });
+      fireEvent.click(increase);
+      await waitFor(() => expect(screen.getByLabelText('Current FP')).toHaveTextContent('9'));
+      await waitFor(() => expect(operationCalls).toBe(1));
 
-      syncedHp = 14;
-      rerenderPools(14);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('12');
-      await act(async () => vi.advanceTimersByTimeAsync(200));
+      fireEvent.click(increase);
+      fireEvent.click(increase);
+      fireEvent.click(increase);
+      await waitFor(() => expect(screen.getByLabelText('Current FP')).toHaveTextContent('12'));
 
-      expect(commitHpDeltas).toHaveBeenCalledTimes(1);
-      expect(await commitHpDeltas.mock.results[0]?.value).toBe(12);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('12');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
+      releaseFirst();
+      await waitFor(() => expect(operationCalls).toBe(2), { timeout: 5_000 });
+      await waitFor(async () => expect(await db.outbox.count()).toBe(0));
 
-  it('keeps a second burst queued while the rebased first commit is still settling', async () => {
-    vi.useFakeTimers();
-    try {
-      let releaseFirst!: (value: number) => void;
-      const first = new Promise<number>((resolve) => {
-        releaseFirst = resolve;
-      });
-      const commitHpDeltas = vi
-        .fn<PoolBumpers['commitHpDeltas']>()
-        .mockReturnValueOnce(first)
-        .mockResolvedValueOnce(11);
-      const { rerenderPools } = setup(10, 10, 20, { hp: commitHpDeltas });
-      fireEvent.click(screen.getByLabelText('Adjust HP'));
-      const decrease = screen.getByRole('button', { name: 'Decrease HP by 1' });
-      fireEvent.click(decrease);
-      fireEvent.click(decrease);
-      await act(async () => vi.advanceTimersByTimeAsync(200));
-      expect(commitHpDeltas).toHaveBeenCalledTimes(1);
-
-      // A cursor update wins the transaction race and becomes the first burst's base.
-      rerenderPools(14);
-      fireEvent.click(decrease);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('11');
-      await act(async () => vi.advanceTimersByTimeAsync(200));
-      expect(commitHpDeltas).toHaveBeenCalledTimes(1);
-
-      await act(async () => releaseFirst(12));
-      expect(commitHpDeltas).toHaveBeenCalledTimes(2);
+      expect(screen.getByLabelText('Current FP')).toHaveTextContent('12');
+      expect((await db.characterCombat.get(LIVE_CHAR_ID))?.currentFp).toBe(12);
+      expect(observed.at(-1)).toBe(12);
       expect(
-        commitHpDeltas.mock.calls.map(([gestures]) => gestures.map(({ delta }) => delta)),
-      ).toEqual([[-1, -1], [-1]]);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('11');
+        observed.every((value, index) => index === 0 || value >= (observed[index - 1] ?? value)),
+      ).toBe(true);
     } finally {
-      vi.useRealTimers();
+      orchestrator.stop();
     }
   });
 
-  it('does not count a LiveQuery acknowledgement twice when it renders before commit settles', async () => {
-    vi.useFakeTimers();
-    try {
-      let releaseFirst!: (value: number) => void;
-      const first = new Promise<number>((resolve) => {
-        releaseFirst = resolve;
-      });
-      const commitHpDeltas = vi
-        .fn<PoolBumpers['commitHpDeltas']>()
-        .mockReturnValueOnce(first)
-        .mockResolvedValueOnce(8);
-      const { rerenderPools } = setup(10, 10, 20, { hp: commitHpDeltas });
-      fireEvent.click(screen.getByLabelText('Adjust HP'));
-      const decrease = screen.getByRole('button', { name: 'Decrease HP by 1' });
-      fireEvent.click(decrease);
-      await act(async () => vi.advanceTimersByTimeAsync(200));
+  it('shows the real soft-cap result instead of predicting a value that rolls back', async () => {
+    const db = getLocalDb();
+    await db.characterCombat.put({
+      id: LIVE_CHAR_ID,
+      characterId: LIVE_CHAR_ID,
+      currentHp: 10,
+      currentFp: 12,
+      conditions: [],
+      maneuver: null,
+      posture: 'standing',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 1,
+    });
+    render(<LivePoolsHarness observed={[]} />);
+    await waitFor(() => expect(screen.getByLabelText('Adjust FP')).toHaveTextContent('FP12'));
+    fireEvent.click(screen.getByLabelText('Adjust FP'));
+    const increase = screen.getByRole('button', { name: 'Increase FP by 1' });
 
-      // Dexie's observer may render the transaction result before the async
-      // caller's continuation records that same result.
-      rerenderPools(9);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('9');
-      fireEvent.click(decrease);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('8');
-      await act(async () => vi.advanceTimersByTimeAsync(200));
-      await act(async () => releaseFirst(9));
+    fireEvent.click(increase);
+    await db.transaction('rw', db.characterCombat, db.outbox, () => undefined);
+    expect(screen.getByLabelText('Current FP')).toHaveTextContent('12');
+    expect((await db.characterCombat.get(LIVE_CHAR_ID))?.currentFp).toBe(12);
 
-      expect(commitHpDeltas).toHaveBeenCalledTimes(2);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('8');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('returns the optimistic display to the durable value when a burst cannot commit', async () => {
-    vi.useFakeTimers();
-    try {
-      const commitHpDeltas = vi.fn().mockResolvedValue(undefined);
-      setup(10, 10, 20, { hp: commitHpDeltas });
-      fireEvent.click(screen.getByLabelText('Adjust HP'));
-      fireEvent.click(screen.getByRole('button', { name: 'Decrease HP by 1' }));
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('9');
-
-      await act(async () => vi.advanceTimersByTimeAsync(200));
-
-      expect(commitHpDeltas).toHaveBeenCalledTimes(1);
-      expect(screen.getByLabelText('Current HP')).toHaveTextContent('10');
-    } finally {
-      vi.useRealTimers();
-    }
+    fireEvent.click(increase);
+    await waitFor(() => expect(screen.getByLabelText('Current FP')).toHaveTextContent('13'));
+    expect((await db.characterCombat.get(LIVE_CHAR_ID))?.currentFp).toBe(13);
   });
 
   it('keeps one panel viewport-fixed when narrow and trigger-anchored on desktop', () => {

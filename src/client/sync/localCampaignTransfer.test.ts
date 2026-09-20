@@ -133,7 +133,10 @@ describe('local campaign transfer', () => {
       await db.outbox.update(create.clientOpId, {
         status,
         ...(status === 'transient_retry'
-          ? { nextEarliestAttemptAt: new Date(Date.now() + 60000).toISOString() }
+          ? {
+              deliveryUncertain: false,
+              nextEarliestAttemptAt: new Date(Date.now() + 60000).toISOString(),
+            }
           : {}),
       });
       db.close();
@@ -294,7 +297,10 @@ describe('local campaign transfer', () => {
       await db.outbox.update(transfer.clientOpId, {
         status,
         ...(status === 'transient_retry'
-          ? { nextEarliestAttemptAt: new Date(Date.now() + 60000).toISOString() }
+          ? {
+              deliveryUncertain: false,
+              nextEarliestAttemptAt: new Date(Date.now() + 60000).toISOString(),
+            }
           : {}),
       });
       const ids: string[] = [];

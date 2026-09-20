@@ -14,12 +14,17 @@ export interface PoolBumpers {
   readonly fpMax: number;
   readonly bumpHp: (d: number) => void;
   readonly bumpFp: (d: number) => void;
+  readonly setHp: (value: number) => void;
+  readonly setFp: (value: number) => void;
   readonly commitHpDeltas: (gestures: readonly PoolDeltaGesture[]) => Promise<number | undefined>;
   readonly commitFpDeltas: (gestures: readonly PoolDeltaGesture[]) => Promise<number | undefined>;
   readonly resetHp: () => void;
   readonly resetFp: () => void;
   readonly flashHp: boolean;
 }
+
+/** Coalesce rapid local pool gestures before the orchestrator sends them. */
+export const POOL_SYNC_DEBOUNCE_MS = 200;
 
 /** A relative pool gesture keeps its interaction time for the soft-cap override window. */
 export interface PoolDeltaGesture {
@@ -48,16 +53,25 @@ export function usePoolBumpers(
     [],
   );
 
-  async function commit(update: CombatUpdate, affected: string[]): Promise<boolean> {
+  async function commit(
+    update: CombatUpdate,
+    affected: string[],
+    drainDelayMs = POOL_SYNC_DEBOUNCE_MS,
+  ): Promise<boolean> {
     let keys = affected;
     let hpDamage = false;
     try {
-      await patchCombat((current) => {
-        const fields = update(current);
-        keys = Object.keys(fields);
-        hpDamage = typeof fields.currentHp === 'number' && fields.currentHp < current.currentHp;
-        return fields;
-      });
+      await patchCombat(
+        (current) => {
+          const fields = update(current);
+          keys = Object.keys(fields);
+          hpDamage = typeof fields.currentHp === 'number' && fields.currentHp < current.currentHp;
+          return fields;
+        },
+        undefined,
+        undefined,
+        { drainDelayMs },
+      );
       if (hpDamage) {
         setFlashHp(true);
         if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -168,6 +182,85 @@ export function usePoolBumpers(
     void commitFpDeltas([{ delta: d, at: Date.now() }]);
   }
 
+  function setHp(value: number) {
+    if (!canWrite || hpMax <= 0) return;
+    const at = Date.now();
+    void commitHpTarget(value, at);
+  }
+
+  async function commitHpTarget(value: number, at: number): Promise<number | undefined> {
+    let committed: number | undefined;
+    let nextBlockedAt: number | null = null;
+    let savedBlockedAt: number | null | undefined;
+    const saved = await commit(
+      (current) => {
+        savedBlockedAt = hpBlockedAtRef.current;
+        const result = bumpPool(
+          current.currentHp,
+          value - current.currentHp,
+          hpMax,
+          savedBlockedAt,
+          at,
+        );
+        nextBlockedAt = result.lastBlockedAt;
+        hpBlockedAtRef.current = nextBlockedAt;
+        committed = Math.max(-hpMax * 5, result.next);
+        return committed === current.currentHp ? {} : { currentHp: committed };
+      },
+      ['currentHp'],
+    );
+    if (!saved) {
+      if (hpBlockedAtRef.current === nextBlockedAt && savedBlockedAt !== undefined) {
+        hpBlockedAtRef.current = savedBlockedAt;
+      }
+      return undefined;
+    }
+    return committed;
+  }
+
+  function setFp(value: number) {
+    if (!canWrite || fpMax <= 0) return;
+    const at = Date.now();
+    void commitFpTarget(value, at);
+  }
+
+  async function commitFpTarget(value: number, at: number): Promise<number | undefined> {
+    let committed: number | undefined;
+    let nextBlockedAt: number | null = null;
+    let savedBlockedAt: number | null | undefined;
+    const saved = await commit(
+      (current) => {
+        savedBlockedAt = fpBlockedAtRef.current;
+        const delta = value - current.currentFp;
+        const result = bumpPool(current.currentFp, delta, fpMax, savedBlockedAt, at);
+        nextBlockedAt = result.lastBlockedAt;
+        let nextFp: number;
+        let nextHp = current.currentHp;
+        if (delta < 0) {
+          const fatigue = applyFatigueLoss(current.currentFp, -delta, fpMax);
+          nextFp = fatigue.fp;
+          if (fatigue.hpCost > 0) nextHp = Math.max(-hpMax * 5, nextHp - fatigue.hpCost);
+        } else {
+          nextFp = result.next;
+        }
+        fpBlockedAtRef.current = nextBlockedAt;
+        committed = nextFp;
+        const fields: Partial<Record<'currentHp' | 'currentFp', number>> = {};
+        if (nextFp !== current.currentFp) fields.currentFp = nextFp;
+        if (nextHp !== current.currentHp) fields.currentHp = nextHp;
+        return fields;
+      },
+      value < fp ? ['currentFp', 'currentHp'] : ['currentFp'],
+    );
+    if (!saved) {
+      if (fpBlockedAtRef.current === nextBlockedAt && savedBlockedAt !== undefined) {
+        fpBlockedAtRef.current = savedBlockedAt;
+      }
+      return undefined;
+    }
+    return committed;
+  }
+
   function resetHp() {
     if (canWrite) void commit(() => ({ currentHp: hpMax }), ['currentHp']);
   }
@@ -182,6 +275,8 @@ export function usePoolBumpers(
     fpMax,
     bumpHp,
     bumpFp,
+    setHp,
+    setFp,
     commitHpDeltas,
     commitFpDeltas,
     resetHp,

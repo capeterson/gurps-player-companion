@@ -236,21 +236,25 @@ envelope, not nested inside the value.
 ### S3. Same-field commits coalesce; never stack pending patches.
 
 The outbox has a `coalesceKey` index of `${entityId}|${fieldPath}`.
-When a `pending` or `transient_retry` op already exists for that key,
-`enqueueFieldPatch` deletes it and inserts the latest. Do not
-introduce a code path that appends a second pending patch for the same
-field — it would replay an old value over a newer one.
+When a safe `pending` or server-confirmed `transient_retry` op already
+exists for that key, `enqueueFieldPatch` deletes it and inserts the latest.
+A delivery-uncertain retry (whole request failure, missing outcome, or recovered
+`in_flight` row) MUST remain as an ordered predecessor, with newer intent held
+behind it until it settles; deleting it or sending the successor first can replay
+an older value over a newer one.
 
 `create` and `delete` ops are never coalesced. Don't add a "merge two
 creates" code path; it doesn't compose with parent/child ordering.
 
 ### S4. The server cursor never overwrites local intent.
 
-`applyServerRow` skips any field that has a `pending` or `in_flight`
+`applyServerRow` skips any field that has a `pending`, `in_flight`, or `transient_retry`
 outbox op for the same `(entityId, fieldPath)`. If you add a new
 write-back path (a new entity class, a new bulk-apply path, a hot-path
 optimisation), it MUST honour the same skip. The local user's typed
-value wins until the server formally rejects it. Re-syncing a whole
+value wins until the server formally rejects it. Cursor rows/tombstones older
+than the local revision are ignored, and acknowledgement revision stamps never
+move backward. Re-syncing a whole
 draft state from a server cache on every refetch is the bug this rule
 exists to prevent.
 

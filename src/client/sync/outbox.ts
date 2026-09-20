@@ -5,10 +5,11 @@
  * one Dexie transaction so a mutation is either fully durable
  * (visible in `useLiveQuery` AND queued for replay) or not at all.
  *
- * Coalescing (AGENTS.md rule 1): when a `pending` patch op already
- * exists for the same `(entityId, fieldPath)` we delete it and insert
- * the latest value -- "additional commits to X queue (latest value
- * wins)".  `create` and `delete` are never coalesced.
+ * Coalescing (AGENTS.md rule 1): when a safe-to-replace `pending` or
+ * server-confirmed transient patch exists for the same field, we delete it
+ * and insert the latest value. A delivery-uncertain retry is retained as an
+ * ordered predecessor because the server may already have applied it.
+ * `create` and `delete` are never coalesced.
  */
 
 import { type LibraryMechanics, libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
@@ -93,6 +94,8 @@ export interface EnqueueFieldPatchArgs {
   readonly characterId?: string | undefined;
   /** Groups mutations from one user gesture for history fold-grouping. */
   readonly batchId?: string | undefined;
+  /** Optional local-only deadline before this operation may be sent. */
+  readonly nextEarliestAttemptAt?: string | undefined;
 }
 
 /**
@@ -174,20 +177,41 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
       )
       .modify({ localWaitForCampaignAssignment: false });
   }
-  const coalescable = dupes.filter((d) => d.status === 'pending' || d.status === 'transient_retry');
+  const coalescable = dupes.filter(
+    (d) =>
+      d.status === 'pending' || (d.status === 'transient_retry' && d.deliveryUncertain === false),
+  );
+  const predecessors = dupes.filter(
+    (d) =>
+      d.status === 'in_flight' || (d.status === 'transient_retry' && d.deliveryUncertain !== false),
+  );
   let carriedPrev: { value: unknown } | undefined;
+  let predecessorClientOpId = predecessors
+    .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt))
+    .at(-1)?.clientOpId;
   let localCampaignTransferUndo = args.localCampaignTransferUndo;
   if (coalescable.length > 0) {
-    // enqueueFieldPatch runs inside a Dexie transaction, so in
-    // practice at most one coalescable dupe exists at a time; sort
-    // defensively by enqueuedAt in case that invariant is ever
-    // violated, so we always carry forward the OLDEST value.
-    const oldest = coalescable.reduce((a, b) => (a.enqueuedAt <= b.enqueuedAt ? a : b));
-    carriedPrev = { value: oldest.prevValue };
-    localCampaignTransferUndo = mergeCampaignTransferUndo(
-      localCampaignTransferUndo,
-      oldest.localCampaignTransferUndo,
+    // A confirmed-transient predecessor and its pending successor can both
+    // become safe to replace. Follow their ancestry rather than trusting wall
+    // clock order, which can tie or move backward.
+    const coalescableIds = new Set(coalescable.map((entry) => entry.clientOpId));
+    const roots = coalescable.filter(
+      (entry) => !entry.predecessorClientOpId || !coalescableIds.has(entry.predecessorClientOpId),
     );
+    const baselineCandidates = roots.length > 0 ? roots : coalescable;
+    const baselineRoot = baselineCandidates.reduce((a, b) =>
+      a.enqueuedAt < b.enqueuedAt || (a.enqueuedAt === b.enqueuedAt && a.clientOpId <= b.clientOpId)
+        ? a
+        : b,
+    );
+    carriedPrev = { value: baselineRoot.prevValue };
+    predecessorClientOpId ??= baselineRoot.predecessorClientOpId;
+    for (const entry of coalescable) {
+      localCampaignTransferUndo = mergeCampaignTransferUndo(
+        localCampaignTransferUndo,
+        entry.localCampaignTransferUndo,
+      );
+    }
   }
   for (const d of coalescable) {
     await db.outbox.delete(d.clientOpId);
@@ -198,8 +222,8 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
   //    server-confirmed current value when refreshing a superseding
   //    op -- see orchestrator.ts's `newerPending` branch, which
   //    applies the exact same "carry the true original value forward"
-  //    idea by hand). Otherwise carry forward the oldest coalesced
-  //    op's prevValue. Only when nothing was pending for this field
+  //    idea by hand). Otherwise carry forward the root coalesced op's
+  //    prevValue. Only when nothing was pending for this field
   //    do we fall back to reading the local row fresh -- there's
   //    nothing to coalesce, so the local row's current value IS the
   //    last-synced value.
@@ -273,6 +297,8 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
     humanName: args.humanName,
     flashKey: args.flashKey,
     batchId: args.batchId,
+    nextEarliestAttemptAt: args.nextEarliestAttemptAt,
+    predecessorClientOpId,
     localCampaignTransferUndo,
   };
   await db.outbox.add(op);
@@ -760,9 +786,9 @@ export async function resolveLegacyCampaignDependency(
   });
 }
 
-export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
+export async function readDrainableOps(limit: number, nowMs = Date.now()): Promise<OutboxEntry[]> {
   const db = getLocalDb();
-  const now = new Date().toISOString();
+  const now = new Date(nowMs).toISOString();
   const unsettled = await db.outbox
     .where('status')
     .anyOf(['pending', 'transient_retry', 'in_flight'])
@@ -833,6 +859,7 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
       .filter((candidate) => candidate.command === 'create')
       .map((candidate) => candidate.entityId),
   );
+  const unsettledClientOpIds = new Set(unsettled.map((candidate) => candidate.clientOpId));
   const ready: OutboxEntry[] = [];
   for (const op of all) {
     const backingOff = op.nextEarliestAttemptAt !== undefined && op.nextEarliestAttemptAt > now;
@@ -856,6 +883,8 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
           : (op.attemptedValue as string)
         : undefined;
     const dependencyHeld =
+      (op.predecessorClientOpId !== undefined &&
+        unsettledClientOpIds.has(op.predecessorClientOpId)) ||
       op.localCampaignDependencyUnknown === true ||
       (op.entityClass === 'character' &&
         op.fieldPath === 'campaignId' &&
@@ -888,6 +917,22 @@ export async function readDrainableOps(limit: number): Promise<OutboxEntry[]> {
   return ready;
 }
 
+/** Milliseconds until the next explicitly delayed pending/retry row becomes eligible. */
+export async function nextOutboxAttemptDelay(nowMs = Date.now()): Promise<number | undefined> {
+  const rows = await getLocalDb()
+    .outbox.where('status')
+    .anyOf(['pending', 'transient_retry'])
+    .toArray();
+  let earliest: number | undefined;
+  for (const row of rows) {
+    if (!row.nextEarliestAttemptAt) continue;
+    const at = Date.parse(row.nextEarliestAttemptAt);
+    if (!Number.isFinite(at) || at <= nowMs) continue;
+    earliest = earliest === undefined ? at : Math.min(earliest, at);
+  }
+  return earliest === undefined ? undefined : Math.max(1, earliest - nowMs);
+}
+
 /**
  * Repair ids emitted by the pre-#132 Math.random fallback. That fallback
  * repeated a short random fragment and could produce UUID groups shorter
@@ -903,6 +948,7 @@ async function repairBrokenFallbackIdsInTransaction(): Promise<void> {
     .toArray();
   const usedClientIds = new Set(entries.map((entry) => entry.clientOpId));
   const repairedBatchIds = new Map<string, string>();
+  const repairedClientIds = new Map<string, string>();
 
   const freshClientId = () => {
     let id = newClientId();
@@ -912,11 +958,21 @@ async function repairBrokenFallbackIdsInTransaction(): Promise<void> {
   };
 
   for (const entry of entries) {
-    const repairClientId = wasGeneratedByBrokenUuidFallback(entry.clientOpId);
-    const repairBatchId = wasGeneratedByBrokenUuidFallback(entry.batchId);
-    if (!repairClientId && !repairBatchId) continue;
+    if (wasGeneratedByBrokenUuidFallback(entry.clientOpId)) {
+      repairedClientIds.set(entry.clientOpId, freshClientId());
+    }
+  }
 
-    const nextClientOpId = repairClientId ? freshClientId() : entry.clientOpId;
+  for (const entry of entries) {
+    const nextClientOpId = repairedClientIds.get(entry.clientOpId) ?? entry.clientOpId;
+    const repairClientId = nextClientOpId !== entry.clientOpId;
+    const repairBatchId = wasGeneratedByBrokenUuidFallback(entry.batchId);
+    const nextPredecessorClientOpId = entry.predecessorClientOpId
+      ? (repairedClientIds.get(entry.predecessorClientOpId) ?? entry.predecessorClientOpId)
+      : undefined;
+    const repairPredecessor = nextPredecessorClientOpId !== entry.predecessorClientOpId;
+    if (!repairClientId && !repairBatchId && !repairPredecessor) continue;
+
     let nextBatchId = entry.batchId;
     if (repairBatchId && entry.batchId) {
       nextBatchId = repairedBatchIds.get(entry.batchId);
@@ -929,6 +985,8 @@ async function repairBrokenFallbackIdsInTransaction(): Promise<void> {
       ...entry,
       clientOpId: nextClientOpId,
       batchId: nextBatchId,
+      predecessorClientOpId: nextPredecessorClientOpId,
+      deliveryUncertain: undefined,
       status: 'pending',
       attemptCount: 0,
       lastAttemptAt: undefined,
@@ -947,16 +1005,67 @@ async function repairBrokenFallbackIdsInTransaction(): Promise<void> {
 }
 
 /**
+ * Upgrade outboxes written before delivery uncertainty and predecessor links
+ * were persisted. A legacy retry may have reached the server, so treating an
+ * absent flag as safe would let a newer same-field patch overtake it.
+ */
+async function normalizeLegacyDeliveryChainsInTransaction(): Promise<void> {
+  const db = getLocalDb();
+  const rows = (await db.outbox.toArray()).filter(
+    (entry) => entry.command === 'patch' && entry.fieldPath !== undefined,
+  );
+  const groups = new Map<string, OutboxEntry[]>();
+  for (const row of rows) {
+    const group = groups.get(row.coalesceKey) ?? [];
+    group.push(row);
+    groups.set(row.coalesceKey, group);
+  }
+  for (const group of groups.values()) {
+    for (const row of group) {
+      if (row.status === 'transient_retry' && row.deliveryUncertain === undefined) {
+        row.deliveryUncertain = true;
+        await db.outbox.update(row.clientOpId, { deliveryUncertain: true });
+      }
+    }
+    group.sort((a, b) => {
+      const blockerRank = (entry: OutboxEntry) =>
+        entry.status === 'in_flight' ||
+        (entry.status === 'transient_retry' && entry.deliveryUncertain)
+          ? 0
+          : 1;
+      const byRank = blockerRank(a) - blockerRank(b);
+      if (byRank !== 0) return byRank;
+      const byTime = a.enqueuedAt.localeCompare(b.enqueuedAt);
+      return byTime !== 0 ? byTime : a.clientOpId.localeCompare(b.clientOpId);
+    });
+    let predecessor: string | undefined;
+    for (const row of group) {
+      if (predecessor && !row.predecessorClientOpId) {
+        row.predecessorClientOpId = predecessor;
+        await db.outbox.update(row.clientOpId, { predecessorClientOpId: predecessor });
+      }
+      if (
+        row.status === 'in_flight' ||
+        (row.status === 'transient_retry' && row.deliveryUncertain)
+      ) {
+        predecessor = row.clientOpId;
+      }
+    }
+  }
+}
+
+/**
  * Select and claim one outbound batch atomically. Enqueue coalescing sees
  * every selected row as `in_flight`; a replacement therefore queues behind
  * it instead of deleting an op whose stale in-memory envelope will be sent.
  * Network I/O remains outside this short transaction.
  */
-export async function claimDrainableOps(limit: number): Promise<OutboxEntry[]> {
+export async function claimDrainableOps(limit: number, nowMs = Date.now()): Promise<OutboxEntry[]> {
   const db = getLocalDb();
   return db.transaction('rw', [db.outbox, db.characters], async () => {
     await repairBrokenFallbackIdsInTransaction();
-    const selected = await readDrainableOps(limit);
+    await normalizeLegacyDeliveryChainsInTransaction();
+    const selected = await readDrainableOps(limit, nowMs);
     const claimedAt = new Date().toISOString();
     const claimed: OutboxEntry[] = [];
     for (const op of selected) {
@@ -981,7 +1090,7 @@ export async function claimDrainableOps(limit: number): Promise<OutboxEntry[]> {
 }
 
 /**
- * Reset stale `in_flight` rows back to `pending`.
+ * Recover stale `in_flight` rows as delivery-uncertain retries.
  *
  * MUST be called while holding the cross-tab drain lock: under the
  * lock, no tab can have a /sync/operations POST outstanding, so any
@@ -990,18 +1099,17 @@ export async function claimDrainableOps(limit: number): Promise<OutboxEntry[]> {
  * rows are invisible to `readDrainableOps` forever -- the edit never
  * syncs and `countPending` pins the indicator at 'syncing'.
  *
- * The replay is safe even if the orphaned POST actually reached the
- * server: patches reconcile through the stale_base path, creates are
- * replay-idempotent server-side (an existing row with the same id
- * comes back `applied`), and deletes of already-deleted rows are
- * idempotent no-ops.
+ * A newer same-field patch is held behind this retry so client replay order
+ * cannot put an older value after the newer one. Creates are replay-safe by
+ * stable entity id, and deletes of already-deleted rows are no-ops.
  */
 export async function recoverStaleInFlight(): Promise<number> {
   const db = getLocalDb();
   const stale = await db.outbox.where('status').equals('in_flight').primaryKeys();
   for (const clientOpId of stale) {
     await db.outbox.update(clientOpId, {
-      status: 'pending',
+      status: 'transient_retry',
+      deliveryUncertain: true,
       serverReason: 'recovered from interrupted send',
     });
   }

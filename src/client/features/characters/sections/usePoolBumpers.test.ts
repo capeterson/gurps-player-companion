@@ -140,6 +140,53 @@ describe('usePoolBumpers', () => {
     await expectPools(9, 11);
   });
 
+  it('persists every mashed FP increment immediately and coalesces the network intent', async () => {
+    const { result, db } = await setup(10, 9);
+    act(() => {
+      for (let index = 0; index < 5; index += 1) result.current.bumpFp(1);
+    });
+
+    // 9 -> 12, one blocked press at the soft cap, then the explicit
+    // second press overrides it. No separate speculative display is involved.
+    await expectPools(10, 13);
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({
+      fieldPath: 'currentFp',
+      prevValue: 9,
+      attemptedValue: 13,
+      status: 'pending',
+    });
+    expect(Date.parse(ops[0]?.nextEarliestAttemptAt ?? '')).toBeGreaterThan(Date.now() - 1);
+  });
+
+  it('rebases consecutive absolute slider targets inside their transactions', async () => {
+    const { result, db } = await setup(10, 12);
+    act(() => {
+      result.current.setFp(9);
+      result.current.setFp(8);
+    });
+
+    await expectPools(10, 8);
+    expect(await db.outbox.toArray()).toMatchObject([
+      { fieldPath: 'currentFp', prevValue: 12, attemptedValue: 8 },
+    ]);
+  });
+
+  it('serializes button and slider gestures against the latest durable row', async () => {
+    const { result, db } = await setup(10, 12);
+    act(() => {
+      result.current.bumpFp(-1);
+      result.current.setFp(6);
+      result.current.bumpFp(1);
+    });
+
+    await expectPools(10, 7);
+    expect(await db.outbox.toArray()).toMatchObject([
+      { fieldPath: 'currentFp', prevValue: 12, attemptedValue: 7 },
+    ]);
+  });
+
   it('composes combined fatigue and independent HP changes through stale render snapshots', async () => {
     const { result, db } = await setup(10, 0);
     act(() => {
@@ -152,6 +199,7 @@ describe('usePoolBumpers', () => {
     const ops = await db.outbox.toArray();
     expect(ops).toHaveLength(2);
     expect(new Set(ops.map((op) => op.batchId)).size).toBe(1);
+    expect(new Set(ops.map((op) => op.nextEarliestAttemptAt)).size).toBe(1);
   });
 
   it('soft cap blocks once, then overrides within two seconds using gesture timestamps', async () => {
