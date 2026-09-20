@@ -121,47 +121,14 @@ describe('DefensesCard', () => {
 
   it('sorts the compact table by defense, governing skill, and final score', () => {
     render(<DefensesCard character={withMultipleDefenses()} openRoll={vi.fn()} />);
-    expect(defenseOrder()).toEqual([
-      'Move',
-      'Dodge',
-      'Parry (Sword)',
-      'Parry (Bow)',
-      'Parry (Axe)',
-    ]);
+    expect(defenseOrder()).toEqual(['Dodge', 'Parry (Sword)', 'Parry (Bow)', 'Parry (Axe)']);
     fireEvent.click(screen.getByRole('button', { name: 'Sort by Defense' }));
-    expect(defenseOrder()).toEqual([
-      'Dodge',
-      'Move',
-      'Parry (Axe)',
-      'Parry (Bow)',
-      'Parry (Sword)',
-    ]);
+    expect(defenseOrder()).toEqual(['Dodge', 'Parry (Axe)', 'Parry (Bow)', 'Parry (Sword)']);
     fireEvent.click(screen.getByRole('button', { name: 'Sort by Governing skill' }));
-    expect(defenseOrder()).toEqual([
-      'Parry (Axe)',
-      'Move',
-      'Dodge',
-      'Parry (Bow)',
-      'Parry (Sword)',
-    ]);
+    expect(defenseOrder()).toEqual(['Parry (Axe)', 'Dodge', 'Parry (Bow)', 'Parry (Sword)']);
     fireEvent.click(screen.getByRole('button', { name: 'Sort by Final' }));
-    expect(defenseOrder()).toEqual([
-      'Move',
-      'Dodge',
-      'Parry (Bow)',
-      'Parry (Axe)',
-      'Parry (Sword)',
-    ]);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Defense order' }), {
-      target: { value: 'custom' },
-    });
-    expect(defenseOrder()).toEqual([
-      'Move',
-      'Dodge',
-      'Parry (Sword)',
-      'Parry (Bow)',
-      'Parry (Axe)',
-    ]);
+    expect(defenseOrder()).toEqual(['Dodge', 'Parry (Bow)', 'Parry (Axe)', 'Parry (Sword)']);
+    expect(screen.queryByRole('combobox', { name: 'Defense order' })).not.toBeInTheDocument();
   });
 
   it('persists keyboard custom ordering per character and clears it at logout', () => {
@@ -169,20 +136,33 @@ describe('DefensesCard', () => {
     const view = render(<DefensesCard character={character} openRoll={vi.fn()} />);
     const dodge = screen.getByRole('rowgroup', { name: 'Dodge' });
     fireEvent.keyDown(within(dodge).getByRole('button', { name: /Reorder/ }), {
-      key: 'ArrowUp',
+      key: 'ArrowDown',
     });
-    expect(defenseOrder().slice(0, 2)).toEqual(['Dodge', 'Move']);
+    expect(defenseOrder().slice(0, 2)).toEqual(['Parry (Sword)', 'Dodge']);
     view.unmount();
     const remount = render(<DefensesCard character={character} openRoll={vi.fn()} />);
-    expect(defenseOrder().slice(0, 2)).toEqual(['Dodge', 'Move']);
+    expect(defenseOrder().slice(0, 2)).toEqual(['Parry (Sword)', 'Dodge']);
     remount.rerender(
       <DefensesCard character={{ ...character, id: 'another-character' }} openRoll={vi.fn()} />,
     );
-    expect(defenseOrder().slice(0, 2)).toEqual(['Move', 'Dodge']);
+    expect(defenseOrder().slice(0, 2)).toEqual(['Dodge', 'Parry (Sword)']);
     remount.unmount();
     clearAllDefenseTablePreferences();
     render(<DefensesCard character={character} openRoll={vi.fn()} />);
-    expect(defenseOrder().slice(0, 2)).toEqual(['Move', 'Dodge']);
+    expect(defenseOrder().slice(0, 2)).toEqual(['Dodge', 'Parry (Sword)']);
+  });
+
+  it('starts manual reordering from the order currently shown after a header sort', () => {
+    render(<DefensesCard character={withMultipleDefenses()} openRoll={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Final' }));
+    expect(defenseOrder()).toEqual(['Dodge', 'Parry (Bow)', 'Parry (Axe)', 'Parry (Sword)']);
+    fireEvent.keyDown(
+      within(screen.getByRole('rowgroup', { name: 'Dodge' })).getByRole('button', {
+        name: /Reorder/,
+      }),
+      { key: 'ArrowDown' },
+    );
+    expect(defenseOrder()).toEqual(['Parry (Bow)', 'Dodge', 'Parry (Axe)', 'Parry (Sword)']);
   });
 
   it('drags a defense row into custom order and restores it after remount', () => {
@@ -195,17 +175,18 @@ describe('DefensesCard', () => {
       }),
       { dataTransfer },
     );
-    fireEvent.dragOver(screen.getByRole('rowgroup', { name: 'Move' }), { dataTransfer });
-    fireEvent.drop(screen.getByRole('rowgroup', { name: 'Move' }), { dataTransfer });
+    fireEvent.dragOver(screen.getByRole('rowgroup', { name: 'Dodge' }), { dataTransfer });
+    fireEvent.drop(screen.getByRole('rowgroup', { name: 'Dodge' }), { dataTransfer });
     expect(defenseOrder()[0]).toBe('Parry (Axe)');
     view.unmount();
     render(<DefensesCard character={character} openRoll={vi.fn()} />);
     expect(defenseOrder()[0]).toBe('Parry (Axe)');
   });
 
-  it('keeps the action grid focused on Move and rollable defenses', () => {
+  it('keeps the table focused on rollable active defenses', () => {
     render(<DefensesCard character={makeCharacter([], [])} openRoll={vi.fn()} />);
-    expect(screen.getByText('Move & defenses')).toBeInTheDocument();
+    expect(screen.getByText('Active defenses')).toBeInTheDocument();
+    expect(screen.queryByRole('rowgroup', { name: 'Move' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Defense hit location')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Defense facing')).not.toBeInTheDocument();
   });
@@ -356,7 +337,7 @@ describe('DefensesCard', () => {
     } as CharacterDetail['combat'];
     return c;
   }
-  it('dispatches pool-adjusted Dodge with encumbrance and DB, then clears restrictions', () => {
+  it('dispatches adjusted Dodge with encumbrance and DB, then clears restrictions', () => {
     const c = liveCharacter();
     c.combat = {
       ...c.combat,
@@ -366,8 +347,6 @@ describe('DefensesCard', () => {
     } as CharacterDetail['combat'];
     const openRoll = vi.fn();
     const view = render(<DefensesCard character={c} openRoll={openRoll} />);
-    const moveRow = () => within(screen.getByRole('rowgroup', { name: 'Move' }));
-    expect(moveRow().getByText('1', { selector: 'td:last-child span' })).toBeInTheDocument(); // ceil(encumbered Move 4 / 4)
     fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
     expect(targetFor(openRoll, 0)).toBe(4); // ceil((9-1)/4) + DB2
     fireEvent.click(screen.getByRole('button', { name: /^Parry/ }));
@@ -380,14 +359,12 @@ describe('DefensesCard', () => {
       conditions: ['Stunned'],
     } as CharacterDetail['combat'];
     view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
-    expect(moveRow().getByText('0', { selector: 'td:last-child span' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
     expect(targetFor(openRoll, 2)).toBe(3); // 8+2-3-4
     c.combat = { ...c.combat, posture: 'standing', conditions: [] } as CharacterDetail['combat'];
     view.rerender(<DefensesCard character={c} openRoll={openRoll} />);
     fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
     expect(targetFor(openRoll, 3)).toBe(10);
-    expect(moveRow().getByText('4', { selector: 'td:last-child span' })).toBeInTheDocument();
   });
 
   it('shows unavailable defenses for All-Out Attack and limits All-Out Defense to a chosen option', () => {

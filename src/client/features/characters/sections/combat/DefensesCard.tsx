@@ -166,20 +166,6 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
   if (armorDbSource) dodgeParts.push(`+ ${armorDbSource.db} armor DB (${armorDbSource.itemName})`);
   const dodgeCaption = dodgeParts.length > 0 ? dodgeParts.join(' ') : undefined;
 
-  const encumbrance = character.encumbrance;
-  const derived = character.derived;
-  const overCarryCap = encumbrance.ratio > 10;
-  const moveFloor = derived.basicMove > 0 ? 1 : 0;
-  const encumberedMove = overCarryCap
-    ? 0
-    : Math.max(moveFloor, Math.floor(derived.basicMove * encumbrance.moveMultiplier));
-  const moveNet = state.movement(encumberedMove, defenseOption);
-  const movePenalty = derived.basicMove - encumberedMove;
-  const moveCaption =
-    character.encumbrance.moveMultiplier !== 1
-      ? `${derived.basicMove} base − ${movePenalty} ${encumbrance.label} encumbrance`
-      : undefined;
-
   const skillCandidates = character.skills.map((skill) => ({
     name: skillDisplayName(skill.name, skill.specialization),
     level: skill.effectiveLevel ?? skill.level,
@@ -247,22 +233,6 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
     : null;
 
   const rows: DefenseRow[] = [
-    {
-      id: 'move',
-      label: 'Move',
-      skill: 'Basic Move',
-      beforeDb: encumberedMove,
-      db: null,
-      final: moveNet,
-      detail: (
-        <>
-          {moveNet !== encumberedMove || state.maneuver
-            ? `${encumberedMove} before pool, posture, and maneuver limits`
-            : null}
-          {moveCaption ? <span className="block">{moveCaption}</span> : null}
-        </>
-      ),
-    },
     {
       id: 'dodge',
       label: 'Dodge',
@@ -356,12 +326,6 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
     );
   }
 
-  function chooseSort(nextSort: DefenseSort) {
-    setSort(nextSort);
-    setDescending(false);
-    persist(customOrder, nextSort, false);
-  }
-
   function toggleSort(nextSort: Exclude<DefenseSort, 'custom'>) {
     const nextDescending = sort === nextSort ? !descending : false;
     setSort(nextSort);
@@ -370,7 +334,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
   }
 
   function moveRow(rowId: string, offset: number) {
-    const current = reorderRows(rows, customOrder).map((row) => row.id);
+    const current = visibleRows.map((row) => row.id);
     const from = current.indexOf(rowId);
     const to = Math.max(0, Math.min(current.length - 1, from + offset));
     if (from < 0 || from === to) return;
@@ -385,7 +349,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
 
   function dropBefore(targetId: string) {
     if (!draggedId || draggedId === targetId) return;
-    const current = reorderRows(rows, customOrder).map((row) => row.id);
+    const current = visibleRows.map((row) => row.id);
     const from = current.indexOf(draggedId);
     const to = current.indexOf(targetId);
     if (from < 0 || to < 0) return;
@@ -413,28 +377,14 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
   }
 
   return (
-    <div className="space-y-3" aria-label="Move and active defenses">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-3" aria-label="Active defenses">
+      <div>
         <div>
-          <h3 className="label-eyebrow">Move &amp; defenses</h3>
+          <h3 className="label-eyebrow">Active defenses</h3>
           <p className="mt-1 text-xs text-muted">
             Uses the hit location and facing selected for armor.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs font-medium">
-          <span>Order</span>
-          <select
-            aria-label="Defense order"
-            className="select select-bordered select-xs"
-            value={sort}
-            onChange={(event) => chooseSort(event.target.value as DefenseSort)}
-          >
-            <option value="custom">Custom</option>
-            <option value="defense">Defense</option>
-            <option value="skill">Governing skill</option>
-            <option value="final">Final score</option>
-          </select>
-        </label>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-base-300">
@@ -467,7 +417,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                 key={row.id}
                 aria-label={row.label}
                 onDragOver={(event) => {
-                  if (sort === 'custom') event.preventDefault();
+                  event.preventDefault();
                 }}
                 onDrop={() => dropBefore(row.id)}
                 className={draggedId === row.id ? 'opacity-50' : undefined}
@@ -476,15 +426,10 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                   <td className="px-2">
                     <button
                       type="button"
-                      draggable={sort === 'custom'}
-                      className="btn btn-ghost btn-xs cursor-grab px-1 disabled:cursor-default"
+                      draggable
+                      className="btn btn-ghost btn-xs cursor-grab px-1"
                       aria-label={`Reorder row ${customIndex + 1}`}
-                      title={
-                        sort === 'custom'
-                          ? 'Drag or use arrow keys to reorder'
-                          : 'Choose Custom order to reorder'
-                      }
-                      disabled={sort !== 'custom'}
+                      title="Drag or use arrow keys to reorder"
                       data-position={customIndex}
                       onDragStart={(event) => {
                         event.dataTransfer.setData('text/plain', row.id);
@@ -593,9 +538,8 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
       />
       <p className="text-[11px] text-base-content/50">
         Active trait bonuses and recorded combat restrictions are included. Add situational
-        modifiers when rolling; shield DB assumes a covered attack. Move includes posture and
-        maneuver limits. Double defense grants a second, different defense after the first fails; it
-        adds no numerical bonus.
+        modifiers when rolling; shield DB assumes a covered attack. Double defense grants a second,
+        different defense after the first fails; it adds no numerical bonus.
       </p>
     </div>
   );

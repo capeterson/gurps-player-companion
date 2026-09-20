@@ -14,6 +14,12 @@ agent access. It is a single Bun process that serves the HTTP API, OAuth and
 MCP, a WebSocket push channel, the OpenAPI document, and the React PWA client —
 all on one origin, one port.
 
+The official hosted instance is [gurps.abundant.zip](https://gurps.abundant.zip).
+The root [README](../../README.md) is the player-facing introduction, with
+current desktop/mobile screenshots and self-hosting/environment documentation
+at the end. Screenshot provenance and refresh notes live in
+[screenshots/README.md](../screenshots/README.md).
+
 The defining product promise is **edits never disappear**. Every character
 mutation is written to IndexedDB and journaled to a durable outbox *before*
 anything touches the network, so a player can keep editing a stale tab with no
@@ -93,17 +99,20 @@ The home page's recent-character cards and the `/characters` listing resolve
 from the local mirror. Each card links to its character and, when assigned,
 shows the synced campaign name as a separate link to that campaign.
 
+- **Narrow-screen navigation.** Character and Campaign navigation groups wrap
+  within the available header width; long breadcrumbs remain truncated and
+  the campaign dropdown stays attached to its group.
 - **Compact combat view and folding.** Combat uses a smaller identity header and
   folds the shared sheet overview (attributes, secondary stats, status, ledger,
   encumbrance and conditional effects) by default. The folded overview shows
   effective ST/DX/IQ/HT. Other tabs keep an independently remembered overview
-  preference. Every sheet panel and main Combat section has a keyboard-accessible
+  preference. Every visible sheet panel and main Combat section has a keyboard-accessible
   folding header; armor remains inline and open by default. `FoldSection` saves
   open/closed preferences per character/section in device-local `localStorage`
   (`gpc:fold:*`), never the server. Content stays mounted while folded so drafts,
   pending saves, roll state and selections survive folding. Storage failures do
   not prevent folding. Recovery/thresholds, the point ledger, defense breakdowns, and the full DR
-  location list start folded.
+  details start folded. The armor body map is the single all-location DR overview.
 - **Markdown descriptions.** Library traits, skills and spells render sanitized
   CommonMark/GFM descriptions; their spacious add/edit forms (including skill
   specialization description overrides) use the shared formatting toolbar and
@@ -167,7 +176,7 @@ shows the synced campaign name as a separate link to that campaign.
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Campaign-defined or custom effects can be applied, activated, deactivated, expired, detached and removed from Combat. Owned mechanics and saved campaign templates work offline; capabilities/senses/resistances have typed labels. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v11. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, but the character sheet does not expose an active-effects editor. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v11. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -409,7 +418,7 @@ shows the synced campaign name as a separate link to that campaign.
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
     so two rapid condition taps before Dexie re-renders don't coalesce
     into one outbox patch and drop the first tap.
-  - **Defense & Damage Resistance** — combines Move, active defenses, equipped armor,
+  - **Defense & Damage Resistance** — combines active defenses, equipped armor,
     active global/location innate DR, and natural skull DR 2 in one workspace
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
     hit-location aim presets. A rounded, generic SVG silhouette exposes all 15
@@ -478,13 +487,13 @@ shows the synced campaign name as a separate link to that campaign.
     it; choosing closes the picker), plus
     a "Custom…" free-text fallback using the same `useDraftField`
     pattern as the sheet's Status card.
-  - **Move & active defenses** — a compact, horizontally scrollable table inside
+  - **Active defenses** — a compact, horizontally scrollable table inside
     **Defense & Damage Resistance**, with sortable Defense, Governing skill, and
     Final columns plus a device-local custom order that supports drag-and-drop and
-    keyboard arrow reordering. Source breakdowns stay collapsed on their rows;
-    current restrictions and All-Out Defense choices remain visible. Move is
-    read-only and net of encumbrance and combat restrictions;
-    Dodge includes
+    keyboard arrow reordering. The column headers are the only explicit sort controls;
+    dragging or using the row handles returns the table to custom order. Source
+    breakdowns stay collapsed on their rows; current restrictions and All-Out Defense
+    choices remain visible. Move is not a defense and is omitted. Dodge includes
     the encumbrance-penalty breakdown and no invented minimum),
     Parry per equipped weapon, and Block. A weapon's governing skill is
     resolved via `resolveWeaponSkill` (`src/shared/domain/defenseCalc.ts`):
@@ -659,7 +668,9 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.
    Newly observed changes remain highlighted for 30 seconds. Cards open the full
-   sheet in a new tab; a dense-display toggle fits larger parties.
+   sheet in a new tab; a dense-display toggle fits larger parties. The REST
+   campaign mirror input stays stable across local subscription renders so
+   the party query can settle instead of being invalidated by repeated mirror writes.
 - **Experimental turn tracking**: the owner enables **Campaign settings →
   Experimental features → Enable turn tracker** (`experimentalTurnTracker`).
   Defaults off for existing/new campaigns; campaignless characters also hide
@@ -768,7 +779,8 @@ src/
                  (buildPatchSet, the shared PATCH-body-to-`.set()` helper),
                  entityWrites (per-entity insert/upsert-values builders
                  shared by REST and the sync dispatcher — AGENTS.md S12)
-    db/          schema.ts (Drizzle), migrations/ (hand-written SQL for
+    db/          schema.ts (Drizzle), seeds/ (Lantern Coast fixture/data/accounts/tests),
+                 migrations/ (hand-written SQL for
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
   client/        React 19 PWA
@@ -847,11 +859,13 @@ src/
                  replay lives in the page orchestrator; see src/sw/registerSW.ts.
 docs/
   specs/         These design specs
+  screenshots/   Current-app README captures; fictional demo data, capture notes
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked)
 bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign
+  lantern_coast.yaml    Rich Lantern Coast library; bootstrap/README.md lists demo accounts
 ```
 
 Read the top-of-file doc comments — most load-bearing modules
@@ -887,6 +901,18 @@ Full detail: [architecture.md](architecture.md).
 ---
 
 ## Orientation notes for future sessions
+
+The standard `bun run db:seed` refreshes the Sample library and creates a populated
+Lantern Coast campaign with three player-owned characters, nine library categories,
+shared/private adventure logs, and an experimental encounter. See the
+[seed guide](../../bootstrap/README.md) for credentials and test cases. Creation is
+transactional and serialized; existing Lantern campaigns are skipped by owner/name
+so test edits survive reruns. Campaign/character fixtures use the normal API
+handlers for validated writes, owned mechanics, history and revisions.
+
+Before a new development task on local `main`, fetch and fast-forward from
+`origin/main` as prescribed in [AGENTS.md](../../AGENTS.md), preserving local
+work. Re-read project instructions and relevant specs changed by that update.
 
 The armor-location design study at [prototypes/armor-preview.html](../prototypes/armor-preview.html)
 opens directly in a browser without dependencies or a build. It previews all 15

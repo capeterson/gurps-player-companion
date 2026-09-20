@@ -338,8 +338,13 @@ Key PG18 / trigger machinery, layered by migration:
 
 - `src/server/config.ts` reads env (JWT secret ≥ 32 chars, DB URL, CORS
   origins, Resend key, environment). `.env.example` documents the surface.
-- Seed: `bun run db:seed` (`src/server/db/seed.ts`) creates the idempotent
-  "Sample" campaign and imports `bootstrap/sample_library.yaml`.
+- Seed: `bun run db:seed` (`src/server/db/seed.ts`) refreshes the Sample
+  campaign library and creates the populated Lantern Coast fixture once.
+  `seeds/lanternCoast.ts` uses the normal in-process API handlers for validated,
+  audited campaign/character writes and owned library snapshots. The standard
+  seed is atomic and advisory-lock serialized; Lantern identity is owner/name,
+  and reruns preserve its play state. See [the seed guide](../../bootstrap/README.md)
+  for fixture coverage, account credentials, and isolation tests.
 
 ## Active effects and skill procedures
 

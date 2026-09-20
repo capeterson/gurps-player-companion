@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { MANA_LEVEL_LABELS } from '../../../shared/constants/magic.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
@@ -30,7 +30,14 @@ export function GmCampaignDashboardPage() {
   const localCampaign = useLiveQuery(() => getLocalDb().campaigns.get(id), [id]);
   // Refresh the read-only campaign mirror after settings edits. The cursor
   // also populates it, allowing the dashboard to reopen without HTTP access.
-  useMirrorCampaigns(campaign.data ? [campaign.data] : undefined);
+  // The local campaign subscription re-renders this page after a mirror write.
+  // Keep the REST projection stable until fetched data actually changes so it
+  // cannot restart that write and starve the character live query indefinitely.
+  const campaignMirror = useMemo(
+    () => (campaign.data ? [campaign.data] : undefined),
+    [campaign.data],
+  );
+  useMirrorCampaigns(campaignMirror);
 
   if (!id) return <p className="alert alert-error">Missing campaign id.</p>;
   const denied =
