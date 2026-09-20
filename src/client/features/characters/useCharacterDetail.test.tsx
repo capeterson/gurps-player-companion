@@ -233,6 +233,49 @@ describe('durable character mechanics', () => {
     },
   );
 
+  it('keeps current HP and FP controls out of the shared Status panel', async () => {
+    await seed();
+    await getLocalDb().campaigns.put({
+      id: CAMPAIGN,
+      ownerId: 'owner',
+      viewerRole: 'owner',
+      name: 'Local Campaign',
+      description: null,
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      revision: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 0,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[`/characters/${CID}`]}>
+          <Routes>
+            <Route path="/characters/:id" element={<CharacterSheetPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Identity' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Identity' }));
+    await waitFor(() => expect(screen.getByText('Basic Lift')).toBeInTheDocument());
+    expect(screen.queryByLabelText('current HP')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('current FP')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Hit points')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Fatigue points')).not.toBeInTheDocument();
+  });
+
   it('renders human labels for active and legacy dismissed warning codes', async () => {
     await seed();
     const db = getLocalDb();

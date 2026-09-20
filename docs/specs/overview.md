@@ -135,10 +135,9 @@ shows the synced campaign name as a separate link to that campaign.
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary** card
   surfaces the six secondary stats (HP, Will, Per, FP, Basic Speed, Basic
   Move) with their effective values and per-stat ✦ temp-modifier
-  popovers. The **Status** card shows the current HP/FP pools (with
-  meters) plus the derived combat values not displayed elsewhere —
-  Dodge, Basic Lift, and Thr / Sw — while pool mutations live only in
-  the Combat tab so independently mounted editors cannot race. The
+  popovers. The **Status** card shows derived combat values not displayed
+  elsewhere — Dodge, Basic Lift, and Thr / Sw — while current HP/FP pools
+  and their mutations live only in the Combat tab. The
   sheet's top row no longer duplicates the six secondary numbers. Temporary ST/HT boosts
   affect their normal derived values but not maximum HP/FP; only the
   dedicated temporary HP/FP modifiers change those maxima (M37). Basic
@@ -410,7 +409,10 @@ shows the synced campaign name as a separate link to that campaign.
     floating pool bar so rapid changes across both UIs never race. The bar
     appears at the top only after the sheet tab list has scrolled away, labels
     both HP and FP, and opens one range popover at a time with threshold/recovery
-    marks. On mobile the open panel is fixed within the viewport rather than
+    marks positioned from their actual values on the scale. Each popover also has
+    touch-sized −1/+1 controls for precise common adjustments, and its threshold
+    names use a compact two-column legend instead of crowding the numeric scale.
+    On mobile the open panel is fixed within the viewport rather than
     overflowing from its trigger; Escape or an outside tap dismisses it.
     Derived pool states such as Reeling, Tired, Exhausted, death checks, and
     Unconscious are visible as badges; exceptional/certain-death bounds are

@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import type { PoolBumpers } from '../usePoolBumpers.ts';
-import { FloatingPoolsBar } from './FloatingPoolsBar.tsx';
+import { FloatingPoolsBar, rangePointPercent } from './FloatingPoolsBar.tsx';
 
 function setup(hp = 10, fp = 10) {
   const character = {
@@ -27,6 +27,20 @@ function setup(hp = 10, fp = 10) {
 }
 
 describe('FloatingPoolsBar', () => {
+  it('positions uneven threshold captions at their corresponding range values', () => {
+    expect(rangePointPercent(-12, -12, 12)).toBe(0);
+    expect(rangePointPercent(0, -12, 12)).toBe(50);
+    expect(rangePointPercent(4, -12, 12)).toBeCloseTo(66.667, 2);
+    expect(rangePointPercent(12, -12, 12)).toBe(100);
+
+    setup();
+    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    expect(document.querySelector('[data-range-point="0"]')).toHaveStyle({ left: '50%' });
+    expect(document.querySelector('[data-range-point="4"]')).toHaveStyle({
+      left: '66.66666666666666%',
+    });
+  });
+
   it('labels and exposes both pools with range controls and recovery notes', () => {
     setup();
     const hpButton = screen.getByLabelText('Adjust HP');
@@ -61,11 +75,30 @@ describe('FloatingPoolsBar', () => {
     expect(bumpFp).toHaveBeenCalledWith(-2);
   });
 
+  it('offers precise minus-one and plus-one controls for both pools', () => {
+    const { bumpHp, bumpFp } = setup();
+
+    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease HP by 1' }));
+    expect(screen.getByLabelText('Current HP')).toHaveTextContent('9');
+    fireEvent.click(screen.getByRole('button', { name: 'Increase HP by 1' }));
+    expect(screen.getByLabelText('Current HP')).toHaveTextContent('10');
+
+    fireEvent.click(screen.getByLabelText('Adjust FP'));
+    fireEvent.click(screen.getByRole('button', { name: 'Decrease FP by 1' }));
+    expect(screen.getByLabelText('Current FP')).toHaveTextContent('9');
+    fireEvent.click(screen.getByRole('button', { name: 'Increase FP by 1' }));
+    expect(screen.getByLabelText('Current FP')).toHaveTextContent('10');
+
+    expect(bumpHp.mock.calls.map(([delta]) => delta)).toEqual([-1, 1]);
+    expect(bumpFp.mock.calls.map(([delta]) => delta)).toEqual([-1, 1]);
+  });
+
   it('keeps the mobile panel inside the viewport and dismisses it', () => {
     setup();
     fireEvent.click(screen.getByLabelText('Adjust FP'));
     const panel = screen.getByRole('group', { name: 'FP adjustment' });
-    expect(panel).toHaveClass('fixed', 'inset-x-4', 'sm:absolute');
+    expect(panel).toHaveClass('fixed!', 'inset-x-4!', 'sm:absolute!');
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'FP adjustment' })).not.toBeInTheDocument();

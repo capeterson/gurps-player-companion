@@ -18,6 +18,12 @@ interface RangePoint {
   label: string;
 }
 
+/** Match a caption to the range thumb's numeric position, including uneven thresholds. */
+export function rangePointPercent(value: number, minimum: number, maximum: number): number {
+  if (maximum <= minimum) return 0;
+  return Math.max(0, Math.min(100, ((value - minimum) / (maximum - minimum)) * 100));
+}
+
 interface PoolRangeProps {
   label: 'HP' | 'FP';
   current: number;
@@ -61,6 +67,13 @@ function PoolRange({
   const sliderValue = Math.max(minimum, Math.min(max, displayValue));
   const panelStyle = { '--pool-panel-top': `${panelTop}px` } as CSSProperties;
 
+  function adjustBy(delta: number) {
+    if (!canWrite) return;
+    lastValue.current += delta;
+    setDisplayValue(lastValue.current);
+    onDelta(delta);
+  }
+
   return (
     <div
       className={`dropdown ${label === 'HP' ? 'dropdown-start' : 'dropdown-end'} ${
@@ -88,18 +101,45 @@ function PoolRange({
           id={panelId}
           aria-label={`${label} adjustment`}
           style={panelStyle}
-          className={`dropdown-content fixed inset-x-4 top-[var(--pool-panel-top)] z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-auto overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg sm:absolute sm:inset-x-auto sm:top-full sm:mt-2 sm:w-80 ${
+          className={`dropdown-content fixed! inset-x-4! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-auto overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg sm:absolute! sm:inset-x-auto! sm:top-full! sm:mt-2 sm:w-80 ${
             label === 'HP' ? 'sm:left-0' : 'sm:right-0'
           }`}
         >
-          <div className="mb-3 flex items-baseline justify-between gap-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="font-semibold">{label === 'HP' ? 'Hit Points' : 'Fatigue Points'}</p>
               <p className="text-xs text-base-content/60">
-                {canWrite ? 'Drag to set the current value.' : 'Current value and thresholds.'}
+                {canWrite ? 'Drag or use −1/+1.' : 'Current value and thresholds.'}
               </p>
             </div>
-            <strong className="num text-xl">{displayValue}</strong>
+            {canWrite ? (
+              <div className="join shrink-0" aria-label={`${label} step controls`}>
+                <button
+                  type="button"
+                  className="btn btn-sm join-item min-h-11 min-w-11 px-2"
+                  aria-label={`Decrease ${label} by 1`}
+                  onClick={() => adjustBy(-1)}
+                >
+                  −1
+                </button>
+                <output
+                  aria-label={`Current ${label}`}
+                  className="join-item num flex min-h-11 min-w-12 items-center justify-center border-y border-base-300 bg-base-200 px-2 text-xl font-bold"
+                >
+                  {displayValue}
+                </output>
+                <button
+                  type="button"
+                  className="btn btn-sm join-item min-h-11 min-w-11 px-2"
+                  aria-label={`Increase ${label} by 1`}
+                  onClick={() => adjustBy(1)}
+                >
+                  +1
+                </button>
+              </div>
+            ) : (
+              <strong className="num text-xl">{displayValue}</strong>
+            )}
           </div>
           <input
             type="range"
@@ -128,18 +168,29 @@ function PoolRange({
               />
             ))}
           </datalist>
-          <div className="mt-2 grid grid-cols-4 gap-1 text-[10px] leading-tight text-base-content/60">
+          <div
+            aria-hidden="true"
+            className="relative h-2 text-base-content/40"
+            style={{ marginInline: 'calc(var(--size-selector, 0.25rem) * 2.5)' }}
+          >
             {points.map((point) => (
               <span
                 key={`${point.value}:${point.label}`}
-                className="text-center first:text-left last:text-right"
-              >
-                <span className="num block font-semibold text-base-content/80">{point.value}</span>
-                {point.label}
-              </span>
+                data-range-point={point.value}
+                className="absolute top-0 h-1.5 w-px -translate-x-1/2 bg-current"
+                style={{ left: `${rangePointPercent(point.value, minimum, max)}%` }}
+              />
             ))}
           </div>
-          <p className="mt-3 text-xs text-base-content/70">{recovery}</p>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-box bg-base-200/60 p-2 text-[11px] leading-tight">
+            {points.map((point) => (
+              <div key={`${point.value}:${point.label}`} className="flex justify-between gap-2">
+                <dt className="text-base-content/60">{point.label}</dt>
+                <dd className="num font-semibold text-base-content/80">{point.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-2 text-xs text-base-content/70">{recovery}</p>
           <p className="mt-1 text-[10px] text-base-content/45">{footnote}</p>
         </fieldset>
       )}
@@ -210,7 +261,7 @@ export function FloatingPoolsBar({
   return (
     <aside
       ref={barRef}
-      className="fixed inset-x-0 z-40 border-b border-base-300 bg-base-100/95 shadow-md backdrop-blur"
+      className="fixed inset-x-0 z-40 border-b border-base-300 bg-base-100/95 shadow-md"
       style={{ top }}
       aria-label="Current HP and FP"
     >
