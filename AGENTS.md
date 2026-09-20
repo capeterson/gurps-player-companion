@@ -435,6 +435,36 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   isolated from the other workspace.
 - Frontend HMR runs through the same Bun process via Vite middleware.
 
+## Test discipline
+
+- **Use Luna for test work.** Always delegate test execution and test-failure
+  triage to a `gpt-5.6-luna` subagent to reduce token cost. The primary agent
+  still selects the applicable tests, reviews the evidence, applies fixes, and
+  owns final verification and PR readiness. If Luna is unavailable, state that
+  explicitly and use the best available subagent rather than silently skipping
+  delegation.
+- **Minimize public-auth registrations in browser tests.** Durable source rate
+  limits are active during testing. A scenario that checks multiple widths or
+  states MUST reuse one account and page within that scenario/worker instead of
+  registering once per case. Prefer authenticated fixtures where isolation
+  permits, but never share mutable accounts or pages across parallel workers.
+  Create only the minimum users required for worker isolation and the behavior,
+  and never clear or bypass the rate limiter just to make a test pass.
+- **Test what the user sees.** UI regressions MUST assert the exact visible
+  labels, controls, states, and interaction results involved. CSS classes,
+  helper math, `data-*` markers, and hidden/proxy elements may support a test,
+  but never substitute for assertions on the visible UI. Geometry bugs require
+  browser-level visibility, bounding-box, alignment, containment, and overlap
+  assertions as applicable.
+- **Exercise boundaries and the supported domain.** Responsive tests cover the
+  reported viewport and the relevant breakpoint boundaries (just below, at,
+  and above). Value-sensitive math is checked across the schema-supported
+  range, with rendered/browser cases for representative values; a fixture such
+  as HP 15 must never become an assumed product maximum.
+- **Visually inspect layout fixes.** For responsive or geometry changes,
+  inspect screenshots or a headed-browser rendering at the affected sizes in
+  addition to automated assertions before handoff.
+
 ## Pull requests
 
 - Before opening a PR, fetch the remote and update the branch against its

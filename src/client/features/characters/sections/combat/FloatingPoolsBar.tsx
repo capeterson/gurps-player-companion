@@ -24,7 +24,47 @@ export function rangePointPercent(value: number, minimum: number, maximum: numbe
   return Math.max(0, Math.min(100, ((value - minimum) / (maximum - minimum)) * 100));
 }
 
-interface PoolRangeProps {
+interface PoolTriggerProps {
+  label: 'HP' | 'FP';
+  current: number;
+  max: number;
+  flashProps: ReturnType<typeof useFlashState>['flashProps'];
+  open: boolean;
+  panelId: string;
+  onToggle: () => void;
+}
+
+function PoolTrigger({
+  label,
+  current,
+  max,
+  flashProps,
+  open,
+  panelId,
+  onToggle,
+}: PoolTriggerProps) {
+  return (
+    <button
+      type="button"
+      {...flashProps}
+      className="field-rollback-flash btn btn-sm gap-1 px-2.5"
+      aria-label={`Adjust ${label}`}
+      aria-expanded={open}
+      aria-controls={panelId}
+      onClick={onToggle}
+    >
+      <span className="font-semibold">{label}</span>
+      <span className="num text-base">{current}</span>
+      <span className="num text-xs text-base-content/60">/ {max}</span>
+      <span aria-hidden="true" className="text-[10px] text-base-content/50">
+        ▾
+      </span>
+    </button>
+  );
+}
+
+interface PoolAdjustmentPanelProps {
+  id: string;
   label: 'HP' | 'FP';
   current: number;
   max: number;
@@ -33,13 +73,11 @@ interface PoolRangeProps {
   recovery: string;
   footnote: string;
   onDelta: (delta: number) => void;
-  flashProps: ReturnType<typeof useFlashState>['flashProps'];
-  open: boolean;
   panelTop: number;
-  onToggle: () => void;
 }
 
-function PoolRange({
+function PoolAdjustmentPanel({
+  id,
   label,
   current,
   max,
@@ -48,13 +86,9 @@ function PoolRange({
   recovery,
   footnote,
   onDelta,
-  flashProps,
-  open,
   panelTop,
-  onToggle,
-}: PoolRangeProps) {
+}: PoolAdjustmentPanelProps) {
   const listId = useId();
-  const panelId = `${listId}-panel`;
   const lastValue = useRef(current);
   const [displayValue, setDisplayValue] = useState(current);
 
@@ -75,126 +109,112 @@ function PoolRange({
   }
 
   return (
-    <div
-      className={`dropdown ${label === 'HP' ? 'dropdown-start' : 'dropdown-end'} ${
-        open ? 'dropdown-open' : ''
-      }`}
+    <fieldset
+      id={id}
+      aria-label={`${label} adjustment`}
+      style={panelStyle}
+      className="fixed left-1/2 top-[var(--pool-panel-top)] z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg"
     >
-      <button
-        type="button"
-        {...flashProps}
-        className="field-rollback-flash btn btn-sm gap-1 px-2.5"
-        aria-label={`Adjust ${label}`}
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={onToggle}
-      >
-        <span className="font-semibold">{label}</span>
-        <span className="num text-base">{current}</span>
-        <span className="num text-xs text-base-content/60">/ {max}</span>
-        <span aria-hidden="true" className="text-[10px] text-base-content/50">
-          ▾
-        </span>
-      </button>
-      {open && (
-        <fieldset
-          id={panelId}
-          aria-label={`${label} adjustment`}
-          style={panelStyle}
-          className={`dropdown-content fixed! inset-x-4! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-auto overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg sm:absolute! sm:inset-x-auto! sm:top-full! sm:mt-2 sm:w-80 ${
-            label === 'HP' ? 'sm:left-0' : 'sm:right-0'
-          }`}
-        >
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="font-semibold">{label === 'HP' ? 'Hit Points' : 'Fatigue Points'}</p>
-              <p className="text-xs text-base-content/60">
-                {canWrite ? 'Drag or use −1/+1.' : 'Current value and thresholds.'}
-              </p>
-            </div>
-            {canWrite ? (
-              <div className="join shrink-0" aria-label={`${label} step controls`}>
-                <button
-                  type="button"
-                  className="btn btn-sm join-item min-h-11 min-w-11 px-2"
-                  aria-label={`Decrease ${label} by 1`}
-                  onClick={() => adjustBy(-1)}
-                >
-                  −1
-                </button>
-                <output
-                  aria-label={`Current ${label}`}
-                  className="join-item num flex min-h-11 min-w-12 items-center justify-center border-y border-base-300 bg-base-200 px-2 text-xl font-bold"
-                >
-                  {displayValue}
-                </output>
-                <button
-                  type="button"
-                  className="btn btn-sm join-item min-h-11 min-w-11 px-2"
-                  aria-label={`Increase ${label} by 1`}
-                  onClick={() => adjustBy(1)}
-                >
-                  +1
-                </button>
-              </div>
-            ) : (
-              <strong className="num text-xl">{displayValue}</strong>
-            )}
+      <div className="mb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-semibold">{label === 'HP' ? 'Hit Points' : 'Fatigue Points'}</p>
+            <p className="text-xs text-base-content/60">
+              {canWrite ? 'Drag or use −1/+1.' : 'Current value and thresholds.'}
+            </p>
           </div>
-          <input
-            type="range"
-            min={minimum}
-            max={max}
-            step={1}
-            list={listId}
-            value={sliderValue}
-            disabled={!canWrite}
-            aria-label={`Set ${label}`}
-            className={`range range-sm w-full ${label === 'HP' ? 'range-error' : 'range-info'}`}
-            onChange={(event) => {
-              const next = event.currentTarget.valueAsNumber;
-              const delta = next - lastValue.current;
-              lastValue.current = next;
-              setDisplayValue(next);
-              if (delta !== 0) onDelta(delta);
-            }}
-          />
-          <datalist id={listId}>
-            {points.map((point) => (
-              <option
-                key={`${point.value}:${point.label}`}
-                value={point.value}
-                label={point.label}
-              />
-            ))}
-          </datalist>
+          {!canWrite && <strong className="num text-xl">{displayValue}</strong>}
+        </div>
+        {canWrite && (
           <div
-            aria-hidden="true"
-            className="relative h-2 text-base-content/40"
-            style={{ marginInline: 'calc(var(--size-selector, 0.25rem) * 2.5)' }}
+            className="join mt-3 grid w-full grid-cols-[minmax(2.75rem,1fr)_auto_minmax(2.75rem,1fr)]"
+            aria-label={`${label} step controls`}
           >
-            {points.map((point) => (
+            <button
+              type="button"
+              className="btn btn-sm join-item min-h-11 w-full px-2"
+              aria-label={`Decrease ${label} by 1`}
+              onClick={() => adjustBy(-1)}
+            >
+              −1
+            </button>
+            <output
+              aria-label={`Current ${label}`}
+              className="join-item num flex min-h-11 min-w-20 items-center justify-center border-y border-base-300 bg-base-200 px-3 text-xl font-bold"
+            >
+              {displayValue}
+            </output>
+            <button
+              type="button"
+              className="btn btn-sm join-item min-h-11 w-full px-2"
+              aria-label={`Increase ${label} by 1`}
+              onClick={() => adjustBy(1)}
+            >
+              +1
+            </button>
+          </div>
+        )}
+      </div>
+      <input
+        type="range"
+        min={minimum}
+        max={max}
+        step={1}
+        list={listId}
+        value={sliderValue}
+        disabled={!canWrite}
+        aria-label={`Set ${label}`}
+        className={`range range-sm w-full ${label === 'HP' ? 'range-error' : 'range-info'}`}
+        onChange={(event) => {
+          const next = event.currentTarget.valueAsNumber;
+          const delta = next - lastValue.current;
+          lastValue.current = next;
+          setDisplayValue(next);
+          if (delta !== 0) onDelta(delta);
+        }}
+      />
+      <datalist id={listId}>
+        {points.map((point) => (
+          <option key={`${point.value}:${point.label}`} value={point.value} label={point.label} />
+        ))}
+      </datalist>
+      <div
+        aria-hidden="true"
+        className="relative h-16 text-base-content/40"
+        style={{ marginInline: 'calc(var(--size-selector, 0.25rem) * 2.5)' }}
+      >
+        {points.map((point, index) => {
+          const percent = rangePointPercent(point.value, minimum, max);
+          const anchor = percent === 0 ? 'start' : percent === 100 ? 'end' : 'center';
+          const alignment =
+            anchor === 'start'
+              ? 'translate-x-0 text-left'
+              : anchor === 'end'
+                ? '-translate-x-full text-right'
+                : '-translate-x-1/2 text-center';
+          return (
+            <div key={`${point.value}:${point.label}`}>
               <span
-                key={`${point.value}:${point.label}`}
                 data-range-point={point.value}
                 className="absolute top-0 h-1.5 w-px -translate-x-1/2 bg-current"
-                style={{ left: `${rangePointPercent(point.value, minimum, max)}%` }}
+                style={{ left: `${percent}%` }}
               />
-            ))}
-          </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-box bg-base-200/60 p-2 text-[11px] leading-tight">
-            {points.map((point) => (
-              <div key={`${point.value}:${point.label}`} className="flex justify-between gap-2">
-                <dt className="text-base-content/60">{point.label}</dt>
-                <dd className="num font-semibold text-base-content/80">{point.value}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-2 text-xs text-base-content/70">{recovery}</p>
-          <p className="mt-1 text-[10px] text-base-content/45">{footnote}</p>
-        </fieldset>
-      )}
-    </div>
+              <span
+                data-range-label={point.value}
+                data-range-anchor={anchor}
+                className={`absolute ${index % 2 === 0 ? 'top-2' : 'top-9'} ${alignment} whitespace-nowrap text-[10px] leading-tight text-base-content/60`}
+                style={{ left: `${percent}%` }}
+              >
+                <span className="num block font-semibold text-base-content/80">{point.value}</span>
+                <span>{point.label}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-base-content/70">{recovery}</p>
+      <p className="mt-1 text-[10px] text-base-content/45">{footnote}</p>
+    </fieldset>
   );
 }
 
@@ -241,6 +261,29 @@ export function FloatingPoolsBar({
     { value: Math.ceil(bumpers.fpMax / 3), label: 'Tired ends' },
     { value: bumpers.fpMax, label: 'Rested' },
   ] as const;
+  const panelId = useId();
+  const activePool =
+    openPool === 'HP'
+      ? {
+          label: 'HP' as const,
+          current: bumpers.hp,
+          max: bumpers.hpMax,
+          points: hpPoints,
+          recovery: 'Recovery: make one HT roll per day; success restores 1 HP (B424).',
+          footnote: `Outside the slider: certain death is −${5 * bumpers.hpMax} HP. Exceptional survival rules may still apply.`,
+          onDelta: bumpers.bumpHp,
+        }
+      : openPool === 'FP'
+        ? {
+            label: 'FP' as const,
+            current: bumpers.fp,
+            max: bumpers.fpMax,
+            points: fpPoints,
+            recovery: 'Recovery: normally regain 1 FP per 10 minutes of rest (B426).',
+            footnote: `At −${bumpers.fpMax} FP, further fatigue loss is paid from HP instead.`,
+            onDelta: bumpers.bumpFp,
+          }
+        : null;
 
   useEffect(() => {
     if (openPool === null) return;
@@ -268,33 +311,23 @@ export function FloatingPoolsBar({
       <div className="mx-auto flex min-h-12 max-w-[80rem] items-center gap-2 px-4 py-2 sm:px-7">
         <span className="hidden text-xs font-medium text-base-content/60 sm:inline">Current</span>
         <div style={{ color: hpColor }}>
-          <PoolRange
+          <PoolTrigger
             label="HP"
             current={bumpers.hp}
             max={bumpers.hpMax}
-            canWrite={canWrite}
-            points={hpPoints}
-            recovery="Recovery: make one HT roll per day; success restores 1 HP (B424)."
-            footnote={`Outside the slider: certain death is −${5 * bumpers.hpMax} HP. Exceptional survival rules may still apply.`}
-            onDelta={bumpers.bumpHp}
             flashProps={hpFlash.flashProps}
             open={openPool === 'HP'}
-            panelTop={top + 56}
+            panelId={panelId}
             onToggle={() => setOpenPool((current) => (current === 'HP' ? null : 'HP'))}
           />
         </div>
-        <PoolRange
+        <PoolTrigger
           label="FP"
           current={bumpers.fp}
           max={bumpers.fpMax}
-          canWrite={canWrite}
-          points={fpPoints}
-          recovery="Recovery: normally regain 1 FP per 10 minutes of rest (B426)."
-          footnote={`At −${bumpers.fpMax} FP, further fatigue loss is paid from HP instead.`}
-          onDelta={bumpers.bumpFp}
           flashProps={fpFlash.flashProps}
           open={openPool === 'FP'}
-          panelTop={top + 56}
+          panelId={panelId}
           onToggle={() => setOpenPool((current) => (current === 'FP' ? null : 'FP'))}
         />
         <div className="ml-auto flex min-w-0 gap-1 overflow-x-auto" aria-label="Pool conditions">
@@ -318,6 +351,15 @@ export function FloatingPoolsBar({
           )}
         </div>
       </div>
+      {activePool && (
+        <PoolAdjustmentPanel
+          key={activePool.label}
+          id={panelId}
+          {...activePool}
+          canWrite={canWrite}
+          panelTop={top + 56}
+        />
+      )}
     </aside>
   );
 }

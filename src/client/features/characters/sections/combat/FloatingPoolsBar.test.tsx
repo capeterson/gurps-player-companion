@@ -4,7 +4,7 @@ import type { CharacterDetail } from '../../../../../shared/schemas/character.ts
 import type { PoolBumpers } from '../usePoolBumpers.ts';
 import { FloatingPoolsBar, rangePointPercent } from './FloatingPoolsBar.tsx';
 
-function setup(hp = 10, fp = 10) {
+function setup(hp = 10, fp = 10, max = 12) {
   const character = {
     id: 'character-1',
     combat: { conditions: [] },
@@ -14,31 +14,71 @@ function setup(hp = 10, fp = 10) {
   const bumpers: PoolBumpers = {
     hp,
     fp,
-    hpMax: 12,
-    fpMax: 12,
+    hpMax: max,
+    fpMax: max,
     bumpHp,
     bumpFp,
     resetHp: vi.fn(),
     resetFp: vi.fn(),
     flashHp: false,
   };
-  render(<FloatingPoolsBar character={character} bumpers={bumpers} canWrite />);
-  return { bumpHp, bumpFp };
+  const view = render(<FloatingPoolsBar character={character} bumpers={bumpers} canWrite />);
+  return { bumpHp, bumpFp, ...view };
 }
 
 describe('FloatingPoolsBar', () => {
-  it('positions uneven threshold captions at their corresponding range values', () => {
-    expect(rangePointPercent(-12, -12, 12)).toBe(0);
-    expect(rangePointPercent(0, -12, 12)).toBe(50);
-    expect(rangePointPercent(4, -12, 12)).toBeCloseTo(66.667, 2);
-    expect(rangePointPercent(12, -12, 12)).toBe(100);
+  it('anchors visible uneven-threshold labels at their corresponding range values', () => {
+    // Exhaust every positive maximum the character schema can produce:
+    // base ST/HT (99) + permanent modifier (50) + temporary pool modifier (50).
+    for (let maximum = 1; maximum <= 199; maximum += 1) {
+      expect(rangePointPercent(-maximum, -maximum, maximum)).toBe(0);
+      expect(rangePointPercent(0, -maximum, maximum)).toBe(50);
+      expect(rangePointPercent(Math.ceil(maximum / 3), -maximum, maximum)).toBeCloseTo(
+        ((Math.ceil(maximum / 3) + maximum) / (2 * maximum)) * 100,
+        8,
+      );
+      expect(rangePointPercent(maximum, -maximum, maximum)).toBe(100);
+    }
 
-    setup();
+    setup(0, 8, 15);
     fireEvent.click(screen.getByLabelText('Adjust HP'));
-    expect(document.querySelector('[data-range-point="0"]')).toHaveStyle({ left: '50%' });
-    expect(document.querySelector('[data-range-point="4"]')).toHaveStyle({
-      left: '66.66666666666666%',
-    });
+    for (const [value, left, anchor] of [
+      [-15, '0%', 'start'],
+      [0, '50%', 'center'],
+      [5, '66.66666666666666%', 'center'],
+      [15, '100%', 'end'],
+    ] as const) {
+      expect(document.querySelector(`[data-range-point="${value}"]`)).toHaveStyle({ left });
+      expect(document.querySelector(`[data-range-label="${value}"]`)).toHaveStyle({ left });
+      expect(document.querySelector(`[data-range-label="${value}"]`)).toHaveAttribute(
+        'data-range-anchor',
+        anchor,
+      );
+    }
+  });
+
+  it('derives rendered threshold labels from each character pool maximum', () => {
+    for (const maximum of [1, 7, 15, 37, 99, 199]) {
+      const { unmount } = setup(maximum, maximum, maximum);
+      fireEvent.click(screen.getByLabelText('Adjust HP'));
+
+      const threshold = Math.ceil(maximum / 3);
+      const thresholdLabel = screen.getByText('Reeling ends').closest('[data-range-label]');
+      expect(thresholdLabel).toHaveAttribute('data-range-label', String(threshold));
+      expect(thresholdLabel).toHaveStyle({
+        left: `${rangePointPercent(threshold, -maximum, maximum)}%`,
+      });
+      expect(screen.getByText('Death check').closest('[data-range-label]')).toHaveAttribute(
+        'data-range-label',
+        String(-maximum),
+      );
+      expect(screen.getByText('Full').closest('[data-range-label]')).toHaveAttribute(
+        'data-range-label',
+        String(maximum),
+      );
+
+      unmount();
+    }
   });
 
   it('labels and exposes both pools with range controls and recovery notes', () => {
@@ -59,6 +99,7 @@ describe('FloatingPoolsBar', () => {
     expect(screen.queryByRole('slider', { name: 'Set HP' })).not.toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Set FP' })).toHaveClass('range');
     expect(screen.getByText(/1 FP per 10 minutes/)).toBeInTheDocument();
+    expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);
   });
 
   it('converts range movement into incremental local-first pool deltas', () => {
@@ -79,12 +120,14 @@ describe('FloatingPoolsBar', () => {
     const { bumpHp, bumpFp } = setup();
 
     fireEvent.click(screen.getByLabelText('Adjust HP'));
+    expect(screen.getByLabelText('HP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease HP by 1' }));
     expect(screen.getByLabelText('Current HP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase HP by 1' }));
     expect(screen.getByLabelText('Current HP')).toHaveTextContent('10');
 
     fireEvent.click(screen.getByLabelText('Adjust FP'));
+    expect(screen.getByLabelText('FP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease FP by 1' }));
     expect(screen.getByLabelText('Current FP')).toHaveTextContent('9');
     fireEvent.click(screen.getByRole('button', { name: 'Increase FP by 1' }));
@@ -94,11 +137,12 @@ describe('FloatingPoolsBar', () => {
     expect(bumpFp.mock.calls.map(([delta]) => delta)).toEqual([-1, 1]);
   });
 
-  it('keeps the mobile panel inside the viewport and dismisses it', () => {
+  it('uses one viewport-fixed panel and dismisses it', () => {
     setup();
     fireEvent.click(screen.getByLabelText('Adjust FP'));
     const panel = screen.getByRole('group', { name: 'FP adjustment' });
-    expect(panel).toHaveClass('fixed!', 'inset-x-4!', 'sm:absolute!');
+    expect(panel).toHaveClass('fixed', 'left-1/2', 'w-[calc(100dvw_-_2rem)]', 'max-w-lg');
+    expect(panel).not.toHaveClass('dropdown-content', 'sm:absolute!');
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'FP adjustment' })).not.toBeInTheDocument();
