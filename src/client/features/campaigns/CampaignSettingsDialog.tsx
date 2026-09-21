@@ -28,6 +28,7 @@ import type {
   TransferOwnershipRequest,
 } from '../../../shared/schemas/campaign.ts';
 import { useDialogState } from '../../hooks/useDialogState.ts';
+import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { CampaignInvitePanel } from './CampaignInvitePanel.tsx';
@@ -53,6 +54,7 @@ function nullableIntFromInput(s: string): number | null | 'invalid' {
 
 export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: Props) {
   const ref = useDialogState(open);
+  const transferMenuRef = useViewportBoundedOverlay<HTMLUListElement>();
   const toasts = useToasts();
   const qc = useQueryClient();
 
@@ -451,7 +453,11 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
               <div className="flex flex-wrap gap-2">
                 <details className="dropdown">
                   <summary className="btn btn-ghost btn-xs">Transfer ownership ▾</summary>
-                  <ul className="menu dropdown-content z-30 mt-1 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-lg max-h-56 overflow-y-auto">
+                  <ul
+                    ref={transferMenuRef}
+                    style={{ marginLeft: 'var(--viewport-overlay-shift-x, 0px)' }}
+                    className="menu dropdown-content z-30 mt-1 max-h-56 w-56 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
+                  >
                     {campaign.members.filter((m) => m.userId !== campaign.ownerId).length === 0 && (
                       <li className="text-xs text-base-content/60 px-2 py-1">
                         No other members yet.

@@ -15,6 +15,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { formatScaled } from '../../../shared/format/number.ts';
+import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 
 interface ModifierField {
   /** Currently committed integer value (raw units). */
@@ -60,6 +61,7 @@ export function TempBoostPopover({
   permCostLabel,
 }: TempBoostPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
+  useViewportBoundedOverlay(true, ref);
 
   const fmt = (n: number) => formatScaled(n, displayScale);
   // Not formatScaled: `d` here is already in display units (pre-scaled),
@@ -98,15 +100,8 @@ export function TempBoostPopover({
     const el = ref.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    if (rect.width === 0 || vw === 0) return;
+    if (rect.width === 0) return;
     const margin = 8;
-    if (rect.left < margin) {
-      el.style.marginLeft = `${margin - rect.left}px`;
-    } else if (rect.right > vw - margin) {
-      el.style.marginLeft = `-${rect.right - (vw - margin)}px`;
-    }
-
     // Attribute chips near the bottom of a short phone viewport used to
     // anchor this popover entirely below its trigger, hiding its actions.
     // Keep the familiar below-trigger placement when it fits, but lift it
@@ -160,7 +155,8 @@ export function TempBoostPopover({
       // to the trigger chip, which role="dialog" describes correctly.
       role="dialog"
       aria-label={`Modifiers for ${label}`}
-      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 max-h-[calc(100dvh-1rem)] w-64 overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
+      style={{ marginLeft: 'var(--viewport-overlay-shift-x, 0px)' }}
+      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 max-h-[calc(100dvh-1rem)] w-64 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
     >
       <div className="label-eyebrow mb-2">{label} modifiers</div>
       {perm && (

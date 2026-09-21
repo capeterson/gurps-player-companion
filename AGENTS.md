@@ -135,6 +135,30 @@ Any draft-on-blur input must have UI tests covering, at minimum:
 
 The `useDraftField` test file is the working reference.
 
+### 4. Anchored overlays must stay inside the visible viewport
+
+Every tooltip, popover, dropdown, toast, and other anchored overlay must remain
+fully reachable within the dynamic/visual viewport at every supported width.
+A viewport-relative width or `max-width` alone is not sufficient: an overlay can
+still overflow when its trigger is near an edge or in the middle of a narrow
+header. Use `useViewportBoundedOverlay` for trigger-anchored horizontal collision,
+pair it with a `100dvw`-relative max width and content wrapping, and retain a
+`100dvh`-relative max height plus internal scrolling when height can grow. Do not
+add one-off pixel offsets for individual triggers.
+
+`overlaySourceGuard.test.ts` rejects raw `data-tip` tooltips and anchored
+`dropdown-content` that bypasses the shared collision helper. A deliberately
+viewport-fixed, centered overlay may be added to its explicit exception list
+only when it has dynamic-viewport bounds of its own.
+
+Any new or changed overlay needs browser coverage that opens the real interaction
+and asserts its bounding box is inside the viewport. Responsive changes must test
+the reported width and relevant breakpoint boundaries (just below, at, and above),
+with long representative content. A page-level `scrollWidth` assertion is useful
+but does not replace overlay geometry assertions because absolutely positioned
+content may be clipped without increasing document width. Visually inspect the
+open overlay at the affected sizes before handoff.
+
 ## Architecture invariants
 
 - **Local-first always.** Every UI mutation writes IndexedDB first and

@@ -8,6 +8,7 @@ import { AppIcon } from './components/ui/AppIcon.tsx';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
+import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
 import { clearSessionQueryCache } from './lib/sessionQueryCache.tsx';
 import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
@@ -42,6 +43,8 @@ export function App() {
   const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
   const campaignMenuRef = useRef<HTMLDetailsElement>(null);
   const userMenuRef = useRef<HTMLDetailsElement>(null);
+  const campaignMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
+  const userMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
   const me = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api<MeResponse>('/auth/me'),
@@ -203,7 +206,13 @@ export function App() {
                 >
                   <AppIcon name="chevronDown" size={14} />
                 </summary>
-                <ul className="menu dropdown-content z-50 mt-2 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg">
+                <ul
+                  ref={campaignMenuPanelRef}
+                  style={{
+                    marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))',
+                  }}
+                  className="menu dropdown-content z-50 mt-2 w-40 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
+                >
                   {CAMPAIGN_SUBNAV.map((tab) => (
                     <li key={tab.to}>
                       <NavLink
@@ -240,7 +249,11 @@ export function App() {
               </span>
               <AppIcon name="chevronDown" size={14} />
             </summary>
-            <ul className="menu dropdown-content z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg">
+            <ul
+              ref={userMenuPanelRef}
+              style={{ marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))' }}
+              className="menu dropdown-content z-50 mt-2 w-56 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
+            >
               <li className="menu-title px-3 py-2">
                 <span>{me.data?.email ?? 'Loading account…'}</span>
               </li>

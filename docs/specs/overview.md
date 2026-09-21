@@ -752,7 +752,16 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   copy. Every queued and journalled event **expands** (collapsed by default) to
   show what actually changed — field, before/after values, entity, operation,
   and the failure reason where there is one.
-- **Notifications bell**: invitations and other events.
+- **Viewport-safe overlays**: trigger-anchored tooltips, popovers, and dropdowns
+  share horizontal collision handling, dynamic-viewport width limits, and content
+  wrapping so their full surface remains reachable on narrow screens and after
+  resize or zoom. The sync status tooltip and notifications panel use this shared
+  behavior; growing overlays also clamp to dynamic viewport height and scroll
+  internally where needed. A source guard rejects raw `data-tip` tooltips and
+  anchored dropdown content that bypasses the collision helper.
+- **Notifications bell**: invitations and other events. Its panel stays inside the
+  visible viewport even when the bell sits near the middle of a wrapped mobile
+  header.
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
   button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
@@ -1015,6 +1024,11 @@ Things that repeatedly surprise people working in this repo:
 8. **When in doubt, read the file's top comment and the relevant `AGENTS.md`
    rule** before editing — most invariants are annotated at the call site
    precisely because they were broken once.
+
+9. **Viewport-sized is not viewport-contained.** Anchored overlays use
+   `useViewportBoundedOverlay` plus dynamic-viewport max dimensions and wrapping;
+   test the open overlay's actual bounding box at narrow and breakpoint widths.
+   Document `scrollWidth` alone cannot detect every clipped absolute overlay.
 
 ---
 

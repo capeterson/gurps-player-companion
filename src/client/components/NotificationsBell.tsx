@@ -12,6 +12,7 @@ import {
   type NotificationOut,
   campaignInvitationNotificationPayload,
 } from '../../shared/schemas/notification.ts';
+import { useViewportBoundedOverlay } from '../hooks/useViewportBoundedOverlay.ts';
 import { ApiError } from '../lib/api.ts';
 import { invitationsApi } from '../lib/invitations.ts';
 import { notificationsApi } from '../lib/notifications.ts';
@@ -27,6 +28,7 @@ function isCampaignInvite(n: NotificationOut): boolean {
 export function NotificationsBell() {
   const qc = useQueryClient();
   const toasts = useToasts();
+  const panelRef = useViewportBoundedOverlay<HTMLDivElement>();
 
   const { data } = useQuery({
     queryKey: ['notifications'],
@@ -89,7 +91,11 @@ export function NotificationsBell() {
           </span>
         )}
       </summary>
-      <div className="dropdown-content z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg">
+      <div
+        ref={panelRef}
+        style={{ marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))' }}
+        className="dropdown-content z-50 mt-2 w-[min(20rem,calc(100dvw-1rem))] [overflow-wrap:anywhere] rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg"
+      >
         <div className="flex items-baseline justify-between mb-2">
           <span className="label-eyebrow">Notifications</span>
           {unread.length > 0 && (

@@ -30,6 +30,7 @@ import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { useRangeSelect } from '../../../hooks/useRangeSelect.ts';
+import { useViewportBoundedOverlay } from '../../../hooks/useViewportBoundedOverlay.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueDeletes, enqueueFieldPatches } from '../../../sync/outbox.ts';
@@ -80,6 +81,7 @@ export function InventoryPanel({
   const encumbrance = character.encumbrance;
   const items = character.inventory;
   const toasts = useToasts();
+  const bulkMoveMenuRef = useViewportBoundedOverlay<HTMLUListElement>();
 
   const [filterText, setFilterText] = useState('');
   const [filterTag, setFilterTag] = useState<InventoryFilterTag>('all');
@@ -683,7 +685,11 @@ export function InventoryPanel({
             <button type="button" className="btn btn-sm">
               Move to container ▾
             </button>
-            <ul className="dropdown-content menu menu-sm bg-base-100 border border-base-300/60 rounded-box shadow-lg z-30 w-56 max-h-72 overflow-y-auto">
+            <ul
+              ref={bulkMoveMenuRef}
+              style={{ marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))' }}
+              className="dropdown-content menu menu-sm z-30 max-h-72 w-56 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300/60 bg-base-100 shadow-lg"
+            >
               <li>
                 <button
                   type="button"
