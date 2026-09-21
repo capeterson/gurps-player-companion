@@ -306,13 +306,25 @@ test('inventory filters keep matching item ancestry without showing unrelated co
   await page.getByLabel('Item name').fill('Apple');
   await addForm.getByLabel('Parent container').selectOption({ label: 'in Backpack' });
   await addForm.getByRole('button', { name: /^add$/i }).click();
-  await expect(page.getByText('Apple', { exact: true })).toBeVisible();
+  await expect(page.getByText('Apple', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('1 contained item')).toBeVisible();
 
   await page.getByLabel('Item name').fill('Broadsword');
   await addForm.getByLabel('Parent container').selectOption({ label: 'in Backpack' });
   await addForm.getByRole('button', { name: 'More options' }).click();
   await addForm.getByRole('button', { name: '+ Weapon', exact: true }).click();
   await addForm.getByRole('button', { name: /^add$/i }).click();
+  await expect(page.getByText('Broadsword', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('2 contained items')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Expand contents' }).click();
+  await expect(page.getByText('Apple', { exact: true })).toBeVisible();
+  await expect(page.getByText('Broadsword', { exact: true })).toBeVisible();
+
+  await page.reload();
+  await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Inventory');
+  await expect(page.getByText('Apple', { exact: true })).toBeVisible();
   await expect(page.getByText('Broadsword', { exact: true })).toBeVisible();
 
   const search = page.getByRole('searchbox', { name: 'Filter inventory' });

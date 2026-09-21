@@ -271,24 +271,29 @@ describe('inline inventory editing', () => {
     expect((await stored()).armor?.dr).toBe(2);
   });
 
-  it('shows populated ranged fields, shield DB zero and alternate modes without More options', async () => {
+  it('shows populated ranged fields, shield side, DB zero and alternate modes without More options', async () => {
     const user = await setup({
       weaponData: weaponData.parse({
         damage: 'sw+1 cut',
         db: 0,
+        wieldedSide: 'left',
         ranged: { acc: 0, range: '100/150' },
         alternateModes: [{ name: 'Thrust', damage: 'thr imp', reach: '1' }],
       }),
     });
     await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
     expect(screen.getByRole('textbox', { name: 'Shield defense bonus' })).toHaveValue('0');
+    expect(screen.getByRole('combobox', { name: 'Shield side' })).toHaveValue('left');
     expect(screen.getByRole('textbox', { name: 'Accuracy' })).toHaveValue('0');
     expect(screen.getByRole('textbox', { name: 'Range' })).toHaveValue('100/150');
     expect(screen.getByRole('textbox', { name: 'Mode reach' })).toHaveValue('1');
     await change('Governing skill', 'Broadsword');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Shield side' }), 'right');
     await waitFor(async () => expect((await stored()).weaponData?.skill).toBe('Broadsword'));
+    await waitFor(async () => expect((await stored()).weaponData?.wieldedSide).toBe('right'));
     expect((await stored()).weaponData).toMatchObject({
       db: 0,
+      wieldedSide: 'right',
       ranged: { acc: 0 },
       alternateModes: [{ name: 'Thrust' }],
     });

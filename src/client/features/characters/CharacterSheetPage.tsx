@@ -55,6 +55,7 @@ import { SkillsPanel } from './sections/SkillsPanel.tsx';
 import { SpellsPanel } from './sections/SpellsPanel.tsx';
 import { TechniquesPanel } from './sections/TechniquesPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
+import { CombatStatusProvider } from './sections/combat/CombatStatusProvider.tsx';
 import { CombatTab } from './sections/combat/CombatTab.tsx';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { type TempEffectsApi, useTempEffects } from './sections/useTempEffects.ts';
@@ -573,10 +574,10 @@ function IdentityPanel({
     ...buildSave('age', { humanName: 'age' }),
   });
   const appearanceField = useDraftField<string | null>({
-    name: 'appearance',
+    name: 'description',
     serverValue: character.appearance ?? '',
     parse: nullableTextParser,
-    ...buildSave('appearance', { humanName: 'appearance' }),
+    ...buildSave('appearance', { humanName: 'description' }),
   });
   const campaignFlashKey = makeFlashKey('character', character.id, 'campaignId');
   const campaignFlash = useFieldFlash(campaignFlashKey);
@@ -681,16 +682,16 @@ function IdentityPanel({
         </div>
       </div>
       <div className="form-control">
-        <span className="label-text-alt label-eyebrow">Appearance / notes</span>
+        <span className="label-text-alt label-eyebrow">Description</span>
         {canWrite ? (
           <RichTextEditor
-            id="character-appearance-editor"
-            aria-label="appearance"
+            id="character-description-editor"
+            aria-label="description"
             value={appearanceField.value}
             onChange={appearanceField.setValue}
             onBlur={appearanceField.inputProps.onBlur}
             className={DRAFT_FIELD_CLASS}
-            placeholder="Appearance, mannerisms, notes…"
+            placeholder="Appearance, mannerisms, background, and other descriptive details…"
             data-flashing={appearanceField.inputProps['data-flashing']}
             data-flash-parity={appearanceField.inputProps['data-flash-parity']}
           />
@@ -1523,213 +1524,173 @@ export function CharacterSheetPage() {
   }
 
   return (
-    <div className="space-y-6 sheet-with-navigation">
-      <nav className="flex items-center gap-2 text-sm">
-        <Link to="/characters" className="link link-hover text-muted">
-          ← All characters
-        </Link>
-        {!canWrite && (
-          <span
-            className="badge badge-ghost badge-sm"
-            title="You can view this sheet but not edit it"
-          >
-            read-only
-          </span>
-        )}
-      </nav>
-
-      <IdentityHero
-        character={character}
-        pointTarget={pointTarget}
-        canWrite={canWrite}
-        compact={tab === 'Combat'}
-      />
-
-      {character.libraryEffectsKnown === false && <MechanicsUnavailable />}
-      {character.libraryEffectsKnown !== false && (
-        <>
-          {(character.warnings.length > 0 || character.dismissedWarnings.length > 0) && (
-            <FoldSection
-              preferenceKey={`${character.id}:warnings`}
-              title="Warnings"
-              summary={`${character.warnings.length} active`}
+    <CombatStatusProvider key={character.id} character={character} canWrite={canWrite}>
+      <div className="space-y-6 sheet-with-navigation">
+        <nav className="flex items-center gap-2 text-sm">
+          <Link to="/characters" className="link link-hover text-muted">
+            ← All characters
+          </Link>
+          {!canWrite && (
+            <span
+              className="badge badge-ghost badge-sm"
+              title="You can view this sheet but not edit it"
             >
-              <WarningsPanel character={character} canWrite={canWrite} />
-            </FoldSection>
+              read-only
+            </span>
           )}
+        </nav>
 
-          <FoldSection
-            preferenceKey={`${character.id}:overview:${tab === 'Combat' ? 'combat' : 'sheet'}`}
-            title="Sheet overview"
-            defaultOpen={tab !== 'Combat'}
-            summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <FoldSection preferenceKey={`${character.id}:AttributesPanel`} title="Attributes">
-                <AttributesPanel
-                  character={character}
-                  canWrite={canWrite}
-                  tempEffects={tempEffects}
-                  enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                />
-              </FoldSection>
+        <IdentityHero
+          character={character}
+          pointTarget={pointTarget}
+          canWrite={canWrite}
+          compact={tab === 'Combat'}
+        />
+
+        {character.libraryEffectsKnown === false && <MechanicsUnavailable />}
+        {character.libraryEffectsKnown !== false && (
+          <>
+            {(character.warnings.length > 0 || character.dismissedWarnings.length > 0) && (
               <FoldSection
-                preferenceKey={`${character.id}:SecondaryModsPanel`}
-                title="Secondary attributes"
+                preferenceKey={`${character.id}:warnings`}
+                title="Warnings"
+                summary={`${character.warnings.length} active`}
               >
-                <SecondaryModsPanel
-                  character={character}
-                  canWrite={canWrite}
-                  tempEffects={tempEffects}
-                  enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                />
+                <WarningsPanel character={character} canWrite={canWrite} />
               </FoldSection>
-              <FoldSection preferenceKey={`${character.id}:StatusPanel`} title="Status">
-                <StatusPanel character={character} />
-              </FoldSection>
-              <div className="grid grid-cols-1 gap-4">
-                <FoldSection
-                  preferenceKey={`${character.id}:PointsPanel`}
-                  title="Point ledger"
-                  defaultOpen={false}
-                  summary={`${character.points.total} pts`}
-                >
-                  <PointsPanel character={character} pointTarget={pointTarget} />
-                </FoldSection>
-                <FoldSection preferenceKey={`${character.id}:EncumbrancePanel`} title="Encumbrance">
-                  <EncumbrancePanel character={character} />
-                </FoldSection>
-                <FoldSection
-                  preferenceKey={`${character.id}:ActiveConditionsPanel`}
-                  title="Conditional effects"
-                >
-                  <ActiveConditionsPanel character={character} canWrite={canWrite} />
-                </FoldSection>
-              </div>
-            </div>
-          </FoldSection>
-        </>
-      )}
-      <SheetNavigation
-        key={character.id}
-        tabs={visibleTabs}
-        active={tab}
-        counts={counts}
-        onSelect={navigateSection}
-      />
+            )}
 
-      <div className="space-y-4">
-        <h2
-          ref={sectionHeading}
-          tabIndex={-1}
-          className="sheet-section-heading font-display text-xl flex items-center gap-3 rounded-field focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <AppIcon name={SHEET_ICONS[tab]} className="text-primary" />
-          {tab}
-        </h2>
-        {tab === 'Combat' && character.libraryEffectsKnown !== false && (
-          <CombatTab
-            character={character}
-            canWrite={canWrite}
-            experimentalTurnTracker={campaign?.experimentalTurnTracker === true}
-          />
+            <FoldSection
+              preferenceKey={`${character.id}:overview:${tab === 'Combat' ? 'combat' : 'sheet'}`}
+              title="Sheet overview"
+              defaultOpen={tab !== 'Combat'}
+              summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <FoldSection preferenceKey={`${character.id}:AttributesPanel`} title="Attributes">
+                  <AttributesPanel
+                    character={character}
+                    canWrite={canWrite}
+                    tempEffects={tempEffects}
+                    enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                  />
+                </FoldSection>
+                <FoldSection
+                  preferenceKey={`${character.id}:SecondaryModsPanel`}
+                  title="Secondary attributes"
+                >
+                  <SecondaryModsPanel
+                    character={character}
+                    canWrite={canWrite}
+                    tempEffects={tempEffects}
+                    enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                  />
+                </FoldSection>
+                <FoldSection preferenceKey={`${character.id}:StatusPanel`} title="Status">
+                  <StatusPanel character={character} />
+                </FoldSection>
+                <div className="grid grid-cols-1 gap-4">
+                  <FoldSection
+                    preferenceKey={`${character.id}:PointsPanel`}
+                    title="Point ledger"
+                    defaultOpen={false}
+                    summary={`${character.points.total} pts`}
+                  >
+                    <PointsPanel character={character} pointTarget={pointTarget} />
+                  </FoldSection>
+                  <FoldSection
+                    preferenceKey={`${character.id}:EncumbrancePanel`}
+                    title="Encumbrance"
+                  >
+                    <EncumbrancePanel character={character} />
+                  </FoldSection>
+                  <FoldSection
+                    preferenceKey={`${character.id}:ActiveConditionsPanel`}
+                    title="Conditional effects"
+                  >
+                    <ActiveConditionsPanel character={character} canWrite={canWrite} />
+                  </FoldSection>
+                </div>
+              </div>
+            </FoldSection>
+          </>
         )}
-        {tab === 'Identity' && (
-          <FoldSection preferenceKey={`${character.id}:IdentityPanel`} title="Identity">
-            <IdentityPanel
+        <SheetNavigation
+          key={character.id}
+          tabs={visibleTabs}
+          active={tab}
+          counts={counts}
+          onSelect={navigateSection}
+        />
+
+        <div className="space-y-4">
+          <h2
+            ref={sectionHeading}
+            tabIndex={-1}
+            className="sheet-section-heading font-display text-xl flex items-center gap-3 rounded-field focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <AppIcon name={SHEET_ICONS[tab]} className="text-primary" />
+            {tab}
+          </h2>
+          {tab === 'Combat' && character.libraryEffectsKnown !== false && (
+            <CombatTab
               character={character}
               canWrite={canWrite}
-              campaigns={campaigns.data ?? []}
+              experimentalTurnTracker={campaign?.experimentalTurnTracker === true}
             />
-          </FoldSection>
-        )}
-        {tab === 'Traits' && (
-          <FoldSection preferenceKey={`${character.id}:TraitsPanel`} title="Traits">
-            <TraitsPanel character={character} canWrite={canWrite} />
-          </FoldSection>
-        )}
-        {tab === 'Skills' && character.libraryEffectsKnown !== false && (
-          <div className="space-y-4">
-            <FoldSection preferenceKey={`${character.id}:SkillsPanel`} title="Skills">
-              <SkillsPanel character={character} canWrite={canWrite} />
+          )}
+          {tab === 'Identity' && (
+            <FoldSection preferenceKey={`${character.id}:IdentityPanel`} title="Identity">
+              <IdentityPanel
+                character={character}
+                canWrite={canWrite}
+                campaigns={campaigns.data ?? []}
+              />
             </FoldSection>
-            <FoldSection preferenceKey={`${character.id}:TechniquesPanel`} title="Techniques">
-              <TechniquesPanel character={character} canWrite={canWrite} />
+          )}
+          {tab === 'Traits' && (
+            <FoldSection preferenceKey={`${character.id}:TraitsPanel`} title="Traits">
+              <TraitsPanel character={character} canWrite={canWrite} />
             </FoldSection>
-            <FoldSection preferenceKey={`${character.id}:LanguagesPanel`} title="Languages">
-              <LanguagesPanel character={character} canWrite={canWrite} />
+          )}
+          {tab === 'Skills' && character.libraryEffectsKnown !== false && (
+            <div className="space-y-4">
+              <FoldSection preferenceKey={`${character.id}:SkillsPanel`} title="Skills">
+                <SkillsPanel character={character} canWrite={canWrite} />
+              </FoldSection>
+              <FoldSection preferenceKey={`${character.id}:TechniquesPanel`} title="Techniques">
+                <TechniquesPanel character={character} canWrite={canWrite} />
+              </FoldSection>
+              <FoldSection preferenceKey={`${character.id}:LanguagesPanel`} title="Languages">
+                <LanguagesPanel character={character} canWrite={canWrite} />
+              </FoldSection>
+            </div>
+          )}
+          {tab === 'Magic' && character.libraryEffectsKnown !== false && (
+            <div className="space-y-4">
+              <FoldSection preferenceKey={`${character.id}:SpellsPanel`} title="Spells">
+                <SpellsPanel character={character} canWrite={canWrite} />
+              </FoldSection>
+              <FoldSection preferenceKey={`${character.id}:PowerstonesPanel`} title="Powerstones">
+                <PowerstonesPanel character={character} canWrite={canWrite} />
+              </FoldSection>
+              <FoldSection preferenceKey={`${character.id}:MagicItemsPanel`} title="Magic items">
+                <MagicItemsPanel character={character} canWrite={canWrite} />
+              </FoldSection>
+            </div>
+          )}
+          {tab === 'Inventory' && (
+            <FoldSection preferenceKey={`${character.id}:InventoryPanel`} title="Inventory">
+              <InventoryPanel character={character} canWrite={canWrite} />
             </FoldSection>
-          </div>
-        )}
-        {tab === 'Magic' && character.libraryEffectsKnown !== false && (
-          <div className="space-y-4">
-            <FoldSection preferenceKey={`${character.id}:SpellsPanel`} title="Spells">
-              <SpellsPanel character={character} canWrite={canWrite} />
+          )}
+          {tab === 'History' && (
+            <FoldSection preferenceKey={`${character.id}:HistoryPanel`} title="History">
+              <HistoryPanel characterId={character.id} />
             </FoldSection>
-            <FoldSection preferenceKey={`${character.id}:PowerstonesPanel`} title="Powerstones">
-              <PowerstonesPanel character={character} canWrite={canWrite} />
-            </FoldSection>
-            <FoldSection preferenceKey={`${character.id}:MagicItemsPanel`} title="Magic items">
-              <MagicItemsPanel character={character} canWrite={canWrite} />
-            </FoldSection>
-          </div>
-        )}
-        {tab === 'Inventory' && (
-          <FoldSection preferenceKey={`${character.id}:InventoryPanel`} title="Inventory">
-            <InventoryPanel character={character} canWrite={canWrite} />
-          </FoldSection>
-        )}
-        {tab === 'Notes' && (
-          <FoldSection preferenceKey={`${character.id}:NotesPanel`} title="Notes">
-            <NotesPanel character={character} canWrite={canWrite} />
-          </FoldSection>
-        )}
-        {tab === 'History' && (
-          <FoldSection preferenceKey={`${character.id}:HistoryPanel`} title="History">
-            <HistoryPanel characterId={character.id} />
-          </FoldSection>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
-
-/** Notes tab — for now a thin shim around the existing `appearance`
- * field on the character. The design's prototype shows a free-form
- * textarea under a Notes tab; rather than introduce a new column we
- * surface the existing field here. */
-function NotesPanel({
-  character,
-  canWrite,
-}: {
-  character: CharacterDetail;
-  canWrite: boolean;
-}) {
-  const buildSave = useCharacterFieldSave(character.id);
-  const notesField = useDraftField<string | null>({
-    name: 'notes',
-    serverValue: character.appearance ?? '',
-    parse: nullableTextParser,
-    ...buildSave('appearance', { humanName: 'notes' }),
-  });
-  return (
-    <section className="card p-card">
-      <p className="label-eyebrow mb-2">Notes</p>
-      {canWrite ? (
-        <RichTextEditor
-          id="character-notes-editor"
-          aria-label="notes"
-          value={notesField.value}
-          onChange={notesField.setValue}
-          onBlur={notesField.inputProps.onBlur}
-          className={DRAFT_FIELD_CLASS}
-          placeholder="Session notes, NPC names, things to remember…"
-          data-flashing={notesField.inputProps['data-flashing']}
-          data-flash-parity={notesField.inputProps['data-flash-parity']}
-        />
-      ) : (
-        <Markdown source={character.appearance ?? ''} />
-      )}
-    </section>
+    </CombatStatusProvider>
   );
 }

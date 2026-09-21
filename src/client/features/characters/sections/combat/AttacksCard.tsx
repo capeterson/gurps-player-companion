@@ -18,6 +18,7 @@ import {
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
+import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
@@ -455,12 +456,8 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     <tr key={key} className="border-0">
                       {rowIndex === 0 && preferences.sort === 'custom' && (
                         <td rowSpan={rows.length} className="align-top px-1">
-                          <button
-                            type="button"
-                            draggable
+                          <DragHandle
                             aria-label={`Reorder attack ${weaponIndex + 1}`}
-                            title="Drag to reorder, or focus and use the up/down arrow keys"
-                            className="btn btn-ghost btn-xs cursor-grab px-1 text-base-content/40 active:cursor-grabbing"
                             onDragStart={(event) => {
                               event.dataTransfer.setData('text/plain', w.id);
                               event.dataTransfer.effectAllowed = 'move';
@@ -477,9 +474,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                                 sortedWeapons[weaponIndex + (event.key === 'ArrowUp' ? -1 : 1)];
                               if (target) moveWeapon(w.id, target.id);
                             }}
-                          >
-                            <span aria-hidden="true">⠿</span>
-                          </button>
+                          />
                         </td>
                       )}
                       {rowIndex === 0 && (

@@ -106,7 +106,9 @@ describe('AttacksCard', () => {
     const character = withMultipleWeapons();
     const view = render(<AttacksCard character={character} openRoll={vi.fn()} />);
     const bow = screen.getByRole('rowgroup', { name: 'Bow' });
-    fireEvent.keyDown(within(bow).getByRole('button', { name: /Reorder/ }), { key: 'ArrowUp' });
+    const handle = within(bow).getByRole('button', { name: /Reorder/ });
+    expect(handle).toHaveTextContent('⠿');
+    fireEvent.keyDown(handle, { key: 'ArrowUp' });
     expect(weaponOrder()).toEqual(['Bow', 'Sword', 'Axe']);
     view.unmount();
     const remount = render(<AttacksCard character={character} openRoll={vi.fn()} />);

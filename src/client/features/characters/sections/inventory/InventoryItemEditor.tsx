@@ -90,6 +90,13 @@ function fieldSpecs(
         text('weaponData.parry', 'Parry'),
         number('weaponData.stRequired', 'ST required', true, true),
         number('weaponData.db', 'Shield defense bonus', true, true),
+        {
+          path: 'weaponData.wieldedSide',
+          label: 'Shield side',
+          choices: ['left', 'right'],
+          optional: true,
+          advanced: true,
+        },
         number('weaponData.ranged.acc', 'Accuracy', true, true),
         text('weaponData.ranged.range', 'Range', true),
         text('weaponData.ranged.rof', 'Rate of fire', true),

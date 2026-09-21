@@ -1,6 +1,6 @@
 /**
  * useConditionsToggle — the conditions-array toggle state machine
- * used by the Combat tab's PoolsCard. The load-bearing semantics:
+ * used by Current Status. The load-bearing semantics:
  *
  *   1. Rapid taps that land before React re-renders compose against
  *      the latest-intended ref, not the render snapshot — two taps

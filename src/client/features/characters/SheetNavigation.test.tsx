@@ -41,6 +41,7 @@ describe('SheetNavigation', () => {
     const navigation = screen.getByRole('navigation', { name: 'Character sections' });
     expect(navigation).toBeVisible();
     expect(navigation.getElementsByTagName('button')).toHaveLength(SHEET_TABS.length);
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Combat' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: 'Skills' })).toHaveTextContent('3');
 
@@ -71,6 +72,7 @@ describe('SheetNavigation', () => {
     expect(screen.getByRole('button', { name: 'Close character navigation' })).toBeVisible();
     const petalGroups = navigation.querySelectorAll('.sheet-petal');
     expect(petalGroups).toHaveLength(SHEET_TABS.length);
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
     expect(navigation.querySelectorAll('[role="tooltip"]')).toHaveLength(0);
     for (const tab of SHEET_TABS) {
       const petal = Array.from(petalGroups).find(

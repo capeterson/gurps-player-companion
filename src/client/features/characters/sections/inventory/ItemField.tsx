@@ -89,9 +89,10 @@ export function ItemField({
                 draft.commit();
               }}
             >
+              {spec.optional && <option value="">Any / unspecified</option>}
               {spec.choices.map((choice) => (
                 <option key={choice} value={choice}>
-                  {choice}
+                  {choice.charAt(0).toUpperCase() + choice.slice(1)}
                 </option>
               ))}
             </select>

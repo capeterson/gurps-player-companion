@@ -13,9 +13,9 @@
  * strings pass through unchanged. Torso armor also covers the vitals;
  * repeated locations count once per piece, including explicit vitals coverage.
  *
- * `frontOnly` / `backOnly` items are included as-is; the combat tab
- * doesn't model facing, so both front and back coverage contribute to
- * the displayed DR. A future facing model would split these.
+ * When a facing is supplied, directional armor is filtered before it
+ * contributes. Front-only and back-only pieces do not protect either side;
+ * non-directional armor protects every facing.
  *
  * Pure TS (shared domain) — runs in Bun, browser, and service worker.
  */
@@ -33,6 +33,16 @@ export interface ArmorItemRow {
   /** Present on resolved character-detail rows; absent on raw legacy callers. */
   readonly baseArmor?: ArmorData | null | undefined;
   readonly enchantmentBreakdown?: InventoryItemOut['enchantmentBreakdown'] | undefined;
+}
+
+export type ArmorFacing = 'front' | 'back' | 'left' | 'right';
+
+/** Whether one directional armor layer protects the selected incoming facing. */
+export function armorAppliesToFacing(armor: ArmorData, facing?: ArmorFacing): boolean {
+  if (!facing) return true;
+  if (facing === 'front') return !armor.backOnly;
+  if (facing === 'back') return !armor.frontOnly;
+  return !armor.frontOnly && !armor.backOnly;
 }
 
 export interface LayeredArmorDrContribution {
@@ -139,6 +149,7 @@ function armorForAggregation(item: ArmorItemRow): ArmorData | null {
 export function layeredArmorDrContributions(
   items: readonly ArmorItemRow[],
   location: string,
+  facing?: ArmorFacing,
 ): LayeredArmorDrContribution[] {
   const grouped = new Map<
     string,
@@ -155,7 +166,12 @@ export function layeredArmorDrContributions(
   for (const [index, item] of items.entries()) {
     if (!item.equipped || !item.isArmor) continue;
     const coverage = armorForAggregation(item);
-    if (!coverage || !armorCoversLocation(coverage, location)) continue;
+    if (
+      !coverage ||
+      !armorCoversLocation(coverage, location) ||
+      !armorAppliesToFacing(coverage, facing)
+    )
+      continue;
     const itemKey = armorItemKey(item, index);
     for (const contribution of item.enchantmentBreakdown ?? []) {
       if (contribution.target !== 'dr') continue;
@@ -255,19 +271,22 @@ export function layeredArmorDrContributions(
   });
 }
 
-export function aggregateDrByLocation(items: readonly ArmorItemRow[]): DrByLocationMap {
+export function aggregateDrByLocation(
+  items: readonly ArmorItemRow[],
+  facing?: ArmorFacing,
+): DrByLocationMap {
   const map: DrByLocationMap = new Map();
   const locations = new Set<string>();
   for (const item of items) {
     if (!item.equipped || !item.isArmor) continue;
     const armor = armorForAggregation(item);
-    if (!armor) continue;
+    if (!armor || !armorAppliesToFacing(armor, facing)) continue;
     for (const location of armor.locations) locations.add(location);
     if (armor.locations.includes('torso')) locations.add('vitals');
   }
   for (const location of locations) {
     const appliedByItem = new Map<string, number>();
-    for (const line of layeredArmorDrContributions(items, location)) {
+    for (const line of layeredArmorDrContributions(items, location, facing)) {
       if (line.status !== 'applied' && line.status !== 'winning') continue;
       appliedByItem.set(line.itemKey, (appliedByItem.get(line.itemKey) ?? 0) + line.value);
     }
@@ -275,7 +294,8 @@ export function aggregateDrByLocation(items: readonly ArmorItemRow[]): DrByLocat
       if (!item.equipped || !item.isArmor) continue;
       const hasDecomposition = canDecomposeArmor(item);
       const armor = armorForAggregation(item);
-      if (!armor || !armorCoversLocation(armor, location)) continue;
+      if (!armor || !armorCoversLocation(armor, location) || !armorAppliesToFacing(armor, facing))
+        continue;
       const modifier = hasDecomposition ? (appliedByItem.get(armorItemKey(item, index)) ?? 0) : 0;
       const layerDr = Math.max(0, armor.dr + modifier);
       const previous = map.get(location);
@@ -323,8 +343,9 @@ export function naturalSkullDr(type: string | null | undefined): number {
 export function effectiveDrByLocation(
   items: readonly ArmorItemRow[],
   effects: readonly Pick<ResolvedEffectOut, 'target' | 'active' | 'value' | 'hitLocation'>[] = [],
+  facing?: ArmorFacing,
 ): DrByLocationMap {
-  const map = aggregateDrByLocation(items);
+  const map = aggregateDrByLocation(items, facing);
   const drEffects = effects.filter((effect) => effect.active && effect.target === 'dr');
   const locations = new Set<string>([
     ...HIT_LOCATIONS,
@@ -355,8 +376,6 @@ export function effectiveDrByLocation(
   return map;
 }
 
-export type ArmorFacing = 'front' | 'back';
-
 export interface ArmorDbResolution {
   readonly db: number;
   readonly itemId: string;
@@ -384,8 +403,7 @@ export function resolveArmorDb(
       !armorCoversLocation(armor, hitLocation)
     )
       return [];
-    if (facing === 'front' && armor.backOnly) return [];
-    if (facing === 'back' && armor.frontOnly) return [];
+    if (!armorAppliesToFacing(armor, facing)) return [];
     const db = armor.db ?? 0;
     if (db <= 0) return [];
     return [

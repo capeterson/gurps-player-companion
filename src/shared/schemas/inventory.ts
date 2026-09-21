@@ -108,6 +108,12 @@ export const weaponData = z
      * the marker).
      */
     db: z.number().int().min(0).max(4).nullable().optional(),
+    /**
+     * Optional hand/side for directional shield DB. A side-specific shield
+     * protects the front and its matching side; null preserves legacy
+     * omnidirectional behavior.
+     */
+    wieldedSide: z.enum(['left', 'right']).nullable().optional(),
     /** Ranged stat block; null/absent = melee-only. Melee fields coexist
      *  (a thrown knife has reach AND ranged). Damage is shared via the
      *  top-level `damage` field. */

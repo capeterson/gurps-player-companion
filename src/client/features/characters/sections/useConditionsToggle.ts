@@ -1,6 +1,6 @@
 /**
- * Conditions-array toggle state machine, used by the Combat tab's
- * PoolsCard. Owns the latest-intended-value ref for the same reason
+ * Conditions-array toggle state machine, used by Current Status.
+ * Owns the latest-intended-value ref for the same reason
  * usePoolBumpers owns one for HP/FP — see that hook's comments for the
  * general pattern.
  *

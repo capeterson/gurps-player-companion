@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
@@ -78,6 +78,33 @@ function renderPanel() {
     </QueryClientProvider>,
   );
 }
+
+afterEach(() => window.localStorage.clear());
+
+describe('Inventory container disclosure', () => {
+  it('starts collapsed and reports every recursively contained item', () => {
+    renderPanel();
+
+    expect(screen.queryByText('Apple')).not.toBeInTheDocument();
+    expect(screen.queryByText('Small pouch')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('4 contained items')).toHaveTextContent('4 items');
+  });
+
+  it('remembers expansion on this device without forcing nested containers open', () => {
+    const first = renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand contents' }));
+
+    expect(screen.getByText('Apple')).toBeVisible();
+    expect(screen.getByText('Small pouch')).toBeVisible();
+    expect(screen.queryByText('Moon Gem')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('1 contained item')).toHaveTextContent('1 item');
+
+    first.unmount();
+    renderPanel();
+    expect(screen.getByText('Small pouch')).toBeVisible();
+    expect(screen.queryByText('Moon Gem')).not.toBeInTheDocument();
+  });
+});
 
 describe('InventoryPanel filtering', () => {
   it('shows matches and ancestor containers while hiding unrelated contents', () => {
