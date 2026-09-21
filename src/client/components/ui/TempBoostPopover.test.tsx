@@ -23,6 +23,7 @@ describe('TempBoostPopover', () => {
 
     const popover = screen.getByRole('dialog', { name: 'Modifiers for ST' });
     expect(popover.className).toMatch(/max-h-\[calc\(100dvh-/);
+    expect(popover.className).toMatch(/max-w-\[calc\(100dvw-/);
     expect(popover.className).toMatch(/overflow-y-auto/);
     expect(popover.className).not.toContain('100vh');
   });

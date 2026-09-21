@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { formatBytes, readLocalDbStatus } from '../lib/localDbStatus.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { SyncLogView } from './SyncLogView.tsx';
+import { InfoTooltip } from './ui/InfoTooltip.tsx';
 
 export function SyncStatusIndicator() {
   const { state, error } = useSyncStatus();
@@ -68,18 +69,18 @@ export function SyncStatusIndicator() {
 
   return (
     <>
-      <span className="tooltip tooltip-bottom" data-tip={tip}>
-        <button
-          type="button"
-          className={`btn btn-ghost btn-sm btn-square ${meta.colorClass}`}
-          aria-label={
-            !online && visualState === 'error' ? `${meta.ariaLabel} (offline)` : meta.ariaLabel
-          }
-          onClick={() => setLogOpen(true)}
-        >
-          <SyncSymbol state={visualState} />
-        </button>
-      </span>
+      <InfoTooltip
+        side="bottom"
+        content={tip}
+        contentClassName="w-max"
+        ariaLabel={
+          !online && visualState === 'error' ? `${meta.ariaLabel} (offline)` : meta.ariaLabel
+        }
+        triggerClassName={`btn btn-ghost btn-sm btn-square ${meta.colorClass}`}
+        onTriggerClick={() => setLogOpen(true)}
+      >
+        <SyncSymbol state={visualState} />
+      </InfoTooltip>
       <SyncLogView
         open={logOpen}
         onClose={() => setLogOpen(false)}

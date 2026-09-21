@@ -117,11 +117,11 @@ describe('SyncStatusIndicator recovery action', () => {
 
     window.dispatchEvent(new Event('offline'));
     const indicator = await screen.findByLabelText('Some changes failed to sync (offline)');
-    expect(indicator.parentElement).toHaveAttribute(
-      'data-tip',
-      expect.stringContaining('Saving Notes failed'),
-    );
-    expect(indicator.parentElement).toHaveAttribute('data-tip', expect.stringContaining('Offline'));
+    await user.hover(indicator);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Saving Notes failed');
+    expect(tooltip).toHaveTextContent('Offline');
+    expect(tooltip).toHaveClass('max-w-[calc(100dvw-1rem)]');
     await user.click(indicator);
     expect(screen.getByRole('heading', { name: 'Sync log' })).toBeInTheDocument();
     online.mockRestore();

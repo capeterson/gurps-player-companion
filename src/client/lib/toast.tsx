@@ -139,7 +139,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   // the app shell regardless of containing-block / overflow context.
   const toastLayer = (
     <div
-      className="toast toast-end pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2"
+      className="toast toast-end pointer-events-none fixed inset-x-2 bottom-2 z-50 flex max-w-[calc(100dvw-1rem)] flex-col gap-2 sm:left-auto sm:right-4 sm:bottom-4 sm:w-auto sm:max-w-lg"
       aria-live="polite"
     >
       {toasts.map((t) => (
@@ -148,10 +148,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           role="alert"
           className={
             t.kind === 'error'
-              ? 'pointer-events-auto alert alert-error shadow'
+              ? 'pointer-events-auto alert alert-error min-w-0 [overflow-wrap:anywhere] shadow'
               : t.kind === 'success'
-                ? 'pointer-events-auto alert alert-success shadow'
-                : 'pointer-events-auto alert alert-info shadow'
+                ? 'pointer-events-auto alert alert-success min-w-0 [overflow-wrap:anywhere] shadow'
+                : 'pointer-events-auto alert alert-info min-w-0 [overflow-wrap:anywhere] shadow'
           }
         >
           <span>{t.message}</span>

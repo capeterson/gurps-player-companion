@@ -10,10 +10,8 @@
  * "more info available" affordance) and is keyboard-focusable.
  */
 
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
-
-const TOOLTIP_WIDTH = 256;
-const VIEWPORT_MARGIN = 8;
+import { type ReactNode, useId, useState } from 'react';
+import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 
 interface InfoTooltipProps {
   children: ReactNode;
@@ -21,6 +19,8 @@ interface InfoTooltipProps {
   side?: 'top' | 'bottom';
   ariaLabel?: string;
   triggerClassName?: string;
+  onTriggerClick?: () => void;
+  contentClassName?: string;
 }
 
 export function InfoTooltip({
@@ -29,26 +29,12 @@ export function InfoTooltip({
   side = 'top',
   ariaLabel,
   triggerClassName,
+  onTriggerClick,
+  contentClassName = 'w-64',
 }: InfoTooltipProps) {
   const [open, setOpen] = useState(false);
-  const [shiftX, setShiftX] = useState(0);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const tooltipRef = useViewportBoundedOverlay<HTMLSpanElement>(open);
   const id = useId();
-
-  useEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const center = rect.left + rect.width / 2;
-    const left = center - TOOLTIP_WIDTH / 2;
-    const right = center + TOOLTIP_WIDTH / 2;
-    if (left < VIEWPORT_MARGIN) {
-      setShiftX(VIEWPORT_MARGIN - left);
-    } else if (right > window.innerWidth - VIEWPORT_MARGIN) {
-      setShiftX(window.innerWidth - VIEWPORT_MARGIN - right);
-    } else {
-      setShiftX(0);
-    }
-  }, [open]);
 
   const positionClass =
     side === 'top' ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top';
@@ -56,7 +42,6 @@ export function InfoTooltip({
   return (
     <span className="relative inline-flex items-baseline">
       <button
-        ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
         aria-describedby={open ? id : undefined}
@@ -64,7 +49,14 @@ export function InfoTooltip({
         onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (onTriggerClick) {
+            setOpen(false);
+            onTriggerClick();
+          } else {
+            setOpen((value) => !value);
+          }
+        }}
         className={
           triggerClassName ??
           'cursor-help rounded-sm border-b border-dotted border-base-content/30 px-1 -mx-1 hover:bg-accent-soft hover:text-base-content hover:border-base-content/60 transition-colors focus-visible:outline-2 focus-visible:outline-primary'
@@ -74,10 +66,13 @@ export function InfoTooltip({
       </button>
       {open && (
         <span
+          ref={tooltipRef}
           id={id}
           role="tooltip"
-          style={{ transform: `translateX(calc(-50% + ${shiftX}px))` }}
-          className={`absolute z-50 left-1/2 ${positionClass} w-64 rounded-lg border border-base-300 bg-base-100 p-3 text-xs text-base-content shadow-lg pointer-events-none`}
+          style={{
+            transform: 'translateX(calc(-50% + var(--viewport-overlay-shift-x, 0px)))',
+          }}
+          className={`absolute left-1/2 z-50 ${positionClass} ${contentClassName} max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] rounded-lg border border-base-300 bg-base-100 p-3 text-xs text-base-content shadow-lg pointer-events-none`}
         >
           {content}
         </span>

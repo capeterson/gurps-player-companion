@@ -10,6 +10,73 @@ async function enableTurnTracker(page: import('@playwright/test').Page) {
   await expect(page.getByRole('button', { name: /new encounter/i })).toBeVisible();
 }
 
+test('header tooltips and alerts stay within the viewport from mobile through desktop', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('/login');
+  await page.getByLabel(/email/i).fill('seed@example.invalid');
+  await page.getByLabel(/^password\b/i).fill('change-me-please-this-is-a-seed-account');
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+
+  const expectInsideViewport = async (locator: import('@playwright/test').Locator) => {
+    await expect(locator).toBeVisible();
+    await expect
+      .poll(async () => {
+        const box = await locator.boundingBox();
+        const currentViewport = page.viewportSize();
+        return box && currentViewport
+          ? box.x >= 8 && box.x + box.width <= currentViewport.width - 8
+          : false;
+      })
+      .toBe(true);
+  };
+
+  // 640px is where the header's desktop labels appear. Reuse one account and
+  // page while checking just below, at, and above that layout boundary, then
+  // representative desktop widths in the dark theme from the reported state.
+  const viewportCases = [
+    { width: 320, height: 568 },
+    { width: 639, height: 700 },
+    { width: 640, height: 700 },
+    { width: 641, height: 700 },
+    { width: 1024, height: 768 },
+    { width: 1280, height: 800 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+  ];
+  let darkTheme = false;
+
+  for (const viewport of viewportCases) {
+    await page.setViewportSize(viewport);
+    if (viewport.width >= 1024 && !darkTheme) {
+      await page.getByRole('button', { name: 'Switch to Dark mode' }).click();
+      darkTheme = true;
+    }
+
+    const sync = page.getByRole('button', { name: 'All changes saved' });
+    await sync.hover();
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toContainText('All changes synced');
+    await expectInsideViewport(tooltip);
+
+    const notifications = page.getByLabel('Notifications', { exact: true });
+    await notifications.click();
+    const alerts = page
+      .locator('details')
+      .filter({ has: notifications })
+      .locator('.dropdown-content');
+    await expect(alerts).toContainText("You're all caught up.");
+    await expectInsideViewport(alerts);
+    await notifications.click();
+
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+      .toBe(true);
+  }
+});
+
 test('long campaign cards do not create page-level horizontal overflow at 320px', async ({
   page,
 }) => {
