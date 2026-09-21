@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
@@ -85,12 +86,8 @@ test('skill, technique, and language rows reflow into readable mobile cards at 3
   await page.getByLabel(/new character name/i).fill('Narrow Skill Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
-  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
-
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Skills/ })
-    .click();
+  await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Skills');
   const skillName = 'Extremely Long Skill Name For Horizontal Testing';
   const skillForm = page.getByLabel(/^skill$/i).locator('xpath=ancestor::form');
   await page.getByLabel(/^skill$/i).fill(skillName);
@@ -140,10 +137,7 @@ test('spell rows stay readable at narrow mobile and tablet breakpoints', async (
   await page.getByLabel(/new character name/i).fill('Narrow Spell Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Magic/ })
-    .click();
+  await selectCharacterSection(page, 'Magic');
   const spellName = 'Extremely Long Spell Name For Horizontal Testing';
   const spellForm = page.getByLabel(/^spell$/i).locator('xpath=ancestor::form');
   await page.getByLabel(/^spell$/i).fill(spellName);
@@ -182,17 +176,11 @@ test('spell rows stay readable at narrow mobile and tablet breakpoints', async (
   await expect(page.getByText(maintainableSpellName, { exact: true })).toBeVisible();
 
   await page.goto(characterUrl);
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Identity/ })
-    .click();
+  await selectCharacterSection(page, 'Identity');
   await page
     .getByLabel('campaign', { exact: true })
     .selectOption({ label: 'Responsive spell library' });
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Magic/ })
-    .click();
+  await selectCharacterSection(page, 'Magic');
   await page.getByLabel(/^spell$/i).fill(maintainableSpellName);
   await page.getByRole('option', { name: new RegExp(maintainableSpellName) }).click();
   const maintainableForm = page.getByLabel(/^spell$/i).locator('xpath=ancestor::form');
@@ -258,11 +246,8 @@ test('inline inventory categories toggle and retain populated advanced fields on
   await page.goto('/characters');
   await page.getByLabel(/new character name/i).fill('Narrow Item Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
-  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Inventory/ })
-    .click();
+  await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Inventory');
   await page.getByLabel('Item name').fill('Reachable item');
   await page.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Reachable item', { exact: true })).toBeVisible();
@@ -308,11 +293,8 @@ test('inventory filters keep matching item ancestry without showing unrelated co
   await page.goto('/characters');
   await page.getByLabel(/new character name/i).fill('Filtered Inventory');
   await page.getByRole('button', { name: /^create$/i }).click();
-  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Inventory/ })
-    .click();
+  await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Inventory');
 
   const addForm = page.getByLabel('Item name').locator('xpath=ancestor::form');
   await page.getByLabel('Item name').fill('Backpack');
@@ -436,19 +418,12 @@ test('cast spell dialog keeps its actions reachable on a short mobile viewport',
   await page.goto('/characters');
   await page.getByLabel(/new character name/i).fill('Narrow Caster Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
-  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
-
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Traits/ })
-    .click();
+  await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Traits');
   await page.getByLabel('Trait name').fill('Magery');
   await page.getByRole('button', { name: /^add$/i }).click();
 
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Magic/ })
-    .click();
+  await selectCharacterSection(page, 'Magic');
   await page.getByLabel(/^spell$/i).fill('Reachable spell');
   await page.getByRole('button', { name: /^add$/i }).click();
   await page.getByRole('button', { name: 'Cast Reachable spell' }).click();
@@ -480,11 +455,8 @@ test('long powerstone and magic-item rows stack their controls on a 320px viewpo
   await page.goto('/characters');
   await page.getByLabel(/new character name/i).fill('Narrow Powerstone Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
-  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Inventory/ })
-    .click();
+  await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Inventory');
   const powerstoneName = 'PneumonoultramicroscopicsilicovolcanoconiosisUnbreakablePowerstone';
   await page.getByLabel('Item name').fill(powerstoneName);
   await page.getByRole('button', { name: /^add$/i }).click();
@@ -498,10 +470,7 @@ test('long powerstone and magic-item rows stack their controls on a 320px viewpo
   await page.getByRole('button', { name: '+ Magic item', exact: true }).click();
   await page.getByLabel('Magic item spell name').fill('Light');
   await page.getByRole('button', { name: 'Add magic item', exact: true }).click();
-  await page
-    .locator('.panel-tab')
-    .filter({ hasText: /^Magic/ })
-    .click();
+  await selectCharacterSection(page, 'Magic');
   await expect(page.getByText('Stored energy')).toBeVisible();
   const powerstoneLabel = page.getByText(powerstoneName, { exact: true });
   const magicItemLabel = page.getByText(magicItemName, { exact: true });
@@ -582,7 +551,7 @@ test('attribute modifier popovers keep their actions reachable on a short mobile
   await page.goto('/characters');
   await page.getByLabel(/new character name/i).fill('Narrow modifier sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
-  await expect(page.locator('.panel-tabs')).toBeVisible({ timeout: 15_000 });
+  await expectCharacterNavigationReady(page);
   const overview = page.getByRole('button', { name: /Sheet overview/ });
   if ((await overview.getAttribute('aria-expanded')) === 'false') await overview.click();
   await page.getByRole('button', { name: 'Edit IQ modifiers' }).click();

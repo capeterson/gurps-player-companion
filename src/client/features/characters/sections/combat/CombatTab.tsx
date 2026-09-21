@@ -43,8 +43,7 @@ export function CombatTab({
   const patchCombat = useCombatPatch(character);
   const bumpers = usePoolBumpers(character, canWrite, patchCombat);
 
-  // The bar is absent while the sheet's tab list is still on screen. Once
-  // this boundary (immediately after that list) passes under the app header,
+  // Once the Combat content boundary passes under the app header,
   // the pool controls become a fixed top companion for the long Combat tab.
   useEffect(() => {
     const update = () => {

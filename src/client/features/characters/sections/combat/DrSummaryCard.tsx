@@ -17,6 +17,7 @@ import {
   effectiveDrAgainstAttack,
   woundingMultiplier,
 } from '../../../../../shared/domain/injuryCalc.ts';
+import { AppIcon } from '../../../../components/ui/AppIcon.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
@@ -127,7 +128,10 @@ export function DrSummaryCard({
   return (
     <section className="card space-y-4 p-4 sm:p-5" aria-label="Defense and damage resistance">
       <div>
-        <h2 className="label-eyebrow">Defense &amp; Damage Resistance</h2>
+        <h2 className="label-eyebrow flex items-center gap-2">
+          <AppIcon name="defense" size={18} />
+          Defense &amp; Damage Resistance
+        </h2>
         <p className="text-xs text-muted mt-1">
           One hit context for armor defense bonus, damage resistance, and incoming damage.
         </p>

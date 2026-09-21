@@ -16,31 +16,12 @@ import { ApiError } from '../lib/api.ts';
 import { invitationsApi } from '../lib/invitations.ts';
 import { notificationsApi } from '../lib/notifications.ts';
 import { useToasts } from '../lib/toast.tsx';
+import { AppIcon } from './ui/AppIcon.tsx';
 
 const REFRESH_INTERVAL_MS = 30_000;
 
 function isCampaignInvite(n: NotificationOut): boolean {
   return n.type === 'campaign_invitation';
-}
-
-function BellIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-    </svg>
-  );
 }
 
 export function NotificationsBell() {
@@ -98,7 +79,7 @@ export function NotificationsBell() {
         className="btn btn-ghost btn-sm btn-square relative"
         aria-label={unread.length > 0 ? `Notifications (${unread.length} unread)` : 'Notifications'}
       >
-        <BellIcon />
+        <AppIcon name="bell" />
         {unread.length > 0 && (
           <span
             data-testid="notifications-unread-badge"

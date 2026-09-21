@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { type Page, expect, test } from '@playwright/test';
+import { selectCharacterSection } from './character-navigation';
 
 /**
  * Full delegated-access acceptance test. The app must be started with a
@@ -245,10 +246,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       await characterLink.click();
       await expect(page).toHaveURL(new RegExp(`/characters/${created.body.id}$`));
 
-      await page
-        .locator('.panel-tab')
-        .filter({ hasText: /^History/ })
-        .click();
+      await selectCharacterSection(page, 'History');
       await expect(
         page.getByText(`Created character ${characterName}`, { exact: true }),
       ).toBeVisible({

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   maxIqWithMentalSecondaryCaps,
@@ -24,6 +24,7 @@ import {
 } from '../../../shared/schemas/character.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
+import { AppIcon } from '../../components/ui/AppIcon.tsx';
 import { EffectSourcesList } from '../../components/ui/EffectSourcesList.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
@@ -39,6 +40,7 @@ import {
   nullableTextParser,
   scaledIntParser,
 } from '../../lib/parsers.ts';
+import { SHEET_ICONS, SHEET_TABS, SheetNavigation, type SheetTab } from './SheetNavigation.tsx';
 
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
@@ -62,26 +64,6 @@ import {
   useCharacterDetail,
 } from './useCharacterDetail.ts';
 import { useMirrorCampaigns } from './useMirrorCampaigns.ts';
-
-type SheetTab =
-  | 'Combat'
-  | 'Identity'
-  | 'Traits'
-  | 'Skills'
-  | 'Magic'
-  | 'Inventory'
-  | 'Notes'
-  | 'History';
-const SHEET_TABS: readonly SheetTab[] = [
-  'Combat',
-  'Identity',
-  'Traits',
-  'Skills',
-  'Magic',
-  'Inventory',
-  'Notes',
-  'History',
-] as const;
 
 interface CountByTab {
   Skills?: number;
@@ -1417,7 +1399,8 @@ function IdentityHero({
 
 export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<SheetTab>('Combat');
+  const [selectedTab, setTab] = useState<SheetTab>('Combat');
+  const sectionHeading = useRef<HTMLHeadingElement>(null);
 
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -1527,10 +1510,20 @@ export function CharacterSheetPage() {
   // already has at least one spell / powerstone / magic item).  Owners
   // without any magic can still tab to it to add their first.
   const showMagicTab = hasMagery(character.traits) || magicTabCount > 0 || canWrite;
-  const visibleTabs = showMagicTab ? SHEET_TABS : SHEET_TABS.filter((t) => t !== 'Magic');
+  const visibleTabs: readonly SheetTab[] = showMagicTab
+    ? SHEET_TABS
+    : SHEET_TABS.filter((t) => t !== 'Magic');
+  const tab = visibleTabs.includes(selectedTab) ? selectedTab : 'Combat';
+  function navigateSection(next: SheetTab) {
+    setTab(next);
+    requestAnimationFrame(() => {
+      sectionHeading.current?.focus({ preventScroll: true });
+      sectionHeading.current?.scrollIntoView({ block: 'start' });
+    });
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 sheet-with-navigation">
       <nav className="flex items-center gap-2 text-sm">
         <Link to="/characters" className="link link-hover text-muted">
           ← All characters
@@ -1617,24 +1610,23 @@ export function CharacterSheetPage() {
           </FoldSection>
         </>
       )}
-      <div className="panel-tabs">
-        {visibleTabs.map((t) => {
-          const count = counts[t as keyof CountByTab];
-          return (
-            <button
-              key={t}
-              type="button"
-              className={`panel-tab ${tab === t ? 'active' : ''}`}
-              onClick={() => setTab(t)}
-            >
-              {t}
-              {count !== undefined && <span className="num text-dim text-[11px]">{count}</span>}
-            </button>
-          );
-        })}
-      </div>
+      <SheetNavigation
+        key={character.id}
+        tabs={visibleTabs}
+        active={tab}
+        counts={counts}
+        onSelect={navigateSection}
+      />
 
-      <div>
+      <div className="space-y-4">
+        <h2
+          ref={sectionHeading}
+          tabIndex={-1}
+          className="sheet-section-heading font-display text-xl flex items-center gap-3 rounded-field focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          <AppIcon name={SHEET_ICONS[tab]} className="text-primary" />
+          {tab}
+        </h2>
         {tab === 'Combat' && character.libraryEffectsKnown !== false && (
           <CombatTab
             character={character}

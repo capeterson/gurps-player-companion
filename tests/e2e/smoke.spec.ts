@@ -8,6 +8,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { selectCharacterSection } from './character-navigation';
 
 const TIMESTAMP_SUFFIX = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
@@ -51,8 +52,7 @@ test('roll history moves from Combat into the History tab and survives reload lo
   await rollDialog.getByRole('button', { name: 'Roll 3d6' }).click();
   await rollDialog.getByRole('button', { name: 'Close' }).last().click();
 
-  const historyTab = page.locator('.panel-tab').filter({ hasText: /^History$/ });
-  await historyTab.click();
+  await selectCharacterSection(page, 'History');
   await expect(page.getByRole('tab', { name: 'Change history' })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -62,7 +62,7 @@ test('roll history moves from Combat into the History tab and survives reload lo
   await expect(page.getByText(/saved on this device only and never synced/i)).toBeVisible();
 
   await page.reload();
-  await historyTab.click();
+  await selectCharacterSection(page, 'History');
   await page.getByRole('tab', { name: 'Roll history' }).click();
   await expect(page.getByRole('list', { name: 'Roll history entries' })).toContainText('Dodge');
 });

@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useState } from 'react';
+import { AppIcon } from './AppIcon.tsx';
 
 interface FoldSectionProps {
   preferenceKey: string;
@@ -50,7 +51,7 @@ export function FoldSection({
           onClick={toggle}
         >
           <span aria-hidden="true" className="text-muted">
-            {open ? '▾' : '▸'}
+            <AppIcon name={open ? 'chevronDown' : 'chevronRight'} size={16} />
           </span>
           <span className="label-eyebrow">{title}</span>
           {!open && summary && (

@@ -17,6 +17,23 @@ if (typeof window !== 'undefined' && !window.localStorage) {
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
 }
 
+// Happy DOM does not implement responsive media queries. Keep the default
+// browser-like state mobile so sheet tests exercise the FAB path explicitly;
+// focused navigation tests replace this with a desktop matchMedia as needed.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: (media: string) => ({
+      matches: false,
+      media,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => true,
+    }),
+  });
+}
+
 afterEach(async () => {
   cleanup();
   // Wipe Dexie between tests so per-test fixtures start fresh.  Done

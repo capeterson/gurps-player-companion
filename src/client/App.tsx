@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { useAppEntityBreadcrumb } from './components/AppBreadcrumbs.ts';
 import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
+import { AppIcon } from './components/ui/AppIcon.tsx';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
@@ -135,6 +136,11 @@ export function App() {
                     : 'text-muted hover:bg-base-200 hover:text-base-content'
                 }`}
               >
+                <AppIcon
+                  name="identity"
+                  size={16}
+                  className="inline-block align-text-bottom mr-1.5"
+                />
                 Character
               </Link>
               {entityBreadcrumb?.kind === 'character' && (
@@ -165,6 +171,11 @@ export function App() {
                     : 'text-muted hover:bg-base-200 hover:text-base-content'
                 }`}
               >
+                <AppIcon
+                  name="campaign"
+                  size={16}
+                  className="inline-block align-text-bottom mr-1.5"
+                />
                 Campaign
               </Link>
               {entityBreadcrumb?.kind === 'campaign' && (
@@ -190,7 +201,7 @@ export function App() {
                   }`}
                   aria-label="Campaign sub-menu"
                 >
-                  <span aria-hidden="true">▾</span>
+                  <AppIcon name="chevronDown" size={14} />
                 </summary>
                 <ul className="menu dropdown-content z-50 mt-2 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg">
                   {CAMPAIGN_SUBNAV.map((tab) => (
@@ -218,7 +229,7 @@ export function App() {
             aria-label={`Switch to ${themeLabel(oppositeTheme(theme))} mode`}
             title={`Switch to ${themeLabel(oppositeTheme(theme))} mode`}
           >
-            {themeLabel(theme) === 'Dark' ? <SunIcon /> : <MoonIcon />}
+            <AppIcon name={themeLabel(theme) === 'Dark' ? 'sun' : 'moon'} size={20} />
             <span className="hidden sm:inline">{themeLabel(theme)} mode</span>
           </button>
           <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
@@ -227,7 +238,7 @@ export function App() {
               <span className="max-w-[8rem] truncate sm:max-w-none">
                 {me.data?.displayName ?? 'Account'}
               </span>
-              <span aria-hidden="true">▾</span>
+              <AppIcon name="chevronDown" size={14} />
             </summary>
             <ul className="menu dropdown-content z-50 mt-2 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg">
               <li className="menu-title px-3 py-2">
@@ -237,7 +248,10 @@ export function App() {
                 <Link to="/about">About</Link>
               </li>
               <li>
-                <Link to="/settings">Settings</Link>
+                <Link to="/settings">
+                  <AppIcon name="settings" size={16} />
+                  Settings
+                </Link>
               </li>
               {me.data?.isSuperuser && (
                 <>
@@ -268,51 +282,5 @@ export function App() {
         <Outlet />
       </main>
     </div>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="4" />
-      <path d="M12 2v2" />
-      <path d="M12 20v2" />
-      <path d="m4.93 4.93 1.41 1.41" />
-      <path d="m17.66 17.66 1.41 1.41" />
-      <path d="M2 12h2" />
-      <path d="M20 12h2" />
-      <path d="m4.93 19.07 1.41-1.41" />
-      <path d="m17.66 6.34 1.41-1.41" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
-    </svg>
   );
 }
