@@ -4,6 +4,7 @@ import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import {
   type ArmorFacing,
   aggregateDrByLocation,
+  armorAppliesToFacing,
   armorCoversLocation,
   effectiveDrByLocation,
   innateDrCoversLocation,
@@ -35,7 +36,7 @@ export interface DrSummaryCardProps {
   location?: string;
   facing?: ArmorFacing | undefined;
   onLocationChange?: (location: string) => void;
-  onFacingChange?: (facing: ArmorFacing | undefined) => void;
+  onFacingChange?: (facing: ArmorFacing) => void;
 }
 
 interface ArmorDrEnchantmentLine {
@@ -83,7 +84,7 @@ export function DrSummaryCard({
   onFacingChange,
 }: DrSummaryCardProps) {
   const [localLocation, setLocalLocation] = useState('torso');
-  const [localFacing, setLocalFacing] = useState<ArmorFacing | undefined>(undefined);
+  const [localFacing, setLocalFacing] = useState<ArmorFacing>('front');
   const [type, setType] = useState('cr');
   const [divisor, setDivisor] = useState('');
   const [damageOpen, setDamageOpen] = useState(false);
@@ -93,25 +94,34 @@ export function DrSummaryCard({
     setLocalLocation(next);
     onLocationChange?.(next);
   };
-  const setFacing = (next: ArmorFacing | undefined) => {
+  const setFacing = (next: ArmorFacing) => {
     setLocalFacing(next);
     onFacingChange?.(next);
   };
   const known = character.libraryEffectsKnown !== false && character.houseRulesKnown !== false;
   const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
-  const map = known ? effectiveDrByLocation(character.inventory, character.effects) : new Map();
+  const map = known
+    ? effectiveDrByLocation(character.inventory, character.effects, selectedFacing)
+    : new Map();
   const custom = [...map.keys()].filter((loc) => !HIT_LOCATIONS.includes(loc as never));
   const dr = resolveDr(type, map.get(location));
   const effective = effectiveDrAgainstAttack(type, map.get(location), divisor, protectNaturalDr);
   const multiplier = woundingMultiplier(type, location);
-  const shield = pickShield(character.inventory.filter((item) => item.equipped));
+  const shield = pickShield(
+    character.inventory.filter((item) => item.equipped),
+    selectedFacing,
+  );
   const shieldDb = shield?.db ?? 0;
   const armorDb = resolveArmorDb(character.inventory, location, selectedFacing);
   const totalDb = shieldDb + (armorDb?.db ?? 0);
   const layers = known
     ? character.inventory.filter(
         (item) =>
-          item.equipped && item.isArmor && item.armor && armorCoversLocation(item.armor, location),
+          item.equipped &&
+          item.isArmor &&
+          item.armor &&
+          armorCoversLocation(item.armor, location) &&
+          armorAppliesToFacing(item.armor, selectedFacing),
       )
     : [];
   const innate = known
@@ -172,16 +182,13 @@ export function DrSummaryCard({
               <select
                 aria-label="Armor facing"
                 className="select select-sm select-bordered w-full"
-                value={selectedFacing ?? ''}
-                onChange={(event) =>
-                  setFacing(
-                    event.target.value === '' ? undefined : (event.target.value as ArmorFacing),
-                  )
-                }
+                value={selectedFacing}
+                onChange={(event) => setFacing(event.target.value as ArmorFacing)}
               >
-                <option value="">Unknown</option>
                 <option value="front">Front</option>
                 <option value="back">Back</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
               </select>
             </label>
             <label className="flex flex-col gap-1 min-w-0">
@@ -267,9 +274,10 @@ export function DrSummaryCard({
                   const baseDr = baseArmor
                     ? resolveDr(
                         type,
-                        aggregateDrByLocation([
-                          { equipped: true, isArmor: true, armor: baseArmor },
-                        ]).get(location),
+                        aggregateDrByLocation(
+                          [{ equipped: true, isArmor: true, armor: baseArmor }],
+                          selectedFacing,
+                        ).get(location),
                       )
                     : null;
                   const appliedEnchantmentDr = enchantments
@@ -279,7 +287,7 @@ export function DrSummaryCard({
                     baseDr === null ? 0 : Math.max(0, -(baseDr + appliedEnchantmentDr));
                   const layerDr =
                     baseDr === null
-                      ? resolveDr(type, aggregateDrByLocation([item]).get(location))
+                      ? resolveDr(type, aggregateDrByLocation([item], selectedFacing).get(location))
                       : Math.max(0, baseDr + appliedEnchantmentDr);
                   return (
                     <li className="py-2" key={item.id}>
@@ -375,7 +383,7 @@ export function DrSummaryCard({
           )}
           <p className="text-xs text-muted">
             Use the attack’s effective divisor after Hardened DR or other special defenses. Facing
-            filters armor DB; front-only and back-only DR are currently combined.
+            filters both armor DR and armor DB.
           </p>
           {bumpHp && hpMax != null && canWrite && (
             <button
@@ -407,6 +415,7 @@ export function DrSummaryCard({
           bumpHp={bumpHp}
           onClose={() => setDamageOpen(false)}
           initialLocation={location}
+          initialFacing={selectedFacing}
           initialType={type}
           initialDivisor={divisor}
         />

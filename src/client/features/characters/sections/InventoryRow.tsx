@@ -7,6 +7,8 @@ import { useFlashState } from '../../../hooks/useFlashState.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
 import { InventoryItemEditor } from './inventory/InventoryItemEditor.tsx';
 import { CATEGORY_LABELS, type ItemCategory, type ItemSection } from './inventory/itemMutations.ts';
+import { readContainerExpanded, writeContainerExpanded } from './inventoryContainerState.ts';
+import { descendantsOf } from './inventoryTree.ts';
 
 export interface InventoryRowProps {
   item: InventoryItemOut;
@@ -51,8 +53,9 @@ export function InventoryRow(props: InventoryRowProps) {
   const children = byParent.get(item.id) ?? [];
   const isRoot = item.parentId === null;
   const hasChildren = item.isContainer && children.length > 0;
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => readContainerExpanded(item.characterId, item.id));
   const contentsOpen = expandContainers || open;
+  const descendantCount = hasChildren ? descendantsOf(item.id, byParent).size : 0;
   const sel = isSelected(item.id);
   const [section, setSection] = useState<ItemSection | null>(null);
   const [visited, setVisited] = useState<ItemSection[]>([]);
@@ -198,7 +201,11 @@ export function InventoryRow(props: InventoryRowProps) {
                     type="button"
                     onClick={(e) => {
                       stop(e);
-                      setOpen((o) => !o);
+                      setOpen((before) => {
+                        const next = !before;
+                        writeContainerExpanded(item.characterId, item.id, next);
+                        return next;
+                      });
                     }}
                     className="btn btn-ghost btn-xs px-1 text-base-content/50"
                     aria-expanded={contentsOpen}
@@ -227,6 +234,14 @@ export function InventoryRow(props: InventoryRowProps) {
                     )}
                   </>,
                 )}
+              {hasChildren && !contentsOpen && (
+                <span
+                  className="badge badge-sm badge-ghost"
+                  aria-label={`${descendantCount} contained ${descendantCount === 1 ? 'item' : 'items'}`}
+                >
+                  {descendantCount} {descendantCount === 1 ? 'item' : 'items'}
+                </span>
+              )}
               {item.isArmor &&
                 item.armor &&
                 categoryChip(

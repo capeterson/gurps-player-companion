@@ -9,7 +9,6 @@ export const SHEET_TABS = [
   'Skills',
   'Magic',
   'Inventory',
-  'Notes',
   'History',
 ] as const;
 export type SheetTab = (typeof SHEET_TABS)[number];
@@ -20,7 +19,6 @@ export const SHEET_ICONS: Record<SheetTab, AppIconName> = {
   Skills: 'skills',
   Magic: 'magic',
   Inventory: 'inventory',
-  Notes: 'notes',
   History: 'history',
 };
 
@@ -139,12 +137,21 @@ export function SheetNavigation({ tabs, active, counts, onSelect }: SheetNavigat
         </button>
         <div id={id} className="sheet-petals" hidden={!open}>
           {tabs.map((tab, index) => {
-            // Leave room for permanent labels beneath each 48px icon target.
-            const inner = index < 3;
-            const angle = inner
-              ? 180 - index * 45
-              : 180 - ((index - 3) * 90) / Math.max(1, tabs.length - 4);
-            const radius = inner ? 112 : 224;
+            // Balance the seven destinations across two compact arcs. The
+            // former fixed eight-item geometry left an obvious hole with seven
+            // destinations; distributing each ring by its actual item count
+            // keeps the dial visually continuous at 320px too.
+            const innerCount = Math.min(3, tabs.length);
+            const inner = index < innerCount;
+            const ringIndex = inner ? index : index - innerCount;
+            const ringCount = inner ? innerCount : tabs.length - innerCount;
+            const startAngle = inner ? 170 : 178;
+            const endAngle = inner ? 90 : 88;
+            const angle =
+              ringCount <= 1
+                ? (startAngle + endAngle) / 2
+                : startAngle - (ringIndex * (startAngle - endAngle)) / (ringCount - 1);
+            const radius = inner ? 122 : 198;
             const style = {
               '--petal-x': `${Math.cos((angle * Math.PI) / 180) * radius}px`,
               '--petal-y': `${-Math.sin((angle * Math.PI) / 180) * radius}px`,

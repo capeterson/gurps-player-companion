@@ -10854,6 +10854,14 @@
                                 "minimum": 0,
                                 "maximum": 4
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -16362,6 +16370,14 @@
                         "minimum": 0,
                         "maximum": 4
                       },
+                      "wieldedSide": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                          "left",
+                          "right"
+                        ]
+                      },
                       "ranged": {
                         "type": "object",
                         "nullable": true,
@@ -16977,6 +16993,14 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 4
+                        },
+                        "wieldedSide": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "left",
+                            "right"
+                          ]
                         },
                         "ranged": {
                           "type": "object",
@@ -17676,6 +17700,14 @@
                         "minimum": 0,
                         "maximum": 4
                       },
+                      "wieldedSide": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                          "left",
+                          "right"
+                        ]
+                      },
                       "ranged": {
                         "type": "object",
                         "nullable": true,
@@ -18288,6 +18320,14 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 4
+                        },
+                        "wieldedSide": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "left",
+                            "right"
+                          ]
                         },
                         "ranged": {
                           "type": "object",
@@ -28331,6 +28371,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -28868,6 +28916,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -31580,6 +31636,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -32117,6 +32181,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -35100,6 +35172,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -35637,6 +35717,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -38428,6 +38516,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -38965,6 +39061,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -42618,6 +42722,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -43155,6 +43267,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -46829,6 +46949,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -47366,6 +47494,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -50100,6 +50236,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -50637,6 +50781,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -53881,6 +54033,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -54418,6 +54578,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -57682,6 +57850,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -58219,6 +58395,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -60953,6 +61137,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -61490,6 +61682,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -64390,6 +64590,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -64927,6 +65135,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -67849,6 +68065,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -68386,6 +68610,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -71120,6 +71352,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -71657,6 +71897,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -74502,6 +74750,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -75039,6 +75295,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -77906,6 +78170,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -78443,6 +78715,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -81177,6 +81457,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -81714,6 +82002,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -84578,6 +84874,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -85115,6 +85419,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -88000,6 +88312,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -88537,6 +88857,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -91271,6 +91599,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -91808,6 +92144,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -92580,6 +92924,14 @@
                         "minimum": 0,
                         "maximum": 4
                       },
+                      "wieldedSide": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                          "left",
+                          "right"
+                        ]
+                      },
                       "ranged": {
                         "type": "object",
                         "nullable": true,
@@ -93195,6 +93547,14 @@
                               "nullable": true,
                               "minimum": 0
                             },
+                            "wieldedSide": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "left",
+                                "right"
+                              ]
+                            },
                             "ranged": {
                               "type": "object",
                               "nullable": true,
@@ -93732,6 +94092,14 @@
                               "nullable": true,
                               "minimum": 0,
                               "maximum": 4
+                            },
+                            "wieldedSide": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "left",
+                                "right"
+                              ]
                             },
                             "ranged": {
                               "type": "object",
@@ -96088,6 +96456,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -96625,6 +97001,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -97422,6 +97806,14 @@
                         "minimum": 0,
                         "maximum": 4
                       },
+                      "wieldedSide": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                          "left",
+                          "right"
+                        ]
+                      },
                       "ranged": {
                         "type": "object",
                         "nullable": true,
@@ -98034,6 +98426,14 @@
                               "nullable": true,
                               "minimum": 0
                             },
+                            "wieldedSide": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "left",
+                                "right"
+                              ]
+                            },
                             "ranged": {
                               "type": "object",
                               "nullable": true,
@@ -98571,6 +98971,14 @@
                               "nullable": true,
                               "minimum": 0,
                               "maximum": 4
+                            },
+                            "wieldedSide": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "left",
+                                "right"
+                              ]
                             },
                             "ranged": {
                               "type": "object",
@@ -100927,6 +101335,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -101464,6 +101880,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -104198,6 +104622,14 @@
                                 "nullable": true,
                                 "minimum": 0
                               },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
+                              },
                               "ranged": {
                                 "type": "object",
                                 "nullable": true,
@@ -104735,6 +105167,14 @@
                                 "nullable": true,
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              "wieldedSide": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               "ranged": {
                                 "type": "object",
@@ -107560,6 +108000,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -108097,6 +108545,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -110834,6 +111290,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -111371,6 +111835,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",
@@ -114106,6 +114578,14 @@
                                     "nullable": true,
                                     "minimum": 0
                                   },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
                                   "ranged": {
                                     "type": "object",
                                     "nullable": true,
@@ -114643,6 +115123,14 @@
                                     "nullable": true,
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  "wieldedSide": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   "ranged": {
                                     "type": "object",

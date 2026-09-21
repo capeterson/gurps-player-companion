@@ -19,6 +19,7 @@ import type {
   CharacterDetail,
   ResolvedEffectOut,
 } from '../../../../../shared/schemas/character.ts';
+import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import type { RollRequest } from '../rollTypes.ts';
 import {
   type DefenseSort,
@@ -138,7 +139,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
   });
   const equippedItems = character.inventory.filter((item) => item.equipped);
   const weapons = equippedItems.filter((item) => item.weaponData != null);
-  const shield = pickShield(equippedItems);
+  const shield = pickShield(equippedItems, facing);
   const shieldDb = shield?.db ?? 0;
   const armorDbSource = resolveArmorDb(character.inventory, hitLocation, facing);
   const armorDb = armorDbSource?.db ?? 0;
@@ -424,12 +425,8 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
               >
                 <tr>
                   <td className="px-2">
-                    <button
-                      type="button"
-                      draggable
-                      className="btn btn-ghost btn-xs cursor-grab px-1"
+                    <DragHandle
                       aria-label={`Reorder row ${customIndex + 1}`}
-                      title="Drag or use arrow keys to reorder"
                       data-position={customIndex}
                       onDragStart={(event) => {
                         event.dataTransfer.setData('text/plain', row.id);
@@ -446,9 +443,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                           moveRow(row.id, 1);
                         }
                       }}
-                    >
-                      <span aria-hidden="true">↕</span>
-                    </button>
+                    />
                   </td>
                   <th scope="row" className="min-w-44 align-top">
                     <span className="font-medium">{row.label}</span>

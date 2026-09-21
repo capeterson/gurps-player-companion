@@ -8567,6 +8567,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -24172,6 +24186,20 @@
                           }
                         ]
                       },
+                      "wieldedSide": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "left",
+                              "right"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "ranged": {
                         "anyOf": [
                           {
@@ -25103,6 +25131,20 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "wieldedSide": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               {
                                 "type": "null"
@@ -26279,6 +26321,20 @@
                           }
                         ]
                       },
+                      "wieldedSide": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "left",
+                              "right"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "ranged": {
                         "anyOf": [
                           {
@@ -27207,6 +27263,20 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 4
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "wieldedSide": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "left",
+                                  "right"
+                                ]
                               },
                               {
                                 "type": "null"
@@ -43905,6 +43975,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -44713,6 +44797,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -50305,6 +50403,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -51113,6 +51225,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -57460,6 +57586,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -58268,6 +58408,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -63747,6 +63901,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -64555,6 +64723,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -71020,6 +71202,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -71828,6 +72024,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -77301,6 +77511,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -78109,6 +78333,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -84575,6 +84813,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -85383,6 +85635,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -91809,6 +92075,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -92617,6 +92897,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -98089,6 +98383,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -98897,6 +99205,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -105306,6 +105628,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -106114,6 +106450,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -111860,6 +112210,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -112668,6 +113032,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -118140,6 +118518,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -118948,6 +119340,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -124680,6 +125086,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -125488,6 +125908,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -131107,6 +131541,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -131915,6 +132363,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -137387,6 +137849,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -138195,6 +138671,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -143800,6 +144290,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -144608,6 +145112,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -150270,6 +150788,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -151078,6 +151610,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -156550,6 +157096,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -157358,6 +157918,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -163005,6 +163579,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -163813,6 +164401,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -167038,6 +167640,20 @@
                           }
                         ]
                       },
+                      "wieldedSide": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "left",
+                              "right"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "ranged": {
                         "anyOf": [
                           {
@@ -167986,6 +168602,20 @@
                                   }
                                 ]
                               },
+                              "wieldedSide": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "ranged": {
                                 "anyOf": [
                                   {
@@ -168794,6 +169424,20 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "wieldedSide": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   {
                                     "type": "null"
@@ -171640,6 +172284,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -172448,6 +173106,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -177920,6 +178592,20 @@
                                     }
                                   ]
                                 },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "ranged": {
                                   "anyOf": [
                                     {
@@ -178728,6 +179414,20 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 4
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "wieldedSide": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "left",
+                                        "right"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -181942,6 +182642,20 @@
                           }
                         ]
                       },
+                      "wieldedSide": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "left",
+                              "right"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "ranged": {
                         "anyOf": [
                           {
@@ -182887,6 +183601,20 @@
                                   }
                                 ]
                               },
+                              "wieldedSide": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "ranged": {
                                 "anyOf": [
                                   {
@@ -183695,6 +184423,20 @@
                                     "type": "integer",
                                     "minimum": 0,
                                     "maximum": 4
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "wieldedSide": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "left",
+                                      "right"
+                                    ]
                                   },
                                   {
                                     "type": "null"
@@ -186541,6 +187283,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -187349,6 +188105,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -192936,6 +193706,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -193744,6 +194528,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -199217,6 +200015,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -200025,6 +200837,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"
@@ -205498,6 +206324,20 @@
                                         }
                                       ]
                                     },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "ranged": {
                                       "anyOf": [
                                         {
@@ -206306,6 +207146,20 @@
                                           "type": "integer",
                                           "minimum": 0,
                                           "maximum": 4
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "wieldedSide": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "left",
+                                            "right"
+                                          ]
                                         },
                                         {
                                           "type": "null"

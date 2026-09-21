@@ -53,6 +53,19 @@ describe('aggregateDrByLocation', () => {
     expect(result.get('arm_left')?.dr).toBe(3);
   });
 
+  it('filters directional DR for front, back, and side facings', () => {
+    const layers = [
+      item(2, ['torso'], { frontOnly: true }),
+      item(3, ['torso'], { backOnly: true }),
+      item(4, ['torso']),
+    ];
+
+    expect(aggregateDrByLocation(layers, 'front').get('torso')?.dr).toBe(6);
+    expect(aggregateDrByLocation(layers, 'back').get('torso')?.dr).toBe(7);
+    expect(aggregateDrByLocation(layers, 'left').get('torso')?.dr).toBe(4);
+    expect(aggregateDrByLocation(layers, 'right').get('torso')?.dr).toBe(4);
+  });
+
   it('skips unequipped or non-armor items', () => {
     const result = aggregateDrByLocation([
       item(4, ['torso']),
@@ -505,6 +518,8 @@ describe('resolveArmorDb', () => {
     const frontA = { ...item(2, ['torso'], { db: 3, frontOnly: true }), id: 'a', name: 'Front A' };
     expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'front')?.itemId).toBe('a');
     expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'back')?.itemId).toBe('b');
+    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'left')).toBeNull();
+    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'right')).toBeNull();
   });
 });
 

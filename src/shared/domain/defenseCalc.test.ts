@@ -249,10 +249,15 @@ describe('stShortfallPenalty', () => {
 });
 
 describe('pickShield', () => {
-  const shield = (name: string, db: number | null, equipped = true) => ({
+  const shield = (
+    name: string,
+    db: number | null,
+    equipped = true,
+    wieldedSide?: 'left' | 'right',
+  ) => ({
     equipped,
     name,
-    weaponData: { db, alternateModes: [] },
+    weaponData: { db, alternateModes: [], wieldedSide },
   });
 
   it('picks the equipped item with a non-null db', () => {
@@ -280,6 +285,17 @@ describe('pickShield', () => {
     expect(pickShield([shield('Zeta Shield', 2), shield('Alpha Shield', 2)])).toMatchObject({
       name: 'Alpha Shield',
     });
+  });
+
+  it('applies a side-specific shield to the front and matching side only', () => {
+    const left = shield('Left Shield', 2, true, 'left');
+    const right = shield('Right Shield', 1, true, 'right');
+
+    expect(pickShield([left, right], 'front')?.name).toBe('Left Shield');
+    expect(pickShield([left, right], 'left')?.name).toBe('Left Shield');
+    expect(pickShield([left, right], 'right')?.name).toBe('Right Shield');
+    expect(pickShield([left, right], 'back')).toBeNull();
+    expect(pickShield([shield('Legacy Shield', 3)], 'back')?.name).toBe('Legacy Shield');
   });
 });
 

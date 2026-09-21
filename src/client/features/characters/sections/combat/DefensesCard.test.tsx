@@ -169,12 +169,12 @@ describe('DefensesCard', () => {
     const character = withMultipleDefenses();
     const view = render(<DefensesCard character={character} openRoll={vi.fn()} />);
     const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
-    fireEvent.dragStart(
-      within(screen.getByRole('rowgroup', { name: 'Parry (Axe)' })).getByRole('button', {
-        name: /Reorder/,
-      }),
-      { dataTransfer },
+    const handle = within(screen.getByRole('rowgroup', { name: 'Parry (Axe)' })).getByRole(
+      'button',
+      { name: /Reorder/ },
     );
+    expect(handle).toHaveTextContent('⠿');
+    fireEvent.dragStart(handle, { dataTransfer });
     fireEvent.dragOver(screen.getByRole('rowgroup', { name: 'Dodge' }), { dataTransfer });
     fireEvent.drop(screen.getByRole('rowgroup', { name: 'Dodge' }), { dataTransfer });
     expect(defenseOrder()[0]).toBe('Parry (Axe)');

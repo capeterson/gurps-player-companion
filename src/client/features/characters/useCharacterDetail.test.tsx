@@ -233,7 +233,7 @@ describe('durable character mechanics', () => {
     },
   );
 
-  it('keeps current HP and FP controls out of the shared Status panel', async () => {
+  it('keeps Current Status available on Identity and uses the markdown Description editor', async () => {
     await seed();
     await getLocalDb().campaigns.put({
       id: CAMPAIGN,
@@ -272,11 +272,13 @@ describe('durable character mechanics', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
     fireEvent.click(screen.getByRole('button', { name: 'Identity' }));
-    await waitFor(() => expect(screen.getByText('Basic Lift')).toBeInTheDocument());
-    expect(screen.queryByLabelText('current HP')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('current FP')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Hit points')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Fatigue points')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Description')).toBeInTheDocument());
+    expect(screen.getByRole('complementary', { name: 'Current Status' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();
+    expect(screen.getByLabelText('description')).toHaveAttribute('contenteditable', 'true');
+    expect(screen.getByRole('button', { name: 'Bold' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
   });
 
   it('renders human labels for active and legacy dismissed warning codes', async () => {

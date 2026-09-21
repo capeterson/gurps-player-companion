@@ -14,6 +14,7 @@
  */
 
 import type { WeaponData } from '../schemas/inventory.ts';
+import type { ArmorFacing } from './armorDr.ts';
 
 /** Dodge after encumbrance (B17). `encumbrancePenalty` must be <= 0. */
 export function effectiveDodge(dodge: number, encumbrancePenalty: number): number {
@@ -256,14 +257,21 @@ export interface PickedShield {
  * The character's active shield: the equipped item with a non-null
  * Defense Bonus (`weaponData.db`). Presence of `db` — not its
  * magnitude — is the shield marker (a DB 0 shield still blocks).
- * Several equipped shields: highest DB wins, ties broken by name for
- * determinism.
+ * A shield with `wieldedSide` protects the front and that matching side,
+ * but not the opposite side or back. Legacy shields without a side retain
+ * their prior behavior. Several applicable shields: highest DB wins, ties
+ * broken by name for determinism.
  */
-export function pickShield(items: readonly ShieldItemRow[]): PickedShield | null {
+export function pickShield(
+  items: readonly ShieldItemRow[],
+  facing?: ArmorFacing,
+): PickedShield | null {
   let best: PickedShield | null = null;
   for (const item of items) {
     const db = item.weaponData?.db;
     if (!item.equipped || item.weaponData == null || db == null) continue;
+    const side = item.weaponData.wieldedSide;
+    if (side && facing && facing !== 'front' && facing !== side) continue;
     if (
       best === null ||
       db > best.db ||

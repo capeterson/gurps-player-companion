@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +12,7 @@ import {
 import { useCombatPatch } from '../useCombatPatch.ts';
 import type { PoolBumpers } from '../usePoolBumpers.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
-import { FloatingPoolsBar, rangePointPercent } from './FloatingPoolsBar.tsx';
+import { CurrentStatusBar, rangePointPercent } from './CurrentStatusBar.tsx';
 
 vi.mock('../../../../lib/toast.tsx', () => ({ useToasts: () => ({ push: vi.fn() }) }));
 
@@ -46,17 +46,27 @@ function LivePoolsHarness({ observed }: { observed: number[] }) {
       posture: 'standing',
     },
   } as unknown as CharacterDetail;
-  const bumpers = usePoolBumpers(character, true, useCombatPatch(character));
+  const patchCombat = useCombatPatch(character);
+  const bumpers = usePoolBumpers(character, true, patchCombat);
   useEffect(() => {
     observed.push(bumpers.fp);
   }, [bumpers.fp, observed]);
-  return <FloatingPoolsBar character={character} bumpers={bumpers} canWrite />;
+  return (
+    <CurrentStatusBar
+      character={character}
+      bumpers={bumpers}
+      canWrite
+      patchCombat={patchCombat}
+      openRoll={vi.fn()}
+    />
+  );
 }
 
-function setup(hp = 10, fp = 10, max = 12) {
+function setup(hp = 10, fp = 10, max = 12, maneuver: string | null = null) {
   const character = {
     id: 'character-1',
-    combat: { conditions: [] },
+    derived: { effectiveHt: 10 },
+    combat: { conditions: [], posture: 'standing', maneuver },
   } as unknown as CharacterDetail;
   const bumpHp = vi.fn();
   const bumpFp = vi.fn();
@@ -77,19 +87,51 @@ function setup(hp = 10, fp = 10, max = 12) {
     resetFp: vi.fn(),
     flashHp: false,
   };
-  const view = render(<FloatingPoolsBar character={character} bumpers={bumpers} canWrite />);
+  const patchCombat = vi.fn().mockResolvedValue(undefined);
+  const openRoll = vi.fn();
+  const view = render(
+    <CurrentStatusBar
+      character={character}
+      bumpers={bumpers}
+      canWrite
+      patchCombat={patchCombat}
+      openRoll={openRoll}
+    />,
+  );
   const rerenderPools = (nextHp: number, nextFp = fp) =>
     view.rerender(
-      <FloatingPoolsBar
+      <CurrentStatusBar
         character={character}
         bumpers={{ ...bumpers, hp: nextHp, fp: nextFp }}
         canWrite
+        patchCombat={patchCombat}
+        openRoll={openRoll}
       />,
     );
-  return { bumpHp, bumpFp, setHp, setFp, rerenderPools, ...view };
+  return { bumpHp, bumpFp, setHp, setFp, patchCombat, openRoll, rerenderPools, ...view };
 }
 
-describe('FloatingPoolsBar', () => {
+describe('Current Status', () => {
+  it('collapses the secondary mobile row while retaining its state summary', () => {
+    setup(10, 10, 12, 'Attack');
+
+    const toggle = screen.getByRole('button', { name: /^Show status details:/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('Standing · Attack · None');
+    expect(
+      screen.getByLabelText('Change posture, current Standing').closest('.col-span-2'),
+    ).toHaveClass('hidden');
+
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: /^Hide status details:/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(
+      screen.getByLabelText('Change posture, current Standing').closest('.col-span-2'),
+    ).toHaveClass('grid');
+  });
+
   it('anchors visible uneven-threshold labels at their corresponding range values', () => {
     // Exhaust every positive maximum the character schema can produce:
     // base ST/HT (99) + permanent modifier (50) + temporary pool modifier (50).
@@ -104,7 +146,7 @@ describe('FloatingPoolsBar', () => {
     }
 
     setup(0, 8, 15);
-    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
     for (const [value, left, anchor] of [
       [-15, '0%', 'start'],
       [0, '50%', 'center'],
@@ -123,7 +165,7 @@ describe('FloatingPoolsBar', () => {
   it('derives rendered threshold labels from each character pool maximum', () => {
     for (const maximum of [1, 7, 15, 37, 99, 199]) {
       const { unmount } = setup(maximum, maximum, maximum);
-      fireEvent.click(screen.getByLabelText('Adjust HP'));
+      fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
 
       const threshold = Math.ceil(maximum / 3);
       const thresholdLabel = screen.getByText('Reeling ends').closest('[data-range-label]');
@@ -146,8 +188,8 @@ describe('FloatingPoolsBar', () => {
 
   it('labels and exposes both pools with range controls and recovery notes', () => {
     setup();
-    const hpButton = screen.getByLabelText('Adjust HP');
-    const fpButton = screen.getByLabelText('Adjust FP');
+    const hpButton = screen.getByLabelText(/^Adjust HP,/);
+    const fpButton = screen.getByLabelText(/^Adjust FP,/);
     expect(hpButton).toHaveTextContent('HP10/ 12');
     expect(fpButton).toHaveTextContent('FP10/ 12');
     expect(hpButton).toHaveAttribute('aria-expanded', 'false');
@@ -167,11 +209,11 @@ describe('FloatingPoolsBar', () => {
 
   it('sends range movement as an absolute transactional target', () => {
     const { setHp, setFp } = setup();
-    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
     fireEvent.change(screen.getByRole('slider', { name: 'Set HP' }), {
       target: { value: '7' },
     });
-    fireEvent.click(screen.getByLabelText('Adjust FP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust FP,/));
     fireEvent.change(screen.getByRole('slider', { name: 'Set FP' }), {
       target: { value: '8' },
     });
@@ -182,14 +224,14 @@ describe('FloatingPoolsBar', () => {
   it('offers precise minus-one and plus-one controls for both pools', () => {
     const { bumpHp, bumpFp } = setup();
 
-    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
     expect(screen.getByLabelText('HP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease HP by 1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Increase HP by 1' }));
     expect(bumpHp).toHaveBeenNthCalledWith(1, -1);
     expect(bumpHp).toHaveBeenNthCalledWith(2, 1);
 
-    fireEvent.click(screen.getByLabelText('Adjust FP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust FP,/));
     expect(screen.getByLabelText('FP step controls')).toHaveClass('join', 'grid', 'w-full');
     fireEvent.click(screen.getByRole('button', { name: 'Decrease FP by 1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Increase FP by 1' }));
@@ -199,7 +241,7 @@ describe('FloatingPoolsBar', () => {
 
   it('renders only the durable prop when local observations are skipped or batched', () => {
     const { rerenderPools } = setup(10, 10, 20);
-    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
     rerenderPools(11);
     expect(screen.getByLabelText('Current HP')).toHaveTextContent('11');
     rerenderPools(14);
@@ -285,7 +327,7 @@ describe('FloatingPoolsBar', () => {
     const orchestrator = getSyncOrchestrator();
     orchestrator.start();
     try {
-      fireEvent.click(screen.getByLabelText('Adjust FP'));
+      fireEvent.click(screen.getByLabelText(/^Adjust FP,/));
       const increase = screen.getByRole('button', { name: 'Increase FP by 1' });
       fireEvent.click(increase);
       await waitFor(() => expect(screen.getByLabelText('Current FP')).toHaveTextContent('9'));
@@ -326,8 +368,8 @@ describe('FloatingPoolsBar', () => {
       revision: 1,
     });
     render(<LivePoolsHarness observed={[]} />);
-    await waitFor(() => expect(screen.getByLabelText('Adjust FP')).toHaveTextContent('FP12'));
-    fireEvent.click(screen.getByLabelText('Adjust FP'));
+    await waitFor(() => expect(screen.getByLabelText(/^Adjust FP,/)).toHaveTextContent('FP12'));
+    fireEvent.click(screen.getByLabelText(/^Adjust FP,/));
     const increase = screen.getByRole('button', { name: 'Increase FP by 1' });
 
     fireEvent.click(increase);
@@ -342,7 +384,7 @@ describe('FloatingPoolsBar', () => {
 
   it('keeps one panel viewport-fixed when narrow and trigger-anchored on desktop', () => {
     setup();
-    fireEvent.click(screen.getByLabelText('Adjust FP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust FP,/));
     const panel = screen.getByRole('group', { name: 'FP adjustment' });
     expect(panel).toHaveClass(
       'dropdown-content',
@@ -350,10 +392,10 @@ describe('FloatingPoolsBar', () => {
       'left-1/2!',
       'w-[calc(100dvw_-_2rem)]',
       'max-w-lg',
-      'lg:absolute!',
-      'lg:left-0!',
-      'lg:top-full!',
-      'lg:translate-x-0',
+      'md:absolute!',
+      'md:left-0!',
+      'md:top-full!',
+      'md:translate-x-0',
     );
     expect(panel.parentElement).toHaveClass('dropdown', 'dropdown-start', 'dropdown-open');
     expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);
@@ -361,22 +403,100 @@ describe('FloatingPoolsBar', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'FP adjustment' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Adjust HP'));
+    fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('group', { name: 'HP adjustment' })).not.toBeInTheDocument();
   });
 
-  it('shows derived pool conditions as badges', () => {
+  it('summarizes threshold warnings beside each pool', () => {
     setup(-12, -12);
-    for (const status of [
-      'Reeling',
-      'Tired',
-      'Exhausted',
-      'Consciousness checks',
-      'Death check',
-      'Unconscious',
-    ]) {
+    for (const status of ['Death checks', 'Exhausted']) {
       expect(screen.getByText(status, { selector: '.badge' })).toBeInTheDocument();
     }
+  });
+
+  it('distinguishes consciousness rolls at zero HP from death checks at negative maximum', () => {
+    const atZero = setup(0, 12, 12);
+    expect(screen.getByText('Stay conscious', { selector: '.badge' })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
+    expect(
+      within(screen.getByRole('group', { name: 'HP adjustment' })).getByRole('button', {
+        name: /Stay conscious/,
+      }),
+    ).toBeVisible();
+    expect(screen.getByText(/Death checks begin at −12 HP/)).toBeInTheDocument();
+    atZero.unmount();
+
+    setup(-12, 12, 12);
+    fireEvent.click(screen.getByLabelText(/^Adjust HP,/));
+    expect(
+      within(screen.getByRole('group', { name: 'HP adjustment' })).getByRole('button', {
+        name: /Death check/,
+      }),
+    ).toBeVisible();
+  });
+
+  it('keeps the manual Reeling reminder in the conditions editor', () => {
+    setup(3, 12, 12);
+    fireEvent.click(screen.getByLabelText('Change conditions, current None'));
+    expect(screen.getByText('Reeling suggested')).toBeInTheDocument();
+  });
+
+  it('keeps posture, maneuver, and conditions in one mutually exclusive status editor', () => {
+    const { patchCombat } = setup();
+
+    fireEvent.click(screen.getByLabelText('Change posture, current Standing'));
+    expect(screen.getByRole('heading', { name: 'Posture' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'kneeling' }));
+    expect(patchCombat).toHaveBeenCalledWith('posture', 'kneeling');
+    expect(screen.queryByRole('heading', { name: 'Posture' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('Change maneuver, current None'));
+    expect(screen.getByRole('heading', { name: 'Maneuver' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Attack' }));
+    expect(patchCombat).toHaveBeenCalledWith('maneuver', 'Attack');
+
+    fireEvent.click(screen.getByLabelText('Change conditions, current None'));
+    expect(screen.getByRole('heading', { name: 'Conditions' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Maneuver' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Stunned' }));
+    expect(patchCombat).toHaveBeenCalledWith('conditions', ['stunned']);
+    expect(screen.getByRole('heading', { name: 'Conditions' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('heading', { name: 'Conditions' })).not.toBeInTheDocument();
+  });
+
+  it('preserves maneuver guidance and clears an active preset when selected again', () => {
+    const { patchCombat } = setup(12, 12, 12, 'All-Out Attack');
+
+    fireEvent.click(screen.getByLabelText('Change maneuver, current All-Out Attack'));
+    expect(screen.getByText(/NO defenses; move half forward only/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'All-Out Attack' }));
+    expect(patchCombat).toHaveBeenCalledWith('maneuver', null);
+  });
+
+  it('keeps an unset custom maneuver empty without persisting literal null text', () => {
+    const { patchCombat } = setup();
+
+    fireEvent.click(screen.getByLabelText('Change maneuver, current None'));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
+    const input = screen.getByRole('textbox', { name: 'Custom maneuver' });
+    expect(input).toHaveValue('');
+    fireEvent.blur(input);
+    expect(patchCombat).not.toHaveBeenCalled();
+  });
+
+  it('commits a typed custom maneuver before an outside pointer dismisses its panel', async () => {
+    const { patchCombat } = setup();
+
+    fireEvent.click(screen.getByLabelText('Change maneuver, current None'));
+    fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Custom maneuver' }), {
+      target: { value: 'Ready — draw sword' },
+    });
+    fireEvent.pointerDown(document.body);
+
+    await waitFor(() => expect(patchCombat).toHaveBeenCalledWith('maneuver', 'Ready — draw sword'));
+    expect(screen.queryByRole('heading', { name: 'Maneuver' })).not.toBeInTheDocument();
   });
 });

@@ -7,7 +7,6 @@ export const CHARACTER_SECTIONS = [
   'Skills',
   'Magic',
   'Inventory',
-  'Notes',
   'History',
 ] as const;
 

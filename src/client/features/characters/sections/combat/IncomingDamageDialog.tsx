@@ -30,6 +30,7 @@ export interface IncomingDamageDialogProps {
   bumpHp: (delta: number) => void;
   onClose: () => void;
   initialLocation?: string;
+  initialFacing?: ArmorFacing;
   initialType?: string;
   initialDivisor?: string;
 }
@@ -42,6 +43,7 @@ export function IncomingDamageDialog({
   bumpHp,
   onClose,
   initialLocation = 'torso',
+  initialFacing = 'front',
   initialType = 'cr',
   initialDivisor = '',
 }: IncomingDamageDialogProps) {
@@ -49,7 +51,7 @@ export function IncomingDamageDialog({
   const [basicRaw, setBasicRaw] = useState('');
   const [type, setType] = useState(initialType);
   const [location, setLocation] = useState(initialLocation);
-  const [facing, setFacing] = useState<ArmorFacing | undefined>(undefined);
+  const [facing, setFacing] = useState<ArmorFacing>(initialFacing);
   const [divisorRaw, setDivisorRaw] = useState(initialDivisor);
   const [customDivisor, setCustomDivisor] = useState(
     !ARMOR_DIVISORS.some(([value]) => value === initialDivisor),
@@ -59,8 +61,8 @@ export function IncomingDamageDialog({
   const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
 
   const drMap = useMemo(
-    () => effectiveDrByLocation(character.inventory, character.effects),
-    [character.inventory, character.effects],
+    () => effectiveDrByLocation(character.inventory, character.effects, facing),
+    [character.inventory, character.effects, facing],
   );
 
   // Custom armor locations the character actually has, beyond the
@@ -162,17 +164,14 @@ export function IncomingDamageDialog({
             <span className="label-eyebrow">Incoming facing</span>
             <select
               aria-label="Incoming facing"
-              value={facing ?? ''}
-              onChange={(event) =>
-                setFacing(
-                  event.target.value === '' ? undefined : (event.target.value as ArmorFacing),
-                )
-              }
+              value={facing}
+              onChange={(event) => setFacing(event.target.value as ArmorFacing)}
               className="select select-sm select-bordered"
             >
-              <option value="">Unknown</option>
               <option value="front">Front</option>
               <option value="back">Back</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
             </select>
           </label>
 

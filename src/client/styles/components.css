@@ -512,13 +512,13 @@
   background: var(--color-base-200);
 }
 
-/* Character navigation extends daisyUI's four-petal flower to eight destinations.
-   Two radii leave room for permanent labels even at a 320px viewport. */
+/* Character navigation extends daisyUI's flower to seven destinations.
+   Two balanced arcs leave room for permanent labels even at a 320px viewport. */
 .sheet-with-navigation {
   padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
 }
 .sheet-section-heading {
-  scroll-margin-top: 12rem;
+  scroll-margin-top: var(--sheet-sticky-offset, 12rem);
 }
 .sheet-dock {
   z-index: 40;

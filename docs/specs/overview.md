@@ -89,7 +89,7 @@ invalidation behavior as REST.
 ### Character sheet (the core surface)
 Route `/characters/:id`. Sectioned sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), destinations:
-**Combat, Identity, Traits, Skills, Magic, Inventory, Notes, History**.
+**Combat, Identity, Traits, Skills, Magic, Inventory, History**.
 Combat is the default section for live play. Magic is hidden on a read-only
 view of a non-magical character; owners always have it available to add magic.
 
@@ -100,8 +100,8 @@ shows the synced campaign name as a separate link to that campaign.
 - **Sheet navigation and icons.** A floating bottom daisyUI dock at widths of
   768px and above replaces the sheet tab bar, with etched outline icons, labels,
   entry counts, and a violet active marker. Below 768px a bottom-right FAB shows
-  the active section icon and opens a two-ring flower speed dial with 48px icon
-  buttons for all available destinations. Each petal has a permanent label below
+  the active section icon and opens a balanced two-ring flower speed dial with
+  48px icon buttons for all available destinations. Each petal has a permanent label below
   its icon and a separate entry-count badge where applicable, with no tooltip.
   The wider rings keep labels apart and inside a 320px viewport;
   selecting a section closes the flower and focuses/scrolls its visible heading.
@@ -111,7 +111,7 @@ shows the synced campaign name as a separate link to that campaign.
   dialogs. Reduced motion disables the flower entrance and sync rotation.
   `SheetNavigation.tsx` owns this responsive control. `AppIcon.tsx` standardizes
   Lucide icons at a 1.75 stroke weight: swords, portrait, fingerprint, target,
-  book, backpack, quill and history for the sheet, with matching map, bell,
+  book, backpack and history for the sheet, with matching map, bell,
   sun/moon, edit, shield, and six-sided die icons across related controls.
 - **Narrow-screen navigation.** Character and Campaign navigation groups wrap
   within the available header width; long breadcrumbs remain truncated and
@@ -125,7 +125,7 @@ shows the synced campaign name as a separate link to that campaign.
   open/closed preferences per character/section in device-local `localStorage`
   (`gpc:fold:*`), never the server. Content stays mounted while folded so drafts,
   pending saves, roll state and selections survive folding. Storage failures do
-  not prevent folding. Recovery/thresholds, the point ledger, defense breakdowns, and the full DR
+  not prevent folding. The point ledger, defense breakdowns, and the full DR
   details start folded. The armor body map is the single all-location DR overview.
 - **Markdown descriptions.** Library traits, skills and spells render sanitized
   CommonMark/GFM descriptions; their spacious add/edit forms (including skill
@@ -135,24 +135,26 @@ shows the synced campaign name as a separate link to that campaign.
   preview beside the compact source editor for owners.
 - **Identity tab.** Name, height, weight, age, **birthdate** (free-form
   text, e.g. "3/7/0402"), campaign assignment, and
-  an **appearance/notes** field. No per-character "player" field is
+  a **Description** field (stored in the existing `appearance` column). No
+  per-character "player" field is
   tracked — the character's owner (the authenticated user who created
   it) is the player. **Tech level** is likewise not set per character:
   it's read-only here, sourced from the parent campaign (or an em dash
-  when campaignless). Appearance/notes is edited with the same
+  when campaignless). Description is edited with the same
   WYSIWYG **markdown editor** (`RichTextEditor`/`Markdown`,
   `src/client/components/markdown/`) used by the adventure log, with a
-  raw-markdown/source toggle and sanitized rendering; the Notes tab is
-  a thin second surface over the same `appearance` column.
+  raw-markdown/source toggle and sanitized rendering. It has no separate
+  Notes destination or duplicate editing surface.
 - **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
   Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary** card
   surfaces the six secondary stats (HP, Will, Per, FP, Basic Speed, Basic
   Move) with their effective values and per-stat ✦ temp-modifier
   popovers. The **Status** card shows derived combat values not displayed
-  elsewhere — Dodge, Basic Lift, and Thr / Sw — while current HP/FP pools
-  and their mutations live only in the Combat tab. The
-  sheet's top row no longer duplicates the six secondary numbers. Temporary ST/HT boosts
+  elsewhere — Dodge, Basic Lift, and Thr / Sw. Current HP/FP, posture,
+  maneuver, and conditions live in the persistent **Current Status** bar
+  described below. The sheet's top row no longer duplicates the six secondary
+  numbers. Temporary ST/HT boosts
   affect their normal derived values but not maximum HP/FP; only the
   dedicated temporary HP/FP modifiers change those maxima (M37). Basic
   Lift rounds to the nearest whole number once it reaches 10 (B15). All
@@ -171,7 +173,7 @@ shows the synced campaign name as a separate link to that campaign.
   the same name never reattaches old copies. Sheet rows show whether rules follow
   library updates or are retained; history records mechanics updates/detachment.
   Already unresolved legacy definitions pause calculated panels
-  and rolls with an explanation; identity, trait, inventory and notes editing remain
+  and rolls with an explanation; identity, trait, inventory and description editing remain
   available (inventory hides its unavailable Basic Lift/encumbrance classification).
   Library edits and YAML imports advance linked child revisions transactionally,
   so incremental HTTP pulls refresh definitions even after missed WS nudges or
@@ -349,7 +351,11 @@ shows the synced campaign name as a separate link to that campaign.
   combines case-insensitive item-name substring matching with a category/status
   tag (weapon, armor, container, powerstone, magic item, enchanted, worn, or
   equipped). Results retain the ancestor containers needed to locate matching
-  nested items while hiding every non-matching sibling and descendant. Equipped
+  nested items while hiding every non-matching sibling and descendant. Containers
+  start collapsed; their expanded/collapsed choice is remembered per character and
+  container in device-local `localStorage`, never synced. A collapsed container
+  shows a category-style count badge for every recursively contained item.
+  Filter-driven ancestor expansion is temporary and does not change the saved choice. Equipped
   armor and active innate DR are aggregated per hit location on the Combat tab's Defense &
   Damage Resistance card. Each enchanted armor layer expands its base DR into nested enchantment
   contributions; highest-only conflicts are resolved across every equipped layer
@@ -377,8 +383,8 @@ shows the synced campaign name as a separate link to that campaign.
   weapon ST, shield DB, ranged stats, alternate modes and notes; powerstone and
   magic-item notes; enchantment details; and basic notes/external location.
   Armor retains every canonical and custom hit location. Weapons retain
-  damage, reach, parry, governing skill, optional ranged stats and alternate
-  attack modes. Powerstones and magic items retain their charge/energy state
+  damage, reach, parry, governing skill, optional shield side, ranged stats,
+  and alternate attack modes. Powerstones and magic items retain their charge/energy state
   and shared validation. Legacy enchantment rows remain display metadata, while
   typed campaign or character-local enchantments contribute attack, damage, Accuracy,
   Parry/Block/DB, DR, armor divisor, weight reduction, or skill modifiers only under
@@ -393,36 +399,42 @@ shows the synced campaign name as a separate link to that campaign.
   Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
-- **Combat tab (live-gameplay surface)**. The first tab on the sheet
+- **Current Status and Combat tab (live-gameplay surfaces)**. Combat is the
+  first tab on the sheet
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
-  hop. Full-width Pools put HP, FP, and posture/conditions side by side on wide
-  screens. Maneuver, Attacks, the combined defense/armor workspace, the Solo
-  tracker, and roll history each use the full width. Sections stack on
+  hop. **Current Status** is a persistent, sheet-level bar directly below the
+  global header on every full character section (the privacy-preserving minimal
+  view does not receive it). It holds HP, FP, posture, maneuver, and conditions;
+  its measured height reserves content space and supplies section scroll offsets,
+  including when the global header wraps on phones. Attacks, the combined
+  defense/armor workspace, the Solo tracker, and roll history use the Combat tab's
+  full width. Sections stack on
   mobile instead of accumulating into two independent, uneven columns. Main combat
   sections fold independently, with responsive grids inside them.
-  - **Pools** — compact HP/FP meters with ±1 controls; ±5, reset and threshold
-    reference text live under **Recovery & thresholds**. Death-check actions and
-    the FP-floor warning remain visible. **Posture & conditions** shows the current
-    posture and active conditions; tap the posture or **Edit conditions** to choose
-    from the full lists. All 12 common-condition chips (normalized against legacy Capitalized entries
-    so old data still lights the right chip). Surfaces reeling
-    *and* death-check thresholds (B419/B423) in one caption, pulses a
-    "suggested" highlight on the Reeling chip in the condition chooser when HP drops below ⅓ max
-    and it isn't set yet — never auto-applied — and tracks HP down to
-    the certain-death floor at −5×HP. Each FP lost below zero also costs
+  - **Current Status** — compact HP/FP controls show their current/max values and
+    important warnings. Opening a pool reveals ±1 and ±5 controls, reset, a range
+    control, threshold/recovery guidance, death-check actions, and the FP-floor
+    warning. Posture and maneuver close after a preset selection; conditions stay
+    open for multi-selection until **Done**. The maneuver editor retains the active
+    preset's rules guidance and supports a custom free-text fallback. The collapsed condition summary shows
+    the first active condition plus `+N`. All common-condition chips normalize
+    legacy Capitalized entries so old data still lights the right chip. On phones,
+    the posture/maneuver/conditions row starts collapsed; its compact header still
+    summarizes all three states and toggles the row without hiding HP/FP. The
+    condition editor suggests Reeling below one-third HP but never applies it.
+    Each FP lost below zero also costs
     one HP, including a decrement crossing zero (B426); FP stops at −FP,
     after which loss is HP-only. Bumpers and spell spending reuse
     `applyFatigueLoss`. Bumpers compose with the latest local draft saves across
     inputs. Combined HP/FP edits enter one local transaction
     with a shared history batch; each field retains ordinary outbox coalescing,
     server settlement and rollback toast/flash behavior. One shared
-    `usePoolBumpers` instance feeds both the in-grid PoolsCard and the
-    floating pool bar so rapid changes across both UIs never race. The bar
-    appears at the top only after the sheet tab list has scrolled away, labels
-    both HP and FP, and opens one range popover at a time with threshold/recovery
+    `usePoolBumpers` instance feeds Current Status, so rapid changes never race.
+    The bar is always present on the full sheet and opens one editor at a time
+    with threshold/recovery
     marks and visible labels positioned from their actual values on the scale.
     Close threshold labels use staggered lanes so they retain their exact anchors
     without colliding. Each popover also has touch-sized −1/+1 controls for precise
@@ -431,14 +443,13 @@ shows the synced campaign name as a separate link to that campaign.
     200 ms deadline debounces only the network drain, allowing the outbox to
     coalesce rapid same-field changes without delaying or replaying the visible
     result. Slider targets are rebased inside the same transaction.
-    The two triggers share one adjustment panel. On phones and tablets it is
-    fixed and centered within the viewport; on desktop it is anchored below the
+    The two triggers share one adjustment panel. On phones it is fixed and
+    centered within the viewport; at 768px and above it is anchored below the
     active trigger. The desktop panel opens toward the available right side so
     FP cannot overflow the viewport's left edge. Escape or an outside tap
     dismisses it.
-    Derived pool states such as Reeling, Tired, Exhausted, death checks, and
-    Unconscious are visible as badges; exceptional/certain-death bounds are
-    de-emphasized notes rather than primary controls;
+    Immediate threshold warnings are visible beside the pool values; exceptional
+    and certain-death bounds are de-emphasized notes rather than primary controls;
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
     so two rapid condition taps before Dexie re-renders don't coalesce
     into one outbox patch and drop the first tap.
@@ -486,9 +497,13 @@ shows the synced campaign name as a separate link to that campaign.
     damage type's multiplier rather than multiplying it twice. Invalid damage
     and divisor inputs cannot be applied; fatigue damage is directed to FP.
     Hardened must be accounted for in the chosen effective divisor, and
-    directional DR remains combined rather than selecting front/back. The
-    shared hit-location and facing controls also resolve the highest applicable
-    armor DB plus shield DB; that defense-only context feeds Dodge, Parry, and
+    armor DR and DB both follow the selected incoming facing. Facing defaults to
+    **Front** and offers Front, Back, Left, and Right; there is no unknown state.
+    Front-only/back-only layers do not protect either side. The shared hit-location
+    and facing controls also resolve the highest applicable
+    armor DB plus shield DB. A shield with an optional left/right side protects
+    the front and its matching side; an unspecified legacy shield retains its
+    prior behavior. That defense-only context feeds Dodge, Parry, and
     Block while remaining explicitly separate from damage resistance.
     The dialog
     (`IncomingDamageDialog.tsx`) resolves a hit against the
@@ -506,16 +521,13 @@ shows the synced campaign name as a separate link to that campaign.
     destruction requires at least twice the crippling amount. The hint describes
     severing for cutting damage and generic destruction for other damage types. Conditions
     remain manual. Torso, skull, and eye-to-brain injuries are uncapped.
-  - **Maneuver** — shows the current choice and blurb, with **Change** opening
-    one-tap chips for all 13 B363-366 maneuvers (tapping the active chip clears
-    it; choosing closes the picker), plus
-    a "Custom…" free-text fallback using the same `useDraftField`
-    pattern as the sheet's Status card.
   - **Active defenses** — a compact, horizontally scrollable table inside
     **Defense & Damage Resistance**, with sortable Defense, Governing skill, and
     Final columns plus a device-local custom order that supports drag-and-drop and
     keyboard arrow reordering. The column headers are the only explicit sort controls;
-    dragging or using the row handles returns the table to custom order. Source
+    dragging or using the row handles returns the table to custom order. Attacks and
+    defenses share the canonical `DragHandle` control and its `⠿` glyph so reorder
+    affordances stay visually consistent. Source
     breakdowns stay collapsed on their rows; current restrictions and All-Out Defense
     choices remain visible. Move is not a defense and is omitted. Dodge includes
     the encumbrance-penalty breakdown and no invented minimum),
@@ -842,8 +854,9 @@ src/
                  RollSheet/RollableRow/rollHistory (per-character
                   localStorage roll log) primitives, RollHistoryPanel (the History
                   sub-tab browser), and combat/
-                  (CombatTab + Pools/Maneuver/Defenses/Attacks/DrSummary cards,
-                   ArmorLocationMap + IncomingDamageDialog)
+                  (CombatStatusProvider/CurrentStatusBar + CombatTab with
+                   Defenses/Attacks/DrSummary cards, ArmorLocationMap +
+                   IncomingDamageDialog)
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth),
@@ -880,8 +893,9 @@ src/
                    Defense & Damage Resistance card's damage dialog), armorDr (armor + innate DR
                    aggregation per hit location + per-damage-type DR
                    resolution via `resolveDr` with typed → crushing →
-                   default fallback, and location/facing-aware maximum armor
-                   DB via `resolveArmorDb`), conditions (snake_case
+                   default fallback, facing-aware DR aggregation, and the
+                   location/facing-aware maximum armor DB via `resolveArmorDb`),
+                   conditions (snake_case
                    condition normalization, tolerant of legacy Capitalized
                    entries))
     constants/   attributes, skills, traits, combat (postures, common

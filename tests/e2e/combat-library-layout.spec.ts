@@ -74,16 +74,12 @@ async function expectVisibleRangeLabelsAligned(panel: Locator, slider: Locator) 
   }
 }
 
-async function expectFloatingPoolPanelAt(page: Page, width: number) {
+async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
   await page.setViewportSize({ width, height: 568 });
   await page.keyboard.press('Escape');
-  const defenseAndDr = page.getByRole('region', {
-    name: /Defense and damage resistance/i,
-  });
-  await defenseAndDr.scrollIntoViewIfNeeded();
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
-  const bar = page.getByRole('complementary', { name: 'Current HP and FP' });
+  const bar = page.getByRole('complementary', { name: 'Current Status' });
   await expect(bar).toBeVisible();
   const barBox = await bar.boundingBox();
   expect(barBox).not.toBeNull();
@@ -125,7 +121,7 @@ async function expectFloatingPoolPanelAt(page: Page, width: number) {
       expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width);
       expect(panelBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
       expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(568);
-      if (width < 1024) {
+      if (width < 768) {
         expect(Math.abs(panelBox.x + panelBox.width / 2 - width / 2)).toBeLessThanOrEqual(1);
       } else {
         expect(Math.abs(panelBox.x - triggerBox.x)).toBeLessThanOrEqual(1);
@@ -148,12 +144,16 @@ async function expectFloatingPoolPanelAt(page: Page, width: number) {
   }
 }
 
-for (const width of [320, 1280]) {
-  test(`combat stays compact and remembers folds at ${width}px`, async ({ page }) => {
+test('Current Status stays available and combat stays compact across mobile and desktop', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await register(page);
+
+  for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    await register(page);
     const character = await api(page, '/characters', {
-      name: 'Compact hero',
+      name: `Compact hero ${width}`,
       st: 15,
       ht: 15,
     });
@@ -161,42 +161,66 @@ for (const width of [320, 1280]) {
     const overview = page.getByRole('button', { name: /^Sheet overview/ });
     await expect(overview).toHaveAttribute('aria-expanded', 'false');
     await selectCharacterSection(page, 'Identity');
-    await expect(page.getByLabel('current HP')).toHaveCount(0);
-    await expect(page.getByLabel('current FP')).toHaveCount(0);
-    await expect(page.getByLabel('Hit points')).toHaveCount(0);
-    await expect(page.getByLabel('Fatigue points')).toHaveCount(0);
+    const status = page.getByRole('complementary', { name: 'Current Status' });
+    await expect(status).toBeVisible();
+    await expect(status.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
+    await expect(status.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();
+    await expect(page.getByText('Description', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Notes', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Edit raw markdown' }).click();
+    await page
+      .getByRole('textbox', { name: 'description', exact: true })
+      .fill('**Field guide** description');
+    await page.getByRole('button', { name: 'Back to rich text' }).click();
+    await expect(page.getByLabel('description').locator('strong')).toHaveText('Field guide');
     await selectCharacterSection(page, 'Combat');
-    const hp = page.getByRole('group', { name: 'Hit points', exact: true });
-    await expect(hp).toBeVisible();
-    expect((await hp.boundingBox())?.y).toBeLessThan(700);
+    await expect(status).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Hit points', exact: true })).toHaveCount(0);
     const defenseAndDr = page.getByRole('region', {
       name: /Defense and damage resistance/i,
     });
     await expect(defenseAndDr).toBeVisible();
     await expect(page.getByLabel('Armor facing')).toBeVisible();
+    await expect(page.getByLabel('Armor facing')).toHaveValue('front');
+    await expect(page.getByLabel('Armor facing').getByRole('option', { name: 'Left' })).toHaveCount(
+      1,
+    );
+    await expect(
+      page.getByLabel('Armor facing').getByRole('option', { name: 'Right' }),
+    ).toHaveCount(1);
+    await expect(
+      page.getByLabel('Armor facing').getByRole('option', { name: 'Unknown' }),
+    ).toHaveCount(0);
     await expect(page.getByText('Active defenses', { exact: true })).toBeVisible();
     await expect(page.getByRole('rowgroup', { name: 'Move' })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Defense order' })).toHaveCount(0);
     await expect(page.getByText('All locations and DR types', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /^Attack$/, exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Change', exact: true }).click();
-    await page.getByRole('button', { name: 'Attack', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Attack', exact: true })).toBeHidden();
-    await page.getByRole('button', { name: 'Edit conditions' }).click();
-    await page.getByRole('button', { name: 'Stunned', exact: true }).click();
-    await page.getByRole('button', { name: 'Done', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Stunned', pressed: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Sleeping', exact: true })).toHaveCount(0);
-    const pools = page.getByRole('button', { name: /^HP & FP/ });
-    await pools.click();
+    if (width === 320) {
+      await status.getByRole('button', { name: /^Show status details:/ }).click();
+    }
+    await status.getByRole('button', { name: 'Change maneuver, current None' }).click();
+    await status.getByRole('button', { name: 'Attack', exact: true }).click();
+    await expect(
+      status.getByRole('button', { name: 'Change maneuver, current Attack' }),
+    ).toBeVisible();
+    await status.getByRole('button', { name: 'Change conditions, current None' }).click();
+    await status.getByRole('button', { name: 'Stunned', exact: true }).click();
+    await status.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(
+      status.getByRole('button', { name: 'Change conditions, current Stunned' }),
+    ).toBeVisible();
+    await expect(status.getByRole('button', { name: 'Sleeping', exact: true })).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole('button', { name: /^HP & FP/ })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
+    await expect(status).toBeVisible();
+    if (width === 320) {
+      await status.getByRole('button', { name: /^Show status details:/ }).click();
+    }
+    await expect(
+      status.getByRole('button', { name: 'Change maneuver, current Attack' }),
+    ).toBeVisible();
     await expect(defenseAndDr).toBeVisible();
-    await page.getByRole('button', { name: /^HP & FP/ }).click();
     await expect(defenseAndDr.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
@@ -206,11 +230,9 @@ for (const width of [320, 1280]) {
       await defenseAndDr.scrollIntoViewIfNeeded();
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
-      const bar = page.getByRole('complementary', {
-        name: 'Current HP and FP',
-      });
+      const bar = page.getByRole('complementary', { name: 'Current Status' });
       await expect(bar).toBeVisible();
-      await bar.getByRole('button', { name: 'Adjust HP' }).click();
+      await bar.getByRole('button', { name: /^Adjust HP,/ }).click();
       const hpPanel = page.getByRole('group', { name: 'HP adjustment' });
       await expect(hpPanel).toBeVisible();
       const [barBox, hpPanelBox] = await Promise.all([bar.boundingBox(), hpPanel.boundingBox()]);
@@ -244,7 +266,7 @@ for (const width of [320, 1280]) {
         })
         .toBe(true);
 
-      await bar.getByRole('button', { name: 'Adjust FP' }).click();
+      await bar.getByRole('button', { name: /^Adjust FP,/ }).click();
       await expect(hpPanel).toHaveCount(0);
       const fpPanel = page.getByRole('group', { name: 'FP adjustment' });
       await expect(fpPanel).toBeVisible();
@@ -262,11 +284,11 @@ for (const width of [320, 1280]) {
         .toBe(true);
 
       for (const breakpointWidth of [477, 575, 639, 640, 641, 768, 1023, 1024, 1025, 1280, 1440]) {
-        await expectFloatingPoolPanelAt(page, breakpointWidth);
+        await expectCurrentStatusPoolPanelAt(page, breakpointWidth);
       }
     }
-  });
-}
+  }
+});
 
 test('library search and markdown toolbar retain drafts and render formatted descriptions', async ({
   page,

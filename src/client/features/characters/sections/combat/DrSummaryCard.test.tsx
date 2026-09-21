@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { resolveEffects } from '../../../../../shared/domain/traitEffects.ts';
 import { campaignHouseRules } from '../../../../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
-import type { ArmorData } from '../../../../../shared/schemas/inventory.ts';
+import { type ArmorData, weaponData } from '../../../../../shared/schemas/inventory.ts';
 import { getLocalDb } from '../../../../db/dexie.ts';
 import { useCombatPatch } from '../useCombatPatch.ts';
 import { usePoolBumpers } from '../usePoolBumpers.ts';
@@ -71,8 +71,51 @@ describe('DrSummaryCard', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/Armor DB \+2 from Deflect Plate/)).toBeInTheDocument();
     expect(screen.getByText(/Applied to Dodge, Parry, and Block/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Armor facing')).toHaveValue('front');
+    expect(screen.getByLabelText('Armor facing')).not.toHaveTextContent('Unknown');
+    expect(screen.getByRole('option', { name: 'Left' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Right' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'back' } });
     expect(onFacingChange).toHaveBeenCalledWith('back');
+  });
+
+  it('uses the selected facing for both DR and armor DB', () => {
+    const character = makeCharacter([
+      { dr: 4, locations: ['torso'] },
+      { dr: 2, locations: ['torso'] },
+    ]);
+    const directional = character.inventory[1];
+    if (!directional?.armor) throw new Error('missing directional armor fixture');
+    directional.name = 'Front plate';
+    directional.armor = { ...directional.armor, frontOnly: true, db: 1 };
+
+    render(<DrSummaryCard character={character} />);
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
+    expect(screen.getByText(/Armor DB \+1 from Front plate/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'left' } });
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('4');
+    expect(screen.getByText(/No armor DB for this location and facing/)).toBeInTheDocument();
+  });
+
+  it('applies a side-specific shield DB to the front and matching side', () => {
+    const character = makeCharacter([]);
+    character.inventory.push({
+      id: 'left-shield',
+      name: 'Left Shield',
+      equipped: true,
+      isArmor: false,
+      armor: null,
+      weaponData: weaponData.parse({ db: 2, wieldedSide: 'left' }),
+    } as CharacterDetail['inventory'][number]);
+
+    render(<DrSummaryCard character={character} />);
+    expect(screen.getByText(/Shield DB \+2 from Left Shield/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'right' } });
+    expect(screen.queryByText(/Shield DB \+2 from Left Shield/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'left' } });
+    expect(screen.getByText(/Shield DB \+2 from Left Shield/)).toBeInTheDocument();
   });
 
   it.each(['cr', 'imp', 'burn', 'cut', ' CUT '])(
