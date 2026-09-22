@@ -15,6 +15,7 @@ import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../../../components/ui/InfoTooltip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../../hooks/useDraftField.ts';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
+import { useViewportBoundedOverlay } from '../../../../hooks/useViewportBoundedOverlay.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import { hpVarFor } from '../hpColor.ts';
@@ -132,13 +133,15 @@ function PoolAdjustmentPanel({
   const minimum = -max;
   const sliderValue = Math.max(minimum, Math.min(max, current));
   const panelStyle = { '--pool-panel-top': `${panelTop}px` } as CSSProperties;
+  const panelRef = useViewportBoundedOverlay<HTMLFieldSetElement>();
 
   return (
     <fieldset
+      ref={panelRef}
       id={id}
       aria-label={`${label} adjustment`}
       style={panelStyle}
-      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg md:absolute! md:left-0! md:right-auto! md:top-full! md:mt-2 md:w-[32rem] md:max-w-[calc(100dvw_-_2rem)] md:translate-x-0"
+      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg md:absolute! md:left-0! md:right-auto! md:top-full! md:mt-[9px] md:w-[32rem] md:max-w-[calc(100dvw_-_2rem)] md:translate-x-[var(--viewport-overlay-shift-x,0px)]"
     >
       <div className="mb-3">
         <div className="flex items-start justify-between gap-3">
@@ -324,11 +327,13 @@ function ChoicePanel({
   children: ReactNode;
 }) {
   const panelStyle = { '--status-panel-top': `${panelTop}px` } as CSSProperties;
+  const panelRef = useViewportBoundedOverlay<HTMLElement>();
   return (
     <section
+      ref={panelRef}
       id={id}
       style={panelStyle}
-      className={`dropdown-content fixed! left-1/2! top-[var(--status-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--status-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg md:absolute! md:top-full! md:mt-2 md:w-96 md:translate-x-0 ${alignEnd ? 'md:left-auto! md:right-0!' : 'md:left-0! md:right-auto!'}`}
+      className={`dropdown-content fixed! left-1/2! top-[var(--status-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--status-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg md:absolute! md:top-full! md:mt-[9px] md:w-96 md:translate-x-[var(--viewport-overlay-shift-x,0px)] ${alignEnd ? 'md:left-auto! md:right-0!' : 'md:left-0! md:right-auto!'}`}
     >
       <h2 className="font-display text-lg">{title}</h2>
       {description && <p className="mt-1 text-xs text-base-content/60">{description}</p>}
@@ -480,7 +485,10 @@ export function CurrentStatusBar({
     lastTrigger.current = trigger;
     setOpenPanel((current) => (current === panel ? null : panel));
   };
-  const panelTop = barRef.current?.getBoundingClientRect().bottom ?? top + 120;
+  // Fixed overlays must start on the first whole pixel after the bar. Using
+  // the fractional bottom directly can round the panel upward by one device
+  // pixel and leave it overlapping the bar at zoomed/boundary widths.
+  const panelTop = Math.ceil(barRef.current?.getBoundingClientRect().bottom ?? top + 120);
 
   return (
     <aside

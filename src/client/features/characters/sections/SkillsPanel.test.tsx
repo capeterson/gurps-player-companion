@@ -21,9 +21,11 @@ import { flashBus } from '../../../sync/flashBus.ts';
 import { SkillsPanel } from './SkillsPanel.tsx';
 
 const enqueueCreate = vi.hoisted(() => vi.fn());
+const enqueueFieldPatch = vi.hoisted(() => vi.fn());
 vi.mock('../../../sync/outbox.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../sync/outbox.ts')>()),
   enqueueCreate,
+  enqueueFieldPatch,
 }));
 const picks = vi.hoisted(() =>
   ['Pistol', 'Rifle'].map((specialty, index) => ({
@@ -82,8 +84,11 @@ vi.mock('../../../components/ui/LibraryAutocomplete.tsx', () => ({
   ),
 }));
 beforeEach(() => {
+  localStorage.clear();
   enqueueCreate.mockReset();
   enqueueCreate.mockResolvedValue(undefined);
+  enqueueFieldPatch.mockReset();
+  enqueueFieldPatch.mockResolvedValue(undefined);
 });
 
 function makeSkill(overrides: Partial<SkillOut> = {}): SkillOut {
@@ -121,14 +126,22 @@ function makeCharacter(skills: SkillOut[]): CharacterDetail {
   } as unknown as CharacterDetail;
 }
 
-function renderPanel(character: CharacterDetail, canWrite = false) {
+function renderPanel(
+  character: CharacterDetail,
+  canWrite = false,
+  openAdd = canWrite && character.skills.length === 0,
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>{children}</ToastProvider>
     </QueryClientProvider>
   );
-  return render(<SkillsPanel character={character} canWrite={canWrite} />, { wrapper: Wrapper });
+  const view = render(<SkillsPanel character={character} canWrite={canWrite} />, {
+    wrapper: Wrapper,
+  });
+  if (openAdd) fireEvent.click(screen.getByRole('button', { name: '+ Add skill' }));
+  return view;
 }
 
 describe('SkillsPanel', () => {
@@ -361,7 +374,7 @@ describe('SkillsPanel', () => {
     expect(history[0].label).toBe('Guns/Pistol');
   });
 
-  it('keeps the specialization beside the editable base name', () => {
+  it('edits the base name and specialization in the inline full-width editor', () => {
     renderPanel(
       makeCharacter([
         makeSkill({ name: 'Current Affairs', specialization: 'Popular Culture', techLevel: 8 }),
@@ -369,11 +382,136 @@ describe('SkillsPanel', () => {
       true,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Current Affairs/Popular Culture' }));
     const name = screen.getByLabelText('Current Affairs/Popular Culture name');
-    const specialization = screen.getByText('/Popular Culture');
+    const specialization = screen.getByLabelText('Current Affairs/Popular Culture specialization');
     expect(name).toHaveValue('Current Affairs');
-    expect(specialization.previousElementSibling).toBe(name);
-    expect(specialization.parentElement).toHaveClass('flex');
+    expect(specialization).toHaveValue('Popular Culture');
+    expect(screen.getByText('Edit Current Affairs/Popular Culture')).toBeInTheDocument();
+    expect(screen.getByText('Source & rules')).toBeInTheDocument();
+  });
+
+  it('keeps the add form and advanced details collapsed until they are useful', () => {
+    renderPanel(makeCharacter([makeSkill()]), true, false);
+
+    expect(screen.queryByLabelText('Skill')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add skill' }));
+    expect(screen.getByLabelText('Skill')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close add form' }));
+    expect(screen.queryByLabelText('Skill')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Broadsword' }));
+    expect(screen.queryByText('Source & rules')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Broadsword description and notes')).toBeInTheDocument();
+  });
+
+  it('sorts from clickable headers and persists custom keyboard ordering', () => {
+    renderPanel(
+      makeCharacter([
+        makeSkill({ id: 'z', name: 'Zephyr', points: 2, level: 11 }),
+        makeSkill({ id: 'a', name: 'Acrobatics', points: 8, level: 13 }),
+      ]),
+    );
+
+    const skillHeading = screen.getByRole('button', { name: 'Sort by Skill' }).closest('th');
+    expect(skillHeading).toHaveAttribute('aria-sort', 'ascending');
+    const pointsHeading = screen.getByRole('button', { name: 'Sort by Points' }).closest('th');
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Points' }));
+    expect(pointsHeading).toHaveAttribute('aria-sort', 'ascending');
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Points' }));
+    expect(pointsHeading).toHaveAttribute('aria-sort', 'descending');
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder Zephyr, row 2' }), {
+      key: 'ArrowUp',
+    });
+    expect(screen.getByText('Zephyr moved to position 1.')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('gurps:skillTable:char-1') ?? '{}')).toMatchObject({
+      order: ['z', 'a'],
+      sort: 'custom',
+      descending: false,
+    });
+  });
+
+  it('filters by details without exposing a second browsing column', () => {
+    renderPanel(
+      makeCharacter([
+        makeSkill({ id: 'a', name: 'Broadsword', notes: 'Two-handed fencing' }),
+        makeSkill({ id: 'b', name: 'Stealth', notes: 'Move quietly' }),
+      ]),
+    );
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search skills' }), {
+      target: { value: 'quietly' },
+    });
+    expect(screen.getByText('Stealth')).toBeInTheDocument();
+    expect(screen.queryByText('Broadsword')).not.toBeInTheDocument();
+  });
+
+  it('shows editing controls only to writers while preserving read-only browsing tools', async () => {
+    renderPanel(makeCharacter([makeSkill({ name: 'Stealth', notes: 'Move quietly' })]), false);
+
+    expect(screen.queryByRole('button', { name: '+ Add skill' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Stealth' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by Skill' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search skills' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reorder Stealth, row 1' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View Stealth' }));
+    expect(await screen.findByText('Move quietly')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete skill' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Stealth name')).not.toBeInTheDocument();
+  });
+
+  it('saves an inline field and rolls it back with a toast and flash on failure', async () => {
+    enqueueFieldPatch.mockRejectedValueOnce(new Error('Disk full'));
+    renderPanel(makeCharacter([makeSkill()]), true);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Broadsword' }));
+    const points = screen.getByLabelText('Broadsword points');
+    fireEvent.change(points, { target: { value: '12' } });
+    fireEvent.blur(points);
+
+    expect(
+      await screen.findByText("Couldn't save Broadsword points — Disk full"),
+    ).toBeInTheDocument();
+    expect(points).toHaveValue('8');
+    expect(points).toHaveAttribute('data-flashing', 'true');
+    expect(enqueueFieldPatch).toHaveBeenCalledWith(
+      expect.objectContaining({ fieldPath: 'points', attemptedValue: 12 }),
+    );
+  });
+
+  it('queues a newer same-field edit and saves a different field in parallel', async () => {
+    let finishFirst = () => {};
+    enqueueFieldPatch.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishFirst = resolve;
+        }),
+    );
+    renderPanel(makeCharacter([makeSkill()]), true);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Broadsword' }));
+
+    const name = screen.getByLabelText('Broadsword name');
+    fireEvent.change(name, { target: { value: 'Longsword' } });
+    fireEvent.blur(name);
+    fireEvent.change(name, { target: { value: 'Rapier' } });
+    fireEvent.blur(name);
+    expect(enqueueFieldPatch).toHaveBeenCalledTimes(1);
+
+    const notes = screen.getByLabelText('Broadsword description and notes');
+    fireEvent.change(notes, { target: { value: 'A different field' } });
+    fireEvent.blur(notes);
+    await waitFor(() => expect(enqueueFieldPatch).toHaveBeenCalledTimes(2));
+    expect(enqueueFieldPatch.mock.calls[1]?.[0]).toMatchObject({
+      fieldPath: 'notes',
+      attemptedValue: 'A different field',
+    });
+
+    await act(async () => finishFirst());
+    await waitFor(() => expect(enqueueFieldPatch).toHaveBeenCalledTimes(3));
+    expect(enqueueFieldPatch.mock.calls[2]?.[0]).toMatchObject({
+      fieldPath: 'name',
+      attemptedValue: 'Rapier',
+    });
   });
 
   it('shows applied skill modifiers from a compact tooltip affordance', () => {

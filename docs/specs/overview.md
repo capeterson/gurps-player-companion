@@ -233,6 +233,15 @@ shows the synced campaign name as a separate link to that campaign.
 - **Skills** with attribute/difficulty relative levels. A skill
   copied from the library retains its specialization, learned tech level,
   description, source, and prerequisites (the latter three in notes).
+  The sheet presents skills as one compact searchable table. Its Skill,
+  Attr/Dif, Points, and Level headings sort in place; the narrower mobile table
+  folds Attr/Dif into the skill row while keeping its visible headings clickable.
+  The shared row handle supports drag and keyboard ordering. Sort and custom
+  order are device-only per-character preferences, survive reloads, and clear on
+  logout. A row opens one full-width inline editor; the add form stays collapsed
+  until requested, and Source & rules is absent unless that skill has configured
+  TL or owned mechanics to show. Read-only viewers keep search, sorting, custom
+  presentation order, details, and rolls without receiving mutation controls.
   Library definitions explicitly declare whether specialization is forbidden,
   optional, or required and whether it is free-form or selected from a catalog.
   Catalog choices can override description, prerequisites, and defaults. The
@@ -845,6 +854,9 @@ src/
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Languages/Techniques/Inventory:
                  LanguagesPanel and TechniquesPanel (the new P0 panels),
+                 SkillsPanel (searchable/sortable compact table and inline
+                 editor) and skillTablePreferences (per-character device-only
+                 sort/custom order),
                  useAddEntityForm
                  (the add form), useEntityRowPatch (per-row field patch
                  dispatch, incl. useEntityEnumField for enum <select>s),

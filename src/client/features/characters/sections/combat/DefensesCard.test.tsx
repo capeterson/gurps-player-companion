@@ -173,7 +173,7 @@ describe('DefensesCard', () => {
       'button',
       { name: /Reorder/ },
     );
-    expect(handle).toHaveTextContent('⠿');
+    expect(handle.querySelector('.lucide-grip-vertical')).toBeInTheDocument();
     fireEvent.dragStart(handle, { dataTransfer });
     fireEvent.dragOver(screen.getByRole('rowgroup', { name: 'Dodge' }), { dataTransfer });
     fireEvent.drop(screen.getByRole('rowgroup', { name: 'Dodge' }), { dataTransfer });

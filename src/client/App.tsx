@@ -8,6 +8,7 @@ import { AppIcon } from './components/ui/AppIcon.tsx';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
+import { clearAllSkillTablePreferences } from './features/characters/sections/skillTablePreferences.ts';
 import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
 import { clearSessionQueryCache } from './lib/sessionQueryCache.tsx';
@@ -100,6 +101,7 @@ export function App() {
     clearAllRollHistory();
     clearAllAttackTablePreferences();
     clearAllDefenseTablePreferences();
+    clearAllSkillTablePreferences();
     navigate('/login');
   }
 

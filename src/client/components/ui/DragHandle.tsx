@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from 'react';
+import { AppIcon } from './AppIcon.tsx';
 
 /** Canonical handle for every explicitly reorderable control in the app. */
 export function DragHandle({
@@ -14,7 +15,7 @@ export function DragHandle({
       className={`btn btn-ghost btn-xs cursor-grab px-1 text-base-content/40 active:cursor-grabbing ${className}`}
       {...props}
     >
-      <span aria-hidden="true">⠿</span>
+      <AppIcon name="gripVertical" size={16} />
     </button>
   );
 }
