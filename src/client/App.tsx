@@ -9,6 +9,7 @@ import { clearAllAttackTablePreferences } from './features/characters/sections/c
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
 import { clearAllSkillTablePreferences } from './features/characters/sections/skillTablePreferences.ts';
+import { clearAllTraitTablePreferences } from './features/characters/sections/traitTablePreferences.ts';
 import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
 import { clearSessionQueryCache } from './lib/sessionQueryCache.tsx';
@@ -102,6 +103,7 @@ export function App() {
     clearAllAttackTablePreferences();
     clearAllDefenseTablePreferences();
     clearAllSkillTablePreferences();
+    clearAllTraitTablePreferences();
     navigate('/login');
   }
 

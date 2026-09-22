@@ -230,6 +230,17 @@ shows the synced campaign name as a separate link to that campaign.
   or portable exact normalized weapon name, governing skill/specialty, or
   library-item provenance. Optional `Primary`/alternate-mode restrictions apply
   only to attack, damage and Accuracy; global item effects reach each mode once.
+  The sheet presents traits in one compact searchable table that mirrors Skills:
+  Trait, Type, Points, and Level headings sort in place, Type folds into the trait
+  row on narrow screens, and the shared row handle supports drag and keyboard
+  ordering. Sort and custom order are device-only per-character preferences.
+  Adding is collapsed until requested, and one full-width row editor opens at a
+  time. Notes, source rules, modifiers, and custom mechanics remain available
+  there; advanced sections appear only when configured or when an owner chooses
+  to add custom effects. Read-only campaign viewers retain search, sorting,
+  ordering, and configured details without seeing mutation controls. Unsaved
+  custom-effect drafts stay mounted when their disclosure or row closes, when
+  another row opens, and while search temporarily hides the row.
 - **Skills** with attribute/difficulty relative levels. A skill
   copied from the library retains its specialization, learned tech level,
   description, source, and prerequisites (the latter three in notes).
@@ -854,6 +865,9 @@ src/
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Languages/Techniques/Inventory:
                  LanguagesPanel and TechniquesPanel (the new P0 panels),
+                 TraitsPanel and traitTablePreferences (searchable/sortable
+                 compact traits table, inline editor, and per-character
+                 device-only sort/custom order),
                  SkillsPanel (searchable/sortable compact table and inline
                  editor) and skillTablePreferences (per-character device-only
                  sort/custom order),
