@@ -501,6 +501,7 @@ test('cast spell dialog keeps its actions reachable on a short mobile viewport',
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
   await selectCharacterSection(page, 'Traits');
+  await page.getByRole('button', { name: '+ Add trait' }).click();
   await page.getByLabel('Trait name').fill('Magery');
   await page.getByRole('button', { name: /^add$/i }).click();
 
