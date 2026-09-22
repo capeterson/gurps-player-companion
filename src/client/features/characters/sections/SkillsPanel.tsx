@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { type DragEvent, useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import {
   type ResolvedLibrarySkillSpecialization,
@@ -12,12 +12,13 @@ import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
+import { AppIcon } from '../../../components/ui/AppIcon.tsx';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
-import { FoldSection } from '../../../components/ui/FoldSection.tsx';
+import { DragHandle } from '../../../components/ui/DragHandle.tsx';
 import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
-import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
+import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
@@ -25,8 +26,15 @@ import { RollSheet } from './RollSheet.tsx';
 import { ProseActionPreview } from './SkillRulePreview.tsx';
 import { ModifierBreakdownContent, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
+import {
+  type SkillSort,
+  type SkillTablePreferences,
+  readSkillTablePreferences,
+  saveSkillTablePreferences,
+} from './skillTablePreferences.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
 import {
+  useEntityEnumField,
   useEntityNameField,
   useEntityPointsField,
   useEntityRowPatch,
@@ -354,6 +362,14 @@ interface SkillRowProps {
   characterId: string;
   skill: SkillOut;
   canWrite: boolean;
+  expanded: boolean;
+  position: number;
+  dragging: boolean;
+  onToggle: () => void;
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
+  onMove: (direction: -1 | 1) => void;
   onRoll: (req: RollRequest) => void;
   effects: CharacterDetail['effects'];
 }
@@ -392,175 +408,20 @@ function SkillModifierTooltip({
   );
 }
 
-function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowProps) {
-  const toasts = useToasts();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const displayName = skillDisplayName(skill.name, skill.specialization);
-  const bonusEffects = skillEffectsForRow(effects, skill.name, skill.specialization);
-  const modifierTooltip = (
-    <SkillModifierTooltip
-      displayName={displayName}
-      baseValue={skill.level}
-      effects={bonusEffects}
-      finalValue={skill.effectiveLevel}
-    />
-  );
-  const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, displayName);
-
-  const nameField = useEntityNameField(rowPatch, skill.name);
-  const pointsField = useEntityPointsField(rowPatch, displayName, skill.points, (s) => {
-    const n = Number(s);
-    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
-      throw new Error('non-negative integer only');
-    }
-    return n;
-  });
-
-  const removeSkill = async () => {
-    try {
-      await enqueueDelete({
-        entityClass: 'character_skill',
-        entityId: skill.id,
-        humanName: `skill "${displayName}"`,
-        characterId,
-        prevValue: skill,
-      });
-    } catch (err) {
-      toasts.push(`Couldn't delete skill — ${(err as Error).message}`, { kind: 'error' });
-    }
-  };
-
+function SkillConfiguredDetails({
+  skill,
+  displayName,
+  onRoll,
+}: {
+  skill: SkillOut;
+  displayName: string;
+  onRoll: (req: RollRequest) => void;
+}) {
   return (
-    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] sm:items-center sm:gap-2 sm:py-2">
-      <div className="col-span-2 min-w-0 sm:col-span-1">
-        {canWrite ? (
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-1.5 font-medium">
-              <span className="flex min-w-0 items-center">
-                <input
-                  aria-label={`${displayName} name`}
-                  className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm min-w-[1ch] max-w-full shrink px-0 font-medium [field-sizing:content]`}
-                  {...nameField.inputProps}
-                />
-                {skill.specialization && (
-                  <span className="min-w-0 break-words">/{skill.specialization}</span>
-                )}
-              </span>
-              {modifierTooltip}
-            </div>
-            {skill.techLevel != null && (
-              <span className="block break-words text-xs text-base-content/70">
-                TL{skill.techLevel}
-              </span>
-            )}
-            {skill.prerequisiteStatus && skill.prerequisiteStatus !== 'met' && (
-              <span className="block break-words text-xs text-warning">
-                {skill.prerequisiteStatus === 'unknown' ? 'Check prerequisites' : 'Unmet'}:{' '}
-                {skill.prerequisiteMessages?.join('; ')}
-              </span>
-            )}
-            {skill.defaultConditionMessages?.length ? (
-              <span className="block break-words text-xs text-base-content/70">
-                Defaults: {skill.defaultConditionMessages.join('; ')}
-              </span>
-            ) : null}
-          </div>
-        ) : (
-          <span className="min-w-0">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="min-w-0 break-words font-medium">
-                {displayName}
-                {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
-              </span>
-              {modifierTooltip}
-            </span>
-            {skill.prerequisiteStatus && skill.prerequisiteStatus !== 'met' ? (
-              <span className="block break-words text-xs text-warning">
-                {skill.prerequisiteStatus === 'unknown' ? 'Check prerequisites' : 'Unmet'}:{' '}
-                {skill.prerequisiteMessages?.join('; ')}
-              </span>
-            ) : null}
-            {skill.defaultConditionMessages?.length ? (
-              <span className="block break-words text-xs text-base-content/70">
-                Defaults: {skill.defaultConditionMessages.join('; ')}
-              </span>
-            ) : null}
-          </span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Attr/Diff</span>
-        <span className="num block text-xs text-base-content/70 sm:text-center">
-          {skill.attribute}/{skill.difficulty}
-        </span>
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Pts</span>
-        {canWrite ? (
-          <input
-            aria-label={`${displayName} points`}
-            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
-            {...pointsField.inputProps}
-          />
-        ) : (
-          <span className="num block text-right">{skill.points}</span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Lvl</span>
-        <RollLevelChip
-          level={skill.effectiveLevel ?? skill.level}
-          name={displayName}
-          title={
-            skill.points <= 0
-              ? skill.defaults == null
-                ? 'Defaults unknown — add the skill definition'
-                : skill.defaults.length === 0
-                  ? 'This skill has no default'
-                  : 'Best available declared default (B173)'
-              : skill.effectiveLevel != null &&
-                  skill.level != null &&
-                  skill.effectiveLevel !== skill.level
-                ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
-                : undefined
-          }
-          onRoll={(level) =>
-            onRoll({
-              label: displayName,
-              baseTarget: level,
-              rules: skill.procedures?.modifiers.filter((r) => r.appliesTo !== 'base_level') ?? [],
-              ruleContext: skill.procedureContext ?? {},
-            })
-          }
-        />
-      </div>
-      {canWrite && (
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs justify-self-end self-end sm:self-center"
-          onClick={() => setConfirmDelete(true)}
-          aria-label={`Delete skill ${displayName}`}
-        >
-          ✕
-        </button>
-      )}
-      <div className="col-span-full">
-        <LibraryMechanicsNote mechanics={skill.libraryMechanics} />
-      </div>
-      <ConfirmDialog
-        open={confirmDelete}
-        title={`Delete skill "${displayName}"?`}
-        confirmLabel="Delete"
-        tone="error"
-        onConfirm={() => {
-          setConfirmDelete(false);
-          void removeSkill();
-        }}
-        onCancel={() => setConfirmDelete(false)}
-      />
+    <>
+      <LibraryMechanicsNote mechanics={skill.libraryMechanics} />
       {skill.procedures && (
-        <div className="col-span-full space-y-2">
+        <div className="space-y-2">
           {skill.procedures.actions.length > 0 && <h4 className="label-eyebrow">Actions</h4>}
           {skill.procedures.actions.map((action) => (
             <div key={action.id} className="rounded border border-base-300 p-2">
@@ -575,7 +436,7 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
                       label: `${displayName}: ${action.label}`,
                       baseTarget: skill.actionTargets?.[action.id] ?? 0,
                       rules: (skill.procedures?.modifiers ?? []).filter(
-                        (r) => r.appliesTo !== 'base_level',
+                        (rule) => rule.appliesTo !== 'base_level',
                       ),
                       ruleContext: skill.procedureContext ?? {},
                       action,
@@ -600,7 +461,7 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
           ))}
           {skill.procedures.benefits.map((benefit) => (
             <p className="text-xs" key={benefit.id}>
-              {skill.benefitStatus?.find((b) => b.id === benefit.id)?.unlocked
+              {skill.benefitStatus?.find((candidate) => candidate.id === benefit.id)?.unlocked
                 ? 'Active'
                 : 'Locked'}
               : {benefit.label} — {benefit.sourceText}
@@ -608,17 +469,352 @@ function SkillRow({ characterId, skill, canWrite, onRoll, effects }: SkillRowPro
           ))}
         </div>
       )}
-      {skill.notes && (
-        <FoldSection
-          preferenceKey={`${skill.id}:description`}
-          title="Description"
-          defaultOpen={false}
-          className="col-span-full mt-2 text-xs"
-        >
-          <Markdown source={skill.notes} className="mt-2" />
-        </FoldSection>
+    </>
+  );
+}
+
+function SkillRow({
+  characterId,
+  skill,
+  canWrite,
+  expanded,
+  position,
+  dragging,
+  onToggle,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  onMove,
+  onRoll,
+  effects,
+}: SkillRowProps) {
+  const toasts = useToasts();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const displayName = skillDisplayName(skill.name, skill.specialization);
+  const bonusEffects = skillEffectsForRow(effects, skill.name, skill.specialization);
+  const modifierTooltip = (
+    <SkillModifierTooltip
+      displayName={displayName}
+      baseValue={skill.level}
+      effects={bonusEffects}
+      finalValue={skill.effectiveLevel}
+    />
+  );
+  const rowPatch = useEntityRowPatch('character_skill', skill.id, characterId, displayName);
+
+  const nameField = useEntityNameField(rowPatch, skill.name);
+  const pointsField = useEntityPointsField(rowPatch, displayName, skill.points, (s) => {
+    const n = Number(s);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {
+      throw new Error('non-negative integer only');
+    }
+    return n;
+  });
+  const attributeField = useEntityEnumField(
+    rowPatch,
+    `${displayName} attribute`,
+    'attribute',
+    skill.attribute,
+    ATTRIBUTES,
+  );
+  const difficultyField = useEntityEnumField(
+    rowPatch,
+    `${displayName} difficulty`,
+    'difficulty',
+    skill.difficulty,
+    DIFFICULTIES,
+  );
+  const specializationField = useDraftField<string | null>({
+    name: `${displayName} specialization`,
+    serverValue: skill.specialization,
+    format: (value) => value ?? '',
+    parse: (value) => value.trim() || null,
+    onSave: (value) => rowPatch.patch('specialization', value),
+    flashKey: rowPatch.flashKey('specialization'),
+  });
+  const notesField = useDraftField<string | null>({
+    name: `${displayName} description and notes`,
+    serverValue: skill.notes,
+    format: (value) => value ?? '',
+    parse: (value) => value.trim() || null,
+    onSave: (value) => rowPatch.patch('notes', value),
+    flashKey: rowPatch.flashKey('notes'),
+  });
+  const techLevelField = useDraftField<number | null>({
+    name: `${displayName} tech level`,
+    serverValue: skill.techLevel,
+    format: (value) => (value == null ? '' : String(value)),
+    parse: (value) => {
+      if (!value.trim()) return null;
+      const parsed = Number(value);
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 12) {
+        throw new Error('whole number from 0 to 12');
+      }
+      return parsed;
+    },
+    onSave: (value) => rowPatch.patch('techLevel', value),
+    flashKey: rowPatch.flashKey('techLevel'),
+  });
+  const saving =
+    nameField.isSaving ||
+    pointsField.isSaving ||
+    attributeField.isSaving ||
+    difficultyField.isSaving ||
+    specializationField.isSaving ||
+    notesField.isSaving ||
+    techLevelField.isSaving;
+  const hasConfiguredRules = Boolean(skill.libraryMechanics || skill.procedures);
+  const hasAdvancedDetails = hasConfiguredRules || skill.techLevel != null;
+  const canExpand = canWrite || Boolean(skill.notes) || hasConfiguredRules;
+
+  const removeSkill = async () => {
+    try {
+      await enqueueDelete({
+        entityClass: 'character_skill',
+        entityId: skill.id,
+        humanName: `skill "${displayName}"`,
+        characterId,
+        prevValue: skill,
+      });
+    } catch (err) {
+      toasts.push(`Couldn't delete skill — ${(err as Error).message}`, { kind: 'error' });
+    }
+  };
+
+  return (
+    <tbody
+      aria-label={displayName}
+      className={dragging ? 'opacity-50' : undefined}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={onDrop}
+    >
+      <tr className={expanded ? 'bg-primary/5' : undefined}>
+        <td className="w-9 px-1 sm:px-2">
+          <DragHandle
+            aria-label={`Reorder ${displayName}, row ${position + 1}`}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+              event.preventDefault();
+              onMove(event.key === 'ArrowUp' ? -1 : 1);
+            }}
+          />
+        </td>
+        <td className="min-w-0 py-2 pl-1 sm:pl-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 break-words font-medium">
+              {displayName}
+              {skill.techLevel != null ? ` / TL${skill.techLevel}` : ''}
+            </span>
+            {modifierTooltip}
+          </span>
+          <span className="mt-0.5 block text-[10px] text-base-content/60 sm:hidden">
+            {skill.attribute}/{skill.difficulty}
+          </span>
+          {skill.prerequisiteStatus && skill.prerequisiteStatus !== 'met' && (
+            <span className="block break-words text-xs text-warning">
+              {skill.prerequisiteStatus === 'unknown' ? 'Check prerequisites' : 'Unmet'}:{' '}
+              {skill.prerequisiteMessages?.join('; ')}
+            </span>
+          )}
+          {skill.defaultConditionMessages?.length ? (
+            <span className="block break-words text-xs text-base-content/70">
+              Defaults: {skill.defaultConditionMessages.join('; ')}
+            </span>
+          ) : null}
+        </td>
+        <td className="w-0 overflow-hidden p-0 text-center text-xs text-base-content/70 sm:w-auto sm:px-3">
+          <span className="hidden sm:inline">
+            {skill.attribute}/{skill.difficulty}
+          </span>
+        </td>
+        <td className="num w-11 text-right text-xs text-base-content/70 sm:w-14">{skill.points}</td>
+        <td className="w-12 text-right sm:w-16">
+          <RollLevelChip
+            level={skill.effectiveLevel ?? skill.level}
+            name={displayName}
+            title={
+              skill.points <= 0
+                ? skill.defaults == null
+                  ? 'Defaults unknown — add the skill definition'
+                  : skill.defaults.length === 0
+                    ? 'This skill has no default'
+                    : 'Best available declared default (B173)'
+                : skill.effectiveLevel != null &&
+                    skill.level != null &&
+                    skill.effectiveLevel !== skill.level
+                  ? `Base ${skill.level} + ${skill.effectiveLevel - skill.level} from trait effects`
+                  : undefined
+            }
+            onRoll={(level) =>
+              onRoll({
+                label: displayName,
+                baseTarget: level,
+                rules:
+                  skill.procedures?.modifiers.filter((rule) => rule.appliesTo !== 'base_level') ??
+                  [],
+                ruleContext: skill.procedureContext ?? {},
+              })
+            }
+          />
+        </td>
+        <td className="w-10 px-1 text-right sm:w-16 sm:px-2">
+          {canExpand && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs min-h-11 px-1 sm:min-h-0 sm:px-2"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              aria-label={`${expanded ? 'Close' : canWrite ? 'Edit' : 'View'} ${displayName}`}
+            >
+              <span className="hidden sm:inline">
+                {expanded ? 'Done' : canWrite ? 'Edit' : 'Details'}
+              </span>
+              <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
+            </button>
+          )}
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
+            {canWrite ? (
+              <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
+                <header className="flex items-center justify-between gap-3">
+                  <h3 className="font-medium">Edit {displayName}</h3>
+                  {saving && (
+                    <span className="text-xs text-warning" aria-live="polite">
+                      Saving…
+                    </span>
+                  )}
+                </header>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_7rem_6rem_5rem] md:gap-3">
+                  <fieldset className="fieldset min-w-0 p-0">
+                    <legend className="fieldset-legend text-xs">Name</legend>
+                    <input
+                      aria-label={`${displayName} name`}
+                      className={`${DRAFT_FIELD_CLASS} input input-sm w-full`}
+                      {...nameField.inputProps}
+                    />
+                  </fieldset>
+                  <fieldset className="fieldset min-w-0 p-0">
+                    <legend className="fieldset-legend text-xs">Specialization</legend>
+                    <input
+                      aria-label={`${displayName} specialization`}
+                      placeholder="None"
+                      className={`${DRAFT_FIELD_CLASS} input input-sm w-full`}
+                      {...specializationField.inputProps}
+                    />
+                  </fieldset>
+                  <fieldset className="fieldset min-w-0 p-0">
+                    <legend className="fieldset-legend text-xs">Attribute</legend>
+                    <select
+                      aria-label={`${displayName} attribute`}
+                      className={`${DRAFT_FIELD_CLASS} select select-sm w-full`}
+                      {...attributeField.selectProps}
+                    >
+                      {ATTRIBUTES.map((attribute) => (
+                        <option key={attribute}>{attribute}</option>
+                      ))}
+                    </select>
+                  </fieldset>
+                  <fieldset className="fieldset min-w-0 p-0">
+                    <legend className="fieldset-legend text-xs">Difficulty</legend>
+                    <select
+                      aria-label={`${displayName} difficulty`}
+                      className={`${DRAFT_FIELD_CLASS} select select-sm w-full`}
+                      {...difficultyField.selectProps}
+                    >
+                      {DIFFICULTIES.map((difficulty) => (
+                        <option key={difficulty}>{difficulty}</option>
+                      ))}
+                    </select>
+                  </fieldset>
+                  <fieldset className="fieldset min-w-0 p-0">
+                    <legend className="fieldset-legend text-xs">Points</legend>
+                    <input
+                      aria-label={`${displayName} points`}
+                      className={`${DRAFT_FIELD_CLASS} input input-sm num w-full text-right`}
+                      inputMode="numeric"
+                      {...pointsField.inputProps}
+                    />
+                  </fieldset>
+                </div>
+                <fieldset className="fieldset min-w-0 p-0">
+                  <legend className="fieldset-legend text-xs">Description &amp; notes</legend>
+                  <textarea
+                    aria-label={`${displayName} description and notes`}
+                    className={`${DRAFT_FIELD_CLASS} textarea textarea-sm min-h-20 w-full`}
+                    value={notesField.value}
+                    onChange={(event) => notesField.setValue(event.target.value)}
+                    onBlur={notesField.inputProps.onBlur}
+                    data-flashing={notesField.inputProps['data-flashing']}
+                    data-flash-parity={notesField.inputProps['data-flash-parity']}
+                  />
+                </fieldset>
+                {hasAdvancedDetails && (
+                  <details className="border-t border-base-300 pt-1">
+                    <summary className="cursor-pointer py-2 text-xs text-base-content/70">
+                      Source &amp; rules
+                    </summary>
+                    <div className="space-y-3 pb-2">
+                      {skill.techLevel != null && (
+                        <fieldset className="fieldset w-24 p-0">
+                          <legend className="fieldset-legend text-xs">Tech level</legend>
+                          <input
+                            aria-label={`${displayName} tech level`}
+                            className={`${DRAFT_FIELD_CLASS} input input-sm num w-full`}
+                            inputMode="numeric"
+                            {...techLevelField.inputProps}
+                          />
+                        </fieldset>
+                      )}
+                      <SkillConfiguredDetails
+                        skill={skill}
+                        displayName={displayName}
+                        onRoll={onRoll}
+                      />
+                    </div>
+                  </details>
+                )}
+                <footer className="flex items-center justify-between gap-3 border-t border-base-300 pt-3">
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-error"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    Delete skill
+                  </button>
+                  <button type="button" className="btn btn-sm" onClick={onToggle}>
+                    Done
+                  </button>
+                </footer>
+                <ConfirmDialog
+                  open={confirmDelete}
+                  title={`Delete skill "${displayName}"?`}
+                  confirmLabel="Delete"
+                  tone="error"
+                  onConfirm={() => {
+                    setConfirmDelete(false);
+                    void removeSkill();
+                  }}
+                  onCancel={() => setConfirmDelete(false)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
+                {skill.notes && <Markdown source={skill.notes} />}
+                {hasConfiguredRules && (
+                  <SkillConfiguredDetails skill={skill} displayName={displayName} onRoll={onRoll} />
+                )}
+              </div>
+            )}
+          </td>
+        </tr>
       )}
-    </li>
+    </tbody>
   );
 }
 
@@ -629,52 +825,275 @@ export function SkillsPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
+  return <SkillsTable key={character.id} character={character} canWrite={canWrite} />;
+}
+
+function SkillsTable({
+  character,
+  canWrite,
+}: {
+  character: CharacterDetail;
+  canWrite: boolean;
+}) {
   // Hosted once here (not per row) so every roll-target tap in the
   // table opens the SAME sheet instance instead of each row owning its
   // own dialog state.
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [query, setQuery] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState(() => readSkillTablePreferences(character.id));
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+
+  const customOrder = [
+    ...preferences.order.filter((id) => character.skills.some((skill) => skill.id === id)),
+    ...character.skills
+      .filter((skill) => !preferences.order.includes(skill.id))
+      .map((skill) => skill.id),
+  ];
+
+  function save(next: SkillTablePreferences) {
+    setPreferences(next);
+    setSaveFailed(!saveSkillTablePreferences(character.id, next));
+  }
+
+  function compareText(left: string, right: string): number {
+    return left.localeCompare(right, undefined, { sensitivity: 'base', numeric: true });
+  }
+
+  const sortedSkills = [...character.skills].sort((left, right) => {
+    if (preferences.sort === 'custom') {
+      return customOrder.indexOf(left.id) - customOrder.indexOf(right.id);
+    }
+    let comparison = 0;
+    if (preferences.sort === 'name') {
+      comparison = compareText(
+        skillDisplayName(left.name, left.specialization),
+        skillDisplayName(right.name, right.specialization),
+      );
+    } else if (preferences.sort === 'basis') {
+      comparison = compareText(
+        `${left.attribute}/${left.difficulty}`,
+        `${right.attribute}/${right.difficulty}`,
+      );
+    } else if (preferences.sort === 'points') {
+      comparison = left.points - right.points;
+    } else {
+      const leftLevel = left.effectiveLevel ?? left.level;
+      const rightLevel = right.effectiveLevel ?? right.level;
+      if (leftLevel == null || rightLevel == null) {
+        if (leftLevel == null && rightLevel == null) comparison = 0;
+        else comparison = leftLevel == null ? 1 : -1;
+      } else {
+        comparison = leftLevel - rightLevel;
+      }
+    }
+    return (
+      (preferences.descending ? -comparison : comparison) ||
+      customOrder.indexOf(left.id) - customOrder.indexOf(right.id)
+    );
+  });
+
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleSkills = sortedSkills.filter((skill) => {
+    if (!normalizedQuery) return true;
+    return [
+      skillDisplayName(skill.name, skill.specialization),
+      skill.attribute,
+      skill.difficulty,
+      skill.notes ?? '',
+      skill.prerequisiteMessages?.join(' ') ?? '',
+      skill.defaultConditionMessages?.join(' ') ?? '',
+    ]
+      .join(' ')
+      .toLocaleLowerCase()
+      .includes(normalizedQuery);
+  });
+
+  function sortBy(sort: Exclude<SkillSort, 'custom'>) {
+    save({
+      ...preferences,
+      sort,
+      descending: preferences.sort === sort ? !preferences.descending : false,
+    });
+  }
+
+  function moveSkill(id: string, targetId: string) {
+    const displayedOrder = sortedSkills.map((skill) => skill.id);
+    const from = displayedOrder.indexOf(id);
+    const to = displayedOrder.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...displayedOrder];
+    next.splice(from, 1);
+    next.splice(to, 0, id);
+    save({ order: next, sort: 'custom', descending: false });
+    const visiblePosition = visibleSkills.findIndex((skill) => skill.id === targetId) + 1;
+    setAnnouncement(
+      `${character.skills.find((skill) => skill.id === id)?.name ?? 'Skill'} moved to position ${visiblePosition}.`,
+    );
+  }
+
+  function moveBy(id: string, direction: -1 | 1) {
+    const visibleOrder = visibleSkills.map((skill) => skill.id);
+    const current = visibleOrder.indexOf(id);
+    const target = current + direction;
+    if (current < 0 || target < 0 || target >= visibleOrder.length) return;
+    moveSkill(id, visibleOrder[target] ?? id);
+  }
+
+  function sortHeader(
+    label: string,
+    sort: Exclude<SkillSort, 'custom'>,
+    headerClassName = '',
+    shortLabel?: string,
+    hideButtonOnMobile = false,
+  ) {
+    const active = preferences.sort === sort;
+    return (
+      <th
+        scope="col"
+        className={headerClassName}
+        aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
+      >
+        <button
+          type="button"
+          className={`btn btn-ghost btn-xs h-auto min-h-0 whitespace-nowrap px-1 py-1 font-semibold ${hideButtonOnMobile ? 'hidden sm:inline-flex' : ''} ${headerClassName.includes('text-right') ? 'w-full justify-end' : 'justify-start'}`}
+          onClick={() => sortBy(sort)}
+          aria-label={`Sort by ${label}`}
+        >
+          <span className={shortLabel ? 'hidden sm:inline' : undefined}>{label}</span>
+          {shortLabel && <span className="sm:hidden">{shortLabel}</span>}
+          <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
+        </button>
+      </th>
+    );
+  }
 
   return (
-    <section className="card space-y-3 p-4 sm:p-5">
-      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+    <section className="card p-0">
+      <header className="flex items-center justify-between gap-3 px-4 pb-3 pt-4 sm:px-5 sm:pt-5">
         <div>
           <p className="label-eyebrow">Skills</p>
           <h2 className="font-display text-2xl">Skills & abilities</h2>
+          <p className="mt-1 text-xs text-base-content/60">
+            {character.skills.length} {character.skills.length === 1 ? 'skill' : 'skills'}
+          </p>
         </div>
-        <p className="text-xs text-base-content/60">
-          {character.skills.length} {character.skills.length === 1 ? 'skill' : 'skills'}
-        </p>
+        {canWrite && (
+          <button
+            type="button"
+            className={`btn btn-sm ${showAdd ? 'btn-ghost' : 'btn-primary'}`}
+            onClick={() => setShowAdd((current) => !current)}
+            aria-expanded={showAdd}
+          >
+            {showAdd ? 'Close add form' : '+ Add skill'}
+          </button>
+        )}
       </header>
 
-      <AddSkillForm
-        characterId={character.id}
-        campaignId={character.campaignId ?? null}
-        canWrite={canWrite}
-      />
+      {showAdd && (
+        <div className="px-4 pb-3 sm:px-5">
+          <AddSkillForm
+            characterId={character.id}
+            campaignId={character.campaignId ?? null}
+            canWrite={canWrite}
+          />
+        </div>
+      )}
 
       {character.skills.length === 0 ? (
-        <p className="text-sm text-base-content/60">No skills yet.</p>
+        <p className="px-4 pb-5 text-sm text-base-content/60 sm:px-5">No skills yet.</p>
       ) : (
         <>
-          <div className="label-eyebrow hidden grid-cols-[minmax(0,1fr)_4rem_4rem_4rem_auto] gap-2 border-b border-base-300 pb-1 sm:grid">
-            <span>Skill</span>
-            <span className="text-center">Attr/Dif</span>
-            <span className="text-right">Pts</span>
-            <span className="text-right">Lvl</span>
-            <span />
-          </div>
-          <ul>
-            {character.skills.map((s) => (
-              <SkillRow
-                key={s.id}
-                characterId={character.id}
-                skill={s}
-                canWrite={canWrite}
-                onRoll={setRollRequest}
-                effects={character.effects}
+          <div className="px-4 pb-3 sm:px-5">
+            <label className="input input-sm flex w-full items-center gap-2 bg-base-200">
+              <svg
+                className="h-4 w-4 shrink-0 fill-none stroke-current text-base-content/50"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle cx="10" cy="10" r="6.5" />
+                <path d="m15 15 5 5" />
+              </svg>
+              <input
+                type="search"
+                className="min-w-0 grow"
+                aria-label="Search skills"
+                placeholder="Search skills…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
               />
-            ))}
-          </ul>
+            </label>
+          </div>
+          <div className="border-t border-base-300">
+            <table className="table table-sm w-full table-fixed" aria-label="Skills">
+              <caption className="sr-only">
+                Character skills. Sort with column headings or use row handles for custom order.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="w-9 px-1 sm:px-2">
+                    <span className="sr-only">Custom order</span>
+                  </th>
+                  {sortHeader('Skill', 'name')}
+                  {sortHeader('Attr/Dif', 'basis', 'w-0 p-0 text-center sm:w-20', undefined, true)}
+                  {sortHeader('Points', 'points', 'w-11 text-right sm:w-14', 'Pts')}
+                  {sortHeader('Level', 'level', 'w-12 text-right sm:w-16', 'Lvl')}
+                  <th scope="col" className="w-10 px-1 sm:w-16 sm:px-2">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              {visibleSkills.map((skill, position) => {
+                return (
+                  <SkillRow
+                    key={skill.id}
+                    characterId={character.id}
+                    skill={skill}
+                    canWrite={canWrite}
+                    expanded={expandedId === skill.id}
+                    position={position}
+                    dragging={draggingId === skill.id}
+                    onToggle={() =>
+                      setExpandedId((current) => (current === skill.id ? null : skill.id))
+                    }
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData('text/plain', skill.id);
+                      event.dataTransfer.effectAllowed = 'move';
+                      setDraggingId(skill.id);
+                    }}
+                    onDragEnd={() => setDraggingId(null)}
+                    onDrop={() => {
+                      if (draggingId) moveSkill(draggingId, skill.id);
+                      setDraggingId(null);
+                    }}
+                    onMove={(direction) => moveBy(skill.id, direction)}
+                    onRoll={setRollRequest}
+                    effects={character.effects}
+                  />
+                );
+              })}
+            </table>
+          </div>
+          {visibleSkills.length === 0 && (
+            <p className="px-4 py-8 text-center text-sm text-base-content/60">
+              No skills match “{query}”.
+            </p>
+          )}
+          <div className="border-t border-base-300 px-4 py-2 text-[10px] text-base-content/50 sm:px-5">
+            Click a column heading to sort. Drag a row handle or focus it and use ↑/↓ for custom
+            order.
+          </div>
+          {saveFailed && (
+            <output className="block px-4 pb-3 text-xs text-warning sm:px-5">
+              This browser could not save the skill order. It will reset when you leave this page.
+            </output>
+          )}
+          <output className="sr-only" aria-live="polite">
+            {announcement}
+          </output>
         </>
       )}
 

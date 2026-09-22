@@ -156,9 +156,11 @@ test('skill, technique, and language rows reflow into readable mobile cards at 3
   await expectCharacterNavigationReady(page);
   await selectCharacterSection(page, 'Skills');
   const skillName = 'Extremely Long Skill Name For Horizontal Testing';
+  await page.getByRole('button', { name: '+ Add skill' }).click();
   const skillForm = page.getByLabel(/^skill$/i).locator('xpath=ancestor::form');
   await page.getByLabel(/^skill$/i).fill(skillName);
   await skillForm.getByRole('button', { name: /^add$/i }).click();
+  await page.getByRole('button', { name: `Edit ${skillName}` }).click();
   const skillNameInput = page.getByLabel(`${skillName} name`);
   await expect(skillNameInput).toBeVisible();
 

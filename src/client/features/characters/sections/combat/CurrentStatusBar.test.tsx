@@ -392,10 +392,12 @@ describe('Current Status', () => {
       'left-1/2!',
       'w-[calc(100dvw_-_2rem)]',
       'max-w-lg',
+      'translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))]',
       'md:absolute!',
       'md:left-0!',
       'md:top-full!',
-      'md:translate-x-0',
+      'md:mt-[9px]',
+      'md:translate-x-[var(--viewport-overlay-shift-x,0px)]',
     );
     expect(panel.parentElement).toHaveClass('dropdown', 'dropdown-start', 'dropdown-open');
     expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);

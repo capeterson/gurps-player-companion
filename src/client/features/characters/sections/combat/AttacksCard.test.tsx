@@ -107,7 +107,7 @@ describe('AttacksCard', () => {
     const view = render(<AttacksCard character={character} openRoll={vi.fn()} />);
     const bow = screen.getByRole('rowgroup', { name: 'Bow' });
     const handle = within(bow).getByRole('button', { name: /Reorder/ });
-    expect(handle).toHaveTextContent('⠿');
+    expect(handle.querySelector('.lucide-grip-vertical')).toBeInTheDocument();
     fireEvent.keyDown(handle, { key: 'ArrowUp' });
     expect(weaponOrder()).toEqual(['Bow', 'Sword', 'Axe']);
     view.unmount();
