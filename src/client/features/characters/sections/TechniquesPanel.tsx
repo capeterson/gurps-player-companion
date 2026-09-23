@@ -12,6 +12,7 @@ import {
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
+import { SkillReferenceCombobox } from '../../../components/ui/SkillReferenceCombobox.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
@@ -31,6 +32,7 @@ import { useLibraryFetcher } from './useLibraryFetcher.ts';
 interface AddTechniqueFormProps {
   characterId: string;
   campaignId: string | null;
+  characterSkills: CharacterDetail['skills'];
   canWrite: boolean;
 }
 
@@ -48,7 +50,12 @@ interface TechniqueSnapshot {
   libraryTechniqueId: string | null;
 }
 
-function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFormProps) {
+function AddTechniqueForm({
+  characterId,
+  campaignId,
+  characterSkills,
+  canWrite,
+}: AddTechniqueFormProps) {
   const [name, setName] = useState('');
   const [defaultSkillName, setDefaultSkillName] = useState('');
   const [difficulty, setDifficulty] = useState<TechniqueDifficulty>('A');
@@ -193,15 +200,17 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
           />
         )}
       </div>
-      <label className="form-control col-span-2 min-w-0 sm:flex-1 sm:min-w-[8rem]">
+      <div className="form-control col-span-2 min-w-0 sm:flex-1 sm:min-w-[8rem]">
         <span className="label-text text-xs">Defaults from</span>
-        <input
-          className="input input-bordered input-sm w-full min-w-0"
+        <SkillReferenceCombobox
+          aria-label="Defaults from"
           value={defaultSkillName}
-          onChange={(e) => setDefaultSkillName(e.target.value)}
+          onChange={setDefaultSkillName}
+          campaignId={campaignId}
+          characterSkills={characterSkills}
           placeholder="e.g. Broadsword"
         />
-      </label>
+      </div>
       <label className="form-control min-w-0">
         <span className="label-text text-xs">Diff</span>
         <select
@@ -253,12 +262,21 @@ function AddTechniqueForm({ characterId, campaignId, canWrite }: AddTechniqueFor
 
 interface TechniqueRowProps {
   characterId: string;
+  campaignId: string | null;
+  characterSkills: CharacterDetail['skills'];
   technique: TechniqueOut;
   canWrite: boolean;
   onRoll: (req: RollRequest) => void;
 }
 
-function TechniqueRow({ characterId, technique, canWrite, onRoll }: TechniqueRowProps) {
+function TechniqueRow({
+  characterId,
+  campaignId,
+  characterSkills,
+  technique,
+  canWrite,
+  onRoll,
+}: TechniqueRowProps) {
   const toasts = useToasts();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -338,10 +356,18 @@ function TechniqueRow({ characterId, technique, canWrite, onRoll }: TechniqueRow
       <div className="col-span-2 min-w-0 sm:col-span-1">
         <span className="label-eyebrow mb-1 block sm:hidden">Defaults from</span>
         {canWrite ? (
-          <input
+          <SkillReferenceCombobox
             aria-label={`${technique.name} default skill`}
-            className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 px-0`}
-            {...defaultSkillField.inputProps}
+            value={defaultSkillField.value}
+            onChange={defaultSkillField.setValue}
+            onPick={(option) => {
+              defaultSkillField.setValue(option.label);
+              defaultSkillField.commit();
+            }}
+            campaignId={campaignId}
+            characterSkills={characterSkills}
+            inputClassName={`${DRAFT_FIELD_CLASS} input-ghost px-0`}
+            inputProps={defaultSkillField.inputProps}
           />
         ) : (
           <span className="break-words text-sm text-base-content/70">
@@ -460,6 +486,7 @@ export function TechniquesPanel({
       <AddTechniqueForm
         characterId={character.id}
         campaignId={character.campaignId ?? null}
+        characterSkills={character.skills}
         canWrite={canWrite}
       />
 
@@ -481,6 +508,8 @@ export function TechniquesPanel({
               <TechniqueRow
                 key={t.id}
                 characterId={character.id}
+                campaignId={character.campaignId ?? null}
+                characterSkills={character.skills}
                 technique={t}
                 canWrite={canWrite}
                 onRoll={setRollRequest}

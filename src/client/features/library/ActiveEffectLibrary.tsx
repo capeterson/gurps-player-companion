@@ -34,6 +34,7 @@ export function ActiveEffectLibrary({
         .map((e) =>
           editing === e.id ? (
             <ActiveEffectForm
+              campaignId={campaignId}
               key={e.id}
               initial={e}
               onCancel={() => setEditing(null)}
@@ -76,6 +77,7 @@ export function ActiveEffectLibrary({
       {isOwner &&
         (editing === 'new' ? (
           <ActiveEffectForm
+            campaignId={campaignId}
             onCancel={() => setEditing(null)}
             onSave={async (value) => {
               await api(`/campaigns/${campaignId}/library/active-effects`, {

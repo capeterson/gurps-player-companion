@@ -6,6 +6,7 @@ import type {
   InventoryItemOut,
 } from '../../../../../shared/schemas/inventory.ts';
 import { LibraryAutocomplete } from '../../../../components/ui/LibraryAutocomplete.tsx';
+import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
 import { ItemField, type ItemFieldSpec } from './ItemField.tsx';
@@ -50,11 +51,7 @@ const DR_TYPES = {
   tox: 'Toxic',
 };
 
-function fieldSpecs(
-  item: InventoryItemOut,
-  section: ItemSection,
-  skillNames: readonly string[],
-): ItemFieldSpec[] {
+function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec[] {
   switch (section) {
     case 'basics':
       return [
@@ -85,7 +82,7 @@ function fieldSpecs(
     case 'weapon':
       return [
         { path: 'weaponData.damage', label: 'Damage' },
-        { ...text('weaponData.skill', 'Governing skill'), suggestions: skillNames },
+        text('weaponData.skill', 'Governing skill'),
         text('weaponData.reach', 'Reach'),
         text('weaponData.parry', 'Parry'),
         number('weaponData.stRequired', 'ST required', true, true),
@@ -254,11 +251,15 @@ function ItemListEditor({
   item,
   kind,
   more,
+  campaignId,
+  skillNames = [],
   fetchEnchantmentOptions,
 }: {
   item: InventoryItemOut;
   kind: 'enchantments' | 'alternateModes';
   more: boolean;
+  campaignId?: string | null | undefined;
+  skillNames?: readonly string[];
   fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
 }) {
   const [name, setName] = useState('');
@@ -519,11 +520,13 @@ function ItemListEditor({
               />
             )}
             {customTarget === 'skill' && (
-              <input
+              <SkillReferenceCombobox
                 aria-label="Custom enchantment skill"
                 value={customSkillName}
-                onChange={(event) => setCustomSkillName(event.target.value)}
-                className="input input-sm input-bordered min-w-0"
+                onChange={setCustomSkillName}
+                campaignId={campaignId}
+                characterSkills={skillNames.map((name) => ({ name, specialization: null }))}
+                className="min-w-0"
                 placeholder="Skill name"
               />
             )}
@@ -551,6 +554,7 @@ export function InventoryItemEditor({
   item,
   section,
   skillNames = [],
+  campaignId,
   fetchEnchantmentOptions,
   hasChildren,
   onSection,
@@ -559,6 +563,7 @@ export function InventoryItemEditor({
   item: InventoryItemOut;
   section: ItemSection;
   skillNames?: readonly string[];
+  campaignId?: string | null | undefined;
   fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
   hasChildren: boolean;
   onSection: (section: ItemSection) => void;
@@ -570,7 +575,7 @@ export function InventoryItemEditor({
   const [spellName, setSpellName] = useState('');
   const { run, pending, flash } = useItemAction(item);
   const active = categories(item);
-  const specs = fieldSpecs(item, section, skillNames);
+  const specs = fieldSpecs(item, section);
   const category = section === 'basics' || section === 'add' ? null : section;
   let content: ReactNode;
   if (section === 'add') {
@@ -641,16 +646,33 @@ export function InventoryItemEditor({
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {specs.map((spec) => (
-            <ItemField key={spec.path} item={item} spec={spec} more={more} />
+            <ItemField
+              key={spec.path}
+              item={item}
+              spec={spec}
+              more={more}
+              campaignId={campaignId}
+              skillNames={skillNames}
+            />
           ))}
         </div>
         {section === 'armor' && <ArmorLocations item={item} more={more} />}
-        {section === 'weapon' && <ItemListEditor item={item} kind="alternateModes" more={more} />}
+        {section === 'weapon' && (
+          <ItemListEditor
+            item={item}
+            kind="alternateModes"
+            more={more}
+            campaignId={campaignId}
+            skillNames={skillNames}
+          />
+        )}
         {section === 'enchantments' && (
           <ItemListEditor
             item={item}
             kind="enchantments"
             more={more}
+            campaignId={campaignId}
+            skillNames={skillNames}
             {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})}
           />
         )}

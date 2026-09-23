@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { skillDisplayName } from '../../../shared/domain/defenseCalc.ts';
+import { skillDisplayName, splitSkillReference } from '../../../shared/domain/defenseCalc.ts';
 import type { LibraryItemOut } from '../../../shared/schemas/campaignLibrary.ts';
 import {
   EFFECT_TARGETS,
@@ -11,6 +11,8 @@ import {
   traitEffect,
 } from '../../../shared/schemas/effects.ts';
 import type { InventoryItemOut } from '../../../shared/schemas/inventory.ts';
+import type { SkillOut } from '../../../shared/schemas/skill.ts';
+import { SkillReferenceCombobox } from '../../components/ui/SkillReferenceCombobox.tsx';
 
 const TARGET_LABELS: Record<EffectTarget, string> = {
   st: 'ST',
@@ -129,6 +131,8 @@ export function effectPreview(effect: TraitEffect): string {
 interface Props<T extends TraitEffect> {
   effects: T[];
   libraryItems?: readonly LibraryItemOut[];
+  campaignId?: string | null | undefined;
+  characterSkills?: readonly Pick<SkillOut, 'name' | 'specialization'>[];
   inventoryItems?: readonly InventoryItemOut[];
   /** Portable editors reject exact character inventory bindings. */
   portable?: boolean;
@@ -140,6 +144,8 @@ interface Props<T extends TraitEffect> {
 export function EffectsEditor<T extends TraitEffect>({
   effects,
   libraryItems = [],
+  campaignId,
+  characterSkills,
   inventoryItems = [],
   portable = true,
   onChange,
@@ -397,17 +403,25 @@ export function EffectsEditor<T extends TraitEffect>({
 
             {draft.target === 'skill' && (
               <div className="grid gap-2 sm:grid-cols-2">
-                <label className="form-control">
+                <div className="form-control">
                   <span className="label-text text-xs">Skill name *</span>
-                  <input
-                    className="input input-bordered input-sm"
+                  <SkillReferenceCombobox
+                    aria-label="Skill name"
                     value={draft.skillName}
                     placeholder="Public Speaking or *"
-                    onChange={(event) =>
-                      update(index, (row) => ({ ...row, skillName: event.target.value }))
-                    }
+                    campaignId={campaignId}
+                    characterSkills={characterSkills ?? []}
+                    onChange={(value) => update(index, (row) => ({ ...row, skillName: value }))}
+                    onPick={(option) => {
+                      const parts = splitSkillReference(option.label);
+                      update(index, (row) => ({
+                        ...row,
+                        skillName: parts.name,
+                        skillSpecialty: parts.specialization,
+                      }));
+                    }}
                   />
-                </label>
+                </div>
                 <label className="form-control">
                   <span className="label-text text-xs">Specialty (optional)</span>
                   <input
@@ -455,20 +469,33 @@ export function EffectsEditor<T extends TraitEffect>({
                 </label>
                 {selector.kind === 'weapon_skill' && (
                   <>
-                    <label className="form-control">
+                    <div className="form-control">
                       <span className="label-text text-xs">Governing skill *</span>
-                      <input
-                        className="input input-bordered input-sm"
+                      <SkillReferenceCombobox
+                        aria-label="Governing skill"
                         value={selector.skillName}
                         placeholder="Broadsword"
-                        onChange={(event) =>
+                        campaignId={campaignId}
+                        characterSkills={characterSkills ?? []}
+                        onChange={(value) =>
                           update(index, (row) => ({
                             ...row,
-                            selector: { ...selector, skillName: event.target.value },
+                            selector: { ...selector, skillName: value },
                           }))
                         }
+                        onPick={(option) => {
+                          const parts = splitSkillReference(option.label);
+                          update(index, (row) => ({
+                            ...row,
+                            selector: {
+                              ...selector,
+                              skillName: parts.name,
+                              skillSpecialty: parts.specialization || undefined,
+                            },
+                          }));
+                        }}
                       />
-                    </label>
+                    </div>
                     <label className="form-control">
                       <span className="label-text text-xs">Specialty (optional)</span>
                       <input

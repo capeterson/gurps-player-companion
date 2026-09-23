@@ -263,6 +263,7 @@ export function ActiveEffectsPanel({
             </button>
             {custom && (
               <ActiveEffectForm
+                campaignId={character.campaignId ?? null}
                 onCancel={() => setCustom(false)}
                 onSave={async (definition) => {
                   await mutateActiveEffects(character.id, `Apply ${definition.name}`, (entries) => [
