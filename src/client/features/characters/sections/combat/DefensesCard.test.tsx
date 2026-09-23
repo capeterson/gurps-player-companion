@@ -97,6 +97,24 @@ function targetFor(openRoll: ReturnType<typeof vi.fn>, index: number): number {
 describe('DefensesCard', () => {
   beforeEach(() => clearAllDefenseTablePreferences());
 
+  it('links defense equipment and armor DB sources to inventory', () => {
+    const character = makeCharacter(
+      [{ id: 'sword', name: 'Sword', parry: '0', skill: 'Broadsword' }],
+      [{ name: 'Broadsword', level: 14 }],
+      [{ id: 'coat', name: 'Coat', db: 1 }],
+    );
+    render(<DefensesCard character={character} openRoll={vi.fn()} />);
+    expect(screen.getByRole('link', { name: 'Parry (Sword)' })).toHaveAttribute(
+      'href',
+      '#inventory-sword',
+    );
+    fireEvent.click(within(screen.getByRole('rowgroup', { name: 'Dodge' })).getByText('Breakdown'));
+    expect(screen.getAllByRole('link', { name: 'Coat' })[0]).toHaveAttribute(
+      'href',
+      '#inventory-coat',
+    );
+  });
+
   function withMultipleDefenses(): CharacterDetail {
     return makeCharacter(
       [
@@ -525,9 +543,12 @@ describe('DefensesCard', () => {
       [{ name: 'Broadsword', level: 14 }],
     );
     render(<DefensesCard character={character} openRoll={openRoll} />);
-    expect(
-      screen.getByText(/Buckler is equipped but has no usable Shield skill/),
-    ).toBeInTheDocument();
+    const hint = screen.getByText(/is equipped but has no usable Shield skill/);
+    expect(hint).toHaveTextContent('Buckler is equipped but has no usable Shield skill');
+    expect(within(hint).getByRole('link', { name: 'Buckler' })).toHaveAttribute(
+      'href',
+      '#inventory-sh',
+    );
     expect(screen.getByText(/skill 'Shield \(Buckler\)' is not on the sheet/)).toBeInTheDocument();
   });
 
@@ -575,7 +596,13 @@ describe('DefensesCard', () => {
     expect(targetFor(openRoll, 1)).toBe(11);
 
     // The Dodge caption names the armor source.
-    expect(screen.getByText('+ 1 armor DB (Deflect Hauberk)')).toBeInTheDocument();
+    expect(screen.getByRole('rowgroup', { name: 'Dodge' })).toHaveTextContent(
+      '+ 1 armor DB (Deflect Hauberk)',
+    );
+    expect(screen.getAllByRole('link', { name: 'Deflect Hauberk' })[0]).toHaveAttribute(
+      'href',
+      '#inventory-a1',
+    );
   });
 
   it('stacks armor DB with shield DB on Dodge, Parry, and Block', () => {
@@ -606,9 +633,9 @@ describe('DefensesCard', () => {
     expect(targetFor(openRoll, 2)).toBe(12);
 
     // The Dodge caption names both sources in the breakdown.
-    expect(
-      screen.getByText('+ 2 DB (Medium Shield) + 1 armor DB (Deflect Breastplate)'),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('rowgroup', { name: 'Dodge' })).toHaveTextContent(
+      '+ 2 DB (Medium Shield) + 1 armor DB (Deflect Breastplate)',
+    );
   });
 
   it('uses one maximum armor DB for the selected location and facing', () => {

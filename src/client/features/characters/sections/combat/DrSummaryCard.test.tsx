@@ -38,6 +38,11 @@ function makeCharacter(
 }
 
 describe('DrSummaryCard', () => {
+  it('links an armor layer to its inventory anchor', () => {
+    const character = makeCharacter([{ dr: 4, locations: ['torso'] }]);
+    render(<DrSummaryCard character={character} />);
+    expect(screen.getByRole('link', { name: 'Armor 0' })).toHaveAttribute('href', '#inventory-a0');
+  });
   it('combines defense bonus context with damage resistance controls', () => {
     const character = makeCharacter([{ dr: 4, locations: ['torso'] }]);
     character.derived = {
@@ -69,7 +74,9 @@ describe('DrSummaryCard', () => {
         { name: 'Defenses' },
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Armor DB \+2 from Deflect Plate/)).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: 'Deflect Plate' })[0]?.closest('p'),
+    ).toHaveTextContent('Armor DB +2 from Deflect Plate');
     expect(screen.getByText(/Applied to Dodge, Parry, and Block/)).toBeInTheDocument();
     expect(screen.getByLabelText('Armor facing')).toHaveValue('front');
     expect(screen.getByLabelText('Armor facing')).not.toHaveTextContent('Unknown');
@@ -91,7 +98,9 @@ describe('DrSummaryCard', () => {
 
     render(<DrSummaryCard character={character} />);
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('6');
-    expect(screen.getByText(/Armor DB \+1 from Front plate/)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Front plate' })[0]?.closest('p')).toHaveTextContent(
+      'Armor DB +1 from Front plate',
+    );
 
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'left' } });
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('4');
@@ -110,12 +119,16 @@ describe('DrSummaryCard', () => {
     } as CharacterDetail['inventory'][number]);
 
     render(<DrSummaryCard character={character} />);
-    expect(screen.getByText(/Shield DB \+2 from Left Shield/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Left Shield' }).closest('p')).toHaveTextContent(
+      'Shield DB +2 from Left Shield',
+    );
 
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'right' } });
-    expect(screen.queryByText(/Shield DB \+2 from Left Shield/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Left Shield' })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'left' } });
-    expect(screen.getByText(/Shield DB \+2 from Left Shield/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Left Shield' }).closest('p')).toHaveTextContent(
+      'Shield DB +2 from Left Shield',
+    );
   });
 
   it.each(['cr', 'imp', 'burn', 'cut', ' CUT '])(

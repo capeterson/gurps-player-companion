@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   maxIqWithMentalSecondaryCaps,
   maxMentalSecondaryModifier,
@@ -41,6 +41,7 @@ import {
   scaledIntParser,
 } from '../../lib/parsers.ts';
 import { SHEET_ICONS, SHEET_TABS, SheetNavigation, type SheetTab } from './SheetNavigation.tsx';
+import { parseSheetAnchor, sheetAnchor } from './sheetAnchors.ts';
 
 import { makeFlashKey } from '../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
@@ -1400,8 +1401,16 @@ function IdentityHero({
 
 export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [selectedTab, setTab] = useState<SheetTab>('Combat');
   const sectionHeading = useRef<HTMLHeadingElement>(null);
+  const anchor = parseSheetAnchor(location.hash);
+  const anchorTab: SheetTab | null = anchor
+    ? ({ inventory: 'Inventory', skill: 'Skills', trait: 'Traits', spell: 'Magic' }[
+        anchor.kind
+      ] as SheetTab)
+    : null;
 
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -1439,6 +1448,25 @@ export function CharacterSheetPage() {
   // loading / not-found early returns so hook order stays stable; the
   // hook degrades gracefully while `character` is still loading.
   const access = useCharacterAccessLocal(character, me.data?.id);
+  const anchorExists = Boolean(
+    anchor &&
+      character &&
+      {
+        inventory: character.inventory,
+        skill: character.skills,
+        trait: character.traits,
+        spell: character.spells,
+      }[anchor.kind].some((entry) => entry.id === anchor.id),
+  );
+  const anchorTargetId = anchor ? sheetAnchor(anchor.kind, anchor.id) : null;
+
+  useEffect(() => {
+    if (!anchorTargetId || !anchorExists || access.accessPending || access.isMinimal) return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(anchorTargetId)?.scrollIntoView({ block: 'center' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [anchorTargetId, anchorExists, access.accessPending, access.isMinimal]);
 
   // Lifted to ONE hook instance shared by AttributesPanel,
   // SecondaryModsPanel, and the effects list (see useTempEffects.ts's
@@ -1514,9 +1542,15 @@ export function CharacterSheetPage() {
   const visibleTabs: readonly SheetTab[] = showMagicTab
     ? SHEET_TABS
     : SHEET_TABS.filter((t) => t !== 'Magic');
-  const tab = visibleTabs.includes(selectedTab) ? selectedTab : 'Combat';
+  const tab =
+    anchorTab && visibleTabs.includes(anchorTab)
+      ? anchorTab
+      : visibleTabs.includes(selectedTab)
+        ? selectedTab
+        : 'Combat';
   function navigateSection(next: SheetTab) {
     setTab(next);
+    if (location.hash) navigate({ pathname: location.pathname, search: location.search, hash: '' });
     requestAnimationFrame(() => {
       sectionHeading.current?.focus({ preventScroll: true });
       sectionHeading.current?.scrollIntoView({ block: 'start' });
@@ -1656,13 +1690,21 @@ export function CharacterSheetPage() {
             </div>
           )}
           {tab === 'Traits' && (
-            <FoldSection preferenceKey={`${character.id}:TraitsPanel`} title="Traits">
+            <FoldSection
+              preferenceKey={`${character.id}:TraitsPanel`}
+              title="Traits"
+              forceOpen={anchor?.kind === 'trait'}
+            >
               <TraitsPanel character={character} canWrite={canWrite} />
             </FoldSection>
           )}
           {tab === 'Skills' && character.libraryEffectsKnown !== false && (
             <div className="space-y-4">
-              <FoldSection preferenceKey={`${character.id}:SkillsPanel`} title="Skills">
+              <FoldSection
+                preferenceKey={`${character.id}:SkillsPanel`}
+                title="Skills"
+                forceOpen={anchor?.kind === 'skill'}
+              >
                 <SkillsPanel character={character} canWrite={canWrite} />
               </FoldSection>
               <FoldSection preferenceKey={`${character.id}:TechniquesPanel`} title="Techniques">
@@ -1675,7 +1717,11 @@ export function CharacterSheetPage() {
           )}
           {tab === 'Magic' && character.libraryEffectsKnown !== false && (
             <div className="space-y-4">
-              <FoldSection preferenceKey={`${character.id}:SpellsPanel`} title="Spells">
+              <FoldSection
+                preferenceKey={`${character.id}:SpellsPanel`}
+                title="Spells"
+                forceOpen={anchor?.kind === 'spell'}
+              >
                 <SpellsPanel character={character} canWrite={canWrite} />
               </FoldSection>
               <FoldSection preferenceKey={`${character.id}:PowerstonesPanel`} title="Powerstones">
@@ -1687,8 +1733,16 @@ export function CharacterSheetPage() {
             </div>
           )}
           {tab === 'Inventory' && (
-            <FoldSection preferenceKey={`${character.id}:InventoryPanel`} title="Inventory">
-              <InventoryPanel character={character} canWrite={canWrite} />
+            <FoldSection
+              preferenceKey={`${character.id}:InventoryPanel`}
+              title="Inventory"
+              forceOpen={anchor?.kind === 'inventory'}
+            >
+              <InventoryPanel
+                character={character}
+                canWrite={canWrite}
+                anchorItemId={anchor?.kind === 'inventory' ? anchor.id : null}
+              />
             </FoldSection>
           )}
           {tab === 'History' && (

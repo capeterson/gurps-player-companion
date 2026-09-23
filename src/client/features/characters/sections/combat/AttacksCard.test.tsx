@@ -56,6 +56,14 @@ function makeCharacter(damage: string, overrides: WeaponOverrides = {}): Charact
 describe('AttacksCard', () => {
   beforeEach(() => clearAllAttackTablePreferences());
 
+  it('links a weapon to its durable inventory anchor', () => {
+    render(<AttacksCard character={makeCharacter('sw+1 cut')} openRoll={vi.fn()} />);
+    expect(screen.getByRole('link', { name: 'Broadsword' })).toHaveAttribute(
+      'href',
+      '#inventory-w1',
+    );
+  });
+
   function withMultipleWeapons() {
     const character = makeCharacter('sw+1 cut', { name: 'Sword', skill: 'Broadsword' });
     const sword = character.inventory[0];

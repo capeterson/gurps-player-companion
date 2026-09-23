@@ -16,7 +16,7 @@
  * everything else mirrors the source.
  */
 
-import { type FormEvent, type ReactNode, useMemo, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import type {
   LibraryEnchantmentOut,
@@ -72,9 +72,11 @@ function dragTargetKey(t: DragTarget): string {
 export function InventoryPanel({
   character,
   canWrite,
+  anchorItemId,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
+  anchorItemId?: string | null;
 }) {
   const characterId = character.id;
   const campaignId = character.campaignId ?? null;
@@ -85,13 +87,37 @@ export function InventoryPanel({
 
   const [filterText, setFilterText] = useState('');
   const [filterTag, setFilterTag] = useState<InventoryFilterTag>('all');
-  const filterActive = filterText.trim().length > 0 || filterTag !== 'all';
+  const [resetForAnchor, setResetForAnchor] = useState<string | null>(null);
+  const revealingNewAnchor = Boolean(anchorItemId && resetForAnchor !== anchorItemId);
+  useEffect(() => {
+    if (anchorItemId && resetForAnchor !== anchorItemId) {
+      setFilterText('');
+      setFilterTag('all');
+      setResetForAnchor(anchorItemId);
+    }
+  }, [anchorItemId, resetForAnchor]);
+  const filterActive = !revealingNewAnchor && (filterText.trim().length > 0 || filterTag !== 'all');
 
   const tree = useMemo(() => buildTree(items), [items]);
   const filteredTree = useMemo(
-    () => filterInventoryTree(items, filterText, filterTag),
-    [items, filterText, filterTag],
+    () =>
+      filterInventoryTree(
+        items,
+        revealingNewAnchor ? '' : filterText,
+        revealingNewAnchor ? 'all' : filterTag,
+      ),
+    [items, filterText, filterTag, revealingNewAnchor],
   );
+  const revealContainers = useMemo(() => {
+    const ancestors = new Set<string>();
+    const byId = new Map(items.map((item) => [item.id, item]));
+    let parentId = byId.get(anchorItemId ?? '')?.parentId;
+    while (parentId && !ancestors.has(parentId)) {
+      ancestors.add(parentId);
+      parentId = byId.get(parentId)?.parentId;
+    }
+    return ancestors;
+  }, [items, anchorItemId]);
   const roots = filteredTree.byParent.get(null) ?? [];
   const wornRoots = roots.filter((r) => r.worn);
   const carriedRoots = roots.filter((r) => !r.worn);
@@ -478,6 +504,8 @@ export function InventoryPanel({
         skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
         fetchEnchantmentOptions={fetchEnchantments}
         expandContainers={filterActive}
+        revealContainers={revealContainers}
+        highlightItemId={anchorItemId ?? null}
         {...(canWrite ? { drag: dragApi } : {})}
         {...(opts.inStashed ? { inStashed: true } : {})}
       />

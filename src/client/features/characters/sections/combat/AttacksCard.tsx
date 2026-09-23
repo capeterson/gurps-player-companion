@@ -20,6 +20,7 @@ import {
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
+import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
 import {
@@ -483,7 +484,12 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                           rowSpan={rows.length}
                           className="min-w-32 max-w-64 align-top font-normal"
                         >
-                          <span className="block font-medium">{w.name}</span>
+                          <InventoryAnchorLink
+                            itemId={w.id}
+                            className="link link-hover block font-medium"
+                          >
+                            {w.name}
+                          </InventoryAnchorLink>
                           {stPenalty > 0 && (
                             <span className="badge badge-warning badge-outline badge-xs mt-1 whitespace-nowrap">
                               ST {wd.stRequired} (−{stPenalty})

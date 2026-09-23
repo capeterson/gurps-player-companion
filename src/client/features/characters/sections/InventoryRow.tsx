@@ -4,6 +4,7 @@ import type { LibraryEnchantmentOut } from '../../../../shared/schemas/campaignL
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
 import { useFlashState } from '../../../hooks/useFlashState.ts';
+import { sheetAnchor } from '../sheetAnchors.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
 import { InventoryItemEditor } from './inventory/InventoryItemEditor.tsx';
 import { CATEGORY_LABELS, type ItemCategory, type ItemSection } from './inventory/itemMutations.ts';
@@ -21,6 +22,8 @@ export interface InventoryRowProps {
   fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
   /** Filtering forces matching descendants open inside their ancestor containers. */
   expandContainers?: boolean;
+  revealContainers?: ReadonlySet<string>;
+  highlightItemId?: string | null;
   drag?: InventoryDragApi;
   // Stashed items don't count against encumbrance, so the row renders the
   // raw weight directly instead of the encumbrance-effective number plus a
@@ -47,6 +50,8 @@ export function InventoryRow(props: InventoryRowProps) {
     skillNames = [],
     fetchEnchantmentOptions,
     expandContainers = false,
+    revealContainers,
+    highlightItemId,
     drag,
     inStashed,
   } = props;
@@ -54,9 +59,10 @@ export function InventoryRow(props: InventoryRowProps) {
   const isRoot = item.parentId === null;
   const hasChildren = item.isContainer && children.length > 0;
   const [open, setOpen] = useState(() => readContainerExpanded(item.characterId, item.id));
-  const contentsOpen = expandContainers || open;
+  const contentsOpen = expandContainers || revealContainers?.has(item.id) || open;
   const descendantCount = hasChildren ? descendantsOf(item.id, byParent).size : 0;
   const sel = isSelected(item.id);
+  const highlighted = highlightItemId === item.id;
   const [section, setSection] = useState<ItemSection | null>(null);
   const [visited, setVisited] = useState<ItemSection[]>([]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -164,6 +170,7 @@ export function InventoryRow(props: InventoryRowProps) {
   return (
     <Fragment>
       <tr
+        id={sheetAnchor('inventory', item.id)}
         onClick={canEdit ? (e) => onRowClick(item.id, e) : undefined}
         draggable={canEdit && !!drag}
         onDragStart={canEdit && drag ? handleDragStart : undefined}
@@ -173,14 +180,15 @@ export function InventoryRow(props: InventoryRowProps) {
         onDragLeave={canEdit && drag ? handleDragLeave : undefined}
         onDrop={canEdit && drag ? handleDrop : undefined}
         className={[
-          'inventory-item-row transition-colors',
+          'inventory-item-row transition-colors scroll-mt-24',
+          highlighted ? '!bg-primary/20 outline outline-2 outline-primary' : '',
           rowFlash.flashing ? 'field-rollback-flash' : '',
           canEdit ? 'cursor-pointer' : '',
           isDragging ? 'opacity-40' : '',
           hoverValid ? '!bg-success/20 outline outline-2 outline-success/50' : '',
           hoverInvalid ? '!bg-error/15 outline outline-2 outline-error/40 cursor-not-allowed' : '',
-          sel && !isHovered ? '!bg-primary/15 hover:!bg-primary/20' : '',
-          !sel && !isHovered ? 'hover:bg-base-200/50' : '',
+          sel && !isHovered && !highlighted ? '!bg-primary/15 hover:!bg-primary/20' : '',
+          !sel && !isHovered && !highlighted ? 'hover:bg-base-200/50' : '',
         ].join(' ')}
         aria-selected={sel}
         {...rowFlash.flashProps}

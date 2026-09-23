@@ -92,6 +92,13 @@ Route `/characters/:id`. Sectioned sheet
 **Combat, Overview, Traits, Skills, Magic, Inventory, History**.
 Combat is the default section for live play. Magic is hidden on a read-only
 view of a non-magical character; owners always have it available to add magic.
+Inventory items, traits, skills, and spells have stable ID-based URL anchors
+(`#inventory-<id>`, `#trait-<id>`, `#skill-<id>`, `#spell-<id>`). Opening a
+character URL with one of these hashes selects the matching section, opens its
+panel, and scrolls to the highlighted entry. Inventory links reveal nested
+items inside closed containers. Weapon names in Attacks, armor layers and DB
+sources in Defense & Damage Resistance, and equipment named in active defenses
+link to their inventory entries without a page reload.
 
 The home page's recent-character cards and the `/characters` listing resolve
 from the local mirror. Each card links to its character and, when assigned,
@@ -875,6 +882,7 @@ src/
                  EffectsEditor, the reusable ordered effect authoring UI shared
                  with character-owned trait mechanics
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
+      characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
