@@ -161,8 +161,8 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
       const combat = flower.getByRole('button', { name: 'Combat', exact: true });
       await combat.hover();
       await expect(flower.locator('[role="tooltip"]')).toHaveCount(0);
-      const identity = flower.getByRole('button', { name: 'Identity', exact: true });
-      await identity.focus();
+      const overview = flower.getByRole('button', { name: 'Overview', exact: true });
+      await overview.focus();
       await expect(flower.locator('[role="tooltip"]')).toHaveCount(0);
 
       await flower

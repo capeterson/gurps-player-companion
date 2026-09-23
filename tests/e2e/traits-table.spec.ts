@@ -113,6 +113,18 @@ test('trait table and inline editor mirror skills across mobile and desktop brea
       const pointsBefore = await page.getByRole('button', { name: 'Sort by Points' }).boundingBox();
       const levelBefore = await page.getByRole('button', { name: 'Sort by Level' }).boundingBox();
       await row.getByRole('button', { name: `Edit ${traitName}` }).click();
+      const closeButton = row.getByRole('button', { name: `Close ${traitName}` });
+      await expect(closeButton).toBeVisible();
+      const actionCellBox = await closeButton.locator('xpath=..').boundingBox();
+      const closeButtonBox = await closeButton.boundingBox();
+      expect(actionCellBox).not.toBeNull();
+      expect(closeButtonBox).not.toBeNull();
+      if (actionCellBox && closeButtonBox) {
+        expect(closeButtonBox.x).toBeGreaterThanOrEqual(actionCellBox.x);
+        expect(closeButtonBox.x + closeButtonBox.width).toBeLessThanOrEqual(
+          actionCellBox.x + actionCellBox.width,
+        );
+      }
       const editorHeading = page.getByRole('heading', { name: `Edit ${traitName}` });
       await expect(editorHeading).toBeVisible();
       const editor = editorHeading.locator('xpath=../..');
@@ -121,7 +133,13 @@ test('trait table and inline editor mirror skills across mobile and desktop brea
       await expect(editor.getByLabel(`${traitName} points`)).toBeVisible();
       await expect(editor.getByLabel(`${traitName} description and notes`)).toBeVisible();
       await expect(editor.getByText('Source & rules')).toHaveCount(0);
-      await expect(editor.getByRole('button', { name: '+ Add custom effects' })).toBeVisible();
+      await expect(editor.getByRole('button', { name: '+ Add effects' })).toBeVisible();
+      if (width === 320) {
+        await editor.getByRole('button', { name: '+ Add effects' }).click();
+        await expect(editor.getByText('Effects', { exact: true })).toBeVisible();
+        await editor.getByRole('button', { name: 'Remove effects' }).click();
+        await expect(editor.getByRole('button', { name: '+ Add effects' })).toBeVisible();
+      }
       await expect(editor.getByRole('button', { name: 'Delete trait' })).toBeVisible();
       const pointsAfter = await page.getByRole('button', { name: 'Sort by Points' }).boundingBox();
       const levelAfter = await page.getByRole('button', { name: 'Sort by Level' }).boundingBox();

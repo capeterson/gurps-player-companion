@@ -11,11 +11,13 @@ import {
 import { COMMON_CONDITIONS, MANEUVERS, POSTURES } from '../../../../../shared/constants/combat.ts';
 import { conditionLabel, conditionsInclude } from '../../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { useCharacterHeaderChrome } from '../../../../components/CharacterHeaderChromeContext.tsx';
 import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../../../components/ui/InfoTooltip.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../../hooks/useDraftField.ts';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useViewportBoundedOverlay } from '../../../../hooks/useViewportBoundedOverlay.ts';
+import type { StatusBarPreferences } from '../../../../lib/statusBarPreferences.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { RollableRow } from '../RollableRow.tsx';
 import { hpVarFor } from '../hpColor.ts';
@@ -34,6 +36,8 @@ interface CurrentStatusBarProps {
   openRoll: (request: RollRequest) => void;
   top?: number;
   onHeightChange?: (height: number) => void;
+  preferences?: StatusBarPreferences;
+  embedded?: boolean;
 }
 
 interface RangePoint {
@@ -61,6 +65,7 @@ interface PoolTriggerProps {
   open: boolean;
   panelId: string;
   onToggle: (trigger: HTMLButtonElement) => void;
+  compact?: boolean;
 }
 
 function PoolTrigger({
@@ -72,26 +77,66 @@ function PoolTrigger({
   open,
   panelId,
   onToggle,
+  compact = false,
 }: PoolTriggerProps) {
+  const compactValue = `${current}/${max}`;
+  const longCompactValue = compactValue.length >= 9;
   return (
     <button
       type="button"
       {...flashProps}
-      className="field-rollback-flash btn btn-sm min-h-10 w-full gap-1 px-2.5 md:w-auto"
+      className={`field-rollback-flash btn btn-sm min-h-11 w-full min-w-0 px-1 ${compact ? 'btn-ghost flex-col justify-center gap-0 rounded-none px-0.5 text-center max-[1279px]:border-0! max-[1279px]:shadow-none! min-[1280px]:min-h-10 min-[1280px]:w-auto min-[1280px]:flex-row min-[1280px]:items-center min-[1280px]:gap-1 min-[1280px]:rounded-field min-[1280px]:px-2.5' : 'flex-wrap gap-0.5 gap-y-0 whitespace-normal min-[1280px]:min-h-10 min-[1280px]:w-auto min-[1280px]:gap-1 min-[1280px]:px-2.5'}`}
       aria-label={`Adjust ${label}, current ${current} of ${max}${warning ? `, ${warning}` : ''}`}
       aria-expanded={open}
       aria-controls={panelId}
       onClick={(event) => onToggle(event.currentTarget)}
     >
-      <span className="font-semibold">{label}</span>
-      <span className="num text-base">{current}</span>
-      <span className="num text-xs text-base-content/60">/ {max}</span>
-      {warning && (
-        <span className="badge badge-warning badge-xs ml-1 max-w-24 truncate">{warning}</span>
+      {compact ? (
+        <>
+          <span
+            className={`flex w-full min-w-0 justify-center leading-none min-[1280px]:hidden ${longCompactValue ? 'flex-col items-center gap-0' : 'items-baseline gap-1'}`}
+          >
+            <span className="shrink-0 text-[10px] font-semibold text-base-content/70">{label}</span>
+            <span className="num min-w-0 whitespace-nowrap text-[13px] font-bold tracking-tight">
+              {compactValue}
+            </span>
+          </span>
+          {warning && (
+            <span
+              className={`w-full whitespace-nowrap text-center font-semibold leading-tight text-warning min-[1280px]:hidden ${warning.length > 10 ? 'text-[10px] tracking-tight' : 'text-[11px]'}`}
+            >
+              {warning}
+            </span>
+          )}
+          <span className="hidden items-center gap-0.5 text-[10px] leading-none min-[1280px]:flex">
+            <span className="font-semibold">{label}</span>
+            {warning && <span className="font-semibold text-warning">{warning}</span>}
+          </span>
+          <span className="num hidden whitespace-nowrap text-base font-semibold min-[1280px]:inline">
+            {current} <span className="text-base-content/60">/ {max}</span>
+          </span>
+          <span
+            aria-hidden="true"
+            className="hidden text-[10px] text-base-content/50 min-[1280px]:inline"
+          >
+            {open ? '▴' : '▾'}
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="font-semibold">{label}</span>
+          <span className="num text-base">{current}</span>
+          <span className="num text-xs text-base-content/60">/ {max}</span>
+          {warning && (
+            <span className="badge badge-warning badge-xs max-w-full truncate min-[1280px]:ml-1">
+              {warning}
+            </span>
+          )}
+          <span aria-hidden="true" className="text-[10px] text-base-content/50">
+            {open ? '▴' : '▾'}
+          </span>
+        </>
       )}
-      <span aria-hidden="true" className="text-[10px] text-base-content/50">
-        {open ? '▴' : '▾'}
-      </span>
     </button>
   );
 }
@@ -141,7 +186,7 @@ function PoolAdjustmentPanel({
       id={id}
       aria-label={`${label} adjustment`}
       style={panelStyle}
-      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg md:absolute! md:left-0! md:right-auto! md:top-full! md:mt-[9px] md:w-[32rem] md:max-w-[calc(100dvw_-_2rem)] md:translate-x-[var(--viewport-overlay-shift-x,0px)]"
+      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg min-[1280px]:absolute! min-[1280px]:left-0! min-[1280px]:right-auto! min-[1280px]:top-full! min-[1280px]:mt-[9px] min-[1280px]:w-[32rem] min-[1280px]:max-w-[calc(100dvw_-_2rem)] min-[1280px]:translate-x-[var(--viewport-overlay-shift-x,0px)]"
     >
       <div className="mb-3">
         <div className="flex items-start justify-between gap-3">
@@ -284,24 +329,26 @@ function StateTrigger({
   open,
   panelId,
   onToggle,
+  flat = false,
 }: {
   label: string;
   summary: string;
   open: boolean;
   panelId: string;
   onToggle: (trigger: HTMLButtonElement) => void;
+  flat?: boolean;
 }) {
   return (
     <button
       type="button"
-      className="btn btn-sm min-h-11 min-w-0 justify-between gap-2 px-2 text-left md:min-h-10 md:flex-1"
+      className={`btn btn-sm min-h-11 w-full min-w-0 justify-between gap-1 px-1.5 text-left min-[1280px]:min-h-10 min-[1280px]:gap-2 min-[1280px]:px-2 ${flat ? 'btn-ghost rounded-none max-[1279px]:border-0! max-[1279px]:shadow-none! min-[1280px]:rounded-field' : ''}`}
       aria-label={`Change ${label.toLowerCase()}, current ${summary}`}
       aria-expanded={open}
       aria-controls={panelId}
       onClick={(event) => onToggle(event.currentTarget)}
     >
       <span className="min-w-0">
-        <span className="label-eyebrow block text-[8px]">{label}</span>
+        <span className="label-eyebrow block text-[10px]">{label}</span>
         <span className="block truncate text-xs font-semibold">{summary}</span>
       </span>
       <span aria-hidden="true" className="shrink-0 text-[10px] text-base-content/50">
@@ -333,7 +380,7 @@ function ChoicePanel({
       ref={panelRef}
       id={id}
       style={panelStyle}
-      className={`dropdown-content fixed! left-1/2! top-[var(--status-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--status-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg md:absolute! md:top-full! md:mt-[9px] md:w-96 md:translate-x-[var(--viewport-overlay-shift-x,0px)] ${alignEnd ? 'md:left-auto! md:right-0!' : 'md:left-0! md:right-auto!'}`}
+      className={`dropdown-content fixed! left-1/2! top-[var(--status-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--status-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg min-[1280px]:absolute! min-[1280px]:top-full! min-[1280px]:mt-[9px] min-[1280px]:w-96 min-[1280px]:translate-x-[var(--viewport-overlay-shift-x,0px)] ${alignEnd ? 'min-[1280px]:left-auto! min-[1280px]:right-0!' : 'min-[1280px]:left-0! min-[1280px]:right-auto!'}`}
     >
       <h2 className="font-display text-lg">{title}</h2>
       {description && <p className="mt-1 text-xs text-base-content/60">{description}</p>}
@@ -350,11 +397,13 @@ export function CurrentStatusBar({
   openRoll,
   top = 64,
   onHeightChange,
+  preferences = { showPosture: false, showManeuver: false, showConditions: false },
+  embedded = false,
 }: CurrentStatusBarProps) {
+  const mobileChrome = useCharacterHeaderChrome();
   const hpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentHp'));
   const fpFlash = useFlashState(makeFlashKey('character_combat', character.id, 'currentFp'));
   const [openPanel, setOpenPanel] = useState<StatusPanel | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [customManeuver, setCustomManeuver] = useState(false);
   const barRef = useRef<HTMLElement>(null);
   const lastTrigger = useRef<HTMLButtonElement | null>(null);
@@ -378,7 +427,6 @@ export function CurrentStatusBar({
     conditions.length === 0
       ? 'None'
       : `${conditionLabel(conditions[0] as string)}${conditions.length > 1 ? ` +${conditions.length - 1}` : ''}`;
-  const mobileSummary = `${postureSummary} · ${storedManeuver ?? 'No maneuver'} · ${conditionSummary}`;
   const reelingSuggested =
     canWrite &&
     bumpers.hpMax > 0 &&
@@ -458,7 +506,8 @@ export function CurrentStatusBar({
   useEffect(() => {
     if (openPanel === null) return;
     const dismissOutside = (event: PointerEvent) => {
-      if (!barRef.current?.contains(event.target as Node)) {
+      const activeDropdown = lastTrigger.current?.closest('.dropdown');
+      if (!activeDropdown?.contains(event.target as Node)) {
         commitPendingCustomManeuver();
         setOpenPanel(null);
       }
@@ -477,6 +526,23 @@ export function CurrentStatusBar({
     };
   }, [commitPendingCustomManeuver, openPanel]);
 
+  useEffect(() => {
+    if (openPanel === 'posture' && !preferences.showPosture) {
+      setOpenPanel(null);
+    } else if (openPanel === 'maneuver' && !preferences.showManeuver) {
+      commitPendingCustomManeuver();
+      setOpenPanel(null);
+    } else if (openPanel === 'conditions' && !preferences.showConditions) {
+      setOpenPanel(null);
+    }
+  }, [
+    commitPendingCustomManeuver,
+    openPanel,
+    preferences.showPosture,
+    preferences.showManeuver,
+    preferences.showConditions,
+  ]);
+
   const closeAndFocus = () => {
     setOpenPanel(null);
     requestAnimationFrame(() => lastTrigger.current?.focus());
@@ -489,40 +555,34 @@ export function CurrentStatusBar({
   // the fractional bottom directly can round the panel upward by one device
   // pixel and leave it overlapping the bar at zoomed/boundary widths.
   const panelTop = Math.ceil(barRef.current?.getBoundingClientRect().bottom ?? top + 120);
+  const optionalCount = [
+    preferences.showPosture,
+    preferences.showManeuver,
+    preferences.showConditions,
+  ].filter(Boolean).length;
+  const optionalColumns =
+    optionalCount === 3 ? 'grid-cols-3' : optionalCount === 2 ? 'grid-cols-2' : 'grid-cols-1';
 
   return (
     <aside
       ref={barRef}
-      className="fixed inset-x-0 z-40 border-b border-base-300 bg-base-100 shadow-md"
-      style={{ top }}
+      className={
+        embedded
+          ? 'relative w-full bg-base-100'
+          : 'fixed inset-x-0 z-40 border-b border-base-300 bg-base-100 shadow-md'
+      }
+      style={embedded ? undefined : { top }}
       aria-label="Current Status"
     >
-      <div className="mx-auto grid max-w-[80rem] grid-cols-2 gap-2 px-4 py-2 md:grid-cols-[auto_auto_auto_minmax(7rem,1fr)_minmax(10rem,1.5fr)_minmax(8rem,1fr)] md:items-center md:px-7">
-        <div className="col-span-2 flex min-w-0 items-center justify-between gap-3 md:col-span-1 md:block md:min-w-28">
+      <div
+        className={`mx-auto grid max-w-[80rem] min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-2 ${embedded ? 'grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem] gap-x-1 gap-y-0 px-0 py-0 min-[480px]:grid-cols-[minmax(0,1fr)_minmax(5rem,max-content)_minmax(5rem,max-content)_5.5rem] min-[1280px]:px-4' : 'grid-cols-2 gap-1 px-2 py-1 min-[1280px]:px-7'} ${optionalCount > 0 ? 'min-[1280px]:py-2' : 'min-[1280px]:py-1'}`}
+      >
+        {embedded && <div className="min-w-0 min-[1280px]:hidden">{mobileChrome?.menu}</div>}
+        <div className="hidden min-[1280px]:block min-[1280px]:min-w-28">
           <span className="label-eyebrow">Current Status</span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-xs min-w-0 max-w-[65%] justify-end gap-1 px-1 md:hidden"
-            aria-label={`${detailsOpen ? 'Hide' : 'Show'} status details: ${mobileSummary}`}
-            aria-expanded={detailsOpen}
-            onClick={() => {
-              setDetailsOpen((current) => !current);
-              setOpenPanel(null);
-            }}
-          >
-            <span className="truncate text-[10px] font-normal text-base-content/60">
-              {mobileSummary}
-            </span>
-            <span
-              aria-hidden="true"
-              className="flex size-5 shrink-0 items-center justify-center rounded-full border border-base-300 text-xs text-primary"
-            >
-              {detailsOpen ? '▴' : '▾'}
-            </span>
-          </button>
         </div>
         <div
-          className={`dropdown dropdown-start ${openPanel === 'HP' ? 'dropdown-open' : ''}`}
+          className={`dropdown dropdown-start relative min-w-0 before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] min-[1280px]:before:hidden ${openPanel === 'HP' ? 'dropdown-open' : ''}`}
           style={{ color: hpColor }}
         >
           <PoolTrigger
@@ -534,6 +594,7 @@ export function CurrentStatusBar({
             open={openPanel === 'HP'}
             panelId={panelId}
             onToggle={(trigger) => togglePanel('HP', trigger)}
+            compact={embedded}
           />
           {activePool?.label === 'HP' && (
             <PoolAdjustmentPanel
@@ -547,7 +608,7 @@ export function CurrentStatusBar({
           )}
         </div>
         <div
-          className={`dropdown dropdown-start ${openPanel === 'FP' ? 'dropdown-open' : ''}`}
+          className={`dropdown dropdown-start relative min-w-0 before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] min-[1280px]:before:hidden ${openPanel === 'FP' ? 'dropdown-open' : ''}`}
           style={{ color: fpColor }}
         >
           <PoolTrigger
@@ -559,6 +620,7 @@ export function CurrentStatusBar({
             open={openPanel === 'FP'}
             panelId={panelId}
             onToggle={(trigger) => togglePanel('FP', trigger)}
+            compact={embedded}
           />
           {activePool?.label === 'FP' && (
             <PoolAdjustmentPanel
@@ -571,145 +633,165 @@ export function CurrentStatusBar({
             />
           )}
         </div>
-        <div
-          className={`col-span-2 grid-cols-3 gap-2 ${detailsOpen ? 'grid' : 'hidden'} md:contents`}
-        >
-          <div className={`dropdown ${openPanel === 'posture' ? 'dropdown-open' : ''}`}>
-            <StateTrigger
-              label="Posture"
-              summary={postureSummary}
-              open={openPanel === 'posture'}
-              panelId={panelId}
-              onToggle={(trigger) => togglePanel('posture', trigger)}
-            />
-            {openPanel === 'posture' && (
-              <ChoicePanel id={panelId} panelTop={panelTop} title="Posture">
-                <div className="flex flex-wrap gap-2">
-                  {POSTURES.map((entry) => (
-                    <ConditionChip
-                      key={entry}
-                      label={entry}
-                      active={posture === entry}
-                      className="capitalize"
-                      onClick={() => {
-                        void patchCombat('posture', entry);
-                        closeAndFocus();
-                      }}
-                      disabled={!canWrite}
-                    />
-                  ))}
-                </div>
-              </ChoicePanel>
-            )}
-          </div>
-          <div className={`dropdown ${openPanel === 'maneuver' ? 'dropdown-open' : ''}`}>
-            <StateTrigger
-              label="Maneuver"
-              summary={storedManeuver ?? 'None'}
-              open={openPanel === 'maneuver'}
-              panelId={panelId}
-              onToggle={(trigger) => togglePanel('maneuver', trigger)}
-            />
-            {openPanel === 'maneuver' && (
-              <ChoicePanel id={panelId} panelTop={panelTop} title="Maneuver">
-                <div className="mb-3 flex gap-2">
-                  <button
-                    type="button"
-                    className={`btn btn-xs ${customManeuver ? '' : 'btn-primary'}`}
-                    onClick={() => setCustomManeuver(false)}
-                  >
-                    Presets
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-xs ${customManeuver ? 'btn-primary' : ''}`}
-                    onClick={() => setCustomManeuver(true)}
-                  >
-                    Custom
-                  </button>
-                </div>
-                {customManeuver ? (
-                  <input
-                    aria-label="Custom maneuver"
-                    className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full`}
-                    placeholder="e.g. Ready — draw sword"
-                    disabled={!canWrite}
-                    {...maneuverField.inputProps}
-                  />
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {MANEUVERS.map((entry) => (
-                      <ConditionChip
-                        key={entry.id}
-                        label={entry.label}
-                        active={activeManeuver?.id === entry.id}
-                        onClick={() => {
-                          void patchCombat(
-                            'maneuver',
-                            activeManeuver?.id === entry.id ? null : entry.label,
-                          );
-                          closeAndFocus();
-                        }}
-                        disabled={!canWrite}
-                      />
-                    ))}
-                  </div>
-                )}
-                {activeManeuver && (
-                  <p className="mt-3 text-xs text-base-content/70">{activeManeuver.blurb}</p>
-                )}
-              </ChoicePanel>
-            )}
-          </div>
+        {embedded && <div className="min-w-0 min-[1280px]:hidden">{mobileChrome?.actions}</div>}
+        {(preferences.showPosture || preferences.showManeuver || preferences.showConditions) && (
           <div
-            className={`dropdown dropdown-end ${openPanel === 'conditions' ? 'dropdown-open' : ''}`}
+            className={`${embedded ? 'col-span-4 border-t border-base-300/60' : 'col-span-2'} grid gap-0 ${optionalColumns} min-[1280px]:contents`}
           >
-            <StateTrigger
-              label="Conditions"
-              summary={conditionSummary}
-              open={openPanel === 'conditions'}
-              panelId={panelId}
-              onToggle={(trigger) => togglePanel('conditions', trigger)}
-            />
-            {openPanel === 'conditions' && (
-              <ChoicePanel
-                id={panelId}
-                panelTop={panelTop}
-                title="Conditions"
-                description="Select every condition that applies. Automatic HP/FP thresholds stay beside their pools."
-                alignEnd
+            {preferences.showPosture && (
+              <div
+                className={`dropdown min-w-0 min-[1280px]:flex-1 ${openPanel === 'posture' ? 'dropdown-open' : ''}`}
               >
-                <div className="flex flex-wrap gap-2">
-                  {COMMON_CONDITIONS.map((entry) => (
-                    <ConditionChip
-                      key={entry}
-                      label={conditionLabel(entry)}
-                      active={conditions.some(
-                        (condition) => condition.trim().toLowerCase() === entry.toLowerCase(),
-                      )}
-                      onClick={() => toggleCondition(entry)}
-                      disabled={!canWrite}
-                    />
-                  ))}
-                </div>
-                {reelingSuggested && (
-                  <p className="mt-3 text-xs text-warning">
-                    <InfoTooltip
-                      content={`HP (${bumpers.hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; Reeling is a manual reminder and adds no extra penalty.`}
-                    >
-                      Reeling suggested
-                    </InfoTooltip>
-                  </p>
+                <StateTrigger
+                  label="Posture"
+                  summary={postureSummary}
+                  open={openPanel === 'posture'}
+                  panelId={panelId}
+                  onToggle={(trigger) => togglePanel('posture', trigger)}
+                  flat={embedded}
+                />
+                {openPanel === 'posture' && (
+                  <ChoicePanel id={panelId} panelTop={panelTop} title="Posture">
+                    <div className="flex flex-wrap gap-2">
+                      {POSTURES.map((entry) => (
+                        <ConditionChip
+                          key={entry}
+                          label={entry}
+                          active={posture === entry}
+                          className="capitalize"
+                          onClick={() => {
+                            void patchCombat('posture', entry);
+                            closeAndFocus();
+                          }}
+                          disabled={!canWrite}
+                        />
+                      ))}
+                    </div>
+                  </ChoicePanel>
                 )}
-                <div className="mt-4 flex justify-end">
-                  <button type="button" className="btn btn-primary btn-sm" onClick={closeAndFocus}>
-                    Done
-                  </button>
-                </div>
-              </ChoicePanel>
+              </div>
+            )}
+            {preferences.showManeuver && (
+              <div
+                className={`dropdown min-w-0 min-[1280px]:flex-1 ${openPanel === 'maneuver' ? 'dropdown-open' : ''}`}
+              >
+                <StateTrigger
+                  label="Maneuver"
+                  summary={storedManeuver ?? 'None'}
+                  open={openPanel === 'maneuver'}
+                  panelId={panelId}
+                  onToggle={(trigger) => togglePanel('maneuver', trigger)}
+                  flat={embedded}
+                />
+                {openPanel === 'maneuver' && (
+                  <ChoicePanel id={panelId} panelTop={panelTop} title="Maneuver">
+                    <div className="mb-3 flex gap-2">
+                      <button
+                        type="button"
+                        className={`btn btn-xs ${customManeuver ? '' : 'btn-primary'}`}
+                        onClick={() => setCustomManeuver(false)}
+                      >
+                        Presets
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-xs ${customManeuver ? 'btn-primary' : ''}`}
+                        onClick={() => setCustomManeuver(true)}
+                      >
+                        Custom
+                      </button>
+                    </div>
+                    {customManeuver ? (
+                      <input
+                        aria-label="Custom maneuver"
+                        className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full`}
+                        placeholder="e.g. Ready — draw sword"
+                        disabled={!canWrite}
+                        {...maneuverField.inputProps}
+                      />
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {MANEUVERS.map((entry) => (
+                          <ConditionChip
+                            key={entry.id}
+                            label={entry.label}
+                            active={activeManeuver?.id === entry.id}
+                            onClick={() => {
+                              void patchCombat(
+                                'maneuver',
+                                activeManeuver?.id === entry.id ? null : entry.label,
+                              );
+                              closeAndFocus();
+                            }}
+                            disabled={!canWrite}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {activeManeuver && (
+                      <p className="mt-3 text-xs text-base-content/70">{activeManeuver.blurb}</p>
+                    )}
+                  </ChoicePanel>
+                )}
+              </div>
+            )}
+            {preferences.showConditions && (
+              <div
+                className={`dropdown dropdown-end min-w-0 min-[1280px]:flex-1 ${openPanel === 'conditions' ? 'dropdown-open' : ''}`}
+              >
+                <StateTrigger
+                  label="Conditions"
+                  summary={conditionSummary}
+                  open={openPanel === 'conditions'}
+                  panelId={panelId}
+                  onToggle={(trigger) => togglePanel('conditions', trigger)}
+                  flat={embedded}
+                />
+                {openPanel === 'conditions' && (
+                  <ChoicePanel
+                    id={panelId}
+                    panelTop={panelTop}
+                    title="Conditions"
+                    description="Select every condition that applies. Automatic HP/FP thresholds stay beside their pools."
+                    alignEnd
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {COMMON_CONDITIONS.map((entry) => (
+                        <ConditionChip
+                          key={entry}
+                          label={conditionLabel(entry)}
+                          active={conditions.some(
+                            (condition) => condition.trim().toLowerCase() === entry.toLowerCase(),
+                          )}
+                          onClick={() => toggleCondition(entry)}
+                          disabled={!canWrite}
+                        />
+                      ))}
+                    </div>
+                    {reelingSuggested && (
+                      <p className="mt-3 text-xs text-warning">
+                        <InfoTooltip
+                          content={`HP (${bumpers.hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; Reeling is a manual reminder and adds no extra penalty.`}
+                        >
+                          Reeling suggested
+                        </InfoTooltip>
+                      </p>
+                    )}
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={closeAndFocus}
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </ChoicePanel>
+                )}
+              </div>
             )}
           </div>
-        </div>
+        )}
       </div>
     </aside>
   );

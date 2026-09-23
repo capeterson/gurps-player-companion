@@ -1318,8 +1318,8 @@ function WarningsPanel({
  * Unspent badge on the right when the campaign defines a point target
  * (the running total lives in the Point Ledger card below).
  *
- * The detail editors for each of those fields live in the "Identity"
- * tab below; this hero is presentational + holds the inline name editor.
+ * The detail editors for each of those fields live in the Overview
+ * section below; this hero is presentational + holds the inline name editor.
  */
 function IdentityHero({
   character,
@@ -1524,7 +1524,12 @@ export function CharacterSheetPage() {
   }
 
   return (
-    <CombatStatusProvider key={character.id} character={character} canWrite={canWrite}>
+    <CombatStatusProvider
+      key={character.id}
+      character={character}
+      canWrite={canWrite}
+      userId={me.data?.id}
+    >
       <div className="space-y-6 sheet-with-navigation">
         <nav className="flex items-center gap-2 text-sm">
           <Link to="/characters" className="link link-hover text-muted">
@@ -1548,73 +1553,16 @@ export function CharacterSheetPage() {
         />
 
         {character.libraryEffectsKnown === false && <MechanicsUnavailable />}
-        {character.libraryEffectsKnown !== false && (
-          <>
-            {(character.warnings.length > 0 || character.dismissedWarnings.length > 0) && (
-              <FoldSection
-                preferenceKey={`${character.id}:warnings`}
-                title="Warnings"
-                summary={`${character.warnings.length} active`}
-              >
-                <WarningsPanel character={character} canWrite={canWrite} />
-              </FoldSection>
-            )}
-
+        {character.libraryEffectsKnown !== false &&
+          (character.warnings.length > 0 || character.dismissedWarnings.length > 0) && (
             <FoldSection
-              preferenceKey={`${character.id}:overview:${tab === 'Combat' ? 'combat' : 'sheet'}`}
-              title="Sheet overview"
-              defaultOpen={tab !== 'Combat'}
-              summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
+              preferenceKey={`${character.id}:warnings`}
+              title="Warnings"
+              summary={`${character.warnings.length} active`}
             >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <FoldSection preferenceKey={`${character.id}:AttributesPanel`} title="Attributes">
-                  <AttributesPanel
-                    character={character}
-                    canWrite={canWrite}
-                    tempEffects={tempEffects}
-                    enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                  />
-                </FoldSection>
-                <FoldSection
-                  preferenceKey={`${character.id}:SecondaryModsPanel`}
-                  title="Secondary attributes"
-                >
-                  <SecondaryModsPanel
-                    character={character}
-                    canWrite={canWrite}
-                    tempEffects={tempEffects}
-                    enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                  />
-                </FoldSection>
-                <FoldSection preferenceKey={`${character.id}:StatusPanel`} title="Status">
-                  <StatusPanel character={character} />
-                </FoldSection>
-                <div className="grid grid-cols-1 gap-4">
-                  <FoldSection
-                    preferenceKey={`${character.id}:PointsPanel`}
-                    title="Point ledger"
-                    defaultOpen={false}
-                    summary={`${character.points.total} pts`}
-                  >
-                    <PointsPanel character={character} pointTarget={pointTarget} />
-                  </FoldSection>
-                  <FoldSection
-                    preferenceKey={`${character.id}:EncumbrancePanel`}
-                    title="Encumbrance"
-                  >
-                    <EncumbrancePanel character={character} />
-                  </FoldSection>
-                  <FoldSection
-                    preferenceKey={`${character.id}:ActiveConditionsPanel`}
-                    title="Conditional effects"
-                  >
-                    <ActiveConditionsPanel character={character} canWrite={canWrite} />
-                  </FoldSection>
-                </div>
-              </div>
+              <WarningsPanel character={character} canWrite={canWrite} />
             </FoldSection>
-          </>
-        )}
+          )}
         <SheetNavigation
           key={character.id}
           tabs={visibleTabs}
@@ -1639,14 +1587,73 @@ export function CharacterSheetPage() {
               experimentalTurnTracker={campaign?.experimentalTurnTracker === true}
             />
           )}
-          {tab === 'Identity' && (
-            <FoldSection preferenceKey={`${character.id}:IdentityPanel`} title="Identity">
-              <IdentityPanel
-                character={character}
-                canWrite={canWrite}
-                campaigns={campaigns.data ?? []}
-              />
-            </FoldSection>
+          {tab === 'Overview' && (
+            <div className="space-y-4">
+              {character.libraryEffectsKnown !== false && (
+                <FoldSection
+                  preferenceKey={`${character.id}:overview`}
+                  title="Sheet overview"
+                  summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
+                >
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <FoldSection
+                      preferenceKey={`${character.id}:AttributesPanel`}
+                      title="Attributes"
+                    >
+                      <AttributesPanel
+                        character={character}
+                        canWrite={canWrite}
+                        tempEffects={tempEffects}
+                        enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                      />
+                    </FoldSection>
+                    <FoldSection
+                      preferenceKey={`${character.id}:SecondaryModsPanel`}
+                      title="Secondary attributes"
+                    >
+                      <SecondaryModsPanel
+                        character={character}
+                        canWrite={canWrite}
+                        tempEffects={tempEffects}
+                        enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                      />
+                    </FoldSection>
+                    <FoldSection preferenceKey={`${character.id}:StatusPanel`} title="Status">
+                      <StatusPanel character={character} />
+                    </FoldSection>
+                    <div className="grid grid-cols-1 gap-4">
+                      <FoldSection
+                        preferenceKey={`${character.id}:PointsPanel`}
+                        title="Point ledger"
+                        defaultOpen={false}
+                        summary={`${character.points.total} pts`}
+                      >
+                        <PointsPanel character={character} pointTarget={pointTarget} />
+                      </FoldSection>
+                      <FoldSection
+                        preferenceKey={`${character.id}:EncumbrancePanel`}
+                        title="Encumbrance"
+                      >
+                        <EncumbrancePanel character={character} />
+                      </FoldSection>
+                      <FoldSection
+                        preferenceKey={`${character.id}:ActiveConditionsPanel`}
+                        title="Conditional effects"
+                      >
+                        <ActiveConditionsPanel character={character} canWrite={canWrite} />
+                      </FoldSection>
+                    </div>
+                  </div>
+                </FoldSection>
+              )}
+              <FoldSection preferenceKey={`${character.id}:IdentityPanel`} title="Identity">
+                <IdentityPanel
+                  character={character}
+                  canWrite={canWrite}
+                  campaigns={campaigns.data ?? []}
+                />
+              </FoldSection>
+            </div>
           )}
           {tab === 'Traits' && (
             <FoldSection preferenceKey={`${character.id}:TraitsPanel`} title="Traits">

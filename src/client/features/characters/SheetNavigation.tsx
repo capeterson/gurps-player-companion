@@ -4,7 +4,7 @@ import { AppIcon, type AppIconName } from '../../components/ui/AppIcon.tsx';
 
 export const SHEET_TABS = [
   'Combat',
-  'Identity',
+  'Overview',
   'Traits',
   'Skills',
   'Magic',
@@ -14,7 +14,7 @@ export const SHEET_TABS = [
 export type SheetTab = (typeof SHEET_TABS)[number];
 export const SHEET_ICONS: Record<SheetTab, AppIconName> = {
   Combat: 'combat',
-  Identity: 'identity',
+  Overview: 'identity',
   Traits: 'traits',
   Skills: 'skills',
   Magic: 'magic',
