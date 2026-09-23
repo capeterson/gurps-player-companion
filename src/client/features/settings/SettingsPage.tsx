@@ -3,6 +3,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
 import { createPasskey, passkeysSupported } from '../../lib/passkeys.ts';
+import {
+  useStatusBarPreferences,
+  writeStatusBarPreferences,
+} from '../../lib/statusBarPreferences.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { tokenStore } from '../../lib/tokenStore.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
@@ -17,6 +21,21 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const me = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api<{ id: string }>('/auth/me'),
+  });
+  const statusBarPreferences = useStatusBarPreferences(me.data?.id);
+
+  const setStatusBarPreference = (
+    field: 'showPosture' | 'showManeuver' | 'showConditions',
+    value: boolean,
+  ) => {
+    if (!me.data?.id) return;
+    if (!writeStatusBarPreferences(me.data.id, { ...statusBarPreferences, [field]: value })) {
+      toasts.push("Couldn't save character sheet preferences on this device", { kind: 'error' });
+    }
+  };
 
   const passkeys = useQuery({
     queryKey: ['passkeys'],
@@ -91,8 +110,65 @@ export function SettingsPage() {
       <header className="space-y-2">
         <p className="label-eyebrow">Account</p>
         <h1 className="font-display text-3xl">Settings</h1>
-        <p className="max-w-2xl text-sm text-muted">Manage your sign-in credentials.</p>
+        <p className="max-w-2xl text-sm text-muted">
+          Manage your character sheet display and sign-in credentials.
+        </p>
       </header>
+
+      <section className="max-w-lg">
+        <div className="card gap-4 p-card">
+          <div>
+            <p className="label-eyebrow">Preferences</p>
+            <h2 className="font-display text-2xl">Character sheet</h2>
+            <p className="text-sm text-muted">
+              Choose which optional controls appear in Current Status. Saved for this account on
+              this device.
+            </p>
+          </div>
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <span className="block font-medium">Posture</span>
+              <span className="text-xs text-muted">Show the posture control in the header.</span>
+            </span>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm shrink-0"
+              aria-label="Show posture in Current Status"
+              checked={statusBarPreferences.showPosture}
+              disabled={!me.data}
+              onChange={(event) => setStatusBarPreference('showPosture', event.target.checked)}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <span className="block font-medium">Maneuver</span>
+              <span className="text-xs text-muted">Show the maneuver control in the header.</span>
+            </span>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm shrink-0"
+              aria-label="Show maneuver in Current Status"
+              checked={statusBarPreferences.showManeuver}
+              disabled={!me.data}
+              onChange={(event) => setStatusBarPreference('showManeuver', event.target.checked)}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <span className="block font-medium">Conditions</span>
+              <span className="text-xs text-muted">Show the conditions control in the header.</span>
+            </span>
+            <input
+              type="checkbox"
+              className="toggle toggle-sm shrink-0"
+              aria-label="Show conditions in Current Status"
+              checked={statusBarPreferences.showConditions}
+              disabled={!me.data}
+              onChange={(event) => setStatusBarPreference('showConditions', event.target.checked)}
+            />
+          </label>
+        </div>
+      </section>
 
       <section className="max-w-lg">
         <form

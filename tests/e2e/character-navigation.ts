@@ -2,7 +2,7 @@ import { type Page, expect } from '@playwright/test';
 
 export const CHARACTER_SECTIONS = [
   'Combat',
-  'Identity',
+  'Overview',
   'Traits',
   'Skills',
   'Magic',

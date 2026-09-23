@@ -104,12 +104,12 @@ describe('SheetNavigation', () => {
     expect(petals).toHaveAttribute('hidden');
 
     await user.click(toggle);
-    const identityLabel = Array.from(navigation.querySelectorAll('.sheet-petal'))
-      .find((group) => group.querySelector('button[aria-label="Identity"]') !== null)
+    const overviewLabel = Array.from(navigation.querySelectorAll('.sheet-petal'))
+      .find((group) => group.querySelector('button[aria-label="Overview"]') !== null)
       ?.querySelector('.sheet-petal-label');
-    expect(identityLabel).not.toBeNull();
-    await user.click(identityLabel as HTMLElement);
-    expect(onSelect).toHaveBeenCalledWith('Identity');
+    expect(overviewLabel).not.toBeNull();
+    await user.click(overviewLabel as HTMLElement);
+    expect(onSelect).toHaveBeenCalledWith('Overview');
     expect(petals).toHaveAttribute('hidden');
   });
 });

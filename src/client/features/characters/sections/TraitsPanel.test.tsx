@@ -128,7 +128,7 @@ function renderOwnedTrait() {
 
 function addDxEffect() {
   fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
-  fireEvent.click(screen.getByRole('button', { name: '+ Add custom effects' }));
+  fireEvent.click(screen.getByRole('button', { name: '+ Add effects' }));
   fireEvent.click(screen.getByRole('button', { name: '+ Add effect' }));
   fireEvent.change(screen.getByLabelText('Effect 1 target'), { target: { value: 'dx' } });
 }
@@ -148,21 +148,87 @@ it('saves character-owned effects through the trait outbox field', async () => {
   );
 });
 
+it('can remove an empty Effects section without writing a trait patch', () => {
+  renderOwnedTrait();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  fireEvent.click(screen.getByRole('button', { name: '+ Add effects' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
+  expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible();
+  expect(screen.queryByText('Effects')).not.toBeInTheDocument();
+  expect(enqueueFieldPatch).not.toHaveBeenCalled();
+});
+
+it('removes saved effects through the outbox and restores the compact add control', async () => {
+  renderCharacterTraits([
+    { ...ownedTrait, customEffects: [{ target: 'dx', value: 1, scaling: 'flat' }] },
+  ]);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  fireEvent.click(screen.getByText('Effects (1)'));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
+  await waitFor(() =>
+    expect(enqueueFieldPatch).toHaveBeenCalledWith(
+      expect.objectContaining({ fieldPath: 'customEffects', attemptedValue: [] }),
+    ),
+  );
+  await waitFor(() => expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible());
+});
+
+it('keeps saved effects visible and flashes the editor if removal fails', async () => {
+  enqueueFieldPatch.mockRejectedValueOnce(new Error('effect rejected'));
+  renderCharacterTraits([
+    { ...ownedTrait, customEffects: [{ target: 'dx', value: 1, scaling: 'flat' }] },
+  ]);
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  fireEvent.click(screen.getByText('Effects (1)'));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
+  await screen.findByText(/Couldn't save Weapon Mastery effects — effect rejected/);
+  expect(screen.getByText('Effects (1)')).toBeVisible();
+  expect(screen.getByText('Effects (1)').closest('details')).toHaveAttribute(
+    'data-flashing',
+    'true',
+  );
+});
+
+it('queues removal behind an in-flight effects save', async () => {
+  let settleFirst: (() => void) | undefined;
+  enqueueFieldPatch.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        settleFirst = resolve;
+      }),
+  );
+  renderOwnedTrait();
+  addDxEffect();
+  fireEvent.click(screen.getByRole('button', { name: 'Save effects' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
+  expect(
+    enqueueFieldPatch.mock.calls.filter(([args]) => args.fieldPath === 'customEffects'),
+  ).toHaveLength(1);
+  settleFirst?.();
+  await waitFor(() =>
+    expect(
+      enqueueFieldPatch.mock.calls.filter(([args]) => args.fieldPath === 'customEffects'),
+    ).toHaveLength(2),
+  );
+  expect(enqueueFieldPatch.mock.calls.at(-1)?.[0]).toMatchObject({
+    fieldPath: 'customEffects',
+    attemptedValue: [],
+  });
+  await waitFor(() => expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible());
+});
+
 it('retains a visible rollback event when an owned-effects save fails', async () => {
   enqueueFieldPatch.mockRejectedValueOnce(new Error('effect rejected'));
   renderOwnedTrait();
   addDxEffect();
   fireEvent.click(screen.getByRole('button', { name: 'Save effects' }));
-  await screen.findByText(/Couldn't save Weapon Mastery custom effects — effect rejected/);
+  await screen.findByText(/Couldn't save Weapon Mastery effects — effect rejected/);
   expect(
     await screen.findByText(
       'No mechanical effects. Add one for stat, skill, defense, DR, damage, or weapon bonuses.',
     ),
   ).toBeInTheDocument();
-  expect(screen.getByText('Custom effects').nextElementSibling).toHaveAttribute(
-    'data-flashing',
-    'true',
-  );
+  expect(screen.getByText('Effects').closest('details')).toHaveAttribute('data-flashing', 'true');
 });
 
 it('queues a newer same-field effect save and lets a different field save in parallel', async () => {
@@ -258,7 +324,7 @@ it('opens one full-width trait editor and keeps unset advanced details out of th
   expect(screen.getByLabelText('Weapon Mastery points')).toBeVisible();
   expect(screen.getByLabelText('Weapon Mastery description and notes')).toBeVisible();
   expect(screen.queryByText('Source & rules')).not.toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '+ Add custom effects' })).toBeVisible();
+  expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Delete trait' })).toBeVisible();
 });
 
@@ -273,12 +339,12 @@ it('preserves unsaved custom-effect drafts when disclosures close or search hide
     },
   ]);
   fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
-  fireEvent.click(screen.getByRole('button', { name: '+ Add custom effects' }));
+  fireEvent.click(screen.getByRole('button', { name: '+ Add effects' }));
   fireEvent.click(screen.getByRole('button', { name: '+ Add effect' }));
 
-  fireEvent.click(screen.getByText('Custom effects'));
+  fireEvent.click(screen.getByText('Effects'));
   expect(screen.getByLabelText('Effect 1 target')).not.toBeVisible();
-  fireEvent.click(screen.getByText('Custom effects'));
+  fireEvent.click(screen.getByText('Effects'));
   expect(screen.getByLabelText('Effect 1 target')).toBeVisible();
 
   fireEvent.change(screen.getByLabelText('Effect 1 target'), { target: { value: 'dx' } });

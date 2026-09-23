@@ -245,7 +245,7 @@ test('spell rows stay readable at narrow mobile and tablet breakpoints', async (
   await expect(page.getByText(maintainableSpellName, { exact: true })).toBeVisible();
 
   await page.goto(characterUrl);
-  await selectCharacterSection(page, 'Identity');
+  await selectCharacterSection(page, 'Overview');
   await page
     .getByLabel('campaign', { exact: true })
     .selectOption({ label: 'Responsive spell library' });
@@ -634,6 +634,7 @@ test('attribute modifier popovers keep their actions reachable on a short mobile
   await page.getByLabel(/new character name/i).fill('Narrow modifier sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Overview');
   const overview = page.getByRole('button', { name: /Sheet overview/ });
   if ((await overview.getAttribute('aria-expanded')) === 'false') await overview.click();
   await page.getByRole('button', { name: 'Edit IQ modifiers' }).click();

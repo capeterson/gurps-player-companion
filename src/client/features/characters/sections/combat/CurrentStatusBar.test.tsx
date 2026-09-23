@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
 import { getLocalDb, resetLocalDb } from '../../../../db/dexie.ts';
+import type { StatusBarPreferences } from '../../../../lib/statusBarPreferences.ts';
 import { tokenStore } from '../../../../lib/tokenStore.ts';
 import {
   getSyncOrchestrator,
@@ -62,7 +63,17 @@ function LivePoolsHarness({ observed }: { observed: number[] }) {
   );
 }
 
-function setup(hp = 10, fp = 10, max = 12, maneuver: string | null = null) {
+function setup(
+  hp = 10,
+  fp = 10,
+  max = 12,
+  maneuver: string | null = null,
+  preferences: StatusBarPreferences = {
+    showPosture: true,
+    showManeuver: true,
+    showConditions: true,
+  },
+) {
   const character = {
     id: 'character-1',
     derived: { effectiveHt: 10 },
@@ -96,6 +107,7 @@ function setup(hp = 10, fp = 10, max = 12, maneuver: string | null = null) {
       canWrite
       patchCombat={patchCombat}
       openRoll={openRoll}
+      preferences={preferences}
     />,
   );
   const rerenderPools = (nextHp: number, nextFp = fp) =>
@@ -106,30 +118,33 @@ function setup(hp = 10, fp = 10, max = 12, maneuver: string | null = null) {
         canWrite
         patchCombat={patchCombat}
         openRoll={openRoll}
+        preferences={preferences}
       />,
     );
   return { bumpHp, bumpFp, setHp, setFp, patchCombat, openRoll, rerenderPools, ...view };
 }
 
 describe('Current Status', () => {
-  it('collapses the secondary mobile row while retaining its state summary', () => {
+  it('shows HP and FP by default while independently hiding optional controls', () => {
+    setup(10, 10, 12, 'Attack', {
+      showPosture: false,
+      showManeuver: false,
+      showConditions: false,
+    });
+
+    expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Change posture/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Change maneuver/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Change conditions/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Show status details:/ })).not.toBeInTheDocument();
+  });
+
+  it('shows enabled maneuver and conditions controls together with posture', () => {
     setup(10, 10, 12, 'Attack');
-
-    const toggle = screen.getByRole('button', { name: /^Show status details:/ });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveTextContent('Standing · Attack · None');
-    expect(
-      screen.getByLabelText('Change posture, current Standing').closest('.col-span-2'),
-    ).toHaveClass('hidden');
-
-    fireEvent.click(toggle);
-    expect(screen.getByRole('button', { name: /^Hide status details:/ })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
-    expect(
-      screen.getByLabelText('Change posture, current Standing').closest('.col-span-2'),
-    ).toHaveClass('grid');
+    expect(screen.getByRole('button', { name: 'Change posture, current Standing' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Change maneuver, current Attack' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Change conditions, current None' })).toBeVisible();
   });
 
   it('anchors visible uneven-threshold labels at their corresponding range values', () => {

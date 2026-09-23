@@ -304,6 +304,13 @@ body {
   color: var(--text-dim);
 }
 
+/* The character's portaled status row replaces the ordinary mobile chrome. */
+@media (max-width: 1279px) {
+  .app-header:has(#character-status-header-slot > aside) > .app-header-normal {
+    display: none;
+  }
+}
+
 /* ============================================================
    Atmospheric vignette — top-right radial glow, fixed to the
    viewport. Apply .arcane-edge to the app shell (positioned

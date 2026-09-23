@@ -233,7 +233,7 @@ describe('durable character mechanics', () => {
     },
   );
 
-  it('keeps Current Status available on Identity and uses the markdown Description editor', async () => {
+  it('shows Sheet overview above Identity only in Overview while Current Status stays available', async () => {
     await seed();
     await getLocalDb().campaigns.put({
       id: CAMPAIGN,
@@ -270,8 +270,10 @@ describe('durable character mechanics', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Open character navigation' })).toBeEnabled(),
     );
+    expect(screen.queryByRole('button', { name: /^Sheet overview/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Identity' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(screen.getByRole('button', { name: /^Sheet overview/ })).toBeVisible();
     await waitFor(() => expect(screen.getByText('Description')).toBeInTheDocument());
     expect(screen.getByRole('complementary', { name: 'Current Status' })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();

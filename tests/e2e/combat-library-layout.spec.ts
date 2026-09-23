@@ -121,10 +121,13 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
       expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width);
       expect(panelBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
       expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(568);
-      if (width < 768) {
+      if (width < 1280) {
         expect(Math.abs(panelBox.x + panelBox.width / 2 - width / 2)).toBeLessThanOrEqual(1);
       } else {
-        expect(Math.abs(panelBox.x - triggerBox.x)).toBeLessThanOrEqual(1);
+        // The shared overlay helper shifts an anchored panel when it would
+        // cross the viewport's 8px safety margin.
+        const expectedX = Math.max(8, Math.min(triggerBox.x, width - 8 - panelBox.width));
+        expect(Math.abs(panelBox.x - expectedX)).toBeLessThanOrEqual(1);
         const triggerGap = panelBox.y - (triggerBox.y + triggerBox.height);
         expect(triggerGap).toBeGreaterThanOrEqual(0);
         expect(triggerGap).toBeLessThanOrEqual(12);
@@ -149,6 +152,22 @@ test('Current Status stays available and combat stays compact across mobile and 
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await register(page);
+  await page.goto('/settings');
+  const posturePreference = page.getByRole('checkbox', {
+    name: 'Show posture in Current Status',
+  });
+  const maneuverPreference = page.getByRole('checkbox', {
+    name: 'Show maneuver in Current Status',
+  });
+  const conditionsPreference = page.getByRole('checkbox', {
+    name: 'Show conditions in Current Status',
+  });
+  await expect(posturePreference).not.toBeChecked();
+  await expect(maneuverPreference).not.toBeChecked();
+  await expect(conditionsPreference).not.toBeChecked();
+  await posturePreference.check();
+  await maneuverPreference.check();
+  await conditionsPreference.check();
 
   for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
@@ -159,8 +178,17 @@ test('Current Status stays available and combat stays compact across mobile and 
     });
     await page.goto(`/characters/${character.id}`);
     const overview = page.getByRole('button', { name: /^Sheet overview/ });
-    await expect(overview).toHaveAttribute('aria-expanded', 'false');
-    await selectCharacterSection(page, 'Identity');
+    await expect(overview).toHaveCount(0);
+    await selectCharacterSection(page, 'Overview');
+    await expect(overview).toBeVisible();
+    await expect(overview).toHaveAttribute('aria-expanded', 'true');
+    const overviewBox = await overview.boundingBox();
+    const identityBox = await page
+      .getByRole('button', { name: 'Identity', exact: true })
+      .boundingBox();
+    expect(overviewBox).not.toBeNull();
+    expect(identityBox).not.toBeNull();
+    if (overviewBox && identityBox) expect(overviewBox.y).toBeLessThan(identityBox.y);
     const status = page.getByRole('complementary', { name: 'Current Status' });
     await expect(status).toBeVisible();
     await expect(status.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
@@ -175,6 +203,7 @@ test('Current Status stays available and combat stays compact across mobile and 
     await page.getByRole('button', { name: 'Back to rich text' }).click();
     await expect(page.getByLabel('description').locator('strong')).toHaveText('Field guide');
     await selectCharacterSection(page, 'Combat');
+    await expect(overview).toHaveCount(0);
     await expect(status).toBeVisible();
     await expect(page.getByRole('group', { name: 'Hit points', exact: true })).toHaveCount(0);
     const defenseAndDr = page.getByRole('region', {
@@ -197,9 +226,6 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(page.getByRole('combobox', { name: 'Defense order' })).toHaveCount(0);
     await expect(page.getByText('All locations and DR types', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toHaveCount(0);
-    if (width === 320) {
-      await status.getByRole('button', { name: /^Show status details:/ }).click();
-    }
     await status.getByRole('button', { name: 'Change maneuver, current None' }).click();
     await status.getByRole('button', { name: 'Attack', exact: true }).click();
     await expect(
@@ -214,9 +240,6 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(status.getByRole('button', { name: 'Sleeping', exact: true })).toHaveCount(0);
     await page.reload();
     await expect(status).toBeVisible();
-    if (width === 320) {
-      await status.getByRole('button', { name: /^Show status details:/ }).click();
-    }
     await expect(
       status.getByRole('button', { name: 'Change maneuver, current Attack' }),
     ).toBeVisible();
@@ -283,7 +306,9 @@ test('Current Status stays available and combat stays compact across mobile and 
         })
         .toBe(true);
 
-      for (const breakpointWidth of [477, 575, 639, 640, 641, 768, 1023, 1024, 1025, 1280, 1440]) {
+      for (const breakpointWidth of [
+        477, 575, 639, 640, 641, 768, 1023, 1024, 1025, 1279, 1280, 1281, 1440,
+      ]) {
         await expectCurrentStatusPoolPanelAt(page, breakpointWidth);
       }
     }

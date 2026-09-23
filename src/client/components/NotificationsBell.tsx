@@ -25,7 +25,7 @@ function isCampaignInvite(n: NotificationOut): boolean {
   return n.type === 'campaign_invitation';
 }
 
-export function NotificationsBell() {
+export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?: string } = {}) {
   const qc = useQueryClient();
   const toasts = useToasts();
   const panelRef = useViewportBoundedOverlay<HTMLDivElement>();
@@ -78,7 +78,7 @@ export function NotificationsBell() {
   return (
     <details className="dropdown dropdown-end relative z-50">
       <summary
-        className="btn btn-ghost btn-sm btn-square relative"
+        className={`btn btn-ghost btn-sm btn-square relative ${triggerClassName}`}
         aria-label={unread.length > 0 ? `Notifications (${unread.length} unread)` : 'Notifications'}
       >
         <AppIcon name="bell" />

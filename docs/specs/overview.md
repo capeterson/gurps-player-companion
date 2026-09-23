@@ -89,7 +89,7 @@ invalidation behavior as REST.
 ### Character sheet (the core surface)
 Route `/characters/:id`. Sectioned sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), destinations:
-**Combat, Identity, Traits, Skills, Magic, Inventory, History**.
+**Combat, Overview, Traits, Skills, Magic, Inventory, History**.
 Combat is the default section for live play. Magic is hidden on a read-only
 view of a non-magical character; owners always have it available to add magic.
 
@@ -113,14 +113,17 @@ shows the synced campaign name as a separate link to that campaign.
   Lucide icons at a 1.75 stroke weight: swords, portrait, fingerprint, target,
   book, backpack and history for the sheet, with matching map, bell,
   sun/moon, edit, shield, and six-sided die icons across related controls.
-- **Narrow-screen navigation.** Character and Campaign navigation groups wrap
-  within the available header width; long breadcrumbs remain truncated and
-  the campaign dropdown stays attached to its group.
-- **Compact combat view and folding.** Combat uses a smaller identity header and
-  folds the shared sheet overview (attributes, secondary stats, status, ledger,
-  encumbrance and conditional effects) by default. The folded overview shows
-  effective ST/DX/IQ/HT. Other tabs keep an independently remembered overview
-  preference. Every visible sheet panel and main Combat section has a keyboard-accessible
+- **Narrow-screen navigation.** The full character sheet uses a compact
+  character/app menu below 1280px, with the full character name inside the menu.
+  Below 480px the trigger is icon-only; the name also remains in the sheet heading.
+  On other pages, Character and Campaign navigation groups wrap within the
+  available header width; long breadcrumbs remain truncated and the campaign
+  dropdown stays attached to its group.
+- **Compact combat view and folding.** Combat uses a smaller identity header.
+  The Overview section places the foldable sheet overview (attributes, secondary
+  stats, status, ledger, encumbrance and conditional effects) above the Identity
+  panel; other destinations do not display it. When folded, it shows effective
+  ST/DX/IQ/HT. Every visible sheet panel and main Combat section has a keyboard-accessible
   folding header; armor remains inline and open by default. `FoldSection` saves
   open/closed preferences per character/section in device-local `localStorage`
   (`gpc:fold:*`), never the server. Content stays mounted while folded so drafts,
@@ -133,7 +136,7 @@ shows the synced campaign name as a separate link to that campaign.
   raw-markdown mode. Character skill/spell copied notes have expandable markdown
   descriptions. Trait notes render markdown for readers and offer a markdown
   preview beside the compact source editor for owners.
-- **Identity tab.** Name, height, weight, age, **birthdate** (free-form
+- **Overview section's Identity panel.** Name, height, weight, age, **birthdate** (free-form
   text, e.g. "3/7/0402"), campaign assignment, and
   a **Description** field (stored in the existing `appearance` column). No
   per-character "player" field is
@@ -151,9 +154,9 @@ shows the synced campaign name as a separate link to that campaign.
   surfaces the six secondary stats (HP, Will, Per, FP, Basic Speed, Basic
   Move) with their effective values and per-stat ✦ temp-modifier
   popovers. The **Status** card shows derived combat values not displayed
-  elsewhere — Dodge, Basic Lift, and Thr / Sw. Current HP/FP, posture,
-  maneuver, and conditions live in the persistent **Current Status** bar
-  described below. The sheet's top row no longer duplicates the six secondary
+  elsewhere — Dodge, Basic Lift, and Thr / Sw. Current HP/FP live in the
+  persistent **Current Status** controls; user preferences can also show posture,
+  maneuver, and conditions there. The sheet's top row no longer duplicates the six secondary
   numbers. Temporary ST/HT boosts
   affect their normal derived values but not maximum HP/FP; only the
   dedicated temporary HP/FP modifiers change those maxima (M37). Basic
@@ -222,9 +225,11 @@ shows the synced campaign name as a separate link to that campaign.
   skill library forms: add, duplicate, reorder and delete rows; choose flat or
   per-level scaling; and supply target-aware skill, DR, condition, or weapon
   fields. Inline previews and field errors keep invalid drafts visible.
-  Character owners can expand **Custom effects** on any trait and use the same
-  editor. Those declarations are saved on the owned trait through the local-first
-  outbox; this is also where an effect can safely bind one exact inventory item.
+  Character owners can expand **Effects** on any trait and use the same
+  editor. They can remove individual effect rows or clear the trait's effects;
+  an emptied section returns to its compact add control. Those declarations
+  are saved on the owned trait through the local-first outbox; this is also
+  where an effect can safely bind one exact inventory item.
   Item-aware targets cover weapon attack, Parry, Block, damage and Accuracy.
   Selectors are deterministic: an exact local inventory id for owned mechanics,
   or portable exact normalized weapon name, governing skill/specialty, or
@@ -237,7 +242,7 @@ shows the synced campaign name as a separate link to that campaign.
   Adding is collapsed until requested, and one full-width row editor opens at a
   time. Notes, source rules, modifiers, and custom mechanics remain available
   there; advanced sections appear only when configured or when an owner chooses
-  to add custom effects. Read-only campaign viewers retain search, sorting,
+  to add effects. Read-only campaign viewers retain search, sorting,
   ordering, and configured details without seeing mutation controls. Unsaved
   custom-effect drafts stay mounted when their disclosure or row closes, when
   another row opens, and while search temporarily hides the row.
@@ -425,11 +430,20 @@ shows the synced campaign name as a separate link to that campaign.
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
   player taps between live combat and the editable sheet without a route
-  hop. **Current Status** is a persistent, sheet-level bar directly below the
-  global header on every full character section (the privacy-preserving minimal
-  view does not receive it). It holds HP, FP, posture, maneuver, and conditions;
-  its measured height reserves content space and supplies section scroll offsets,
-  including when the global header wraps on phones. Attacks, the combined
+  hop. **Current Status** is persistent on every full character section (the
+  privacy-preserving minimal view does not receive it). It always holds HP and FP.
+  Posture, maneuver, and conditions are independent, off-by-default user display preferences in Settings;
+  they do not change the saved combat state or its effects on the rules. Settings
+  are saved per signed-in user on this device. The status controls are portaled
+  into the sticky global header. Below 1280px, a compact character/navigation menu,
+  HP, FP, sync status, and notifications occupy separate, nonoverlapping tracks
+  in one row; enabled optional controls form a second row. The mobile pool targets
+  show current/max values above warning text in a flat, divided toolbar. The menu
+  retains character, campaign, account, theme, and
+  other navigation actions. On desktop the ordinary navigation row stays above
+  the status controls, with less status padding when all optional controls are off.
+  The measured complete header height supplies section scroll offsets, including
+  when desktop navigation wraps. Attacks, the combined
   defense/armor workspace, the Solo tracker, and roll history use the Combat tab's
   full width. Sections stack on
   mobile instead of accumulating into two independent, uneven columns. Main combat
@@ -437,13 +451,13 @@ shows the synced campaign name as a separate link to that campaign.
   - **Current Status** — compact HP/FP controls show their current/max values and
     important warnings. Opening a pool reveals ±1 and ±5 controls, reset, a range
     control, threshold/recovery guidance, death-check actions, and the FP-floor
-    warning. Posture and maneuver close after a preset selection; conditions stay
-    open for multi-selection until **Done**. The maneuver editor retains the active
+    warning. Enabled posture and maneuver close after a preset selection; enabled
+    conditions stay open for multi-selection until **Done**. The maneuver editor retains the active
     preset's rules guidance and supports a custom free-text fallback. The collapsed condition summary shows
     the first active condition plus `+N`. All common-condition chips normalize
-    legacy Capitalized entries so old data still lights the right chip. On phones,
-    the posture/maneuver/conditions row starts collapsed; its compact header still
-    summarizes all three states and toggles the row without hiding HP/FP. The
+    legacy Capitalized entries so old data still lights the right chip. Below 1280px,
+    HP and FP share the first row with navigation and sync actions; enabled posture,
+    maneuver, and conditions appear directly below them. The
     condition editor suggests Reeling below one-third HP but never applies it.
     Each FP lost below zero also costs
     one HP, including a decrement crossing zero (B426); FP stops at −FP,
@@ -804,7 +818,8 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   support correlation without exposing raw error details.
 - **Themeable** (light/dark; "Arcane" DaisyUI theme), installable PWA, works
   offline for the character surface.
-- **Settings** page: profile, password, passkeys, API keys. Long credential and
+- **Settings** page: account-scoped device-local Current Status display switches,
+  profile, password, passkeys, API keys. Long credential and
   connected-app names wrap inside their cards, with destructive actions stacked
   below them on narrow screens rather than overlapping the metadata.
 
@@ -883,6 +898,9 @@ src/
                   (CombatStatusProvider/CurrentStatusBar + CombatTab with
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
+    lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
+    components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
+                 into the portaled Current Status row
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth),

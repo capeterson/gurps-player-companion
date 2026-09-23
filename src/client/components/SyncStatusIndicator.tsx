@@ -20,7 +20,7 @@ import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 import { InfoTooltip } from './ui/InfoTooltip.tsx';
 
-export function SyncStatusIndicator() {
+export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassName?: string } = {}) {
   const { state, error } = useSyncStatus();
 
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -76,7 +76,7 @@ export function SyncStatusIndicator() {
         ariaLabel={
           !online && visualState === 'error' ? `${meta.ariaLabel} (offline)` : meta.ariaLabel
         }
-        triggerClassName={`btn btn-ghost btn-sm btn-square ${meta.colorClass}`}
+        triggerClassName={`btn btn-ghost btn-sm btn-square ${meta.colorClass} ${triggerClassName}`}
         onTriggerClick={() => setLogOpen(true)}
       >
         <SyncSymbol state={visualState} />

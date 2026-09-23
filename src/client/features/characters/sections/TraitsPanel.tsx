@@ -1,4 +1,4 @@
-import { type DragEvent, useState } from 'react';
+import { type DragEvent, useCallback, useEffect, useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
@@ -450,16 +450,32 @@ function CharacterEffectsEditor({
   const [valid, setValid] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [hasOpened, setHasOpened] = useState(false);
+  const [editorVersion, setEditorVersion] = useState(0);
+  const [removeRequested, setRemoveRequested] = useState(false);
+  const hideEffects = useCallback(() => {
+    setHasOpened(false);
+    setEditorOpen(false);
+    setValid(true);
+    setEditorVersion((version) => version + 1);
+  }, []);
   const effectsField = useDraftField<TraitEffect[]>({
-    name: `${trait.name} custom effects`,
+    name: `${trait.name} effects`,
     serverValue: trait.customEffects ?? [],
     format: JSON.stringify,
     parse: (raw) => characterEffectsSchema.parse(JSON.parse(raw) as unknown),
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-    onSave: (effects) => rowPatch.patch('customEffects', effects),
+    onSave: async (effects) => {
+      await rowPatch.patch('customEffects', effects);
+      if (effects.length === 0) hideEffects();
+    },
     flashKey: rowPatch.flashKey('customEffects'),
   });
   const effects = characterEffectsSchema.parse(JSON.parse(effectsField.value) as unknown);
+  useEffect(() => {
+    if (!removeRequested || effectsField.isSaving) return;
+    if (effects.length === 0 && !effectsField.error) hideEffects();
+    setRemoveRequested(false);
+  }, [removeRequested, effectsField.isSaving, effectsField.error, effects.length, hideEffects]);
 
   if (effects.length === 0 && !hasOpened) {
     return (
@@ -471,14 +487,16 @@ function CharacterEffectsEditor({
           setEditorOpen(true);
         }}
       >
-        + Add custom effects
+        + Add effects
       </button>
     );
   }
 
   return (
     <details
-      className="rounded-lg border border-base-300 bg-base-100/50 p-2"
+      className={`${DRAFT_FIELD_CLASS} rounded-lg border border-base-300 bg-base-100/50 p-2`}
+      data-flashing={effectsField.inputProps['data-flashing']}
+      data-flash-parity={effectsField.inputProps['data-flash-parity']}
       open={editorOpen}
       onToggle={(event) => {
         setEditorOpen(event.currentTarget.open);
@@ -486,18 +504,15 @@ function CharacterEffectsEditor({
       }}
     >
       <summary className="cursor-pointer text-xs font-medium">
-        Custom effects{effects.length > 0 ? ` (${effects.length})` : ''}
+        Effects{effects.length > 0 ? ` (${effects.length})` : ''}
       </summary>
-      <div
-        className={`${DRAFT_FIELD_CLASS} mt-2 space-y-2`}
-        data-flashing={effectsField.inputProps['data-flashing']}
-        data-flash-parity={effectsField.inputProps['data-flash-parity']}
-      >
+      <div className="mt-2 space-y-2">
         <p className="text-xs text-base-content/60">
           Add character-specific mechanics here. “This inventory item” is the safest way to bind a
           bonus to one weapon; it becomes inactive while that item is unequipped.
         </p>
         <EffectsEditor
+          key={editorVersion}
           effects={effects}
           inventoryItems={inventory}
           portable={false}
@@ -505,7 +520,18 @@ function CharacterEffectsEditor({
           onValidityChange={setValid}
         />
         {effectsField.error && <p className="text-xs text-error">{effectsField.error}</p>}
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm text-error"
+            onClick={() => {
+              setRemoveRequested(true);
+              effectsField.setValue('[]');
+              effectsField.commit();
+            }}
+          >
+            Remove effects
+          </button>
           <button
             type="button"
             className="btn btn-primary btn-sm"
@@ -587,7 +613,7 @@ function TraitCustomEffects({
   if (effects.length === 0) return null;
   return (
     <div>
-      <h4 className="label-eyebrow mb-1">Custom effects</h4>
+      <h4 className="label-eyebrow mb-1">Effects</h4>
       <ul className="space-y-1 text-xs text-base-content/70">
         {effects.map((effect, index) => (
           <li key={`${traitEffectSummary(effect, inventory)}:${index}`}>
@@ -693,11 +719,11 @@ function TraitRow({
         <td className="num w-12 text-right text-xs text-base-content/70 sm:w-16">
           {trait.level ?? '—'}
         </td>
-        <td className="w-10 px-1 text-right sm:w-16 sm:px-2">
+        <td className="w-14 px-1 text-right sm:w-20 sm:px-2">
           {canExpand && (
             <button
               type="button"
-              className="btn btn-ghost btn-xs min-h-11 px-1 sm:min-h-0 sm:px-2"
+              className="btn btn-ghost btn-xs min-h-11 w-full min-w-0 gap-1 px-0 sm:min-h-0 sm:px-1"
               onClick={onToggle}
               aria-expanded={expanded}
               aria-label={`${expanded ? 'Close' : canWrite ? 'Edit' : 'View'} ${trait.name}`}
@@ -1050,7 +1076,7 @@ function TraitsTable({
                   {sortHeader('Type', 'kind', 'w-0 p-0 text-center sm:w-32', undefined, true)}
                   {sortHeader('Points', 'points', 'w-11 text-right sm:w-14', 'Pts')}
                   {sortHeader('Level', 'level', 'w-12 text-right sm:w-16', 'Lvl')}
-                  <th scope="col" className="w-10 px-1 sm:w-16 sm:px-2">
+                  <th scope="col" className="w-14 px-1 sm:w-20 sm:px-2">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
