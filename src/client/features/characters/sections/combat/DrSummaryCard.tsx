@@ -19,6 +19,7 @@ import {
   woundingMultiplier,
 } from '../../../../../shared/domain/injuryCalc.ts';
 import { AppIcon } from '../../../../components/ui/AppIcon.tsx';
+import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
@@ -255,11 +256,30 @@ export function DrSummaryCard({
                 <strong className="num text-lg">{totalDb > 0 ? `+${totalDb}` : '—'}</strong>
               </div>
               <p className="text-xs text-muted">
-                {armorDb
-                  ? `Armor DB +${armorDb.db} from ${armorDb.itemName}`
-                  : 'No armor DB for this location and facing'}
-                {shieldDb > 0 && shield ? ` · Shield DB +${shieldDb} from ${shield.name}` : ''}.
-                Applied to Dodge, Parry, and Block; DB never reduces damage.
+                {armorDb ? (
+                  <>
+                    Armor DB +{armorDb.db} from{' '}
+                    <InventoryAnchorLink itemId={armorDb.itemId}>
+                      {armorDb.itemName}
+                    </InventoryAnchorLink>
+                  </>
+                ) : (
+                  'No armor DB for this location and facing'
+                )}
+                {shieldDb > 0 && shield ? (
+                  <>
+                    {' '}
+                    · Shield DB +{shieldDb} from{' '}
+                    {shield.id ? (
+                      <InventoryAnchorLink itemId={shield.id}>{shield.name}</InventoryAnchorLink>
+                    ) : (
+                      shield.name
+                    )}
+                  </>
+                ) : (
+                  ''
+                )}
+                . Applied to Dodge, Parry, and Block; DB never reduces damage.
               </p>
             </div>
           </div>
@@ -292,7 +312,7 @@ export function DrSummaryCard({
                   return (
                     <li className="py-2" key={item.id}>
                       <div className="flex justify-between gap-3">
-                        <span>{item.name}</span>
+                        <InventoryAnchorLink itemId={item.id}>{item.name}</InventoryAnchorLink>
                         <span className="num shrink-0">{layerDr} DR</span>
                       </div>
                       {enchantments.length > 0 && (

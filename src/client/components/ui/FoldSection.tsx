@@ -1,4 +1,4 @@
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useId, useLayoutEffect, useState } from 'react';
 import { AppIcon } from './AppIcon.tsx';
 
 interface FoldSectionProps {
@@ -6,6 +6,7 @@ interface FoldSectionProps {
   title: string;
   summary?: ReactNode;
   defaultOpen?: boolean;
+  forceOpen?: boolean;
   children: ReactNode;
   className?: string;
 }
@@ -16,6 +17,7 @@ export function FoldSection({
   title,
   summary,
   defaultOpen = true,
+  forceOpen = false,
   children,
   className = '',
 }: FoldSectionProps) {
@@ -30,6 +32,9 @@ export function FoldSection({
   };
   const [preference, setPreference] = useState(() => ({ key: storageKey, open: readPreference() }));
   const open = preference.key === storageKey ? preference.open : readPreference();
+  useLayoutEffect(() => {
+    if (forceOpen) setPreference({ key: storageKey, open: true });
+  }, [forceOpen, storageKey]);
   const id = useId();
   function toggle() {
     const next = !open;

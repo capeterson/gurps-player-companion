@@ -688,7 +688,10 @@ function TraitRow({
       onDragOver={(event) => event.preventDefault()}
       onDrop={onDrop}
     >
-      <tr className={expanded ? 'bg-primary/5' : undefined}>
+      <tr
+        id={`trait-${trait.id}`}
+        className={`${expanded ? 'bg-primary/5 ' : ''}scroll-mt-24 target:!bg-primary/20 target:outline target:outline-2 target:outline-primary`}
+      >
         <td className="w-9 px-1 sm:px-2">
           <DragHandle
             aria-label={`Reorder ${trait.name}, row ${position + 1}`}

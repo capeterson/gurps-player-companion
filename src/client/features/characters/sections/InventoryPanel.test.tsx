@@ -52,7 +52,7 @@ function item(
   };
 }
 
-function renderPanel() {
+function renderPanel(anchorItemId?: string) {
   const inventory = [
     item('pack', 'Backpack', null, { container: true }),
     item('apple', 'Apple', 'pack'),
@@ -73,7 +73,11 @@ function renderPanel() {
   return render(
     <QueryClientProvider client={client}>
       <ToastProvider>
-        <InventoryPanel character={character} canWrite={false} />
+        <InventoryPanel
+          character={character}
+          canWrite={false}
+          anchorItemId={anchorItemId ?? null}
+        />
       </ToastProvider>
     </QueryClientProvider>,
   );
@@ -82,6 +86,13 @@ function renderPanel() {
 afterEach(() => window.localStorage.clear());
 
 describe('Inventory container disclosure', () => {
+  it('reveals a linked item through nested closed containers', () => {
+    renderPanel('gem');
+    expect(screen.getByText('Backpack')).toBeVisible();
+    expect(screen.getByText('Small pouch')).toBeVisible();
+    expect(screen.getByText('Moon Gem').closest('tr')).toHaveAttribute('id', 'inventory-gem');
+    expect(screen.getByText('Apple')).toBeVisible();
+  });
   it('starts collapsed and reports every recursively contained item', () => {
     renderPanel();
 

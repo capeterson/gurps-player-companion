@@ -293,7 +293,10 @@ function SpellRow({
   };
 
   return (
-    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 md:grid-cols-[minmax(0,1fr)_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] md:items-center md:gap-2 md:py-2">
+    <li
+      id={`spell-${spell.id}`}
+      className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 md:grid-cols-[minmax(0,1fr)_5rem_3.5rem_3rem_3rem_3rem_3rem_auto] md:items-center md:gap-2 md:py-2 scroll-mt-24 target:!bg-primary/20 target:outline target:outline-2 target:outline-primary"
+    >
       <div className="col-span-2 min-w-0 md:col-span-1">
         {canWrite ? (
           <input

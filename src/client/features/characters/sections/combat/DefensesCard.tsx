@@ -20,6 +20,7 @@ import type {
   ResolvedEffectOut,
 } from '../../../../../shared/schemas/character.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
+import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { RollRequest } from '../rollTypes.ts';
 import {
   type DefenseSort,
@@ -56,6 +57,7 @@ interface ParryRow {
 
 interface DefenseRow {
   id: string;
+  itemId?: string;
   label: string;
   skill: string;
   beforeDb: number | string;
@@ -144,16 +146,32 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
   const armorDbSource = resolveArmorDb(character.inventory, hitLocation, facing);
   const armorDb = armorDbSource?.db ?? 0;
   const db = shieldDb + armorDb;
-  const shieldDbCaption = shield && shieldDb > 0 ? `+ ${shieldDb} DB (${shield.name})` : '';
-  const armorDbCaption = armorDbSource
-    ? `+ ${armorDbSource.db} armor DB (${armorDbSource.itemName})`
-    : '';
-  const dbCaption =
-    shieldDbCaption && armorDbCaption
-      ? ` ${shieldDbCaption} + ${armorDbCaption}`
-      : shieldDbCaption || armorDbCaption
-        ? ` ${shieldDbCaption}${armorDbCaption}`
-        : '';
+  const dbCaption = (
+    <>
+      {shield && shieldDb > 0 && (
+        <>
+          {' '}
+          + {shieldDb} DB (
+          {shield.id ? (
+            <InventoryAnchorLink itemId={shield.id}>{shield.name}</InventoryAnchorLink>
+          ) : (
+            shield.name
+          )}
+          )
+        </>
+      )}
+      {armorDbSource && (
+        <>
+          {' '}
+          + {armorDbSource.db} armor DB (
+          <InventoryAnchorLink itemId={armorDbSource.itemId}>
+            {armorDbSource.itemName}
+          </InventoryAnchorLink>
+          )
+        </>
+      )}
+    </>
+  );
 
   const dodgeBeforeDb = effectiveDodge(character.derived.dodge, character.encumbrance.dodgePenalty);
   const dodge = state.defense('dodge', dodgeBeforeDb, defenseOption, db);
@@ -163,9 +181,13 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
       `${character.derived.dodge} base − ${-character.encumbrance.dodgePenalty} ${character.encumbrance.label} encumbrance`,
     );
   }
-  if (shield && shieldDb > 0) dodgeParts.push(`+ ${shieldDb} DB (${shield.name})`);
-  if (armorDbSource) dodgeParts.push(`+ ${armorDbSource.db} armor DB (${armorDbSource.itemName})`);
-  const dodgeCaption = dodgeParts.length > 0 ? dodgeParts.join(' ') : undefined;
+  const dodgeCaption =
+    dodgeParts.length > 0 || shieldDb > 0 || armorDbSource ? (
+      <>
+        {dodgeParts.join(' ')}
+        {dbCaption}
+      </>
+    ) : undefined;
 
   const skillCandidates = character.skills.map((skill) => ({
     name: skillDisplayName(skill.name, skill.specialization),
@@ -207,7 +229,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
             parsed.mod,
             (character.derived.parryMod ?? 0) + effectTotal(weaponEffects),
           ),
-          caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}${dbCaption}`,
+          caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}`,
           raw,
           baseValue,
           skillEffects,
@@ -251,6 +273,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
       const reason = row.value == null ? null : state.reason('parry');
       return {
         id: `parry:${row.key}`,
+        itemId: row.key,
         label: `Parry (${row.name})`,
         skill: row.skill,
         beforeDb: row.value ?? '—',
@@ -261,6 +284,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
         detail: (
           <>
             {row.caption}
+            {dbCaption}
             {row.value != null && (
               <ModifierBreakdownContent
                 baseLabel="Weapon Parry"
@@ -289,6 +313,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
     const reason = state.reason('block');
     rows.push({
       id: `block:${shield.id}`,
+      ...(shield.id ? { itemId: shield.id } : {}),
       label: `Block (${shield.name})`,
       skill: blockResolution.name,
       beforeDb,
@@ -446,7 +471,16 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                     />
                   </td>
                   <th scope="row" className="min-w-44 align-top">
-                    <span className="font-medium">{row.label}</span>
+                    {row.itemId ? (
+                      <InventoryAnchorLink
+                        itemId={row.itemId}
+                        className="link link-hover font-medium"
+                      >
+                        {row.label}
+                      </InventoryAnchorLink>
+                    ) : (
+                      <span className="font-medium">{row.label}</span>
+                    )}
                     {row.detail && (
                       <details className="mt-1 font-normal text-[11px] text-base-content/60">
                         <summary className="cursor-pointer select-none">Breakdown</summary>
@@ -514,7 +548,12 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
       )}
       {shield && blockResolution && blockResolution.kind !== 'matched' && (
         <p className="text-xs text-base-content/60">
-          {shield.name} is equipped but has no usable Shield skill —{' '}
+          {shield.id ? (
+            <InventoryAnchorLink itemId={shield.id}>{shield.name}</InventoryAnchorLink>
+          ) : (
+            shield.name
+          )}{' '}
+          is equipped but has no usable Shield skill —{' '}
           {blockResolution.kind === 'missing'
             ? `skill '${blockResolution.skillName}' is not on the sheet.`
             : 'bind its skill in the Inventory tab.'}
