@@ -1,12 +1,18 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryTraitEffect } from '../../../shared/schemas/effects.ts';
 import { EffectsEditor } from './EffectsEditor.tsx';
 
+function renderWithQuery(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
 function renderEditor(initial: LibraryTraitEffect[] = []) {
   const onChange = vi.fn();
   const onValidityChange = vi.fn();
-  render(
+  renderWithQuery(
     <EffectsEditor effects={initial} onChange={onChange} onValidityChange={onValidityChange} />,
   );
   return { onChange, onValidityChange };
@@ -112,7 +118,7 @@ describe('EffectsEditor', () => {
   it('authors an exact inventory binding only in the character-owned editor', () => {
     const onChange = vi.fn();
     const inventoryItemId = '01997c5c-8d80-7000-8000-000000000001';
-    render(
+    renderWithQuery(
       <EffectsEditor
         effects={[]}
         portable={false}

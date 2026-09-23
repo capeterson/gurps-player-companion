@@ -422,6 +422,8 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
 
 interface TraitRowProps {
   characterId: string;
+  campaignId: string | null;
+  characterSkills: CharacterDetail['skills'];
   trait: TraitOut;
   inventory: CharacterDetail['inventory'];
   canWrite: boolean;
@@ -441,10 +443,14 @@ const characterEffectsSchema = traitEffect.array().max(50);
 function CharacterEffectsEditor({
   trait,
   inventory,
+  campaignId,
+  characterSkills,
   rowPatch,
 }: {
   trait: TraitOut;
   inventory: CharacterDetail['inventory'];
+  campaignId: string | null;
+  characterSkills: CharacterDetail['skills'];
   rowPatch: ReturnType<typeof useEntityRowPatch>;
 }) {
   const [valid, setValid] = useState(true);
@@ -512,6 +518,8 @@ function CharacterEffectsEditor({
           bonus to one weapon; it becomes inactive while that item is unequipped.
         </p>
         <EffectsEditor
+          campaignId={campaignId}
+          characterSkills={characterSkills}
           key={editorVersion}
           effects={effects}
           inventoryItems={inventory}
@@ -627,6 +635,8 @@ function TraitCustomEffects({
 
 function TraitRow({
   characterId,
+  campaignId,
+  characterSkills,
   trait,
   inventory,
   canWrite,
@@ -829,7 +839,13 @@ function TraitRow({
                   </details>
                 )}
                 <div className={hasSourceRules ? undefined : 'border-t border-base-300 pt-3'}>
-                  <CharacterEffectsEditor trait={trait} inventory={inventory} rowPatch={rowPatch} />
+                  <CharacterEffectsEditor
+                    trait={trait}
+                    inventory={inventory}
+                    campaignId={campaignId}
+                    characterSkills={characterSkills}
+                    rowPatch={rowPatch}
+                  />
                 </div>
                 <footer className="flex items-center justify-between gap-3 border-t border-base-300 pt-3">
                   <button
@@ -1088,6 +1104,8 @@ function TraitsTable({
                 <TraitRow
                   key={trait.id}
                   characterId={character.id}
+                  campaignId={character.campaignId ?? null}
+                  characterSkills={character.skills}
                   trait={trait}
                   inventory={character.inventory}
                   canWrite={canWrite}

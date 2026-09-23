@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import type { InventoryItemOut } from '../../../../../shared/schemas/inventory.ts';
+import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
 import { useDraftField } from '../../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { readItemPath, readPath, writeItemPath } from './itemMutations.ts';
@@ -11,7 +12,6 @@ export interface ItemFieldSpec {
   optional?: boolean;
   advanced?: boolean;
   choices?: readonly string[];
-  suggestions?: readonly string[];
 }
 
 export function hasFieldValue(value: unknown): boolean {
@@ -24,10 +24,14 @@ export function ItemField({
   item,
   spec,
   more,
+  campaignId,
+  skillNames = [],
 }: {
   item: InventoryItemOut;
   spec: ItemFieldSpec;
   more: boolean;
+  campaignId?: string | null | undefined;
+  skillNames?: readonly string[];
 }) {
   const id = useId();
   const [focused, setFocused] = useState(false);
@@ -96,25 +100,31 @@ export function ItemField({
                 </option>
               ))}
             </select>
+          ) : spec.path === 'weaponData.skill' ? (
+            <SkillReferenceCombobox
+              aria-label={spec.label}
+              value={draft.value}
+              onChange={draft.setValue}
+              onPick={(option) => {
+                draft.setValue(option.label);
+                draft.commit();
+              }}
+              campaignId={campaignId}
+              characterSkills={skillNames.map((name) => ({ name, specialization: null }))}
+              inputClassName="field-rollback-flash"
+              inputProps={common}
+            />
           ) : (
             <input
               {...common}
               className={className}
               inputMode={spec.kind === 'number' ? 'decimal' : undefined}
-              list={spec.suggestions ? `${id}-suggestions` : undefined}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') event.currentTarget.blur();
               }}
             />
           )}
         </label>
-      )}
-      {spec.suggestions && (
-        <datalist id={`${id}-suggestions`}>
-          {spec.suggestions.map((suggestion) => (
-            <option key={suggestion} value={suggestion} />
-          ))}
-        </datalist>
       )}
       {draft.error && (
         <p id={`${id}-error`} className="text-xs text-error mt-1">

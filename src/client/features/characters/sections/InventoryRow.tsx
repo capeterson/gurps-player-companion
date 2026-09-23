@@ -18,6 +18,7 @@ export interface InventoryRowProps {
   isSelected: (id: string) => boolean;
   onRowClick: (id: string, e: MouseEvent) => void;
   canEdit: boolean;
+  campaignId?: string | null | undefined;
   skillNames?: readonly string[];
   fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>;
   /** Filtering forces matching descendants open inside their ancestor containers. */
@@ -47,6 +48,7 @@ export function InventoryRow(props: InventoryRowProps) {
     isSelected,
     onRowClick,
     canEdit,
+    campaignId,
     skillNames = [],
     fetchEnchantmentOptions,
     expandContainers = false,
@@ -440,6 +442,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   }}
                   section={entry}
                   skillNames={skillNames}
+                  campaignId={campaignId}
                   {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})}
                   hasChildren={children.length > 0}
                   onSection={showSection}
