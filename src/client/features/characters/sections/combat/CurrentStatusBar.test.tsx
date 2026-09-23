@@ -408,11 +408,11 @@ describe('Current Status', () => {
       'w-[calc(100dvw_-_2rem)]',
       'max-w-lg',
       'translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))]',
-      'md:absolute!',
-      'md:left-0!',
-      'md:top-full!',
-      'md:mt-[9px]',
-      'md:translate-x-[var(--viewport-overlay-shift-x,0px)]',
+      'min-[1280px]:absolute!',
+      'min-[1280px]:left-0!',
+      'min-[1280px]:top-full!',
+      'min-[1280px]:mt-[9px]',
+      'min-[1280px]:translate-x-[var(--viewport-overlay-shift-x,0px)]',
     );
     expect(panel.parentElement).toHaveClass('dropdown', 'dropdown-start', 'dropdown-open');
     expect(screen.getAllByRole('group', { name: / adjustment$/ })).toHaveLength(1);
