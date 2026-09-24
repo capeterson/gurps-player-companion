@@ -42,6 +42,7 @@ import type {
 import type { EnchantmentEffectTarget } from '../../../shared/schemas/inventory.ts';
 import type { TraitModifier } from '../../../shared/schemas/trait.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
+import { SkillReferenceCombobox } from '../../components/ui/SkillReferenceCombobox.tsx';
 import { ApiError, api, apiFetch } from '../../lib/api.ts';
 import { EffectsEditor, effectPreview } from './EffectsEditor.tsx';
 
@@ -564,6 +565,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                 traitsEditId === t.id ? (
                   <TraitForm
                     key={t.id}
+                    campaignId={campaignId}
                     initial={t}
                     isPending={updateTrait.isPending}
                     error={
@@ -638,6 +640,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               )}
             {isOwner && traitsAddOpen && (
               <TraitForm
+                campaignId={campaignId}
                 isPending={createTrait.isPending}
                 error={
                   createTrait.error instanceof ApiError
@@ -680,6 +683,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                 skillsEditId === s.id ? (
                   <SkillForm
                     key={s.id}
+                    campaignId={campaignId}
                     initial={s}
                     isPending={updateSkill.isPending}
                     error={
@@ -765,6 +769,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               )}
             {isOwner && skillsAddOpen && (
               <SkillForm
+                campaignId={campaignId}
                 isPending={createSkill.isPending}
                 error={
                   createSkill.error instanceof ApiError
@@ -1012,6 +1017,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               .map((entry) =>
                 enchantmentsEditId === entry.id ? (
                   <EnchantmentForm
+                    campaignId={campaignId}
                     key={entry.id}
                     initial={entry}
                     isPending={updateEnchantment.isPending}
@@ -1076,6 +1082,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               )}
             {isOwner && enchantmentsAddOpen && (
               <EnchantmentForm
+                campaignId={campaignId}
                 isPending={createEnchantment.isPending}
                 error={
                   createEnchantment.error instanceof ApiError
@@ -1184,6 +1191,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 // ── Trait form ──────────────────────────────────────────────────────────────
 
 interface TraitFormProps {
+  campaignId: string | null;
   initial?: LibraryTraitOut;
   isPending: boolean;
   error?: string | null;
@@ -1193,6 +1201,7 @@ interface TraitFormProps {
 }
 
 function TraitForm({
+  campaignId,
   initial,
   isPending,
   error,
@@ -1288,6 +1297,7 @@ function TraitForm({
       </div>
       <ModifierSubEditor modifiers={modifiers} onChange={setModifiers} />
       <EffectsEditor
+        campaignId={campaignId}
         effects={effects}
         libraryItems={libraryItems}
         onChange={setEffects}
@@ -1473,6 +1483,7 @@ function ModifierSubEditor({
 // ── Skill form ──────────────────────────────────────────────────────────────
 
 interface SkillFormProps {
+  campaignId: string | null;
   initial?: LibrarySkillOut;
   isPending: boolean;
   error?: string | null;
@@ -1482,6 +1493,7 @@ interface SkillFormProps {
 }
 
 function SkillForm({
+  campaignId,
   initial,
   isPending,
   error,
@@ -1827,6 +1839,7 @@ function SkillForm({
         </div>
       )}
       <EffectsEditor
+        campaignId={campaignId}
         effects={effects}
         libraryItems={libraryItems}
         onChange={setEffects}
@@ -2385,12 +2398,14 @@ const ENCHANTMENT_TARGETS: readonly EnchantmentEffectTarget[] = [
 ];
 
 function EnchantmentForm({
+  campaignId,
   initial,
   isPending,
   error,
   onSubmit,
   onCancel,
 }: {
+  campaignId: string | null;
   initial?: LibraryEnchantmentOut;
   isPending: boolean;
   error?: string | null;
@@ -2562,20 +2577,21 @@ function EnchantmentForm({
               />
             </label>
             {effect.target === 'skill' && (
-              <label className="form-control min-w-[10rem] flex-1">
+              <div className="form-control min-w-[10rem] flex-1">
                 <span className="label-text">Skill</span>
-                <input
-                  className="input input-bordered input-sm"
+                <SkillReferenceCombobox
+                  aria-label="Skill"
                   value={effect.skillName ?? ''}
-                  onChange={(event) =>
+                  campaignId={campaignId}
+                  onChange={(value) =>
                     setEffects(
                       effects.map((entry, entryIndex) =>
-                        entryIndex === index ? { ...entry, skillName: event.target.value } : entry,
+                        entryIndex === index ? { ...entry, skillName: value } : entry,
                       ),
                     )
                   }
                 />
-              </label>
+              </div>
             )}
             <button
               type="button"
@@ -2744,12 +2760,13 @@ function EnchantmentForm({
                   />
                 </label>
                 {effect.target === 'skill' && (
-                  <label className="form-control min-w-[10rem] flex-1">
+                  <div className="form-control min-w-[10rem] flex-1">
                     <span className="label-text">Skill</span>
-                    <input
-                      className="input input-bordered input-sm"
+                    <SkillReferenceCombobox
+                      aria-label="Skill"
                       value={effect.skillName ?? ''}
-                      onChange={(event) =>
+                      campaignId={campaignId}
+                      onChange={(value) =>
                         setLevels(
                           levels.map((entry, index) =>
                             index === levelIndex
@@ -2757,7 +2774,7 @@ function EnchantmentForm({
                                   ...entry,
                                   effects: entry.effects.map((candidate, candidateIndex) =>
                                     candidateIndex === effectIndex
-                                      ? { ...candidate, skillName: event.target.value }
+                                      ? { ...candidate, skillName: value }
                                       : candidate,
                                   ),
                                 }
@@ -2766,7 +2783,7 @@ function EnchantmentForm({
                         )
                       }
                     />
-                  </label>
+                  </div>
                 )}
                 <button
                   type="button"

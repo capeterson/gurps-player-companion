@@ -352,6 +352,13 @@ shows the synced campaign name as a separate link to that campaign.
   level is a tappable roll target like a skill's. Rendered on the Skills
   tab. Its add form and rows reflow into labeled two-column mobile layouts;
   the desktop column header is hidden rather than forcing horizontal scroll.
+  Default-skill references use the shared React Aria skill combobox: suggestions
+  combine the character sheet and campaign library, with the campaign entry
+  taking precedence for the same name and specialization. Free text remains
+  available for references not yet in either list. The same picker serves
+  weapon governing skills and skill-targeted trait, active-effect, and
+  enchantment rules; picking a specialized skill fills both fields where the
+  rule stores name and specialty separately.
   Martial-arts **styles** live in the campaign library only
   (name + technique/perk/skill lists); a character adopts one by adding
   its pieces, so there is no per-character style row.
@@ -930,6 +937,8 @@ src/
     db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth),
                   plus per-character device-only solo tracker scratchpads
     components/ui/AppIcon.tsx  Shared Lucide icon names, size and stroke conventions
+    components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker
+                 and campaign-first suggestion merge
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...

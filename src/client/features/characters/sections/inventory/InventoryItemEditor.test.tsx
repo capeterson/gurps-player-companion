@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -92,8 +93,14 @@ async function setup(
   fetchEnchantmentOptions?: (query: string) => Promise<LibraryEnchantmentOut[]>,
 ) {
   await getLocalDb().characterInventory.put({ ...item(overrides), revision: 1 });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <Harness canEdit={canEdit} {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})} />,
+    <QueryClientProvider client={client}>
+      <Harness
+        canEdit={canEdit}
+        {...(fetchEnchantmentOptions ? { fetchEnchantmentOptions } : {})}
+      />
+    </QueryClientProvider>,
   );
   await screen.findByText('Coat');
   return userEvent.setup();

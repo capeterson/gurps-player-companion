@@ -501,6 +501,7 @@ export function InventoryPanel({
         isSelected={isSelected}
         onRowClick={handleClick}
         canEdit={canWrite}
+        campaignId={campaignId}
         skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
         fetchEnchantmentOptions={fetchEnchantments}
         expandContainers={filterActive}

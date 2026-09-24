@@ -6,10 +6,12 @@ import {
 import { EffectsEditor } from './EffectsEditor.tsx';
 
 export function ActiveEffectForm({
+  campaignId,
   initial,
   onSave,
   onCancel,
 }: {
+  campaignId?: string | null;
   initial?: ActiveEffectDefinition;
   onSave: (value: ActiveEffectDefinition) => Promise<void>;
   onCancel: () => void;
@@ -151,7 +153,12 @@ export function ActiveEffectForm({
         Effects sharing a key use the chosen policy. Highest keeps the strongest value per target;
         replace keeps the latest application.
       </p>
-      <EffectsEditor effects={effects} onChange={setEffects} onValidityChange={setValid} />
+      <EffectsEditor
+        campaignId={campaignId}
+        effects={effects}
+        onChange={setEffects}
+        onValidityChange={setValid}
+      />
       <div className="space-y-2">
         <p>Capabilities, senses and resistances</p>
         {capabilities.map((c, i) => (
