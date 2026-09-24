@@ -316,10 +316,16 @@ Key PG18 / trigger machinery, layered by migration:
   (Compose app container: `db:5432`) and otherwise default to the CI/host URL
   at `localhost:5432`.
 - `vitest run` — client component/hook tests (happy-dom DOM environment;
-  `fake-indexeddb` for Dexie).
+  `fake-indexeddb` for Dexie). The development Compose `client-tests`
+  profile runs these under Node 22; the Bun-only app container's `node`
+  fallback is incompatible with Vitest and must not be used to claim a
+  passing client suite. Zero discovered tests fail the full-suite command.
+  A one-shot `deps` service fills the project-local dependency volume from the
+  frozen lockfile; it runs in parallel with PostgreSQL startup, and client
+  tests depend only on `deps`, so they do not boot PostgreSQL.
 - `playwright test` — end-to-end.
-- `npm run check` = `lint` (Biome) + `typecheck` (`tsc --build`) + `bun test`
-  (**server + shared only**) + `openapi:check` (contract drift). It does **not**
+- `bun run check` = `lint` (Biome) + `typecheck` (`tsc --build`) + `bun test`
+  (**server + shared only**) + OpenAPI/MCP contract checks. It does **not**
   run the client vitest or Playwright suites — run those separately for client
   changes. This is the baseline gate before finishing a change.
 - Per-PR GitHub CI runs lint, typechecking, server/shared tests, client tests,

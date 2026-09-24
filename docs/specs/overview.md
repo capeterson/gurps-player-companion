@@ -1101,10 +1101,15 @@ Things that repeatedly surprise people working in this repo:
    campaign detail page. Changing one without the others reopens a leak
    hole.
 
-7. **Dev + tests run in Docker/Bun.** There is no host `bun` requirement. `bun
-   test` covers `src/server` + `src/shared`; `vitest` covers client; Playwright
-   covers e2e. `npm run check` = lint + typecheck + **`bun test`
-   (server+shared only)** + OpenAPI drift — it does **not** run the client
+7. **Dev + tests run in Docker.** There is no host `bun` requirement. The
+   `scripts/dev-worktree.sh` wrapper gives each checkout a stable, isolated
+   Compose project and host ports. The Compose `deps` service installs from
+   the frozen lockfile while PostgreSQL starts; client tests can start with
+   `deps` alone. `bun test` covers `src/server` +
+   `src/shared`; the Compose `client-tests` profile runs the full Vitest
+   suite under Node 22 and fails on zero discovered tests; Playwright
+   covers e2e. `bun run check` = lint + typecheck + **`bun test`
+   (server+shared only)** + OpenAPI and MCP drift checks — it does **not** run the client
    vitest or Playwright suites, so run those separately for client changes.
    Per-PR GitHub CI includes client tests and the production build but
    intentionally omits browser installation/automation. PR authors run relevant

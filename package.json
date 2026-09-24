@@ -12,7 +12,7 @@
     "build:migrate": "bun build src/server/db/migrate.ts --outdir dist/server --target bun --sourcemap=linked",
     "start": "bun run dist/server/index.js",
     "test": "bun test src/server src/shared",
-    "test:client": "vitest run --passWithNoTests",
+    "test:client": "node scripts/run-client-tests.mjs",
     "test:watch": "vitest",
     "test:server": "bun test src/server",
     "test:shared": "bun test src/shared",
