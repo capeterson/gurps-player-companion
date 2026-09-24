@@ -95,8 +95,6 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
       panel.getByRole('slider', { name: `Set ${pool}` }),
     );
 
-    const current = panel.getByLabel(`Current ${pool}`);
-    const before = Number(await current.textContent());
     const decrease = panel.getByRole('button', {
       name: `Decrease ${pool} by 1`,
     });
@@ -139,11 +137,6 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
         expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
       }
     }
-
-    await decrease.click();
-    await expect(current).toHaveText(String(before - 1));
-    await increase.click();
-    await expect(current).toHaveText(String(before));
   }
 }
 
@@ -356,6 +349,12 @@ test('Current Status stays available and combat stays compact across mobile and 
       await expect(hpPanel).toHaveCount(0);
       const fpPanel = page.getByRole('group', { name: 'FP adjustment' });
       await expect(fpPanel).toBeVisible();
+      const currentFp = fpPanel.getByLabel('Current FP');
+      const fpBefore = Number(await currentFp.textContent());
+      await fpPanel.getByRole('button', { name: 'Decrease FP by 1' }).click();
+      await expect(currentFp).toHaveText(String(fpBefore - 1));
+      await fpPanel.getByRole('button', { name: 'Increase FP by 1' }).click();
+      await expect(currentFp).toHaveText(String(fpBefore));
       await expectVisibleRangeLabelsAligned(
         fpPanel,
         fpPanel.getByRole('slider', { name: 'Set FP' }),
