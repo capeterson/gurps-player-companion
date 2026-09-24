@@ -18,6 +18,7 @@ import { invitationsApi } from '../lib/invitations.ts';
 import { notificationsApi } from '../lib/notifications.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { AppIcon } from './ui/AppIcon.tsx';
+import { QueryReadError } from './ui/QueryReadError.tsx';
 
 const REFRESH_INTERVAL_MS = 30_000;
 
@@ -30,14 +31,14 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
   const toasts = useToasts();
   const panelRef = useViewportBoundedOverlay<HTMLDivElement>();
 
-  const { data } = useQuery({
+  const notifications = useQuery({
     queryKey: ['notifications'],
     queryFn: () => notificationsApi.list(),
     refetchInterval: REFRESH_INTERVAL_MS,
     refetchOnWindowFocus: true,
   });
 
-  const items = data ?? [];
+  const items = notifications.data ?? [];
   const unread = items.filter((n) => n.readAt === null);
 
   const accept = useMutation({
@@ -108,9 +109,16 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
             </button>
           )}
         </div>
-        {items.length === 0 ? (
+        {notifications.isError && (
+          <QueryReadError
+            label="notifications"
+            error={notifications.error}
+            onRetry={() => void notifications.refetch()}
+          />
+        )}
+        {items.length === 0 && !notifications.isError ? (
           <p className="text-sm text-base-content/60 py-4 text-center">You're all caught up.</p>
-        ) : (
+        ) : items.length > 0 ? (
           <ul className="grid gap-2 max-h-96 overflow-y-auto">
             {items.map((n) => {
               const inviteId = n.relatedId;
@@ -171,7 +179,7 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
               );
             })}
           </ul>
-        )}
+        ) : null}
       </div>
     </details>
   );

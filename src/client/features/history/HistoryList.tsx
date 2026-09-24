@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { groupIntoBatches } from '../../../shared/history/summarize.ts';
 import type { HistoryEventOut } from '../../../shared/schemas/history.ts';
+import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { HistoryGroupRow } from './HistoryGroupRow.tsx';
 
 const ENTITY_FILTERS = [
@@ -12,8 +13,11 @@ const ENTITY_FILTERS = [
   {
     label: 'Skills',
     match: (e: HistoryEventOut) =>
-      e.entityClass === 'character_skill' || e.entityClass === 'character_spell',
+      e.entityClass === 'character_skill' ||
+      e.entityClass === 'character_language' ||
+      e.entityClass === 'character_technique',
   },
+  { label: 'Magic', match: (e: HistoryEventOut) => e.entityClass === 'character_spell' },
   {
     label: 'Inventory',
     match: (e: HistoryEventOut) => e.entityClass === 'character_inventory',
@@ -37,6 +41,8 @@ type OpFilter = (typeof OP_FILTERS)[number]['op'];
 interface HistoryListProps {
   events: HistoryEventOut[];
   isLoading: boolean;
+  error?: unknown;
+  onRetry?: () => void;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
@@ -47,6 +53,8 @@ interface HistoryListProps {
 export function HistoryList({
   events,
   isLoading,
+  error,
+  onRetry,
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
@@ -81,10 +89,14 @@ export function HistoryList({
 
   return (
     <div className="space-y-3">
+      {error != null && onRetry && (
+        <QueryReadError label="history" error={error} onRetry={onRetry} />
+      )}
       {/* Filter bar */}
       <div className="flex flex-wrap gap-2 items-center">
         <input
           type="search"
+          aria-label="Search history"
           placeholder="Search history…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -96,6 +108,7 @@ export function HistoryList({
               key={f.label}
               type="button"
               onClick={() => setEntityFilter(entityFilter === f.label ? null : f.label)}
+              aria-pressed={entityFilter === f.label}
               className={`chip text-xs ${entityFilter === f.label ? 'on' : ''}`}
             >
               {f.label}
@@ -108,6 +121,7 @@ export function HistoryList({
               key={op}
               type="button"
               onClick={() => setOpFilter(opFilter === op ? null : op)}
+              aria-pressed={opFilter === op}
               className={`chip text-xs ${opFilter === op ? 'on' : ''}`}
             >
               {label}
@@ -117,11 +131,11 @@ export function HistoryList({
       </div>
 
       {/* History list */}
-      {groups.length === 0 ? (
+      {groups.length === 0 && !error ? (
         <p className="text-sm text-base-content/50 p-4 text-center">
           {search || entityFilter || opFilter ? 'No matches.' : 'No history yet.'}
         </p>
-      ) : (
+      ) : groups.length > 0 ? (
         <div className="rounded-lg border border-base-300 bg-base-100 overflow-hidden">
           {groups.map((g) => (
             <HistoryGroupRow
@@ -132,7 +146,7 @@ export function HistoryList({
             />
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Load more */}
       {hasNextPage && (

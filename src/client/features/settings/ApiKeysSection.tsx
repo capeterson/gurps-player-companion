@@ -39,6 +39,7 @@ export function ApiKeysSection() {
   const revoke = useMutation({
     mutationFn: (id: string) => apiKeysApi.delete(id),
     onSuccess: () => {
+      setRevokeTarget(null);
       qc.invalidateQueries({ queryKey: ['api-keys'] });
       toasts.push('API key revoked', { kind: 'success' });
     },
@@ -99,7 +100,7 @@ export function ApiKeysSection() {
         {list.isError && (
           <p className="text-xs text-error">Couldn't load API keys. Refresh to retry.</p>
         )}
-        {!list.isLoading && items.length === 0 && (
+        {!list.isLoading && !list.isError && items.length === 0 && (
           <p className="text-xs text-base-content/60">No API keys yet.</p>
         )}
         {items.map((k) => (
@@ -134,10 +135,11 @@ export function ApiKeysSection() {
         title="Revoke API key"
         tone="error"
         confirmLabel="Revoke"
+        pending={revoke.isPending}
+        pendingLabel="Revoking…"
         onConfirm={() => {
-          if (revokeTarget) {
+          if (revokeTarget && !revoke.isPending) {
             revoke.mutate(revokeTarget.id);
-            setRevokeTarget(null);
           }
         }}
         onCancel={() => setRevokeTarget(null)}

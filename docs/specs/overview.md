@@ -744,7 +744,8 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   **importable/exportable as versioned YAML**
   for sharing between campaigns. The top-nav **Library** page (`/library`,
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
-  import/export flow.
+  import/export flow. Import validates the chosen file and shows a confirmation
+  preview before Merge or Replace; Replace never runs on file selection alone.
   Library skill forms also author first-class free-form/catalog specialization
   policies and per-catalog-option rule overrides; portable YAML v11 retains them.
 - **Adventure log**: session log entries with per-entry visibility
@@ -760,6 +761,8 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
   can be **edited or deleted** by their author or the campaign owner. See
   campaign-content-sharing.md.
+  Campaign/library/log/history reads show a retryable error when their request
+  fails, rather than presenting a failed request as an empty collection.
 - **Campaign history view**: campaign-level audit log (settings, membership,
   library, log), plus an owner/manager roll-up across member characters.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
@@ -930,6 +933,7 @@ src/
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
     lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
+    features/characters/sections/tablePreferences.ts  Shared device-local sortable-table codec
     components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
                  into the portaled Current Status row
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
@@ -939,7 +943,9 @@ src/
     components/ui/AppIcon.tsx  Shared Lucide icon names, size and stroke conventions
     components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker
                  and campaign-first suggestion merge
+    components/ui/QueryReadError.tsx  Shared retryable online-read error
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
+                 useSelectedCampaignId (legacy Log/Library campaign URL selection),
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...
     components/  Shared UI (FoldSection: device-persisted folding without unmounting,

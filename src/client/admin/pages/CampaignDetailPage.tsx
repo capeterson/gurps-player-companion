@@ -31,15 +31,15 @@ export function CampaignDetailPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="label-eyebrow">
             <Link to="/admin/campaigns" className="link">
               ← All campaigns
             </Link>
           </p>
-          <h1 className="font-display text-3xl">{c.name}</h1>
+          <h1 className="font-display break-all text-3xl">{c.name}</h1>
           {c.description && (
-            <p className="text-sm text-base-content/60 max-w-prose">{c.description}</p>
+            <p className="max-w-prose break-all text-sm text-base-content/60">{c.description}</p>
           )}
         </div>
         <div className="flex flex-wrap gap-1">
@@ -52,10 +52,10 @@ export function CampaignDetailPage() {
       <section className="card p-card space-y-3">
         <p className="label-eyebrow">Owner</p>
         <p className="text-sm">
-          <Link to={`/admin/users/${c.ownerId}`} className="link link-primary">
+          <Link to={`/admin/users/${c.ownerId}`} className="link link-primary break-all">
             {c.ownerDisplayName}
           </Link>
-          <span className="ml-2 text-xs text-base-content/60">{c.ownerEmail}</span>
+          <span className="ml-2 break-all text-xs text-base-content/60">{c.ownerEmail}</span>
         </p>
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div>
@@ -76,11 +76,11 @@ export function CampaignDetailPage() {
         <p className="label-eyebrow">Members ({c.members.length})</p>
         <ul className="space-y-1 text-sm">
           {c.members.map((m) => (
-            <li key={m.userId} className="flex items-center justify-between gap-3">
-              <Link to={`/admin/users/${m.userId}`} className="link link-primary truncate">
+            <li key={m.userId} className="flex flex-wrap items-center justify-between gap-3">
+              <Link to={`/admin/users/${m.userId}`} className="link link-primary min-w-0 break-all">
                 {m.displayName}
               </Link>
-              <span className="text-xs text-base-content/60">{m.email}</span>
+              <span className="min-w-0 break-all text-xs text-base-content/60">{m.email}</span>
               <span
                 className={`badge badge-sm ${
                   m.role === 'owner'

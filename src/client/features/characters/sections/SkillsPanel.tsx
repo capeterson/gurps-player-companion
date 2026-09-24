@@ -62,6 +62,7 @@ interface SkillSnapshot {
   picked: LibrarySkillOut | null;
   specialization: string;
   techLevel: number | null;
+  techLevelRaw: string;
   nameVersion: number;
 }
 
@@ -149,7 +150,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           setName((cur) => (cur === snap.nameRaw ? '' : cur));
           setPicked((cur) => (cur === snap.picked ? null : cur));
           setSpecialization((cur) => (cur === snap.specialization ? '' : cur));
-          setTechLevel('');
+          setTechLevel((cur) => (cur === snap.techLevelRaw ? '' : cur));
         }
         setPoints((cur) => (cur === snap.pointsRaw ? '1' : cur));
       },
@@ -196,6 +197,7 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
           picked,
           specialization,
           techLevel: fixedPickedTechLevel(picked) ?? (techLevel.trim() ? Number(techLevel) : null),
+          techLevelRaw: techLevel,
           nameVersion: nameVersion.current,
         });
       }}

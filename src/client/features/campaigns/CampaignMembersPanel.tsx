@@ -6,12 +6,14 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import type {
   CampaignMemberOut,
   CampaignOut,
   CampaignRole,
   SetMemberRoleRequest,
 } from '../../../shared/schemas/campaign.ts';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
 
@@ -23,6 +25,7 @@ interface Props {
 export function CampaignMembersPanel({ campaign, viewerRole }: Props) {
   const qc = useQueryClient();
   const toasts = useToasts();
+  const [memberToRemove, setMemberToRemove] = useState<CampaignMemberOut | null>(null);
 
   const setRole = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: 'member' | 'manager' }) =>
@@ -42,6 +45,7 @@ export function CampaignMembersPanel({ campaign, viewerRole }: Props) {
     mutationFn: (userId: string) =>
       api<void>(`/campaigns/${campaign.id}/members/${userId}`, { method: 'DELETE' }),
     onSuccess: () => {
+      setMemberToRemove(null);
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       toasts.push('Member removed', { kind: 'success' });
     },
@@ -121,7 +125,7 @@ export function CampaignMembersPanel({ campaign, viewerRole }: Props) {
                     type="button"
                     className="btn btn-ghost btn-xs text-error"
                     disabled={remove.isPending}
-                    onClick={() => remove.mutate(m.userId)}
+                    onClick={() => setMemberToRemove(m)}
                   >
                     Remove
                   </button>
@@ -131,6 +135,20 @@ export function CampaignMembersPanel({ campaign, viewerRole }: Props) {
           );
         })}
       </ul>
+      <ConfirmDialog
+        open={memberToRemove !== null}
+        title={`Remove ${memberToRemove?.displayName ?? 'member'}?`}
+        confirmLabel="Remove member"
+        tone="error"
+        pending={remove.isPending}
+        pendingLabel="Removing…"
+        onCancel={() => setMemberToRemove(null)}
+        onConfirm={() => {
+          if (memberToRemove && !remove.isPending) remove.mutate(memberToRemove.userId);
+        }}
+      >
+        They will lose access to this campaign.
+      </ConfirmDialog>
     </section>
   );
 }

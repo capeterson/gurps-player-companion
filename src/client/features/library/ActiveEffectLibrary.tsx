@@ -13,6 +13,7 @@ export function ActiveEffectLibrary({
 }: { campaignId: string; entries: ActiveEffectDefinitionOut[]; isOwner: boolean; search: string }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deletingPending, setDeletingPending] = useState(false);
   const [error, setError] = useState('');
   const client = useQueryClient();
   async function refreshed() {
@@ -92,21 +93,41 @@ export function ActiveEffectLibrary({
             Add active effect
           </button>
         ))}
-      {error && <p role="alert">{error}</p>}
       <ConfirmDialog
         open={!!deleting}
         title="Delete active effect definition?"
         confirmLabel="Delete"
-        onCancel={() => setDeleting(null)}
+        tone="error"
+        pending={deletingPending}
+        pendingLabel="Deleting…"
+        onCancel={() => {
+          setDeleting(null);
+          setError('');
+        }}
         onConfirm={() => {
+          if (!deleting || deletingPending) return;
+          setDeletingPending(true);
+          setError('');
           void api(`/campaigns/${campaignId}/library/active-effects/${deleting}`, {
             method: 'DELETE',
           })
-            .then(refreshed)
-            .catch((e) => setError(e.message));
-          setDeleting(null);
+            .then(async () => {
+              await refreshed();
+              setDeleting(null);
+            })
+            .catch((cause: unknown) =>
+              setError(cause instanceof Error ? cause.message : 'Delete failed'),
+            )
+            .finally(() => setDeletingPending(false));
         }}
-      />
+      >
+        This definition will be removed from the campaign library.
+        {error && (
+          <p role="alert" className="text-error">
+            {error}
+          </p>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

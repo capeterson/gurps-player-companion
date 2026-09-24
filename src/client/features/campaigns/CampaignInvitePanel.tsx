@@ -119,7 +119,7 @@ export function CampaignInvitePanel({ campaignId, viewerRole }: Props) {
         {list.isError && (
           <p className="text-xs text-error">Couldn't load invitations. Refresh to retry.</p>
         )}
-        {!list.isLoading && pending.length === 0 && (
+        {!list.isLoading && !list.isError && pending.length === 0 && (
           <p className="text-xs text-base-content/60">No pending invitations.</p>
         )}
         {pending.map((inv: InvitationOut) => (

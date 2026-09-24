@@ -10,10 +10,17 @@ interface CampaignHistoryPanelProps {
 export function CampaignHistoryPanel({ campaignId, isOwner }: CampaignHistoryPanelProps) {
   const [scope, setScope] = useState<'campaign' | 'character'>('campaign');
 
-  const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } = useCampaignHistory(
-    campaignId,
-    scope,
-  );
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    isFetchNextPageError,
+    refetch,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useCampaignHistory(campaignId, scope);
 
   const events = data?.pages.flatMap((p) => p.items) ?? [];
 
@@ -24,6 +31,7 @@ export function CampaignHistoryPanel({ campaignId, isOwner }: CampaignHistoryPan
           <button
             type="button"
             onClick={() => setScope('campaign')}
+            aria-pressed={scope === 'campaign'}
             className={`chip text-xs ${scope === 'campaign' ? 'on' : ''}`}
           >
             Campaign changes
@@ -31,6 +39,7 @@ export function CampaignHistoryPanel({ campaignId, isOwner }: CampaignHistoryPan
           <button
             type="button"
             onClick={() => setScope('character')}
+            aria-pressed={scope === 'character'}
             className={`chip text-xs ${scope === 'character' ? 'on' : ''}`}
           >
             Character changes
@@ -40,6 +49,8 @@ export function CampaignHistoryPanel({ campaignId, isOwner }: CampaignHistoryPan
       <HistoryList
         events={events}
         isLoading={isLoading}
+        error={isError ? error : null}
+        onRetry={() => void (isFetchNextPageError ? fetchNextPage() : refetch())}
         hasNextPage={hasNextPage ?? false}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={fetchNextPage}

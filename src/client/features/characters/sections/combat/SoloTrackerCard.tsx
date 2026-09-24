@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { EFFECT_TEMPLATES } from '../../../../../shared/constants/effectTemplates.ts';
 import {
   effectRemainingLabel,
@@ -10,6 +10,7 @@ import { advanceTurn, previousTurn } from '../../../../../shared/domain/encounte
 import type { EffectDuration } from '../../../../../shared/schemas/encounter.ts';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { type LocalSoloEncounter, getLocalDb } from '../../../../db/dexie.ts';
+import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
 import { flashBus } from '../../../../sync/flashBus.ts';
 import { campaignTransferStores } from '../../../../sync/localCampaignTransfer.ts';
@@ -26,27 +27,48 @@ export function SoloTrackerCard({
   const [effectUnit, setEffectUnit] = useState<EffectDuration['unit']>('rounds');
   const [effectAmount, setEffectAmount] = useState('1');
   const [maintenance, setMaintenance] = useState('');
+  const combatantEditVersion = useRef(0);
+  const effectEditVersion = useRef(0);
+  const combatantAddInFlight = useRef(false);
+  const effectAddInFlight = useRef(false);
+  const [addingCombatant, setAddingCombatant] = useState(false);
+  const [addingEffect, setAddingEffect] = useState(false);
+  const combatantFlash = useFlashState(undefined);
+  const effectFlash = useFlashState(undefined);
+  const { push } = useToasts();
+
+  function reportFailure(label: string, error: unknown, flash?: () => void) {
+    const reason = error instanceof Error ? error.message : String(error);
+    push(`Couldn't save ${label} — ${reason}`, { kind: 'error' });
+    flash?.();
+  }
 
   async function update(change: (row: LocalSoloEncounter) => LocalSoloEncounter) {
     // Read inside the transaction so rapid local controls do not overwrite each other.
     await db.transaction('rw', db.soloEncounters, async () => {
       const row = await db.soloEncounters.get(characterId);
-      if (row) await db.soloEncounters.put(change(row));
+      if (!row) throw new Error('The local tracker is no longer available');
+      await db.soloEncounters.put(change(row));
     });
+  }
+
+  function updateEffect(label: string, change: (row: LocalSoloEncounter) => LocalSoloEncounter) {
+    void update(change).catch((error: unknown) => reportFailure(label, error));
   }
 
   function start() {
-    void db.soloEncounters.put({
-      characterId,
-      round: 1,
-      activeCombatantId: null,
-      combatants: [],
-      effects: [],
-      updatedAt: new Date().toISOString(),
-    });
+    void db.soloEncounters
+      .put({
+        characterId,
+        round: 1,
+        activeCombatantId: null,
+        combatants: [],
+        effects: [],
+        updatedAt: new Date().toISOString(),
+      })
+      .catch((error: unknown) => reportFailure('turn tracker', error));
   }
 
-  const { push } = useToasts();
   const stamp = (row: LocalSoloEncounter) => ({ ...row, updatedAt: new Date().toISOString() });
   function turn(direction: 'next' | 'previous') {
     void db
@@ -85,7 +107,11 @@ export function SoloTrackerCard({
       });
   }
   function addCombatant() {
-    if (!combatantName.trim()) return;
+    if (!combatantName.trim() || combatantAddInFlight.current) return;
+    combatantAddInFlight.current = true;
+    setAddingCombatant(true);
+    const submittedName = combatantName.trim();
+    const submittedVersion = combatantEditVersion.current;
     void update((row) =>
       stamp({
         ...row,
@@ -93,23 +119,36 @@ export function SoloTrackerCard({
           ...row.combatants,
           {
             id: crypto.randomUUID(),
-            name: combatantName.trim(),
+            name: submittedName,
             orderKey: (row.combatants.length + 1) * 10,
             active: true,
           },
         ],
       }),
-    );
-    setCombatantName('');
+    )
+      .then(() => {
+        if (combatantEditVersion.current === submittedVersion) {
+          setCombatantName((current) => (current.trim() === submittedName ? '' : current));
+        }
+      })
+      .catch((error: unknown) =>
+        reportFailure('solo combatant name', error, combatantFlash.trigger),
+      )
+      .finally(() => {
+        combatantAddInFlight.current = false;
+        setAddingCombatant(false);
+      });
   }
   function applyTemplate(templateId: string) {
     const template = EFFECT_TEMPLATES.find((entry) => entry.id === templateId);
     if (!template) return;
+    effectEditVersion.current++;
     setEffectName(template.name);
     setEffectUnit(template.duration.unit);
     setEffectAmount(String(template.duration.unit === 'indefinite' ? 1 : template.duration.amount));
   }
   function addEffect() {
+    if (effectAddInFlight.current) return;
     const amount = Number(effectAmount);
     if (
       !effectName.trim() ||
@@ -124,6 +163,13 @@ export function SoloTrackerCard({
       return;
     const duration: EffectDuration =
       effectUnit === 'indefinite' ? { unit: effectUnit } : { unit: effectUnit, amount };
+    effectAddInFlight.current = true;
+    setAddingEffect(true);
+    const submittedName = effectName.trim();
+    const submittedUnit = effectUnit;
+    const submittedAmount = effectAmount;
+    const submittedMaintenance = maintenance;
+    const submittedVersion = effectEditVersion.current;
     void update((row) =>
       stamp({
         ...row,
@@ -131,18 +177,26 @@ export function SoloTrackerCard({
           ...row.effects,
           {
             id: crypto.randomUUID(),
-            name: effectName.trim(),
+            name: submittedName,
             duration,
             startedAtRound: row.round,
             ...(maintenanceCost === undefined ? {} : { maintenanceCost }),
           },
         ],
       }),
-    );
-    setEffectName('');
-    setEffectUnit('rounds');
-    setEffectAmount('1');
-    setMaintenance('');
+    )
+      .then(() => {
+        if (effectEditVersion.current !== submittedVersion) return;
+        setEffectName((current) => (current.trim() === submittedName ? '' : current));
+        setEffectUnit((current) => (current === submittedUnit ? 'rounds' : current));
+        setEffectAmount((current) => (current === submittedAmount ? '1' : current));
+        setMaintenance((current) => (current === submittedMaintenance ? '' : current));
+      })
+      .catch((error: unknown) => reportFailure('solo effect', error, effectFlash.trigger))
+      .finally(() => {
+        effectAddInFlight.current = false;
+        setAddingEffect(false);
+      });
   }
 
   return (
@@ -183,9 +237,13 @@ export function SoloTrackerCard({
           <div className="flex gap-2">
             <input
               aria-label="Solo combatant name"
-              className="input input-bordered input-sm min-w-0"
+              className="input input-bordered input-sm min-w-0 field-rollback-flash"
+              {...combatantFlash.flashProps}
               value={combatantName}
-              onChange={(event) => setCombatantName(event.target.value)}
+              onChange={(event) => {
+                combatantEditVersion.current++;
+                setCombatantName(event.target.value);
+              }}
               placeholder="Combatant name"
               disabled={!canWrite}
             />
@@ -193,9 +251,9 @@ export function SoloTrackerCard({
               type="button"
               className="btn btn-sm"
               onClick={addCombatant}
-              disabled={!canWrite}
+              disabled={!canWrite || addingCombatant}
             >
-              Add
+              {addingCombatant ? 'Adding…' : 'Add'}
             </button>
           </div>
           <ul className="space-y-1 text-sm">
@@ -257,7 +315,7 @@ export function SoloTrackerCard({
                           type="button"
                           className="btn btn-xs"
                           onClick={() =>
-                            void update((row) =>
+                            updateEffect('effect maintenance', (row) =>
                               stamp({
                                 ...row,
                                 effects: row.effects.map((entry) =>
@@ -277,7 +335,7 @@ export function SoloTrackerCard({
                           type="button"
                           className="btn btn-xs"
                           onClick={() =>
-                            void update((row) =>
+                            updateEffect('effect expiry', (row) =>
                               stamp({
                                 ...row,
                                 effects: row.effects.map((entry) =>
@@ -296,7 +354,7 @@ export function SoloTrackerCard({
                         type="button"
                         className="btn btn-ghost btn-xs"
                         onClick={() =>
-                          void update((row) =>
+                          updateEffect('effect removal', (row) =>
                             stamp({
                               ...row,
                               effects: row.effects.filter((entry) => entry.id !== effect.id),
@@ -333,9 +391,13 @@ export function SoloTrackerCard({
                   <span className="label-text">Effect name</span>
                   <input
                     aria-label="Effect name"
-                    className="input input-bordered input-sm"
+                    className="input input-bordered input-sm field-rollback-flash"
+                    {...effectFlash.flashProps}
                     value={effectName}
-                    onChange={(event) => setEffectName(event.target.value)}
+                    onChange={(event) => {
+                      effectEditVersion.current++;
+                      setEffectName(event.target.value);
+                    }}
                   />
                 </label>
                 <label className="form-control">
@@ -344,9 +406,10 @@ export function SoloTrackerCard({
                     aria-label="Effect duration"
                     className="select select-bordered select-sm"
                     value={effectUnit}
-                    onChange={(event) =>
-                      setEffectUnit(event.target.value as EffectDuration['unit'])
-                    }
+                    onChange={(event) => {
+                      effectEditVersion.current++;
+                      setEffectUnit(event.target.value as EffectDuration['unit']);
+                    }}
                   >
                     <option value="rounds">Rounds</option>
                     <option value="minutes">Minutes</option>
@@ -363,7 +426,10 @@ export function SoloTrackerCard({
                       type="number"
                       min={1}
                       value={effectAmount}
-                      onChange={(event) => setEffectAmount(event.target.value)}
+                      onChange={(event) => {
+                        effectEditVersion.current++;
+                        setEffectAmount(event.target.value);
+                      }}
                     />
                   </label>
                 )}
@@ -375,12 +441,20 @@ export function SoloTrackerCard({
                     type="number"
                     min={0}
                     value={maintenance}
-                    onChange={(event) => setMaintenance(event.target.value)}
+                    onChange={(event) => {
+                      effectEditVersion.current++;
+                      setMaintenance(event.target.value);
+                    }}
                   />
                 </label>
                 <div className="flex items-end">
-                  <button type="button" className="btn btn-primary btn-sm" onClick={addEffect}>
-                    Add effect
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={addEffect}
+                    disabled={addingEffect}
+                  >
+                    {addingEffect ? 'Adding effect…' : 'Add effect'}
                   </button>
                 </div>
               </div>

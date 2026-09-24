@@ -9,7 +9,7 @@
  * third copy.
  */
 
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 import { useDialogState } from '../../hooks/useDialogState.ts';
 
 interface RetypeToConfirmDialogProps {
@@ -38,6 +38,7 @@ export function RetypeToConfirmDialog({
   onCancel,
 }: RetypeToConfirmDialogProps) {
   const ref = useDialogState(open);
+  const titleId = useId();
   const [typed, setTyped] = useState('');
 
   useEffect(() => {
@@ -52,9 +53,19 @@ export function RetypeToConfirmDialog({
   const matches = typed.trim() === expectedText;
 
   return (
-    <dialog ref={ref} className="modal" onClose={onCancel} onCancel={onCancel}>
+    <dialog
+      ref={ref}
+      className="modal"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!pending) onCancel();
+      }}
+    >
       <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl">
-        <h3 className="font-display text-xl font-semibold">{title}</h3>
+        <h3 id={titleId} className="font-display text-xl font-semibold">
+          {title}
+        </h3>
         <div className="py-3 text-sm space-y-3">
           {children}
           <p>
@@ -71,7 +82,7 @@ export function RetypeToConfirmDialog({
           />
         </div>
         <div className="modal-action">
-          <button type="button" onClick={onCancel} className="btn btn-ghost">
+          <button type="button" onClick={onCancel} disabled={pending} className="btn btn-ghost">
             Cancel
           </button>
           <button
@@ -85,7 +96,7 @@ export function RetypeToConfirmDialog({
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={onCancel} disabled={pending}>
           close
         </button>
       </form>

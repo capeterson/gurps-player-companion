@@ -4,7 +4,7 @@
  * any destructive op (delete item, drop trait, etc.).
  */
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 import { useDialogState } from '../../hooks/useDialogState.ts';
 
 interface ConfirmDialogProps {
@@ -14,6 +14,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   tone?: 'primary' | 'error';
+  pending?: boolean;
+  pendingLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -25,10 +27,13 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   tone = 'primary',
+  pending = false,
+  pendingLabel = 'Working…',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const ref = useDialogState(open);
+  const titleId = useId();
   const confirmClass = tone === 'error' ? 'btn-error' : 'btn-primary';
 
   return (
@@ -42,25 +47,33 @@ export function ConfirmDialog({
     <dialog
       ref={ref}
       className="modal"
+      aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
-        onCancel();
+        if (!pending) onCancel();
       }}
     >
       <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl">
-        <h3 className="font-display text-xl font-semibold">{title}</h3>
+        <h3 id={titleId} className="font-display text-xl font-semibold">
+          {title}
+        </h3>
         {children && <div className="py-3 text-sm">{children}</div>}
         <div className="modal-action">
-          <button type="button" onClick={onCancel} className="btn btn-ghost">
+          <button type="button" onClick={onCancel} disabled={pending} className="btn btn-ghost">
             {cancelLabel}
           </button>
-          <button type="button" onClick={onConfirm} className={`btn ${confirmClass}`}>
-            {confirmLabel}
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={pending}
+            className={`btn ${confirmClass}`}
+          >
+            {pending ? pendingLabel : confirmLabel}
           </button>
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={onCancel} disabled={pending}>
           close
         </button>
       </form>

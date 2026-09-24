@@ -54,8 +54,8 @@ export function AdminLayout() {
 
   return (
     <div className="arcane-edge min-h-screen bg-base-200 text-base-content">
-      <header className="sticky top-0 z-50 flex w-full items-center justify-between gap-2 border-b border-base-300 bg-base-100/95 px-3 py-3 backdrop-blur sm:gap-6 sm:px-7">
-        <div className="flex min-w-0 items-center gap-3 sm:gap-6">
+      <header className="sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 bg-base-100/95 px-3 py-3 backdrop-blur sm:gap-6 sm:px-7">
+        <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-6">
           <a href="/" className="flex items-center gap-2 no-cap sm:gap-3">
             <span
               aria-hidden="true"
@@ -94,11 +94,11 @@ export function AdminLayout() {
             </NavLink>
           </nav>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <a href="/" className="btn btn-ghost btn-sm">
             ← Back to app
           </a>
-          <span className="text-xs text-base-content/60 hidden sm:inline">
+          <span className="hidden min-w-0 max-w-36 break-all text-xs text-base-content/60 sm:inline">
             {me.data?.displayName ?? '…'}
           </span>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => void signOut()}>

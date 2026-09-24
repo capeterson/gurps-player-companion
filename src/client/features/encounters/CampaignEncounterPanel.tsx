@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { useToasts } from '../../lib/toast.tsx';
 import { encounterKeys, encountersApi } from './encountersApi.ts';
 import { useEncounters } from './useEncounters.ts';
@@ -38,7 +39,10 @@ export function CampaignEncounterPanel({
       {list.isLoading ? (
         <p className="text-sm text-base-content/60">Loading encounters...</p>
       ) : null}
-      {list.data?.length === 0 ? (
+      {list.isError && (
+        <QueryReadError label="encounters" error={list.error} onRetry={() => void list.refetch()} />
+      )}
+      {list.data?.length === 0 && !list.isError ? (
         <p className="text-sm text-base-content/60">No encounters yet.</p>
       ) : null}
       <EncounterList
