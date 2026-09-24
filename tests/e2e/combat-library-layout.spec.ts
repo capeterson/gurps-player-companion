@@ -176,6 +176,17 @@ test('Current Status stays available and combat stays compact across mobile and 
       st: 15,
       ht: 15,
     });
+    await api(page, `/characters/${character.id}/inventory`, {
+      name: 'Deflect vest',
+      equipped: true,
+      isArmor: true,
+      armor: { locations: ['torso'], dr: 4, db: 2, frontOnly: true },
+    });
+    await api(page, `/characters/${character.id}/inventory`, {
+      name: 'Buckler',
+      equipped: true,
+      weaponData: { db: 1, skill: 'Shield', wieldedSide: 'left' },
+    });
     await page.goto(`/characters/${character.id}`);
     const overview = page.getByRole('button', { name: /^Sheet overview/ });
     await expect(overview).toHaveCount(0);
@@ -206,10 +217,16 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(overview).toHaveCount(0);
     await expect(status).toBeVisible();
     await expect(page.getByRole('group', { name: 'Hit points', exact: true })).toHaveCount(0);
-    const defenseAndDr = page.getByRole('region', {
-      name: /Defense and damage resistance/i,
-    });
-    await expect(defenseAndDr).toBeVisible();
+    const incomingAttack = page.getByRole('region', { name: 'Incoming attack' });
+    await expect(incomingAttack).toBeVisible();
+    const attackFold = page.getByRole('button', { name: 'Incoming attack' });
+    await expect(attackFold).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('table', { name: 'Defenses' })).toBeVisible();
+    await attackFold.click();
+    await expect(page.getByRole('table', { name: 'Defenses' })).toBeHidden();
+    await expect(page.getByLabel('Armor facing')).toBeHidden();
+    await attackFold.click();
+    await expect(page.getByRole('table', { name: 'Defenses' })).toBeVisible();
     await expect(page.getByLabel('Armor facing')).toBeVisible();
     await expect(page.getByLabel('Armor facing')).toHaveValue('front');
     await expect(page.getByLabel('Armor facing').getByRole('option', { name: 'Left' })).toHaveCount(
@@ -222,6 +239,52 @@ test('Current Status stays available and combat stays compact across mobile and 
       page.getByLabel('Armor facing').getByRole('option', { name: 'Unknown' }),
     ).toHaveCount(0);
     await expect(page.getByText('Active defenses', { exact: true })).toBeVisible();
+    if (width === 320) {
+      for (const boundaryWidth of [320, 599, 600, 601, 899, 900, 901, 1199, 1200, 1201]) {
+        await page.setViewportSize({ width: boundaryWidth, height: 900 });
+        const defenseTable = incomingAttack.getByRole('table', { name: 'Defenses' });
+        const viewport = defenseTable.locator('..');
+        const score = defenseTable.getByRole('button', { name: /^Dodge \d+$/ });
+        await expect(score).toBeVisible();
+        const [viewportBox, scoreBox] = await Promise.all([
+          viewport.boundingBox(),
+          score.boundingBox(),
+        ]);
+        expect(viewportBox).not.toBeNull();
+        expect(scoreBox).not.toBeNull();
+        if (viewportBox && scoreBox) {
+          expect(scoreBox.x).toBeGreaterThanOrEqual(viewportBox.x);
+          expect(scoreBox.x + scoreBox.width).toBeLessThanOrEqual(
+            viewportBox.x + viewportBox.width,
+          );
+        }
+      }
+      await page.setViewportSize({ width, height: 900 });
+    }
+    await incomingAttack.getByRole('button', { name: /^Dodge \d+$/ }).click();
+    await expect(incomingAttack.getByText(/Selected defense: Dodge/)).toBeVisible();
+    await page.keyboard.press('Escape');
+    const frontDodge = Number(
+      (
+        await incomingAttack.getByRole('button', { name: /^Dodge \d+$/ }).getAttribute('aria-label')
+      )?.match(/\d+$/)?.[0],
+    );
+    await page.getByLabel('Armor facing').selectOption('back');
+    await expect(incomingAttack.getByText(/Selected defense: Dodge/)).toHaveCount(0);
+    const backDodge = Number(
+      (
+        await incomingAttack.getByRole('button', { name: /^Dodge \d+$/ }).getAttribute('aria-label')
+      )?.match(/\d+$/)?.[0],
+    );
+    expect(frontDodge - backDodge).toBe(3);
+    await incomingAttack.getByRole('button', { name: /Incoming damage…/ }).click();
+    const damageDialog = page.getByRole('dialog', { name: 'Incoming damage' });
+    await expect(damageDialog.getByLabel('Incoming attack context')).toContainText(
+      'Torso · back · Crushing (cr) · Normal DR',
+    );
+    await expect(damageDialog.getByLabel('Basic damage')).toBeVisible();
+    await expect(damageDialog.getByRole('combobox')).toHaveCount(0);
+    await damageDialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('rowgroup', { name: 'Move' })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Defense order' })).toHaveCount(0);
     await expect(page.getByText('All locations and DR types', { exact: true })).toHaveCount(0);
@@ -243,14 +306,14 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(
       status.getByRole('button', { name: 'Change maneuver, current Attack' }),
     ).toBeVisible();
-    await expect(defenseAndDr).toBeVisible();
-    await expect(defenseAndDr.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
+    await expect(incomingAttack).toBeVisible();
+    await expect(incomingAttack.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBeLessThanOrEqual(width);
     if (width === 320) {
       await page.setViewportSize({ width, height: 568 });
-      await defenseAndDr.scrollIntoViewIfNeeded();
+      await incomingAttack.scrollIntoViewIfNeeded();
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
 
       const bar = page.getByRole('complementary', { name: 'Current Status' });

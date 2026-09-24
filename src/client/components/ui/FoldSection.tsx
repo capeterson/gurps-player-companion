@@ -1,9 +1,10 @@
 import { type ReactNode, useId, useLayoutEffect, useState } from 'react';
-import { AppIcon } from './AppIcon.tsx';
+import { AppIcon, type AppIconName } from './AppIcon.tsx';
 
 interface FoldSectionProps {
   preferenceKey: string;
   title: string;
+  icon?: AppIconName;
   summary?: ReactNode;
   defaultOpen?: boolean;
   forceOpen?: boolean;
@@ -15,6 +16,7 @@ interface FoldSectionProps {
 export function FoldSection({
   preferenceKey,
   title,
+  icon,
   summary,
   defaultOpen = true,
   forceOpen = false,
@@ -58,6 +60,7 @@ export function FoldSection({
           <span aria-hidden="true" className="text-muted">
             <AppIcon name={open ? 'chevronDown' : 'chevronRight'} size={16} />
           </span>
+          {icon && <AppIcon name={icon} size={18} className="text-muted" />}
           <span className="label-eyebrow">{title}</span>
           {!open && summary && (
             <span className="ml-auto min-w-0 text-right text-xs text-muted font-normal">

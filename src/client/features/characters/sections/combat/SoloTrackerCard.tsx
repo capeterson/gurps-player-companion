@@ -146,7 +146,7 @@ export function SoloTrackerCard({
   }
 
   return (
-    <FoldSection preferenceKey={`${characterId}:SoloTrackerCard`} title="Turn tracker">
+    <FoldSection preferenceKey={`${characterId}:SoloTrackerCard`} title="Turn tracker" icon="dice">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="label-eyebrow">Solo tracker</p>

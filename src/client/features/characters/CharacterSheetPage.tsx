@@ -1627,6 +1627,7 @@ export function CharacterSheetPage() {
                 <FoldSection
                   preferenceKey={`${character.id}:overview`}
                   title="Sheet overview"
+                  icon="identity"
                   summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
                 >
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1680,7 +1681,11 @@ export function CharacterSheetPage() {
                   </div>
                 </FoldSection>
               )}
-              <FoldSection preferenceKey={`${character.id}:IdentityPanel`} title="Identity">
+              <FoldSection
+                preferenceKey={`${character.id}:IdentityPanel`}
+                title="Identity"
+                icon="identity"
+              >
                 <IdentityPanel
                   character={character}
                   canWrite={canWrite}
@@ -1693,6 +1698,7 @@ export function CharacterSheetPage() {
             <FoldSection
               preferenceKey={`${character.id}:TraitsPanel`}
               title="Traits"
+              icon="traits"
               forceOpen={anchor?.kind === 'trait'}
             >
               <TraitsPanel character={character} canWrite={canWrite} />
@@ -1703,6 +1709,7 @@ export function CharacterSheetPage() {
               <FoldSection
                 preferenceKey={`${character.id}:SkillsPanel`}
                 title="Skills"
+                icon="skills"
                 forceOpen={anchor?.kind === 'skill'}
               >
                 <SkillsPanel character={character} canWrite={canWrite} />
@@ -1720,6 +1727,7 @@ export function CharacterSheetPage() {
               <FoldSection
                 preferenceKey={`${character.id}:SpellsPanel`}
                 title="Spells"
+                icon="magic"
                 forceOpen={anchor?.kind === 'spell'}
               >
                 <SpellsPanel character={character} canWrite={canWrite} />
@@ -1736,6 +1744,7 @@ export function CharacterSheetPage() {
             <FoldSection
               preferenceKey={`${character.id}:InventoryPanel`}
               title="Inventory"
+              icon="inventory"
               forceOpen={anchor?.kind === 'inventory'}
             >
               <InventoryPanel
@@ -1746,7 +1755,11 @@ export function CharacterSheetPage() {
             </FoldSection>
           )}
           {tab === 'History' && (
-            <FoldSection preferenceKey={`${character.id}:HistoryPanel`} title="History">
+            <FoldSection
+              preferenceKey={`${character.id}:HistoryPanel`}
+              title="History"
+              icon="history"
+            >
               <HistoryPanel characterId={character.id} />
             </FoldSection>
           )}

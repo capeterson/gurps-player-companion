@@ -38,6 +38,10 @@ import {
 export interface DefensesCardProps {
   character: CharacterDetail;
   openRoll: (req: RollRequest) => void;
+  onDefenseUsed?: (defense: { id: string; label: string; target: number }) => void;
+  selectedDefenseId?: string | null;
+  selectedDefenseTarget?: number | null;
+  onDefenseInvalidated?: () => void;
   /** Shared with armor and incoming damage so DB uses the same selected hit context. */
   hitLocation?: string;
   facing?: ArmorFacing | undefined;
@@ -115,7 +119,16 @@ export function DefensesCard(props: DefensesCardProps) {
   return <DefenseTable key={props.character.id} {...props} />;
 }
 
-function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: DefensesCardProps) {
+function DefenseTable({
+  character,
+  openRoll,
+  onDefenseUsed,
+  selectedDefenseId,
+  selectedDefenseTarget,
+  onDefenseInvalidated,
+  hitLocation = 'torso',
+  facing,
+}: DefensesCardProps) {
   const effects = character.effects ?? [];
   const initialPreferences = readDefenseTablePreferences(character.id);
   const [customOrder, setCustomOrder] = useState(initialPreferences.order);
@@ -339,6 +352,16 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
     });
   }
 
+  const selectedRowTarget = rows.find((row) => row.id === selectedDefenseId)?.rollTarget;
+  useEffect(() => {
+    if (
+      selectedDefenseId &&
+      (selectedRowTarget == null || selectedRowTarget !== selectedDefenseTarget)
+    ) {
+      onDefenseInvalidated?.();
+    }
+  }, [selectedDefenseId, selectedDefenseTarget, selectedRowTarget, onDefenseInvalidated]);
+
   const orderedRows = reorderRows(rows, customOrder);
   const visibleRows = sortRows(orderedRows, sort, descending);
 
@@ -396,7 +419,14 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
         onClick={() => toggleSort(value)}
         aria-label={`Sort by ${label}`}
       >
-        {label}
+        {value === 'skill' ? (
+          <>
+            <span className="hidden sm:inline">{label}</span>
+            <span className="sm:hidden">Skill</span>
+          </>
+        ) : (
+          label
+        )}
         {sort === value ? (descending ? ' ↓' : ' ↑') : ''}
       </button>
     );
@@ -404,32 +434,29 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
 
   return (
     <div className="space-y-3" aria-label="Active defenses">
-      <div>
-        <div>
-          <h3 className="label-eyebrow">Active defenses</h3>
-          <p className="mt-1 text-xs text-muted">
-            Uses the hit location and facing selected for armor.
-          </p>
-        </div>
-      </div>
+      <p className="text-xs text-muted">Scores include the selected hit location and facing.</p>
 
       <div className="overflow-x-auto rounded-xl border border-base-300">
         <table className="table table-sm w-full" aria-label="Defenses">
           <thead>
             <tr>
-              <th className="w-8" aria-label="Custom order" />
+              <th className="w-8 max-sm:w-6 max-sm:px-1" aria-label="Custom order" />
               <th
+                className="max-sm:px-1"
                 aria-sort={sort === 'defense' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Defense', 'defense')}
               </th>
-              <th aria-sort={sort === 'skill' ? (descending ? 'descending' : 'ascending') : 'none'}>
+              <th
+                className="max-sm:hidden"
+                aria-sort={sort === 'skill' ? (descending ? 'descending' : 'ascending') : 'none'}
+              >
                 {sortButton('Governing skill', 'skill')}
               </th>
-              <th className="text-right whitespace-nowrap">Before DB</th>
+              <th className="text-right whitespace-nowrap max-sm:hidden">Before DB</th>
               <th className="text-right">DB</th>
               <th
-                className="text-right"
+                className="text-right max-sm:px-1"
                 aria-sort={sort === 'final' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Final', 'final', 'w-full justify-end')}
@@ -446,10 +473,16 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                   event.preventDefault();
                 }}
                 onDrop={() => dropBefore(row.id)}
-                className={draggedId === row.id ? 'opacity-50' : undefined}
+                className={
+                  draggedId === row.id
+                    ? 'opacity-50'
+                    : selectedDefenseId === row.id
+                      ? 'bg-primary/10'
+                      : undefined
+                }
               >
                 <tr>
-                  <td className="px-2">
+                  <td className="px-2 max-sm:px-1">
                     <DragHandle
                       aria-label={`Reorder row ${customIndex + 1}`}
                       data-position={customIndex}
@@ -470,7 +503,7 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                       }}
                     />
                   </td>
-                  <th scope="row" className="min-w-44 align-top">
+                  <th scope="row" className="min-w-44 max-sm:min-w-20 max-sm:px-1 align-top">
                     {row.itemId ? (
                       <InventoryAnchorLink
                         itemId={row.itemId}
@@ -481,6 +514,9 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                     ) : (
                       <span className="font-medium">{row.label}</span>
                     )}
+                    <span className="block text-xs text-muted sm:hidden">
+                      {row.skill} · Base {row.beforeDb}
+                    </span>
                     {row.detail && (
                       <details className="mt-1 font-normal text-[11px] text-base-content/60">
                         <summary className="cursor-pointer select-none">Breakdown</summary>
@@ -488,12 +524,12 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                       </details>
                     )}
                   </th>
-                  <td className="min-w-32 align-top text-xs">{row.skill}</td>
-                  <td className="num text-right align-top">{row.beforeDb}</td>
+                  <td className="min-w-32 align-top text-xs max-sm:hidden">{row.skill}</td>
+                  <td className="num text-right align-top max-sm:hidden">{row.beforeDb}</td>
                   <td className="num text-right align-top">
                     {row.db == null ? '—' : signed(row.db)}
                   </td>
-                  <td className="text-right align-top">
+                  <td className="text-right align-top max-sm:px-1">
                     {row.reason ? (
                       <span className="inline-block text-left text-xs">
                         <span>{row.label} — unavailable</span>
@@ -506,6 +542,11 @@ function DefenseTable({ character, openRoll, hitLocation = 'torso', facing }: De
                         aria-label={`${row.label} ${row.rollTarget}`}
                         onClick={() => {
                           if (row.rollTarget != null) {
+                            onDefenseUsed?.({
+                              id: row.id,
+                              label: row.label,
+                              target: row.rollTarget,
+                            });
                             openRoll({ label: row.label, baseTarget: row.rollTarget });
                           }
                         }}

@@ -89,7 +89,7 @@ invalidation behavior as REST.
 ### Character sheet (the core surface)
 Route `/characters/:id`. Sectioned sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), destinations:
-**Combat, Overview, Traits, Skills, Magic, Inventory, History**.
+**Overview, Combat, Traits, Skills, Magic, Inventory, History**.
 Combat is the default section for live play. Magic is hidden on a read-only
 view of a non-magical character; owners always have it available to add magic.
 Inventory items, traits, skills, and spells have stable ID-based URL anchors
@@ -97,7 +97,7 @@ Inventory items, traits, skills, and spells have stable ID-based URL anchors
 character URL with one of these hashes selects the matching section, opens its
 panel, and scrolls to the highlighted entry. Inventory links reveal nested
 items inside closed containers. Weapon names in Attacks, armor layers and DB
-sources in Defense & Damage Resistance, and equipment named in active defenses
+sources in Incoming attack, and equipment named in active defenses
 link to their inventory entries without a page reload.
 
 The home page's recent-character cards and the `/characters` listing resolve
@@ -116,7 +116,9 @@ shows the synced campaign name as a separate link to that campaign.
   hidden from keyboard and assistive technology. Safe-area spacing and bottom
   content padding protect controls from the dock/FAB; navigation yields to modal
   dialogs. Reduced motion disables the flower entrance and sync rotation.
-  `SheetNavigation.tsx` owns this responsive control. `AppIcon.tsx` standardizes
+  `SheetNavigation.tsx` owns this responsive control. Overview appears first in
+  the dock and mobile navigation while Combat remains the initial live-play view.
+  `AppIcon.tsx` standardizes
   Lucide icons at a 1.75 stroke weight: swords, portrait, fingerprint, target,
   book, backpack and history for the sheet, with matching map, bell,
   sun/moon, edit, shield, and six-sided die icons across related controls.
@@ -131,7 +133,11 @@ shows the synced campaign name as a separate link to that campaign.
   stats, status, ledger, encumbrance and conditional effects) above the Identity
   panel; other destinations do not display it. When folded, it shows effective
   ST/DX/IQ/HT. Every visible sheet panel and main Combat section has a keyboard-accessible
-  folding header; armor remains inline and open by default. `FoldSection` saves
+  folding header. On Combat, Attacks, Incoming attack, and the optional Turn
+  tracker fold independently. Incoming attack groups the body map, target/facing
+  controls, active defenses, DR, and damage application in one open-by-default
+  section. Main section headers use matching outline icons where the
+  icon identifies the content. `FoldSection` saves
   open/closed preferences per character/section in device-local `localStorage`
   (`gpc:fold:*`), never the server. Content stays mounted while folded so drafts,
   pending saves, roll state and selections survive folding. Storage failures do
@@ -432,7 +438,7 @@ shows the synced campaign name as a separate link to that campaign.
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
 - **Current Status and Combat tab (live-gameplay surfaces)**. Combat is the
-  first tab on the sheet
+  initial sheet view, with Overview first in the navigation
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
@@ -494,8 +500,8 @@ shows the synced campaign name as a separate link to that campaign.
     `useConditionsToggle` mirrors the same latest-intended-ref pattern
     so two rapid condition taps before Dexie re-renders don't coalesce
     into one outbox patch and drop the first tap.
-  - **Defense & Damage Resistance** — combines active defenses, equipped armor,
-    active global/location innate DR, and natural skull DR 2 in one workspace
+  - **Incoming attack** — a foldable workspace with equipped armor,
+    active global/location innate DR, and natural skull DR 2
     (`src/shared/domain/armorDr.ts`), complementing the Attacks card's
     hit-location aim presets. A rounded, generic SVG silhouette exposes all 15
     standard locations with clickable zones, keyboard selection, and linked
@@ -516,9 +522,10 @@ shows the synced campaign name as a separate link to that campaign.
     linked trait/skill definitions are unavailable (including a cold offline
     load), DR is marked unavailable and the damage dialog cannot apply HP loss.
     Known empty effect definitions remain distinguishable from missing entries.
-    An **"Incoming damage…"** button carries the selected location, damage type,
-    and penetration into a dialog. Presets include armor divisors and Ignore DR;
-    custom divisors are supported in the dialog. The campaign's **House rules**
+    An **"Incoming damage…"** button carries the one selected location, facing,
+    damage type, and penetration into a dialog that displays this context read-only
+    and asks for basic damage. Presets include armor divisors and Ignore DR;
+    custom types and divisors are edited in the workspace. The campaign's **House rules**
     setting `protectNaturalDr` defaults **on** for existing/new campaigns and
     campaignless characters: divisors above 1 (including Ignore DR) affect worn
     armor only; innate and natural skull DR remain intact. Turn it off for the
@@ -562,10 +569,17 @@ shows the synced campaign name as a separate link to that campaign.
     destruction requires at least twice the crippling amount. The hint describes
     severing for cutting damage and generic destruction for other damage types. Conditions
     remain manual. Torso, skull, and eye-to-brain injuries are uncapped.
-  - **Active defenses** — a compact, horizontally scrollable table inside
-    **Defense & Damage Resistance**, with sortable Defense, Governing skill, and
+  - **Active defenses** — an icon-labelled table alongside the body map inside
+    Incoming attack, using its selected hit location and facing,
+    with sortable Defense, Governing skill, and
     Final columns plus a device-local custom order that supports drag-and-drop and
     keyboard arrow reordering. The column headers are the only explicit sort controls;
+    on narrow screens the skill and base score move under the defense name to keep
+    the final defense roll visible. Choosing a numeric defense records its name
+    and current score in the attack workspace. Changing the location, facing,
+    or score clears that selection, as does applying injury. The roll result
+    and situational modifiers remain a player
+    decision; incoming damage is an explicit path when the attack hits.
     dragging or using the row handles returns the table to custom order. Attacks and
     defenses share the canonical `DragHandle` control and its `⠿` glyph so reorder
     affordances stay visually consistent. Source
@@ -783,11 +797,13 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   local-first outbox. REST and sync use the same central write decision.
 
 ### Cross-cutting UI
-- **Navigational breadcrumbs** (persistent header): character and campaign
-  routes show two clickable levels — `Character › <character name>` and
-  `Campaign › <campaign name>`. The first level returns to its collection and
-  the named level returns to that entity's main page; nested campaign surfaces
-  deliberately do not add a third level.
+- **Navigational breadcrumbs** (persistent header): character detail shows
+  `Character › <character name>`. Campaign detail shows
+  `Campaign › <campaign name>`; campaign library, GM, and encounter routes add
+  their page label. Global Log and Library pages resolve their `?campaign=`
+  selection into `Campaign › <campaign name> › Log/Library`. The first level
+  returns to its collection and the named level returns to that entity's main
+  page. Campaign sub-navigation carries the current campaign into Log/Library.
 - **Logged-in home**: a compact welcome and the four most recently updated
   characters. Global Character, Campaign, Log, and Library destinations stay in the
   persistent header instead of being repeated as homepage buttons or shortcut
@@ -942,7 +958,7 @@ src/
                    penalty, equipped-shield picking), combatAdjustments (pool,
                    posture, stun and maneuver limits on live defenses and Move), injuryCalc (incoming-
                    damage DR/divisor/wounding-multiplier resolution for the
-                   Defense & Damage Resistance card's damage dialog), armorDr (armor + innate DR
+                   Incoming attack panel's damage dialog), armorDr (armor + innate DR
                    aggregation per hit location + per-damage-type DR
                    resolution via `resolveDr` with typed → crushing →
                    default fallback, facing-aware DR aggregation, and the

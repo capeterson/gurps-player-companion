@@ -40,6 +40,12 @@ describe('SheetNavigation', () => {
 
     const navigation = screen.getByRole('navigation', { name: 'Character sections' });
     expect(navigation).toBeVisible();
+    expect(
+      Array.from(navigation.querySelectorAll('button')).map((button) =>
+        button.getAttribute('aria-label'),
+      ),
+    ).toEqual(SHEET_TABS);
+    expect(SHEET_TABS.slice(0, 2)).toEqual(['Overview', 'Combat']);
     expect(navigation.getElementsByTagName('button')).toHaveLength(SHEET_TABS.length);
     expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Combat' })).toHaveAttribute('aria-current', 'page');

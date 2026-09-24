@@ -249,7 +249,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
 
   if (weapons.length === 0) {
     return (
-      <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks">
+      <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks" icon="combat">
         <p className="text-sm text-base-content/60">
           No equipped weapons — equip items in the Inventory tab.
         </p>
@@ -258,7 +258,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
   }
 
   return (
-    <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks">
+    <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks" icon="combat">
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
         <p className="label-eyebrow">
           <span className="text-base-content/50">{weapons.length} equipped weapons</span>

@@ -42,6 +42,8 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
 
       const buttons = dock.getByRole('button');
       await expect(buttons).toHaveCount(CHARACTER_SECTIONS.length);
+      await expect(buttons.first()).toHaveAttribute('aria-label', 'Overview');
+      await expect(buttons.nth(1)).toHaveAttribute('aria-label', 'Combat');
       for (const section of CHARACTER_SECTIONS) {
         const button = dock.getByRole('button', { name: section, exact: true });
         await expect(button).toBeVisible();

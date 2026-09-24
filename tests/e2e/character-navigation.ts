@@ -1,8 +1,8 @@
 import { type Page, expect } from '@playwright/test';
 
 export const CHARACTER_SECTIONS = [
-  'Combat',
   'Overview',
+  'Combat',
   'Traits',
   'Skills',
   'Magic',
