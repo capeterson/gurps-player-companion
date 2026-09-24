@@ -1,6 +1,15 @@
 name: nimble-rocket-29ef18d6
 
 services:
+  deps:
+    image: oven/bun:1.2-alpine
+    working_dir: /app
+    restart: 'no'
+    command: ['bun', 'install', '--frozen-lockfile']
+    volumes:
+      - ./:/app
+      - bun_modules:/app/node_modules
+
   db:
     image: postgres:18-alpine
     restart: unless-stopped
@@ -9,7 +18,7 @@ services:
       POSTGRES_PASSWORD: gurps
       POSTGRES_DB: gurps
     ports:
-      - '5434:5432'
+      - '${GPC_DB_PORT:-5434}:5432'
     volumes:
       - db_data_dev:/var/lib/postgresql
     healthcheck:
@@ -22,10 +31,7 @@ services:
     image: oven/bun:1.2-alpine
     working_dir: /app
     restart: 'no'
-    command:
-      - sh
-      - -c
-      - 'bun install --frozen-lockfile || bun install; bun run db:migrate'
+    command: ['bun', 'run', 'db:migrate']
     environment:
       DATABASE_URL: postgres://gurps:gurps@db:5432/gurps
       JWT_SECRET: dev-only-secret-replace-me-replace-me-replace-me
@@ -35,6 +41,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      deps:
+        condition: service_completed_successfully
 
   app:
     image: oven/bun:1.2-alpine
@@ -49,13 +57,13 @@ services:
       JWT_ACCESS_TTL_MINUTES: 15
       JWT_REFRESH_TTL_DAYS: 14
       CORS_ORIGINS: '[]'
-      APP_BASE_URL: http://localhost:3001
+      APP_BASE_URL: http://localhost:${GPC_APP_PORT:-3001}
       OAUTH_CLIENTS: '[]'
       # Vite HMR client runs in the *host* browser, so it must connect
-      # back to the host-mapped port (3001), not the container's
-      # internal 3000. See vite.config.ts `server.hmr`.
+      # back to the host-mapped port, not the container's internal 3000.
+      # See vite.config.ts `server.hmr`.
       VITE_HMR_HOST: localhost
-      VITE_HMR_PORT: '3001'
+      VITE_HMR_PORT: '${GPC_APP_PORT:-3001}'
     volumes:
       - ./:/app
       - bun_modules:/app/node_modules
@@ -65,7 +73,19 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - '3001:3000'
+      - '${GPC_APP_PORT:-3001}:3000'
+
+  client-tests:
+    image: node:22-alpine
+    profiles: ['test']
+    working_dir: /app
+    command: ['node', 'scripts/run-client-tests.mjs']
+    volumes:
+      - ./:/app
+      - bun_modules:/app/node_modules
+    depends_on:
+      deps:
+        condition: service_completed_successfully
 
 volumes:
   db_data_dev:

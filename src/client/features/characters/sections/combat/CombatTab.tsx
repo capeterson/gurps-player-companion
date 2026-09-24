@@ -1,11 +1,12 @@
 /**
- * CombatTab — the live-gameplay surface, rendered as the first tab on
+ * CombatTab — the live-gameplay surface, rendered as a dock destination on
  * the character sheet. Attacks, defenses, armor, and the optional solo
  * tracker stay inline on `/characters/:id` so the player taps
  * between live combat and the editable sheet without a route hop.
  *
- * Full-width status, attacks, armor and tracker sections avoid independent
- * columns growing lopsided. Each section folds independently on this device.
+ * Full-width status, attacks, incoming attack, and tracker sections avoid
+ * independent columns growing lopsided. Each section folds independently
+ * on this device; incoming attack contains defenses, armor, and damage.
  *
  * Current HP/FP, posture, conditions, and maneuver live in the sheet-level
  * Current Status bar supplied by CombatStatusProvider. The provider owns the

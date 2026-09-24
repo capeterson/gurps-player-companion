@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { AppIcon, type AppIconName } from '../../components/ui/AppIcon.tsx';
 
 export const SHEET_TABS = [
-  'Combat',
   'Overview',
+  'Combat',
   'Traits',
   'Skills',
   'Magic',

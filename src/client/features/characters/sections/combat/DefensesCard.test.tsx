@@ -203,7 +203,7 @@ describe('DefensesCard', () => {
 
   it('keeps the table focused on rollable active defenses', () => {
     render(<DefensesCard character={makeCharacter([], [])} openRoll={vi.fn()} />);
-    expect(screen.getByText('Active defenses')).toBeInTheDocument();
+    expect(screen.getByText('Scores include the selected hit location and facing.')).toBeVisible();
     expect(screen.queryByRole('rowgroup', { name: 'Move' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Defense hit location')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Defense facing')).not.toBeInTheDocument();

@@ -2,7 +2,9 @@
  * IncomingDamageDialog — resolve a hit landing on THIS character: basic
  * damage − DR(location)/divisor → penetrating × wounding multiplier =
  * injury (B378-379), then apply the injury to HP through the shared
- * pool bumpers. DR belongs to the defender, and this is a
+ * pool bumpers. The selected target, facing, type, and divisor are read-only
+ * context from Incoming attack so the injury calculation cannot diverge from
+ * the defense calculation. DR belongs to the defender, and this is a
  * single-character companion, so "incoming damage" lives on the
  * defender's own sheet rather than an attack-side damage-vs-DR flow.
  *
@@ -11,7 +13,6 @@
  */
 
 import { type FormEvent, useMemo, useState } from 'react';
-import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
 import {
   type ArmorFacing,
   effectiveDrByLocation,
@@ -29,10 +30,12 @@ export interface IncomingDamageDialogProps {
   hpMax: number;
   bumpHp: (delta: number) => void;
   onClose: () => void;
-  initialLocation?: string;
-  initialFacing?: ArmorFacing;
-  initialType?: string;
-  initialDivisor?: string;
+  onApplied?: () => void;
+  location: string;
+  facing: ArmorFacing;
+  type: string;
+  divisor: string;
+  defenseUsed?: string | null;
 }
 
 export function IncomingDamageDialog({
@@ -42,20 +45,15 @@ export function IncomingDamageDialog({
   hpMax,
   bumpHp,
   onClose,
-  initialLocation = 'torso',
-  initialFacing = 'front',
-  initialType = 'cr',
-  initialDivisor = '',
+  onApplied,
+  location,
+  facing,
+  type,
+  divisor,
+  defenseUsed,
 }: IncomingDamageDialogProps) {
   const ref = useDialogState(open);
   const [basicRaw, setBasicRaw] = useState('');
-  const [type, setType] = useState(initialType);
-  const [location, setLocation] = useState(initialLocation);
-  const [facing, setFacing] = useState<ArmorFacing>(initialFacing);
-  const [divisorRaw, setDivisorRaw] = useState(initialDivisor);
-  const [customDivisor, setCustomDivisor] = useState(
-    !ARMOR_DIVISORS.some(([value]) => value === initialDivisor),
-  );
   const effectsKnown =
     character.libraryEffectsKnown !== false && character.houseRulesKnown !== false;
   const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
@@ -65,16 +63,9 @@ export function IncomingDamageDialog({
     [character.inventory, character.effects, facing],
   );
 
-  // Custom armor locations the character actually has, beyond the
-  // canonical set, so a homebrew "wing"/"tail" location can be targeted.
-  const customLocations = useMemo(
-    () => [...drMap.keys()].filter((loc) => !HIT_LOCATIONS.includes(loc as never)),
-    [drMap],
-  );
-
   const validBasic = /^\d+$/.test(basicRaw.trim()) && Number.isSafeInteger(Number(basicRaw));
   const basic = validBasic ? Number(basicRaw) : 0;
-  const validDivisor = !divisorRaw.trim() || parseArmorDivisor(divisorRaw) != null;
+  const validDivisor = !divisor.trim() || parseArmorDivisor(divisor) != null;
   const fatigueType = type.trim().toLowerCase() === 'fat';
   const valid = validBasic && validDivisor && !fatigueType;
   const result = applyDamage(
@@ -82,7 +73,7 @@ export function IncomingDamageDialog({
     type,
     location,
     drMap,
-    divisorRaw.trim() || null,
+    divisor.trim() || null,
     hpMax,
     protectNaturalDr,
   );
@@ -97,18 +88,19 @@ export function IncomingDamageDialog({
     e.preventDefault();
     if (!canWrite || !effectsKnown || !valid || result.injury <= 0) return;
     bumpHp(-result.injury);
+    onApplied?.();
     onClose();
   }
 
   const divisorText =
-    protectNaturalDr && (parseArmorDivisor(divisorRaw) ?? 1) > 1
+    protectNaturalDr && (parseArmorDivisor(divisor) ?? 1) > 1
       ? ' (armor penetration; natural DR unchanged)'
       : result.drAtLocation === 0 && result.effectiveDr === 1
         ? ' (unprotected target: DR 1, B379)'
-        : parseArmorDivisor(divisorRaw) === Number.POSITIVE_INFINITY
+        : parseArmorDivisor(divisor) === Number.POSITIVE_INFINITY
           ? ' (bypassed)'
           : result.effectiveDr !== result.drAtLocation
-            ? `/${divisorRaw.trim()}`
+            ? `/${divisor.trim()}`
             : '';
   const breakdown = !effectsKnown
     ? 'Linked library effects or campaign house rules are unavailable. Reconnect and load them before applying damage.'
@@ -131,119 +123,31 @@ export function IncomingDamageDialog({
       <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl max-w-md">
         <h3 className="font-display text-xl font-semibold">Incoming damage</h3>
         <form onSubmit={handleApply} className="mt-3 space-y-3 text-sm">
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Basic damage</span>
-              <input
-                value={basicRaw}
-                inputMode="numeric"
-                onChange={(e) => setBasicRaw(e.target.value)}
-                className="num input input-sm input-bordered text-right"
-                placeholder="0"
-                // biome-ignore lint/a11y/noAutofocus: first field of a small purpose-built dialog.
-                autoFocus
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Type</span>
-              <select
-                value={DAMAGE_TYPES.some(([value]) => value === type) ? type : '__other'}
-                onChange={(e) => setType(e.target.value === '__other' ? '' : e.target.value)}
-                className="select select-sm select-bordered"
-              >
-                {DAMAGE_TYPES.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-                <option value="__other">other…</option>
-              </select>
-            </label>
-          </div>
+          <p
+            className="rounded-lg border border-base-300/60 bg-base-200/40 px-3 py-2 text-xs text-base-content/80"
+            aria-label="Incoming attack context"
+          >
+            <strong>{locationLabel(location)}</strong> · {facing} ·{' '}
+            {DAMAGE_TYPES.find(([value]) => value === type)?.[1] ?? type} ·{' '}
+            {ARMOR_DIVISORS.find(([value]) => value === divisor)?.[1] ?? `Divisor ${divisor}`}
+            <span className="block mt-1">
+              {defenseUsed
+                ? `Selected defense: ${defenseUsed}. Confirm the hit before applying injury.`
+                : 'Confirm that the attack hits before applying injury.'}
+            </span>
+          </p>
           <label className="flex flex-col gap-1">
-            <span className="label-eyebrow">Incoming facing</span>
-            <select
-              aria-label="Incoming facing"
-              value={facing}
-              onChange={(event) => setFacing(event.target.value as ArmorFacing)}
-              className="select select-sm select-bordered"
-            >
-              <option value="front">Front</option>
-              <option value="back">Back</option>
-              <option value="left">Left</option>
-              <option value="right">Right</option>
-            </select>
+            <span className="label-eyebrow">Basic damage</span>
+            <input
+              value={basicRaw}
+              inputMode="numeric"
+              onChange={(e) => setBasicRaw(e.target.value)}
+              className="num input input-sm input-bordered text-right"
+              placeholder="0"
+              // biome-ignore lint/a11y/noAutofocus: first field of a small purpose-built dialog.
+              autoFocus
+            />
           </label>
-
-          {!DAMAGE_TYPES.some(([value]) => value === type) && (
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Custom type</span>
-              <input
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="input input-sm input-bordered"
-                placeholder="e.g. fat"
-              />
-            </label>
-          )}
-
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Hit location</span>
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="select select-sm select-bordered"
-              >
-                {HIT_LOCATIONS.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {locationLabel(loc)}
-                  </option>
-                ))}
-                {customLocations.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {locationLabel(loc)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Armor divisor</span>
-              <select
-                value={customDivisor ? '__custom' : divisorRaw}
-                onChange={(event) => {
-                  const custom = event.target.value === '__custom';
-                  setCustomDivisor(custom);
-                  setDivisorRaw(custom ? '' : event.target.value);
-                }}
-                className="select select-sm select-bordered"
-              >
-                {ARMOR_DIVISORS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-                <option value="__custom">Custom divisor…</option>
-              </select>
-            </label>
-          </div>
-          {customDivisor && (
-            <label className="flex flex-col gap-1">
-              <span className="label-eyebrow">Custom armor divisor</span>
-              <input
-                value={divisorRaw}
-                onChange={(event) => setDivisorRaw(event.target.value)}
-                className="input input-sm input-bordered"
-                placeholder="e.g. (2) or 0.5"
-                aria-invalid={!validDivisor}
-              />
-            </label>
-          )}
-          {!validDivisor && (
-            <p role="alert" className="text-xs text-error">
-              Enter a positive armor divisor, such as 2 or (0.5).
-            </p>
-          )}
           {basicRaw.trim() && !validBasic && (
             <p role="alert" className="text-xs text-error">
               Basic damage must be a non-negative whole number.

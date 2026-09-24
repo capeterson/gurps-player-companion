@@ -457,10 +457,14 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
 
 - Bun is run inside Docker (see `docker-compose.dev.yml`). There is no
   host-level `bun` requirement.
-- Bring up local Postgres + dev server: `docker compose -f docker-compose.dev.yml up`.
-- This worktree's Compose project is `nimble-rocket-29ef18d6`; it binds the app
-  to `http://localhost:3001` and Postgres to host port `5434` so it remains
-  isolated from the other workspace.
+- Bring up local Postgres + dev server from any worktree with
+  `./scripts/dev-worktree.sh up -d --build`. Use `./scripts/dev-worktree.sh info`
+  for its stable project name and host ports; pass all further Compose commands
+  through the same wrapper. The default Compose name and ports in
+  `docker-compose.dev.yml` are for the primary checkout only.
+- Run the complete client suite with
+  `./scripts/dev-worktree.sh --profile test run --rm client-tests`. Vitest
+  requires real Node 22; Bun's `node` fallback cannot run it.
 - Frontend HMR runs through the same Bun process via Vite middleware.
 
 ## Test discipline

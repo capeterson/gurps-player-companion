@@ -64,25 +64,36 @@ describe('DrSummaryCard', () => {
     item.name = 'Deflect Plate';
     item.armor = { ...item.armor, db: 2, frontOnly: true };
     const onFacingChange = vi.fn();
-    render(<DrSummaryCard character={character} facing="front" onFacingChange={onFacingChange} />);
+    render(<DrSummaryCard character={character} onFacingChange={onFacingChange} />);
+    expect(screen.getByRole('heading', { name: 'Incoming attack' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Incoming attack' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('table', { name: 'Defenses' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Incoming attack' }));
+    expect(screen.queryByRole('table', { name: 'Defenses' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Armor facing')).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Incoming attack' }));
+    expect(screen.getByRole('table', { name: 'Defenses' })).toBeVisible();
     expect(
-      screen.getByRole('heading', { name: 'Defense & Damage Resistance' }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole('region', { name: 'Defense and damage resistance' })).getByRole(
-        'table',
-        { name: 'Defenses' },
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('link', { name: 'Deflect Plate' })[0]?.closest('p'),
+      screen
+        .getAllByRole('link', { name: 'Deflect Plate' })
+        .find((link) => link.closest('p')?.textContent?.includes('Armor DB +2 from Deflect Plate'))
+        ?.closest('p'),
     ).toHaveTextContent('Armor DB +2 from Deflect Plate');
     expect(screen.getByText(/Applied to Dodge, Parry, and Block/)).toBeInTheDocument();
     expect(screen.getByLabelText('Armor facing')).toHaveValue('front');
     expect(screen.getByLabelText('Armor facing')).not.toHaveTextContent('Unknown');
     expect(screen.getByRole('option', { name: 'Left' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Right' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dodge 11' }));
+    expect(
+      screen.getByText(/Selected defense: Dodge 11 against Torso from the front/),
+    ).toBeVisible();
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'back' } });
+    expect(screen.queryByText(/Selected defense: Dodge/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dodge 9' })).toBeVisible();
     expect(onFacingChange).toHaveBeenCalledWith('back');
   });
 
@@ -105,6 +116,46 @@ describe('DrSummaryCard', () => {
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'left' } });
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('4');
     expect(screen.getByText(/No armor DB for this location and facing/)).toBeInTheDocument();
+  });
+
+  it('clears a selected defense when its score changes and after injury is applied', async () => {
+    const character = makeCharacter([{ dr: 4, locations: ['torso'] }]);
+    character.derived = {
+      hp: 10,
+      fp: 10,
+      dodge: 9,
+      basicMove: 5,
+      effectiveSt: 10,
+    } as CharacterDetail['derived'];
+    character.encumbrance = {
+      dodgePenalty: 0,
+      moveMultiplier: 1,
+      label: 'None',
+      ratio: 1,
+    } as CharacterDetail['encumbrance'];
+    character.skills = [];
+    const bumpHp = vi.fn();
+    const { rerender } = render(
+      <DrSummaryCard character={character} canWrite hpMax={10} bumpHp={bumpHp} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Dodge 9' }));
+    expect(screen.getByText(/Selected defense: Dodge 9/)).toBeVisible();
+
+    const changed = { ...character, derived: { ...character.derived, dodge: 8 } };
+    rerender(<DrSummaryCard character={changed} canWrite hpMax={10} bumpHp={bumpHp} />);
+    expect(screen.getByRole('button', { name: 'Dodge 8' })).toBeVisible();
+    await waitFor(() =>
+      expect(screen.queryByText(/Selected defense: Dodge/)).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dodge 8' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Incoming damage…' }));
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: /Apply −6 HP/ }));
+    expect(bumpHp).toHaveBeenCalledWith(-6);
+    await waitFor(() =>
+      expect(screen.queryByText(/Selected defense: Dodge/)).not.toBeInTheDocument(),
+    );
   });
 
   it('applies a side-specific shield DB to the front and matching side', () => {
@@ -135,17 +186,14 @@ describe('DrSummaryCard', () => {
     'only describes severing when destruction uses cutting damage (%s)',
     (type) => {
       render(<DrSummaryCard character={makeCharacter([])} canWrite hpMax={10} bumpHp={vi.fn()} />);
-      fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
-      fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
-      fireEvent.change(
-        within(screen.getByRole('dialog', { hidden: true })).getByLabelText('Hit location'),
-        { target: { value: 'arm_left' } },
-      );
-      fireEvent.change(screen.getByLabelText('Type'), {
+      fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: 'arm_left' } });
+      fireEvent.change(screen.getByLabelText('Damage type'), {
         target: { value: type === ' CUT ' ? '__other' : type },
       });
       if (type === ' CUT ')
-        fireEvent.change(screen.getByLabelText('Custom type'), { target: { value: type } });
+        fireEvent.change(screen.getByLabelText('Custom damage type'), { target: { value: type } });
+      fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+      fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
       const hint = screen.getByText(/body part is destroyed/);
       if (type.trim().toLowerCase() === 'cut')
         expect(hint).toHaveTextContent('severed by cutting damage');
@@ -210,11 +258,9 @@ describe('DrSummaryCard', () => {
       return <DrSummaryCard character={character} canWrite hpMax={10} bumpHp={pools.bumpHp} />;
     }
     render(<Sheet />);
+    fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: location } });
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '20' } });
-    fireEvent.change(screen.getAllByLabelText('Hit location').at(-1) as HTMLElement, {
-      target: { value: location },
-    });
     expect(screen.getByText(/20 injury; capped/)).toBeInTheDocument();
     expect(screen.getByText(/body part is destroyed/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: `Apply −${cap} HP` }));
@@ -263,14 +309,14 @@ describe('DrSummaryCard', () => {
       const label = location === 'torso' ? 'Torso' : location === 'skull' ? 'Skull' : 'Eye';
       if (dr > 0)
         expect(screen.getAllByRole('button', { name: `${label}, DR ${dr}` })).toHaveLength(2);
+      fireEvent.change(screen.getByLabelText('Damage type'), { target: { value: type } });
+      fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: location } });
+      if (divisor)
+        fireEvent.change(screen.getByLabelText('Armor penetration'), {
+          target: { value: divisor },
+        });
       fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
       fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '6' } });
-      fireEvent.change(screen.getByLabelText('Type'), { target: { value: type } });
-      fireEvent.change(screen.getAllByLabelText('Hit location').at(-1) as HTMLElement, {
-        target: { value: location },
-      });
-      if (divisor)
-        fireEvent.change(screen.getByLabelText('Armor divisor'), { target: { value: divisor } });
       const apply = screen.getByRole('button', { name: `Apply −${injury} HP` });
       if (injury === 0) {
         expect(apply).toBeDisabled();
@@ -489,11 +535,11 @@ describe('DrSummaryCard', () => {
       />,
     );
 
+    // Type defaults to 'cr'; switch to cut for the ×1.5 multiplier.
+    const typeSelect = screen.getByLabelText('Damage type');
+    fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '12' } });
-    // Type defaults to 'cr'; switch to cut for the ×1.5 multiplier.
-    const typeSelect = screen.getByLabelText('Type');
-    fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
 
     const apply = screen.getByRole('button', { name: /Apply −12 HP/ });
     fireEvent.click(apply);
@@ -581,10 +627,10 @@ describe('DrSummaryCard', () => {
         bumpHp={bumpHp}
       />,
     );
+    const typeSelect = screen.getByLabelText('Damage type');
+    fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
     fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
     fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '12' } });
-    const typeSelect = screen.getByLabelText('Type');
-    fireEvent.change(typeSelect as HTMLElement, { target: { value: 'cut' } });
     // Base DR is 4 but the cut override stops 6 — the breakdown shows DR 6.
     expect(screen.getByText(/− DR 6 →/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Apply −9 HP/ })).toBeInTheDocument();

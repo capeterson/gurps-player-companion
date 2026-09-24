@@ -1,12 +1,23 @@
 .armor-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, .7fr) minmax(0, 1.3fr);
   gap: 1.5rem;
   align-items: start;
+}
+.armor-defenses {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
 }
 .armor-map-container {
   container-type: inline-size;
   min-width: 0;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+.armor-damage {
+  grid-column: 2;
+  grid-row: 2;
 }
 .armor-orientation {
   display: flex;
@@ -100,12 +111,21 @@
     max-width: 280px;
   }
 }
-@media (max-width: 767px) {
+@media (max-width: 1200px) {
   .armor-workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .armor-workspace > * {
+    grid-column: auto;
+    grid-row: auto;
   }
   .armor-map {
     max-width: 420px;
+  }
+}
+@media (max-width: 600px) {
+  .armor-map {
+    max-width: 245px;
   }
 }
 @media (pointer: coarse) {

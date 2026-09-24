@@ -70,13 +70,31 @@ docker compose -f docker-compose.dev.yml up --build
 
 Open **[http://localhost:3001](http://localhost:3001)** and create an account. The development Compose file supplies development credentials, installs dependencies in a shared volume, applies migrations, and starts the app with hot reload. No `.env` is required for this path.
 
+For a Git worktree or another checkout on the same host, use the wrapper so
+Compose gets a stable project name and separate host ports derived from that
+checkout's path:
+
+```sh
+./scripts/dev-worktree.sh info
+./scripts/dev-worktree.sh up -d --build
+```
+
+`info` prints the app URL and Postgres port for that worktree.
+`GPC_APP_PORT` and `GPC_DB_PORT` can override the derived ports if either
+is occupied. Pass other Compose commands through the same wrapper, including
+`logs`, `exec`, and `down`, so they affect only that worktree's stack.
+
 | Service | Local address / behavior |
 | --- | --- |
 | App and API | `http://localhost:3001`; container port `3000`. |
 | PostgreSQL 18 | `localhost:5434`; database/user/password are `gurps`; container port `5432`. |
-| Migrations | One-shot `migrate` service; the app waits for it to succeed. |
+| Dependencies | One-shot `deps` service installs from the frozen lockfile in `bun_modules`, in parallel with database startup. |
+| Migrations | One-shot `migrate` service waits for dependencies and a healthy database; the app waits for it to succeed. |
+| Client tests | Optional `client-tests` service uses Node 22 and the same dependency volume; it starts without PostgreSQL. |
 
-The development Compose project is named `nimble-rocket-29ef18d6`. Its `db_data_dev` volume persists the database, and `bun_modules` holds dependencies.
+The default development Compose project is named `nimble-rocket-29ef18d6`;
+the worktree wrapper gives each checkout its own name. Its `db_data_dev`
+volume persists the database, and `bun_modules` holds dependencies.
 
 Useful commands:
 
@@ -149,9 +167,15 @@ Development HMR uses `VITE_HMR_HOST` (default `localhost`), `VITE_HMR_PORT` (def
 
 ```sh
 docker compose -f docker-compose.dev.yml exec app bun run check
-docker compose -f docker-compose.dev.yml exec app bun run test:client
+docker compose -f docker-compose.dev.yml --profile test run --rm client-tests
 ```
 
-The first command runs lint, type checking, server/shared tests, and API/MCP contract checks. Browser tests use Playwright against the running dev app; see [playwright.config.ts](playwright.config.ts).
+The first command runs lint, type checking, server/shared tests, and API/MCP
+contract checks. The client test service runs Vitest with Node 22 and fails if
+it discovers no tests; the Bun-only app image cannot run this suite correctly.
+For a worktree, replace `docker compose -f docker-compose.dev.yml` in these
+commands with `./scripts/dev-worktree.sh`. Browser tests use Playwright
+against the running dev app; set `PLAYWRIGHT_BASE_URL` to the URL printed by
+`info` and see [playwright.config.ts](playwright.config.ts).
 
 Start with the [application overview](docs/specs/overview.md) and [contribution rules](AGENTS.md) before changing code. Detailed implementation notes live in the [architecture](docs/specs/architecture.md), [offline sync](docs/specs/offline-sync.md), [campaign sharing](docs/specs/campaign-content-sharing.md), and [history](docs/specs/history-tracking.md) guides.

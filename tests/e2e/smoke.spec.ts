@@ -84,4 +84,34 @@ test('campaign sub-menu stays inside a 320px viewport', async ({ page }) => {
   expect(bounds).not.toBeNull();
   expect(bounds?.x).toBeGreaterThanOrEqual(0);
   expect(bounds ? bounds.x + bounds.width : 0).toBeLessThanOrEqual(320);
+
+  await page.goto('/campaigns');
+  const campaignName = `Breadcrumb ${TIMESTAMP_SUFFIX()}`;
+  await page.getByRole('button', { name: /new campaign/i }).click();
+  await page.getByLabel(/campaign name/i).fill(campaignName);
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await page.getByRole('link', { name: new RegExp(campaignName) }).click();
+  const campaignId = page.url().split('/').at(-1);
+  const primary = page.getByRole('navigation', { name: 'Primary navigation' });
+  await expect(primary.getByRole('link', { name: campaignName })).toBeVisible({ timeout: 15_000 });
+
+  await page.getByLabel('Campaign sub-menu').click();
+  const campaignMenu = primary.locator('.dropdown-content');
+  await expect(campaignMenu).toBeVisible();
+  const campaignMenuBounds = await campaignMenu.boundingBox();
+  expect(campaignMenuBounds).not.toBeNull();
+  expect(campaignMenuBounds?.x).toBeGreaterThanOrEqual(0);
+  expect(
+    campaignMenuBounds ? campaignMenuBounds.x + campaignMenuBounds.width : 0,
+  ).toBeLessThanOrEqual(320);
+  await primary.getByRole('link', { name: 'Log', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/log\\?campaign=${campaignId}$`));
+  await expect(primary.getByRole('link', { name: campaignName })).toBeVisible({ timeout: 15_000 });
+  await expect(primary.locator('span[aria-current="page"]')).toHaveText('Log');
+
+  await page.getByLabel('Campaign sub-menu').click();
+  await primary.getByRole('link', { name: 'Library', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/library\\?campaign=${campaignId}$`));
+  await expect(primary.getByRole('link', { name: campaignName })).toBeVisible({ timeout: 15_000 });
+  await expect(primary.locator('span[aria-current="page"]')).toHaveText('Library');
 });

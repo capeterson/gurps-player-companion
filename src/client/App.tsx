@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useAppEntityBreadcrumb } from './components/AppBreadcrumbs.ts';
+import { appBreadcrumbPage, useAppEntityBreadcrumb } from './components/AppBreadcrumbs.ts';
 import { CharacterHeaderChromeContext } from './components/CharacterHeaderChromeContext.tsx';
 import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
@@ -38,7 +38,8 @@ export function App() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const location = useLocation();
-  const entityBreadcrumb = useAppEntityBreadcrumb(location.pathname);
+  const entityBreadcrumb = useAppEntityBreadcrumb(location.pathname, location.search);
+  const campaignPage = appBreadcrumbPage(location.pathname);
   const characterActive =
     location.pathname === '/characters' || entityBreadcrumb?.kind === 'character';
   const characterDetail = /^\/characters\/[^/]+\/?$/.test(location.pathname);
@@ -305,6 +306,19 @@ export function App() {
                     </Link>
                   </>
                 )}
+                {campaignPage && (
+                  <>
+                    <span aria-hidden="true" className="text-dim">
+                      ›
+                    </span>
+                    <span
+                      aria-current="page"
+                      className="max-w-28 truncate px-2 py-2 text-sm font-medium text-base-content sm:max-w-40"
+                    >
+                      {campaignPage}
+                    </span>
+                  </>
+                )}
                 <details ref={campaignMenuRef} className="dropdown dropdown-end relative z-50">
                   <summary
                     className={`flex cursor-pointer list-none items-center rounded-field px-2 py-2 text-sm transition ${
@@ -326,7 +340,11 @@ export function App() {
                     {CAMPAIGN_SUBNAV.map((tab) => (
                       <li key={tab.to}>
                         <NavLink
-                          to={tab.to}
+                          to={
+                            entityBreadcrumb?.kind === 'campaign'
+                              ? `${tab.to}?campaign=${encodeURIComponent(entityBreadcrumb.id)}`
+                              : tab.to
+                          }
                           className={({ isActive }) => (isActive ? 'active' : undefined)}
                         >
                           {tab.label}
