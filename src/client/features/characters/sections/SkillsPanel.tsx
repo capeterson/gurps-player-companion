@@ -28,7 +28,6 @@ import { ModifierBreakdownContent, skillEffectsForRow } from './combat/weaponEff
 import type { RollRequest } from './rollTypes.ts';
 import {
   type SkillSort,
-  type SkillTablePreferences,
   readSkillTablePreferences,
   saveSkillTablePreferences,
 } from './skillTablePreferences.ts';
@@ -40,6 +39,12 @@ import {
   useEntityRowPatch,
 } from './useEntityRowPatch.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
+import {
+  SortableHeader,
+  compareOptionalLevel,
+  compareTableText,
+  useSortableCharacterRows,
+} from './useSortableCharacterRows.tsx';
 
 const ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per', 'Other'] as const;
 const DIFFICULTIES = ['E', 'A', 'H', 'VH'] as const;
@@ -847,134 +852,54 @@ function SkillsTable({
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [preferences, setPreferences] = useState(() => readSkillTablePreferences(character.id));
-  const [saveFailed, setSaveFailed] = useState(false);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState('');
-
-  const customOrder = [
-    ...preferences.order.filter((id) => character.skills.some((skill) => skill.id === id)),
-    ...character.skills
-      .filter((skill) => !preferences.order.includes(skill.id))
-      .map((skill) => skill.id),
-  ];
-
-  function save(next: SkillTablePreferences) {
-    setPreferences(next);
-    setSaveFailed(!saveSkillTablePreferences(character.id, next));
-  }
-
-  function compareText(left: string, right: string): number {
-    return left.localeCompare(right, undefined, { sensitivity: 'base', numeric: true });
-  }
-
-  const sortedSkills = [...character.skills].sort((left, right) => {
-    if (preferences.sort === 'custom') {
-      return customOrder.indexOf(left.id) - customOrder.indexOf(right.id);
-    }
-    let comparison = 0;
-    if (preferences.sort === 'name') {
-      comparison = compareText(
-        skillDisplayName(left.name, left.specialization),
-        skillDisplayName(right.name, right.specialization),
-      );
-    } else if (preferences.sort === 'basis') {
-      comparison = compareText(
-        `${left.attribute}/${left.difficulty}`,
-        `${right.attribute}/${right.difficulty}`,
-      );
-    } else if (preferences.sort === 'points') {
-      comparison = left.points - right.points;
-    } else {
-      const leftLevel = left.effectiveLevel ?? left.level;
-      const rightLevel = right.effectiveLevel ?? right.level;
-      if (leftLevel == null || rightLevel == null) {
-        if (leftLevel == null && rightLevel == null) comparison = 0;
-        else comparison = leftLevel == null ? 1 : -1;
-      } else {
-        comparison = leftLevel - rightLevel;
-      }
-    }
-    return (
-      (preferences.descending ? -comparison : comparison) ||
-      customOrder.indexOf(left.id) - customOrder.indexOf(right.id)
-    );
+  const {
+    preferences,
+    saveFailed,
+    draggingId,
+    setDraggingId,
+    announcement,
+    visibleRows: visibleSkills,
+    sortBy,
+    move: moveSkill,
+    moveBy,
+  } = useSortableCharacterRows<SkillOut, SkillSort>({
+    rows: character.skills,
+    characterId: character.id,
+    query,
+    readPreferences: readSkillTablePreferences,
+    savePreferences: saveSkillTablePreferences,
+    comparators: {
+      name: (left, right) =>
+        compareTableText(
+          skillDisplayName(left.name, left.specialization),
+          skillDisplayName(right.name, right.specialization),
+        ),
+      basis: (left, right) =>
+        compareTableText(
+          `${left.attribute}/${left.difficulty}`,
+          `${right.attribute}/${right.difficulty}`,
+        ),
+      points: (left, right) => left.points - right.points,
+      level: (left, right) =>
+        compareOptionalLevel(
+          left.effectiveLevel ?? left.level,
+          right.effectiveLevel ?? right.level,
+        ),
+    },
+    matchesSearch: (skill, normalizedQuery) =>
+      [
+        skillDisplayName(skill.name, skill.specialization),
+        skill.attribute,
+        skill.difficulty,
+        skill.notes ?? '',
+        skill.prerequisiteMessages?.join(' ') ?? '',
+        skill.defaultConditionMessages?.join(' ') ?? '',
+      ]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(normalizedQuery),
+    announcementName: (skill) => skill.name,
   });
-
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const visibleSkills = sortedSkills.filter((skill) => {
-    if (!normalizedQuery) return true;
-    return [
-      skillDisplayName(skill.name, skill.specialization),
-      skill.attribute,
-      skill.difficulty,
-      skill.notes ?? '',
-      skill.prerequisiteMessages?.join(' ') ?? '',
-      skill.defaultConditionMessages?.join(' ') ?? '',
-    ]
-      .join(' ')
-      .toLocaleLowerCase()
-      .includes(normalizedQuery);
-  });
-
-  function sortBy(sort: Exclude<SkillSort, 'custom'>) {
-    save({
-      ...preferences,
-      sort,
-      descending: preferences.sort === sort ? !preferences.descending : false,
-    });
-  }
-
-  function moveSkill(id: string, targetId: string) {
-    const displayedOrder = sortedSkills.map((skill) => skill.id);
-    const from = displayedOrder.indexOf(id);
-    const to = displayedOrder.indexOf(targetId);
-    if (from < 0 || to < 0 || from === to) return;
-    const next = [...displayedOrder];
-    next.splice(from, 1);
-    next.splice(to, 0, id);
-    save({ order: next, sort: 'custom', descending: false });
-    const visiblePosition = visibleSkills.findIndex((skill) => skill.id === targetId) + 1;
-    setAnnouncement(
-      `${character.skills.find((skill) => skill.id === id)?.name ?? 'Skill'} moved to position ${visiblePosition}.`,
-    );
-  }
-
-  function moveBy(id: string, direction: -1 | 1) {
-    const visibleOrder = visibleSkills.map((skill) => skill.id);
-    const current = visibleOrder.indexOf(id);
-    const target = current + direction;
-    if (current < 0 || target < 0 || target >= visibleOrder.length) return;
-    moveSkill(id, visibleOrder[target] ?? id);
-  }
-
-  function sortHeader(
-    label: string,
-    sort: Exclude<SkillSort, 'custom'>,
-    headerClassName = '',
-    shortLabel?: string,
-    hideButtonOnMobile = false,
-  ) {
-    const active = preferences.sort === sort;
-    return (
-      <th
-        scope="col"
-        className={headerClassName}
-        aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
-      >
-        <button
-          type="button"
-          className={`btn btn-ghost btn-xs h-auto min-h-0 whitespace-nowrap px-1 py-1 font-semibold ${hideButtonOnMobile ? 'hidden sm:inline-flex' : ''} ${headerClassName.includes('text-right') ? 'w-full justify-end' : 'justify-start'}`}
-          onClick={() => sortBy(sort)}
-          aria-label={`Sort by ${label}`}
-        >
-          <span className={shortLabel ? 'hidden sm:inline' : undefined}>{label}</span>
-          {shortLabel && <span className="sm:hidden">{shortLabel}</span>}
-          <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
-        </button>
-      </th>
-    );
-  }
 
   return (
     <section className="card p-0">
@@ -1042,10 +967,36 @@ function SkillsTable({
                   <th scope="col" className="w-9 px-1 sm:px-2">
                     <span className="sr-only">Custom order</span>
                   </th>
-                  {sortHeader('Skill', 'name')}
-                  {sortHeader('Attr/Dif', 'basis', 'w-0 p-0 text-center sm:w-20', undefined, true)}
-                  {sortHeader('Points', 'points', 'w-11 text-right sm:w-14', 'Pts')}
-                  {sortHeader('Level', 'level', 'w-12 text-right sm:w-16', 'Lvl')}
+                  <SortableHeader
+                    label="Skill"
+                    sort="name"
+                    preferences={preferences}
+                    onSort={sortBy}
+                  />
+                  <SortableHeader
+                    label="Attr/Dif"
+                    sort="basis"
+                    preferences={preferences}
+                    onSort={sortBy}
+                    headerClassName="w-0 p-0 text-center sm:w-20"
+                    hideButtonOnMobile
+                  />
+                  <SortableHeader
+                    label="Points"
+                    sort="points"
+                    preferences={preferences}
+                    onSort={sortBy}
+                    headerClassName="w-11 text-right sm:w-14"
+                    shortLabel="Pts"
+                  />
+                  <SortableHeader
+                    label="Level"
+                    sort="level"
+                    preferences={preferences}
+                    onSort={sortBy}
+                    headerClassName="w-12 text-right sm:w-16"
+                    shortLabel="Lvl"
+                  />
                   <th scope="col" className="w-10 px-1 sm:w-16 sm:px-2">
                     <span className="sr-only">Actions</span>
                   </th>

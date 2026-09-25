@@ -21,7 +21,7 @@ import {
  * for the same (entityId, fieldPath).  See `applyServerRow`.
  */
 
-import { type Table, liveQuery } from 'dexie';
+import { liveQuery } from 'dexie';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type {
   EntityClass,
@@ -47,6 +47,12 @@ import {
   getLocalDb,
   storeForEntityClass,
 } from '../db/dexie.ts';
+import {
+  readSyncEntity,
+  stampSyncEntityRevision,
+  syncEntityTable,
+  updateSyncEntity,
+} from '../db/syncEntityStore.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { clearActiveUser } from './activeUser.ts';
@@ -1441,45 +1447,7 @@ class SyncOrchestrator {
     entityId: string,
     revision: number,
   ): Promise<void> {
-    const db = getLocalDb();
-    const stamp = async <T extends { revision: number }>(table: Table<T, string>) => {
-      await db.transaction('rw', table, async () => {
-        await table
-          .where(':id')
-          .equals(entityId)
-          .modify((existing) => {
-            if (existing.revision < revision) existing.revision = revision;
-          });
-      });
-    };
-    switch (entityClass) {
-      case 'character':
-        await stamp(db.characters);
-        return;
-      case 'character_trait':
-        await stamp(db.characterTraits);
-        return;
-      case 'character_skill':
-        await stamp(db.characterSkills);
-        return;
-      case 'character_spell':
-        await stamp(db.characterSpells);
-        return;
-      case 'character_language':
-        await stamp(db.characterLanguages);
-        return;
-      case 'character_technique':
-        await stamp(db.characterTechniques);
-        return;
-      case 'character_inventory':
-        await stamp(db.characterInventory);
-        return;
-      case 'character_combat':
-        await stamp(db.characterCombat);
-        return;
-      default:
-        return;
-    }
+    await stampSyncEntityRevision(entityClass, entityId, revision);
   }
 
   private async revertField(
@@ -1488,71 +1456,14 @@ class SyncOrchestrator {
     fieldPath: string,
     prevValue: unknown,
   ): Promise<void> {
-    const db = getLocalDb();
-    const updates = { [fieldPath]: prevValue, updatedAt: new Date().toISOString() };
-    switch (entityClass) {
-      case 'character':
-        await db.characters.update(entityId, updates as Partial<LocalCharacter>);
-        return;
-      case 'character_trait':
-        await db.characterTraits.update(entityId, updates as Partial<LocalCharacterTrait>);
-        return;
-      case 'character_skill':
-        await db.characterSkills.update(entityId, updates as Partial<LocalCharacterSkill>);
-        return;
-      case 'character_spell':
-        await db.characterSpells.update(entityId, updates as Partial<LocalCharacterSpell>);
-        return;
-      case 'character_language':
-        await db.characterLanguages.update(entityId, updates as Partial<LocalCharacterLanguage>);
-        return;
-      case 'character_technique':
-        await db.characterTechniques.update(entityId, updates as Partial<LocalCharacterTechnique>);
-        return;
-      case 'character_inventory':
-        await db.characterInventory.update(entityId, updates as Partial<LocalCharacterInventory>);
-        return;
-      case 'character_combat':
-        await db.characterCombat.update(entityId, updates as Partial<LocalCharacterCombat>);
-        return;
-      default:
-        return;
-    }
+    await updateSyncEntity(entityClass, entityId, {
+      [fieldPath]: prevValue,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   private async deleteLocal(entityClass: EntityClass, entityId: string): Promise<void> {
-    const db = getLocalDb();
-    switch (entityClass) {
-      case 'character':
-        await db.characters.delete(entityId);
-        return;
-      case 'character_trait':
-        await db.characterTraits.delete(entityId);
-        return;
-      case 'character_skill':
-        await db.characterSkills.delete(entityId);
-        return;
-      case 'character_spell':
-        await db.characterSpells.delete(entityId);
-        return;
-      case 'character_language':
-        await db.characterLanguages.delete(entityId);
-        return;
-      case 'character_technique':
-        await db.characterTechniques.delete(entityId);
-        return;
-      case 'character_inventory':
-        await db.characterInventory.delete(entityId);
-        return;
-      case 'character_combat':
-        await db.characterCombat.delete(entityId);
-        return;
-      case 'campaign':
-        await db.campaigns.delete(entityId);
-        return;
-      default:
-        return;
-    }
+    await syncEntityTable(entityClass)?.delete(entityId);
   }
 
   /** Read the row that a cursor change is about, for an applied before/after journal snapshot. */
@@ -1560,29 +1471,7 @@ class SyncOrchestrator {
     entityClass: EntityClass,
     entityId: string,
   ): Promise<Record<string, unknown> | undefined> {
-    const db = getLocalDb();
-    switch (entityClass) {
-      case 'character':
-        return (await db.characters.get(entityId)) as Record<string, unknown> | undefined;
-      case 'character_trait':
-        return (await db.characterTraits.get(entityId)) as Record<string, unknown> | undefined;
-      case 'character_skill':
-        return (await db.characterSkills.get(entityId)) as Record<string, unknown> | undefined;
-      case 'character_spell':
-        return (await db.characterSpells.get(entityId)) as Record<string, unknown> | undefined;
-      case 'character_language':
-        return (await db.characterLanguages.get(entityId)) as Record<string, unknown> | undefined;
-      case 'character_technique':
-        return (await db.characterTechniques.get(entityId)) as Record<string, unknown> | undefined;
-      case 'character_inventory':
-        return (await db.characterInventory.get(entityId)) as Record<string, unknown> | undefined;
-      case 'character_combat':
-        return (await db.characterCombat.get(entityId)) as Record<string, unknown> | undefined;
-      case 'campaign':
-        return (await db.campaigns.get(entityId)) as Record<string, unknown> | undefined;
-      default:
-        return undefined;
-    }
+    return readSyncEntity(entityClass, entityId);
   }
 
   private async discardSpeculativeCreate(op: OutboxEntry): Promise<void> {

@@ -23,7 +23,6 @@ import { EffectsEditor, effectPreview } from '../../library/EffectsEditor.tsx';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import {
   type TraitSort,
-  type TraitTablePreferences,
   readTraitTablePreferences,
   saveTraitTablePreferences,
 } from './traitTablePreferences.ts';
@@ -34,6 +33,12 @@ import {
   useEntityRowPatch,
 } from './useEntityRowPatch.ts';
 import { useLibraryFetcher } from './useLibraryFetcher.ts';
+import {
+  SortableHeader,
+  compareOptionalLevel,
+  compareTableText,
+  useSortableCharacterRows,
+} from './useSortableCharacterRows.tsx';
 
 const TRAIT_KINDS = [
   'advantage',
@@ -924,125 +929,47 @@ function TraitsTable({
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [preferences, setPreferences] = useState(() => readTraitTablePreferences(character.id));
-  const [saveFailed, setSaveFailed] = useState(false);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState('');
-
-  const customOrder = [
-    ...preferences.order.filter((id) => character.traits.some((trait) => trait.id === id)),
-    ...character.traits
-      .filter((trait) => !preferences.order.includes(trait.id))
-      .map((trait) => trait.id),
-  ];
-
-  function save(next: TraitTablePreferences) {
-    setPreferences(next);
-    setSaveFailed(!saveTraitTablePreferences(character.id, next));
-  }
-
-  function compareText(left: string, right: string): number {
-    return left.localeCompare(right, undefined, { sensitivity: 'base', numeric: true });
-  }
-
-  const sortedTraits = [...character.traits].sort((left, right) => {
-    if (preferences.sort === 'custom') {
-      return customOrder.indexOf(left.id) - customOrder.indexOf(right.id);
-    }
-    let comparison = 0;
-    if (preferences.sort === 'name') comparison = compareText(left.name, right.name);
-    else if (preferences.sort === 'kind') comparison = compareText(left.kind, right.kind);
-    else if (preferences.sort === 'points') comparison = left.points - right.points;
-    else {
-      if (left.level == null || right.level == null) {
-        if (left.level == null && right.level == null) comparison = 0;
-        else comparison = left.level == null ? 1 : -1;
-      } else comparison = left.level - right.level;
-    }
-    return (
-      (preferences.descending ? -comparison : comparison) ||
-      customOrder.indexOf(left.id) - customOrder.indexOf(right.id)
-    );
+  const {
+    preferences,
+    saveFailed,
+    draggingId,
+    setDraggingId,
+    announcement,
+    sortedRows: sortedTraits,
+    visibleRows: visibleTraits,
+    visibleIds: visibleTraitIds,
+    sortBy,
+    move: moveTrait,
+    moveBy,
+  } = useSortableCharacterRows<TraitOut, TraitSort>({
+    rows: character.traits,
+    characterId: character.id,
+    query,
+    readPreferences: readTraitTablePreferences,
+    savePreferences: saveTraitTablePreferences,
+    comparators: {
+      name: (left, right) => compareTableText(left.name, right.name),
+      kind: (left, right) => compareTableText(left.kind, right.kind),
+      points: (left, right) => left.points - right.points,
+      level: (left, right) => compareOptionalLevel(left.level, right.level),
+    },
+    matchesSearch: (trait, normalizedQuery) =>
+      [
+        trait.name,
+        traitKindLabel(trait.kind),
+        trait.variantName ?? '',
+        trait.notes ?? '',
+        ...trait.modifiers.flatMap((modifier) => [modifier.name, modifier.description ?? '']),
+        ...(trait.customEffects ?? []).map((effect) =>
+          traitEffectSummary(effect, character.inventory),
+        ),
+        ...(trait.libraryMechanics?.effects ?? []).map((effect) => traitEffectSummary(effect)),
+      ]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(normalizedQuery),
+    announcementName: (trait) => trait.name,
   });
-
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const visibleTraits = sortedTraits.filter((trait) => {
-    if (!normalizedQuery) return true;
-    return [
-      trait.name,
-      traitKindLabel(trait.kind),
-      trait.variantName ?? '',
-      trait.notes ?? '',
-      ...trait.modifiers.flatMap((modifier) => [modifier.name, modifier.description ?? '']),
-      ...(trait.customEffects ?? []).map((effect) =>
-        traitEffectSummary(effect, character.inventory),
-      ),
-      ...(trait.libraryMechanics?.effects ?? []).map((effect) => traitEffectSummary(effect)),
-    ]
-      .join(' ')
-      .toLocaleLowerCase()
-      .includes(normalizedQuery);
-  });
-  const visibleTraitIds = new Set(visibleTraits.map((trait) => trait.id));
-
-  function sortBy(sort: Exclude<TraitSort, 'custom'>) {
-    save({
-      ...preferences,
-      sort,
-      descending: preferences.sort === sort ? !preferences.descending : false,
-    });
-  }
-
-  function moveTrait(id: string, targetId: string) {
-    const displayedOrder = sortedTraits.map((trait) => trait.id);
-    const from = displayedOrder.indexOf(id);
-    const to = displayedOrder.indexOf(targetId);
-    if (from < 0 || to < 0 || from === to) return;
-    const next = [...displayedOrder];
-    next.splice(from, 1);
-    next.splice(to, 0, id);
-    save({ order: next, sort: 'custom', descending: false });
-    const visiblePosition = visibleTraits.findIndex((trait) => trait.id === targetId) + 1;
-    setAnnouncement(
-      `${character.traits.find((trait) => trait.id === id)?.name ?? 'Trait'} moved to position ${visiblePosition}.`,
-    );
-  }
-
-  function moveBy(id: string, direction: -1 | 1) {
-    const visibleOrder = visibleTraits.map((trait) => trait.id);
-    const current = visibleOrder.indexOf(id);
-    const target = current + direction;
-    if (current < 0 || target < 0 || target >= visibleOrder.length) return;
-    moveTrait(id, visibleOrder[target] ?? id);
-  }
-
-  function sortHeader(
-    label: string,
-    sort: Exclude<TraitSort, 'custom'>,
-    headerClassName = '',
-    shortLabel?: string,
-    hideButtonOnMobile = false,
-  ) {
-    const active = preferences.sort === sort;
-    return (
-      <th
-        scope="col"
-        className={headerClassName}
-        aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
-      >
-        <button
-          type="button"
-          className={`btn btn-ghost btn-xs h-auto min-h-0 whitespace-nowrap px-1 py-1 font-semibold ${hideButtonOnMobile ? 'hidden sm:inline-flex' : ''} ${headerClassName.includes('text-right') ? 'w-full justify-end' : 'justify-start'}`}
-          onClick={() => sortBy(sort)}
-          aria-label={`Sort by ${label}`}
-        >
-          <span className={shortLabel ? 'hidden sm:inline' : undefined}>{label}</span>
-          {shortLabel && <span className="sm:hidden">{shortLabel}</span>}
-          <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
-        </button>
-      </th>
-    );
-  }
 
   return (
     <section className="card p-0">
@@ -1110,10 +1037,36 @@ function TraitsTable({
                   <th scope="col" className="w-9 px-1 sm:px-2">
                     <span className="sr-only">Custom order</span>
                   </th>
-                  {sortHeader('Trait', 'name')}
-                  {sortHeader('Type', 'kind', 'w-0 p-0 text-center sm:w-32', undefined, true)}
-                  {sortHeader('Points', 'points', 'w-11 text-right sm:w-14', 'Pts')}
-                  {sortHeader('Level', 'level', 'w-12 text-right sm:w-16', 'Lvl')}
+                  <SortableHeader
+                    label="Trait"
+                    sort="name"
+                    preferences={preferences}
+                    onSort={sortBy}
+                  />
+                  <SortableHeader
+                    label="Type"
+                    sort="kind"
+                    preferences={preferences}
+                    onSort={sortBy}
+                    headerClassName="w-0 p-0 text-center sm:w-32"
+                    hideButtonOnMobile
+                  />
+                  <SortableHeader
+                    label="Points"
+                    sort="points"
+                    preferences={preferences}
+                    onSort={sortBy}
+                    headerClassName="w-11 text-right sm:w-14"
+                    shortLabel="Pts"
+                  />
+                  <SortableHeader
+                    label="Level"
+                    sort="level"
+                    preferences={preferences}
+                    onSort={sortBy}
+                    headerClassName="w-12 text-right sm:w-16"
+                    shortLabel="Lvl"
+                  />
                   <th scope="col" className="w-14 px-1 sm:w-20 sm:px-2">
                     <span className="sr-only">Actions</span>
                   </th>
