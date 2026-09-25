@@ -1,4 +1,4 @@
-import { type DragEvent, useCallback, useEffect, useState } from 'react';
+import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
@@ -80,6 +80,7 @@ interface TraitSnapshot {
   selectedModifierNames: readonly string[];
   /** Snapshot of the picked trait's catalogue entry (for resolving modifier metadata at create time). */
   pickedTrait: LibraryTraitOut | null;
+  draftVersion: number;
 }
 
 /**
@@ -121,7 +122,9 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const [levelDraft, setLevelDraft] = useState<string>('');
   /** Selected variant name; null = base form. */
   const [variantName, setVariantName] = useState<string | null>(null);
+  const draftVersion = useRef(0);
   const editName = (value: string) => {
+    draftVersion.current++;
     setName(value);
     setPickedLibraryId(null);
     setPickedTrait(null);
@@ -190,21 +193,22 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         ...(modifiers.length > 0 ? { modifiers } : {}),
       },
       () => {
-        // Per AGENTS.md (rule 1: never silently discard user edits): only
-        // clear fields whose current value still matches the snapshot we
-        // submitted.  We use functional setters so the comparison runs
-        // against the *live* state at completion time, not the
-        // closure-captured value from the render that submitted; that
-        // way a field the user has typed into during the await isn't
-        // wiped, which is exactly the quick-edit loss this guard exists
-        // to prevent.
-        setName((cur) => (cur === snap.nameRaw ? '' : cur));
-        setPoints((cur) => (cur === snap.pointsRaw ? '0' : cur));
-        setPickedLibraryId(null);
-        setPickedTrait(null);
-        setSelectedModifiers([]);
-        setLevelDraft('');
-        setVariantName(null);
+        // A library pick and its name, level, variant, modifiers, and points
+        // form one draft. Any edit after submit preserves the entire draft.
+        if (draftVersion.current === snap.draftVersion) {
+          setName((cur) => (cur === snap.nameRaw ? '' : cur));
+          setPoints((cur) => (cur === snap.pointsRaw ? '0' : cur));
+          setPickedLibraryId((cur) => (cur === snap.libraryTraitId ? null : cur));
+          setPickedTrait((cur) => (cur === snap.pickedTrait ? null : cur));
+          setSelectedModifiers((cur) =>
+            cur.length === snap.selectedModifierNames.length &&
+            cur.every((name, index) => name === snap.selectedModifierNames[index])
+              ? []
+              : cur,
+          );
+          setLevelDraft('');
+          setVariantName((cur) => (cur === snap.variantName ? null : cur));
+        }
       },
       snap.pickedTrait && snap.libraryTraitId
         ? libraryMechanics.parse({
@@ -255,6 +259,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
           libraryTraitId: pickedLibraryId,
           selectedModifierNames: selectedModifiers,
           pickedTrait,
+          draftVersion: draftVersion.current,
         });
       }}
     >
@@ -268,6 +273,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
               value={name}
               onChange={editName}
               onPick={(opt) => {
+                draftVersion.current++;
                 setName(opt.name);
                 setKind(opt.kind);
                 setPoints(String(opt.basePoints));
@@ -310,7 +316,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
           <select
             className="select select-bordered select-sm"
             value={kind}
-            onChange={(e) => setKind(e.target.value as TraitKind)}
+            onChange={(e) => {
+              draftVersion.current++;
+              setKind(e.target.value as TraitKind);
+            }}
           >
             {CREATABLE_TRAIT_KINDS.map((k) => (
               <option key={k} value={k}>
@@ -337,7 +346,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
               max={pickedTrait?.maxLevel ?? 99}
               className="input input-bordered input-sm num"
               value={levelDraft}
-              onChange={(e) => setLevelDraft(e.target.value)}
+              onChange={(e) => {
+                draftVersion.current++;
+                setLevelDraft(e.target.value);
+              }}
               aria-label="Trait level"
             />
           </label>
@@ -348,7 +360,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
             className="input input-bordered input-sm num"
             value={livePoints !== null ? String(livePoints) : points}
             readOnly={livePoints !== null}
-            onChange={(e) => setPoints(e.target.value)}
+            onChange={(e) => {
+              draftVersion.current++;
+              setPoints(e.target.value);
+            }}
             title={
               livePoints !== null
                 ? 'Computed from base + level + variant + modifiers. Edit those inputs to change.'
@@ -366,7 +381,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
           <select
             className="select select-bordered select-sm"
             value={variantName ?? ''}
-            onChange={(e) => setVariantName(e.target.value || null)}
+            onChange={(e) => {
+              draftVersion.current++;
+              setVariantName(e.target.value || null);
+            }}
           >
             <option value="">(base form)</option>
             {pickedTrait.variants.map((v) => {
@@ -409,11 +427,12 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
           }
           available={pickedTrait.availableModifiers}
           selectedNames={selectedModifiers}
-          onToggle={(modName) =>
+          onToggle={(modName) => {
+            draftVersion.current++;
             setSelectedModifiers((prev) =>
               applyModifierToggle(pickedTrait.availableModifiers, prev, modName),
-            )
-          }
+            );
+          }}
         />
       )}
     </form>

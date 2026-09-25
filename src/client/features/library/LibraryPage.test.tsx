@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api.ts';
 import { LibraryPage } from './LibraryPage.tsx';
@@ -116,4 +116,95 @@ it('renders sanitized markdown in descriptions', async () => {
   await waitFor(() =>
     expect(view.container.querySelector('.markdown-body strong')).toHaveTextContent('See'),
   );
+});
+
+it('reviews a Replace YAML file before submitting and permits cancellation', async () => {
+  setup();
+  await screen.findByText('Night Vision');
+  fireEvent.click(screen.getByRole('button', { name: /Import YAML/ }));
+  fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'replace' } });
+  const file = new File(
+    ['version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n'],
+    'empty.yaml',
+    { type: 'text/yaml' },
+  );
+  Object.defineProperty(file, 'text', {
+    value: async () => 'version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n',
+  });
+  fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  const dialog = await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
+  expect(dialog).toHaveTextContent('Traits: 0 in file · 2 to remove');
+  expect(
+    vi
+      .mocked(api)
+      .mock.calls.some(([path, options]) => path.endsWith('/import') && options?.method === 'POST'),
+  ).toBe(false);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('dialog', { name: 'Import empty.yaml?' })).toBeNull();
+  fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
+  fireEvent.click(screen.getByRole('button', { name: 'Replace library' }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign/library/import',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({ mode: 'replace' }),
+      }),
+    ),
+  );
+});
+
+it('discards a Replace preview when the selected campaign changes', async () => {
+  vi.mocked(api).mockImplementation(async (path, options) => {
+    if (path === '/auth/me') return { id: 'owner' };
+    if (path === '/campaigns')
+      return [
+        { id: 'campaign-a', ownerId: 'owner', name: 'A' },
+        { id: 'campaign-b', ownerId: 'owner', name: 'B' },
+      ];
+    if (options?.method === 'POST') return { created: {}, updated: {}, deleted: {} };
+    return { traits, skills: [], spells: [], items: [], enchantments: [] };
+  });
+  function SwitchCampaign() {
+    const navigate = useNavigate();
+    return (
+      <button type="button" onClick={() => navigate('/?campaign=campaign-b')}>
+        Switch campaign
+      </button>
+    );
+  }
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={['/?campaign=campaign-a']}>
+        <SwitchCampaign />
+        <LibraryPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await screen.findByText('Night Vision');
+  fireEvent.click(screen.getByRole('button', { name: /Import YAML/ }));
+  fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'replace' } });
+  const file = new File(
+    ['version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n'],
+    'empty.yaml',
+  );
+  Object.defineProperty(file, 'text', {
+    value: async () => 'version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n',
+  });
+  fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
+  fireEvent.click(screen.getByRole('button', { name: 'Switch campaign' }));
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog', { name: 'Import empty.yaml?' })).toBeNull(),
+  );
+  expect(
+    vi
+      .mocked(api)
+      .mock.calls.some(
+        ([path, options]) => path.includes('/library/import') && options?.method === 'POST',
+      ),
+  ).toBe(false);
 });

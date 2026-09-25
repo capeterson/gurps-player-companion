@@ -6,6 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { ApiError } from '../../lib/api.ts';
 import { invitationsApi } from '../../lib/invitations.ts';
 import { useToasts } from '../../lib/toast.tsx';
@@ -43,6 +44,11 @@ export function InvitationsInbox() {
   });
 
   const items = list.data ?? [];
+  if (list.isError) {
+    return (
+      <QueryReadError label="invitations" error={list.error} onRetry={() => void list.refetch()} />
+    );
+  }
   if (list.isLoading || items.length === 0) return null;
 
   return (

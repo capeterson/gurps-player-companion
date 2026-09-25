@@ -129,20 +129,24 @@ export function CampaignsPage() {
           const isManager = !isOwner && myMembership?.role === 'manager';
           const canManage = isOwner || isManager;
           return (
-            <Link
+            <div
               key={c.id}
-              to={`/campaigns/${c.id}`}
               className={`card relative flex min-w-0 flex-col items-stretch gap-4 px-5 py-4 transition hover:border-border-strong sm:flex-row sm:items-center ${
                 isOwner ? 'border-l-[3px] border-l-primary' : ''
               }`}
             >
+              <Link
+                to={`/campaigns/${c.id}`}
+                className="absolute inset-0 rounded-[inherit] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                aria-label={c.name}
+              />
               <div
                 aria-hidden="true"
                 className="flex h-14 w-14 shrink-0 items-center justify-center rounded-field border border-dashed border-border-strong text-[10px] uppercase tracking-widest text-dim"
               >
                 cover
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="pointer-events-none min-w-0 flex-1">
                 <div className="font-display text-lg font-semibold truncate">{c.name}</div>
                 <div className="mt-0.5 text-xs text-muted">
                   <span className="num">{c.members.length}</span> member
@@ -157,23 +161,15 @@ export function CampaignsPage() {
               {canManage && (
                 <button
                   type="button"
-                  className="btn btn-ghost btn-xs"
-                  // Stop the wrapping Link from navigating when the
-                  // settings button is clicked. preventDefault catches the
-                  // anchor's default behaviour; stopPropagation prevents
-                  // the click from reaching the Link's React handler.
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setSettingsId(c.id);
-                  }}
+                  className="btn btn-ghost btn-xs relative z-10 self-end sm:self-auto"
+                  onClick={() => setSettingsId(c.id)}
                   aria-label={`Settings for ${c.name}`}
                   title="Campaign settings"
                 >
                   ⚙
                 </button>
               )}
-            </Link>
+            </div>
           );
         })}
       </div>

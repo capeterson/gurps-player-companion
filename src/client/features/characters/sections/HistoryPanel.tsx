@@ -82,8 +82,17 @@ export function HistoryPanel({ characterId }: HistoryPanelProps) {
 }
 
 function ChangeHistory({ characterId }: HistoryPanelProps) {
-  const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    useCharacterHistory(characterId);
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    isFetchNextPageError,
+    refetch,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useCharacterHistory(characterId);
 
   const events = data?.pages.flatMap((p) => p.items) ?? [];
 
@@ -92,6 +101,8 @@ function ChangeHistory({ characterId }: HistoryPanelProps) {
       <HistoryList
         events={events}
         isLoading={isLoading}
+        error={isError ? error : null}
+        onRetry={() => void (isFetchNextPageError ? fetchNextPage() : refetch())}
         hasNextPage={hasNextPage ?? false}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={fetchNextPage}

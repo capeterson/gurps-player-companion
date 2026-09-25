@@ -3,6 +3,7 @@ import { skillProcedures } from '../../../shared/schemas/skillProcedures.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
+import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { ActiveEffectLibrary } from './ActiveEffectLibrary.tsx';
 import { matchesLibrarySearch } from './librarySearch.ts';
 /**
@@ -12,8 +13,7 @@ import { matchesLibrarySearch } from './librarySearch.ts';
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SKILL_ATTRIBUTES,
   SKILL_DIFFICULTIES,
@@ -31,18 +31,23 @@ import type {
   LibraryEnchantmentOut,
   LibraryItemCreate,
   LibraryItemOut,
+  LibraryLanguageOut,
   LibrarySkillCreate,
   LibrarySkillOut,
   LibrarySkillSpecializationPolicy,
   LibrarySpellCreate,
   LibrarySpellOut,
+  LibraryStyleOut,
+  LibraryTechniqueOut,
   LibraryTraitCreate,
   LibraryTraitOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
 import type { EnchantmentEffectTarget } from '../../../shared/schemas/inventory.ts';
 import type { TraitModifier } from '../../../shared/schemas/trait.ts';
+import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { SkillReferenceCombobox } from '../../components/ui/SkillReferenceCombobox.tsx';
+import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api, apiFetch } from '../../lib/api.ts';
 import { EffectsEditor, effectPreview } from './EffectsEditor.tsx';
 
@@ -53,6 +58,9 @@ interface LibraryPayload {
   items: LibraryItemOut[];
   enchantments: LibraryEnchantmentOut[];
   activeEffects?: ActiveEffectDefinitionOut[];
+  languages?: LibraryLanguageOut[];
+  techniques?: LibraryTechniqueOut[];
+  styles?: LibraryStyleOut[];
 }
 
 type SectionKey = 'traits' | 'skills' | 'spells' | 'items' | 'enchantments' | 'activeEffects';
@@ -65,7 +73,6 @@ type SectionKey = 'traits' | 'skills' | 'spells' | 'items' | 'enchantments' | 'a
  */
 export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {
   const qc = useQueryClient();
-  const [params, setParams] = useSearchParams();
   // Always fetch campaigns — needed for isOwner check and campaign name
   // even when the parent passes campaignId directly.
   const campaigns = useQuery({
@@ -73,21 +80,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     queryFn: () => api<CampaignOut[]>('/campaigns'),
   });
 
-  const urlCampaign = params.get('campaign');
-  const campaignId = useMemo(() => {
-    if (campaignIdProp) return campaignIdProp;
-    if (urlCampaign && campaigns.data?.some((c) => c.id === urlCampaign)) return urlCampaign;
-    return campaigns.data?.[0]?.id ?? null;
-  }, [campaignIdProp, urlCampaign, campaigns.data]);
-
-  useEffect(() => {
-    if (campaignIdProp) return;
-    if (campaignId && urlCampaign !== campaignId) {
-      const next = new URLSearchParams(params);
-      next.set('campaign', campaignId);
-      setParams(next, { replace: true });
-    }
-  }, [campaignIdProp, campaignId, urlCampaign, params, setParams]);
+  const { campaignId, params, setParams } = useSelectedCampaignId(campaignIdProp, campaigns.data);
+  const currentCampaignId = useRef(campaignId);
+  currentCampaignId.current = campaignId;
 
   const library = useQuery({
     queryKey: ['campaigns', campaignId, 'library'],
@@ -111,6 +106,18 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   const [applyCampaignSettings, setApplyCampaignSettings] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<{
+    campaignId: string;
+    fileName: string;
+    yaml: string;
+    mode: 'merge' | 'replace';
+    applyCampaignSettings: boolean;
+    counts: { label: string; incoming: number; removed: number | null }[];
+  } | null>(null);
+
+  useEffect(() => {
+    setPendingImport((current) => (current?.campaignId === campaignId ? current : null));
+  }, [campaignId]);
 
   // Per-section CRUD state
   const [traitsAddOpen, setTraitsAddOpen] = useState(false);
@@ -278,18 +285,24 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
   const importMutation = useMutation({
     mutationFn: (snap: {
+      campaignId: string;
       yaml: string;
       mode: 'merge' | 'replace';
       applyCampaignSettings: boolean;
     }) =>
-      api<ImportResult>(`/campaigns/${campaignId}/library/import`, {
+      api<ImportResult>(`/campaigns/${snap.campaignId}/library/import`, {
         method: 'POST',
-        body: snap,
+        body: {
+          yaml: snap.yaml,
+          mode: snap.mode,
+          applyCampaignSettings: snap.applyCampaignSettings,
+        },
       }),
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
+      setPendingImport(null);
       setImportError(null);
       setImportMessage(formatImportResult(result));
-      qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'library'] });
+      qc.invalidateQueries({ queryKey: ['campaigns', variables.campaignId, 'library'] });
       // Campaign settings live in the top-level campaigns list query, not
       // the library query — refresh it too so a manaLevel/pointTarget
       // change from an applied import shows up without a manual reload.
@@ -321,12 +334,67 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   );
 
   async function onFileSelected(file: File) {
+    const selectedCampaignId = campaignId;
+    if (!selectedCampaignId) return;
     if (file.size > 20 * 1024 * 1024) {
       setImportError('YAML payload is larger than 20 MB');
       return;
     }
-    const text = await file.text();
-    importMutation.mutate({ yaml: text, mode: importMode, applyCampaignSettings });
+    try {
+      const yaml = await file.text();
+      if (selectedCampaignId !== currentCampaignId.current) return;
+      const parsed = parseLibraryYaml(yaml);
+      const mode = importMode;
+      const applySettings = applyCampaignSettings;
+      if (mode === 'replace' && (!library.data || library.isError)) {
+        throw new Error('Reload the current library before replacing it');
+      }
+      const sections = [
+        [
+          'Traits',
+          'traits',
+          (entry: { name: string; kind: string }) => `${entry.kind}:${entry.name.toLowerCase()}`,
+        ],
+        ['Skills', 'skills', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Spells', 'spells', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Items', 'items', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Enchantments', 'enchantments', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Active effects', 'activeEffects', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Languages', 'languages', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Techniques', 'techniques', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Styles', 'styles', (entry: { name: string }) => entry.name.toLowerCase()],
+      ] as const;
+      const preview = sections.flatMap(([label, key, naturalKey]) => {
+        const incoming = parsed.library[key];
+        // Omitted optional sections are intentionally untouched by Replace.
+        if (!incoming) return [];
+        const current = library.data?.[key];
+        const incomingKeys = new Set(incoming.map((entry) => naturalKey(entry as never)));
+        return [
+          {
+            label,
+            incoming: incoming.length,
+            removed:
+              mode === 'replace' && current
+                ? current.filter((entry) => !incomingKeys.has(naturalKey(entry as never))).length
+                : null,
+          },
+        ];
+      });
+      setImportError(null);
+      setImportMessage(null);
+      setPendingImport({
+        campaignId: selectedCampaignId,
+        fileName: file.name,
+        yaml,
+        mode,
+        applyCampaignSettings: applySettings,
+        counts: preview,
+      });
+    } catch (error) {
+      setPendingImport(null);
+      setImportError(error instanceof Error ? error.message : 'Could not read YAML file');
+    }
   }
 
   function downloadExport() {
@@ -406,10 +474,28 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         </div>
       </header>
 
-      {!campaigns.isLoading && !campaignIdProp && (campaigns.data?.length ?? 0) === 0 && (
-        <div className="card p-card text-center text-muted">
-          You don&apos;t belong to any campaigns yet.
-        </div>
+      {campaigns.isError && !campaignIdProp && (
+        <QueryReadError
+          label="campaigns"
+          error={campaigns.error}
+          onRetry={() => void campaigns.refetch()}
+        />
+      )}
+      {!campaigns.isLoading &&
+        !campaigns.isError &&
+        !campaignIdProp &&
+        (campaigns.data?.length ?? 0) === 0 && (
+          <div className="card p-card text-center text-muted">
+            You don&apos;t belong to any campaigns yet.
+          </div>
+        )}
+
+      {campaignId && library.isError && (
+        <QueryReadError
+          label="library"
+          error={library.error}
+          onRetry={() => void library.refetch()}
+        />
       )}
 
       {campaignId && isOwner && (
@@ -470,6 +556,49 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           </div>
         </FoldSection>
       )}
+      <ConfirmDialog
+        open={pendingImport !== null}
+        title={`Import ${pendingImport?.fileName ?? 'YAML'}?`}
+        confirmLabel={pendingImport?.mode === 'replace' ? 'Replace library' : 'Merge library'}
+        tone={pendingImport?.mode === 'replace' ? 'error' : 'primary'}
+        pending={importMutation.isPending}
+        pendingLabel="Importing…"
+        onCancel={() => setPendingImport(null)}
+        onConfirm={() => {
+          if (!pendingImport || pendingImport.campaignId !== campaignId || importMutation.isPending)
+            return;
+          importMutation.mutate({
+            campaignId: pendingImport.campaignId,
+            yaml: pendingImport.yaml,
+            mode: pendingImport.mode,
+            applyCampaignSettings: pendingImport.applyCampaignSettings,
+          });
+        }}
+      >
+        <p>
+          {pendingImport?.mode === 'replace'
+            ? 'Replace will remove existing entries missing from this file.'
+            : 'Merge will add or update entries without deleting existing entries.'}
+          {pendingImport?.applyCampaignSettings &&
+            ' Campaign settings in the file will also be applied.'}
+        </p>
+        <ul className="mt-2 space-y-1" aria-label="Import preview">
+          {pendingImport?.counts.map((section) => (
+            <li key={section.label}>
+              {section.label}: {section.incoming} in file
+              {section.removed !== null && ` · ${section.removed} to remove`}
+            </li>
+          ))}
+        </ul>
+        {pendingImport?.mode === 'replace' &&
+          pendingImport.counts.some((section) => section.removed === null) && (
+            <p className="mt-2 text-warning">
+              Some current section counts are unavailable. The server will report final deletion
+              counts after import.
+            </p>
+          )}
+        {importError && <p className="alert alert-error mt-2">{importError}</p>}
+      </ConfirmDialog>
 
       <div className="flex flex-wrap gap-2">
         <button
@@ -477,42 +606,43 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           onClick={() => setSection('traits')}
           className={`chip ${section === 'traits' ? 'on' : ''}`}
         >
-          Traits <span className="num text-dim ml-1">{counts.traits}</span>
+          Traits <span className="num text-dim ml-1">{library.data ? counts.traits : '—'}</span>
         </button>
         <button
           type="button"
           onClick={() => setSection('skills')}
           className={`chip ${section === 'skills' ? 'on' : ''}`}
         >
-          Skills <span className="num text-dim ml-1">{counts.skills}</span>
+          Skills <span className="num text-dim ml-1">{library.data ? counts.skills : '—'}</span>
         </button>
         <button
           type="button"
           onClick={() => setSection('spells')}
           className={`chip ${section === 'spells' ? 'on' : ''}`}
         >
-          Spells <span className="num text-dim ml-1">{counts.spells}</span>
+          Spells <span className="num text-dim ml-1">{library.data ? counts.spells : '—'}</span>
         </button>
         <button
           type="button"
           onClick={() => setSection('items')}
           className={`chip ${section === 'items' ? 'on' : ''}`}
         >
-          Items <span className="num text-dim ml-1">{counts.items}</span>
+          Items <span className="num text-dim ml-1">{library.data ? counts.items : '—'}</span>
         </button>
         <button
           type="button"
           onClick={() => setSection('enchantments')}
           className={`chip ${section === 'enchantments' ? 'on' : ''}`}
         >
-          Enchantments <span className="num text-dim ml-1">{counts.enchantments}</span>
+          Enchantments{' '}
+          <span className="num text-dim ml-1">{library.data ? counts.enchantments : '—'}</span>
         </button>
         <button
           type="button"
           className={`chip ${section === 'activeEffects' ? 'on' : ''}`}
           onClick={() => setSection('activeEffects')}
         >
-          Active Effects <span className="num">{counts.activeEffects}</span>
+          Active Effects <span className="num">{library.data ? counts.activeEffects : '—'}</span>
         </button>
       </div>
 
@@ -1120,13 +1250,20 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         title="Delete library trait"
         confirmLabel="Delete"
         tone="error"
+        pending={deleteTrait.isPending}
+        pendingLabel="Deleting…"
         onConfirm={() => {
-          if (traitsDeleteId) deleteTrait.mutate(traitsDeleteId);
+          if (traitsDeleteId && !deleteTrait.isPending) deleteTrait.mutate(traitsDeleteId);
         }}
         onCancel={() => setTraitsDeleteId(null)}
       >
         Delete <strong>{traitToDelete?.name}</strong> from the library? Existing characters that use
         this trait are not affected.
+        {deleteTrait.isError && (
+          <p role="alert" className="text-error">
+            {deleteTrait.error instanceof Error ? deleteTrait.error.message : 'Delete failed'}
+          </p>
+        )}
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -1134,13 +1271,20 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         title="Delete library skill"
         confirmLabel="Delete"
         tone="error"
+        pending={deleteSkill.isPending}
+        pendingLabel="Deleting…"
         onConfirm={() => {
-          if (skillsDeleteId) deleteSkill.mutate(skillsDeleteId);
+          if (skillsDeleteId && !deleteSkill.isPending) deleteSkill.mutate(skillsDeleteId);
         }}
         onCancel={() => setSkillsDeleteId(null)}
       >
         Delete <strong>{skillToDelete?.name}</strong> from the library? Existing characters that use
         this skill are not affected.
+        {deleteSkill.isError && (
+          <p role="alert" className="text-error">
+            {deleteSkill.error instanceof Error ? deleteSkill.error.message : 'Delete failed'}
+          </p>
+        )}
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -1148,13 +1292,20 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         title="Delete library spell"
         confirmLabel="Delete"
         tone="error"
+        pending={deleteSpell.isPending}
+        pendingLabel="Deleting…"
         onConfirm={() => {
-          if (spellsDeleteId) deleteSpell.mutate(spellsDeleteId);
+          if (spellsDeleteId && !deleteSpell.isPending) deleteSpell.mutate(spellsDeleteId);
         }}
         onCancel={() => setSpellsDeleteId(null)}
       >
         Delete <strong>{spellToDelete?.name}</strong> from the library? Existing characters that
         know this spell are not affected.
+        {deleteSpell.isError && (
+          <p role="alert" className="text-error">
+            {deleteSpell.error instanceof Error ? deleteSpell.error.message : 'Delete failed'}
+          </p>
+        )}
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -1162,13 +1313,20 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         title="Delete library item"
         confirmLabel="Delete"
         tone="error"
+        pending={deleteItem.isPending}
+        pendingLabel="Deleting…"
         onConfirm={() => {
-          if (itemsDeleteId) deleteItem.mutate(itemsDeleteId);
+          if (itemsDeleteId && !deleteItem.isPending) deleteItem.mutate(itemsDeleteId);
         }}
         onCancel={() => setItemsDeleteId(null)}
       >
         Delete <strong>{itemToDelete?.name}</strong> from the library? Existing characters that have
         this item are not affected.
+        {deleteItem.isError && (
+          <p role="alert" className="text-error">
+            {deleteItem.error instanceof Error ? deleteItem.error.message : 'Delete failed'}
+          </p>
+        )}
       </ConfirmDialog>
 
       <ConfirmDialog
@@ -1176,13 +1334,23 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         title="Delete enchantment definition"
         confirmLabel="Delete"
         tone="error"
+        pending={deleteEnchantment.isPending}
+        pendingLabel="Deleting…"
         onConfirm={() => {
-          if (enchantmentsDeleteId) deleteEnchantment.mutate(enchantmentsDeleteId);
+          if (enchantmentsDeleteId && !deleteEnchantment.isPending)
+            deleteEnchantment.mutate(enchantmentsDeleteId);
         }}
         onCancel={() => setEnchantmentsDeleteId(null)}
       >
         Delete <strong>{enchantmentToDelete?.name}</strong>? Existing item snapshots keep their
         mechanics and become detached.
+        {deleteEnchantment.isError && (
+          <p role="alert" className="text-error">
+            {deleteEnchantment.error instanceof Error
+              ? deleteEnchantment.error.message
+              : 'Delete failed'}
+          </p>
+        )}
       </ConfirmDialog>
     </div>
   );

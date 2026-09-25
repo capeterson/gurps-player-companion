@@ -315,7 +315,9 @@ describe('LogPage', () => {
     await waitFor(() => expect(screen.getByText('My entry')).toBeInTheDocument());
 
     await user.click(screen.getByLabelText('Delete My entry'));
-    expect(mockConfirm).toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Delete My entry?' })).toBeInTheDocument();
+    expect(mockConfirm).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Delete entry' }));
 
     await waitFor(() => {
       const call = vi

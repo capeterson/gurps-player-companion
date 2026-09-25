@@ -19,6 +19,7 @@ import type {
   EffectUpdate,
   EncounterOut,
 } from '../../../shared/schemas/encounter.ts';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { type LocalCharacter, type LocalCharacterSpell, getLocalDb } from '../../db/dexie.ts';
 import { api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
@@ -59,6 +60,19 @@ export function EncounterPage() {
   const [pcCharacterId, setPcCharacterId] = useState('');
   const [editingNpc, setEditingNpc] = useState<Combatant | null | undefined>(undefined);
   const [editingEffect, setEditingEffect] = useState<Effect | null | undefined>(undefined);
+  const [confirmation, setConfirmation] = useState<
+    | ((
+        | { kind: 'end' }
+        | { kind: 'remove'; effect: Effect }
+        | { kind: 'acknowledge'; effect: Effect }
+      ) & { campaignId: string; encounterId: string })
+    | null
+  >(null);
+  useEffect(() => {
+    setConfirmation((current) =>
+      current?.campaignId === id && current.encounterId === encounterId ? current : null,
+    );
+  }, [id, encounterId]);
   const encounter = useEncounter(id, encounterId);
   const npcHpIntents = useRef(new Map<string, NpcHpIntent>());
   const campaign = useQuery({
@@ -188,12 +202,42 @@ export function EncounterPage() {
         allowGmCharacterEditing: campaign.data?.allowGmCharacterEditing ?? false,
       },
     );
-  const removeEffect = (effect: Effect, label = 'Remove') => {
-    if (!window.confirm(`${label} ${effect.name}? Linked sheet effects will be cleared.`)) return;
-    mutation.mutate(async () => {
-      await encountersApi.deleteEffect(id, encounterId, effect.id);
-      await cleanup(effect);
-    });
+  const confirmDestructiveAction = () => {
+    if (
+      !confirmation ||
+      mutation.isPending ||
+      confirmation.campaignId !== id ||
+      confirmation.encounterId !== encounterId
+    )
+      return;
+    const selected = confirmation;
+    mutation.mutate(
+      async () => {
+        if (selected.kind === 'end') {
+          await encountersApi.update(selected.campaignId, selected.encounterId, {
+            status: 'ended',
+          });
+        } else if (selected.kind === 'remove') {
+          await encountersApi.deleteEffect(
+            selected.campaignId,
+            selected.encounterId,
+            selected.effect.id,
+          );
+          await cleanup(selected.effect);
+        } else {
+          await encountersApi.updateEffect(
+            selected.campaignId,
+            selected.encounterId,
+            selected.effect.id,
+            {
+              expiryAcknowledgedAtRound: data.round,
+            },
+          );
+          await cleanup(selected.effect);
+        }
+      },
+      { onSuccess: () => setConfirmation(null) },
+    );
   };
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -252,12 +296,7 @@ export function EncounterPage() {
                 type="button"
                 className="btn btn-ghost"
                 disabled={mutation.isPending}
-                onClick={() => {
-                  if (window.confirm('End this combat?'))
-                    mutation.mutate(() =>
-                      encountersApi.update(id, encounterId, { status: 'ended' }),
-                    );
-                }}
+                onClick={() => setConfirmation({ kind: 'end', campaignId: id, encounterId })}
               >
                 End combat
               </button>
@@ -488,21 +527,12 @@ export function EncounterPage() {
                 }),
               )
             }
-            onAcknowledge={() => {
-              if (
-                !window.confirm(
-                  `Acknowledge expiry for ${effect.name} and clear linked sheet effects?`,
-                )
-              )
-                return;
-              mutation.mutate(async () => {
-                await encountersApi.updateEffect(id, encounterId, effect.id, {
-                  expiryAcknowledgedAtRound: data.round,
-                });
-                await cleanup(effect);
-              });
-            }}
-            onRemove={() => removeEffect(effect)}
+            onAcknowledge={() =>
+              setConfirmation({ kind: 'acknowledge', effect, campaignId: id, encounterId })
+            }
+            onRemove={() =>
+              setConfirmation({ kind: 'remove', effect, campaignId: id, encounterId })
+            }
           />
         ))}
       </section>
@@ -528,6 +558,32 @@ export function EncounterPage() {
           }
         />
       )}
+      <ConfirmDialog
+        open={confirmation !== null}
+        title={
+          confirmation?.kind === 'end'
+            ? 'End this combat?'
+            : confirmation?.kind === 'acknowledge'
+              ? `Acknowledge expiry for ${confirmation.effect.name}?`
+              : `Remove ${confirmation?.effect.name ?? 'effect'}?`
+        }
+        tone="error"
+        confirmLabel={
+          confirmation?.kind === 'end'
+            ? 'End combat'
+            : confirmation?.kind === 'acknowledge'
+              ? 'Acknowledge expiry'
+              : 'Remove effect'
+        }
+        pending={mutation.isPending}
+        pendingLabel="Saving…"
+        onCancel={() => setConfirmation(null)}
+        onConfirm={confirmDestructiveAction}
+      >
+        {confirmation?.kind === 'end'
+          ? 'The turn tracker will stop advancing.'
+          : 'Linked sheet effects will be cleared.'}
+      </ConfirmDialog>
     </div>
   );
 }

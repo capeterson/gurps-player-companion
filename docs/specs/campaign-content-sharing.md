@@ -436,7 +436,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 10`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 11`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
@@ -447,7 +447,8 @@ mechanism for sharing content between campaigns or seeding a new one.
   conditional group/tag defaults, and the campaign prerequisite policy. v10 adds
   portable mechanical enchantment definitions and structured owned item snapshots;
   campaign-local definition UUIDs are removed on export while source revision and
-  mechanics remain. The
+  mechanics remain. v11 retains portable skill specialization policies and
+  per-catalog-option rule overrides. The
   parser unions on the literal `version` field and newer fields default/absent
   on older docs.
 - **Item fields (v3):** library items carry the same container/powerstone/
@@ -503,7 +504,12 @@ mechanism for sharing content between campaigns or seeding a new one.
   campaign settings, and all eight library sections are read on one read-only
   `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
   document assembled from different database moments.
-- **Import** (`POST /campaigns/{id}/library/import`): owner only. Two modes:
+- **Import** (`POST /campaigns/{id}/library/import`): owner only. The UI parses
+  and validates a selected file locally, then shows a confirmation preview with
+  incoming section counts and available deletion counts. Selecting a file alone
+  never submits it. The chosen mode and settings option are captured with the
+  file, so changing those controls later cannot alter the pending operation.
+  Two modes:
   - `merge` (default) — upsert incoming rows by name/kind key, leave others.
   - `replace` — additionally delete existing rows not present in the document.
     **Careful edge case, encoded in the importer:** a `replace` import only

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import type { EncounterOut } from '../../../shared/schemas/encounter.ts';
@@ -107,6 +107,53 @@ function renderPage() {
 }
 
 describe('EncounterPage', () => {
+  it('drops an open destructive confirmation when navigating to another encounter', async () => {
+    function SwitchEncounter() {
+      const navigate = useNavigate();
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            encounter.data = makeEncounter({ id: 'second' });
+            navigate('/campaigns/campaign/encounters/second');
+          }}
+        >
+          Open encounter B
+        </button>
+      );
+    }
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <ToastProvider>
+          <MemoryRouter initialEntries={['/campaigns/campaign/encounters/encounter']}>
+            <SwitchEncounter />
+            <Routes>
+              <Route path="/campaigns/:id/encounters/:encounterId" element={<EncounterPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'End combat' }));
+    expect(screen.getByRole('dialog', { name: 'End this combat?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open encounter B' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'End this combat?' })).toBeNull(),
+    );
+    expect(encountersApi.update).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'End combat' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'End this combat?' })).getByRole('button', {
+        name: 'End combat',
+      }),
+    );
+    await waitFor(() =>
+      expect(encountersApi.update).toHaveBeenCalledWith('campaign', 'second', { status: 'ended' }),
+    );
+  });
+
   it.each([false, undefined])(
     'hides bookmarked encounters when tracking is %s',
     async (enabled) => {
@@ -291,11 +338,20 @@ describe('EncounterPage', () => {
     const effectCard = (await screen.findByText('Haste')).closest('article');
     if (!effectCard) throw new Error('effect card is missing');
     fireEvent.click(within(effectCard).getByRole('button', { name: 'Remove' }));
+    expect(screen.getByRole('dialog', { name: 'Remove Haste?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove effect' }));
 
     await waitFor(() => expect(encountersApi.deleteEffect).toHaveBeenCalled());
     expect(cleanupLinkedSheetEffect).not.toHaveBeenCalled();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     fireEvent.click(within(effectCard).getByRole('button', { name: 'Acknowledge expiry' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Acknowledge expiry for Haste?' })).getByRole(
+        'button',
+        { name: 'Acknowledge expiry' },
+      ),
+    );
     await waitFor(() => expect(encountersApi.updateEffect).toHaveBeenCalled());
     expect(cleanupLinkedSheetEffect).not.toHaveBeenCalled();
   });

@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import type {
   AdventureLogCreate,
   AdventureLogOut,
@@ -10,6 +9,9 @@ import type {
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
+import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
+import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api } from '../../lib/api.ts';
 
 type FilterKind = 'all' | 'shared' | 'private';
@@ -143,31 +145,13 @@ function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
  */
 export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {
   const qc = useQueryClient();
-  const [params, setParams] = useSearchParams();
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignOut[]>('/campaigns'),
     enabled: !campaignIdProp,
   });
 
-  const urlCampaign = params.get('campaign');
-  const campaignId = useMemo(() => {
-    if (campaignIdProp) return campaignIdProp;
-    if (urlCampaign && campaigns.data?.some((c) => c.id === urlCampaign)) return urlCampaign;
-    return campaigns.data?.[0]?.id ?? null;
-  }, [campaignIdProp, urlCampaign, campaigns.data]);
-
-  // Mirror the resolved campaign back to the URL so reloads are stable
-  // (only when this page owns the routing — embedded mode is driven by
-  // the parent route's path param).
-  useEffect(() => {
-    if (campaignIdProp) return;
-    if (campaignId && urlCampaign !== campaignId) {
-      const next = new URLSearchParams(params);
-      next.set('campaign', campaignId);
-      setParams(next, { replace: true });
-    }
-  }, [campaignIdProp, campaignId, urlCampaign, params, setParams]);
+  const { campaignId, params, setParams } = useSelectedCampaignId(campaignIdProp, campaigns.data);
 
   const entries = useQuery({
     queryKey: ['campaigns', campaignId, 'log'],
@@ -191,6 +175,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   const [editor, setEditor] = useState<EditorState>({ kind: 'hidden' });
   const [draft, setDraft] = useState<AdventureLogCreate>(emptyDraft());
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [entryToDelete, setEntryToDelete] = useState<AdventureLogOut | null>(null);
 
   // Collapse the editor whenever the campaign changes so a stale
   // draft from another campaign can't be committed by accident.
@@ -199,6 +184,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     setEditor({ kind: 'hidden' });
     setDraft(emptyDraft());
     setSaveError(null);
+    setEntryToDelete(null);
   }, [campaignId]);
 
   const create = useMutation({
@@ -268,6 +254,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     mutationFn: (entryId: string) =>
       api<void>(`/campaigns/${campaignId}/log/${entryId}`, { method: 'DELETE' }),
     onSuccess: () => {
+      setEntryToDelete(null);
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
     },
   });
@@ -397,11 +384,21 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
         </div>
       </header>
 
-      {!campaigns.isLoading && (campaigns.data?.length ?? 0) === 0 && !campaignIdProp && (
-        <div className="card p-card text-center text-muted">
-          You don't belong to any campaigns yet. Create one on the Campaign tab to start a log.
-        </div>
+      {campaigns.isError && !campaignIdProp && (
+        <QueryReadError
+          label="campaigns"
+          error={campaigns.error}
+          onRetry={() => void campaigns.refetch()}
+        />
       )}
+      {!campaigns.isLoading &&
+        !campaigns.isError &&
+        (campaigns.data?.length ?? 0) === 0 &&
+        !campaignIdProp && (
+          <div className="card p-card text-center text-muted">
+            You don't belong to any campaigns yet. Create one on the Campaign tab to start a log.
+          </div>
+        )}
 
       {campaignId && (
         <div className="flex flex-wrap gap-2">
@@ -410,21 +407,21 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
             onClick={() => setFilter('all')}
             className={`chip ${filter === 'all' ? 'on' : ''}`}
           >
-            All <span className="num text-dim ml-1">{counts.all}</span>
+            All <span className="num text-dim ml-1">{entries.data ? counts.all : '—'}</span>
           </button>
           <button
             type="button"
             onClick={() => setFilter('shared')}
             className={`chip ${filter === 'shared' ? 'on' : ''}`}
           >
-            Shared <span className="num text-dim ml-1">{counts.shared}</span>
+            Shared <span className="num text-dim ml-1">{entries.data ? counts.shared : '—'}</span>
           </button>
           <button
             type="button"
             onClick={() => setFilter('private')}
             className={`chip ${filter === 'private' ? 'on' : ''}`}
           >
-            Private <span className="num text-dim ml-1">{counts.private}</span>
+            Private <span className="num text-dim ml-1">{entries.data ? counts.private : '—'}</span>
           </button>
         </div>
       )}
@@ -531,8 +528,15 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       )}
 
       {entries.isLoading && campaignId && <p className="text-muted">Loading log…</p>}
+      {entries.isError && campaignId && (
+        <QueryReadError
+          label="adventure log"
+          error={entries.error}
+          onRetry={() => void entries.refetch()}
+        />
+      )}
 
-      {visible.length === 0 && entries.isFetched && campaignId && (
+      {visible.length === 0 && entries.isFetched && !entries.isError && campaignId && (
         <p className="text-center text-muted">No entries yet for this filter.</p>
       )}
 
@@ -572,11 +576,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                       <button
                         type="button"
                         className="btn btn-ghost btn-xs text-error"
-                        onClick={() => {
-                          if (window.confirm(`Delete "${entry.title}"? This can't be undone.`)) {
-                            remove.mutate(entry.id);
-                          }
-                        }}
+                        onClick={() => setEntryToDelete(entry)}
                         aria-label={`Delete ${entry.title}`}
                         disabled={deleting === entry.id}
                       >
@@ -595,6 +595,25 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           );
         })}
       </div>
+      <ConfirmDialog
+        open={entryToDelete !== null}
+        title={`Delete ${entryToDelete?.title ?? 'entry'}?`}
+        confirmLabel="Delete entry"
+        tone="error"
+        pending={remove.isPending}
+        pendingLabel="Deleting…"
+        onCancel={() => setEntryToDelete(null)}
+        onConfirm={() => {
+          if (entryToDelete && !remove.isPending) remove.mutate(entryToDelete.id);
+        }}
+      >
+        This adventure log entry cannot be restored.
+        {remove.isError && (
+          <p className="alert alert-error mt-2">
+            {remove.error instanceof Error ? remove.error.message : 'Delete failed'}
+          </p>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

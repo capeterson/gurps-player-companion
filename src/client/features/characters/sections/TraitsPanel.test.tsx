@@ -89,6 +89,37 @@ it('rejects a stale campaign trait pick, retains the draft and flashes the form'
   expect(enqueueCreate.mock.calls[0]?.[0].localLibraryMechanics).toBeNull();
 });
 
+it('keeps a later selection of the same trait while the first add is pending', async () => {
+  let settle: (() => void) | undefined;
+  enqueueCreate.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        settle = resolve;
+      }),
+  );
+  const character = {
+    id: 'char-1',
+    campaignId: pick.campaignId,
+    traits: [],
+  } as unknown as CharacterDetail;
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ToastProvider>
+        <TraitsPanel character={character} canWrite />
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: '+ Add trait' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pick Gifted' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+  await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+  fireEvent.click(screen.getByRole('button', { name: 'Pick Gifted' }));
+  settle?.();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled());
+  expect(screen.getByLabelText('Trait name')).toHaveValue('Gifted');
+  expect(screen.getByRole('button', { name: 'Pick Gifted' })).toBeVisible();
+});
+
 const ownedTrait = {
   id: '01997c5c-8d80-7000-8000-000000000010',
   characterId: '01997c5c-8d80-7000-8000-000000000011',

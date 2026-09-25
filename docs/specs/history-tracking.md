@@ -11,6 +11,9 @@ The **append-only history/audit log**:
   a sibling Roll history sub-tab browses device-only rolls without adding them to
   the server audit log. The campaign page retains its campaign-level History view.
 - Provides **local filtering & search** over loaded history.
+  The Skills category includes skills, languages, and techniques; Magic includes
+  spells. Failed page loads show an error and retry action instead of an empty
+  history message.
 
 - Becomes a **required baseline**: every new syncable table must participate in history capture, enforced by an automated test.
 - Records nullable OAuth client and grant provenance for delegated writes; the UI

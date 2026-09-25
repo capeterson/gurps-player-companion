@@ -66,14 +66,14 @@ export function UserDetailPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="label-eyebrow">
             <Link to="/admin/users" className="link">
               ← All users
             </Link>
           </p>
-          <h1 className="font-display text-3xl">{u.displayName}</h1>
-          <p className="text-sm text-base-content/60">{u.email}</p>
+          <h1 className="font-display break-all text-3xl">{u.displayName}</h1>
+          <p className="break-all text-sm text-base-content/60">{u.email}</p>
         </div>
         <div className="flex flex-wrap gap-1">
           {u.isSuperuser && <span className="badge badge-secondary">superuser</span>}

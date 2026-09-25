@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../../../../db/dexie.ts';
 import { ToastProvider } from '../../../../lib/toast.tsx';
 import { SoloTrackerCard } from './SoloTrackerCard.tsx';
@@ -62,6 +62,37 @@ describe('SoloTrackerCard', () => {
       ]);
     });
     expect(await getLocalDb().outbox.count()).toBe(0);
+  });
+
+  it('keeps the draft and prevents a duplicate add while the local write is pending', async () => {
+    render(
+      <ToastProvider>
+        <SoloTrackerCard characterId="character-a" canWrite={true} />
+      </ToastProvider>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Start tracker' }));
+    await screen.findByLabelText('Solo combatant name');
+    const db = getLocalDb();
+    const originalPut = db.soloEncounters.put.bind(db.soloEncounters);
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const put = vi
+      .spyOn(db.soloEncounters, 'put')
+      .mockImplementationOnce(
+        (row) => gate.then(() => originalPut(row)) as ReturnType<typeof originalPut>,
+      );
+    fireEvent.change(screen.getByLabelText('Solo combatant name'), { target: { value: 'Scout' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByLabelText('Solo combatant name')).toHaveValue('Scout');
+    expect(screen.getByRole('button', { name: 'Adding…' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Adding…' }));
+    release?.();
+    await waitFor(async () => {
+      expect((await db.soloEncounters.get('character-a'))?.combatants).toHaveLength(1);
+    });
+    put.mockRestore();
   });
 
   it('prompts for expired and overdue maintenance effects, then acknowledges and removes them locally', async () => {
