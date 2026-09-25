@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api.ts';
@@ -116,6 +116,47 @@ it('renders sanitized markdown in descriptions', async () => {
   await waitFor(() =>
     expect(view.container.querySelector('.markdown-body strong')).toHaveTextContent('See'),
   );
+});
+
+it('creates and deletes a trait through the shared library CRUD flow', async () => {
+  vi.mocked(api).mockImplementation(async (path, options) => {
+    if (path === '/auth/me') return { id: 'owner' };
+    if (path === '/campaigns') return [{ id: 'campaign', ownerId: 'owner', name: 'Test' }];
+    if (options?.method === 'POST') return { id: 'created', name: 'New Trait' };
+    if (options?.method === 'DELETE') return {};
+    return { traits, skills: [], spells: [], items: [], enchantments: [] };
+  });
+  setup();
+  await screen.findByText('Night Vision');
+  fireEvent.click(screen.getByRole('button', { name: '+ Add trait' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name *' }), {
+    target: { value: 'New Trait' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add trait' }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign/library/traits',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({ name: 'New Trait' }),
+      }),
+    ),
+  );
+  expect(await screen.findByRole('button', { name: '+ Add trait' })).toBeVisible();
+
+  const deleteAction = screen.getAllByRole('button', { name: 'Delete' })[0];
+  if (!deleteAction) throw new Error('Missing trait delete action');
+  fireEvent.click(deleteAction);
+  const dialog = await screen.findByRole('dialog', { name: 'Delete library trait' });
+  expect(dialog).toHaveTextContent('Night Vision');
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign/library/traits/night',
+      expect.objectContaining({ method: 'DELETE' }),
+    ),
+  );
+  await waitFor(() => expect(dialog).not.toBeVisible());
 });
 
 it('reviews a Replace YAML file before submitting and permits cancellation', async () => {

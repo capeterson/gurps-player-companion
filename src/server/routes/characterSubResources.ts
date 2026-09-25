@@ -90,6 +90,22 @@ async function manaLevelFor(campaignId: string | null): Promise<ManaLevel> {
   return row?.manaLevel ?? 'normal';
 }
 
+/** Shared write gate for REST character subresources. */
+async function loadWritableCharacter(id: string, userId: string) {
+  const access = await loadCharacterOr403(id, userId);
+  assertWrite(access);
+  return access;
+}
+
+async function withWritableCharacterAudit<T>(
+  id: string,
+  userId: string,
+  write: Parameters<typeof withAudit<T>>[2],
+): Promise<T> {
+  await loadWritableCharacter(id, userId);
+  return withAudit(userId, undefined, write);
+}
+
 // ===================== TRAITS =====================
 
 router.openapi(
@@ -121,8 +137,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterTraits)
@@ -171,8 +186,7 @@ router.openapi(
     const user = c.get('user');
     const { id, traitId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) => {
       await prepareLibraryReference(tx, user.id, id, 'traits', updates, traitId);
@@ -207,9 +221,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, traitId } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
-    const result = await withAudit(user.id, undefined, async (tx) =>
+    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
       tx
         .delete(characterTraits)
         .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
@@ -251,8 +263,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterSkills)
@@ -304,8 +315,7 @@ router.openapi(
     const user = c.get('user');
     const { id, skillId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) => {
       await prepareLibraryReference(tx, user.id, id, 'skills', updates, skillId);
@@ -343,9 +353,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, skillId } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
-    const result = await withAudit(user.id, undefined, async (tx) =>
+    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
       tx
         .delete(characterSkills)
         .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
@@ -387,8 +395,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    const access = await loadWritableCharacter(id, user.id);
     const db = getDb();
     const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
@@ -451,8 +458,7 @@ router.openapi(
     const user = c.get('user');
     const { id, spellId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    const access = await loadWritableCharacter(id, user.id);
     const db = getDb();
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) =>
@@ -500,9 +506,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, spellId } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
-    const result = await withAudit(user.id, undefined, async (tx) =>
+    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
       tx
         .delete(characterSpells)
         .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
@@ -544,8 +548,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterLanguages)
@@ -597,8 +600,7 @@ router.openapi(
     const user = c.get('user');
     const { id, languageId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) =>
       tx
@@ -635,9 +637,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, languageId } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
-    const result = await withAudit(user.id, undefined, async (tx) =>
+    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
       tx
         .delete(characterLanguages)
         .where(and(eq(characterLanguages.id, languageId), eq(characterLanguages.characterId, id)))
@@ -695,8 +695,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const [created] = await withAudit(user.id, undefined, async (tx) =>
       tx
         .insert(characterTechniques)
@@ -746,8 +745,7 @@ router.openapi(
     const user = c.get('user');
     const { id, techniqueId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
     const [updated] = await withAudit(user.id, undefined, async (tx) =>
       tx
@@ -784,9 +782,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, techniqueId } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
-    const result = await withAudit(user.id, undefined, async (tx) =>
+    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
       tx
         .delete(characterTechniques)
         .where(
@@ -895,9 +891,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
-    const created = await withAudit(user.id, undefined, async (tx) => {
+    const created = await withWritableCharacterAudit(id, user.id, async (tx) => {
       // Hold a row lock on the character so concurrent inventory tree
       // changes for this character serialize.  Without it two parent
       // changes can each pass their own pre-checks against pre-write
@@ -963,8 +957,7 @@ router.openapi(
     const user = c.get('user');
     const { id, itemId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     if (body.parentId !== undefined && body.parentId !== null && body.parentId === itemId) {
       throw new HTTPException(400, { message: 'an item cannot be its own parent' });
     }
@@ -1024,8 +1017,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, itemId } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     // Reparent children up one level so we don't strand them.  Always
     // scope to this character's items: even though create/patch validate
     // `parentId`, defence in depth means a stray cross-character link
@@ -1086,8 +1078,7 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    const access = await loadWritableCharacter(id, user.id);
 
     // Atomic upsert keyed on the unique (character_id) index. Doing this
     // as a single statement is essential: the previous select-then-insert
@@ -1148,8 +1139,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, group } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     // Read-modify-write under a row lock INSIDE the audit transaction:
     // deriving `next` from the permission-check snapshot would let two
     // concurrent toggles (different groups, two tabs) overwrite each
@@ -1197,8 +1187,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, group } = c.req.valid('param');
-    const access = await loadCharacterOr403(id, user.id);
-    assertWrite(access);
+    await loadWritableCharacter(id, user.id);
     // Same locked read-modify-write as the POST handler above — see the
     // comment there for the concurrent-toggle race this prevents.
     const next = await withAudit(user.id, undefined, async (tx) => {

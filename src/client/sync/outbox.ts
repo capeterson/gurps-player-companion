@@ -14,20 +14,14 @@
 
 import { type LibraryMechanics, libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
+import { type OutboxEntry, type OutboxStatus, coalesceKey, getLocalDb } from '../db/dexie.ts';
 import {
-  type LocalCharacter,
-  type LocalCharacterCombat,
-  type LocalCharacterInventory,
-  type LocalCharacterLanguage,
-  type LocalCharacterSkill,
-  type LocalCharacterSpell,
-  type LocalCharacterTechnique,
-  type LocalCharacterTrait,
-  type OutboxEntry,
-  type OutboxStatus,
-  coalesceKey,
-  getLocalDb,
-} from '../db/dexie.ts';
+  deleteSyncEntity,
+  readSyncEntity,
+  syncEntityTable,
+  updateSyncEntity,
+  writableSyncEntityTable,
+} from '../db/syncEntityStore.ts';
 import {
   campaignTransferStores,
   detachLocalCampaignReferences,
@@ -514,29 +508,7 @@ async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void
 }
 
 async function readLocalEntity(entityClass: EntityClass, entityId: string): Promise<unknown> {
-  const db = getLocalDb();
-  switch (entityClass) {
-    case 'character':
-      return db.characters.get(entityId);
-    case 'character_trait':
-      return db.characterTraits.get(entityId);
-    case 'character_skill':
-      return db.characterSkills.get(entityId);
-    case 'character_spell':
-      return db.characterSpells.get(entityId);
-    case 'character_language':
-      return db.characterLanguages.get(entityId);
-    case 'character_technique':
-      return db.characterTechniques.get(entityId);
-    case 'character_inventory':
-      return db.characterInventory.get(entityId);
-    case 'character_combat':
-      return db.characterCombat.get(entityId);
-    case 'campaign':
-      return db.campaigns.get(entityId);
-    default:
-      return undefined;
-  }
+  return readSyncEntity(entityClass, entityId);
 }
 
 /**
@@ -556,79 +528,21 @@ export function newBatchId(): string {
 // ---------- internal: local writers ----------
 
 function storesForOp(entityClass: EntityClass) {
-  const db = getLocalDb();
-  switch (entityClass) {
-    case 'character':
-      return [db.characters, ...campaignTransferStores()];
-    case 'character_trait':
-      return [db.characterTraits];
-    case 'character_skill':
-      return [db.characterSkills];
-    case 'character_spell':
-      return [db.characterSpells];
-    case 'character_language':
-      return [db.characterLanguages];
-    case 'character_technique':
-      return [db.characterTechniques];
-    case 'character_inventory':
-      return [db.characterInventory];
-    case 'character_combat':
-      return [db.characterCombat];
-    case 'campaign':
-      return [db.campaigns];
-    default:
-      return [];
-  }
+  const table = syncEntityTable(entityClass);
+  if (!table) return [];
+  return entityClass === 'character' ? [table, ...campaignTransferStores()] : [table];
 }
 
 async function applyLocalPatch(args: EnqueueFieldPatchArgs): Promise<void> {
-  const db = getLocalDb();
-  const updates: Record<string, unknown> = {
+  await updateSyncEntity(args.entityClass, args.entityId, {
     [args.fieldPath]: args.attemptedValue,
     updatedAt: new Date().toISOString(),
-  };
-  switch (args.entityClass) {
-    case 'character':
-      await db.characters.update(args.entityId, updates as Partial<LocalCharacter>);
-      return;
-    case 'character_trait':
-      await db.characterTraits.update(args.entityId, updates as Partial<LocalCharacterTrait>);
-      return;
-    case 'character_skill':
-      await db.characterSkills.update(args.entityId, updates as Partial<LocalCharacterSkill>);
-      return;
-    case 'character_spell':
-      await db.characterSpells.update(args.entityId, updates as Partial<LocalCharacterSpell>);
-      return;
-    case 'character_language':
-      await db.characterLanguages.update(args.entityId, updates as Partial<LocalCharacterLanguage>);
-      return;
-    case 'character_technique':
-      await db.characterTechniques.update(
-        args.entityId,
-        updates as Partial<LocalCharacterTechnique>,
-      );
-      return;
-    case 'character_inventory':
-      await db.characterInventory.update(
-        args.entityId,
-        updates as Partial<LocalCharacterInventory>,
-      );
-      return;
-    case 'character_combat':
-      // combat is keyed by characterId; entityId IS the characterId.
-      await db.characterCombat.update(args.entityId, updates as Partial<LocalCharacterCombat>);
-      return;
-    default:
-      // Other entity classes don't have a local writer yet.
-      return;
-  }
+  });
 }
 
 async function applyLocalCreate<T extends Record<string, unknown>>(
   args: EnqueueCreateArgs<T>,
 ): Promise<void> {
-  const db = getLocalDb();
   const now = new Date().toISOString();
   const base = {
     id: args.entityId,
@@ -654,69 +568,20 @@ async function applyLocalCreate<T extends Record<string, unknown>>(
       throw new Error('Selected library rules do not match the new copy');
     base.libraryMechanics = snapshot;
   }
-  switch (args.entityClass) {
-    case 'character':
-      await db.characters.put(base as unknown as LocalCharacter);
-      return;
-    case 'character_trait':
-      await db.characterTraits.put(base as unknown as LocalCharacterTrait);
-      return;
-    case 'character_skill':
-      await db.characterSkills.put(base as unknown as LocalCharacterSkill);
-      return;
-    case 'character_spell':
-      await db.characterSpells.put(base as unknown as LocalCharacterSpell);
-      return;
-    case 'character_language':
-      await db.characterLanguages.put(base as unknown as LocalCharacterLanguage);
-      return;
-    case 'character_technique':
-      await db.characterTechniques.put(base as unknown as LocalCharacterTechnique);
-      return;
-    case 'character_inventory':
-      await db.characterInventory.put(base as unknown as LocalCharacterInventory);
-      return;
-    case 'character_combat':
-      await db.characterCombat.put({
-        ...base,
-        characterId: args.entityId,
-      } as unknown as LocalCharacterCombat);
-      return;
-    default:
-      return;
-  }
+  const table = writableSyncEntityTable(args.entityClass);
+  await table.put(
+    args.entityClass === 'character_combat'
+      ? ({ ...base, characterId: args.entityId } as unknown as {
+          id: string;
+          revision: number;
+          [key: string]: unknown;
+        })
+      : (base as unknown as { id: string; revision: number; [key: string]: unknown }),
+  );
 }
 
 async function applyLocalDelete(entityClass: EntityClass, entityId: string): Promise<void> {
-  const db = getLocalDb();
-  switch (entityClass) {
-    case 'character':
-      await db.characters.delete(entityId);
-      return;
-    case 'character_trait':
-      await db.characterTraits.delete(entityId);
-      return;
-    case 'character_skill':
-      await db.characterSkills.delete(entityId);
-      return;
-    case 'character_spell':
-      await db.characterSpells.delete(entityId);
-      return;
-    case 'character_language':
-      await db.characterLanguages.delete(entityId);
-      return;
-    case 'character_technique':
-      await db.characterTechniques.delete(entityId);
-      return;
-    case 'character_inventory':
-      await db.characterInventory.delete(entityId);
-      return;
-    case 'character_combat':
-      await db.characterCombat.delete(entityId);
-      return;
-    default:
-      return;
-  }
+  await deleteSyncEntity(entityClass, entityId);
 }
 
 // ---------- queries used by the orchestrator ----------

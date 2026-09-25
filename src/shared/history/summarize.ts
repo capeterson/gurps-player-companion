@@ -7,7 +7,7 @@
 import { skillDisplayName, skillReferenceDisplayName } from '../domain/defenseCalc.ts';
 import { formatSigned } from '../format/number.ts';
 import { MANUAL_TEMP_EFFECT_ID } from '../schemas/character.ts';
-import type { HistoryEventOut } from '../schemas/history.ts';
+import type { EntityClass } from '../schemas/sync.ts';
 
 // ---------- field-label maps ----------
 
@@ -634,6 +634,38 @@ export interface SummarizedEvent {
   changes: FieldChange[];
 }
 
+type Row = Record<string, unknown> | null;
+type EventSummarizer = (op: string, oldRow: Row, newRow: Row) => string;
+
+/** Each history entity has exactly one formatter; new classes register here. */
+const EVENT_SUMMARIZERS = {
+  character: summarizeCharacter,
+  character_trait: summarizeCharacterTrait,
+  character_skill: summarizeCharacterSkill,
+  character_spell: summarizeCharacterSpell,
+  character_language: summarizeCharacterLanguage,
+  character_technique: summarizeCharacterTechnique,
+  character_inventory: summarizeInventory,
+  character_combat: summarizeCombat,
+  campaign: summarizeCampaign,
+  campaign_membership: summarizeMembership,
+  campaign_library_trait: summarizeLibraryTrait,
+  campaign_library_skill: summarizeLibrarySkill,
+  campaign_library_spell: summarizeLibrarySpell,
+  campaign_library_item: summarizeLibraryItem,
+  campaign_library_language: summarizeLibraryLanguage,
+  campaign_library_technique: summarizeLibraryTechnique,
+  campaign_library_style: summarizeLibraryStyle,
+  campaign_library_active_effect: (op, oldRow, newRow) =>
+    op === 'insert'
+      ? `Added active effect definition ${newRow?.name}`
+      : op === 'delete'
+        ? `Removed active effect definition ${oldRow?.name}`
+        : describeFieldChanges('Library active effect', diffRows(oldRow, newRow)),
+  campaign_library_enchantment: summarizeLibraryEnchantment,
+  adventure_log: summarizeAdventureLog,
+} satisfies Record<EntityClass, EventSummarizer>;
+
 /** Compute a one-line summary and structured field-level diff from a raw history row. */
 export function summarizeEvent(event: {
   entityClass: string;
@@ -647,223 +679,9 @@ export function summarizeEvent(event: {
   const oldRow = camelizeRow(event.oldRow);
   const newRow = camelizeRow(event.newRow);
   const changes = diffRows(oldRow, newRow);
-  let summary: string;
-  switch (entityClass) {
-    case 'character':
-      summary = summarizeCharacter(op, oldRow, newRow);
-      break;
-    case 'character_trait':
-      summary = summarizeCharacterTrait(op, oldRow, newRow);
-      break;
-    case 'character_skill':
-      summary = summarizeCharacterSkill(op, oldRow, newRow);
-      break;
-    case 'character_spell':
-      summary = summarizeCharacterSpell(op, oldRow, newRow);
-      break;
-    case 'character_language':
-      summary = summarizeCharacterLanguage(op, oldRow, newRow);
-      break;
-    case 'character_technique':
-      summary = summarizeCharacterTechnique(op, oldRow, newRow);
-      break;
-    case 'character_inventory':
-      summary = summarizeInventory(op, oldRow, newRow);
-      break;
-    case 'character_combat':
-      summary = summarizeCombat(op, oldRow, newRow);
-      break;
-    case 'campaign':
-      summary = summarizeCampaign(op, oldRow, newRow);
-      break;
-    case 'campaign_membership':
-      summary = summarizeMembership(op, oldRow, newRow);
-      break;
-    case 'campaign_library_trait':
-      summary = summarizeLibraryTrait(op, oldRow, newRow);
-      break;
-    case 'campaign_library_skill':
-      summary = summarizeLibrarySkill(op, oldRow, newRow);
-      break;
-    case 'campaign_library_spell':
-      summary = summarizeLibrarySpell(op, oldRow, newRow);
-      break;
-    case 'campaign_library_item':
-      summary = summarizeLibraryItem(op, oldRow, newRow);
-      break;
-    case 'campaign_library_language':
-      summary = summarizeLibraryLanguage(op, oldRow, newRow);
-      break;
-    case 'campaign_library_technique':
-      summary = summarizeLibraryTechnique(op, oldRow, newRow);
-      break;
-    case 'campaign_library_style':
-      summary = summarizeLibraryStyle(op, oldRow, newRow);
-      break;
-    case 'campaign_library_active_effect':
-      summary =
-        op === 'insert'
-          ? `Added active effect definition ${newRow?.name}`
-          : op === 'delete'
-            ? `Removed active effect definition ${oldRow?.name}`
-            : describeFieldChanges('Library active effect', diffRows(oldRow, newRow));
-      break;
-    case 'campaign_library_enchantment':
-      summary = summarizeLibraryEnchantment(op, oldRow, newRow);
-      break;
-    case 'adventure_log':
-      summary = summarizeAdventureLog(op, oldRow, newRow);
-      break;
-    default:
-      summary = `${entityClass} ${op}`;
-  }
+  const formatter = (EVENT_SUMMARIZERS as Record<string, EventSummarizer>)[entityClass];
+  const summary = formatter?.(op, oldRow, newRow) ?? `${entityClass} ${op}`;
   return { summary, changes };
 }
 
-// ---------- batch grouping ----------
-
-export interface HistoryGroup {
-  batchId: string | null;
-  events: HistoryEventOut[];
-  /** Pre-computed one-liner for the group header. */
-  groupSummary: string;
-  /** True when the group has more than one event and should show a fold arrow. */
-  foldable: boolean;
-}
-
-/**
- * Consecutive events on the same item (same actor, same field-patch op)
- * spaced no more than this far apart get folded together even without an
- * explicit shared batchId (e.g. someone fiddling with a single item's
- * fields one field-patch at a time).
- */
-const SAME_ITEM_BURST_WINDOW_MS = 60_000;
-
-/**
- * `batchId` is non-null for effectively every sync-backed write:
- * `dispatchOperation` fills it in from `op.clientOpId` when the client
- * didn't set one (see syncDispatch.ts), so a single un-batched field
- * patch still gets its own distinct, non-null batch_id in entity_history.
- * That id has no sibling — no other event shares it — so it isn't a real
- * "one user gesture" batch the way a multi-item bulk move's shared
- * batchId is. Treat a batchId as a real batch only when >1 event in the
- * loaded page actually carries it; a singleton batchId is eligible for
- * the same-item time-window burst heuristic below, same as a null one.
- */
-function countBatchMembers(events: HistoryEventOut[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const ev of events) {
-    if (!ev.batchId) continue;
-    counts.set(ev.batchId, (counts.get(ev.batchId) ?? 0) + 1);
-  }
-  return counts;
-}
-
-/**
- * Fold consecutive events into one group when either:
- *   - they share a batchId that >1 loaded event carries (one explicit
- *     user gesture, e.g. a bulk inventory move), or
- *   - they're both plain field-patch updates to the same entity by the
- *     same actor, neither carries a "real" (multi-member) batchId, and
- *     they land within SAME_ITEM_BURST_WINDOW_MS of each other (a burst
- *     of quick edits to one item that weren't explicitly batched).
- * Standalone events become single-item groups without a fold arrow.
- */
-export function groupIntoBatches(events: HistoryEventOut[]): HistoryGroup[] {
-  const batchMembers = countBatchMembers(events);
-  const isRealBatch = (ev: HistoryEventOut) =>
-    Boolean(ev.batchId) &&
-    Math.max(ev.batchSize ?? 0, batchMembers.get(ev.batchId as string) ?? 0) > 1;
-
-  const groups: HistoryGroup[] = [];
-  for (const ev of events) {
-    const last = groups[groups.length - 1];
-    const lastEvent = last?.events[last.events.length - 1];
-    const sharesBatch = isRealBatch(ev) && last?.batchId === ev.batchId;
-    const sameItemBurst =
-      !sharesBatch &&
-      !isRealBatch(ev) &&
-      last &&
-      lastEvent &&
-      !isRealBatch(lastEvent) &&
-      ev.op === 'update' &&
-      lastEvent.op === 'update' &&
-      lastEvent.entityId === ev.entityId &&
-      lastEvent.entityClass === ev.entityClass &&
-      lastEvent.actorUserId != null &&
-      ev.actorUserId != null &&
-      lastEvent.actorUserId === ev.actorUserId &&
-      Math.abs(new Date(ev.createdAt).getTime() - new Date(lastEvent.createdAt).getTime()) <=
-        SAME_ITEM_BURST_WINDOW_MS;
-    if (sharesBatch || sameItemBurst) {
-      last.events.push(ev);
-    } else {
-      groups.push({
-        batchId: ev.batchId,
-        events: [ev],
-        groupSummary: ev.summary,
-        foldable: false,
-      });
-    }
-  }
-  // Finalize: set foldable flag and synthesize header for multi-event groups.
-  for (const g of groups) {
-    if (g.events.length > 1) {
-      g.foldable = true;
-      g.groupSummary = makeBatchSummary(g.events);
-    }
-  }
-  return groups;
-}
-
-function makeBatchSummary(events: HistoryEventOut[]): string {
-  const n = events.length;
-  const first = events[0];
-  if (!first) return `${n} changes`;
-  // A same-item burst (see SAME_ITEM_BURST_WINDOW_MS) is several quick
-  // edits to one thing, not one gesture touching several things — phrase
-  // it accordingly rather than reusing the "N items" bulk-gesture wording.
-  const sameItem = events.every((e) => e.entityId === first.entityId);
-  // If all events share the same entity class and op, describe uniformly.
-  const firstClass = first.entityClass;
-  const firstOp = first.op;
-  const uniform = events.every((e) => e.entityClass === firstClass && e.op === firstOp);
-  if (!uniform) return `${n} changes`;
-  if (sameItem) {
-    switch (firstClass) {
-      case 'character_inventory':
-        return `${n} updates to this item`;
-      case 'character_skill':
-        return `${n} updates to this skill`;
-      case 'character_spell':
-        return `${n} updates to this spell`;
-      case 'character_trait':
-        return `${n} updates to this trait`;
-      case 'character':
-        return `${n} attribute changes`;
-      default:
-        return `${n} updates`;
-    }
-  }
-  switch (firstClass) {
-    case 'character_inventory':
-      if (firstOp === 'update') return `Moved ${n} items`;
-      if (firstOp === 'delete') return `Removed ${n} items`;
-      return `${n} inventory changes`;
-    case 'character':
-      if (firstOp === 'update') return `${n} attribute changes`;
-      return `${n} character changes`;
-    case 'character_skill':
-      return `${n} skill changes`;
-    case 'character_spell':
-      return `${n} spell changes`;
-    case 'character_trait':
-      return `${n} trait changes`;
-    case 'character_language':
-      return `${n} language changes`;
-    case 'character_technique':
-      return `${n} technique changes`;
-    default:
-      return `${n} changes`;
-  }
-}
+export { groupIntoBatches, type HistoryGroup } from './groupBatches.ts';

@@ -918,8 +918,9 @@ src/
                  compact traits table, inline editor, and per-character
                  device-only sort/custom order),
                  SkillsPanel (searchable/sortable compact table and inline
-                 editor) and skillTablePreferences (per-character device-only
-                 sort/custom order),
+                 editor), skillTablePreferences and tablePreferences
+                 (per-character device-only sort/custom order),
+                 useSortableCharacterRows (shared skill/trait table behavior),
                  useAddEntityForm
                  (the add form), useEntityRowPatch (per-row field patch
                  dispatch, incl. useEntityEnumField for enum <select>s),
@@ -933,12 +934,15 @@ src/
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
     lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
-    features/characters/sections/tablePreferences.ts  Shared device-local sortable-table codec
+    features/library/  LibraryPage browsing/import, five explicit category form
+                 files, and useLibrarySectionCrud for online-only CRUD state
+                 and query invalidation
     components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
                  into the portaled Current Status row
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
-    db/          dexie.ts — the IndexedDB stores + outbox (UI source of truth),
+    db/          dexie.ts and syncEntityStore.ts — IndexedDB stores and shared
+                 sync row lookup/writes (UI source of truth),
                   plus per-character device-only solo tracker scratchpads
     components/ui/AppIcon.tsx  Shared Lucide icon names, size and stroke conventions
     components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker

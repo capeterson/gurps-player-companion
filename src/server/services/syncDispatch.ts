@@ -529,6 +529,34 @@ async function assertCharacterPatchCaps(
   assertAttributeCaps(campaign?.enforceAttributeCaps ?? false, current, patch);
 }
 
+/** Keep child sync writes on the same authorization and lock path. */
+async function dispatchLibraryChild(
+  ctx: DispatchContext,
+  op: OperationEnvelope,
+  tx: AuditTx,
+  handlers: {
+    create: (characterId: string) => Promise<number>;
+    remove: (characterId: string) => Promise<void>;
+    patch: (characterId: string) => Promise<OperationOutcome>;
+  },
+): Promise<OperationOutcome> {
+  const characterId = requireParentId(op);
+  const access = await loadCharacterOr403(characterId, ctx.userId);
+  assertWrite(access);
+  if (op.command === 'create') {
+    const revision = await handlers.create(characterId);
+    return appliedOutcome(op, revision);
+  }
+  if (op.command === 'delete') {
+    // Replayed deletes are idempotent after parent write access is established.
+    await handlers.remove(characterId);
+    return { clientOpId: op.clientOpId, status: 'applied' };
+  }
+  // Recheck permissions under locks before stale-base can return private row data.
+  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
+  return handlers.patch(characterId);
+}
+
 // ---------- character_trait ----------
 
 async function dispatchTrait(
@@ -536,61 +564,51 @@ async function dispatchTrait(
   op: OperationEnvelope,
   tx: AuditTx,
 ): Promise<OperationOutcome> {
-  if (op.command === 'create') {
-    const body = traitCreate.parse(op.attemptedValue);
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    const [created] = await tx
-      .insert(characterTraits)
-      .values(
-        await prepareLibraryReference(
-          tx,
-          ctx.userId,
-          characterId,
-          'traits',
-          traitInsertValues(body, { characterId, id: op.entityId }),
-        ),
-      )
-      .returning();
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    return appliedOutcome(op, Number(created.revision));
-  }
-
-  if (op.command === 'delete') {
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    // No existence check: deletes are idempotent.  A replayed delete
-    // whose first ack got lost finds the row already gone; write
-    // access to the parent was asserted above, so "nothing to delete"
-    // is success — returning unauthorized would make the client roll
-    // back and resurrect the row locally.
-    await tx
-      .delete(characterTraits)
-      .where(
-        and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
-      );
-    return { clientOpId: op.clientOpId, status: 'applied' };
-  }
-
-  // patch
-  const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
-  assertWrite(access);
-  // Recheck permissions under locks before stale-base can return private row data.
-  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
-  return await patchEntity({
-    op,
-    userId: ctx.userId,
-    entityClass: 'character_trait',
-    tx,
-    table: characterTraits,
-    prepareUpdates: async (updates) => {
-      await prepareLibraryReference(tx, ctx.userId, characterId, 'traits', updates, op.entityId);
+  return dispatchLibraryChild(ctx, op, tx, {
+    create: async (characterId) => {
+      const body = traitCreate.parse(op.attemptedValue);
+      const [created] = await tx
+        .insert(characterTraits)
+        .values(
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'traits',
+            traitInsertValues(body, { characterId, id: op.entityId }),
+          ),
+        )
+        .returning();
+      if (!created) throw new HTTPException(500, { message: 'insert failed' });
+      return Number(created.revision);
     },
-    childWhere: () =>
-      and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
+    remove: async (characterId) => {
+      await tx
+        .delete(characterTraits)
+        .where(
+          and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
+        );
+    },
+    patch: async (characterId) =>
+      patchEntity({
+        op,
+        userId: ctx.userId,
+        entityClass: 'character_trait',
+        tx,
+        table: characterTraits,
+        prepareUpdates: async (updates) => {
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'traits',
+            updates,
+            op.entityId,
+          );
+        },
+        childWhere: () =>
+          and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
+      }),
   });
 }
 
@@ -601,56 +619,51 @@ async function dispatchSkill(
   op: OperationEnvelope,
   tx: AuditTx,
 ): Promise<OperationOutcome> {
-  if (op.command === 'create') {
-    const body = skillCreate.parse(op.attemptedValue);
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    const [created] = await tx
-      .insert(characterSkills)
-      .values(
-        await prepareLibraryReference(
-          tx,
-          ctx.userId,
-          characterId,
-          'skills',
-          skillInsertValues(body, { characterId, id: op.entityId }),
-        ),
-      )
-      .returning();
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    return appliedOutcome(op, Number(created.revision));
-  }
-
-  if (op.command === 'delete') {
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    // Idempotent delete — see the trait dispatcher for rationale.
-    await tx
-      .delete(characterSkills)
-      .where(
-        and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
-      );
-    return { clientOpId: op.clientOpId, status: 'applied' };
-  }
-
-  const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
-  assertWrite(access);
-  // Recheck permissions under locks before stale-base can return private row data.
-  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
-  return await patchEntity({
-    op,
-    userId: ctx.userId,
-    entityClass: 'character_skill',
-    tx,
-    table: characterSkills,
-    prepareUpdates: async (updates) => {
-      await prepareLibraryReference(tx, ctx.userId, characterId, 'skills', updates, op.entityId);
+  return dispatchLibraryChild(ctx, op, tx, {
+    create: async (characterId) => {
+      const body = skillCreate.parse(op.attemptedValue);
+      const [created] = await tx
+        .insert(characterSkills)
+        .values(
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'skills',
+            skillInsertValues(body, { characterId, id: op.entityId }),
+          ),
+        )
+        .returning();
+      if (!created) throw new HTTPException(500, { message: 'insert failed' });
+      return Number(created.revision);
     },
-    childWhere: () =>
-      and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
+    remove: async (characterId) => {
+      await tx
+        .delete(characterSkills)
+        .where(
+          and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
+        );
+    },
+    patch: async (characterId) =>
+      patchEntity({
+        op,
+        userId: ctx.userId,
+        entityClass: 'character_skill',
+        tx,
+        table: characterSkills,
+        prepareUpdates: async (updates) => {
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'skills',
+            updates,
+            op.entityId,
+          );
+        },
+        childWhere: () =>
+          and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
+      }),
   });
 }
 
@@ -661,56 +674,51 @@ async function dispatchSpell(
   op: OperationEnvelope,
   tx: AuditTx,
 ): Promise<OperationOutcome> {
-  if (op.command === 'create') {
-    const body = spellCreate.parse(op.attemptedValue);
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    const [created] = await tx
-      .insert(characterSpells)
-      .values(
-        await prepareLibraryReference(
-          tx,
-          ctx.userId,
-          characterId,
-          'spells',
-          spellInsertValues(body, { characterId, id: op.entityId }),
-        ),
-      )
-      .returning();
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    return appliedOutcome(op, Number(created.revision));
-  }
-
-  if (op.command === 'delete') {
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    // Idempotent delete — see the trait dispatcher for rationale.
-    await tx
-      .delete(characterSpells)
-      .where(
-        and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
-      );
-    return { clientOpId: op.clientOpId, status: 'applied' };
-  }
-
-  const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
-  assertWrite(access);
-  // Recheck permissions under locks before stale-base can return private row data.
-  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
-  return await patchEntity({
-    op,
-    userId: ctx.userId,
-    entityClass: 'character_spell',
-    tx,
-    table: characterSpells,
-    prepareUpdates: async (updates) => {
-      await prepareLibraryReference(tx, ctx.userId, characterId, 'spells', updates, op.entityId);
+  return dispatchLibraryChild(ctx, op, tx, {
+    create: async (characterId) => {
+      const body = spellCreate.parse(op.attemptedValue);
+      const [created] = await tx
+        .insert(characterSpells)
+        .values(
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'spells',
+            spellInsertValues(body, { characterId, id: op.entityId }),
+          ),
+        )
+        .returning();
+      if (!created) throw new HTTPException(500, { message: 'insert failed' });
+      return Number(created.revision);
     },
-    childWhere: () =>
-      and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+    remove: async (characterId) => {
+      await tx
+        .delete(characterSpells)
+        .where(
+          and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+        );
+    },
+    patch: async (characterId) =>
+      patchEntity({
+        op,
+        userId: ctx.userId,
+        entityClass: 'character_spell',
+        tx,
+        table: characterSpells,
+        prepareUpdates: async (updates) => {
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'spells',
+            updates,
+            op.entityId,
+          );
+        },
+        childWhere: () =>
+          and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
+      }),
   });
 }
 
@@ -721,59 +729,57 @@ async function dispatchLanguage(
   op: OperationEnvelope,
   tx: AuditTx,
 ): Promise<OperationOutcome> {
-  if (op.command === 'create') {
-    const body = languageCreate.parse(op.attemptedValue);
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    const [created] = await tx
-      .insert(characterLanguages)
-      .values(
-        await prepareLibraryReference(
-          tx,
-          ctx.userId,
-          characterId,
-          'languages',
-          languageInsertValues(body, { characterId, id: op.entityId }),
-        ),
-      )
-      .returning();
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    return appliedOutcome(op, Number(created.revision));
-  }
-
-  if (op.command === 'delete') {
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    // Idempotent delete — see the trait dispatcher for rationale.
-    await tx
-      .delete(characterLanguages)
-      .where(
-        and(
-          eq(characterLanguages.id, op.entityId),
-          eq(characterLanguages.characterId, characterId),
-        ),
-      );
-    return { clientOpId: op.clientOpId, status: 'applied' };
-  }
-
-  const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
-  assertWrite(access);
-  // Recheck permissions under locks before stale-base can return private row data.
-  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
-  return await patchEntity({
-    op,
-    userId: ctx.userId,
-    entityClass: 'character_language',
-    tx,
-    table: characterLanguages,
-    prepareUpdates: async (updates) => {
-      await prepareLibraryReference(tx, ctx.userId, characterId, 'languages', updates, op.entityId);
+  return dispatchLibraryChild(ctx, op, tx, {
+    create: async (characterId) => {
+      const body = languageCreate.parse(op.attemptedValue);
+      const [created] = await tx
+        .insert(characterLanguages)
+        .values(
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'languages',
+            languageInsertValues(body, { characterId, id: op.entityId }),
+          ),
+        )
+        .returning();
+      if (!created) throw new HTTPException(500, { message: 'insert failed' });
+      return Number(created.revision);
     },
-    childWhere: () =>
-      and(eq(characterLanguages.id, op.entityId), eq(characterLanguages.characterId, characterId)),
+    remove: async (characterId) => {
+      await tx
+        .delete(characterLanguages)
+        .where(
+          and(
+            eq(characterLanguages.id, op.entityId),
+            eq(characterLanguages.characterId, characterId),
+          ),
+        );
+    },
+    patch: async (characterId) =>
+      patchEntity({
+        op,
+        userId: ctx.userId,
+        entityClass: 'character_language',
+        tx,
+        table: characterLanguages,
+        prepareUpdates: async (updates) => {
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'languages',
+            updates,
+            op.entityId,
+          );
+        },
+        childWhere: () =>
+          and(
+            eq(characterLanguages.id, op.entityId),
+            eq(characterLanguages.characterId, characterId),
+          ),
+      }),
   });
 }
 
@@ -784,69 +790,57 @@ async function dispatchTechnique(
   op: OperationEnvelope,
   tx: AuditTx,
 ): Promise<OperationOutcome> {
-  if (op.command === 'create') {
-    const body = techniqueCreate.parse(op.attemptedValue);
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    const [created] = await tx
-      .insert(characterTechniques)
-      .values(
-        await prepareLibraryReference(
-          tx,
-          ctx.userId,
-          characterId,
-          'techniques',
-          techniqueInsertValues(body, { characterId, id: op.entityId }),
-        ),
-      )
-      .returning();
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
-    return appliedOutcome(op, Number(created.revision));
-  }
-
-  if (op.command === 'delete') {
-    const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
-    assertWrite(access);
-    // Idempotent delete — see the trait dispatcher for rationale.
-    await tx
-      .delete(characterTechniques)
-      .where(
-        and(
-          eq(characterTechniques.id, op.entityId),
-          eq(characterTechniques.characterId, characterId),
-        ),
-      );
-    return { clientOpId: op.clientOpId, status: 'applied' };
-  }
-
-  const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
-  assertWrite(access);
-  // Recheck permissions under locks before stale-base can return private row data.
-  await lockLibraryReferenceScope(tx, characterId, ctx.userId);
-  return await patchEntity({
-    op,
-    userId: ctx.userId,
-    entityClass: 'character_technique',
-    tx,
-    table: characterTechniques,
-    prepareUpdates: async (updates) => {
-      await prepareLibraryReference(
-        tx,
-        ctx.userId,
-        characterId,
-        'techniques',
-        updates,
-        op.entityId,
-      );
+  return dispatchLibraryChild(ctx, op, tx, {
+    create: async (characterId) => {
+      const body = techniqueCreate.parse(op.attemptedValue);
+      const [created] = await tx
+        .insert(characterTechniques)
+        .values(
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'techniques',
+            techniqueInsertValues(body, { characterId, id: op.entityId }),
+          ),
+        )
+        .returning();
+      if (!created) throw new HTTPException(500, { message: 'insert failed' });
+      return Number(created.revision);
     },
-    childWhere: () =>
-      and(
-        eq(characterTechniques.id, op.entityId),
-        eq(characterTechniques.characterId, characterId),
-      ),
+    remove: async (characterId) => {
+      await tx
+        .delete(characterTechniques)
+        .where(
+          and(
+            eq(characterTechniques.id, op.entityId),
+            eq(characterTechniques.characterId, characterId),
+          ),
+        );
+    },
+    patch: async (characterId) =>
+      patchEntity({
+        op,
+        userId: ctx.userId,
+        entityClass: 'character_technique',
+        tx,
+        table: characterTechniques,
+        prepareUpdates: async (updates) => {
+          await prepareLibraryReference(
+            tx,
+            ctx.userId,
+            characterId,
+            'techniques',
+            updates,
+            op.entityId,
+          );
+        },
+        childWhere: () =>
+          and(
+            eq(characterTechniques.id, op.entityId),
+            eq(characterTechniques.characterId, characterId),
+          ),
+      }),
   });
 }
 
