@@ -4,6 +4,7 @@ import type {
   LibraryItemCreate,
   LibraryItemOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 
 interface ItemFormProps {
   initial?: LibraryItemOut;
@@ -257,25 +258,15 @@ export function ItemForm({
           Edit those fields via YAML import/export for now.
         </p>
       )}
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={onCancel}
-          disabled={isPending}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={handleSubmit}
-          disabled={isPending || !name.trim()}
-        >
-          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add item'}
-        </button>
-      </div>
-      {error && <p className="alert alert-error text-sm">{error}</p>}
+      <LibraryFormFooter
+        noun="item"
+        editing={Boolean(initial)}
+        isPending={isPending}
+        canSubmit={Boolean(name.trim())}
+        error={error}
+        onCancel={onCancel}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

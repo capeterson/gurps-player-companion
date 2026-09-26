@@ -19,6 +19,7 @@ import {
   parseArmorDivisor,
   woundingMultiplier,
 } from '../../../../../shared/domain/injuryCalc.ts';
+import { formatSigned } from '../../../../../shared/format/number.ts';
 import { AppIcon } from '../../../../components/ui/AppIcon.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
@@ -69,10 +70,6 @@ export function armorDrEnchantmentLines(
       status: line.status,
       ...(line.winnerName ? { winnerName: enchantmentLabel(item.name, line.winnerName) } : {}),
     }));
-}
-
-function signed(value: number): string {
-  return value >= 0 ? `+${value}` : String(value);
 }
 
 export function DrSummaryCard({
@@ -466,7 +463,7 @@ export function DrSummaryCard({
                                         : ''
                                     }`}
                                   >
-                                    {signed(entry.value)} DR
+                                    {formatSigned(entry.value)} DR
                                   </span>
                                 </li>
                               ))}

@@ -68,7 +68,7 @@ export async function mutateItem(
     const patch = inventoryItemUpdate.parse(update(current));
     if (
       patch.isContainer === false &&
-      (await db.characterInventory.filter((child) => child.parentId === id).count())
+      (await db.characterInventory.where('parentId').equals(id).count())
     ) {
       throw new Error('Move the contents before removing the Container category');
     }

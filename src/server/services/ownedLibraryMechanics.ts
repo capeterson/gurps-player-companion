@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { resolveLibrarySkillSpecialization } from '../../shared/domain/librarySkillSpecializations.ts';
 import { enchantmentRef } from '../../shared/schemas/inventory.ts';
@@ -110,10 +110,19 @@ export async function refreshOwnedLibraryMechanics(
       });
       return changed ? next : null;
     };
+    // Only rows whose enchantment list references this definition: a YAML
+    // import refreshes every changed enchantment, and loading the whole
+    // campaign's items for each one dominated large imports.
+    const referencesSource = JSON.stringify([{ definitionId: sourceId }]);
     const libraryItems = await tx
-      .select()
+      .select({ id: campaignLibraryItems.id, enchantments: campaignLibraryItems.enchantments })
       .from(campaignLibraryItems)
-      .where(eq(campaignLibraryItems.campaignId, campaignId));
+      .where(
+        and(
+          eq(campaignLibraryItems.campaignId, campaignId),
+          sql`${campaignLibraryItems.enchantments} @> ${referencesSource}::jsonb`,
+        ),
+      );
     for (const item of libraryItems) {
       const enchantments = refresh(item.enchantments);
       if (enchantments)
@@ -126,7 +135,12 @@ export async function refreshOwnedLibraryMechanics(
       .select({ id: inventoryItems.id, enchantments: inventoryItems.enchantments })
       .from(inventoryItems)
       .innerJoin(characters, eq(inventoryItems.characterId, characters.id))
-      .where(eq(characters.campaignId, campaignId));
+      .where(
+        and(
+          eq(characters.campaignId, campaignId),
+          sql`${inventoryItems.enchantments} @> ${referencesSource}::jsonb`,
+        ),
+      );
     for (const item of ownedItems) {
       const enchantments = refresh(item.enchantments);
       if (enchantments)

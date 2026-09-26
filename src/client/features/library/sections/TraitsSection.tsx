@@ -1,4 +1,5 @@
 import { TRAIT_KINDS } from '../../../../shared/constants/traits.ts';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryTraitCreate } from '../../../../shared/schemas/campaignLibrary.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import type { LocalLibraryTrait } from '../../../db/dexie.ts';
@@ -15,7 +16,7 @@ function kindLabel(kind: string): string {
 }
 
 function signed(value: number, unit: string): string {
-  return `${value > 0 ? '+' : ''}${value}${unit}`;
+  return `${formatSigned(value, { zero: 'plain' })}${unit}`;
 }
 
 export const traitsConfig: LibrarySectionConfig<LocalLibraryTrait> = {

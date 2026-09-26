@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from 'bun:test';
 import { createApp } from '../app.ts';
+import { subscribe } from '../services/wsBus.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
 configureIntegrationTestEnvironment();
@@ -1455,5 +1456,138 @@ describe('POST /api/v1/sync/operations -- inventory enchantments', () => {
     };
     expect(detail.inventory.find((item) => item.id === childId)?.parentId).toBe(rootId);
     expect(root.outcomes[0]?.status).toBe('applied');
+  });
+});
+
+describe('POST /api/v1/sync/operations -- batch-scoped access and invalidation', () => {
+  function decodeUserId(accessToken: string): string {
+    const payloadSegment = accessToken.split('.')[1];
+    if (!payloadSegment) throw new Error('malformed jwt');
+    const json = JSON.parse(Buffer.from(payloadSegment, 'base64url').toString('utf8')) as {
+      sub: string;
+    };
+    return json.sub;
+  }
+
+  function languageCreate(characterId: string, name: string) {
+    return {
+      clientOpId: crypto.randomUUID(),
+      entityClass: 'character_language' as const,
+      entityId: crypto.randomUUID(),
+      command: 'create' as const,
+      attemptedValue: { name, characterId },
+      parentId: characterId,
+      validationVersion: 1,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  it('sends one merged nudge per recipient for a whole batch', async () => {
+    const gm = await registerUser('sync-batch-ws-gm');
+    const owner = await registerUser('sync-batch-ws-owner');
+    const outsider = await registerUser('sync-batch-ws-outsider');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ name: `Camp ${Date.now()}-${Math.random()}` }),
+    });
+    const campaign = (await campaignRes.json()) as { id: string };
+    await app.request(`/api/v1/campaigns/${campaign.id}/members`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ email: owner.email }),
+    });
+    const charRes = await app.request('/api/v1/characters', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Batched PC', campaignId: campaign.id }),
+    });
+    const character = (await charRes.json()) as { id: string; revision: number };
+
+    const inboxes = new Map<string, string[]>();
+    const stops = [gm, owner, outsider].map((user) => {
+      const inbox: string[] = [];
+      inboxes.set(user.accessToken, inbox);
+      return subscribe(decodeUserId(user.accessToken), { send: (text) => inbox.push(text) });
+    });
+    try {
+      const body = await postOperations(owner.accessToken, [
+        ...Array.from({ length: 5 }, (_, i) => languageCreate(character.id, `Tongue ${i}`)),
+        patchOp({
+          clientOpId: crypto.randomUUID(),
+          entityId: character.id,
+          fieldPath: 'name',
+          attemptedValue: 'Renamed PC',
+          baseRevision: character.revision,
+        }),
+      ]);
+      expect(body.outcomes.map((outcome) => outcome.status)).toEqual(Array(6).fill('applied'));
+      for (const user of [gm, owner]) {
+        const messages = (inboxes.get(user.accessToken) ?? []).map(
+          (text) => JSON.parse(text) as { kind: string; entityClasses: string[] },
+        );
+        expect(messages).toHaveLength(1);
+        expect(messages[0]?.kind).toBe('sync_invalidate');
+        expect([...(messages[0]?.entityClasses ?? [])].sort()).toEqual([
+          'character',
+          'character_language',
+        ]);
+      }
+      expect(inboxes.get(outsider.accessToken)).toEqual([]);
+    } finally {
+      for (const stop of stops) stop();
+    }
+  });
+
+  it('re-reads the character after a character op instead of reusing a stale row', async () => {
+    const { accessToken } = await registerUser('sync-batch-access-refresh');
+    const character = await createCharacter(accessToken);
+    // The language create caches the parent row (ST 10). The ST patch must
+    // clear it, so the first combat upsert defaults current HP from ST 14.
+    const body = await postOperations(accessToken, [
+      languageCreate(character.id, 'Latin'),
+      patchOp({
+        clientOpId: crypto.randomUUID(),
+        entityId: character.id,
+        fieldPath: 'st',
+        attemptedValue: 14,
+        baseRevision: character.revision,
+      }),
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_combat' as const,
+        entityId: character.id,
+        command: 'patch' as const,
+        fieldPath: 'currentFp',
+        attemptedValue: 5,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(body.outcomes.map((outcome) => outcome.status)).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+    const detail = (await getCharacter(accessToken, character.id)) as unknown as {
+      combat: { currentHp: number; currentFp: number } | null;
+    };
+    expect(detail.combat?.currentFp).toBe(5);
+    expect(detail.combat?.currentHp).toBe(14);
+  });
+
+  it('checks access for every op when the parent lookup fails', async () => {
+    const owner = await registerUser('sync-batch-denied-owner');
+    const stranger = await registerUser('sync-batch-denied-stranger');
+    const character = await createCharacter(owner.accessToken);
+    const body = await postOperations(stranger.accessToken, [
+      languageCreate(character.id, 'Latin'),
+      languageCreate(character.id, 'Greek'),
+    ]);
+    expect(body.outcomes.map((outcome) => outcome.status)).toEqual([
+      'unauthorized',
+      'unauthorized',
+    ]);
   });
 });

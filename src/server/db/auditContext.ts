@@ -36,13 +36,12 @@ export async function withAudit<T>(
   return runInDbSavepoint(async () => {
     const tx = getDb() as unknown as AuditTx;
     const execution = currentTrustedExecution();
-    await tx.execute(sql`select set_config('app.actor_id', ${actorId}, true)`);
-    await tx.execute(sql`select set_config('app.batch_id', ${batchId ?? ''}, true)`);
+    // One round-trip for all four GUCs; this runs before every audited write.
     await tx.execute(
-      sql`select set_config('app.oauth_client_id', ${execution?.oauthClientDbId ?? ''}, true)`,
-    );
-    await tx.execute(
-      sql`select set_config('app.oauth_grant_id', ${execution?.oauthGrantId ?? ''}, true)`,
+      sql`select set_config('app.actor_id', ${actorId}, true),
+                 set_config('app.batch_id', ${batchId ?? ''}, true),
+                 set_config('app.oauth_client_id', ${execution?.oauthClientDbId ?? ''}, true),
+                 set_config('app.oauth_grant_id', ${execution?.oauthGrantId ?? ''}, true)`,
     );
     return fn(tx);
   });

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { skillDisplayName, splitSkillReference } from '../../../shared/domain/defenseCalc.ts';
+import { formatSigned } from '../../../shared/format/number.ts';
 import type { LibraryItemOut } from '../../../shared/schemas/campaignLibrary.ts';
 import {
   EFFECT_TARGETS,
@@ -109,7 +110,7 @@ function candidateFromDraft(draft: EffectDraft): unknown {
 }
 
 export function effectPreview(effect: TraitEffect): string {
-  const signed = `${effect.value >= 0 ? '+' : ''}${effect.value}`;
+  const signed = formatSigned(effect.value);
   const scale = effect.scaling === 'per_level' ? '/level' : '';
   let target = TARGET_LABELS[effect.target];
   if (effect.target === 'skill') {

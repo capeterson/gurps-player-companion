@@ -155,93 +155,146 @@ export async function projectEncounterForViewer(
   isAdmin: boolean,
   canManageCharacters: boolean,
 ) {
+  const [projected] = await projectEncountersForViewer([row], userId, isAdmin, canManageCharacters);
+  if (!projected) throw new HTTPException(404, { message: 'encounter not found' });
+  return projected;
+}
+
+function groupByEncounter<T extends { encounterId: string }>(rows: readonly T[]): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const group = grouped.get(row.encounterId);
+    if (group) group.push(row);
+    else grouped.set(row.encounterId, [row]);
+  }
+  return grouped;
+}
+
+/**
+ * Project encounters for one viewer with a fixed number of queries,
+ * whatever the number of encounters (the list route used to run three or
+ * four per encounter).
+ */
+export async function projectEncountersForViewer(
+  rows: readonly DbEncounter[],
+  userId: string,
+  isAdmin: boolean,
+  canManageCharacters: boolean,
+) {
+  if (rows.length === 0) return [];
   const db = getDb();
-  const [campaign] = await db
-    .select({ shareCharacterSheets: campaigns.shareCharacterSheets })
+  const encounterIds = rows.map((row) => row.id);
+  const campaignRows = await db
+    .select({ id: campaigns.id, shareCharacterSheets: campaigns.shareCharacterSheets })
     .from(campaigns)
-    .where(eq(campaigns.id, row.campaignId));
-  const combatants = await db
-    .select()
-    .from(encounterCombatants)
-    .where(eq(encounterCombatants.encounterId, row.id))
-    .orderBy(asc(encounterCombatants.orderKey), asc(encounterCombatants.createdAt));
-  const effects = await db
-    .select()
-    .from(encounterEffects)
-    .where(eq(encounterEffects.encounterId, row.id));
-  if (!campaign) throw new HTTPException(404, { message: 'campaign not found' });
-  const pcCharacterIds = combatants.flatMap((combatant) =>
-    combatant.kind === 'pc' && combatant.characterId ? [combatant.characterId] : [],
+    .where(inArray(campaigns.id, [...new Set(rows.map((row) => row.campaignId))]));
+  const shareByCampaign = new Map(
+    campaignRows.map((campaign) => [campaign.id, campaign.shareCharacterSheets]),
+  );
+  const combatantsByEncounter = groupByEncounter(
+    await db
+      .select()
+      .from(encounterCombatants)
+      .where(inArray(encounterCombatants.encounterId, encounterIds))
+      .orderBy(asc(encounterCombatants.orderKey), asc(encounterCombatants.createdAt)),
+  );
+  const effectsByEncounter = groupByEncounter(
+    await db
+      .select()
+      .from(encounterEffects)
+      .where(inArray(encounterEffects.encounterId, encounterIds)),
   );
   // Managers/owners with character access never mask, so the ownership lookup
   // only matters for viewers subject to the share gate.
+  const gatedPcCharacterIds = canManageCharacters
+    ? []
+    : rows.flatMap((row) =>
+        shareByCampaign.get(row.campaignId) === false
+          ? (combatantsByEncounter.get(row.id) ?? []).flatMap((combatant) =>
+              combatant.kind === 'pc' && combatant.characterId ? [combatant.characterId] : [],
+            )
+          : [],
+      );
   const ownedCharacterIds =
-    canManageCharacters || campaign.shareCharacterSheets || pcCharacterIds.length === 0
+    gatedPcCharacterIds.length === 0
       ? new Set<string>()
       : new Set(
           (
             await db
               .select({ id: characters.id })
               .from(characters)
-              .where(and(eq(characters.ownerId, userId), inArray(characters.id, pcCharacterIds)))
+              .where(
+                and(
+                  eq(characters.ownerId, userId),
+                  inArray(characters.id, [...new Set(gatedPcCharacterIds)]),
+                ),
+              )
           ).map((character) => character.id),
         );
-  const visible = combatants
-    .map((combatant) =>
-      outCombatant(
-        combatant,
-        isAdmin,
-        canManageCharacters,
-        campaign.shareCharacterSheets,
-        ownedCharacterIds,
-      ),
-    )
-    .filter((combatant): combatant is NonNullable<typeof combatant> => combatant !== null);
-  const visibleIds = new Set(visible.map((combatant) => combatant.id));
-  // A masked PC still appears in the roster, but effects targeting it must not
-  // leak the sheet condition / temp-effect id its combatant projection redacted.
-  const maskedCombatantIds = new Set(
-    combatants
-      .filter((combatant) =>
-        shouldMaskCharacterCombat(
+
+  return rows.map((row) => {
+    const shareCharacterSheets = shareByCampaign.get(row.campaignId);
+    if (shareCharacterSheets === undefined)
+      throw new HTTPException(404, { message: 'campaign not found' });
+    const combatants = combatantsByEncounter.get(row.id) ?? [];
+    const effects = effectsByEncounter.get(row.id) ?? [];
+    const visible = combatants
+      .map((combatant) =>
+        outCombatant(
           combatant,
+          isAdmin,
           canManageCharacters,
-          campaign.shareCharacterSheets,
+          shareCharacterSheets,
           ownedCharacterIds,
         ),
       )
-      .map((combatant) => combatant.id),
-  );
-  return {
-    id: row.id,
-    campaignId: row.campaignId,
-    name: row.name,
-    status: row.status,
-    round: row.round,
-    // This remains an opaque turn-state token even when its combatant is hidden.
-    // The hidden row and every effect targeting it are still excluded below.
-    activeCombatantId: row.activeCombatantId,
-    version: row.version,
-    endedAt: row.endedAt?.toISOString() ?? null,
-    combatants: visible,
-    effects: effects
-      .filter((effect) => visibleIds.has(effect.targetCombatantId))
-      .map((effect) => {
-        const masked = maskedCombatantIds.has(effect.targetCombatantId);
-        return {
-          ...outEffect(effect),
-          // Do not reveal a hidden NPC's stable combatant id through an effect.
-          casterCombatantId: visibleIds.has(effect.casterCombatantId ?? '')
-            ? effect.casterCombatantId
-            : null,
-          // A masked PC's linked sheet condition / temp-effect id are private too.
-          linkedCondition: masked ? null : effect.linkedCondition,
-          linkedTempEffectId: masked ? null : effect.linkedTempEffectId,
-        };
-      }),
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
+      .filter((combatant): combatant is NonNullable<typeof combatant> => combatant !== null);
+    const visibleIds = new Set(visible.map((combatant) => combatant.id));
+    // A masked PC still appears in the roster, but effects targeting it must not
+    // leak the sheet condition / temp-effect id its combatant projection redacted.
+    const maskedCombatantIds = new Set(
+      combatants
+        .filter((combatant) =>
+          shouldMaskCharacterCombat(
+            combatant,
+            canManageCharacters,
+            shareCharacterSheets,
+            ownedCharacterIds,
+          ),
+        )
+        .map((combatant) => combatant.id),
+    );
+    return {
+      id: row.id,
+      campaignId: row.campaignId,
+      name: row.name,
+      status: row.status,
+      round: row.round,
+      // This remains an opaque turn-state token even when its combatant is hidden.
+      // The hidden row and every effect targeting it are still excluded below.
+      activeCombatantId: row.activeCombatantId,
+      version: row.version,
+      endedAt: row.endedAt?.toISOString() ?? null,
+      combatants: visible,
+      effects: effects
+        .filter((effect) => visibleIds.has(effect.targetCombatantId))
+        .map((effect) => {
+          const masked = maskedCombatantIds.has(effect.targetCombatantId);
+          return {
+            ...outEffect(effect),
+            // Do not reveal a hidden NPC's stable combatant id through an effect.
+            casterCombatantId: visibleIds.has(effect.casterCombatantId ?? '')
+              ? effect.casterCombatantId
+              : null,
+            // A masked PC's linked sheet condition / temp-effect id are private too.
+            linkedCondition: masked ? null : effect.linkedCondition,
+            linkedTempEffectId: masked ? null : effect.linkedTempEffectId,
+          };
+        }),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  });
 }
 
 async function invalidateEncounter(campaignId: string, encounterId: string) {
@@ -401,17 +454,12 @@ router.openapi(
       .orderBy(asc(encounters.createdAt), asc(encounters.id))
       .limit(limit)
       .offset(offset);
-    const projected: Awaited<ReturnType<typeof projectEncounterForViewer>>[] = [];
-    for (const row of rows) {
-      projected.push(
-        await projectEncounterForViewer(
-          row,
-          user.id,
-          isAdmin(access.role),
-          canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
-        ),
-      );
-    }
+    const projected = await projectEncountersForViewer(
+      rows,
+      user.id,
+      isAdmin(access.role),
+      canManageCharacters(access.role, access.campaign.allowGmCharacterEditing),
+    );
     return c.json(projected, 200);
   },
 );

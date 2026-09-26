@@ -38,14 +38,10 @@ import {
   LIBRARY_STORE_NAMES,
   type LocalCharacter,
   type LocalCharacterCombat,
-  type LocalCharacterInventory,
-  type LocalCharacterLanguage,
-  type LocalCharacterSkill,
-  type LocalCharacterSpell,
-  type LocalCharacterTechnique,
-  type LocalCharacterTrait,
   type OutboxEntry,
   type RejectionRecord,
+  SYNCED_ENTITY_CLASSES,
+  type TombstoneRow,
   coalesceKey,
   getLocalDb,
   storeForEntityClass,
@@ -91,25 +87,17 @@ import {
   snapshotValue,
 } from './syncLog.ts';
 
-const ALL_ENTITY_CLASSES: EntityClass[] = [
-  'character',
-  'character_trait',
-  'character_skill',
-  'character_spell',
-  'character_language',
-  'character_technique',
-  'character_inventory',
-  'character_combat',
-  // Campaigns are pulled READ-ONLY: rows land in Dexie so
-  // `enforceMinimalViewLocally` can evaluate shareCharacterSheets and
-  // `useCharacterDetail` can resolve campaign names offline.  Campaign
-  // *mutations* still go through the REST routes — there is no outbox
-  // path for them (see AGENTS.md S0).
-  'campaign',
-  // The campaign library is fully sync-backed: cursor rows plus outbox
-  // creates, whole-entry patches (S13) and deletes.
-  ...LIBRARY_ENTITY_CLASSES,
-];
+const ALL_ENTITY_CLASSES: readonly EntityClass[] = SYNCED_ENTITY_CLASSES;
+
+interface ServerRowOptions {
+  readonly ignoreOutboxConflict?: boolean;
+  /** The local row and tombstone the caller already read for this entity. */
+  readonly known?: {
+    readonly entityId: string;
+    readonly row: Record<string, unknown> | undefined;
+    readonly tombstone: TombstoneRow | undefined;
+  };
+}
 
 /** A whole-entry patch (AGENTS.md S13): no fieldPath, the full body in attemptedValue. */
 function isEntityPatch(op: OutboxEntry): boolean {
@@ -939,8 +927,15 @@ class SyncOrchestrator {
   private async applyOutcomes(ops: OutboxEntry[], outcomes: OperationOutcome[]): Promise<void> {
     const db = getLocalDb();
     const byOpId = new Map(outcomes.map((o) => [o.clientOpId, o]));
+    // Consecutive applied ops are settled as one group, flushed before any
+    // other outcome is handled so per-op ordering is unchanged.
+    let appliedRun: { op: OutboxEntry; outcome: OperationOutcome }[] = [];
     for (const op of ops) {
       const outcome = byOpId.get(op.clientOpId);
+      if (!outcome || outcome.status !== 'applied') {
+        await this.settleApplied(appliedRun);
+        appliedRun = [];
+      }
       if (!outcome) {
         // Server didn't return an outcome for this op.  Treat as
         // transient -- the ack got lost; we'll retry the same op.
@@ -972,28 +967,11 @@ class SyncOrchestrator {
         continue;
       }
       switch (outcome.status) {
-        case 'applied': {
-          // Stamp the new server revision into the local row so future
-          // patches use it as their baseRevision.  Then drop the op.
-          if (typeof outcome.newRevision === 'number') {
-            await this.stampRevision(op.entityClass, op.entityId, outcome.newRevision);
-          }
-          await appendSyncLog({
-            direction: 'push',
-            result: 'synced',
-            entityClass: op.entityClass,
-            entityId: op.entityId,
-            parentId: op.parentId,
-            command: op.command,
-            fieldPath: op.fieldPath,
-            humanName: op.humanName,
-            previousValue: snapshotValue(op.prevValue),
-            newValue: snapshotValue(op.attemptedValue),
-            details: snapshotValue(outcome),
-          });
-          await db.outbox.delete(op.clientOpId);
+        case 'applied':
+          // Settled together with any adjacent applied ops (see
+          // settleApplied) instead of three auto-committed writes each.
+          appliedRun.push({ op, outcome });
           break;
-        }
         case 'rejected':
         case 'unauthorized':
         case 'conflict':
@@ -1145,6 +1123,43 @@ class SyncOrchestrator {
         }
       }
     }
+    await this.settleApplied(appliedRun);
+  }
+
+  /**
+   * Stamp each applied op's new server revision into its local row (so
+   * future patches use it as their baseRevision) and drop the ops, in one
+   * transaction. Per-op auto-committed writes woke every live query --
+   * including the full character-detail rebuild -- three times per op.
+   */
+  private async settleApplied(
+    run: readonly { op: OutboxEntry; outcome: OperationOutcome }[],
+  ): Promise<void> {
+    if (run.length === 0) return;
+    const db = getLocalDb();
+    await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      for (const { op, outcome } of run) {
+        if (typeof outcome.newRevision === 'number') {
+          await this.stampRevision(op.entityClass, op.entityId, outcome.newRevision);
+        }
+      }
+      await db.outbox.bulkDelete(run.map(({ op }) => op.clientOpId));
+    });
+    await appendSyncLogEntries(
+      run.map(({ op, outcome }) => ({
+        direction: 'push' as const,
+        result: 'synced' as const,
+        entityClass: op.entityClass,
+        entityId: op.entityId,
+        parentId: op.parentId,
+        command: op.command,
+        fieldPath: op.fieldPath,
+        humanName: op.humanName,
+        previousValue: snapshotValue(op.prevValue),
+        newValue: snapshotValue(op.attemptedValue),
+        details: snapshotValue(outcome),
+      })),
+    );
   }
 
   /**
@@ -1528,7 +1543,9 @@ class SyncOrchestrator {
             });
           }
         } else if (!staleChange && change.data && typeof change.data === 'object') {
-          await this.applyServerRow(change.entityClass, change.data as Record<string, unknown>, {});
+          await this.applyServerRow(change.entityClass, change.data as Record<string, unknown>, {
+            known: { entityId: change.entityId, row: before, tombstone: priorTombstone },
+          });
         }
         const after = await this.readLocalEntity(change.entityClass, change.entityId);
         pullLogEntries.push(pullLogEntry(change, before, after));
@@ -1718,7 +1735,7 @@ class SyncOrchestrator {
   private async applyServerRow(
     entityClass: EntityClass,
     row: Record<string, unknown>,
-    opts: { ignoreOutboxConflict?: boolean },
+    opts: ServerRowOptions,
   ): Promise<void> {
     const db = getLocalDb();
     await db.transaction(
@@ -1739,7 +1756,7 @@ class SyncOrchestrator {
   private async mergeServerRow(
     entityClass: EntityClass,
     row: Record<string, unknown>,
-    opts: { ignoreOutboxConflict?: boolean },
+    opts: ServerRowOptions,
   ): Promise<void> {
     const db = getLocalDb();
     const id =
@@ -1747,9 +1764,12 @@ class SyncOrchestrator {
         ? (row.characterId as string | undefined)
         : (row.id as string | undefined);
     if (!id) return;
-    const existingRow = await this.readLocalEntity(entityClass, id);
+    // A cursor page already read this row and its tombstone in the same
+    // transaction; reuse them instead of reading each twice more.
+    const known = opts.known?.entityId === id ? opts.known : undefined;
+    const existingRow = known ? known.row : await this.readLocalEntity(entityClass, id);
     const incomingRevision = row.revision;
-    const tombstone = await db.tombstones.get([entityClass, id]);
+    const tombstone = known ? known.tombstone : await db.tombstones.get([entityClass, id]);
     if (
       typeof incomingRevision === 'number' &&
       ((typeof existingRow?.revision === 'number' && incomingRevision < existingRow.revision) ||
@@ -1878,7 +1898,7 @@ class SyncOrchestrator {
     }
     switch (entityClass) {
       case 'character': {
-        const existing = await db.characters.get(id);
+        const existing = existingRow as LocalCharacter | undefined;
         if (merged.activeEffects !== undefined)
           merged.activeEffects = activeEffectsField
             .parse(merged.activeEffects)
@@ -1891,52 +1911,9 @@ class SyncOrchestrator {
         await db.characters.put({ ...(existing ?? {}), ...merged } as LocalCharacter);
         return;
       }
-      case 'character_trait': {
-        const existing = await db.characterTraits.get(id);
-        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
-          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
-        await db.characterTraits.put({ ...(existing ?? {}), ...merged } as LocalCharacterTrait);
-        return;
-      }
-      case 'character_skill': {
-        const existing = await db.characterSkills.get(id);
-        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
-          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
-        await db.characterSkills.put({ ...(existing ?? {}), ...merged } as LocalCharacterSkill);
-        return;
-      }
-      case 'character_spell': {
-        const existing = await db.characterSpells.get(id);
-        await db.characterSpells.put({ ...(existing ?? {}), ...merged } as LocalCharacterSpell);
-        return;
-      }
-      case 'character_language': {
-        const existing = await db.characterLanguages.get(id);
-        await db.characterLanguages.put({
-          ...(existing ?? {}),
-          ...merged,
-        } as LocalCharacterLanguage);
-        return;
-      }
-      case 'character_technique': {
-        const existing = await db.characterTechniques.get(id);
-        await db.characterTechniques.put({
-          ...(existing ?? {}),
-          ...merged,
-        } as LocalCharacterTechnique);
-        return;
-      }
-      case 'character_inventory': {
-        const existing = await db.characterInventory.get(id);
-        await db.characterInventory.put({
-          ...(existing ?? {}),
-          ...merged,
-        } as LocalCharacterInventory);
-        return;
-      }
       case 'character_combat': {
         const characterId = (row.characterId as string) ?? id;
-        const existing = await db.characterCombat.get(characterId);
+        const existing = existingRow;
         await db.characterCombat.put({
           ...(existing ?? {}),
           ...merged,
@@ -1949,21 +1926,24 @@ class SyncOrchestrator {
           merged.activeEffectDefinitions = activeEffectDefinitionOut
             .array()
             .parse(merged.activeEffectDefinitions);
-        const existing = await db.campaigns.get(id);
+        const existing = existingRow;
         await db.campaigns.put({ ...(existing ?? {}), ...merged } as Record<
           string,
           unknown
         > as never);
         return;
       }
-      default: {
-        if (!isLibraryEntityClass(entityClass)) return;
-        const table = writableSyncEntityTable(entityClass);
-        const existing = await table.get(id);
-        await table.put({ ...(existing ?? {}), ...merged } as never);
-        return;
-      }
+      case 'character_trait':
+      case 'character_skill':
+        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
+          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
+        break;
     }
+    // Every other id-keyed class (character children and library entries)
+    // merges the server row over the local one in its own store.
+    const table = syncEntityTable(entityClass);
+    if (!table) return;
+    await table.put({ ...(existingRow ?? {}), ...merged } as never);
   }
 
   private async replayRejectionToasts(): Promise<void> {

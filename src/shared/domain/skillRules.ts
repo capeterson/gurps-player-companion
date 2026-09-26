@@ -1,4 +1,5 @@
 import type { SkillAttribute } from '../constants/skills.ts';
+import { formatSigned } from '../format/number.ts';
 import type {
   SkillDefaultCondition,
   SkillPrerequisite,
@@ -87,7 +88,7 @@ export function evaluateSkillPrerequisite(
       prerequisite.minimumLevel === undefined ? null : `level ${prerequisite.minimumLevel}`,
       prerequisite.minimumRelativeLevel === undefined
         ? null
-        : `relative level ${prerequisite.minimumRelativeLevel >= 0 ? '+' : ''}${prerequisite.minimumRelativeLevel}`,
+        : `relative level ${formatSigned(prerequisite.minimumRelativeLevel)}`,
       prerequisite.minimumPoints === undefined ? null : `${prerequisite.minimumPoints} points`,
     ].filter(Boolean);
     return {

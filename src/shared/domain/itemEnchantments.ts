@@ -2,7 +2,6 @@ import type {
   ArmorData,
   EnchantmentEffect,
   EnchantmentRef,
-  InventoryItemOut,
   WeaponData,
 } from '../schemas/inventory.ts';
 import type { ResolvedEffect } from './traitEffects.ts';
@@ -208,30 +207,5 @@ export function resolveItemEnchantments(item: ItemInput): ItemEnchantmentResolut
         suppressedByStacking: key !== null && winners.get(key) !== candidate.instanceKey,
       };
     }),
-  };
-}
-
-export function enchantmentResolutionForOutput(
-  item: ItemInput,
-): Pick<
-  InventoryItemOut,
-  | 'armor'
-  | 'weaponData'
-  | 'baseArmor'
-  | 'baseWeaponData'
-  | 'effectiveArmorDivisor'
-  | 'effectiveWeightReductionPercent'
-  | 'enchantmentBreakdown'
-> & { effects: ResolvedEffect[] } {
-  const resolved = resolveItemEnchantments(item);
-  return {
-    armor: resolved.armor,
-    weaponData: resolved.weaponData,
-    baseArmor: item.armor,
-    baseWeaponData: item.weaponData,
-    effectiveArmorDivisor: resolved.armorDivisor,
-    effectiveWeightReductionPercent: resolved.weightReductionPercent,
-    enchantmentBreakdown: resolved.breakdown,
-    effects: resolved.effects,
   };
 }

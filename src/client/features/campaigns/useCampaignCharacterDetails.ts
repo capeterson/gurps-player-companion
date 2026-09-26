@@ -20,33 +20,39 @@ export function useCampaignCharacterDetails(
     ]);
     if (characters.length === 0) return [];
 
-    const ids = new Set(characters.map((character) => character.id));
+    const ids = characters.map((character) => character.id);
     const [traits, skills, spells, languages, techniques, inventory, combat] = await Promise.all([
-      db.characterTraits.filter((row) => ids.has(row.characterId)).toArray(),
-      db.characterSkills.filter((row) => ids.has(row.characterId)).toArray(),
-      db.characterSpells.filter((row) => ids.has(row.characterId)).toArray(),
-      db.characterLanguages.filter((row) => ids.has(row.characterId)).toArray(),
-      db.characterTechniques.filter((row) => ids.has(row.characterId)).toArray(),
-      db.characterInventory.filter((row) => ids.has(row.characterId)).toArray(),
-      db.characterCombat.filter((row) => ids.has(row.characterId)).toArray(),
+      db.characterTraits.where('characterId').anyOf(ids).toArray(),
+      db.characterSkills.where('characterId').anyOf(ids).toArray(),
+      db.characterSpells.where('characterId').anyOf(ids).toArray(),
+      db.characterLanguages.where('characterId').anyOf(ids).toArray(),
+      db.characterTechniques.where('characterId').anyOf(ids).toArray(),
+      db.characterInventory.where('characterId').anyOf(ids).toArray(),
+      db.characterCombat.bulkGet(ids),
     ]);
+    const traitsBy = groupByCharacter(traits);
+    const skillsBy = groupByCharacter(skills);
+    const spellsBy = groupByCharacter(spells);
+    const languagesBy = groupByCharacter(languages);
+    const techniquesBy = groupByCharacter(techniques);
+    const inventoryBy = groupByCharacter(inventory);
 
     return characters
-      .map((character) => {
+      .map((character, index) => {
         const joined = joinCharacterMechanics(
           campaignId,
-          traits.filter((row) => row.characterId === character.id),
-          skills.filter((row) => row.characterId === character.id),
+          traitsBy.get(character.id) ?? [],
+          skillsBy.get(character.id) ?? [],
         );
         const detail = buildCharacterDetail({
           character,
           traits: joined.traits,
           skills: joined.skills,
-          spells: spells.filter((row) => row.characterId === character.id),
-          languages: languages.filter((row) => row.characterId === character.id),
-          techniques: techniques.filter((row) => row.characterId === character.id),
-          inventory: inventory.filter((row) => row.characterId === character.id),
-          combat: combat.find((row) => row.characterId === character.id) ?? null,
+          spells: spellsBy.get(character.id) ?? [],
+          languages: languagesBy.get(character.id) ?? [],
+          techniques: techniquesBy.get(character.id) ?? [],
+          inventory: inventoryBy.get(character.id) ?? [],
+          combat: combat[index] ?? null,
           campaign: campaign
             ? {
                 pointTarget: campaign.pointTarget,
@@ -62,4 +68,14 @@ export function useCampaignCharacterDetails(
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [campaignId]);
+}
+
+function groupByCharacter<T extends { characterId: string }>(rows: readonly T[]): Map<string, T[]> {
+  const byCharacter = new Map<string, T[]>();
+  for (const row of rows) {
+    const group = byCharacter.get(row.characterId);
+    if (group) group.push(row);
+    else byCharacter.set(row.characterId, [row]);
+  }
+  return byCharacter;
 }

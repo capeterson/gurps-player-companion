@@ -1,5 +1,6 @@
 import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { type TraitEffect, traitEffect } from '../../../../shared/schemas/effects.ts';
@@ -27,6 +28,7 @@ import {
   saveTraitTablePreferences,
 } from './traitTablePreferences.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
+import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityNameField,
   useEntityPointsField,
@@ -398,7 +400,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                 adj.push(`×${v.pointCostMultiplier}`);
               }
               if (v.pointCostDelta !== undefined) {
-                adj.push(`${v.pointCostDelta >= 0 ? '+' : ''}${v.pointCostDelta} pts`);
+                adj.push(`${formatSigned(v.pointCostDelta)} pts`);
               }
               const adjStr = adj.length > 0 ? ` (${adj.join(', ')})` : '';
               return (
@@ -608,8 +610,7 @@ function TraitConfiguredDetails({ trait }: { trait: TraitOut }) {
               <li key={`${modifier.category}:${modifier.name}`}>
                 <span className="font-medium">{modifier.name}</span>{' '}
                 <span className="text-base-content/60">
-                  ({modifier.costValue >= 0 ? '+' : ''}
-                  {modifier.costValue}
+                  ({formatSigned(modifier.costValue)}
                   {modifier.costType === 'percent' ? '%' : ' pts'})
                 </span>
                 {modifier.description && (
@@ -674,9 +675,6 @@ function TraitRow({
   onDrop,
   onMove,
 }: TraitRowProps) {
-  const toasts = useToasts();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   const rowPatch = useEntityRowPatch('character_trait', trait.id, characterId, trait.name);
 
   const nameField = useEntityNameField(rowPatch, trait.name);
@@ -700,19 +698,13 @@ function TraitRow({
   const hasCustomEffects = (trait.customEffects?.length ?? 0) > 0;
   const canExpand = canWrite || Boolean(trait.notes) || hasSourceRules || hasCustomEffects;
 
-  const removeTrait = async () => {
-    try {
-      await enqueueDelete({
-        entityClass: 'character_trait',
-        entityId: trait.id,
-        humanName: `trait "${trait.name}"`,
-        characterId,
-        prevValue: trait,
-      });
-    } catch (err) {
-      toasts.push(`Couldn't delete trait — ${(err as Error).message}`, { kind: 'error' });
-    }
-  };
+  const deletion = useConfirmedEntityDelete({
+    entityClass: 'character_trait',
+    noun: 'trait',
+    label: trait.name,
+    entity: trait,
+    characterId,
+  });
 
   return (
     <tbody
@@ -875,7 +867,7 @@ function TraitRow({
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm text-error"
-                    onClick={() => setConfirmDelete(true)}
+                    onClick={deletion.request}
                   >
                     Delete trait
                   </button>
@@ -883,17 +875,7 @@ function TraitRow({
                     Done
                   </button>
                 </footer>
-                <ConfirmDialog
-                  open={confirmDelete}
-                  title={`Delete trait "${trait.name}"?`}
-                  confirmLabel="Delete"
-                  tone="error"
-                  onConfirm={() => {
-                    setConfirmDelete(false);
-                    void removeTrait();
-                  }}
-                  onCancel={() => setConfirmDelete(false)}
-                />
+                {deletion.dialog}
               </div>
             ) : (
               <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">

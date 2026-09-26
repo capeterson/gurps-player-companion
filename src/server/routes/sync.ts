@@ -32,24 +32,22 @@ import {
 import { requireActiveUser } from '../auth/middleware.ts';
 import { getDb } from '../db/client.ts';
 import {
-  type DbCampaign,
-  type DbCampaignMembership,
   type DbCharacter,
   campaignMemberships,
   campaigns,
-  characterLanguages,
-  characterSkills,
-  characterSpells,
-  characterTechniques,
-  characterTraits,
   characters,
   combatStates,
   entityTombstones,
   inventoryItems,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { CHARACTER_CHILD_TABLES } from '../services/characterChildren.ts';
 import { withLibraryMechanics } from '../services/libraryMechanics.ts';
-import { dispatchOperation } from '../services/syncDispatch.ts';
+import {
+  createDispatchBatch,
+  dispatchOperation,
+  publishBatchInvalidations,
+} from '../services/syncDispatch.ts';
 import { libraryEntityConfig, libraryRowOut } from './campaignLibraryEntities.ts';
 
 const router = createOpenApiApp();
@@ -100,12 +98,17 @@ router.openapi(
     // normal -- the client's stale_base self-heal remains the fallback
     // for that case and for bursts spanning more than one 50-op batch.
     const chains = createBatchRevisionChains();
+    const batch = createDispatchBatch();
     for (const op of operations) {
       const effective = chains.rewrite(op);
-      const outcome = await dispatchOperation({ userId: user.id, batchId: op.batchId }, effective);
+      const outcome = await dispatchOperation(
+        { userId: user.id, batchId: op.batchId, batch },
+        effective,
+      );
       chains.record(op, outcome);
       outcomes.push(outcome);
     }
+    await publishBatchInvalidations(user.id, batch);
     return c.json({ outcomes }, 200);
   },
 );
@@ -531,77 +534,27 @@ async function fetchClassUpserts(args: {
       });
     }
     case 'character_trait':
-      return await withLibraryMechanics(
-        await fetchChildClass({
-          entityClass,
-          table: characterTraits,
-          idCol: characterTraits.id,
-          revisionCol: characterTraits.revision,
-          characterIdCol: characterTraits.characterId,
-          accessibleCharacterIds: fullAccessCharacterIds,
-          sinceRevision,
-          limit,
-        }),
-        accessibleCampaignIds,
-      );
     case 'character_skill':
-      return await withLibraryMechanics(
-        await fetchChildClass({
-          entityClass,
-          table: characterSkills,
-          idCol: characterSkills.id,
-          revisionCol: characterSkills.revision,
-          characterIdCol: characterSkills.characterId,
-          accessibleCharacterIds: fullAccessCharacterIds,
-          sinceRevision,
-          limit,
-        }),
-        accessibleCampaignIds,
-      );
     case 'character_spell':
-      return await fetchChildClass({
-        entityClass,
-        table: characterSpells,
-        idCol: characterSpells.id,
-        revisionCol: characterSpells.revision,
-        characterIdCol: characterSpells.characterId,
-        accessibleCharacterIds: fullAccessCharacterIds,
-        sinceRevision,
-        limit,
-      });
     case 'character_language':
-      return await fetchChildClass({
-        entityClass,
-        table: characterLanguages,
-        idCol: characterLanguages.id,
-        revisionCol: characterLanguages.revision,
-        characterIdCol: characterLanguages.characterId,
-        accessibleCharacterIds: fullAccessCharacterIds,
-        sinceRevision,
-        limit,
-      });
     case 'character_technique':
-      return await fetchChildClass({
+    case 'character_inventory': {
+      const table = CHARACTER_CHILD_TABLES[entityClass];
+      const changes = await fetchChildClass({
         entityClass,
-        table: characterTechniques,
-        idCol: characterTechniques.id,
-        revisionCol: characterTechniques.revision,
-        characterIdCol: characterTechniques.characterId,
+        table,
+        idCol: table.id,
+        revisionCol: table.revision,
+        characterIdCol: table.characterId,
         accessibleCharacterIds: fullAccessCharacterIds,
         sinceRevision,
         limit,
       });
-    case 'character_inventory':
-      return await fetchChildClass({
-        entityClass,
-        table: inventoryItems,
-        idCol: inventoryItems.id,
-        revisionCol: inventoryItems.revision,
-        characterIdCol: inventoryItems.characterId,
-        accessibleCharacterIds: fullAccessCharacterIds,
-        sinceRevision,
-        limit,
-      });
+      // Trait and skill rows carry their library mechanics declarations.
+      return entityClass === 'character_trait' || entityClass === 'character_skill'
+        ? await withLibraryMechanics(changes, accessibleCampaignIds)
+        : changes;
+    }
     case 'character_combat':
       // Combat is 1:1 with its character.  We emit the row keyed by
       // characterId (not combat_states.id) so the client's local
@@ -872,13 +825,5 @@ function serializeRow(data: unknown): unknown {
   }
   return out;
 }
-
-// Touch unused-import noise so biome doesn't complain.
-export const _internalCampaign: typeof campaigns | undefined = undefined as
-  | typeof campaigns
-  | undefined;
-export const _internalDbCampaign: DbCampaign | undefined = undefined;
-export const _internalDbMembership: DbCampaignMembership | undefined = undefined;
-export const _internalDbCharacter: DbCharacter | undefined = undefined;
 
 export const syncRouter = router;

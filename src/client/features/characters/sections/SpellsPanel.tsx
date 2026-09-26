@@ -18,6 +18,7 @@ import { RollSheet } from './RollSheet.tsx';
 import { ModifierBreakdown, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
+import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityNameField,
   useEntityPointsField,
@@ -241,8 +242,6 @@ function SpellRow({
   onRoll,
   effects,
 }: SpellRowProps) {
-  const toasts = useToasts();
-  const [confirmDelete, setConfirmDelete] = useState(false);
   // A spell with no points has no skill level (spells have no default
   // in GURPS), so there is nothing to roll against — hold Cast/Maintain
   // for that row even when the ambient mana allows casting.
@@ -278,19 +277,13 @@ function SpellRow({
     flashKey: rowPatch.flashKey('baseEnergyCost'),
   });
 
-  const removeSpell = async () => {
-    try {
-      await enqueueDelete({
-        entityClass: 'character_spell',
-        entityId: spell.id,
-        humanName: `spell "${spell.name}"`,
-        characterId,
-        prevValue: spell,
-      });
-    } catch (err) {
-      toasts.push(`Couldn't delete spell — ${(err as Error).message}`, { kind: 'error' });
-    }
-  };
+  const deletion = useConfirmedEntityDelete({
+    entityClass: 'character_spell',
+    noun: 'spell',
+    label: spell.name,
+    entity: spell,
+    characterId,
+  });
 
   return (
     <li
@@ -425,7 +418,7 @@ function SpellRow({
           <button
             type="button"
             className="btn btn-ghost btn-xs"
-            onClick={() => setConfirmDelete(true)}
+            onClick={deletion.request}
             aria-label={`Delete spell ${spell.name}`}
           >
             ✕
@@ -442,17 +435,7 @@ function SpellRow({
           />
         </div>
       )}
-      <ConfirmDialog
-        open={confirmDelete}
-        title={`Delete spell "${spell.name}"?`}
-        confirmLabel="Delete"
-        tone="error"
-        onConfirm={() => {
-          setConfirmDelete(false);
-          void removeSpell();
-        }}
-        onCancel={() => setConfirmDelete(false)}
-      />
+      {deletion.dialog}
       {spell.notes && (
         <FoldSection
           preferenceKey={`${spell.id}:description`}

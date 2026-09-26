@@ -50,7 +50,11 @@ import {
 } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
-import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
+import {
+  type EntityClass,
+  type OperationCommand,
+  entityClass as entityClassSchema,
+} from '../../shared/schemas/sync.ts';
 import { inferLegacyCampaignOrder, legacyReferenceFields } from './legacyCampaignDependencies.ts';
 
 /**
@@ -771,51 +775,51 @@ export const ALL_STORE_NAMES = [
 ] as const;
 
 /**
+ * The Dexie store for each entity class, or null for a class with no local
+ * store (the `entityClass` enum carries headroom values). A `Record` over
+ * every class, so adding a class to the enum without deciding its store is a
+ * compile error rather than a silently unsynced class.
+ */
+const STORE_BY_ENTITY_CLASS: Readonly<Record<EntityClass, keyof LocalDb | null>> = {
+  character: 'characters',
+  character_trait: 'characterTraits',
+  character_skill: 'characterSkills',
+  character_spell: 'characterSpells',
+  character_language: 'characterLanguages',
+  character_technique: 'characterTechniques',
+  character_inventory: 'characterInventory',
+  character_combat: 'characterCombat',
+  campaign: 'campaigns',
+  campaign_membership: null,
+  campaign_library_trait: 'campaignLibraryTraits',
+  campaign_library_skill: 'campaignLibrarySkills',
+  campaign_library_spell: 'campaignLibrarySpells',
+  campaign_library_item: 'campaignLibraryItems',
+  campaign_library_language: 'campaignLibraryLanguages',
+  campaign_library_technique: 'campaignLibraryTechniques',
+  campaign_library_style: 'campaignLibraryStyles',
+  campaign_library_enchantment: 'campaignLibraryEnchantments',
+  campaign_library_active_effect: 'campaignLibraryActiveEffects',
+  adventure_log: null,
+};
+
+/**
  * Map an EntityClass to the corresponding Dexie store name.  Used by
  * the orchestrator when applying /sync/cursor responses.
  */
 export function storeForEntityClass(entityClass: EntityClass): keyof LocalDb | null {
-  switch (entityClass) {
-    case 'character':
-      return 'characters';
-    case 'character_trait':
-      return 'characterTraits';
-    case 'character_skill':
-      return 'characterSkills';
-    case 'character_spell':
-      return 'characterSpells';
-    case 'character_language':
-      return 'characterLanguages';
-    case 'character_technique':
-      return 'characterTechniques';
-    case 'character_inventory':
-      return 'characterInventory';
-    case 'character_combat':
-      return 'characterCombat';
-    case 'campaign':
-      return 'campaigns';
-    case 'campaign_library_trait':
-      return 'campaignLibraryTraits';
-    case 'campaign_library_skill':
-      return 'campaignLibrarySkills';
-    case 'campaign_library_spell':
-      return 'campaignLibrarySpells';
-    case 'campaign_library_item':
-      return 'campaignLibraryItems';
-    case 'campaign_library_language':
-      return 'campaignLibraryLanguages';
-    case 'campaign_library_technique':
-      return 'campaignLibraryTechniques';
-    case 'campaign_library_style':
-      return 'campaignLibraryStyles';
-    case 'campaign_library_enchantment':
-      return 'campaignLibraryEnchantments';
-    case 'campaign_library_active_effect':
-      return 'campaignLibraryActiveEffects';
-    default:
-      return null;
-  }
+  return STORE_BY_ENTITY_CLASS[entityClass] ?? null;
 }
+
+/**
+ * Every class with a local store, in `entityClass` enum order: the classes
+ * the orchestrator pulls through /sync/cursor. Campaigns are pulled
+ * READ-ONLY (for the minimal-view sweep and offline campaign names); their
+ * mutations stay on REST (AGENTS.md S0).
+ */
+export const SYNCED_ENTITY_CLASSES: readonly EntityClass[] = entityClassSchema.options.filter(
+  (entityClass) => STORE_BY_ENTITY_CLASS[entityClass] !== null,
+);
 
 /** Build the outbox coalesce key.  Empty fieldPath collapses to bare entityId. */
 export function coalesceKey(entityId: string, fieldPath?: string): string {

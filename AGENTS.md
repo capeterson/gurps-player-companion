@@ -314,19 +314,26 @@ A new sync-participating entity class MUST be added to **all** of:
 1. `entityClass` enum in [src/shared/schemas/sync.ts](src/shared/schemas/sync.ts).
 2. A Dexie store + `LocalFoo` interface in
    [src/client/db/dexie.ts](src/client/db/dexie.ts), with `id` and
-   `revision` columns. Add it to `ALL_STORE_NAMES` and
-   `storeForEntityClass`.
-3. The orchestrator's per-class switches:
-   `applyServerRow`, `revertField`, `deleteLocal`, `reinsertLocal`,
-   `stampRevision`, and `ALL_ENTITY_CLASSES`.
-4. The outbox helpers' switches: `storesForOp`, `applyLocalPatch`,
-   `applyLocalCreate`, `applyLocalDelete`, `readFieldValue`,
-   `readEntityRevision`, and `parentIdFor` if the new class is a
+   `revision` columns. Add it to `ALL_STORE_NAMES` and give the class its
+   store in `STORE_BY_ENTITY_CLASS` (a `Record` over every class, so a
+   missing entry fails typechecking). That map drives the shared
+   read/update/delete/stamp helpers in
+   [src/client/db/syncEntityStore.ts](src/client/db/syncEntityStore.ts) and
+   `SYNCED_ENTITY_CLASSES`, the list the orchestrator pulls.
+3. The orchestrator's `mergeServerRow` switch, only when the class needs
+   special parsing or keying (character active effects, trait/skill
+   `libraryMechanics`, combat keyed by `characterId`, campaign
+   definitions). Other classes use the generic merge.
+4. The outbox's `FIELD_PATCH_CLASSES` if the class takes per-field patches,
+   `applyLocalCreate` defaults, and `parentIdFor` if the new class is a
    child entity.
 5. The server dispatcher in
    [src/server/services/syncDispatch.ts](src/server/services/syncDispatch.ts)
    and the cursor reader in
-   [src/server/routes/sync.ts](src/server/routes/sync.ts).
+   [src/server/routes/sync.ts](src/server/routes/sync.ts). An id-keyed
+   character child also goes in `CHARACTER_CHILD_TABLES` (and, when
+   library-linked, `LIBRARY_LINKED_CHILDREN`) in
+   [src/server/services/characterChildren.ts](src/server/services/characterChildren.ts).
 6. The purge list in `orchestrator.purge` so logout wipes it.
 7. A tombstone trigger on the table, so deletes reach other devices.
 8. Envelope `parentId`: the parent **character** id for character
@@ -531,13 +538,15 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   registering once per case. Prefer authenticated fixtures where isolation
   permits, but never share mutable accounts or pages across parallel workers.
   Create only the minimum users required for worker isolation and the behavior,
-  and never clear or bypass the rate limiter just to make a test pass.
-  The one exception is interactive debugging: when no other tool is
-  reasonably viable (for example, logging into an existing account or a
-  unit-level reproduction cannot expose the problem), a local worktree stack's
-  limiter may be bypassed temporarily as a debugging hack. Never commit that
-  bypass, never use it in a test or CI, and restore normal limits before
-  running the validation suite.
+  and never clear the rate limiter or change a test to dodge it.
+  **Local in-development runs may raise the limits.** For local debugging and
+  local Playwright runs during development (including the pre-handoff browser
+  pass), start a temporary server for your own worktree with raised
+  `AUTH_RATE_LIMIT_*_MAX` values set through its environment, rather than
+  waiting out rate-limit windows. Never commit raised limits (code, compose
+  files, or config), and tear the temporary server down afterwards. **Never raise
+  or bypass limits for CI, the image-promotion gate, or any production or
+  shared deployment**; those always run with the real limits.
 - **Test what the user sees.** UI regressions MUST assert the exact visible
   labels, controls, states, and interaction results involved. CSS classes,
   helper math, `data-*` markers, and hidden/proxy elements may support a test,
