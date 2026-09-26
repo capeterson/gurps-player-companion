@@ -1,3 +1,4 @@
+import { isLibraryEntityClass } from '../../shared/schemas/sync.ts';
 import type { SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { newClientId } from './outbox.ts';
@@ -65,9 +66,68 @@ export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
       id: entry.id ?? newClientId(),
       occurredAt: entry.occurredAt ?? new Date().toISOString(),
     });
-    await pruneSyncLog();
+    scheduleSyncLogPrune();
   } catch {
     // Diagnostic persistence must never interrupt outbox settlement.
+  }
+}
+
+/**
+ * Append one cursor page's journal entries with a single write. Per-entry
+ * appends that each pruned inline stalled large library pulls for tens of
+ * seconds between cursor pages.
+ */
+export async function appendSyncLogEntries(entries: readonly NewSyncLogEntry[]): Promise<void> {
+  if (entries.length === 0) return;
+  try {
+    const db = getLocalDb();
+    const now = new Date().toISOString();
+    await db.syncLog.bulkPut(
+      entries.map((entry) => ({
+        ...entry,
+        id: entry.id ?? newClientId(),
+        occurredAt: entry.occurredAt ?? now,
+      })),
+    );
+    scheduleSyncLogPrune();
+  } catch {
+    // Diagnostic persistence must never interrupt a cursor pull.
+  }
+}
+
+/**
+ * Retention is eventually consistent: writes schedule a debounced prune
+ * instead of counting and trimming inline, so bursts (a large cursor pull,
+ * a drained outbox) pay for one prune. The journal may briefly exceed
+ * SYNC_LOG_RETENTION; the max wait bounds that under continuous writes.
+ */
+export const SYNC_LOG_PRUNE_DEBOUNCE_MS = 2_000;
+export const SYNC_LOG_PRUNE_MAX_WAIT_MS = 10_000;
+let pruneTimer: ReturnType<typeof setTimeout> | null = null;
+let pruneFirstScheduledAt: number | null = null;
+
+function scheduleSyncLogPrune(): void {
+  const now = Date.now();
+  pruneFirstScheduledAt ??= now;
+  if (pruneTimer) clearTimeout(pruneTimer);
+  const delay = Math.max(
+    0,
+    Math.min(SYNC_LOG_PRUNE_DEBOUNCE_MS, pruneFirstScheduledAt + SYNC_LOG_PRUNE_MAX_WAIT_MS - now),
+  );
+  pruneTimer = setTimeout(() => {
+    void flushSyncLogPrune();
+  }, delay);
+}
+
+/** Run any scheduled prune now (tests, and callers that need exact retention). */
+export async function flushSyncLogPrune(): Promise<void> {
+  if (pruneTimer) clearTimeout(pruneTimer);
+  pruneTimer = null;
+  pruneFirstScheduledAt = null;
+  try {
+    await pruneSyncLog();
+  } catch {
+    // Best-effort; the next write schedules another attempt.
   }
 }
 
@@ -157,9 +217,13 @@ export async function redactSyncLogForCampaigns(campaignIds: Iterable<string>): 
       .filter(
         (entry) =>
           !entry.redacted &&
-          entry.entityClass === 'campaign' &&
-          entry.entityId !== undefined &&
-          ids.has(entry.entityId),
+          ((entry.entityClass === 'campaign' &&
+            entry.entityId !== undefined &&
+            ids.has(entry.entityId)) ||
+            // Library journal rows are parented by their campaign.
+            (isLibraryEntityClass(entry.entityClass) &&
+              entry.parentId !== undefined &&
+              ids.has(entry.parentId))),
       )
       .toArray();
     if (affected.length > 0) {

@@ -193,8 +193,8 @@ shows the synced campaign name as a separate link to that campaign.
   available (inventory hides its unavailable Basic Lift/encumbrance classification).
   Library edits and YAML imports advance linked child revisions transactionally,
   so incremental HTTP pulls refresh definitions even after missed WS nudges or
-  offline sessions. Library writes also advance the campaign cursor; its committed
-  HTTP changes invalidate each tab's library editor cache through Dexie observation.
+  offline sessions. Library rows are themselves sync-backed, so every tab's editor
+  and autocompletes follow committed cursor pulls through Dexie live queries.
   WS only accelerates that cycle. Cursor-only campaign touches do not clutter history.
   Already selected definitions are saved with speculative adds as local-only metadata,
   keeping those new copies usable offline; the server resolves its own version on replay.
@@ -733,19 +733,36 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
-  items, enchantments, languages, techniques, and styles. The in-app catalog editor
-  (`/campaigns/:id/library`) offers dedicated CRUD forms for **traits,
-  skills, spells, items, and mechanical enchantments**; **languages, techniques, and styles** are
-  authored via the versioned YAML import/export flow (or the owner-only
+  items, enchantments, active effects, languages, techniques, and styles. It is
+  **fully sync-backed**: every member browses it from Dexie (offline too), and
+  the owner's creates, edits and deletes go through the outbox (edits are
+  whole-entry patches, AGENTS.md S13) with the standard rejection toast and row
+  flash. The in-app catalog editor (`/campaigns/:id/library`) offers dedicated
+  CRUD forms for **traits, skills, spells, items, mechanical enchantments and
+  active effects**; **languages, techniques, and styles** are authored via the
+  versioned YAML import/export flow (or the owner-only
   `.../library/{languages|techniques|styles}` REST routes the generic
   factory registers) — the dedicated character-sheet Languages and
-  Techniques panels consume them through their autocompletes, and the
-  editor's table shows the counts. The whole catalog is also
+  Techniques panels consume them through their autocompletes. Built for
+  libraries with hundreds of entries: each category is one compact table with
+  sortable column headings (device-remembered per campaign and category),
+  light category groups that fold (traits by kind, skills by attribute, spells
+  by college, items by category, enchantments by applicability, active effects
+  by first tag) and a jump strip to any group. Rows show the name, key numbers
+  and a one-line plain-text excerpt; opening a row renders its full Markdown
+  entry in place. The category chips, search and jump strip stay pinned under
+  the app header. Search matches every word across names, descriptions, sources
+  and categories. `?section=`, `?q=` and `?open=` make a category, search or
+  entry linkable. Drafts survive category switches, searches and folded groups,
+  and a draft the client can already tell is invalid (schema, specialization
+  rule, duplicate name) stays open with the reason. The whole catalog is also
   **importable/exportable as versioned YAML**
   for sharing between campaigns. The top-nav **Library** page (`/library`,
   `features/library/LibraryPage.tsx`) is the primary home for the YAML
   import/export flow. Import validates the chosen file and shows a confirmation
   preview before Merge or Replace; Replace never runs on file selection alone.
+  Import is the one online-only library action; the page pulls its result into
+  Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
   policies and per-catalog-option rule overrides; portable YAML v11 retains them.
 - **Adventure log**: session log entries with per-entry visibility
@@ -902,11 +919,16 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
-      library/   LibraryPage (markdown descriptions, live category search,
-                 draft-preserving category switches, and typed enchantment
-                 authoring), librarySearch (human-readable-field matcher), plus
-                 EffectsEditor, the reusable ordered effect authoring UI shared
-                 with character-owned trait mechanics
+      library/   LibraryPage (page shell: import/export, sticky category/search
+                 toolbar, URL state), LibrarySection (generic sortable, grouped,
+                 foldable table with memoized expandable rows),
+                 sections/*Section (per-category columns, groups, details and
+                 form wiring), useLocalLibrary (Dexie reads + local-first
+                 outbox mutations with pre-enqueue validation),
+                 libraryTablePreferences, useLibraryGroupFolds, librarySearch
+                 (cached human-readable-field matcher), plus EffectsEditor, the
+                 reusable ordered effect authoring UI shared with
+                 character-owned trait mechanics
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
       characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
@@ -934,9 +956,8 @@ src/
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
     lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
-    features/library/  LibraryPage browsing/import, five explicit category form
-                 files, and useLibrarySectionCrud for online-only CRUD state
-                 and query invalidation
+    features/library/  Category form files (Trait/Skill/Spell/Item/Enchantment/
+                 ActiveEffectForm) used by the sync-backed library sections
     components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
                  into the portaled Current Status row
     sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
@@ -949,6 +970,7 @@ src/
                  and campaign-first suggestion merge
     components/ui/QueryReadError.tsx  Shared retryable online-read error
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
+                 useAppHeaderBottom (live sticky-header offset),
                  useSelectedCampaignId (legacy Log/Library campaign URL selection),
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), ...
@@ -1067,13 +1089,14 @@ this standalone study retains illustrative data and alternative head designs.
 
 Things that repeatedly surprise people working in this repo:
 
-1. **Sync coverage is partial and deliberate.** Only the character family
+1. **Sync coverage is partial and deliberate.** The character family
    (`character`, `character_trait`, `character_skill`, `character_spell`,
    `character_language`, `character_technique`, `character_inventory`,
-   `character_combat`) flows through the outbox. Campaigns
-   are pulled **read-only** into Dexie; the campaign library, adventure log,
-   invitations, and notifications are still **online-only** React-Query/HTTP
-   surfaces. The `entityClass` enum lists more than the orchestrator pulls —
+   `character_combat`) and all nine `campaign_library_*` classes flow through
+   the outbox; library edits are whole-entry patches (`AGENTS.md` S13) and the
+   library YAML import is the one online-only library action. Campaigns
+   are pulled **read-only** into Dexie; the adventure log, invitations, and
+   notifications are still **online-only** React-Query/HTTP surfaces. The `entityClass` enum lists more than the orchestrator pulls —
    that's headroom, not coverage. The authoritative list is `ALL_ENTITY_CLASSES`
    in `src/client/sync/orchestrator.ts`. Confirm before assuming offline
    behaviour. (`AGENTS.md` S0.)

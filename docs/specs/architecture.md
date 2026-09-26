@@ -286,8 +286,9 @@ Key PG18 / trigger machinery, layered by migration:
 - **Local-first data layer**: the UI reads from Dexie via `useLiveQuery` and
   writes through the outbox; the sync orchestrator is a long-lived singleton.
   This is the heart of the app — see [offline-sync.md](offline-sync.md).
-- **Online-only surfaces** (campaign library, adventure log, invitations,
-  notifications, settings, admin, and campaign encounters) use TanStack Query directly against the HTTP
+- **Online-only surfaces** (adventure log, invitations, notifications,
+  settings, admin, campaign encounters, and the library YAML import) use
+  TanStack Query directly against the HTTP
   API. Query hashes include the current token-session id. Both the PWA and admin
   entry mount `SessionQueryCacheBoundary`, which cancels and clears all query and
   mutation state whenever login identity changes locally or in another tab.

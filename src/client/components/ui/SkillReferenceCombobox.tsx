@@ -1,11 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { type FocusEventHandler, type KeyboardEventHandler, useMemo, useState } from 'react';
 import { ComboBox, Input, ListBox, ListBoxItem, Popover } from 'react-aria-components';
 import { skillDisplayName, skillReferencesMatch } from '../../../shared/domain/defenseCalc.ts';
 import type { LibrarySkillOut } from '../../../shared/schemas/campaignLibrary.ts';
 import type { SkillOut } from '../../../shared/schemas/skill.ts';
+import { getLocalDb } from '../../db/dexie.ts';
 import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
-import { api } from '../../lib/api.ts';
 
 type CharacterSkill = Pick<SkillOut, 'name' | 'specialization'>;
 type CampaignSkill = Pick<
@@ -86,15 +86,17 @@ export function SkillReferenceCombobox({
   inputProps,
   disabled = false,
 }: Props) {
-  const campaign = useQuery({
-    queryKey: ['campaigns', campaignId, 'library'],
-    enabled: !!campaignId && campaignSkills === undefined,
-    queryFn: () => api<{ skills: LibrarySkillOut[] }>(`/campaigns/${campaignId}/library`),
-    staleTime: 30_000,
-  });
+  // The campaign library is sync-backed; read it from Dexie (AGENTS.md S0).
+  const localSkills = useLiveQuery(
+    () =>
+      campaignId && campaignSkills === undefined
+        ? getLocalDb().campaignLibrarySkills.where('campaignId').equals(campaignId).toArray()
+        : [],
+    [campaignId, campaignSkills === undefined],
+  );
   const options = useMemo(
-    () => skillReferenceOptions(characterSkills, campaignSkills ?? campaign.data?.skills ?? []),
-    [characterSkills, campaignSkills, campaign.data?.skills],
+    () => skillReferenceOptions(characterSkills, campaignSkills ?? localSkills ?? []),
+    [characterSkills, campaignSkills, localSkills],
   );
   const visibleOptions = useMemo(() => {
     const needle = value.trim().toLocaleLowerCase();

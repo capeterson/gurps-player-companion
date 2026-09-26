@@ -13,7 +13,12 @@
  */
 
 import { type LibraryMechanics, libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
-import type { EntityClass, OperationCommand } from '../../shared/schemas/sync.ts';
+import {
+  type EntityClass,
+  type LibraryEntityClass,
+  type OperationCommand,
+  isLibraryEntityClass,
+} from '../../shared/schemas/sync.ts';
 import { type OutboxEntry, type OutboxStatus, coalesceKey, getLocalDb } from '../db/dexie.ts';
 import {
   deleteSyncEntity,
@@ -171,44 +176,13 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
       )
       .modify({ localWaitForCampaignAssignment: false });
   }
-  const coalescable = dupes.filter(
-    (d) =>
-      d.status === 'pending' || (d.status === 'transient_retry' && d.deliveryUncertain === false),
-  );
-  const predecessors = dupes.filter(
-    (d) =>
-      d.status === 'in_flight' || (d.status === 'transient_retry' && d.deliveryUncertain !== false),
-  );
-  let carriedPrev: { value: unknown } | undefined;
-  let predecessorClientOpId = predecessors
-    .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt))
-    .at(-1)?.clientOpId;
+  const { coalescable, carriedPrev, predecessorClientOpId } = await coalesceSameKeyOps(dupes);
   let localCampaignTransferUndo = args.localCampaignTransferUndo;
-  if (coalescable.length > 0) {
-    // A confirmed-transient predecessor and its pending successor can both
-    // become safe to replace. Follow their ancestry rather than trusting wall
-    // clock order, which can tie or move backward.
-    const coalescableIds = new Set(coalescable.map((entry) => entry.clientOpId));
-    const roots = coalescable.filter(
-      (entry) => !entry.predecessorClientOpId || !coalescableIds.has(entry.predecessorClientOpId),
+  for (const entry of coalescable) {
+    localCampaignTransferUndo = mergeCampaignTransferUndo(
+      localCampaignTransferUndo,
+      entry.localCampaignTransferUndo,
     );
-    const baselineCandidates = roots.length > 0 ? roots : coalescable;
-    const baselineRoot = baselineCandidates.reduce((a, b) =>
-      a.enqueuedAt < b.enqueuedAt || (a.enqueuedAt === b.enqueuedAt && a.clientOpId <= b.clientOpId)
-        ? a
-        : b,
-    );
-    carriedPrev = { value: baselineRoot.prevValue };
-    predecessorClientOpId ??= baselineRoot.predecessorClientOpId;
-    for (const entry of coalescable) {
-      localCampaignTransferUndo = mergeCampaignTransferUndo(
-        localCampaignTransferUndo,
-        entry.localCampaignTransferUndo,
-      );
-    }
-  }
-  for (const d of coalescable) {
-    await db.outbox.delete(d.clientOpId);
   }
 
   // 2. prevValue precedence: an explicit caller override always wins
@@ -299,7 +273,118 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
 }
 
 /**
- * Resolve the canonical parent character id for an outbox row.  For
+ * Coalesce the outbox rows that share one coalesce key (AGENTS.md S3).
+ *
+ * Safe-to-replace rows (`pending`, or a server-confirmed transient retry) are
+ * deleted, and the ROOT one's prevValue is carried forward so a later
+ * rollback lands on the last server-confirmed value rather than on an
+ * unsynced intermediate. A delivery-uncertain row may already have been
+ * applied, so it stays queued as the successor's ordered predecessor.
+ * Callers must run inside the enqueue transaction.
+ */
+async function coalesceSameKeyOps(dupes: readonly OutboxEntry[]): Promise<{
+  coalescable: OutboxEntry[];
+  carriedPrev: { value: unknown } | undefined;
+  predecessorClientOpId: string | undefined;
+}> {
+  const coalescable = dupes.filter(
+    (d) =>
+      d.status === 'pending' || (d.status === 'transient_retry' && d.deliveryUncertain === false),
+  );
+  const predecessors = dupes.filter(
+    (d) =>
+      d.status === 'in_flight' || (d.status === 'transient_retry' && d.deliveryUncertain !== false),
+  );
+  let carriedPrev: { value: unknown } | undefined;
+  let predecessorClientOpId = [...predecessors]
+    .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt))
+    .at(-1)?.clientOpId;
+  if (coalescable.length > 0) {
+    // A confirmed-transient predecessor and its pending successor can both
+    // become safe to replace. Follow their ancestry rather than trusting wall
+    // clock order, which can tie or move backward.
+    const coalescableIds = new Set(coalescable.map((entry) => entry.clientOpId));
+    const roots = coalescable.filter(
+      (entry) => !entry.predecessorClientOpId || !coalescableIds.has(entry.predecessorClientOpId),
+    );
+    const baselineCandidates = roots.length > 0 ? roots : coalescable;
+    const baselineRoot = baselineCandidates.reduce((a, b) =>
+      a.enqueuedAt < b.enqueuedAt || (a.enqueuedAt === b.enqueuedAt && a.clientOpId <= b.clientOpId)
+        ? a
+        : b,
+    );
+    carriedPrev = { value: baselineRoot.prevValue };
+    predecessorClientOpId ??= baselineRoot.predecessorClientOpId;
+  }
+  const db = getLocalDb();
+  for (const d of coalescable) {
+    await db.outbox.delete(d.clientOpId);
+  }
+  return { coalescable, carriedPrev, predecessorClientOpId };
+}
+
+export interface EnqueueEntityPatchArgs {
+  readonly entityClass: LibraryEntityClass;
+  readonly entityId: string;
+  /** Owning campaign; carried as the envelope's `parentId`. */
+  readonly campaignId: string;
+  /**
+   * The entry's full update body. The server validates it as one unit, and
+   * every key stays protected from cursor overwrites until the op settles.
+   */
+  readonly attemptedValue: Record<string, unknown>;
+  /**
+   * Server-confirmed baseline override, used by the orchestrator's
+   * stale-base resend. Normally read from the coalesced root or local row.
+   */
+  readonly prevValue?: Record<string, unknown> | undefined;
+  readonly baseRevision?: number | undefined;
+  readonly humanName?: string | undefined;
+  readonly batchId?: string | undefined;
+}
+
+/**
+ * Whole-entry patch (AGENTS.md S13) for entities edited as one form whose
+ * fields the server validates together. Same durability, coalescing and
+ * predecessor rules as `enqueueFieldPatch`; `prevValue` is the full row.
+ */
+export async function enqueueEntityPatch(args: EnqueueEntityPatchArgs): Promise<void> {
+  const db = getLocalDb();
+  const table = writableSyncEntityTable(args.entityClass);
+  await db.transaction('rw', [db.outbox, table], async () => {
+    const current = await table.get(args.entityId);
+    if (!current) throw new Error(`${args.humanName ?? 'This entry'} no longer exists`);
+    const ckey = coalesceKey(args.entityId, undefined);
+    const dupes = (await db.outbox.where('coalesceKey').equals(ckey).toArray()).filter(
+      (op) => op.command === 'patch' && op.fieldPath === undefined,
+    );
+    const { carriedPrev, predecessorClientOpId } = await coalesceSameKeyOps(dupes);
+    const now = new Date().toISOString();
+    await table.put({ ...current, ...args.attemptedValue, updatedAt: now });
+    await db.outbox.add({
+      clientOpId: newClientId(),
+      entityClass: args.entityClass,
+      entityId: args.entityId,
+      command: 'patch',
+      coalesceKey: ckey,
+      attemptedValue: args.attemptedValue,
+      prevValue: args.prevValue ?? (carriedPrev ? carriedPrev.value : current),
+      baseRevision: args.baseRevision ?? (current.revision === -1 ? undefined : current.revision),
+      parentId: args.campaignId,
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: now,
+      attemptCount: 0,
+      humanName: args.humanName,
+      batchId: args.batchId,
+      predecessorClientOpId,
+    });
+  });
+}
+
+/**
+ * Resolve the canonical parent id for an outbox row: the character for
+ * character children, the campaign for library classes (S6).  For
  * combat the entityId IS the characterId (1:1 keyed), so we fall back
  * to it when the caller didn't pass `characterId` explicitly.  For
  * character / campaign rows the parent concept doesn't apply.
@@ -308,8 +393,13 @@ function parentIdFor(
   entityClass: EntityClass,
   characterId: string | undefined,
   entityId: string,
+  campaignId?: string,
 ): string | undefined {
   if (entityClass === 'character' || entityClass === 'campaign') return undefined;
+  if (isLibraryEntityClass(entityClass)) {
+    if (!campaignId) throw new Error(`${entityClass} operations need their campaign id`);
+    return campaignId;
+  }
   if (characterId) return characterId;
   if (entityClass === 'character_combat') return entityId;
   return undefined;
@@ -402,6 +492,8 @@ export interface EnqueueCreateArgs<T> {
   readonly localLibraryMechanics?: LibraryMechanics | null | undefined;
   readonly humanName?: string | undefined;
   readonly characterId?: string | undefined;
+  /** Owning campaign for library classes (the envelope's `parentId`). */
+  readonly campaignId?: string | undefined;
   readonly batchId?: string | undefined;
 }
 
@@ -423,7 +515,7 @@ export async function enqueueCreate<T extends Record<string, unknown>>(
     attemptedValue: args.characterId
       ? { ...args.attemptedValue, characterId: args.characterId }
       : args.attemptedValue,
-    parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
+    parentId: parentIdFor(args.entityClass, args.characterId, args.entityId, args.campaignId),
     validationVersion: 1,
     status: 'pending',
     enqueuedAt: now,
@@ -432,7 +524,7 @@ export async function enqueueCreate<T extends Record<string, unknown>>(
     batchId: args.batchId,
   };
   await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
-    if (op.parentId) {
+    if (op.parentId && !isLibraryEntityClass(args.entityClass)) {
       op.localWaitForCampaignAssignment = Boolean(
         await db.outbox
           .where('entityId')
@@ -457,6 +549,8 @@ export interface EnqueueDeleteArgs {
   readonly entityId: string;
   readonly humanName?: string | undefined;
   readonly characterId?: string | undefined;
+  /** Owning campaign for library classes (the envelope's `parentId`). */
+  readonly campaignId?: string | undefined;
   readonly prevValue?: unknown;
   readonly batchId?: string | undefined;
 }
@@ -495,7 +589,7 @@ async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void
     coalesceKey: `${coalesceKey(args.entityId, undefined)}:delete`,
     attemptedValue: args.characterId ? { characterId: args.characterId } : null,
     prevValue,
-    parentId: parentIdFor(args.entityClass, args.characterId, args.entityId),
+    parentId: parentIdFor(args.entityClass, args.characterId, args.entityId, args.campaignId),
     validationVersion: 1,
     status: 'pending',
     enqueuedAt: now,
@@ -557,6 +651,11 @@ async function applyLocalCreate<T extends Record<string, unknown>>(
      */
     revision: -1,
     ...args.attemptedValue,
+    // Library rows are looked up by campaign; the id travels as parentId,
+    // never inside the (strict) create body.
+    ...(isLibraryEntityClass(args.entityClass) && args.campaignId
+      ? { campaignId: args.campaignId }
+      : {}),
   } as Record<string, unknown>;
   if (args.entityClass === 'character_trait' || args.entityClass === 'character_skill') {
     const snapshot =

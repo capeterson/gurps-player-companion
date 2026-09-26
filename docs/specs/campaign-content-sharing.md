@@ -323,20 +323,24 @@ Library languages carry only the book definition — `name`, `description`,
 live on `character_languages`; picking a sign language from the autocomplete
 seeds the character row's written fluency to `n/a`.
 
-- **Read** (`GET /campaigns/{id}/library`): any campaign **member**.
-- **Write** (per-entity CRUD): campaign **owner** only. Endpoints are
-  `POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|enchantments|languages|techniques|styles}[/{id}]`
-  in `src/server/routes/campaignLibrary.ts`. These back the library editor UI
-  (traits/skills/spells/items/enchantments have dedicated editor forms; the
-  languages/techniques/styles routes are primarily exercised via the YAML
-  import flow and consumed on the character sheet — the editor's own tabs
-  do not yet render those kinds); library mutations do **not** go through
-  the sync outbox.
+- **Read**: any campaign **member**, through `GET /campaigns/{id}/library`
+  (REST/MCP) and, in the PWA, the `campaign_library_*` sync cursor classes. The
+  app reads the library only from Dexie, so browsing works offline.
+- **Write** (per-entity CRUD): campaign **owner** only, through REST
+  (`POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|enchantments|active-effects|languages|techniques|styles}[/{id}]`
+  in `src/server/routes/campaignLibrary.ts`) or `/sync/operations`. Both
+  doors share one service layer (`createLibraryEntry` / `updateLibraryEntry` /
+  `deleteLibraryEntry`). The PWA editor always uses the outbox, with whole-entry
+  patches, so the owner can edit offline; see offline-sync.md "Campaign
+  library". Traits/skills/spells/items/enchantments/active effects have
+  dedicated editor forms; languages/techniques/styles are authored through the
+  YAML import flow and consumed on the character sheet.
 - Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor)
   and the top-nav `LibraryPage` (`/library`, the primary home for YAML
   import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
   character sheet, which let a player search the campaign library when adding a
-  trait/skill/spell/item/enchantment/language/technique.
+  trait/skill/spell/item/enchantment/language/technique. All of them read the
+  synced Dexie stores.
 
 Library enchantments declare `weapon`, `armor`, `shield`, or `any` applicability;
 typed flat effects; optional level-specific effects; and either additive stacking
@@ -385,8 +389,8 @@ Trait/skill effect declarations are materialized on the owned character rows,
 live-linked and versioned while their source exists. Library CRUD
 and YAML import advance referencing child revisions in the same transaction, so
 other devices refresh calculations through their normal HTTP cursor even if a WS
-nudge is dropped. Library writes also advance the campaign revision so committed
-HTTP pulls invalidate its library editor/autocomplete query, including definitions
+nudge is dropped. Library rows have their own cursor classes and tombstones, so
+the editor and autocompletes update from any committed pull, including definitions
 with no owned copies. Post-commit campaign-scoped nudges only accelerate the pull. Character share
 gates still apply to every emitted child row; nudges carry no definitions.
 

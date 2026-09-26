@@ -1,26 +1,3 @@
-import { getLocalDb } from '../../../db/dexie.ts';
-/**
- * Fetch a campaign's library (traits + skills + spells + items +
- * languages + techniques) once via the
- * aggregate `GET /campaigns/{id}/library` endpoint, then return a
- * `fetchOptions(query)` function suitable for `<LibraryAutocomplete>`
- * that filters the requested kind client-side.
- *
- * Filtering is client-side because campaign libraries are typically
- * dozens to hundreds of entries — fast enough to substring-match in
- * the browser without server-side search infrastructure.
- *
- * Returns `null`-shaped behaviour (always-empty options) when the
- * character is not attached to a campaign, so the autocomplete just
- * acts as a plain input.
- *
- * Codex review on PR #22 caught the original implementation hitting
- * non-existent `/library/{kind}` GET endpoints (those paths only
- * accept POST for create) — fixed here by using the single aggregate
- * GET and picking the right array.
- */
-
-import { useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type { ActiveEffectDefinitionOut } from '../../../../shared/schemas/activeEffects.ts';
 import type {
@@ -32,7 +9,21 @@ import type {
   LibraryTechniqueOut,
   LibraryTraitOut,
 } from '../../../../shared/schemas/campaignLibrary.ts';
-import { ApiError, api } from '../../../lib/api.ts';
+import type { LibraryEntityClass } from '../../../../shared/schemas/sync.ts';
+import { syncEntityTable } from '../../../db/syncEntityStore.ts';
+
+/**
+ * `fetchOptions(query)` for `<LibraryAutocomplete>`, reading the campaign's
+ * sync-backed library straight from Dexie (AGENTS.md S0), so picking a
+ * library entry works offline and never waits on the network.
+ *
+ * Filtering is client-side because campaign libraries are typically
+ * dozens to hundreds of entries — fast enough to substring-match in
+ * the browser without server-side search infrastructure.
+ *
+ * Returns always-empty options when the character is not attached to a
+ * campaign, so the autocomplete just acts as a plain input.
+ */
 
 type Kind =
   | 'traits'
@@ -54,28 +45,15 @@ type LibraryEntry =
   | LibraryEnchantmentOut
   | ActiveEffectDefinitionOut;
 
-interface LibraryPayload {
-  readonly traits: LibraryTraitOut[];
-  readonly skills: LibrarySkillOut[];
-  /** Optional: servers from before the spell library omit it. */
-  readonly spells?: LibrarySpellOut[];
-  readonly items: LibraryItemOut[];
-  /** Optional: servers from before the language library omit it. */
-  readonly languages?: LibraryLanguageOut[];
-  /** Optional: servers from before the technique library omit it. */
-  readonly techniques?: LibraryTechniqueOut[];
-  readonly enchantments?: LibraryEnchantmentOut[];
-  readonly activeEffects?: ActiveEffectDefinitionOut[];
-}
-
-const EMPTY_LIBRARY: LibraryPayload = {
-  traits: [],
-  skills: [],
-  spells: [],
-  items: [],
-  languages: [],
-  techniques: [],
-  enchantments: [],
+const ENTITY_CLASS: Record<Kind, LibraryEntityClass> = {
+  traits: 'campaign_library_trait',
+  skills: 'campaign_library_skill',
+  spells: 'campaign_library_spell',
+  items: 'campaign_library_item',
+  languages: 'campaign_library_language',
+  techniques: 'campaign_library_technique',
+  enchantments: 'campaign_library_enchantment',
+  activeEffects: 'campaign_library_active_effect',
 };
 
 export function useLibraryFetcher<T extends LibraryEntry>(
@@ -85,41 +63,17 @@ export function useLibraryFetcher<T extends LibraryEntry>(
   fetchOptions: (query: string) => Promise<T[]>;
   isLoading: boolean;
 } {
-  const enabled = typeof campaignId === 'string' && campaignId.length > 0;
-  const query = useQuery({
-    enabled,
-    // Single cache entry per campaign — all kinds share the aggregate
-    // response so picking traits then skills doesn't refetch. The key
-    // matches LibraryPage's query so its CRUD mutations invalidate this
-    // cache too. Character derivation uses synced declarations instead.
-    queryKey: ['campaigns', campaignId, 'library'],
-    queryFn: async (): Promise<LibraryPayload> => {
-      if (!campaignId) return EMPTY_LIBRARY;
-      try {
-        return await api<LibraryPayload>(`/campaigns/${campaignId}/library`);
-      } catch (err) {
-        // 403 (member can't see campaign) shouldn't crash the form.
-        if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
-          return EMPTY_LIBRARY;
-        }
-        throw err;
-      }
-    },
-    staleTime: 30_000,
-  });
-
   const fetchOptions = useCallback(
     async (q: string): Promise<T[]> => {
-      const payload = query.data ?? EMPTY_LIBRARY;
+      if (!campaignId) return [];
+      const table = syncEntityTable(ENTITY_CLASS[kind]);
       // The caller's `T` is one of the union members; the kind arg
-      // discriminates which array we want. TS can't narrow through
-      // the indexed access so this cast is necessary at the boundary.
-      const durable =
-        kind === 'activeEffects' && campaignId
-          ? (await getLocalDb().campaigns.get(campaignId))?.activeEffectDefinitions
-          : undefined;
-      const list = (durable ?? payload[kind] ?? []) as unknown as readonly T[];
-      if (q.length === 0) return list.slice(0, 20);
+      // discriminates which store we read. TS can't narrow through that
+      // mapping, so this cast is necessary at the boundary.
+      const list = ((await table?.where('campaignId').equals(campaignId).toArray()) ??
+        []) as unknown as T[];
+      if (q.length === 0)
+        return [...list].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20);
       const needle = q.toLowerCase();
       const ranked = list
         .map((opt) => {
@@ -139,8 +93,8 @@ export function useLibraryFetcher<T extends LibraryEntry>(
         .map((r) => r.opt);
       return ranked;
     },
-    [query.data, kind, campaignId],
+    [kind, campaignId],
   );
 
-  return { fetchOptions, isLoading: query.isLoading };
+  return { fetchOptions, isLoading: false };
 }

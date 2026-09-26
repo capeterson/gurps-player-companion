@@ -19,6 +19,7 @@ import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
+import { LIBRARY_ENTITY_CLASSES } from '../../shared/schemas/sync.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
 import { withAudit } from '../db/auditContext.ts';
@@ -263,7 +264,8 @@ describe('library changes propagate through incremental character cursors', () =
           {
             kind: 'sync_invalidate',
             campaignId: campaign.id,
-            entityClasses: ['character_trait', 'character_skill'],
+            // Library rows are sync-backed too, so the nudge names their classes.
+            entityClasses: ['character_trait', 'character_skill', ...LIBRARY_ENTITY_CLASSES],
             emittedAt: expect.any(String),
           },
         ]);

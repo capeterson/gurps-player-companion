@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { LIBRARY_ENTITY_CLASSES } from '../../shared/schemas/sync.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { campaignMemberships, campaigns } from '../db/schema.ts';
@@ -32,7 +33,7 @@ export async function publishLibraryInvalidation(campaignId: string): Promise<vo
       publish(userId, {
         kind: 'sync_invalidate',
         campaignId,
-        entityClasses: ['character_trait', 'character_skill'],
+        entityClasses: ['character_trait', 'character_skill', ...LIBRARY_ENTITY_CLASSES],
         emittedAt: new Date().toISOString(),
       });
     }

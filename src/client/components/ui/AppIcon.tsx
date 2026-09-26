@@ -21,6 +21,7 @@ import {
   Sun,
   Swords,
   Target,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react';
@@ -50,6 +51,7 @@ const ICONS = {
   close: X,
   chevronDown: ChevronDown,
   chevronRight: ChevronRight,
+  trash: Trash2,
 } as const;
 
 export type AppIconName = keyof typeof ICONS;

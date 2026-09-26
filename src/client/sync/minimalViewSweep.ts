@@ -23,6 +23,8 @@
  * in tests.
  */
 
+import { isLibraryEntityClass } from '../../shared/schemas/sync.ts';
+
 export interface SweepInputCharacter {
   readonly id: string;
   readonly ownerId: string;
@@ -151,6 +153,10 @@ export function isOutboxAccessRestricted(
   op: OutboxAccessSubject,
   access: LocalCharacterAccess,
 ): boolean {
+  // Library entries are campaign content every member may read; their
+  // parentId is the campaign, so only losing that campaign restricts them.
+  if (isLibraryEntityClass(op.entityClass))
+    return op.parentId !== undefined && access.revokedCampaigns.has(op.parentId);
   const characterId = op.parentId ?? (op.entityClass === 'character' ? op.entityId : undefined);
   if (!characterId) return false;
   if (access.masked.has(characterId)) return true;
@@ -181,6 +187,8 @@ export function isRecordAccessRestricted(
     access.revokedCampaigns.has(record.entityId)
   )
     return true;
+  if (isLibraryEntityClass(record.entityClass))
+    return record.parentId !== undefined && access.revokedCampaigns.has(record.parentId);
   const characterId =
     record.parentId ?? (record.entityClass === 'character' ? record.entityId : undefined);
   if (!characterId) return false;

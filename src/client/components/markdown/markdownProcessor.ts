@@ -90,19 +90,48 @@ const processor = unified()
   .use(rehypeStringify);
 
 /**
+ * Bounded LRU of rendered output keyed by source. Long lists (the campaign
+ * library, the adventure log) remount the same descriptions on every filter,
+ * tab switch and refetch; the pipeline is by far the most expensive part of
+ * those renders, so identical input is served from here synchronously.
+ */
+const RENDER_CACHE_LIMIT = 500;
+const renderCache = new Map<string, string>();
+
+function remember(src: string, html: string): void {
+  renderCache.delete(src);
+  renderCache.set(src, html);
+  if (renderCache.size > RENDER_CACHE_LIMIT) {
+    const oldest = renderCache.keys().next().value;
+    if (oldest !== undefined) renderCache.delete(oldest);
+  }
+}
+
+/** Sanitized HTML for `src` if it was rendered recently, without re-running the pipeline. */
+export function peekRenderedMarkdown(src: string): string | undefined {
+  if (!src) return '';
+  const html = renderCache.get(src);
+  if (html !== undefined) remember(src, html);
+  return html;
+}
+
+/**
  * Render a markdown source string to a sanitized HTML string.
  *
  * Never throws on malformed input; an empty/failed render yields ''.
  */
 export async function renderMarkdown(src: string): Promise<string> {
   if (!src) return '';
+  const cached = peekRenderedMarkdown(src);
+  if (cached !== undefined) return cached;
   try {
-    const file = await processor.process(src);
-    return String(file);
+    const html = String(await processor.process(src));
+    remember(src, html);
+    return html;
   } catch {
     return '';
   }
 }
 
-export { rehypeEscapeRaw };
+export { RENDER_CACHE_LIMIT, rehypeEscapeRaw };
 export type { RawNode };

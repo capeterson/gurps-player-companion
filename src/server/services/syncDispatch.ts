@@ -31,14 +31,21 @@ import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/i
 import { languageCreate, languageUpdate } from '../../shared/schemas/language.ts';
 import { skillCreate, skillUpdate } from '../../shared/schemas/skill.ts';
 import { spellCreate, spellUpdate } from '../../shared/schemas/spell.ts';
-import type {
-  EntityClass,
-  OperationEnvelope,
-  OperationOutcome,
+import {
+  type EntityClass,
+  type LibraryEntityClass,
+  type OperationEnvelope,
+  type OperationOutcome,
+  isLibraryEntityClass,
 } from '../../shared/schemas/sync.ts';
 import { techniqueCreate, techniqueUpdate } from '../../shared/schemas/technique.ts';
 import { traitCreate, traitUpdate } from '../../shared/schemas/trait.ts';
-import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
+import {
+  assertWrite,
+  loadCampaignOr403,
+  loadCharacterOr403,
+  requireCampaignOwner,
+} from '../auth/permissions.ts';
 import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
@@ -55,6 +62,12 @@ import {
   inventoryItems,
 } from '../db/schema.ts';
 import {
+  createLibraryEntry,
+  deleteLibraryEntry,
+  updateLibraryEntry,
+} from '../routes/campaignLibraryCrud.ts';
+import { libraryEntityConfig, libraryRowOut } from '../routes/campaignLibraryEntities.ts';
+import {
   type AttributeCapPatch,
   assertAttributeCaps,
   touchesAttributeCaps,
@@ -70,6 +83,7 @@ import {
   techniqueInsertValues,
   traitInsertValues,
 } from './entityWrites.ts';
+import { publishLibraryInvalidation } from './libraryInvalidation.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 import { buildPatchSet } from './patchSet.ts';
 import { publish as wsPublish } from './wsBus.ts';
@@ -106,9 +120,11 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   character_technique: Object.keys(techniqueUpdate.shape) as readonly string[],
   character_inventory: Object.keys(inventoryItemUpdate.shape) as readonly string[],
   character_combat: Object.keys(combatStateUpdate.shape) as readonly string[],
-  // Not yet exposed via /sync (no client UI mutations today).
+  // Not exposed via /sync (campaign mutations are online-only REST).
   campaign: null,
   campaign_membership: null,
+  // Library classes accept whole-entry patches only (AGENTS.md S13); their
+  // body is validated by the entity's REST update schema in dispatchLibrary.
   campaign_library_trait: null,
   campaign_library_skill: null,
   campaign_library_spell: null,
@@ -138,6 +154,15 @@ const DISPATCHABLE_CLASSES = new Set<EntityClass>([
   'character_technique',
   'character_inventory',
   'character_combat',
+  'campaign_library_trait',
+  'campaign_library_skill',
+  'campaign_library_spell',
+  'campaign_library_item',
+  'campaign_library_language',
+  'campaign_library_technique',
+  'campaign_library_style',
+  'campaign_library_enchantment',
+  'campaign_library_active_effect',
 ]);
 
 /**
@@ -161,6 +186,22 @@ function dbFreeRejection(op: OperationEnvelope): OperationOutcome | null {
       status: 'rejected',
       reason: 'combat state is not deletable',
     };
+  }
+  if (isLibraryEntityClass(op.entityClass)) {
+    if (typeof op.parentId !== 'string') {
+      return {
+        clientOpId: op.clientOpId,
+        status: 'rejected',
+        reason: 'campaign id required for library operations',
+      };
+    }
+    if (op.command === 'patch' && op.fieldPath !== undefined) {
+      return {
+        clientOpId: op.clientOpId,
+        status: 'rejected',
+        reason: 'library entries accept whole-entry patches only',
+      };
+    }
   }
   return null;
 }
@@ -187,7 +228,11 @@ export async function dispatchOperation(
     const outcome = await withAudit(ctx.userId, batchId, (tx) =>
       dispatchOperationInner({ ...ctx, batchId }, op, tx),
     );
-    if (outcome.status === 'applied') {
+    if (outcome.status === 'applied' && isLibraryEntityClass(op.entityClass)) {
+      // Every campaign member reads the library; nudge them all (and the
+      // owner's other devices). The cursor pull remains the source of truth.
+      await publishLibraryInvalidation(op.parentId as string);
+    } else if (outcome.status === 'applied') {
       // Wake the actor's other tabs/devices AND every other user who
       // can see the affected character (owner, campaign GM, campaign
       // members) so a GM editing a player's sheet -- or vice versa --
@@ -384,10 +429,24 @@ async function resolveReplayedCreate(
           );
         return row ? appliedOutcome(op, Number(row.revision)) : null;
       }
-      default:
-        // character_combat creates are upserts (no unique violation);
-        // other classes have no create dispatcher.
-        return null;
+      default: {
+        if (!isLibraryEntityClass(op.entityClass)) {
+          // character_combat creates are upserts (no unique violation);
+          // other classes have no create dispatcher.
+          return null;
+        }
+        const campaignId = op.parentId as string;
+        await requireCampaignOwner(campaignId, userId);
+        const cfg = libraryEntityConfig(op.entityClass);
+        const [row] = (await db
+          .select()
+          // biome-ignore lint/suspicious/noExplicitAny: generic library table runtime object
+          .from(cfg.table as any)
+          .where(
+            and(eq(cfg.table.id, op.entityId), eq(cfg.table.campaignId, campaignId)),
+          )) as Array<{ revision: unknown }>;
+        return row ? appliedOutcome(op, Number(row.revision)) : null;
+      }
     }
   } catch {
     // Any access/parent-resolution failure means this is not a clean
@@ -418,6 +477,16 @@ async function dispatchOperationInner(
       return dispatchInventory(ctx, op, tx);
     case 'character_combat':
       return dispatchCombat(ctx, op, tx);
+    case 'campaign_library_trait':
+    case 'campaign_library_skill':
+    case 'campaign_library_spell':
+    case 'campaign_library_item':
+    case 'campaign_library_language':
+    case 'campaign_library_technique':
+    case 'campaign_library_style':
+    case 'campaign_library_enchantment':
+    case 'campaign_library_active_effect':
+      return dispatchLibrary(ctx, op, op.entityClass, tx);
     default:
       return {
         clientOpId: op.clientOpId,
@@ -555,6 +624,68 @@ async function dispatchLibraryChild(
   // Recheck permissions under locks before stale-base can return private row data.
   await lockLibraryReferenceScope(tx, characterId, ctx.userId);
   return handlers.patch(characterId);
+}
+
+// ---------- campaign library ----------
+
+/**
+ * Library writes share the REST route's service functions
+ * (`createLibraryEntry` / `updateLibraryEntry` / `deleteLibraryEntry`), so
+ * validation, reference preparation, owned-snapshot refresh and the campaign
+ * revision fan-out are identical on both doors (AGENTS.md S12). Only the
+ * campaign owner may write, exactly like the REST routes; the row must belong
+ * to the campaign named by the envelope's `parentId`.
+ */
+async function dispatchLibrary(
+  ctx: DispatchContext,
+  op: OperationEnvelope,
+  entityClass: LibraryEntityClass,
+  tx: AuditTx,
+): Promise<OperationOutcome> {
+  const campaignId = op.parentId;
+  if (typeof campaignId !== 'string') {
+    return { clientOpId: op.clientOpId, status: 'rejected', reason: 'campaign id required' };
+  }
+  const cfg = libraryEntityConfig(entityClass);
+  await requireCampaignOwner(campaignId, ctx.userId);
+
+  if (op.command === 'create') {
+    const body = cfg.createSchema.parse(op.attemptedValue);
+    const created = await createLibraryEntry(tx, cfg, campaignId, body, op.entityId);
+    return appliedOutcome(op, Number((created as { revision: unknown }).revision));
+  }
+
+  if (op.command === 'delete') {
+    // Replayed deletes are idempotent once campaign ownership is established.
+    await deleteLibraryEntry(tx, cfg, campaignId, op.entityId);
+    return { clientOpId: op.clientOpId, status: 'applied' };
+  }
+
+  if (op.fieldPath !== undefined) {
+    return {
+      clientOpId: op.clientOpId,
+      status: 'rejected',
+      reason: 'library entries accept whole-entry patches only',
+    };
+  }
+  const body = cfg.updateSchema.parse(op.attemptedValue);
+  const result = await updateLibraryEntry(tx, cfg, campaignId, op.entityId, body, {
+    baseRevision: op.baseRevision,
+  });
+  if (result.kind === 'not_found') {
+    return { clientOpId: op.clientOpId, status: 'unauthorized', reason: 'not found' };
+  }
+  if (result.kind === 'stale') {
+    return {
+      clientOpId: op.clientOpId,
+      status: 'stale_base',
+      reason: 'newer server revision',
+      // The client compares this against its whole-entry prevValue, which is
+      // the same public projection the cursor emits.
+      latestEntity: libraryRowOut(cfg, result.current),
+    };
+  }
+  return appliedOutcome(op, Number((result.row as { revision: unknown }).revision));
 }
 
 // ---------- character_trait ----------

@@ -301,3 +301,25 @@ describe('isRecordAccessRestricted with a missing parent', () => {
     expect(isRecordAccessRestricted(entry, access)).toBe(false);
   });
 });
+
+describe('library records (parented by a campaign, not a character)', () => {
+  const campaignId = '0193b3c0-f1f0-7000-8000-00000000ca01';
+  const record = {
+    entityClass: 'campaign_library_skill',
+    entityId: '0193b3c0-f1f0-7000-8000-00000000a001',
+    parentId: campaignId,
+    command: 'patch',
+  };
+
+  it('stays readable while the campaign is accessible, even with no local characters', () => {
+    const access = characterAccessFrom([]);
+    expect(isOutboxAccessRestricted(record, access)).toBe(false);
+    expect(isRecordAccessRestricted(record, access)).toBe(false);
+  });
+
+  it('is restricted once the campaign has been revoked', () => {
+    const access = characterAccessFrom([], [], [campaignId]);
+    expect(isOutboxAccessRestricted(record, access)).toBe(true);
+    expect(isRecordAccessRestricted(record, access)).toBe(true);
+  });
+});

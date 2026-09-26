@@ -29,6 +29,28 @@ export const entityClass = z.enum([
 ]);
 export type EntityClass = z.infer<typeof entityClass>;
 
+/**
+ * Campaign-library classes: sync-backed like the character classes, but
+ * parented by a campaign. Their envelope `parentId` is the campaign id, and
+ * edits are whole-entry patches (AGENTS.md S13).
+ */
+export const LIBRARY_ENTITY_CLASSES = [
+  'campaign_library_trait',
+  'campaign_library_skill',
+  'campaign_library_spell',
+  'campaign_library_item',
+  'campaign_library_language',
+  'campaign_library_technique',
+  'campaign_library_style',
+  'campaign_library_enchantment',
+  'campaign_library_active_effect',
+] as const satisfies readonly EntityClass[];
+export type LibraryEntityClass = (typeof LIBRARY_ENTITY_CLASSES)[number];
+
+export function isLibraryEntityClass(value: string | undefined): value is LibraryEntityClass {
+  return (LIBRARY_ENTITY_CLASSES as readonly string[]).includes(value ?? '');
+}
+
 export const operationCommand = z.enum(['create', 'patch', 'delete']);
 export type OperationCommand = z.infer<typeof operationCommand>;
 

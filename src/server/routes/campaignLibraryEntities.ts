@@ -74,6 +74,7 @@ import {
   libraryTraitOut,
   libraryTraitUpdate,
 } from '../../shared/schemas/campaignLibrary.ts';
+import type { LibraryEntityClass } from '../../shared/schemas/sync.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
   campaignLibraryEnchantments,
@@ -883,3 +884,31 @@ export const libraryEntities = [
   enchantmentEntity,
   activeEffectEntity,
 ] as const;
+
+/** Entity-class → config, shared by the sync dispatcher and cursor reader. */
+export const LIBRARY_ENTITY_CONFIGS = {
+  campaign_library_trait: traitEntity,
+  campaign_library_skill: skillEntity,
+  campaign_library_spell: spellEntity,
+  campaign_library_item: itemEntity,
+  campaign_library_language: languageEntity,
+  campaign_library_technique: techniqueEntity,
+  campaign_library_style: styleEntity,
+  campaign_library_enchantment: enchantmentEntity,
+  campaign_library_active_effect: activeEffectEntity,
+} as const satisfies Record<LibraryEntityClass, unknown>;
+
+// biome-ignore lint/suspicious/noExplicitAny: heterogeneous configs are only used through the generic services.
+export type AnyLibraryEntityConfig = LibraryEntityConfig<LibraryTable, any, any, any, string>;
+
+export function libraryEntityConfig(entityClass: LibraryEntityClass): AnyLibraryEntityConfig {
+  return LIBRARY_ENTITY_CONFIGS[entityClass] as unknown as AnyLibraryEntityConfig;
+}
+
+/** The cursor/stale-base projection of a library row: its REST shape plus `revision`. */
+export function libraryRowOut(cfg: AnyLibraryEntityConfig, row: unknown): Record<string, unknown> {
+  return {
+    ...(cfg.toOut(row as never) as Record<string, unknown>),
+    revision: Number((row as { revision: unknown }).revision),
+  };
+}

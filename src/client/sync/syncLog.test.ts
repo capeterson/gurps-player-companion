@@ -5,9 +5,12 @@ import {
   REJECTION_REPLAY_MAX_AGE_MS,
   REJECTION_RETENTION,
   REVOKED_CHARACTERS_RETENTION,
+  SYNC_LOG_PRUNE_DEBOUNCE_MS,
   SYNC_LOG_RETENTION,
   SYNC_LOG_VALUE_MAX_CHARS,
   appendSyncLog,
+  appendSyncLogEntries,
+  flushSyncLogPrune,
   markRejectionDismissed,
   pruneRejectionToasts,
   readRevokedCampaigns,
@@ -46,6 +49,8 @@ describe('sync log', () => {
       command: 'patch',
       occurredAt: new Date(SYNC_LOG_RETENTION + 1).toISOString(),
     });
+    // Retention is eventually consistent (debounced prune).
+    await flushSyncLogPrune();
 
     expect(await db.syncLog.count()).toBe(SYNC_LOG_RETENTION);
     expect(await db.syncLog.get('entry-0000')).toBeUndefined();
@@ -269,5 +274,55 @@ describe('rejection record retention', () => {
 
     expect(await db.rejectionToasts.count()).toBe(REJECTION_RETENTION);
     expect(await db.rejectionToasts.get('op-0000')).toBeUndefined();
+  });
+});
+
+describe('appendSyncLogEntries', () => {
+  it('writes a cursor page in one batch and defers retention to one debounced prune', async () => {
+    const db = getLocalDb();
+    await db.syncLog.bulkPut(
+      Array.from({ length: SYNC_LOG_RETENTION }, (_, index) => ({
+        id: `old-${index}`,
+        direction: 'pull' as const,
+        result: 'synced' as const,
+        occurredAt: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      })),
+    );
+    const count = vi.spyOn(db.syncLog, 'count');
+    const page = (offset: number) =>
+      Array.from({ length: 125 }, (_, index) => ({
+        direction: 'pull' as const,
+        result: 'synced' as const,
+        entityClass: 'campaign_library_spell' as const,
+        entityId: `spell-${offset + index}`,
+      }));
+
+    await appendSyncLogEntries(page(0));
+    await appendSyncLogEntries(page(125));
+    // Writes never count or trim inline.
+    expect(count).not.toHaveBeenCalled();
+    expect(await db.syncLog.count()).toBe(SYNC_LOG_RETENTION + 250);
+    count.mockClear();
+
+    await flushSyncLogPrune();
+    expect(await db.syncLog.count()).toBe(SYNC_LOG_RETENTION);
+    expect(await db.syncLog.where('id').equals('old-0').count()).toBe(0);
+    expect(await db.syncLog.filter((entry) => entry.entityId === 'spell-249').count()).toBe(1);
+  });
+
+  it('coalesces a burst of writes into a single prune after the debounce', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const db = getLocalDb();
+      const count = vi.spyOn(db.syncLog, 'count');
+      for (let index = 0; index < 5; index++) {
+        await appendSyncLog({ direction: 'push', result: 'synced', entityId: `op-${index}` });
+      }
+      expect(count).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(SYNC_LOG_PRUNE_DEBOUNCE_MS);
+      await vi.waitFor(() => expect(count).toHaveBeenCalledTimes(1));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

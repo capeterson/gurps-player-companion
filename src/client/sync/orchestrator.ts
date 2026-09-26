@@ -23,16 +23,19 @@ import {
 
 import { liveQuery } from 'dexie';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
-import type {
-  EntityClass,
-  OperationEnvelope,
-  OperationOutcome,
-  SyncCursorChange,
-  SyncCursorResponse,
-  SyncOperationsResponse,
+import {
+  type EntityClass,
+  LIBRARY_ENTITY_CLASSES,
+  type OperationEnvelope,
+  type OperationOutcome,
+  type SyncCursorChange,
+  type SyncCursorResponse,
+  type SyncOperationsResponse,
+  isLibraryEntityClass,
 } from '../../shared/schemas/sync.ts';
 import {
   ALL_STORE_NAMES,
+  LIBRARY_STORE_NAMES,
   type LocalCharacter,
   type LocalCharacterCombat,
   type LocalCharacterInventory,
@@ -52,6 +55,7 @@ import {
   stampSyncEntityRevision,
   syncEntityTable,
   updateSyncEntity,
+  writableSyncEntityTable,
 } from '../db/syncEntityStore.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
@@ -68,6 +72,7 @@ import {
   backoffMs,
   claimDrainableOps,
   countPending,
+  enqueueEntityPatch,
   enqueueFieldPatch,
   nextOutboxAttemptDelay,
   recoverStaleInFlight,
@@ -77,6 +82,7 @@ import { syncStateStore } from './state.ts';
 import {
   type NewSyncLogEntry,
   appendSyncLog,
+  appendSyncLogEntries,
   pruneRejectionToasts,
   redactSyncLogForCampaigns,
   redactSyncLogForCharacters,
@@ -100,7 +106,29 @@ const ALL_ENTITY_CLASSES: EntityClass[] = [
   // *mutations* still go through the REST routes — there is no outbox
   // path for them (see AGENTS.md S0).
   'campaign',
+  // The campaign library is fully sync-backed: cursor rows plus outbox
+  // creates, whole-entry patches (S13) and deletes.
+  ...LIBRARY_ENTITY_CLASSES,
 ];
+
+/** A whole-entry patch (AGENTS.md S13): no fieldPath, the full body in attemptedValue. */
+function isEntityPatch(op: OutboxEntry): boolean {
+  return op.command === 'patch' && op.fieldPath === undefined;
+}
+
+/** The keys a whole-entry patch owns until it settles. */
+function entityPatchKeys(op: OutboxEntry): string[] {
+  const body = op.attemptedValue;
+  return isEntityPatch(op) && body && typeof body === 'object' && !Array.isArray(body)
+    ? Object.keys(body)
+    : [];
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
 
 const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
@@ -191,8 +219,14 @@ function pullLogEntry(
   after: Record<string, unknown> | undefined,
 ): NewSyncLogEntry {
   const characterRow = after ?? before;
+  // Character children are parented by their character, library rows by
+  // their campaign (so a campaign's journal rows can be redacted together).
   const parentId =
-    typeof characterRow?.characterId === 'string' ? characterRow.characterId : undefined;
+    typeof characterRow?.characterId === 'string'
+      ? characterRow.characterId
+      : isLibraryEntityClass(change.entityClass) && typeof characterRow?.campaignId === 'string'
+        ? characterRow.campaignId
+        : undefined;
   const changedFields =
     before && after
       ? [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
@@ -647,7 +681,7 @@ class SyncOrchestrator {
       // Usually `prevValue`, but a superseding edit deliberately keeps
       // the user's newer value instead.
       let restoredValue: unknown = op.prevValue;
-      if (op.command === 'patch' && op.fieldPath !== undefined) {
+      if (op.command === 'patch') {
         const preserved = await this.revertLocal(op, {
           clientOpId: op.clientOpId,
           status: 'rejected',
@@ -687,6 +721,11 @@ class SyncOrchestrator {
       if (op.fieldPath) {
         flashBus.emit({
           key: op.flashKey ?? makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
+          reason: 'Local change reverted by user',
+        });
+      } else if (isLibraryEntityClass(op.entityClass) && op.command !== 'create') {
+        flashBus.emit({
+          key: makeFlashKey(op.entityClass, op.entityId, 'entry'),
           reason: 'Local change reverted by user',
         });
       }
@@ -1061,6 +1100,7 @@ class SyncOrchestrator {
               break;
             }
           }
+          if (isEntityPatch(op) && (await this.requeueStaleEntityPatch(op, outcome))) break;
           await this.rollbackLocally(op, outcome);
           break;
         }
@@ -1168,6 +1208,7 @@ class SyncOrchestrator {
         return newer ? { preservedValue: newer.attemptedValue } : undefined;
       });
     }
+    if (isEntityPatch(op)) return this.revertEntityPatch(op, outcome);
     if (outcome.latestEntity && typeof outcome.latestEntity === 'object') {
       await this.applyServerRow(op.entityClass, outcome.latestEntity as Record<string, unknown>, {
         ignoreOutboxConflict: true,
@@ -1180,6 +1221,113 @@ class SyncOrchestrator {
       await this.reinsertLocal(op.entityClass, op.prevValue);
     }
     return undefined;
+  }
+
+  /**
+   * Undo a rejected whole-entry patch (S13). Mirrors the field-patch branch
+   * of `revertLocal`: a newer queued edit of the same entry keeps its value
+   * and inherits the server-confirmed baseline; otherwise the changed keys
+   * return to the server's `latestEntity` or to the pre-edit row.
+   */
+  private async revertEntityPatch(
+    op: OutboxEntry,
+    outcome: OperationOutcome,
+  ): Promise<{ preservedValue: unknown } | undefined> {
+    const db = getLocalDb();
+    return db.transaction('rw', ALL_STORE_NAMES, async () => {
+      const newer = await db.outbox
+        .where('coalesceKey')
+        .equals(coalesceKey(op.entityId, undefined))
+        .filter(
+          (candidate) =>
+            candidate.clientOpId !== op.clientOpId &&
+            candidate.entityClass === op.entityClass &&
+            isEntityPatch(candidate) &&
+            (candidate.status === 'pending' ||
+              candidate.status === 'transient_retry' ||
+              candidate.status === 'in_flight'),
+        )
+        .first();
+      const latest = asRecord(outcome.latestEntity);
+      const previous = asRecord(op.prevValue) ?? {};
+      await db.outbox.delete(op.clientOpId);
+      if (newer) {
+        await db.outbox.update(newer.clientOpId, {
+          prevValue: latest ?? previous,
+          ...(typeof latest?.revision === 'number' ? { baseRevision: latest.revision } : {}),
+        });
+      }
+      if (latest) {
+        await this.applyServerRow(op.entityClass, latest, { ignoreOutboxConflict: false });
+      } else if (!newer) {
+        const restored = Object.fromEntries(entityPatchKeys(op).map((key) => [key, previous[key]]));
+        await updateSyncEntity(op.entityClass, op.entityId, {
+          ...restored,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      return newer ? { preservedValue: newer.attemptedValue } : undefined;
+    });
+  }
+
+  /**
+   * `stale_base` for a whole-entry patch: when the server has not changed
+   * any key this edit owns since its baseline, resend it against the new
+   * revision (or refresh a newer queued edit). Returns false when a patched
+   * key moved underneath us, which is a real conflict and must roll back.
+   */
+  private async requeueStaleEntityPatch(
+    op: OutboxEntry,
+    outcome: OperationOutcome,
+  ): Promise<boolean> {
+    const latest = asRecord(outcome.latestEntity);
+    const previous = asRecord(op.prevValue);
+    const body = asRecord(op.attemptedValue);
+    const newRevision = typeof latest?.revision === 'number' ? latest.revision : undefined;
+    if (!latest || !previous || !body || newRevision === undefined || !op.parentId) return false;
+    if (!entityPatchKeys(op).every((key) => fieldValuesEqual(latest[key], previous[key])))
+      return false;
+    if (!isLibraryEntityClass(op.entityClass)) return false;
+    const entityClass = op.entityClass;
+    const campaignId = op.parentId;
+    const db = getLocalDb();
+    await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      await this.stampRevision(entityClass, op.entityId, newRevision);
+      await db.outbox.delete(op.clientOpId);
+      await appendSyncLog({
+        direction: 'push',
+        result: 'requeued',
+        entityClass,
+        entityId: op.entityId,
+        parentId: op.parentId,
+        command: op.command,
+        humanName: op.humanName,
+        details: { serverReason: outcome.reason, newRevision },
+      });
+      const newer = await db.outbox
+        .where('coalesceKey')
+        .equals(coalesceKey(op.entityId, undefined))
+        .filter(
+          (row) =>
+            isEntityPatch(row) && (row.status === 'pending' || row.status === 'transient_retry'),
+        )
+        .first();
+      if (newer) {
+        await db.outbox.update(newer.clientOpId, { baseRevision: newRevision, prevValue: latest });
+      } else {
+        await enqueueEntityPatch({
+          entityClass,
+          entityId: op.entityId,
+          campaignId,
+          attemptedValue: body,
+          prevValue: latest,
+          baseRevision: newRevision,
+          humanName: op.humanName,
+          batchId: op.batchId,
+        });
+      }
+    });
+    return true;
   }
 
   private async rollbackLocally(op: OutboxEntry, outcome: OperationOutcome): Promise<void> {
@@ -1204,6 +1352,12 @@ class SyncOrchestrator {
     } else if (op.command === 'create' && op.parentId) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.parentId, 'create'),
+        reason: outcome.reason ?? 'sync rejected',
+      });
+    } else if (isLibraryEntityClass(op.entityClass)) {
+      // Whole-entry patches and deletes pulse the entry's row (S5/S13).
+      flashBus.emit({
+        key: makeFlashKey(op.entityClass, op.entityId, 'entry'),
         reason: outcome.reason ?? 'sync rejected',
       });
     }
@@ -1276,6 +1430,11 @@ class SyncOrchestrator {
         key: makeFlashKey(op.entityClass, op.parentId, 'create'),
         reason: outcome.reason ?? 'sync failed',
       });
+    } else if (isLibraryEntityClass(op.entityClass)) {
+      flashBus.emit({
+        key: makeFlashKey(op.entityClass, op.entityId, 'entry'),
+        reason: outcome.reason ?? 'sync failed',
+      });
     }
     await appendSyncLog({
       direction: 'push',
@@ -1344,6 +1503,7 @@ class SyncOrchestrator {
       db.characterInventory,
       db.characterCombat,
       db.campaigns,
+      ...LIBRARY_STORE_NAMES.map((name) => db[name]),
       db.tombstones,
       db.syncCursors,
       db.outbox,
@@ -1375,9 +1535,7 @@ class SyncOrchestrator {
       }
       await this.persistCursors(res.nextCursor);
     });
-    for (const entry of pullLogEntries) {
-      await appendSyncLog(entry);
-    }
+    await appendSyncLogEntries(pullLogEntries);
   }
 
   private async persistCursors(
@@ -1572,6 +1730,7 @@ class SyncOrchestrator {
         db.characterCombat,
         db.tombstones,
         ...campaignTransferStores(),
+        ...LIBRARY_STORE_NAMES.map((name) => db[name]),
       ],
       () => this.mergeServerRow(entityClass, row, opts),
     );
@@ -1633,6 +1792,8 @@ class SyncOrchestrator {
           // value, drop the server's.
           delete merged[op.fieldPath];
         }
+        // A whole-entry patch owns every key of its body (S13).
+        for (const key of entityPatchKeys(op)) delete merged[key];
       }
     }
     // Campaign moves also change child links locally. Cursor rows must not
@@ -1795,8 +1956,13 @@ class SyncOrchestrator {
         > as never);
         return;
       }
-      default:
+      default: {
+        if (!isLibraryEntityClass(entityClass)) return;
+        const table = writableSyncEntityTable(entityClass);
+        const existing = await table.get(id);
+        await table.put({ ...(existing ?? {}), ...merged } as never);
         return;
+      }
     }
   }
 
@@ -1987,6 +2153,8 @@ class SyncOrchestrator {
       );
     }
 
+    await this.pruneInaccessibleLibrary(accessibleCampaignIds);
+
     const staleCharacterIds = chars
       .filter((c) => !accessibleCharacterIds.has(c.id) && c.revision >= 0)
       .map((c) => c.id);
@@ -2079,6 +2247,42 @@ class SyncOrchestrator {
       redactSyncLogForCharacters(charIdsToDelete),
       redactSyncLogForCampaigns(campaignIdsToDelete),
     ]);
+  }
+
+  /**
+   * Library rows belong to campaigns; tombstones cannot reach an ex-member,
+   * so drop every synced library row of a campaign outside the authoritative
+   * accessible set. Rows with unsettled local intent are kept (S7).
+   */
+  private async pruneInaccessibleLibrary(
+    accessibleCampaignIds: ReadonlySet<string>,
+  ): Promise<void> {
+    const db = getLocalDb();
+    const stores = LIBRARY_STORE_NAMES.map((name) => db[name]);
+    await db.transaction('rw', [db.outbox, ...stores], async () => {
+      for (const entityClass of LIBRARY_ENTITY_CLASSES) {
+        const table = writableSyncEntityTable(entityClass);
+        const stale = (await table
+          .filter(
+            (row) =>
+              row.revision >= 0 &&
+              typeof row.campaignId === 'string' &&
+              !accessibleCampaignIds.has(row.campaignId),
+          )
+          .primaryKeys()) as string[];
+        if (stale.length === 0) continue;
+        const dirty = new Set(
+          (
+            await db.outbox
+              .where('entityId')
+              .anyOf(stale)
+              .filter((o) => ['pending', 'in_flight', 'transient_retry'].includes(o.status))
+              .toArray()
+          ).map((o) => o.entityId),
+        );
+        await table.bulkDelete(stale.filter((id) => !dirty.has(id)));
+      }
+    });
   }
 
   private fireCycleDone(): void {

@@ -19,12 +19,18 @@ for a newly introduced server route.
 
 ## Scope — what is actually sync-backed
 
-The outbox + cursor system covers **only the character family**:
+The outbox + cursor system covers the **character family** and the
+**campaign library**:
 
 ```
 character  character_trait  character_skill  character_spell
 character_language  character_technique  character_inventory
 character_combat
+
+campaign_library_trait  campaign_library_skill  campaign_library_spell
+campaign_library_item  campaign_library_language  campaign_library_technique
+campaign_library_style  campaign_library_enchantment
+campaign_library_active_effect
 ```
 
 Everything else is either read-only in the local store or fully online:
@@ -34,8 +40,9 @@ Everything else is either read-only in the local store or fully online:
   character inputs can resolve campaign names and the default-on
   `enforceAttributeCaps` rule offline) but have **no outbox path** — campaign
   *mutations* go through REST.
-- **Online-only** (HTTP + React Query, no offline support): the campaign
-  library, adventure log, invitations, notifications, settings, admin.
+- **Online-only** (HTTP + React Query, no offline support): adventure log,
+  invitations, notifications, settings, admin, and the library **YAML
+  import** (see [Campaign library](#campaign-library)).
 
 Delegated MCP calls are online server operations. They never fabricate Dexie
 rows or enter a browser outbox, and they cannot see unsynced browser edits.
@@ -44,8 +51,7 @@ invalidations as REST. Browsers converge through the ordinary cursor pull;
 pending local fields remain protected and replay or conflict normally even
 when a WebSocket nudge is missed.
 
-Library editing remains online-only, but calculation no longer depends on its
-React Query cache. Trait/skill rows persist `libraryMechanics` in Postgres and
+Character calculation never depends on live library rows. Trait/skill rows persist `libraryMechanics` in Postgres and
 Dexie: source ID, source campaign, source revision, raw effect declarations, and
 an optional `detached` flag. Effect declarations include deterministic weapon
 selectors and are resolved against the same mirrored inventory rows in local and
@@ -67,8 +73,8 @@ character-local instances omit the UUID. The pure shared item resolver consumes
 only this owned snapshot, so DR, DB, attack/damage/Accuracy, Parry/Block, armor
 divisor, weight reduction, and skill effects remain identical offline. The item
 field still uses the normal coalesced outbox patch, pending-field protection,
-rejection toast, and row flash. Campaign enchantment definitions themselves stay
-online-only with the rest of the library. Library edits refresh linked inventory
+rejection toast, and row flash. Campaign enchantment definitions themselves sync
+like every other library entry. Library edits refresh linked inventory
 snapshots and their revisions in the same audited transaction; delete/transfer
 clears live IDs without deleting the snapshot. An optimistic offline campaign
 transfer performs the same nested-ID detachment in its character/outbox
@@ -107,14 +113,11 @@ with declarations; array length is never used as a freshness signal.
 
 After commit, `services/libraryInvalidation.ts` sends a row-free `sync_invalidate`
 nudge to the campaign owner and members. `wsSubscriber.ts` only triggers the ordinary
-sync cycle. All library CRUD/import transactions also advance the campaign revision;
-after HTTP cursor changes commit locally, a Dexie live query in each tab invalidates
-that campaign's React Query library prefix via `features/campaigns/libraryInvalidation.ts`.
-This also
-retains invalidation when an initial library request is still pending: after that
-request settles, active queries refetch and inactive prefetches remain stale.
-The observer also
-refreshes unowned definitions and works when WS is unavailable. Migration 0035 indexes
+sync cycle. All library CRUD/import transactions also advance the campaign revision.
+Library rows themselves arrive through their own cursor classes, and every reader
+(the library page, character-sheet autocompletes, the skill-reference combobox) uses
+Dexie live queries, so each tab updates as soon as any tab commits a pull, with or
+without WS. Migration 0035 indexes
 library references and advances existing linked children to repair pre-fan-out cursors.
 A durable function-comment marker makes this repair idempotent on SQL replay; an
 advisory transaction lock serializes concurrent repair attempts. Cursor-only campaign
@@ -300,7 +303,8 @@ Defined in `src/shared/schemas/sync.ts`, validated identically on both sides.
 - **Operation commands** — `create` | `patch` | `delete`.
 - **Envelope** (`operationEnvelope`): `clientOpId`, `entityClass`, `entityId`,
   `command`, `fieldPath?`, `attemptedValue`, `prevValue?`, `baseRevision?`,
-  `parentId?` (parent character id for child classes — kept top-level so
+  `parentId?` (parent character id for child classes, owning campaign id for
+  `campaign_library_*` classes — kept top-level so
   `attemptedValue`/`prevValue` stay **raw field values**, `AGENTS.md` S2),
   `validationVersion`, and optional `batchId` (groups one user gesture for the
   history fold).
@@ -434,7 +438,7 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   logged nothing anywhere** — no outbox row, no rejection record, no toast —
   which left the red badge with nothing to point at during a server outage.
 
-It is pruned to the newest 1,000 records. `push` and `local` entries snapshot
+It is pruned to the newest 1,000 records, eventually: writes never count or trim inline, but schedule a debounced prune (2 s trailing, 10 s max wait), and each cursor page's pull entries are written in one batch. The journal can briefly exceed 1,000 rows during a burst; per-row inline pruning once stalled large library pulls for tens of seconds between pages. `push` and `local` entries snapshot
 the outbox's `previousValue` / `newValue`. Pull entries compare the row in
 Dexie immediately before and after applying the cursor change and snapshot only
 the data fields that actually moved; this means a pending local field protected
@@ -777,6 +781,44 @@ rejection, slow same-field follow-up, slow different-field follow-up,
 stale-field cursor preservation). The `useDraftField`, `outbox`, and
 orchestrator test files are the working references.
 
+
+## Campaign library
+
+All nine library classes are sync-backed (Dexie v11 stores
+`campaignLibrary*`, indexed by `campaignId`). Reads are local-first for every
+campaign member: `/sync/cursor` emits each row's REST projection plus `revision`
+for campaigns in the viewer's accessible set, and migration 0051 adds
+`record_campaign_library_tombstone` so deletes (sync, REST, YAML replace) reach
+other devices. Tombstones carry the campaign id, so members receive them; an
+ex-member's rows are removed by the accessible-set prune instead.
+
+Writes are owner-only on both doors. REST and `/sync/operations` call the same
+`createLibraryEntry` / `updateLibraryEntry` / `deleteLibraryEntry` services in
+`routes/campaignLibraryCrud.ts`, so schema validation, cross-field checks,
+reference preparation, owned-snapshot refresh and campaign-revision fan-out
+cannot drift (`AGENTS.md` S12). The envelope `parentId` names the campaign; the
+dispatcher requires campaign ownership and that the row belongs to that
+campaign. Creates adopt the client UUID (S7); a duplicate natural key is a
+`conflict`; replayed creates and deletes are idempotent.
+
+Library edits are **whole-entry patches** (`AGENTS.md` S13): the form's full
+update body travels as one op without a `fieldPath`, because the server
+validates fields together (a skill's specialization policy and default, or TL
+policy and TL). `enqueueEntityPatch` coalesces per entity with the same
+safe-coalesce and predecessor rules as field patches and records the full
+pre-edit row as `prevValue`. A pending whole-entry patch protects every key of
+its body from cursor rows (S4). Rejection restores the changed keys (or adopts
+`latestEntity`), keeps a newer queued edit, persists the toast and flashes
+`${entityClass}:${entityId}:entry`, the row's name cell. `stale_base` resends
+against the new revision only when the server has not changed any edited key.
+Create rejections flash the section's add button
+(`${entityClass}:${campaignId}:create`). The page validates each draft with the
+shared schemas, the specialization rule and a local unique-name check before
+enqueueing, so a draft the client can already tell is invalid stays open in its
+form.
+
+The YAML import stays an online bulk REST operation (up to 20 MB, server-side
+upsert/prune in one transaction). On success the page triggers a cursor pull.
 
 ### Campaign house rules
 

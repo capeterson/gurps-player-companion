@@ -276,6 +276,8 @@ test.describe('delegated MCP OAuth acceptance', () => {
       // Keep a browser edit pending offline while the agent changes another
       // field. On reconnect the stale-base retry must retain ST=11, then the
       // normal HTTP cursor must bring in the agent's DX=12 without a WS nudge.
+      // Attributes live on Overview; History was the last section opened.
+      await selectCharacterSection(page, 'Overview');
       const st = page.getByRole('textbox', { name: /st base/i });
       const dx = page.getByRole('textbox', { name: /dx base/i });
       await expect(st).toHaveValue('10');
@@ -285,7 +287,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       await st.fill('11');
       await st.blur();
       await expect(st).toHaveValue('11');
-      await expect(page.getByLabel(/offline/i)).toBeVisible();
+      await expect(page.getByLabel(/offline/i).filter({ visible: true })).toBeVisible();
 
       toolEnvelope(
         await client.callTool({
@@ -326,7 +328,9 @@ test.describe('delegated MCP OAuth acceptance', () => {
           { timeout: 30_000 },
         )
         .toBe(11);
-      await expect(page.getByLabel(/all changes saved/i)).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByLabel(/all changes saved/i).filter({ visible: true })).toBeVisible({
+        timeout: 30_000,
+      });
       await expect(st).toHaveValue('11', { timeout: 20_000 });
       await expect(dx).toHaveValue('12', { timeout: 20_000 });
       expect(successfulCursorPulls).toBeGreaterThan(cursorCountBeforeReconnect);

@@ -87,17 +87,16 @@ describe('sync schemas', () => {
 
 describe('dispatchOperation (DB-free branches)', () => {
   it('rejects an op against an unsupported entity class', async () => {
-    // campaign_library_trait has no dispatcher branch yet — this hits
-    // the default in dispatchOperationInner and returns rejected
-    // without touching the DB.
+    // adventure_log has no dispatcher branch — this is rejected before the
+    // withAudit transaction without touching the DB.
     const outcome = await dispatchOperation(
       { userId: '0193b3c0-f1f0-7000-8000-000000000010' },
       {
         clientOpId: '0193b3c0-f1f0-7000-8000-000000000011',
-        entityClass: 'campaign_library_trait',
+        entityClass: 'adventure_log',
         entityId: '0193b3c0-f1f0-7000-8000-000000000012',
         command: 'patch',
-        fieldPath: 'name',
+        fieldPath: 'body',
         attemptedValue: 'whatever',
         validationVersion: 1,
         createdAt: new Date().toISOString(),
@@ -105,6 +104,43 @@ describe('dispatchOperation (DB-free branches)', () => {
     );
     expect(outcome.status).toBe('rejected');
     expect(outcome.reason).toMatch(/not yet supported/);
+  });
+
+  it('rejects library ops without a campaign or with a field path before touching the DB', async () => {
+    const base = {
+      entityClass: 'campaign_library_trait' as const,
+      entityId: '0193b3c0-f1f0-7000-8000-000000000012',
+      validationVersion: 1,
+      createdAt: new Date().toISOString(),
+    };
+    const missingCampaign = await dispatchOperation(
+      { userId: '0193b3c0-f1f0-7000-8000-000000000010' },
+      {
+        ...base,
+        clientOpId: '0193b3c0-f1f0-7000-8000-000000000013',
+        command: 'create',
+        attemptedValue: { name: 'Luck', kind: 'advantage' },
+      },
+    );
+    expect(missingCampaign).toMatchObject({
+      status: 'rejected',
+      reason: 'campaign id required for library operations',
+    });
+    const fieldPatch = await dispatchOperation(
+      { userId: '0193b3c0-f1f0-7000-8000-000000000010' },
+      {
+        ...base,
+        clientOpId: '0193b3c0-f1f0-7000-8000-000000000014',
+        command: 'patch',
+        parentId: '0193b3c0-f1f0-7000-8000-000000000015',
+        fieldPath: 'name',
+        attemptedValue: 'whatever',
+      },
+    );
+    expect(fieldPatch).toMatchObject({
+      status: 'rejected',
+      reason: 'library entries accept whole-entry patches only',
+    });
   });
 
   it('rejects a delete op on combat state (combat is not deletable)', async () => {

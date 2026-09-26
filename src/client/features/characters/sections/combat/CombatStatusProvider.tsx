@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { useAppHeaderBottom } from '../../../../hooks/useAppHeaderBottom.ts';
 import { useStatusBarPreferences } from '../../../../lib/statusBarPreferences.ts';
 import { RollSheet } from '../RollSheet.tsx';
 import type { RollRequest } from '../rollTypes.ts';
@@ -47,29 +48,13 @@ export function CombatStatusProvider({
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
   const statusBarPreferences = useStatusBarPreferences(userId);
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
-  const [headerBottom, setHeaderBottom] = useState(
-    () => document.querySelector('header')?.getBoundingClientRect().bottom ?? 64,
-  );
+  const headerBottom = useAppHeaderBottom();
   const [statusHeight, setStatusHeight] = useState(() =>
     window.matchMedia('(min-width: 768px)').matches ? 56 : 120,
   );
 
   useLayoutEffect(() => {
     setHeaderSlot(document.getElementById('character-status-header-slot'));
-  }, []);
-
-  useLayoutEffect(() => {
-    const header = document.querySelector('header');
-    if (!header) return;
-    const measure = () => setHeaderBottom(header.getBoundingClientRect().bottom);
-    measure();
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    observer?.observe(header);
-    window.addEventListener('resize', measure);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', measure);
-    };
   }, []);
 
   const value = useMemo<CombatStatusContextValue>(

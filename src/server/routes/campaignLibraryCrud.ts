@@ -153,29 +153,9 @@ export function registerLibraryCrud<
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
       await requireCampaignOwner(id, user.id);
-      cfg.validateCreate?.(body);
-      let row: TTable['$inferSelect'];
-      try {
-        row = await withAudit(user.id, undefined, async (tx) => {
-          await advanceLibraryCampaignRevision(tx, id);
-          const prepared = cfg.prepareValues
-            ? ((await cfg.prepareValues(tx, id, body)) as TCreate)
-            : body;
-          const [inserted] = (await tx
-            .insert(asTable(cfg.table))
-            .values(cfg.toInsertValues(id, prepared))
-            .returning()) as TTable['$inferSelect'][];
-          if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
-          return inserted;
-        });
-      } catch (err) {
-        if (isUniqueViolation(err)) {
-          throw new HTTPException(409, {
-            message: `a ${cfg.entityLabel} with that name already exists`,
-          });
-        }
-        throw err;
-      }
+      const row = await asDuplicateConflict(cfg, () =>
+        withAudit(user.id, undefined, (tx) => createLibraryEntry(tx, cfg, id, body)),
+      );
       await publishLibraryInvalidation(id);
       return c.json(cfg.toOut(row), 201);
     },
@@ -213,44 +193,15 @@ export function registerLibraryCrud<
       const itemId = params[cfg.paramName];
       const body = c.req.valid('json');
       await requireCampaignOwner(id, user.id);
-      let row: TTable['$inferSelect'];
-      try {
-        row = await withAudit(user.id, undefined, async (tx) => {
-          await advanceLibraryCampaignRevision(tx, id);
-          const [existing] = (await tx
-            .select()
-            .from(asTable(cfg.table))
-            .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
-            .for('update')) as TTable['$inferSelect'][];
-          const prepared = cfg.prepareValues
-            ? ((await cfg.prepareValues(tx, id, body, existing)) as TUpdate)
-            : body;
-          const normalized = cfg.normalizePatch ? cfg.normalizePatch(prepared) : prepared;
-          const updates = buildPatchSet(
-            normalized as Record<string, unknown>,
-            cfg.stringifyKeys ? { stringifyKeys: cfg.stringifyKeys } : undefined,
-          );
-          const [updated] = (await tx
-            .update(asTable(cfg.table))
-            .set(updates)
-            .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
-            .returning()) as TTable['$inferSelect'][];
-          if (!updated)
-            throw new HTTPException(404, {
-              message: `${cfg.entityLabel} not found`,
-            });
-          cfg.validateRow?.(updated);
-          await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, id, itemId);
-          return updated;
-        });
-      } catch (err) {
-        if (isUniqueViolation(err)) {
-          throw new HTTPException(409, {
-            message: `a ${cfg.entityLabel} with that name already exists`,
-          });
-        }
-        throw err;
-      }
+      const row = await asDuplicateConflict(cfg, () =>
+        withAudit(user.id, undefined, async (tx) => {
+          const result = await updateLibraryEntry(tx, cfg, id, itemId, body);
+          // Throw inside the transaction so a miss rolls back the campaign touch.
+          if (result.kind !== 'updated')
+            throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
+          return result.row;
+        }),
+      );
       await publishLibraryInvalidation(id);
       return c.json(cfg.toOut(row), 200);
     },
@@ -276,27 +227,124 @@ export function registerLibraryCrud<
       const { id } = params;
       const itemId = params[cfg.paramName];
       await requireCampaignOwner(id, user.id);
-      const result = await withAudit(user.id, undefined, async (tx) => {
-        await advanceLibraryCampaignRevision(tx, id);
-        await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, id, itemId, true);
-        const deleted = (await tx
-          .delete(asTable(cfg.table))
-          .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, id)))
-          .returning({ id: cfg.table.id })) as { id: string }[];
-        if (deleted.length === 0)
-          throw new HTTPException(404, {
-            message: `${cfg.entityLabel} not found`,
-          });
-        return deleted;
+      await withAudit(user.id, undefined, async (tx) => {
+        if (!(await deleteLibraryEntry(tx, cfg, id, itemId)))
+          throw new HTTPException(404, { message: `${cfg.entityLabel} not found` });
       });
-      if (result.length === 0)
-        throw new HTTPException(404, {
-          message: `${cfg.entityLabel} not found`,
-        });
       await publishLibraryInvalidation(id);
       return c.body(null, 204);
     },
   );
+}
+
+/** REST reports a duplicate natural key as 409; sync maps the raw violation to `conflict`. */
+async function asDuplicateConflict<T>(
+  cfg: { entityLabel: string },
+  run: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      throw new HTTPException(409, {
+        message: `a ${cfg.entityLabel} with that name already exists`,
+      });
+    }
+    throw err;
+  }
+}
+
+/**
+ * Insert one library entry. Shared by the REST POST route and the
+ * `/sync/operations` dispatcher so both doors apply identical validation,
+ * reference preparation and campaign-revision fan-out (AGENTS.md S12).
+ * Sync passes the client-generated id (S7); REST lets Postgres assign one.
+ * Callers authorize the campaign owner first. A duplicate natural key
+ * propagates as the raw unique violation for the caller to classify.
+ */
+export async function createLibraryEntry<TTable extends LibraryTable, TCreate, TUpdate, TOut>(
+  tx: AuditTx,
+  cfg: LibraryEntityConfig<TTable, TCreate, TUpdate, TOut, string>,
+  campaignId: string,
+  body: TCreate,
+  id?: string,
+): Promise<TTable['$inferSelect']> {
+  cfg.validateCreate?.(body);
+  await advanceLibraryCampaignRevision(tx, campaignId);
+  const prepared = cfg.prepareValues
+    ? ((await cfg.prepareValues(tx, campaignId, body)) as TCreate)
+    : body;
+  const values = cfg.toInsertValues(campaignId, prepared);
+  const [inserted] = (await tx
+    .insert(asTable(cfg.table))
+    .values(id ? { ...values, id } : values)
+    .returning()) as TTable['$inferSelect'][];
+  if (!inserted) throw new HTTPException(500, { message: 'insert failed' });
+  return inserted;
+}
+
+export type LibraryUpdateResult<Row> =
+  | { readonly kind: 'updated'; readonly row: Row }
+  | { readonly kind: 'not_found' }
+  | { readonly kind: 'stale'; readonly current: Row };
+
+/**
+ * Apply a partial update to one library entry and refresh every owned
+ * character snapshot linked to it. `baseRevision` (sync only) turns a newer
+ * server row into a `stale` result instead of silently overwriting it.
+ */
+export async function updateLibraryEntry<TTable extends LibraryTable, TCreate, TUpdate, TOut>(
+  tx: AuditTx,
+  cfg: LibraryEntityConfig<TTable, TCreate, TUpdate, TOut, string>,
+  campaignId: string,
+  itemId: string,
+  body: TUpdate,
+  options: { readonly baseRevision?: number | undefined } = {},
+): Promise<LibraryUpdateResult<TTable['$inferSelect']>> {
+  await advanceLibraryCampaignRevision(tx, campaignId);
+  const [existing] = (await tx
+    .select()
+    .from(asTable(cfg.table))
+    .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, campaignId)))
+    .for('update')) as TTable['$inferSelect'][];
+  if (!existing) return { kind: 'not_found' };
+  const currentRevision = Number((existing as { revision?: unknown }).revision);
+  if (options.baseRevision !== undefined && currentRevision > options.baseRevision) {
+    return { kind: 'stale', current: existing };
+  }
+  const prepared = cfg.prepareValues
+    ? ((await cfg.prepareValues(tx, campaignId, body, existing)) as TUpdate)
+    : body;
+  const normalized = cfg.normalizePatch ? cfg.normalizePatch(prepared) : prepared;
+  const updates = buildPatchSet(
+    normalized as Record<string, unknown>,
+    cfg.stringifyKeys ? { stringifyKeys: cfg.stringifyKeys } : undefined,
+  );
+  const [updated] = (await tx
+    .update(asTable(cfg.table))
+    .set(updates)
+    .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, campaignId)))
+    .returning()) as TTable['$inferSelect'][];
+  if (!updated) return { kind: 'not_found' };
+  cfg.validateRow?.(updated);
+  await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, itemId);
+  return { kind: 'updated', row: updated };
+}
+
+/** Delete one library entry, detaching owned character copies first. Returns false when absent. */
+export async function deleteLibraryEntry<TTable extends LibraryTable, TCreate, TUpdate, TOut>(
+  tx: AuditTx,
+  cfg: LibraryEntityConfig<TTable, TCreate, TUpdate, TOut, string>,
+  campaignId: string,
+  itemId: string,
+): Promise<boolean> {
+  await advanceLibraryCampaignRevision(tx, campaignId);
+  await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, itemId, true);
+  const deleted = (await tx
+    .delete(asTable(cfg.table))
+    .where(and(eq(cfg.table.id, itemId), eq(cfg.table.campaignId, campaignId)))
+    .returning({ id: cfg.table.id })) as { id: string }[];
+  return deleted.length > 0;
 }
 
 export interface UpsertCounts {

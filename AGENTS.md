@@ -210,19 +210,27 @@ broken at least once; assume the comment in the file already warns you.
 
 ### S0. Know what's actually sync-backed.
 
-The outbox + cursor system currently covers only the character
-classes: `character`, `character_trait`, `character_skill`,
-`character_spell`, `character_language`, `character_technique`,
-`character_inventory`, `character_combat`. Campaigns are pulled
-READ-ONLY through `/sync/cursor` (so the minimal-view sweep and
-offline campaign-name lookups have local rows to work with) but have
-no outbox path — campaign mutations, the campaign library
-(traits/skills/spells/items/languages/techniques/styles), adventure log entries, invitations,
-and notifications are still online-only HTTP/React-Query surfaces.
-The `entityClass` enum lists more values than the orchestrator
-currently pulls — that's intentional headroom for future migration,
-not a claim of current coverage. The authoritative list is
-`ALL_ENTITY_CLASSES` in
+The outbox + cursor system covers the character classes (`character`,
+`character_trait`, `character_skill`, `character_spell`,
+`character_language`, `character_technique`, `character_inventory`,
+`character_combat`) **and every campaign-library class**
+(`campaign_library_trait`, `_skill`, `_spell`, `_item`, `_language`,
+`_technique`, `_style`, `_enchantment`, `_active_effect`). The library is
+local-first like the character sheet: every library read comes from Dexie,
+and every library create/edit/delete goes through the outbox. Do not add a
+React Query/HTTP read or a direct REST write for library entries in the PWA.
+The one deliberate exception is the **YAML import**: a server-side bulk
+upsert/prune of up to 20 MB that stays an online-only REST call, followed by a
+cursor pull. (Broken once: the library shipped as an online-only React Query
+surface, so it was laggy, unavailable offline and outside the outbox.)
+
+Campaigns are pulled READ-ONLY through `/sync/cursor` (so the minimal-view
+sweep and offline campaign-name lookups have local rows to work with) but
+have no outbox path. Campaign settings/membership mutations, adventure log
+entries, invitations, and notifications are still online-only
+HTTP/React-Query surfaces. The `entityClass` enum may list values the
+orchestrator does not pull; that is headroom, not a claim of coverage. The
+authoritative list is `ALL_ENTITY_CLASSES` in
 [src/client/sync/orchestrator.ts](src/client/sync/orchestrator.ts).
 
 When working on an existing surface, check whether it's sync-backed
@@ -246,7 +254,9 @@ This is what guarantees:
 If you find yourself wanting to write a new fetch in a mutation
 handler for a sync-backed class, you are on the wrong path — extend
 the outbox helpers instead. Surfaces that have not yet been migrated
-(see S0) keep using React Query for now.
+(see S0) keep using React Query for now. Library entries use
+`enqueueCreate` / `enqueueEntityPatch` / `enqueueDelete` with the campaign
+id (S13).
 
 ### S2. Patches carry raw field values, never wrapped objects.
 
@@ -318,6 +328,11 @@ A new sync-participating entity class MUST be added to **all** of:
    and the cursor reader in
    [src/server/routes/sync.ts](src/server/routes/sync.ts).
 6. The purge list in `orchestrator.purge` so logout wipes it.
+7. A tombstone trigger on the table, so deletes reach other devices.
+8. Envelope `parentId`: the parent **character** id for character
+   children, the owning **campaign** id for `campaign_library_*` classes.
+   The dispatcher must authorize against that parent and verify the row
+   actually belongs to it.
 
 A class registered in the schema but missing from any of these is a
 silent data-loss bug. There is no automatic registry; review the
@@ -406,6 +421,30 @@ when touching either path:
    `src/shared/schemas/character.ts`) — and grep the client for
    `fieldPath:` literals to confirm every one is writable server-side.
 
+### S13. Whole-entry patches are for entities edited as one form.
+
+Per-field patches (`enqueueFieldPatch`) are the default. Use a whole-entry
+patch (`enqueueEntityPatch`: `fieldPath` omitted, `attemptedValue` = the
+entity's full update body) only when the server validates fields together,
+so applying them one at a time could land a half-edit. Campaign-library
+entries are the current case: a skill's specialization policy and default,
+or TL policy and TL, must change atomically. Whole-entry patches must keep
+every guarantee field patches have:
+
+- `prevValue` is the full pre-edit row. Coalescing replaces a safe pending
+  patch for the same entity and carries the **oldest** `prevValue` forward.
+  A delivery-uncertain predecessor stays queued ahead of the successor (S3).
+- S4 applies to **every key in the pending body**: a cursor row never
+  overwrites them until the op settles.
+- A rejection restores exactly the changed keys (or the server's
+  `latestEntity`), preserves a newer queued edit, persists the toast and
+  flashes `${entityClass}:${entityId}:entry` (S5).
+- `stale_base` re-sends only when the server has not changed any patched
+  key since `prevValue`; otherwise it is a visible rollback.
+- Validate with the shared create/update schema and cross-field checks
+  before enqueueing. A draft the client can already tell is invalid must
+  stay open in its form, not be sent and rolled back.
+
 ## History tracking is a required baseline for all new entities
 
 Every new syncable entity class MUST participate in the history/audit log.
@@ -469,12 +508,14 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
 
 ## Test discipline
 
-- **Use Luna for test work.** Always delegate test execution and test-failure
-  triage to a `gpt-5.6-luna` subagent to reduce token cost. The primary agent
-  still selects the applicable tests, reviews the evidence, applies fixes, and
-  owns final verification and PR readiness. If Luna is unavailable, state that
-  explicitly and use the best available subagent rather than silently skipping
-  delegation.
+- **Use a low-cost test subagent for test work.** Always delegate test
+  execution and test-failure triage to a subagent to reduce token cost.
+  `gpt-5.6-luna` and Claude Sonnet are equivalent for this: use whichever the
+  current harness offers (Luna under Codex, a Sonnet subagent under Claude
+  Code), without needing to justify the choice. The primary agent still selects
+  the applicable tests, reviews the evidence, applies fixes, and owns final
+  verification and PR readiness. If neither is available, state that explicitly
+  and use the best available subagent rather than silently skipping delegation.
 - **Minimize public-auth registrations in browser tests.** Durable source rate
   limits are active during testing. A scenario that checks multiple widths or
   states MUST reuse one account and page within that scenario/worker instead of
@@ -482,6 +523,12 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   permits, but never share mutable accounts or pages across parallel workers.
   Create only the minimum users required for worker isolation and the behavior,
   and never clear or bypass the rate limiter just to make a test pass.
+  The one exception is interactive debugging: when no other tool is
+  reasonably viable (for example, logging into an existing account or a
+  unit-level reproduction cannot expose the problem), a local worktree stack's
+  limiter may be bypassed temporarily as a debugging hack. Never commit that
+  bypass, never use it in a test or CI, and restore normal limits before
+  running the validation suite.
 - **Test what the user sees.** UI regressions MUST assert the exact visible
   labels, controls, states, and interaction results involved. CSS classes,
   helper math, `data-*` markers, and hidden/proxy elements may support a test,
