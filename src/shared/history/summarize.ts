@@ -265,7 +265,7 @@ function summarizeCharacter(
     const label = TEMP_ATTR_LABELS[c.field];
     const val = Number(c.newValue ?? 0);
     if (val === 0) return `${label} boost cleared`;
-    return `${label} ${val > 0 ? '+' : ''}${val}`;
+    return `${label} ${formatSigned(val, { zero: 'plain' })}`;
   }
   if (c.field in ATTR_LABELS) {
     return `${ATTR_LABELS[c.field]} ${c.oldValue} → ${c.newValue}`;

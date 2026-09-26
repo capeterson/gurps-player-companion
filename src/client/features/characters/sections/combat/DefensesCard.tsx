@@ -15,6 +15,7 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { formatSigned } from '../../../../../shared/format/number.ts';
 import type {
   CharacterDetail,
   ResolvedEffectOut,
@@ -74,11 +75,6 @@ interface DefenseRow {
 
 function modifierCaption(value: number): string {
   return value ? ` ${value > 0 ? '+' : '−'} ${Math.abs(value)} defense modifiers` : '';
-}
-
-function signed(value: number): string {
-  if (value === 0) return '0';
-  return value > 0 ? `+${value}` : String(value);
 }
 
 function compareText(left: string, right: string): number {
@@ -527,7 +523,7 @@ function DefenseTable({
                   <td className="min-w-32 align-top text-xs max-sm:hidden">{row.skill}</td>
                   <td className="num text-right align-top max-sm:hidden">{row.beforeDb}</td>
                   <td className="num text-right align-top">
-                    {row.db == null ? '—' : signed(row.db)}
+                    {row.db == null ? '—' : formatSigned(row.db, { zero: 'plain' })}
                   </td>
                   <td className="text-right align-top max-sm:px-1">
                     {row.reason ? (

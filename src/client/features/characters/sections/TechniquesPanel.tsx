@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { skillReferenceDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import { techniqueBonus } from '../../../../shared/domain/techniqueCalc.ts';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryTechniqueOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import {
@@ -336,7 +337,7 @@ function TechniqueRow({
       ? `Skill "${defaultSkillDisplayName}" not on sheet`
       : `${defaultSkillDisplayName} ${technique.defaultSkillLevel}${
           technique.defaultModifier !== 0
-            ? ` ${technique.defaultModifier > 0 ? '+' : ''}${technique.defaultModifier}`
+            ? ` ${formatSigned(technique.defaultModifier, { zero: 'plain' })}`
             : ''
         } +${bonus}${technique.maxLevel !== null ? ` (capped at +${technique.maxLevel})` : ''}`;
 

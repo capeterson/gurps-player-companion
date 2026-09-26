@@ -4,6 +4,7 @@ import {
   MODIFIER_COST_TYPES,
   TRAIT_KINDS,
 } from '../../../shared/constants/traits.ts';
+import { formatSigned } from '../../../shared/format/number.ts';
 import type {
   LibraryItemOut,
   LibraryTraitCreate,
@@ -191,8 +192,8 @@ function ModifierSubEditor({
             <span key={`${m.name}-${m.costValue}`} className="chip flex items-center gap-1 text-xs">
               {m.name}{' '}
               {m.costType === 'percent'
-                ? `${m.costValue > 0 ? '+' : ''}${m.costValue}%`
-                : `${m.costValue > 0 ? '+' : ''}${m.costValue} pts`}
+                ? `${formatSigned(m.costValue, { zero: 'plain' })}%`
+                : `${formatSigned(m.costValue, { zero: 'plain' })} pts`}
               <button
                 type="button"
                 className="ml-1 text-error"

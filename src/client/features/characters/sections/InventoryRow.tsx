@@ -1,5 +1,6 @@
 import './inventory/inventory.css';
 import { type DragEvent, Fragment, type MouseEvent, type ReactNode, useRef, useState } from 'react';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryEnchantmentOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
@@ -358,8 +359,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   }
                 >
                   {effect.sourceName}: {effect.target.replaceAll('_', ' ')}{' '}
-                  {effect.value >= 0 ? '+' : ''}
-                  {effect.value}
+                  {formatSigned(effect.value)}
                   {!effect.active
                     ? ' (inactive)'
                     : effect.suppressedByStacking

@@ -1,3 +1,4 @@
+import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryEnchantmentCreate } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { LocalLibraryEnchantment } from '../../../db/dexie.ts';
 import { compareTableText } from '../../characters/sections/useSortableCharacterRows.tsx';
@@ -43,7 +44,7 @@ export const enchantmentsConfig: LibrarySectionConfig<LocalLibraryEnchantment> =
       {row.effects.length > 0 && (
         <p className="text-xs text-base-content/70">
           {row.effects
-            .map((effect) => `${effect.target} ${effect.value >= 0 ? '+' : ''}${effect.value}`)
+            .map((effect) => `${effect.target} ${formatSigned(effect.value)}`)
             .join(' · ')}
         </p>
       )}

@@ -1,5 +1,6 @@
 import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { type TraitEffect, traitEffect } from '../../../../shared/schemas/effects.ts';
@@ -398,7 +399,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                 adj.push(`×${v.pointCostMultiplier}`);
               }
               if (v.pointCostDelta !== undefined) {
-                adj.push(`${v.pointCostDelta >= 0 ? '+' : ''}${v.pointCostDelta} pts`);
+                adj.push(`${formatSigned(v.pointCostDelta)} pts`);
               }
               const adjStr = adj.length > 0 ? ` (${adj.join(', ')})` : '';
               return (
@@ -608,8 +609,7 @@ function TraitConfiguredDetails({ trait }: { trait: TraitOut }) {
               <li key={`${modifier.category}:${modifier.name}`}>
                 <span className="font-medium">{modifier.name}</span>{' '}
                 <span className="text-base-content/60">
-                  ({modifier.costValue >= 0 ? '+' : ''}
-                  {modifier.costValue}
+                  ({formatSigned(modifier.costValue)}
                   {modifier.costType === 'percent' ? '%' : ' pts'})
                 </span>
                 {modifier.description && (
