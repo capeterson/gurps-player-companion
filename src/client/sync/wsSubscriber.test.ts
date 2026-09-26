@@ -1,6 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, expect, it, vi } from 'vitest';
-import { mountLibraryInvalidations } from '../features/campaigns/libraryInvalidation.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncWsSubscriber, resetSyncWsSubscriberForTests } from './wsSubscriber.ts';
 
@@ -14,7 +13,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('a library WS nudge only triggers the standard sync cycle without touching query caches', () => {
+it('a library WS nudge only triggers the standard sync cycle without touching query caches (S8)', () => {
   const sockets: EventTarget[] = [];
   class Socket extends EventTarget {
     constructor() {
@@ -28,7 +27,6 @@ it('a library WS nudge only triggers the standard sync cycle without touching qu
   const client = new QueryClient();
   client.setQueryData(['campaigns', 'a', 'library'], { traits: [] });
   client.setQueryData(['campaigns', 'b', 'library'], { traits: [] });
-  const unmount = mountLibraryInvalidations(client);
   try {
     getSyncWsSubscriber().start();
     sockets[0]?.dispatchEvent(
@@ -40,7 +38,6 @@ it('a library WS nudge only triggers the standard sync cycle without touching qu
     expect(client.getQueryState(['campaigns', 'b', 'library'])?.isInvalidated).toBe(false);
     expect(drain).toHaveBeenCalledTimes(1);
   } finally {
-    unmount();
     client.clear();
   }
 });

@@ -400,8 +400,11 @@ test('library search and markdown toolbar retain drafts and render formatted des
   await search.fill('darkness B71');
   await expect(page.getByText('Night Vision', { exact: true })).toBeVisible();
   await expect(page.getByText('Fearfulness', { exact: true })).toHaveCount(0);
+  // Collapsed rows show a plain excerpt; opening the entry renders its Markdown.
+  await expect(page.getByText('Darkness vision', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Night Vision', exact: true }).click();
   await expect(page.locator('.markdown-body strong')).toHaveText('Darkness');
-  await page.getByRole('button', { name: /Edit/ }).click();
+  await page.getByRole('button', { name: 'Edit Night Vision' }).click();
   await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit raw markdown' }).click();
   const editor = page.getByRole('textbox', {

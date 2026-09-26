@@ -11,11 +11,8 @@
  * it.  See `pruneInaccessibleLocally` in orchestrator.ts.
  */
 
-import { QueryClient } from '@tanstack/react-query';
-import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
-import { mountLibraryInvalidations } from '../features/campaigns/libraryInvalidation.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
 import { syncStateStore } from './state.ts';
@@ -125,54 +122,70 @@ describe('accessible-set prune', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3); // unchanged access does not loop/reset again
   });
 
-  it('refreshes the changed campaign library after HTTP commit even without a WS frame', async () => {
-    const client = new QueryClient();
-    const otherTab = new QueryClient();
-    otherTab.setQueryData(['campaigns', STALE_CAMPAIGN_ID, 'library'], { traits: [] });
-    const unmountOther = mountLibraryInvalidations(otherTab);
-    client.setQueryData(['campaigns', STALE_CAMPAIGN_ID, 'library'], { traits: [] });
-    client.setQueryData(['campaigns', 'other', 'library'], { traits: [] });
-    const unmount = mountLibraryInvalidations(client);
-    const original = client.invalidateQueries.bind(client);
-    const committed: number[] = [];
-    vi.spyOn(client, 'invalidateQueries').mockImplementation(async (...args) => {
-      committed.push((await getLocalDb().campaigns.get(STALE_CAMPAIGN_ID))?.revision ?? 0);
-      return original(...args);
-    });
+  it('pulls library rows into Dexie and drops them when the campaign becomes inaccessible', async () => {
+    const db = getLocalDb();
     loginAs('user-1');
+    const skill = {
+      id: '0193b3c0-f1f0-7000-8000-00000000e001',
+      campaignId: STALE_CAMPAIGN_ID,
+      name: 'Stealth',
+      attribute: 'DX',
+      difficulty: 'A',
+      revision: 9,
+    };
+    const dirtySkill = { ...skill, id: '0193b3c0-f1f0-7000-8000-00000000e002', name: 'Climbing' };
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        cursorResponse([
-          {
-            entityClass: 'campaign',
-            entityId: STALE_CAMPAIGN_ID,
-            command: 'patch',
-            revision: 9,
-            data: { id: STALE_CAMPAIGN_ID, ownerId: 'user-1', name: 'Campaign', revision: 9 },
-          },
-        ]),
-      ),
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          cursorResponse(
+            [
+              {
+                entityClass: 'campaign_library_skill',
+                entityId: skill.id,
+                command: 'patch',
+                revision: 9,
+                data: skill,
+              },
+              {
+                entityClass: 'campaign_library_skill',
+                entityId: dirtySkill.id,
+                command: 'patch',
+                revision: 10,
+                data: { ...dirtySkill, revision: 10 },
+              },
+            ],
+            { characterIds: [], campaignIds: [STALE_CAMPAIGN_ID] },
+          ),
+        )
+        .mockResolvedValue(cursorResponse([], { characterIds: [], campaignIds: [] })),
     );
-    try {
-      await getSyncOrchestrator().triggerCursorPull();
-      await waitFor(() => expect(committed).toEqual([9]));
-      await waitFor(() =>
-        expect(
-          otherTab.getQueryState(['campaigns', STALE_CAMPAIGN_ID, 'library'])?.isInvalidated,
-        ).toBe(true),
-      );
-      expect(client.getQueryState(['campaigns', STALE_CAMPAIGN_ID, 'library'])?.isInvalidated).toBe(
-        true,
-      );
-      expect(client.getQueryState(['campaigns', 'other', 'library'])?.isInvalidated).toBe(false);
-    } finally {
-      unmount();
-      unmountOther();
-      otherTab.clear();
-      client.clear();
-    }
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser('user-1');
+    // No WS frame is involved: the HTTP cursor alone delivers library rows.
+    await orchestrator.triggerCursorPull();
+    expect(await db.campaignLibrarySkills.get(skill.id)).toMatchObject({ name: 'Stealth' });
+
+    // An unsettled local edit keeps its row through the prune (S7).
+    await db.outbox.add({
+      clientOpId: '0193b3c0-f1f0-7000-8000-00000000e0ff',
+      entityClass: 'campaign_library_skill',
+      entityId: dirtySkill.id,
+      command: 'patch',
+      coalesceKey: `${dirtySkill.id}|`,
+      attemptedValue: { name: 'Climbing!' },
+      parentId: STALE_CAMPAIGN_ID,
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 0,
+    });
+    await orchestrator.triggerCursorPull();
+    expect(await db.campaignLibrarySkills.get(skill.id)).toBeUndefined();
+    expect(await db.campaignLibrarySkills.get(dirtySkill.id)).toMatchObject({ name: 'Climbing' });
   });
+
   it('prunes a stale foreign character + all child rows + a stale campaign', async () => {
     const db = getLocalDb();
     await db.characters.bulkPut([

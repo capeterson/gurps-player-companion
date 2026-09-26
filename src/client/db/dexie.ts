@@ -20,6 +20,7 @@ import type {
  *   characterInventory pk=id
  *   characterCombat    pk=characterId  (1:1 with characters)
  *   campaigns          pk=id
+ *   campaignLibrary*   pk=id, index campaignId  (v11, one per library class)
  *   outbox             pk=clientOpId
  *   syncCursors        pk=entityClass
  *   syncMeta           pk=key
@@ -32,6 +33,16 @@ import type {
  */
 
 import Dexie, { type Table } from 'dexie';
+import type {
+  LibraryEnchantmentOut,
+  LibraryItemOut,
+  LibraryLanguageOut,
+  LibrarySkillOut,
+  LibrarySpellOut,
+  LibraryStyleOut,
+  LibraryTechniqueOut,
+  LibraryTraitOut,
+} from '../../shared/schemas/campaignLibrary.ts';
 import {
   MANUAL_TEMP_EFFECT_ID,
   type TempEffect,
@@ -257,6 +268,21 @@ export interface LocalCampaign {
   updatedAt: string;
   revision: number;
 }
+
+/**
+ * Campaign-library rows (sync-backed, AGENTS.md S0): the REST projection
+ * of each entry plus its sync `revision`, exactly as `/sync/cursor` emits it.
+ */
+type LocalLibraryRow<T> = T & { revision: number };
+export type LocalLibraryTrait = LocalLibraryRow<LibraryTraitOut>;
+export type LocalLibrarySkill = LocalLibraryRow<LibrarySkillOut>;
+export type LocalLibrarySpell = LocalLibraryRow<LibrarySpellOut>;
+export type LocalLibraryItem = LocalLibraryRow<LibraryItemOut>;
+export type LocalLibraryLanguage = LocalLibraryRow<LibraryLanguageOut>;
+export type LocalLibraryTechnique = LocalLibraryRow<LibraryTechniqueOut>;
+export type LocalLibraryStyle = LocalLibraryRow<LibraryStyleOut>;
+export type LocalLibraryEnchantment = LocalLibraryRow<LibraryEnchantmentOut>;
+export type LocalLibraryActiveEffect = ActiveEffectDefinitionOut;
 
 /** Device-only, unsynced initiative tracker for one character. */
 export interface LocalSoloEncounter {
@@ -544,6 +570,15 @@ class LocalDb extends Dexie {
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
   campaigns!: Table<LocalCampaign, string>;
+  campaignLibraryTraits!: Table<LocalLibraryTrait, string>;
+  campaignLibrarySkills!: Table<LocalLibrarySkill, string>;
+  campaignLibrarySpells!: Table<LocalLibrarySpell, string>;
+  campaignLibraryItems!: Table<LocalLibraryItem, string>;
+  campaignLibraryLanguages!: Table<LocalLibraryLanguage, string>;
+  campaignLibraryTechniques!: Table<LocalLibraryTechnique, string>;
+  campaignLibraryStyles!: Table<LocalLibraryStyle, string>;
+  campaignLibraryEnchantments!: Table<LocalLibraryEnchantment, string>;
+  campaignLibraryActiveEffects!: Table<LocalLibraryActiveEffect, string>;
   soloEncounters!: Table<LocalSoloEncounter, string>;
   outbox!: Table<OutboxEntry, string>;
   syncCursors!: Table<SyncCursor, string>;
@@ -662,6 +697,19 @@ class LocalDb extends Dexie {
           });
         }
       });
+    // v11 makes the campaign library sync-backed (S0/S6). New stores start
+    // empty; their cursors are absent, so the next pull backfills from 0.
+    this.version(11).stores({
+      campaignLibraryTraits: 'id, campaignId, revision',
+      campaignLibrarySkills: 'id, campaignId, revision',
+      campaignLibrarySpells: 'id, campaignId, revision',
+      campaignLibraryItems: 'id, campaignId, revision',
+      campaignLibraryLanguages: 'id, campaignId, revision',
+      campaignLibraryTechniques: 'id, campaignId, revision',
+      campaignLibraryStyles: 'id, campaignId, revision',
+      campaignLibraryEnchantments: 'id, campaignId, revision',
+      campaignLibraryActiveEffects: 'id, campaignId, revision',
+    });
   }
 }
 
@@ -688,6 +736,19 @@ export async function resetLocalDb(): Promise<void> {
   dbInstance = null;
 }
 
+/** Campaign-library stores, in `LIBRARY_ENTITY_CLASSES` order. */
+export const LIBRARY_STORE_NAMES = [
+  'campaignLibraryTraits',
+  'campaignLibrarySkills',
+  'campaignLibrarySpells',
+  'campaignLibraryItems',
+  'campaignLibraryLanguages',
+  'campaignLibraryTechniques',
+  'campaignLibraryStyles',
+  'campaignLibraryEnchantments',
+  'campaignLibraryActiveEffects',
+] as const;
+
 /** All store names — handy for transactions that touch every table. */
 export const ALL_STORE_NAMES = [
   'characters',
@@ -699,6 +760,7 @@ export const ALL_STORE_NAMES = [
   'characterInventory',
   'characterCombat',
   'campaigns',
+  ...LIBRARY_STORE_NAMES,
   'soloEncounters',
   'outbox',
   'syncCursors',
@@ -732,6 +794,24 @@ export function storeForEntityClass(entityClass: EntityClass): keyof LocalDb | n
       return 'characterCombat';
     case 'campaign':
       return 'campaigns';
+    case 'campaign_library_trait':
+      return 'campaignLibraryTraits';
+    case 'campaign_library_skill':
+      return 'campaignLibrarySkills';
+    case 'campaign_library_spell':
+      return 'campaignLibrarySpells';
+    case 'campaign_library_item':
+      return 'campaignLibraryItems';
+    case 'campaign_library_language':
+      return 'campaignLibraryLanguages';
+    case 'campaign_library_technique':
+      return 'campaignLibraryTechniques';
+    case 'campaign_library_style':
+      return 'campaignLibraryStyles';
+    case 'campaign_library_enchantment':
+      return 'campaignLibraryEnchantments';
+    case 'campaign_library_active_effect':
+      return 'campaignLibraryActiveEffects';
     default:
       return null;
   }

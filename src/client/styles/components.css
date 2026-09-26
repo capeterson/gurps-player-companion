@@ -689,3 +689,46 @@ body:has([aria-modal="true"]:not([hidden]), dialog[open]) .sheet-flower,
 body:has([aria-modal="true"]:not([hidden]), dialog[open]) .sheet-flower-backdrop {
   visibility: hidden;
 }
+
+/* Campaign library: the section/search toolbar sticks under the app header
+   (its `top` is set inline from the measured header) so category, search and
+   group jumps stay reachable in long lists. Rows and group headings scroll
+   to just below it via --library-scroll-offset, set on the page. */
+.library-toolbar {
+  position: sticky;
+  z-index: 20;
+  display: grid;
+  /* A bare auto column grows to its widest child; pin it so the chip row
+     and jump strip scroll inside the viewport instead of widening it. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+  margin-inline: -0.5rem;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-base-300);
+  background: color-mix(in oklch, var(--color-base-100) 95%, transparent);
+  backdrop-filter: blur(6px);
+}
+.library-jump-strip {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+/* Wider screens show every group; phones scroll the strip sideways. */
+@media (min-width: 640px) {
+  .library-jump-strip {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    /* Two rows at most, so the sticky toolbar never eats the list. */
+    max-height: 3.75rem;
+    overflow-y: auto;
+  }
+}
+.library-group-heading {
+  background: var(--color-base-200);
+  padding: 0 0.5rem;
+  scroll-margin-top: var(--library-scroll-offset, 8rem);
+}
+.library-entry-row {
+  scroll-margin-top: var(--library-scroll-offset, 8rem);
+}

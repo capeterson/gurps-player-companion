@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMarkdown } from './markdownProcessor.ts';
+import { RENDER_CACHE_LIMIT, peekRenderedMarkdown, renderMarkdown } from './markdownProcessor.ts';
 
 /**
  * Security & correctness tests for the sanitized markdown pipeline.
@@ -89,5 +89,24 @@ describe('renderMarkdown — markdown rendering', () => {
     expect(out).toContain('<hr');
     expect(out).toContain('<del>struck</del>');
     expect(out).toContain('type="checkbox"');
+  });
+});
+
+describe('renderMarkdown — render cache', () => {
+  it('serves a rendered source synchronously and evicts the least recently used entry', async () => {
+    const first = 'cache **first** entry';
+    expect(peekRenderedMarkdown(first)).toBeUndefined();
+    const html = await renderMarkdown(first);
+    expect(html).toContain('<strong>first</strong>');
+    expect(peekRenderedMarkdown(first)).toBe(html);
+
+    for (let index = 0; index < RENDER_CACHE_LIMIT; index++) {
+      expect(peekRenderedMarkdown(first)).toBe(html);
+      await renderMarkdown(`filler ${index}`);
+    }
+    // Reading refreshes recency, so the oldest untouched filler is evicted instead.
+    expect(peekRenderedMarkdown(first)).toBe(html);
+    expect(peekRenderedMarkdown('filler 0')).toBeUndefined();
+    expect(peekRenderedMarkdown('')).toBe('');
   });
 });

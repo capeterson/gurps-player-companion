@@ -20,6 +20,7 @@ import { and, asc, eq, gt, inArray, or } from 'drizzle-orm';
 import { campaignHouseRules } from '../../shared/schemas/campaign.ts';
 import {
   type EntityClass,
+  type LibraryEntityClass,
   type OperationEnvelope,
   type OperationOutcome,
   type SyncCursorChange,
@@ -49,6 +50,7 @@ import {
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { withLibraryMechanics } from '../services/libraryMechanics.ts';
 import { dispatchOperation } from '../services/syncDispatch.ts';
+import { libraryEntityConfig, libraryRowOut } from './campaignLibraryEntities.ts';
 
 const router = createOpenApiApp();
 router.use('/sync/*', requireActiveUser);
@@ -671,13 +673,54 @@ async function fetchClassUpserts(args: {
         }),
       );
     }
+    case 'campaign_library_trait':
+    case 'campaign_library_skill':
+    case 'campaign_library_spell':
+    case 'campaign_library_item':
+    case 'campaign_library_language':
+    case 'campaign_library_technique':
+    case 'campaign_library_style':
+    case 'campaign_library_enchantment':
+    case 'campaign_library_active_effect':
+      return await fetchLibraryClass(entityClass, sinceRevision, limit, accessibleCampaignIds);
     default:
-      // Other entity classes (library, adventure log) are not synced
-      // through this endpoint yet -- the client doesn't drive any
-      // mutations for them today.  Returning empty keeps the cursor
+      // Other entity classes (campaign membership, adventure log) are not
+      // synced through this endpoint.  Returning empty keeps the cursor
       // contract honest.
       return [];
   }
+}
+
+/**
+ * Library rows are campaign content every member may read (matching
+ * `GET /campaigns/{id}/library`), so they are scoped by campaign access
+ * rather than character access. Rows carry their REST projection plus
+ * `revision`, the same shape the client stores and compares on stale_base.
+ */
+async function fetchLibraryClass(
+  entityClass: LibraryEntityClass,
+  sinceRevision: number,
+  limit: number,
+  accessibleCampaignIds: string[],
+): Promise<SyncCursorChange[]> {
+  if (accessibleCampaignIds.length === 0) return [];
+  const cfg = libraryEntityConfig(entityClass);
+  // biome-ignore lint/suspicious/noExplicitAny: generic library table runtime object
+  const table = cfg.table as any;
+  const rows = (await getDb()
+    .select()
+    .from(table)
+    .where(
+      and(
+        gt(table.revision, sinceRevision),
+        inArray(cfg.table.campaignId, [...accessibleCampaignIds]),
+      ),
+    )
+    .orderBy(asc(table.revision))
+    .limit(limit)) as Array<{ id: string; revision: unknown }>;
+  return rows.map((row) =>
+    upsertChange(entityClass, row.id, Number(row.revision), libraryRowOut(cfg, row)),
+  );
 }
 
 interface ChildFetchArgs {
