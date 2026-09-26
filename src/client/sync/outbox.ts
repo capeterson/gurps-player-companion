@@ -763,8 +763,14 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
         op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
     )
     .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
+  const assignmentsByCharacter = new Map<string, OutboxEntry[]>();
+  for (const op of assignmentOps) {
+    const moves = assignmentsByCharacter.get(op.entityId);
+    if (moves) moves.push(op);
+    else assignmentsByCharacter.set(op.entityId, [op]);
+  }
   const assignmentsFor = (parentId: string | undefined) =>
-    assignmentOps.filter((op) => op.entityId === parentId);
+    (parentId === undefined ? undefined : assignmentsByCharacter.get(parentId)) ?? [];
   const campaignCreateReady = new Set<string>();
   for (const op of unsettled) {
     if (op.command !== 'create' || op.localRequiredCampaignId === undefined) continue;
@@ -789,14 +795,21 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
     }
   }
   const all = unsettled.filter((op) => op.status !== 'in_flight');
-  const campaignAssignments = new Set(
-    unsettled
-      .filter(
-        (op) =>
-          op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
-      )
-      .map((op) => op.entityId),
-  );
+  const campaignAssignments = new Set(assignmentsByCharacter.keys());
+  // Campaigns that a still-unsettled linked create requires its character
+  // to be in, keyed by that character: a move away from one must wait.
+  const requiredCampaignsByCharacter = new Map<string, Set<unknown>>();
+  for (const child of unsettled) {
+    if (
+      child.command !== 'create' ||
+      child.parentId === undefined ||
+      child.localRequiredCampaignId === undefined
+    )
+      continue;
+    const required = requiredCampaignsByCharacter.get(child.parentId) ?? new Set<unknown>();
+    required.add(child.localRequiredCampaignId);
+    requiredCampaignsByCharacter.set(child.parentId, required);
+  }
   const parentsWithEarlierCreates = new Set(
     unsettled
       .filter(
@@ -853,13 +866,7 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
       (op.entityClass === 'character' &&
         op.fieldPath === 'campaignId' &&
         (parentsWithEarlierCreates.has(op.entityId) ||
-          unsettled.some(
-            (child) =>
-              child.command === 'create' &&
-              child.parentId === op.entityId &&
-              child.localRequiredCampaignId !== undefined &&
-              child.localRequiredCampaignId === op.prevValue,
-          ))) ||
+          requiredCampaignsByCharacter.get(op.entityId)?.has(op.prevValue) === true)) ||
       heldBackCreates.has(op.entityId) ||
       (op.parentId !== undefined && heldBackCreates.has(op.parentId)) ||
       (op.command === 'create' &&
