@@ -5,12 +5,12 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { effectiveDodge } from '../../shared/domain/defenseCalc.ts';
 import { advanceTurn, previousTurn } from '../../shared/domain/encounterTurns.ts';
 import { effectiveMove } from '../../shared/domain/encumbrance.ts';
-import { uuid } from '../../shared/schemas/common.ts';
+import { listQuery, uuid } from '../../shared/schemas/common.ts';
 import {
   advanceRequest,
   combatantCreate,
@@ -375,7 +375,7 @@ router.openapi(
     path: '/campaigns/{id}/encounters',
     tags: ['encounters'],
     security: [{ bearerAuth: [] }],
-    request: { params: z.object({ id: uuid }) },
+    request: { params: z.object({ id: uuid }), query: listQuery },
     responses: {
       200: {
         description: 'Encounter aggregates',
@@ -387,12 +387,20 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
+    const { search, limit, offset } = c.req.valid('query');
     const access = await requireCampaignMember(id, user.id);
     const rows = await getDb()
       .select()
       .from(encounters)
-      .where(eq(encounters.campaignId, id))
-      .orderBy(asc(encounters.createdAt));
+      .where(
+        and(
+          eq(encounters.campaignId, id),
+          search ? ilike(encounters.name, `%${search}%`) : undefined,
+        ),
+      )
+      .orderBy(asc(encounters.createdAt), asc(encounters.id))
+      .limit(limit)
+      .offset(offset);
     const projected: Awaited<ReturnType<typeof projectEncounterForViewer>>[] = [];
     for (const row of rows) {
       projected.push(

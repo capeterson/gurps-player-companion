@@ -622,6 +622,33 @@ describe('GET /campaigns/{id}/library', () => {
     });
     expect(outsiderRes.status).toBe(403);
   });
+
+  it('can narrow by section, name, limit, and offset without changing the response shape', async () => {
+    const owner = await registerUser('read-filter-owner');
+    const campaign = await createCampaign(owner.accessToken);
+    await createTrait(owner.accessToken, campaign.id as string, { name: 'Needle Alpha' });
+    await createTrait(owner.accessToken, campaign.id as string, { name: 'Needle Beta' });
+    const skill = await app.request(`/api/v1/campaigns/${campaign.id}/library/skills`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Needle Skill', attribute: 'DX', difficulty: 'A' }),
+    });
+    expect(skill.status).toBe(201);
+
+    const response = await app.request(
+      `/api/v1/campaigns/${campaign.id}/library?section=traits&search=needle&limit=1&offset=1`,
+      { headers: bearer(owner.accessToken) },
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      traits: Array<{ name: string }>;
+      skills: unknown[];
+      spells: unknown[];
+    };
+    expect(body.traits).toEqual([expect.objectContaining({ name: 'Needle Beta' })]);
+    expect(body.skills).toEqual([]);
+    expect(body.spells).toEqual([]);
+  });
 });
 
 describe('write permission gates', () => {

@@ -224,7 +224,11 @@ test.describe('delegated MCP OAuth acceptance', () => {
       expect(me.body).toMatchObject({ email, displayName: 'MCP E2E Player' });
 
       const characterName = `SDK Hero ${suffix()}`;
-      const created = toolEnvelope<{ id: string; name: string; st: number; dx: number }>(
+      const created = toolEnvelope<{
+        acknowledged: true;
+        resourceId: string;
+        revision: number;
+      }>(
         await client.callTool({
           name: 'gpc_create_character',
           arguments: {
@@ -233,8 +237,17 @@ test.describe('delegated MCP OAuth acceptance', () => {
           },
         }),
       );
-      expect(created.body).toMatchObject({ name: characterName, st: 10, dx: 10 });
-      expect(created.body.id).toMatch(/^[0-9a-f-]{36}$/i);
+      expect(created.body).toMatchObject({ acknowledged: true });
+      expect(created.body.revision).toBeGreaterThanOrEqual(0);
+      expect(created.body.resourceId).toMatch(/^[0-9a-f-]{36}$/i);
+      const characterId = created.body.resourceId;
+      const createdDetail = toolEnvelope<{ name: string; st: number; dx: number }>(
+        await client.callTool({
+          name: 'gpc_get_character',
+          arguments: { path: { id: characterId } },
+        }),
+      );
+      expect(createdDetail.body).toMatchObject({ name: characterName, st: 10, dx: 10 });
 
       // The player sees the MCP create through the HTTP cursor while WebSocket
       // delivery is blocked for the entire browser session.
@@ -244,7 +257,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       expect(successfulCursorPulls).toBeGreaterThan(0);
       expect(blockedWebSockets).toBeGreaterThan(0);
       await characterLink.click();
-      await expect(page).toHaveURL(new RegExp(`/characters/${created.body.id}$`));
+      await expect(page).toHaveURL(new RegExp(`/characters/${characterId}$`));
 
       await selectCharacterSection(page, 'History');
       await expect(
@@ -261,7 +274,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       >(
         await client.callTool({
           name: 'gpc_get_character_history',
-          arguments: { path: { id: created.body.id } },
+          arguments: { path: { id: characterId } },
         }),
       );
       expect(agentHistory.body).toEqual(
@@ -293,7 +306,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
         await client.callTool({
           name: 'gpc_update_character',
           arguments: {
-            path: { id: created.body.id },
+            path: { id: characterId },
             body: { dx: 12 },
             idempotencyKey: `e2e-update-${randomUUID()}`,
           },
@@ -302,7 +315,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       const beforeReconnect = toolEnvelope<{ st: number; dx: number }>(
         await client.callTool({
           name: 'gpc_get_character',
-          arguments: { path: { id: created.body.id } },
+          arguments: { path: { id: characterId } },
         }),
       );
       expect(beforeReconnect.body).toMatchObject({ st: 10, dx: 12 });
@@ -320,7 +333,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
             const current = toolEnvelope<{ st: number }>(
               await client.callTool({
                 name: 'gpc_get_character',
-                arguments: { path: { id: created.body.id } },
+                arguments: { path: { id: characterId } },
               }),
             );
             return current.body.st;
@@ -338,7 +351,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       const converged = toolEnvelope<{ st: number; dx: number }>(
         await client.callTool({
           name: 'gpc_get_character',
-          arguments: { path: { id: created.body.id } },
+          arguments: { path: { id: characterId } },
         }),
       );
       expect(converged.body).toMatchObject({ st: 11, dx: 12 });

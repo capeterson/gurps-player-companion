@@ -74,6 +74,25 @@ describe('/sync/ws routing', () => {
   });
 });
 
+describe('/mcp gzip boundary', () => {
+  const app = createApp(testConfig);
+
+  it('preserves small JSON responses when compression is not worthwhile', async () => {
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'accept-encoding': 'gzip',
+        'content-type': 'application/json',
+      },
+      body: '{}',
+    });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('content-encoding')).toBeNull();
+    expect(await response.json()).toEqual({ error: 'unauthorized' });
+  });
+});
+
 describe('configured browser OAuth CORS', () => {
   const origin = 'https://agent.example';
   const app = createApp({ ...testConfig, corsOrigins: [origin] });

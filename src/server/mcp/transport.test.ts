@@ -10,6 +10,7 @@ import {
   MAX_MCP_BODY_BYTES,
   createMcpHandler,
   describeMcpTool,
+  mutationAcknowledgement,
   readBoundedMcpJson,
 } from './transport.ts';
 
@@ -53,6 +54,7 @@ function handler(
     principal?: OAuthPrincipal;
     resolveFailure?: Error;
     executeFailure?: Error;
+    executeResponse?: () => Response;
   } = {},
 ) {
   const actor = options.principal ?? principal();
@@ -65,6 +67,7 @@ function handler(
     async execute() {
       executed++;
       if (options.executeFailure) throw options.executeFailure;
+      if (options.executeResponse) return options.executeResponse();
       return Response.json([]);
     },
   });
@@ -119,6 +122,27 @@ describe('MCP streaming request boundary', () => {
   });
 });
 
+describe('compact mutation acknowledgements', () => {
+  test('prefers the affected child and falls back to the most specific path id', () => {
+    const childId = '0198aa77-1111-7111-8111-111111111111';
+    const characterId = '0198aa77-2222-7222-8222-222222222222';
+    expect(
+      mutationAcknowledgement(
+        {
+          item: { id: childId, revision: 7, name: 'Spear' },
+          character: { id: characterId, revision: 12, inventory: [] },
+        },
+        { path: { id: characterId } },
+      ),
+    ).toEqual({ acknowledged: true, resourceId: childId, revision: 7 });
+    expect(
+      mutationAcknowledgement(null, {
+        path: { id: characterId, itemId: childId },
+      }),
+    ).toEqual({ acknowledged: true, resourceId: childId });
+  });
+});
+
 describe('MCP protocol and OAuth transport', () => {
   test('live tools/list uses the same schemas and hints as the shared catalog projection', async () => {
     const { handle, actor } = handler();
@@ -140,6 +164,44 @@ describe('MCP protocol and OAuth transport', () => {
       result: { structuredContent: { status: 200, body: [] } },
     });
     expect(fixture.executed()).toBe(1);
+  });
+
+  test('successful writes return the compact acknowledgement without duplicating it as text', async () => {
+    const actor = principal();
+    actor.scopes = ['gpc:write'];
+    const fixture = handler({
+      principal: actor,
+      executeResponse: () => new Response(null, { status: 204 }),
+    });
+    const response = await fixture.handle(
+      request({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: { name: 'gpc_mark_all_notifications_read', arguments: {} },
+      }),
+    );
+    expect(await response.json()).toMatchObject({
+      result: {
+        content: [{ type: 'text', text: 'HTTP 204; result is available in structuredContent.' }],
+        structuredContent: {
+          status: 204,
+          contentType: 'application/json',
+          body: { acknowledged: true },
+        },
+      },
+    });
+  });
+
+  test('successful reads keep the payload only in structuredContent', async () => {
+    const fixture = handler();
+    const response = await fixture.handle(request(readCall));
+    expect(await response.json()).toMatchObject({
+      result: {
+        content: [{ type: 'text', text: 'HTTP 200; result is available in structuredContent.' }],
+        structuredContent: { status: 200, body: [] },
+      },
+    });
   });
 
   test('insufficient scope challenges at HTTP level and never executes a write', async () => {

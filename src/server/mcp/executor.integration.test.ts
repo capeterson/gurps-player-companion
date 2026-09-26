@@ -17,6 +17,7 @@ const operation: IncludedOperation = {
   destructive: false,
   handler: 'shared-openapi-handler',
   schemaSource: 'openapi-zod-registry',
+  resultMode: 'compact-mutation-ack',
   parityTests: [
     'src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential',
     'src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope',

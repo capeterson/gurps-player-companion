@@ -12,7 +12,7 @@ import type { OAuthPrincipal } from '../oauth/service.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { executeOperation } from './executor.ts';
 import { TOOLS } from './operationManifest.ts';
-import { createMcpHandler } from './transport.ts';
+import { createMcpHandler, mutationAcknowledgement } from './transport.ts';
 
 configureIntegrationTestEnvironment();
 
@@ -35,11 +35,24 @@ interface Actor {
 }
 
 let activePrincipal: OAuthPrincipal;
+let lastExecutionResult: { status: number; body: unknown; contentType: string | null } | null =
+  null;
 const handleMcp = createMcpHandler(config, app, document, {
   async resolvePrincipal() {
     return activePrincipal;
   },
-  execute: executeOperation,
+  async execute(...args: Parameters<typeof executeOperation>) {
+    const response = await executeOperation(...args);
+    const clone = response.clone();
+    const contentType = clone.headers.get('content-type');
+    const text = await clone.text();
+    lastExecutionResult = {
+      status: clone.status,
+      contentType,
+      body: text.length === 0 ? null : contentType?.includes('json') ? JSON.parse(text) : text,
+    };
+    return response;
+  },
 });
 const toolByName = new Map(TOOLS.map((tool) => [tool.tool, tool]));
 const stableIds = new Set<string>();
@@ -209,22 +222,39 @@ async function call<T = unknown>(
 ): Promise<{ status: number; body: T; contentType: string | null }> {
   rememberIds(actor.principal.user.id);
   rememberIds(args);
+  const tool = toolByName.get(name);
+  if (!tool) throw new Error(`missing manifest tool ${name}`);
   const rest = await previewRest(actor, name, args);
   const result = await callAny(actor, name, args);
   expect(result.isError, `${name}: ${result.message}`).not.toBe(true);
   expect(result.structured.status, name).toBeGreaterThanOrEqual(200);
   expect(result.structured.status, name).toBeLessThan(300);
   expect(result.structured.status, `${name} REST status parity`).toBe(rest.status);
+  if (!result.raw) throw new Error(`${name} did not execute its shared handler`);
+  expect(result.raw.status, `${name} raw REST status parity`).toBe(rest.status);
+  expect(
+    result.raw.contentType?.split(';', 1)[0] ?? null,
+    `${name} raw REST content-type parity`,
+  ).toBe(rest.contentType?.split(';', 1)[0] ?? null);
+  expect(normalizeParity(result.raw.body), `${name} raw REST body parity`).toEqual(
+    normalizeParity(rest.body),
+  );
   expect(
     result.structured.contentType?.split(';', 1)[0] ?? null,
     `${name} REST content-type parity`,
-  ).toBe(rest.contentType?.split(';', 1)[0] ?? null);
-  expect(normalizeParity(result.structured.body), `${name} REST body parity`).toEqual(
-    normalizeParity(rest.body),
-  );
-  rememberIds(result.structured.body);
+  ).toBe(tool.method === 'GET' ? (rest.contentType?.split(';', 1)[0] ?? null) : 'application/json');
+  if (tool.method === 'GET') {
+    expect(normalizeParity(result.structured.body), `${name} REST body parity`).toEqual(
+      normalizeParity(rest.body),
+    );
+  } else {
+    expect(result.structured.body, `${name} compact mutation acknowledgement`).toEqual(
+      mutationAcknowledgement(result.raw.body, args),
+    );
+  }
+  rememberIds(result.raw.body);
   exercised.add(name);
-  return result.structured as {
+  return (tool.method === 'GET' ? result.structured : result.raw) as {
     status: number;
     body: T;
     contentType: string | null;
@@ -239,8 +269,10 @@ async function callAny(
   isError: boolean;
   message: string;
   structured: { status: number; body: unknown; contentType: string | null };
+  raw: { status: number; body: unknown; contentType: string | null } | null;
 }> {
   activePrincipal = actor.principal;
+  lastExecutionResult = null;
   const response = await handleMcp(
     new Request('http://localhost:3001/mcp', {
       method: 'POST',
@@ -278,6 +310,7 @@ async function callAny(
     isError: result.isError === true,
     message: result.content?.[0]?.text ?? 'unknown error',
     structured: result.structuredContent,
+    raw: lastExecutionResult,
   };
 }
 
@@ -311,6 +344,10 @@ describe('delegated operation behavioral parity', () => {
       })
     ).body;
     const campaignId = campaign.id as string;
+    const filteredCampaigns = await call<Array<{ id: string }>>(owner, 'gpc_list_campaigns', {
+      query: { search: suffix, limit: 1, offset: 0 },
+    });
+    expect(filteredCampaigns.body).toEqual([expect.objectContaining({ id: campaignId })]);
     await call(owner, 'gpc_get_campaign', path(campaignId));
     await call(owner, 'gpc_update_campaign', {
       ...path(campaignId),
@@ -350,7 +387,10 @@ describe('delegated operation behavioral parity', () => {
         body: { handle: member.email },
       })
     ).body;
-    await call(owner, 'gpc_list_campaign_invitations', path(campaignId));
+    await call(owner, 'gpc_list_campaign_invitations', {
+      ...path(campaignId),
+      query: { limit: 1, offset: 0 },
+    });
     await call(
       owner,
       'gpc_cancel_campaign_invitation',
@@ -368,7 +408,7 @@ describe('delegated operation behavioral parity', () => {
         body: { handle: member.email },
       })
     ).body;
-    await call(member, 'gpc_list_invitations');
+    await call(member, 'gpc_list_invitations', { query: { limit: 1, offset: 0 } });
     await call(member, 'gpc_accept_invitation', {
       path: { invitationId: acceptedInvite.id },
     });
@@ -397,9 +437,11 @@ describe('delegated operation behavioral parity', () => {
       ...path(notificationCampaign.id),
       body: { handle: member.email },
     });
-    const notificationList = (await call(member, 'gpc_list_notifications')).body as Array<{
-      id: string;
-    }>;
+    const notificationList = (
+      await call(member, 'gpc_list_notifications', {
+        query: { unreadOnly: 'true', limit: 1, offset: 0 },
+      })
+    ).body as Array<{ id: string }>;
     expect(notificationList.length).toBeGreaterThan(0);
     const notification = notificationList[0];
     if (!notification) throw new Error('invitation did not create a notification');
@@ -455,6 +497,18 @@ describe('delegated operation behavioral parity', () => {
         ...itemPath,
         body: { name: `${body.name} updated` },
       });
+      if (kind === 'trait') {
+        const narrowed = await call<{ traits: Array<{ id: string }>; skills: unknown[] }>(
+          owner,
+          'gpc_get_campaign_library',
+          {
+            ...path(campaignId),
+            query: { section: 'traits', search: suffix, limit: 1, offset: 0 },
+          },
+        );
+        expect(narrowed.body.traits).toEqual([expect.objectContaining({ id: created.id })]);
+        expect(narrowed.body.skills).toEqual([]);
+      }
       await call(owner, `gpc_delete_library_${kind}`, itemPath);
     }
     const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaignId));
@@ -471,6 +525,11 @@ describe('delegated operation behavioral parity', () => {
         body: { sessionDate: '2026-09-12', title: 'Matrix session' },
       })
     ).body;
+    const filteredLog = await call<Array<{ id: string }>>(owner, 'gpc_list_adventure_log', {
+      ...path(campaignId),
+      query: { search: 'Matrix', limit: 1, offset: 0 },
+    });
+    expect(filteredLog.body).toEqual([expect.objectContaining({ id: logEntry.id })]);
     await call(owner, 'gpc_update_adventure_log_entry', {
       ...path(campaignId, { entryId: logEntry.id }),
       body: { title: 'Matrix session updated' },
@@ -493,6 +552,11 @@ describe('delegated operation behavioral parity', () => {
         },
       })
     ).body;
+    const filteredEncounters = await call<Array<{ id: string }>>(owner, 'gpc_list_encounters', {
+      ...path(campaignId),
+      query: { search: 'Matrix', limit: 1, offset: 0 },
+    });
+    expect(filteredEncounters.body).toEqual([expect.objectContaining({ id: encounter.id })]);
     const encounterPath = path(campaignId, { encounterId: encounter.id });
     await call(owner, 'gpc_get_encounter', encounterPath);
     await call(owner, 'gpc_update_encounter', {
@@ -558,6 +622,10 @@ describe('delegated operation behavioral parity', () => {
       })
     ).body;
     const characterId = character.id as string;
+    const filteredCharacters = await call<Array<{ id: string }>>(owner, 'gpc_list_characters', {
+      query: { search: suffix, limit: 1, offset: 0 },
+    });
+    expect(filteredCharacters.body).toEqual([expect.objectContaining({ id: characterId })]);
     await call(owner, 'gpc_get_character', path(characterId));
     await call(owner, 'gpc_update_character', {
       ...path(characterId),
@@ -1016,7 +1084,7 @@ describe('delegated operation behavioral parity', () => {
     const imported = await call(owner, 'gpc_import_campaign_library', importArgs);
     expect(
       (await callAny(owner, 'gpc_import_campaign_library', importArgs)).structured.body,
-    ).toEqual(imported.body);
+    ).toEqual(mutationAcknowledgement(imported.body, importArgs));
     const library = (
       await call<{
         traits: Array<{ effects: unknown[] }>;
@@ -1094,7 +1162,7 @@ describe('delegated operation behavioral parity', () => {
     expect(created.trait.customEffects).toEqual(customEffects);
     expect(
       (await callAny(owner, 'gpc_create_character_trait', createArgs)).structured.body,
-    ).toEqual(created);
+    ).toEqual(mutationAcknowledgement(created, createArgs));
     const detail = (
       await call<{ traits: unknown[]; effects: unknown[] }>(
         owner,

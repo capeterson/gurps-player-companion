@@ -9,14 +9,14 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, desc, eq, ne, or } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, ne, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   adventureLogCreate,
   adventureLogOut,
   adventureLogUpdate,
 } from '../../shared/schemas/adventureLog.ts';
-import { uuid } from '../../shared/schemas/common.ts';
+import { listQuery, uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { loadCampaignOr403, requireCampaignMember } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
@@ -58,9 +58,9 @@ router.openapi(
     method: 'get',
     path: '/campaigns/{id}/log',
     tags: ['adventure-log'],
-    summary: 'List log entries (members see campaign-visible + their own private)',
+    summary: 'List/search log entries (members see campaign-visible + their own private)',
     security: [{ bearerAuth: [] }],
-    request: { params: z.object({ id: uuid }) },
+    request: { params: z.object({ id: uuid }), query: listQuery },
     responses: {
       200: {
         description: 'Adventure log entries (newest first)',
@@ -73,6 +73,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
+    const { search, limit, offset } = c.req.valid('query');
     await requireCampaignMember(id, user.id);
     const db = getDb();
     const rows = await db
@@ -87,9 +88,22 @@ router.openapi(
             eq(adventureLogEntries.visibility, 'campaign'),
             eq(adventureLogEntries.authorId, user.id),
           ),
+          search
+            ? or(
+                ilike(adventureLogEntries.title, `%${search}%`),
+                ilike(adventureLogEntries.body, `%${search}%`),
+                ilike(adventureLogEntries.location, `%${search}%`),
+              )
+            : undefined,
         ),
       )
-      .orderBy(desc(adventureLogEntries.sessionDate), desc(adventureLogEntries.createdAt));
+      .orderBy(
+        desc(adventureLogEntries.sessionDate),
+        desc(adventureLogEntries.createdAt),
+        desc(adventureLogEntries.id),
+      )
+      .limit(limit ?? 500)
+      .offset(offset ?? 0);
     return c.json(
       rows.map((r) => entryToOut(r.entry, { id: r.author.id, displayName: r.author.displayName })),
       200,

@@ -16,9 +16,8 @@ export const timestamps = { createdAt: isoTimestamp, updatedAt: isoTimestamp } a
 export const revision = z.number().int().nonnegative();
 
 export type ListQuery = z.infer<typeof listQuery>;
-export const listQuery = z
-  .object({
-    search: z.string().min(1).max(120).optional(),
-    limit: z.coerce.number().int().min(1).max(500).default(200),
-  })
-  .partial();
+export const listQuery = z.object({
+  search: z.string().min(1).max(120).optional().describe('Case-insensitive name/text filter.'),
+  limit: z.coerce.number().int().min(1).max(500).default(200).describe('Maximum rows.'),
+  offset: z.coerce.number().int().min(0).max(100_000).default(0).describe('Rows to skip.'),
+});

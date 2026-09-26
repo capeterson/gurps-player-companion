@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
 import {
@@ -11,7 +11,7 @@ import {
   setMemberRoleRequest,
   transferOwnershipRequest,
 } from '../../shared/schemas/campaign.ts';
-import { uuid } from '../../shared/schemas/common.ts';
+import { listQuery, uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import {
   loadCampaignOr403,
@@ -97,6 +97,7 @@ router.openapi(
     tags: ['campaigns'],
     summary: 'List campaigns the user owns or is a member of',
     security: [{ bearerAuth: [] }],
+    request: { query: listQuery },
     responses: {
       200: {
         description: 'Campaign list',
@@ -107,6 +108,7 @@ router.openapi(
   }),
   async (c) => {
     const user = c.get('user');
+    const { search, limit, offset } = c.req.valid('query');
     const db = getDb();
     const rows = await db
       .selectDistinct()
@@ -118,7 +120,15 @@ router.openapi(
           eq(campaignMemberships.userId, user.id),
         ),
       )
-      .where(or(eq(campaigns.ownerId, user.id), eq(campaignMemberships.userId, user.id)));
+      .where(
+        and(
+          or(eq(campaigns.ownerId, user.id), eq(campaignMemberships.userId, user.id)),
+          search ? ilike(campaigns.name, `%${search}%`) : undefined,
+        ),
+      )
+      .orderBy(asc(campaigns.name), asc(campaigns.id))
+      .limit(limit ?? 500)
+      .offset(offset ?? 0);
     const ids = rows.map((r) => r.campaigns.id);
     if (ids.length === 0) return c.json([], 200);
     const memberLookup = await db

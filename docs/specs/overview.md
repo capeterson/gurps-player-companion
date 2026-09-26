@@ -62,7 +62,15 @@ no per-client server configuration or shared secret.
 Every player-domain raw API operation has a stable tool; security, administration,
 replication, and transport endpoints have exact checked-in exclusions. MCP commits
 use the same route graph, validation, authorization, audit, revisions, and
-invalidation behavior as REST.
+invalidation behavior as REST. Successful mutations return a compact
+acknowledgement rather than echoing complete character/campaign resources; errors
+retain their actionable body and agents re-read when refreshed state is needed.
+Successful result payloads are emitted only as structured content, with concise
+status text instead of a duplicate JSON copy.
+Character, campaign, encounter, adventure-log, invitation, notification, and
+campaign-library reads offer bounded search/limit/offset controls, with library
+section selection, so agents can avoid loading unrelated context. History feeds
+remain cursor-paginated. Compatible clients also receive compressed MCP responses.
 
 ## User-facing features
 

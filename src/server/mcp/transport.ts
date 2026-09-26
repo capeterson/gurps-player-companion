@@ -109,6 +109,7 @@ export function describeMcpTool(entry: RuntimeTool) {
     _meta: {
       requiredScope: entry.policy.scope,
       operation: `${entry.policy.method} ${entry.policy.path}`,
+      resultMode: entry.policy.resultMode,
     },
   };
 }
@@ -117,6 +118,79 @@ type Dependencies = {
   resolvePrincipal: typeof resolveOAuthAccessToken;
   execute: typeof executeOperation;
 };
+
+export interface MutationAcknowledgement {
+  acknowledged: true;
+  resourceId?: string;
+  revision?: number;
+}
+
+const nestedResourceKeys = [
+  'trait',
+  'skill',
+  'spell',
+  'language',
+  'technique',
+  'item',
+  'combat',
+  'combatant',
+  'effect',
+  'entry',
+  'invitation',
+  'notification',
+  'encounter',
+  'character',
+  'campaign',
+] as const;
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * Keep successful delegated writes small and stable. The complete REST body is
+ * validated before this projection, so this function is only an agent-facing
+ * acknowledgement builder, never a substitute for the canonical contract.
+ */
+export function mutationAcknowledgement(
+  body: unknown,
+  input: OperationInput,
+): MutationAcknowledgement {
+  const root = record(body);
+  let resource = root;
+  if (root && typeof root.id !== 'string') {
+    resource = null;
+    for (const key of nestedResourceKeys) {
+      const candidate = record(root[key]);
+      if (candidate && typeof candidate.id === 'string') {
+        resource = candidate;
+        break;
+      }
+    }
+  }
+
+  let resourceId = resource && typeof resource.id === 'string' ? resource.id : undefined;
+  if (!resourceId) {
+    const pathEntries = Object.entries(input.path ?? {});
+    for (let index = pathEntries.length - 1; index >= 0; index--) {
+      const [key, value] = pathEntries[index] ?? [];
+      if (key && /id$/i.test(key) && typeof value === 'string') {
+        resourceId = value;
+        break;
+      }
+    }
+  }
+  const revision = resource?.revision;
+  return {
+    acknowledged: true,
+    ...(resourceId ? { resourceId } : {}),
+    ...(typeof revision === 'number' && Number.isInteger(revision) && revision >= 0
+      ? { revision }
+      : {}),
+  };
+}
 
 export function createMcpHandler(
   config: AppConfig,
@@ -218,7 +292,7 @@ export function createMcpHandler(
       {
         capabilities: { tools: {} },
         instructions:
-          'Tools mirror the GPC player API. Supply a stable idempotencyKey for mutations and reuse it after a lost response; do not retry with a new key without checking the outcome.',
+          'Tools mirror the GPC player API. Mutations return only a compact acknowledgement; call the corresponding read tool when refreshed state is needed. Supply a stable idempotencyKey for mutations and reuse it after a lost response; do not retry with a new key without checking the outcome.',
       },
     );
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -265,12 +339,21 @@ export function createMcpHandler(
             'The operation returned an invalid response',
             500,
           );
+        const mutationBody =
+          response.ok && runtime.policy.method !== 'GET'
+            ? mutationAcknowledgement(body, input)
+            : body;
+        const resultContentType =
+          response.ok && runtime.policy.method !== 'GET' ? 'application/json' : contentType || null;
+        const resultText = response.ok
+          ? `HTTP ${response.status}; result is available in structuredContent.`
+          : text || `HTTP ${response.status}`;
         return {
-          content: [{ type: 'text', text: text || `HTTP ${response.status}` }],
+          content: [{ type: 'text', text: resultText }],
           structuredContent: {
             status: response.status,
-            contentType: contentType || null,
-            body,
+            contentType: resultContentType,
+            body: mutationBody,
           },
           ...(response.ok ? {} : { isError: true }),
         };

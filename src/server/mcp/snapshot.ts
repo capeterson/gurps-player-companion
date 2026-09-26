@@ -43,6 +43,7 @@ export function generateMcpSnapshot() {
       destructive: entry.policy.destructive,
       handler: entry.policy.handler,
       schemaSource: entry.policy.schemaSource,
+      resultMode: entry.policy.resultMode,
       parityTests: entry.policy.parityTests,
     })),
   };

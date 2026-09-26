@@ -60,6 +60,16 @@ executor sends a Request through the same OpenAPI handler graph; a private
 object-identity capability supplies the trusted OAuth actor, so no token is
 forwarded and external requests cannot inject one. App JWTs/API keys remain
 distinct from audience-bound, scoped, revocable OAuth credentials.
+Read results retain the canonical REST shape. Successful mutations are validated
+against that full shape and then projected to the MCP-wide compact acknowledgement
+(`acknowledged`, optional resource id/revision), preventing full character and
+campaign schemas/results from being repeated across write tools. Error bodies are
+not compacted. Successful payloads live only in `structuredContent`; text content
+is a short status pointer rather than a duplicate JSON serialization. Collection
+reads expose bounded search/limit/offset controls and campaign-library section
+selection; outside the Vite development adapter, the MCP route also honors gzip
+HTTP compression without relying on the runtime-optional `CompressionStream`
+global.
 
 Authorization-server discovery advertises Client ID Metadata Documents and a
 Dynamic Client Registration endpoint. CIMD metadata retrieval pins a public DNS

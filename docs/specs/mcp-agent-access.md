@@ -101,7 +101,7 @@ tools. The current covered surface is:
 | Current user (`GET /auth/me`) | Safe current-user identity with no credentials. |
 | Characters | List/detail/create/update/delete, warning dismissal, all trait/skill/spell/language/technique/inventory writes, combat updates, condition-group activation/deactivation. Include every writable field, optional/null/default behavior, and computed detail field. |
 | Campaigns | List/detail/create/update/delete, member and role changes, ownership transfer; use existing role checks. |
-| Campaign library | Read, CRUD for all eight library types (including mechanical enchantments), YAML import/export with all existing options and result semantics. Preserve YAML as a typed text payload. |
+| Campaign library | Read and CRUD for every library type, plus YAML import/export with all existing options. Reads support section/name/limit/offset narrowing; preserve YAML export as a typed text payload. |
 | Invitations and notifications | All list, invite/cancel/accept/reject, mark-read/read-all, and deletion operations. |
 | Adventure log | All reads/writes, privacy, session/location fields, and XP award semantics. |
 | Encounters | List/detail/create/update, advance turn, combatant and effect CRUD; retain optimistic turn-concurrency checks and hidden-NPC/PC privacy. |
@@ -121,14 +121,22 @@ names the tool, schemas, handler, required scopes, mutation/destructive hints,
 and parity tests, or an exact exclusion with a reason. Do not use a catch-all
 HTTP/URL/SQL tool or wildcard exclusions that silently swallow new routes.
 
-Generate tool input/output definitions from the canonical shared schemas and
-validate outputs as well as inputs. Preserve required fields, refinements,
-nullable values, unions, bounds, pagination, filters, and import formats. Keep
-stable tool names; descriptions explain field meaning and effects. Return
-structured results and a useful text rendering. Preserve domain error codes,
-field errors, conflicts and retry guidance in tool errors; protocol failures and
-OAuth failures retain their protocol/HTTP meanings. Set read-only, destructive,
-and idempotency annotations accurately; annotations are hints, not enforcement.
+Generate tool inputs and read outputs from the canonical shared schemas and
+validate every raw handler output as well as every input. Preserve required
+fields, refinements, nullable values, unions, bounds, pagination, filters, and
+import formats. Successful mutation tools deliberately advertise and return one
+small acknowledgement shape (`acknowledged`, plus `resourceId` from the result
+or target path and `revision` when the canonical result exposes it) instead of
+repeating the REST resource schema. The complete REST response is still
+validated before projection.
+Keep stable tool names; descriptions explain field meaning and effects. Successful
+calls keep the authoritative payload only in `structuredContent`; their text
+content is a short HTTP-status pointer so model context does not contain a second
+serialized copy. Failed calls retain their complete domain error text and
+structured payload, including field errors, conflicts and retry guidance;
+protocol failures and OAuth failures retain their protocol/HTTP meanings. Set
+read-only, destructive, and idempotency annotations accurately; annotations are
+hints, not enforcement.
 See [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
 
 ### Drift must fail CI
@@ -139,9 +147,11 @@ The normal `check` gate fails when:
    a mapping references a removed operation, or tool names collide.
 2. The live `tools/list` catalog differs from the checked-in generated catalog,
    schemas, scope metadata, or operation mapping.
-3. REST and MCP executions from equivalent seeded DB states disagree on results,
-   errors, authorized visibility, stored changes, history, or invalidations.
-   Normalize only volatile IDs/timestamps and transport envelopes.
+3. REST and MCP executions from equivalent seeded DB states disagree on GET
+   results, errors, authorized visibility, stored changes, history, or
+   invalidations, or a successful mutation acknowledgement does not match the
+   validated REST outcome. Normalize only volatile IDs/timestamps and transport
+   envelopes.
 
 Schema snapshots alone are insufficient. Cover each mapped operation with
 success and representative validation/permission failures, and add focused
@@ -196,6 +206,37 @@ actor; no external header can forge it, and OAuth bearer tokens are rejected by
 `withAudit`, so history distinguishes direct edits from `Player via Client`.
 Mutation idempotency wraps the shared handler in an outer transaction, persists
 its response for 24 hours, and rejects key reuse with changed input or authority.
+After a successful non-GET response passes the canonical OpenAPI and original
+Zod validators, the MCP adapter projects it to the compact mutation
+acknowledgement. Failed operations retain their complete error body so an agent
+can correct the call. The acknowledgement is the structured result; the text
+result contains only a status pointer. Agents explicitly re-read when they need
+refreshed state.
+
+## Context and transfer efficiency
+
+Collection reads accept bounded filters without changing their array/object
+response shapes. Character, campaign, and encounter lists accept
+case-insensitive `search`, `limit`, and `offset`; adventure-log reads apply the
+same controls to visible entry title/body/location text; invitations and
+notifications accept `limit` and `offset`. History feeds retain their existing
+revision-cursor pagination.
+Campaign-library reads additionally accept a `section`; unselected sections are
+returned as empty arrays, while `search`, `limit`, and `offset` narrow the chosen
+section. Agents should list/search first and request broad character or library
+detail only when required.
+
+Non-development `/mcp` JSON responses use gzip compression when the client
+advertises it. Vite's development adapter remains uncompressed. This improves
+discovery transfer and startup latency but does not
+claim to reduce model tokens. Catalog order remains deterministic for client and
+prompt-cache stability. Scope filtering remains the standards-compatible tool
+surface reduction: the server does not hide authorized tools behind a catch-all
+executor or a non-standard per-request profile.
+
+Successful read payloads likewise appear only in `structuredContent`, avoiding
+the former JSON-in-text duplicate. This intentionally relies on structured-output
+capable MCP clients; error text remains self-contained for diagnosis.
 
 The existing trait/skill library create/update tools accept ordered `effects`,
 including weapon attack, Parry, Block, damage and Accuracy targets. Their

@@ -51,6 +51,8 @@ router.openapi(
           .enum(['true', 'false'])
           .optional()
           .transform((v) => v === 'true'),
+        limit: z.coerce.number().int().min(1).max(500).optional(),
+        offset: z.coerce.number().int().min(0).max(100_000).optional(),
       }),
     },
     responses: {
@@ -62,7 +64,7 @@ router.openapi(
   }),
   async (c) => {
     const user = c.get('user');
-    const { unreadOnly } = c.req.valid('query');
+    const { unreadOnly, limit, offset } = c.req.valid('query');
     const db = getDb();
     const where = unreadOnly
       ? and(eq(notifications.userId, user.id), isNull(notifications.readAt))
@@ -71,7 +73,9 @@ router.openapi(
       .select()
       .from(notifications)
       .where(where)
-      .orderBy(desc(notifications.createdAt));
+      .orderBy(desc(notifications.createdAt), desc(notifications.id))
+      .limit(limit ?? 500)
+      .offset(offset ?? 0);
     return c.json(rows.map(toOut), 200);
   },
 );

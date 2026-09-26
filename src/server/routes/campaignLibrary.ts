@@ -68,6 +68,39 @@ import {
 const router = createOpenApiApp();
 router.use('/campaigns/*', requireActiveUser);
 
+const libraryReadQuery = z.object({
+  section: z
+    .enum([
+      'traits',
+      'skills',
+      'spells',
+      'items',
+      'languages',
+      'techniques',
+      'styles',
+      'enchantments',
+      'activeEffects',
+    ])
+    .optional()
+    .describe('Return only this library section; every other section is an empty array.'),
+  search: z.string().trim().min(1).max(120).optional().describe('Name substring filter.'),
+  limit: z.coerce.number().int().min(1).max(500).optional().describe('Maximum rows per section.'),
+  offset: z.coerce.number().int().min(0).max(100_000).optional().describe('Rows to skip.'),
+});
+
+function narrowLibraryRows<T extends { name: string }>(
+  rows: T[],
+  search: string | undefined,
+  limit: number | undefined,
+  offset: number | undefined,
+): T[] {
+  const matched = search
+    ? rows.filter((row) => row.name.toLowerCase().includes(search.toLowerCase()))
+    : rows;
+  const start = offset ?? 0;
+  return limit === undefined ? matched.slice(start) : matched.slice(start, start + limit);
+}
+
 // ===================== LIST =====================
 
 router.openapi(
@@ -76,8 +109,8 @@ router.openapi(
     path: '/campaigns/{id}/library',
     tags: ['campaigns'],
     security: [{ bearerAuth: [] }],
-    summary: 'Get the campaign library (member or owner)',
-    request: { params: z.object({ id: uuid }) },
+    summary: 'Get/filter the campaign library (member or owner)',
+    request: { params: z.object({ id: uuid }), query: libraryReadQuery },
     responses: {
       200: {
         description: 'Library payload',
@@ -104,28 +137,48 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
+    const { section, search, limit, offset } = c.req.valid('query');
     await requireCampaignMember(id, user.id);
     const db = getDb();
-    const traits = await selectLibrarySection(db, traitEntity, id);
-    const skills = await selectLibrarySection(db, skillEntity, id);
-    const spells = await selectLibrarySection(db, spellEntity, id);
-    const items = await selectLibrarySection(db, itemEntity, id);
-    const languages = await selectLibrarySection(db, languageEntity, id);
-    const techniques = await selectLibrarySection(db, techniqueEntity, id);
-    const styles = await selectLibrarySection(db, styleEntity, id);
-    const enchantments = await selectLibrarySection(db, enchantmentEntity, id);
-    const activeEffects = await selectLibrarySection(db, activeEffectEntity, id);
+    const includes = (candidate: string) => section === undefined || section === candidate;
+    const traits = includes('traits') ? await selectLibrarySection(db, traitEntity, id) : [];
+    const skills = includes('skills') ? await selectLibrarySection(db, skillEntity, id) : [];
+    const spells = includes('spells') ? await selectLibrarySection(db, spellEntity, id) : [];
+    const items = includes('items') ? await selectLibrarySection(db, itemEntity, id) : [];
+    const languages = includes('languages')
+      ? await selectLibrarySection(db, languageEntity, id)
+      : [];
+    const techniques = includes('techniques')
+      ? await selectLibrarySection(db, techniqueEntity, id)
+      : [];
+    const styles = includes('styles') ? await selectLibrarySection(db, styleEntity, id) : [];
+    const enchantments = includes('enchantments')
+      ? await selectLibrarySection(db, enchantmentEntity, id)
+      : [];
+    const activeEffects = includes('activeEffects')
+      ? await selectLibrarySection(db, activeEffectEntity, id)
+      : [];
     return c.json(
       {
-        traits: traits.map(traitEntity.toOut),
-        skills: skills.map(skillEntity.toOut),
-        spells: spells.map(spellEntity.toOut),
-        items: items.map(itemEntity.toOut),
-        languages: languages.map(languageEntity.toOut),
-        techniques: techniques.map(techniqueEntity.toOut),
-        styles: styles.map(styleEntity.toOut),
-        enchantments: enchantments.map(enchantmentEntity.toOut),
-        activeEffects: activeEffects.map(activeEffectEntity.toOut),
+        traits: narrowLibraryRows(traits.map(traitEntity.toOut), search, limit, offset),
+        skills: narrowLibraryRows(skills.map(skillEntity.toOut), search, limit, offset),
+        spells: narrowLibraryRows(spells.map(spellEntity.toOut), search, limit, offset),
+        items: narrowLibraryRows(items.map(itemEntity.toOut), search, limit, offset),
+        languages: narrowLibraryRows(languages.map(languageEntity.toOut), search, limit, offset),
+        techniques: narrowLibraryRows(techniques.map(techniqueEntity.toOut), search, limit, offset),
+        styles: narrowLibraryRows(styles.map(styleEntity.toOut), search, limit, offset),
+        enchantments: narrowLibraryRows(
+          enchantments.map(enchantmentEntity.toOut),
+          search,
+          limit,
+          offset,
+        ),
+        activeEffects: narrowLibraryRows(
+          activeEffects.map(activeEffectEntity.toOut),
+          search,
+          limit,
+          offset,
+        ),
       },
       200,
     );
