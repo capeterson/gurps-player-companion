@@ -38,14 +38,9 @@ import {
   LIBRARY_STORE_NAMES,
   type LocalCharacter,
   type LocalCharacterCombat,
-  type LocalCharacterInventory,
-  type LocalCharacterLanguage,
-  type LocalCharacterSkill,
-  type LocalCharacterSpell,
-  type LocalCharacterTechnique,
-  type LocalCharacterTrait,
   type OutboxEntry,
   type RejectionRecord,
+  SYNCED_ENTITY_CLASSES,
   coalesceKey,
   getLocalDb,
   storeForEntityClass,
@@ -91,25 +86,7 @@ import {
   snapshotValue,
 } from './syncLog.ts';
 
-const ALL_ENTITY_CLASSES: EntityClass[] = [
-  'character',
-  'character_trait',
-  'character_skill',
-  'character_spell',
-  'character_language',
-  'character_technique',
-  'character_inventory',
-  'character_combat',
-  // Campaigns are pulled READ-ONLY: rows land in Dexie so
-  // `enforceMinimalViewLocally` can evaluate shareCharacterSheets and
-  // `useCharacterDetail` can resolve campaign names offline.  Campaign
-  // *mutations* still go through the REST routes — there is no outbox
-  // path for them (see AGENTS.md S0).
-  'campaign',
-  // The campaign library is fully sync-backed: cursor rows plus outbox
-  // creates, whole-entry patches (S13) and deletes.
-  ...LIBRARY_ENTITY_CLASSES,
-];
+const ALL_ENTITY_CLASSES: readonly EntityClass[] = SYNCED_ENTITY_CLASSES;
 
 /** A whole-entry patch (AGENTS.md S13): no fieldPath, the full body in attemptedValue. */
 function isEntityPatch(op: OutboxEntry): boolean {
@@ -1918,49 +1895,6 @@ class SyncOrchestrator {
         await db.characters.put({ ...(existing ?? {}), ...merged } as LocalCharacter);
         return;
       }
-      case 'character_trait': {
-        const existing = await db.characterTraits.get(id);
-        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
-          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
-        await db.characterTraits.put({ ...(existing ?? {}), ...merged } as LocalCharacterTrait);
-        return;
-      }
-      case 'character_skill': {
-        const existing = await db.characterSkills.get(id);
-        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
-          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
-        await db.characterSkills.put({ ...(existing ?? {}), ...merged } as LocalCharacterSkill);
-        return;
-      }
-      case 'character_spell': {
-        const existing = await db.characterSpells.get(id);
-        await db.characterSpells.put({ ...(existing ?? {}), ...merged } as LocalCharacterSpell);
-        return;
-      }
-      case 'character_language': {
-        const existing = await db.characterLanguages.get(id);
-        await db.characterLanguages.put({
-          ...(existing ?? {}),
-          ...merged,
-        } as LocalCharacterLanguage);
-        return;
-      }
-      case 'character_technique': {
-        const existing = await db.characterTechniques.get(id);
-        await db.characterTechniques.put({
-          ...(existing ?? {}),
-          ...merged,
-        } as LocalCharacterTechnique);
-        return;
-      }
-      case 'character_inventory': {
-        const existing = await db.characterInventory.get(id);
-        await db.characterInventory.put({
-          ...(existing ?? {}),
-          ...merged,
-        } as LocalCharacterInventory);
-        return;
-      }
       case 'character_combat': {
         const characterId = (row.characterId as string) ?? id;
         const existing = await db.characterCombat.get(characterId);
@@ -1983,14 +1917,18 @@ class SyncOrchestrator {
         > as never);
         return;
       }
-      default: {
-        if (!isLibraryEntityClass(entityClass)) return;
-        const table = writableSyncEntityTable(entityClass);
-        const existing = await table.get(id);
-        await table.put({ ...(existing ?? {}), ...merged } as never);
-        return;
-      }
+      case 'character_trait':
+      case 'character_skill':
+        if ('libraryMechanics' in merged && merged.libraryMechanics !== null)
+          merged.libraryMechanics = libraryMechanics.parse(merged.libraryMechanics);
+        break;
     }
+    // Every other id-keyed class (character children and library entries)
+    // merges the server row over the local one in its own store.
+    const table = syncEntityTable(entityClass);
+    if (!table) return;
+    const existing = await table.get(id);
+    await table.put({ ...(existing ?? {}), ...merged } as never);
   }
 
   private async replayRejectionToasts(): Promise<void> {

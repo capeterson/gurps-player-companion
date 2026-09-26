@@ -405,80 +405,35 @@ function parentIdFor(
   return undefined;
 }
 
+/**
+ * Field patches read their prior value and base revision from the local
+ * character-family row. Library entries use whole-entry patches and
+ * campaigns are cursor-only, so neither has a field-patch base here.
+ */
+const FIELD_PATCH_CLASSES: ReadonlySet<EntityClass> = new Set([
+  'character',
+  'character_trait',
+  'character_skill',
+  'character_spell',
+  'character_language',
+  'character_technique',
+  'character_inventory',
+  'character_combat',
+]);
+
+async function readFieldPatchRow(
+  args: EnqueueFieldPatchArgs,
+): Promise<Record<string, unknown> | undefined> {
+  if (!FIELD_PATCH_CLASSES.has(args.entityClass)) return undefined;
+  return readSyncEntity(args.entityClass, args.entityId);
+}
+
 async function readFieldValue(args: EnqueueFieldPatchArgs): Promise<unknown> {
-  const db = getLocalDb();
-  const get = async (): Promise<unknown> => {
-    switch (args.entityClass) {
-      case 'character': {
-        const row = await db.characters.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_trait': {
-        const row = await db.characterTraits.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_skill': {
-        const row = await db.characterSkills.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_spell': {
-        const row = await db.characterSpells.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_language': {
-        const row = await db.characterLanguages.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_technique': {
-        const row = await db.characterTechniques.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_inventory': {
-        const row = await db.characterInventory.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_combat': {
-        const row = await db.characterCombat.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      default:
-        return undefined;
-    }
-  };
-  return await get();
+  return (await readFieldPatchRow(args))?.[args.fieldPath];
 }
 
 async function readEntityRevision(args: EnqueueFieldPatchArgs): Promise<number | undefined> {
-  const db = getLocalDb();
-  let rev: number | undefined;
-  switch (args.entityClass) {
-    case 'character':
-      rev = (await db.characters.get(args.entityId))?.revision;
-      break;
-    case 'character_trait':
-      rev = (await db.characterTraits.get(args.entityId))?.revision;
-      break;
-    case 'character_skill':
-      rev = (await db.characterSkills.get(args.entityId))?.revision;
-      break;
-    case 'character_spell':
-      rev = (await db.characterSpells.get(args.entityId))?.revision;
-      break;
-    case 'character_language':
-      rev = (await db.characterLanguages.get(args.entityId))?.revision;
-      break;
-    case 'character_technique':
-      rev = (await db.characterTechniques.get(args.entityId))?.revision;
-      break;
-    case 'character_inventory':
-      rev = (await db.characterInventory.get(args.entityId))?.revision;
-      break;
-    case 'character_combat':
-      rev = (await db.characterCombat.get(args.entityId))?.revision;
-      break;
-    default:
-      return undefined;
-  }
+  const rev = (await readFieldPatchRow(args))?.revision as number | undefined;
   return rev === -1 ? undefined : rev;
 }
 

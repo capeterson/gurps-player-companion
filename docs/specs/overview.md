@@ -1124,9 +1124,10 @@ Things that repeatedly surprise people working in this repo:
 4. **Adding a syncable entity class touches ~6 sites** (schema enum, Dexie,
    orchestrator switches, outbox switches, server dispatcher + cursor reader,
    purge list) **plus** the history checklist (trigger, `SYNCABLE_TABLES`,
-   `summarizeEvent`, `withAudit`). There is no registry that catches a miss —
-   follow the `AGENTS.md` S6 and H1–H5 checklists end-to-end or you get silent
-   data loss.
+   `summarizeEvent`, `withAudit`). Only the client store map
+   (`STORE_BY_ENTITY_CLASS`) fails typechecking on a miss; nothing else catches
+   one — follow the `AGENTS.md` S6 and H1–H5 checklists end-to-end or you get
+   silent data loss.
 
 5. **REST and sync share primitives, not every handler.** Sync writes use
    `dispatchOperation()` in `syncDispatch.ts`; REST routes also perform writes

@@ -314,14 +314,18 @@ A new sync-participating entity class MUST be added to **all** of:
 1. `entityClass` enum in [src/shared/schemas/sync.ts](src/shared/schemas/sync.ts).
 2. A Dexie store + `LocalFoo` interface in
    [src/client/db/dexie.ts](src/client/db/dexie.ts), with `id` and
-   `revision` columns. Add it to `ALL_STORE_NAMES` and
-   `storeForEntityClass`.
-3. The orchestrator's per-class switches:
-   `applyServerRow`, `revertField`, `deleteLocal`, `reinsertLocal`,
-   `stampRevision`, and `ALL_ENTITY_CLASSES`.
-4. The outbox helpers' switches: `storesForOp`, `applyLocalPatch`,
-   `applyLocalCreate`, `applyLocalDelete`, `readFieldValue`,
-   `readEntityRevision`, and `parentIdFor` if the new class is a
+   `revision` columns. Add it to `ALL_STORE_NAMES` and give the class its
+   store in `STORE_BY_ENTITY_CLASS` (a `Record` over every class, so a
+   missing entry fails typechecking). That map drives the shared
+   read/update/delete/stamp helpers in
+   [src/client/db/syncEntityStore.ts](src/client/db/syncEntityStore.ts) and
+   `SYNCED_ENTITY_CLASSES`, the list the orchestrator pulls.
+3. The orchestrator's `mergeServerRow` switch, only when the class needs
+   special parsing or keying (character active effects, trait/skill
+   `libraryMechanics`, combat keyed by `characterId`, campaign
+   definitions). Other classes use the generic merge.
+4. The outbox's `FIELD_PATCH_CLASSES` if the class takes per-field patches,
+   `applyLocalCreate` defaults, and `parentIdFor` if the new class is a
    child entity.
 5. The server dispatcher in
    [src/server/services/syncDispatch.ts](src/server/services/syncDispatch.ts)
