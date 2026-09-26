@@ -487,11 +487,16 @@ export const TOOLS = OPERATION_POLICY.filter(
   (entry): entry is IncludedOperation => entry.kind === 'tool',
 );
 
+// Compiled once: the idempotency middleware matches every mutation request.
+const OPERATION_MATCHERS = OPERATION_POLICY.map((entry) => ({
+  entry,
+  pattern: new RegExp(`^${entry.path.replace(/\{[^}]+\}/g, '[^/]+')}$`),
+}));
+
 export function matchOperation(method: string, pathname: string): OperationPolicy | undefined {
-  for (const entry of OPERATION_POLICY) {
-    if (entry.method !== method.toUpperCase()) continue;
-    const pattern = new RegExp(`^${entry.path.replace(/\{[^}]+\}/g, '[^/]+')}$`);
-    if (pattern.test(pathname)) return entry;
+  const upper = method.toUpperCase();
+  for (const { entry, pattern } of OPERATION_MATCHERS) {
+    if (entry.method === upper && pattern.test(pathname)) return entry;
   }
   return undefined;
 }
