@@ -43,6 +43,12 @@ import {
 import { campaigns as campaignsTable } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import {
+  LIBRARY_LINKED_CHILDREN,
+  deleteCharacterChild,
+  insertCharacterChild,
+  updateCharacterChild,
+} from '../services/characterChildren.ts';
+import {
   buildCombatStateOut,
   buildLanguageOut,
   buildSkillOut,
@@ -52,15 +58,7 @@ import {
   characterAttrsFromRow,
   loadCharacterDetail,
 } from '../services/characterSummary.ts';
-import {
-  combatUpsertValues,
-  inventoryInsertValues,
-  languageInsertValues,
-  skillInsertValues,
-  spellInsertValues,
-  techniqueInsertValues,
-  traitInsertValues,
-} from '../services/entityWrites.ts';
+import { combatUpsertValues, inventoryInsertValues } from '../services/entityWrites.ts';
 import {
   lockLibraryReferenceScope,
   prepareLibraryReference,
@@ -138,21 +136,9 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
-    const [created] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .insert(characterTraits)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            user.id,
-            id,
-            'traits',
-            traitInsertValues(body, { characterId: id }),
-          ),
-        )
-        .returning(),
+    const created = await withAudit(user.id, undefined, (tx) =>
+      insertCharacterChild(tx, user.id, LIBRARY_LINKED_CHILDREN.character_trait, id, body),
     );
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return c.json({ trait: buildTraitOut(created), character: await loadCharacterDetail(id) }, 201);
   },
 );
@@ -188,14 +174,16 @@ router.openapi(
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, async (tx) => {
-      await prepareLibraryReference(tx, user.id, id, 'traits', updates, traitId);
-      return tx
-        .update(characterTraits)
-        .set(updates)
-        .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
-        .returning();
-    });
+    const updated = await withAudit(user.id, undefined, (tx) =>
+      updateCharacterChild(
+        tx,
+        user.id,
+        LIBRARY_LINKED_CHILDREN.character_trait,
+        id,
+        traitId,
+        updates,
+      ),
+    );
     if (!updated) throw new HTTPException(404, { message: 'trait not found' });
     return c.json({ trait: buildTraitOut(updated), character: await loadCharacterDetail(id) }, 200);
   },
@@ -221,13 +209,10 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, traitId } = c.req.valid('param');
-    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
-      tx
-        .delete(characterTraits)
-        .where(and(eq(characterTraits.id, traitId), eq(characterTraits.characterId, id)))
-        .returning({ id: characterTraits.id }),
+    const removed = await withWritableCharacterAudit(id, user.id, (tx) =>
+      deleteCharacterChild(tx, LIBRARY_LINKED_CHILDREN.character_trait, id, traitId),
     );
-    if (result.length === 0) throw new HTTPException(404, { message: 'trait not found' });
+    if (!removed) throw new HTTPException(404, { message: 'trait not found' });
     return c.json(await loadCharacterDetail(id), 200);
   },
 );
@@ -264,21 +249,9 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
-    const [created] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .insert(characterSkills)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            user.id,
-            id,
-            'skills',
-            skillInsertValues(body, { characterId: id }),
-          ),
-        )
-        .returning(),
+    const created = await withAudit(user.id, undefined, (tx) =>
+      insertCharacterChild(tx, user.id, LIBRARY_LINKED_CHILDREN.character_skill, id, body),
     );
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const character = await loadCharacterDetail(id);
     const skill = character.skills.find((skill) => skill.id === created.id);
     if (!skill) throw new HTTPException(500, { message: 'created skill missing from detail' });
@@ -317,14 +290,16 @@ router.openapi(
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, async (tx) => {
-      await prepareLibraryReference(tx, user.id, id, 'skills', updates, skillId);
-      return tx
-        .update(characterSkills)
-        .set(updates)
-        .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
-        .returning();
-    });
+    const updated = await withAudit(user.id, undefined, (tx) =>
+      updateCharacterChild(
+        tx,
+        user.id,
+        LIBRARY_LINKED_CHILDREN.character_skill,
+        id,
+        skillId,
+        updates,
+      ),
+    );
     if (!updated) throw new HTTPException(404, { message: 'skill not found' });
     const character = await loadCharacterDetail(id);
     const skill = character.skills.find((skill) => skill.id === updated.id);
@@ -353,13 +328,10 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, skillId } = c.req.valid('param');
-    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
-      tx
-        .delete(characterSkills)
-        .where(and(eq(characterSkills.id, skillId), eq(characterSkills.characterId, id)))
-        .returning({ id: characterSkills.id }),
+    const removed = await withWritableCharacterAudit(id, user.id, (tx) =>
+      deleteCharacterChild(tx, LIBRARY_LINKED_CHILDREN.character_skill, id, skillId),
     );
-    if (result.length === 0) throw new HTTPException(404, { message: 'skill not found' });
+    if (!removed) throw new HTTPException(404, { message: 'skill not found' });
     return c.json(await loadCharacterDetail(id), 200);
   },
 );
@@ -397,21 +369,9 @@ router.openapi(
     const body = c.req.valid('json');
     const access = await loadWritableCharacter(id, user.id);
     const db = getDb();
-    const [created] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .insert(characterSpells)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            user.id,
-            id,
-            'spells',
-            spellInsertValues(body, { characterId: id }),
-          ),
-        )
-        .returning(),
+    const created = await withAudit(user.id, undefined, (tx) =>
+      insertCharacterChild(tx, user.id, LIBRARY_LINKED_CHILDREN.character_spell, id, body),
     );
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
     const traits = await db
       .select()
@@ -461,12 +421,15 @@ router.openapi(
     const access = await loadWritableCharacter(id, user.id);
     const db = getDb();
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .update(characterSpells)
-        .set(await prepareLibraryReference(tx, user.id, id, 'spells', updates, spellId))
-        .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
-        .returning(),
+    const updated = await withAudit(user.id, undefined, (tx) =>
+      updateCharacterChild(
+        tx,
+        user.id,
+        LIBRARY_LINKED_CHILDREN.character_spell,
+        id,
+        spellId,
+        updates,
+      ),
     );
     if (!updated) throw new HTTPException(404, { message: 'spell not found' });
     const derived = computeDerived(characterAttrsFromRow(access.character));
@@ -506,13 +469,10 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, spellId } = c.req.valid('param');
-    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
-      tx
-        .delete(characterSpells)
-        .where(and(eq(characterSpells.id, spellId), eq(characterSpells.characterId, id)))
-        .returning({ id: characterSpells.id }),
+    const removed = await withWritableCharacterAudit(id, user.id, (tx) =>
+      deleteCharacterChild(tx, LIBRARY_LINKED_CHILDREN.character_spell, id, spellId),
     );
-    if (result.length === 0) throw new HTTPException(404, { message: 'spell not found' });
+    if (!removed) throw new HTTPException(404, { message: 'spell not found' });
     return c.json(await loadCharacterDetail(id), 200);
   },
 );
@@ -549,21 +509,9 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
-    const [created] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .insert(characterLanguages)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            user.id,
-            id,
-            'languages',
-            languageInsertValues(body, { characterId: id }),
-          ),
-        )
-        .returning(),
+    const created = await withAudit(user.id, undefined, (tx) =>
+      insertCharacterChild(tx, user.id, LIBRARY_LINKED_CHILDREN.character_language, id, body),
     );
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
     return c.json(
       { language: buildLanguageOut(created), character: await loadCharacterDetail(id) },
       201,
@@ -602,12 +550,15 @@ router.openapi(
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .update(characterLanguages)
-        .set(await prepareLibraryReference(tx, user.id, id, 'languages', updates, languageId))
-        .where(and(eq(characterLanguages.id, languageId), eq(characterLanguages.characterId, id)))
-        .returning(),
+    const updated = await withAudit(user.id, undefined, (tx) =>
+      updateCharacterChild(
+        tx,
+        user.id,
+        LIBRARY_LINKED_CHILDREN.character_language,
+        id,
+        languageId,
+        updates,
+      ),
     );
     if (!updated) throw new HTTPException(404, { message: 'language not found' });
     return c.json(
@@ -637,13 +588,10 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, languageId } = c.req.valid('param');
-    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
-      tx
-        .delete(characterLanguages)
-        .where(and(eq(characterLanguages.id, languageId), eq(characterLanguages.characterId, id)))
-        .returning({ id: characterLanguages.id }),
+    const removed = await withWritableCharacterAudit(id, user.id, (tx) =>
+      deleteCharacterChild(tx, LIBRARY_LINKED_CHILDREN.character_language, id, languageId),
     );
-    if (result.length === 0) throw new HTTPException(404, { message: 'language not found' });
+    if (!removed) throw new HTTPException(404, { message: 'language not found' });
     return c.json(await loadCharacterDetail(id), 200);
   },
 );
@@ -696,21 +644,9 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
-    const [created] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .insert(characterTechniques)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            user.id,
-            id,
-            'techniques',
-            techniqueInsertValues(body, { characterId: id }),
-          ),
-        )
-        .returning(),
+    const created = await withAudit(user.id, undefined, (tx) =>
+      insertCharacterChild(tx, user.id, LIBRARY_LINKED_CHILDREN.character_technique, id, body),
     );
-    if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const detail = await loadCharacterDetail(id);
     return c.json({ technique: techniqueFromDetail(detail, created.id), character: detail }, 201);
   },
@@ -747,14 +683,15 @@ router.openapi(
     const body = c.req.valid('json');
     await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
-    const [updated] = await withAudit(user.id, undefined, async (tx) =>
-      tx
-        .update(characterTechniques)
-        .set(await prepareLibraryReference(tx, user.id, id, 'techniques', updates, techniqueId))
-        .where(
-          and(eq(characterTechniques.id, techniqueId), eq(characterTechniques.characterId, id)),
-        )
-        .returning(),
+    const updated = await withAudit(user.id, undefined, (tx) =>
+      updateCharacterChild(
+        tx,
+        user.id,
+        LIBRARY_LINKED_CHILDREN.character_technique,
+        id,
+        techniqueId,
+        updates,
+      ),
     );
     if (!updated) throw new HTTPException(404, { message: 'technique not found' });
     const detail = await loadCharacterDetail(id);
@@ -782,15 +719,10 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id, techniqueId } = c.req.valid('param');
-    const result = await withWritableCharacterAudit(id, user.id, async (tx) =>
-      tx
-        .delete(characterTechniques)
-        .where(
-          and(eq(characterTechniques.id, techniqueId), eq(characterTechniques.characterId, id)),
-        )
-        .returning({ id: characterTechniques.id }),
+    const removed = await withWritableCharacterAudit(id, user.id, (tx) =>
+      deleteCharacterChild(tx, LIBRARY_LINKED_CHILDREN.character_technique, id, techniqueId),
     );
-    if (result.length === 0) throw new HTTPException(404, { message: 'technique not found' });
+    if (!removed) throw new HTTPException(404, { message: 'technique not found' });
     return c.json(await loadCharacterDetail(id), 200);
   },
 );

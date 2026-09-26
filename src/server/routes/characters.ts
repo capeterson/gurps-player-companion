@@ -93,8 +93,20 @@ router.openapi(
       campaignIds.length === 0
         ? eq(characters.ownerId, user.id)
         : or(eq(characters.ownerId, user.id), inArray(characters.campaignId, campaignIds));
+    // Only the listed columns: the full row carries every JSONB blob.
     const rows = await db
-      .select()
+      .select({
+        id: characters.id,
+        ownerId: characters.ownerId,
+        campaignId: characters.campaignId,
+        name: characters.name,
+        st: characters.st,
+        dx: characters.dx,
+        iq: characters.iq,
+        ht: characters.ht,
+        updatedAt: characters.updatedAt,
+        revision: characters.revision,
+      })
       .from(characters)
       .where(search ? and(accessWhere, ilike(characters.name, `%${search}%`)) : accessWhere)
       .orderBy(desc(characters.updatedAt), desc(characters.id));

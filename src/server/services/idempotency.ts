@@ -9,6 +9,8 @@ import type { AppEnv } from '../openapi/app.ts';
 import { trustedExecutionFor } from './executionContext.ts';
 
 export const IDEMPOTENCY_RETENTION_MS = 24 * 60 * 60_000;
+const EXPIRED_SWEEP_INTERVAL_MS = 60_000;
+let lastExpiredSweepAt = 0;
 
 class RollbackHttpResponse extends Error {
   constructor(readonly response: Response) {
@@ -101,19 +103,25 @@ export const durableIdempotency: MiddlewareHandler<AppEnv> = async (c, next) => 
   const result = await runInDbTransaction(async () => {
     const db = getDb();
     let currentPermissionHash = await permissionHash(user.id);
-    await db.delete(mutationIdempotency).where(lt(mutationIdempotency.expiresAt, new Date()));
-    let [existing] = await db
-      .select()
-      .from(mutationIdempotency)
-      .where(
-        and(
-          eq(mutationIdempotency.actorUserId, user.id),
-          eq(mutationIdempotency.clientKey, clientKey),
-          eq(mutationIdempotency.operationKey, operationKey),
-          eq(mutationIdempotency.idempotencyKey, key),
-        ),
-      )
-      .for('update');
+    const now = new Date();
+    // An expired record for this key must never be replayed, so drop it
+    // inline (a unique-key lookup). The table-wide sweep of other expired
+    // rows is housekeeping and runs at most once a minute per process.
+    const keyScope = and(
+      eq(mutationIdempotency.actorUserId, user.id),
+      eq(mutationIdempotency.clientKey, clientKey),
+      eq(mutationIdempotency.operationKey, operationKey),
+      eq(mutationIdempotency.idempotencyKey, key),
+    );
+    if (now.getTime() - lastExpiredSweepAt >= EXPIRED_SWEEP_INTERVAL_MS) {
+      lastExpiredSweepAt = now.getTime();
+      await db.delete(mutationIdempotency).where(lt(mutationIdempotency.expiresAt, now));
+    } else {
+      await db
+        .delete(mutationIdempotency)
+        .where(and(keyScope, lt(mutationIdempotency.expiresAt, now)));
+    }
+    let [existing] = await db.select().from(mutationIdempotency).where(keyScope).for('update');
     let insertedId: string | undefined;
     if (!existing) {
       const [record] = await db

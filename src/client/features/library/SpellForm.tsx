@@ -6,6 +6,7 @@ import type {
 } from '../../../shared/schemas/campaignLibrary.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
+import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 
 interface SpellFormProps {
   initial?: LibrarySpellOut;
@@ -165,27 +166,15 @@ export function SpellForm({ initial, isPending, error, onSubmit, onCancel }: Spe
           placeholder="Description (Markdown supported)…"
         />
       </div>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={onCancel}
-          disabled={isPending}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={handleSubmit}
-          disabled={isPending || !name.trim()}
-        >
-          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add spell'}
-        </button>
-      </div>
-      {error && <p className="alert alert-error text-sm">{error}</p>}
+      <LibraryFormFooter
+        noun="spell"
+        editing={Boolean(initial)}
+        isPending={isPending}
+        canSubmit={Boolean(name.trim())}
+        error={error}
+        onCancel={onCancel}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }
-
-// ── Item form ───────────────────────────────────────────────────────────────

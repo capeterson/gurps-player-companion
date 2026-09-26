@@ -66,7 +66,7 @@ const references = {
     field: 'libraryTechniqueId',
   },
 } as const;
-type ReferenceKind = keyof typeof references;
+export type ReferenceKind = keyof typeof references;
 
 export async function hydrateItemEnchantmentDefinitions<T extends Record<string, unknown>>(
   tx: AuditTx,

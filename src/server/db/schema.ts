@@ -421,53 +421,57 @@ export const mutationIdempotency = pgTable(
 
 // ---------- campaigns ----------
 
-export const campaigns = pgTable('campaigns', {
-  id: id(),
-  name: varchar('name', { length: 120 }).notNull(),
-  description: text('description'),
-  ownerId: uuid('owner_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'restrict' }),
-  pointTarget: integer('point_target'),
-  disadvantageCap: integer('disadvantage_cap'),
-  quirkCap: integer('quirk_cap').default(5),
-  houseRules: jsonb('house_rules')
-    .$type<CampaignHouseRules>()
-    .notNull()
-    .default(sql`'{"protectNaturalDr":true}'::jsonb`),
-  /** Ambient mana level (Basic Set p. 235); folded into spell math. */
-  manaLevel: varchar('mana_level', {
-    length: 12,
-    enum: ['none', 'low', 'normal', 'high', 'very_high'],
-  })
-    .notNull()
-    .default('normal'),
-  /** Campaign-wide tech level (Basic Set p. 513); characters no longer set their own. */
-  techLevel: smallint('tech_level'),
-  /** Enforce purchased DX/IQ/HT and Will/Per caps from Basic Set pp. B14-B16. */
-  enforceAttributeCaps: boolean('enforce_attribute_caps').notNull().default(true),
-  /**
-   * When false, non-owner members fetching `/characters/{id}` get the
-   * minimal "readily apparent" view (race / height / weight / age /
-   * appearance / TL) instead of the full sheet. Owner and the author
-   * always see the full sheet.  Defaults to true so existing campaigns
-   * keep their previous behaviour.
-   */
-  shareCharacterSheets: boolean('share_character_sheets').notNull().default(true),
-  /** Owner/manager edits of member-owned character sheets; opt-in. */
-  allowGmCharacterEditing: boolean('allow_gm_character_editing').notNull().default(false),
-  /** Authoritative handling of unmet structured skill prerequisites. */
-  skillPrerequisitePolicy: varchar('skill_prerequisite_policy', {
-    length: 8,
-    enum: ['block', 'warn'],
-  })
-    .notNull()
-    .default('block'),
-  experimentalTurnTracker: boolean('experimental_turn_tracker').notNull().default(false),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-  revision: revision(),
-});
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: id(),
+    name: varchar('name', { length: 120 }).notNull(),
+    description: text('description'),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    pointTarget: integer('point_target'),
+    disadvantageCap: integer('disadvantage_cap'),
+    quirkCap: integer('quirk_cap').default(5),
+    houseRules: jsonb('house_rules')
+      .$type<CampaignHouseRules>()
+      .notNull()
+      .default(sql`'{"protectNaturalDr":true}'::jsonb`),
+    /** Ambient mana level (Basic Set p. 235); folded into spell math. */
+    manaLevel: varchar('mana_level', {
+      length: 12,
+      enum: ['none', 'low', 'normal', 'high', 'very_high'],
+    })
+      .notNull()
+      .default('normal'),
+    /** Campaign-wide tech level (Basic Set p. 513); characters no longer set their own. */
+    techLevel: smallint('tech_level'),
+    /** Enforce purchased DX/IQ/HT and Will/Per caps from Basic Set pp. B14-B16. */
+    enforceAttributeCaps: boolean('enforce_attribute_caps').notNull().default(true),
+    /**
+     * When false, non-owner members fetching `/characters/{id}` get the
+     * minimal "readily apparent" view (race / height / weight / age /
+     * appearance / TL) instead of the full sheet. Owner and the author
+     * always see the full sheet.  Defaults to true so existing campaigns
+     * keep their previous behaviour.
+     */
+    shareCharacterSheets: boolean('share_character_sheets').notNull().default(true),
+    /** Owner/manager edits of member-owned character sheets; opt-in. */
+    allowGmCharacterEditing: boolean('allow_gm_character_editing').notNull().default(false),
+    /** Authoritative handling of unmet structured skill prerequisites. */
+    skillPrerequisitePolicy: varchar('skill_prerequisite_policy', {
+      length: 8,
+      enum: ['block', 'warn'],
+    })
+      .notNull()
+      .default('block'),
+    experimentalTurnTracker: boolean('experimental_turn_tracker').notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({ ownerIdx: index('campaigns_owner_idx').on(t.ownerId) }),
+);
 
 export const campaignMemberships = pgTable(
   'campaign_memberships',
@@ -486,6 +490,7 @@ export const campaignMemberships = pgTable(
   },
   (t) => ({
     membershipKey: uniqueIndex('campaign_memberships_campaign_user_key').on(t.campaignId, t.userId),
+    userCampaignIdx: index('campaign_memberships_user_campaign_idx').on(t.userId, t.campaignId),
   }),
 );
 
@@ -605,6 +610,7 @@ export const characters = pgTable(
   },
   (t) => ({
     ownerIdx: index('characters_owner_idx').on(t.ownerId),
+    ownerRevisionIdx: index('characters_owner_revision_idx').on(t.ownerId, t.revision),
     campaignIdx: index('characters_campaign_idx').on(t.campaignId),
   }),
 );
@@ -637,6 +643,10 @@ export const characterTraits = pgTable(
   },
   (t) => ({
     characterIdx: index('character_traits_character_idx').on(t.characterId),
+    characterRevisionIdx: index('character_traits_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
     libraryIdx: index('character_traits_library_idx').on(t.libraryTraitId),
   }),
 );
@@ -665,6 +675,10 @@ export const characterSkills = pgTable(
   },
   (t) => ({
     characterIdx: index('character_skills_character_idx').on(t.characterId),
+    characterRevisionIdx: index('character_skills_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
     libraryIdx: index('character_skills_library_idx').on(t.librarySkillId),
   }),
 );
@@ -699,6 +713,10 @@ export const characterLanguages = pgTable(
   },
   (t) => ({
     characterIdx: index('character_languages_character_idx').on(t.characterId),
+    characterRevisionIdx: index('character_languages_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
   }),
 );
 
@@ -735,6 +753,10 @@ export const characterTechniques = pgTable(
   },
   (t) => ({
     characterIdx: index('character_techniques_character_idx').on(t.characterId),
+    characterRevisionIdx: index('character_techniques_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
   }),
 );
 
@@ -781,6 +803,10 @@ export const inventoryItems = pgTable(
   },
   (t) => ({
     characterIdx: index('inventory_items_character_idx').on(t.characterId),
+    characterRevisionIdx: index('inventory_items_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
     parentIdx: index('inventory_items_parent_idx').on(t.parentId),
   }),
 );
@@ -820,6 +846,10 @@ export const characterSpells = pgTable(
   },
   (t) => ({
     characterIdx: index('character_spells_character_idx').on(t.characterId),
+    characterRevisionIdx: index('character_spells_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1014,6 +1044,10 @@ export const campaignLibraryTraits = pgTable(
       t.kind,
       sql`lower(${t.name})`,
     ),
+    campaignRevisionIdx: index('campaign_library_traits_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1065,6 +1099,10 @@ export const campaignLibrarySkills = pgTable(
   (t) => ({
     // Case-insensitive natural key -- see migration 0021.
     naturalKey: uniqueIndex('campaign_library_skills_key').on(t.campaignId, sql`lower(${t.name})`),
+    campaignRevisionIdx: index('campaign_library_skills_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1099,6 +1137,10 @@ export const campaignLibrarySpells = pgTable(
   (t) => ({
     // Case-insensitive natural key -- see migration 0021.
     naturalKey: uniqueIndex('campaign_library_spells_key').on(t.campaignId, sql`lower(${t.name})`),
+    campaignRevisionIdx: index('campaign_library_spells_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1128,6 +1170,10 @@ export const campaignLibraryLanguages = pgTable(
     naturalKey: uniqueIndex('campaign_library_languages_key').on(
       t.campaignId,
       sql`lower(${t.name})`,
+    ),
+    campaignRevisionIdx: index('campaign_library_languages_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
     ),
   }),
 );
@@ -1166,6 +1212,10 @@ export const campaignLibraryTechniques = pgTable(
       t.campaignId,
       sql`lower(${t.name})`,
     ),
+    campaignRevisionIdx: index('campaign_library_techniques_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1197,6 +1247,10 @@ export const campaignLibraryStyles = pgTable(
   (t) => ({
     // Case-insensitive natural key -- see migration 0027.
     naturalKey: uniqueIndex('campaign_library_styles_key').on(t.campaignId, sql`lower(${t.name})`),
+    campaignRevisionIdx: index('campaign_library_styles_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1232,6 +1286,10 @@ export const campaignLibraryEnchantments = pgTable(
     naturalKey: uniqueIndex('campaign_library_enchantments_key').on(
       t.campaignId,
       sql`lower(${t.name})`,
+    ),
+    campaignRevisionIdx: index('campaign_library_enchantments_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
     ),
   }),
 );
@@ -1274,6 +1332,10 @@ export const campaignLibraryItems = pgTable(
   (t) => ({
     // Case-insensitive natural key -- see migration 0021.
     naturalKey: uniqueIndex('campaign_library_items_key').on(t.campaignId, sql`lower(${t.name})`),
+    campaignRevisionIdx: index('campaign_library_items_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1420,6 +1482,10 @@ export const campaignLibraryActiveEffects = pgTable(
     naturalKey: uniqueIndex('campaign_library_active_effects_key').on(
       t.campaignId,
       sql`lower(${t.name})`,
+    ),
+    campaignRevisionIdx: index('campaign_library_active_effects_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
     ),
   }),
 );

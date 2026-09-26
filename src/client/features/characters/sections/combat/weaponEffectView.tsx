@@ -1,5 +1,6 @@
 import { normalizeMechanicalName } from '../../../../../shared/domain/traitEffects.ts';
 import { type ResolvedEffect, skillBonusFor } from '../../../../../shared/domain/traitEffects.ts';
+import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { ResolvedEffectOut } from '../../../../../shared/schemas/character.ts';
 import type { WeaponEffectTarget } from '../../../../../shared/schemas/effects.ts';
 
@@ -66,8 +67,7 @@ export function ModifierBreakdownContent({
 }: ModifierBreakdownProps) {
   const source = (effect: ResolvedEffectOut, index: number) => (
     <li key={`${effect.sourceId}-${effect.target}-${effect.value}-${index}`}>
-      {effect.value >= 0 ? '+' : ''}
-      {effect.value} <span>{effect.sourceName}</span>
+      {formatSigned(effect.value)} <span>{effect.sourceName}</span>
       {effect.conditionLabel ? ` (${effect.conditionLabel})` : ''}
     </li>
   );

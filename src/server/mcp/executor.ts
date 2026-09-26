@@ -64,8 +64,10 @@ export async function executeOperation(
       return await runInDbTransaction(async () => {
         // PostgreSQL cancels the transaction itself at the execution deadline;
         // the HTTP adapter never races a still-running mutation in JavaScript.
-        await getDb().execute(sql`select set_config('statement_timeout', '30000', true)`);
-        await getDb().execute(sql`select set_config('transaction_timeout', '30000', true)`);
+        await getDb().execute(
+          sql`select set_config('statement_timeout', '30000', true),
+                     set_config('transaction_timeout', '30000', true)`,
+        );
         const response = await Promise.resolve(app.fetch(request));
         if (response.status >= 500) {
           throw new Error(`shared operation failed with HTTP ${response.status}`);

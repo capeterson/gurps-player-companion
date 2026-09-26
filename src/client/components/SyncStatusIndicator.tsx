@@ -81,12 +81,17 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
       >
         <SyncSymbol state={visualState} />
       </InfoTooltip>
-      <SyncLogView
-        open={logOpen}
-        onClose={() => setLogOpen(false)}
-        online={online}
-        storageMessage={storageMsg}
-      />
+      {/* Mounted only while open: the log's live queries scan the whole
+          outbox and sync log, so keeping it mounted closed re-ran them on
+          every local edit and pull. */}
+      {logOpen && (
+        <SyncLogView
+          open
+          onClose={() => setLogOpen(false)}
+          online={online}
+          storageMessage={storageMsg}
+        />
+      )}
     </>
   );
 }

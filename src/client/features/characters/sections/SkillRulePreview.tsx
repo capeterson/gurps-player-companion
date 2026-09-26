@@ -5,6 +5,7 @@ import {
   evaluateNumber,
   inputKey,
 } from '../../../../shared/domain/skillProcedures.ts';
+import { formatSigned } from '../../../../shared/format/number.ts';
 import type {
   RuleInput,
   SkillAction,
@@ -209,7 +210,7 @@ export function SkillRulePreview({
           <p>{action.sourceText}</p>
           <p>
             {action.roll
-              ? `Roll basis: ${action.roll.basis.replaceAll('_', ' ')} ${action.roll.attribute ?? action.roll.skillName ?? ''} ${action.roll.modifier >= 0 ? '+' : ''}${action.roll.modifier}`
+              ? `Roll basis: ${action.roll.basis.replaceAll('_', ' ')} ${action.roll.attribute ?? action.roll.skillName ?? ''} ${formatSigned(action.roll.modifier)}`
               : 'No automated roll'}
           </p>
           {action.time && (

@@ -13,6 +13,13 @@ describe('formatSigned', () => {
   it('renders negative numbers with an ASCII hyphen-minus', () => {
     expect(formatSigned(-2)).toBe('-2');
   });
+
+  it("prints an unsigned zero with { zero: 'plain' } and signs everything else", () => {
+    expect(formatSigned(0, { zero: 'plain' })).toBe('0');
+    expect(formatSigned(-0, { zero: 'plain' })).toBe('0');
+    expect(formatSigned(4, { zero: 'plain' })).toBe('+4');
+    expect(formatSigned(-4, { zero: 'plain' })).toBe('-4');
+  });
 });
 
 describe('formatScaled', () => {

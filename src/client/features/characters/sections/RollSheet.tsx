@@ -23,6 +23,7 @@ import { AppIcon } from '../../../components/ui/AppIcon.tsx';
  */
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { formatDamageDice } from '../../../../shared/constants/damage.ts';
 import { minBasicDamageFor } from '../../../../shared/domain/damageParse.ts';
 import {
@@ -207,7 +208,10 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     });
   }
 
-  return (
+  // Portaled to <body>: rendered in place, the fixed overlay is trapped in
+  // <main>'s stacking context and the sticky app header covers its top,
+  // including the Close button.
+  return createPortal(
     <div
       className="modal-back roll-sheet-back"
       // biome-ignore lint/a11y/useSemanticElements: fixed-position aria-roled div, same
@@ -405,6 +409,7 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

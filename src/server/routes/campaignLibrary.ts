@@ -23,7 +23,7 @@ import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { eq, type sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
 import { campaignUpdate } from '../../shared/schemas/campaign.ts';
@@ -475,7 +475,4 @@ router.openapi(
   },
 );
 
-// Touch the unused sql tag so biome doesn't complain when this file
-// imports it for potential future use.
-export const _internalLibrarySql: typeof sql | undefined = undefined;
 export const campaignLibraryRouter = router;

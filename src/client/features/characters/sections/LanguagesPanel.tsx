@@ -14,6 +14,7 @@ import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
+import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityEnumField,
   useEntityNameField,
@@ -213,9 +214,6 @@ interface LanguageRowProps {
 }
 
 function LanguageRow({ characterId, language, canWrite }: LanguageRowProps) {
-  const toasts = useToasts();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   const rowPatch = useEntityRowPatch('character_language', language.id, characterId, language.name);
 
   const nameField = useEntityNameField(rowPatch, language.name);
@@ -241,19 +239,13 @@ function LanguageRow({ characterId, language, canWrite }: LanguageRowProps) {
     return n;
   });
 
-  const removeLanguage = async () => {
-    try {
-      await enqueueDelete({
-        entityClass: 'character_language',
-        entityId: language.id,
-        humanName: `language "${language.name}"`,
-        characterId,
-        prevValue: language,
-      });
-    } catch (err) {
-      toasts.push(`Couldn't delete language — ${(err as Error).message}`, { kind: 'error' });
-    }
-  };
+  const deletion = useConfirmedEntityDelete({
+    entityClass: 'character_language',
+    noun: 'language',
+    label: language.name,
+    entity: language,
+    characterId,
+  });
 
   return (
     <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_4rem_auto] sm:items-center sm:gap-2 sm:py-2">
@@ -320,23 +312,13 @@ function LanguageRow({ characterId, language, canWrite }: LanguageRowProps) {
         <button
           type="button"
           className="btn btn-ghost btn-xs justify-self-end self-end sm:self-center"
-          onClick={() => setConfirmDelete(true)}
+          onClick={deletion.request}
           aria-label={`Delete language ${language.name}`}
         >
           ✕
         </button>
       )}
-      <ConfirmDialog
-        open={confirmDelete}
-        title={`Delete language "${language.name}"?`}
-        confirmLabel="Delete"
-        tone="error"
-        onConfirm={() => {
-          setConfirmDelete(false);
-          void removeLanguage();
-        }}
-        onCancel={() => setConfirmDelete(false)}
-      />
+      {deletion.dialog}
     </li>
   );
 }

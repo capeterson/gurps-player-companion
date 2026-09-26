@@ -17,6 +17,7 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
@@ -420,7 +421,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                         ...(ranged.acc != null || accuracyEffects.length > 0
                           ? [
                               {
-                                label: `Aim (${accuracy >= 0 ? '+' : ''}${accuracy})`,
+                                label: `Aim (${formatSigned(accuracy)})`,
                                 mod: accuracy,
                               },
                             ]
