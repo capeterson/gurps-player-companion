@@ -538,13 +538,15 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   registering once per case. Prefer authenticated fixtures where isolation
   permits, but never share mutable accounts or pages across parallel workers.
   Create only the minimum users required for worker isolation and the behavior,
-  and never clear or bypass the rate limiter just to make a test pass.
-  The one exception is interactive debugging: when no other tool is
-  reasonably viable (for example, logging into an existing account or a
-  unit-level reproduction cannot expose the problem), a local worktree stack's
-  limiter may be bypassed temporarily as a debugging hack. Never commit that
-  bypass, never use it in a test or CI, and restore normal limits before
-  running the validation suite.
+  and never clear the rate limiter or change a test to dodge it.
+  **Local in-development runs may raise the limits.** For local debugging and
+  local Playwright runs during development (including the pre-handoff browser
+  pass), start a temporary server for your own worktree with raised
+  `AUTH_RATE_LIMIT_*_MAX` values set through its environment, rather than
+  waiting out rate-limit windows. Never commit raised limits (code, compose
+  files, or config), and tear the temporary server down afterwards. **Never raise
+  or bypass limits for CI, the image-promotion gate, or any production or
+  shared deployment**; those always run with the real limits.
 - **Test what the user sees.** UI regressions MUST assert the exact visible
   labels, controls, states, and interaction results involved. CSS classes,
   helper math, `data-*` markers, and hidden/proxy elements may support a test,
