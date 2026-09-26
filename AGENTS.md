@@ -505,6 +505,15 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   `./scripts/dev-worktree.sh --profile test run --rm client-tests`. Vitest
   requires real Node 22; Bun's `node` fallback cannot run it.
 - Frontend HMR runs through the same Bun process via Vite middleware.
+- Playwright starts Chromium with `--disable-dev-shm-usage`, so its
+  shared-memory buffers live in `$TMPDIR` (default `/tmp`). On hosts where
+  `/tmp` is a small or per-user-quota tmpfs, browser runs against the Vite dev
+  server (hundreds of unbundled modules per page load) exhaust it after a few
+  full navigations: module loads fail with `net::ERR_INSUFFICIENT_RESOURCES`,
+  the page stays blank, and the browser can close mid-test, while the built
+  server passes. Point `TMPDIR` at disk-backed storage for local Playwright
+  runs (for example `TMPDIR=$HOME/.cache/pw-tmp`). Don't clear other people's
+  or tools' files out of `/tmp` to make room.
 
 ## Test discipline
 
