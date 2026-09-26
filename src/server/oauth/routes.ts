@@ -28,6 +28,7 @@ import { type AppEnv, createOpenApiApp, errorResponse } from '../openapi/app.ts'
 import { ClientRegistrationError } from './clientRegistration.ts';
 import {
   OAuthError,
+  RecentAuthenticationRequiredError,
   beginAuthorization,
   exchangeAuthorizationCode,
   finishAuthorization,
@@ -375,6 +376,7 @@ export function createOAuthAccountRouter(config: AppConfig) {
         },
         400: errorResponse('Invalid authorization request'),
         401: errorResponse('Unauthorized'),
+        403: errorResponse('Recent authentication required'),
       },
     }),
     async (c) => {
@@ -392,6 +394,9 @@ export function createOAuthAccountRouter(config: AppConfig) {
           200,
         );
       } catch (error) {
+        if (error instanceof RecentAuthenticationRequiredError) {
+          return c.json({ error: error.message }, 403);
+        }
         if (error instanceof OAuthError) {
           return c.json({ error: oauthFailure(error).error_description }, 400);
         }

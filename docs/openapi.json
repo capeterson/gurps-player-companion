@@ -116605,6 +116605,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Recent authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       },

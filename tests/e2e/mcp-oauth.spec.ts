@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { type Page, expect, test } from '@playwright/test';
+import { SignJWT, decodeJwt } from 'jose';
 import { selectCharacterSection } from './character-navigation';
 
 /**
@@ -21,6 +22,7 @@ const REDIRECT_URI =
   process.env.MCP_E2E_REDIRECT_URI ?? new URL('/oauth/callback', BASE_URL).toString();
 const RESOURCE = new URL('/mcp', BASE_URL).toString();
 const PASSWORD = 'CorrectHorseBatteryStaple1';
+const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-only-secret-replace-me-replace-me-replace-me';
 
 interface AuthorizationAttempt {
   readonly state: string;
@@ -89,6 +91,34 @@ async function requireBuiltServiceWorker(page: Page): Promise<void> {
       timeout: 15_000,
     })
     .toBe(true);
+}
+
+async function makeBrowserSessionStale(page: Page): Promise<void> {
+  const stored = await page.evaluate(() => localStorage.getItem('gpc.tokenPair.v1'));
+  if (!stored) throw new Error('registered browser session is missing');
+  const pair = JSON.parse(stored) as { accessToken: string } & Record<string, unknown>;
+  const current = decodeJwt(pair.accessToken);
+  if (typeof current.sub !== 'string') throw new Error('browser access token is missing its user');
+  const now = Math.floor(Date.now() / 1000);
+  const staleAccessToken = await new SignJWT({
+    type: 'access',
+    av: Number.isInteger(current.av) ? Number(current.av) : 0,
+    auth_time: now - 601,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(current.sub)
+    .setIssuedAt(now)
+    .setExpirationTime(now + 15 * 60)
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  await page.evaluate(
+    ({ original, accessToken }) => {
+      localStorage.setItem(
+        'gpc.tokenPair.v1',
+        JSON.stringify({ ...(JSON.parse(original) as object), accessToken }),
+      );
+    },
+    { original: stored, accessToken: staleAccessToken },
+  );
 }
 
 async function beginAuthorization(page: Page, attempt: AuthorizationAttempt): Promise<void> {
@@ -168,17 +198,14 @@ test.describe('delegated MCP OAuth acceptance', () => {
     await register(page, email);
     await requireBuiltServiceWorker(page);
 
-    // Exercise the actual browser login return path instead of carrying the
-    // registration session directly into consent.
-    await page.evaluate(() => {
-      localStorage.removeItem('gpc.tokenPair.v1');
-      localStorage.removeItem('gpc.access');
-      localStorage.removeItem('gpc.refresh');
-    });
+    // A valid but no-longer-recent browser session must return to login before
+    // any consent controls render, while retaining the complete OAuth request.
+    await makeBrowserSessionStale(page);
 
     const denied = pkceAttempt();
     await page.goto(denied.url);
     await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole('button', { name: 'Authorize', exact: true })).toHaveCount(0);
     await page.getByLabel(/email/i).fill(email);
     await page.getByLabel(/^password$/i).fill(PASSWORD);
     await page.getByRole('button', { name: /sign in/i }).click();
