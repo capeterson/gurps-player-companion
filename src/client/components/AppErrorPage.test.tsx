@@ -44,6 +44,7 @@ describe('AppErrorPage', () => {
     expect(screen.getByText(/^gpcerr_/)).toBeInTheDocument();
     expect(screen.getByText('/missing-page')).toBeInTheDocument();
     expect(screen.queryByText('User ID')).not.toBeInTheDocument();
+    expect(container.querySelector('img[src="/icon-256.png"]')).toBeVisible();
     expect(container.querySelector('.arcane-edge')).not.toBeNull();
     await waitFor(() => expect(console.error).toHaveBeenCalled());
   });

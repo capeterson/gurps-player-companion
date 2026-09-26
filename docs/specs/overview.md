@@ -832,6 +832,10 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   local-first outbox. REST and sync use the same central write decision.
 
 ### Cross-cutting UI
+- **Shared app mark**: the opaque charcoal-and-gold die/book mark is the favicon,
+  installable-PWA artwork, and visible brand icon in player, admin, and error
+  chrome. `BrandMark.tsx` owns the in-app rendering so those surfaces do not
+  drift back to separate letter marks.
 - **Navigational breadcrumbs** (persistent header): character detail shows
   `Character › <character name>`. Campaign detail shows
   `Campaign › <campaign name>`; campaign library, GM, and encounter routes add
@@ -974,6 +978,7 @@ src/
                  sync row lookup/writes (UI source of truth),
                   plus per-character device-only solo tracker scratchpads
     components/ui/AppIcon.tsx  Shared Lucide icon names, size and stroke conventions
+    components/ui/BrandMark.tsx  Shared app mark used by player/admin/error chrome
     components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker
                  and campaign-first suggestion merge
     components/ui/QueryReadError.tsx  Shared retryable online-read error
@@ -1032,6 +1037,11 @@ docs/
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked)
+plugins/
+  gurps-player-companion-dev/  Portable ChatGPT/Codex plugin package for the
+                               public development MCP endpoint, including its
+                               private registered-app mapping and a production-
+                               publishing readiness checklist
 bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign
   lantern_coast.yaml    Rich Lantern Coast library; bootstrap/README.md lists demo accounts

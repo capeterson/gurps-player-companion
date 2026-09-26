@@ -136,7 +136,10 @@ serialized copy. Failed calls retain their complete domain error text and
 structured payload, including field errors, conflicts and retry guidance;
 protocol failures and OAuth failures retain their protocol/HTTP meanings. Set
 read-only, destructive, and idempotency annotations accurately; annotations are
-hints, not enforcement.
+hints, not enforcement. Account- and campaign-bounded operations advertise
+`openWorldHint: false` even though the service is remotely hosted. The campaign
+invitation tool alone advertises `openWorldHint: true` because it sends email to
+an arbitrary external recipient.
 See [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
 
 ### Drift must fail CI
@@ -185,6 +188,8 @@ MCP request IDs are not mutation deduplication keys. Define a shared mutation
 idempotency contract for REST and MCP: persist the key, actor/client, operation,
 input fingerprint, and outcome transactionally; identical retries replay the
 outcome, differing input rejects key reuse. Set a documented retention window.
+Only mutation tools advertise the optional `idempotencyKey` input; read tools do
+not expose a meaningless retry field.
 Test lost-response retries for create, import, XP awards, and turn advancement.
 Use existing revision/turn checks; any added precondition must be shared by REST
 and MCP. Never silently retry a conflict with freshly fetched values. Return a
@@ -304,6 +309,14 @@ repeated at token exchange. Public clients use authorization code with PKCE S256
 and no secret. Direct browser clients must also list their origin in
 `CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth requests do not require a
 CORS entry.
+
+The checked-in `plugins/gurps-player-companion-dev/` portable plugin package is
+bound only to `https://gurps-dev.abundant.zip/mcp` and is for developer-mode and
+local package testing. It deliberately uses a `-dev` identity. The public
+production plugin must be created separately against
+`https://gurps.abundant.zip/mcp`; a published MCP origin cannot be promoted from
+the dev hostname to production in place. The package's `PUBLISHING.md` tracks
+the remaining directory-review prerequisites and metadata risks.
 
 Client setup uses the `/mcp` resource URL. Discovery supplies the authorization
 server and endpoints. The client sends its registered ID, exact callback,

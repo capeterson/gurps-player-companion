@@ -13,6 +13,7 @@ const policy: IncludedOperation = {
   tool: 'example',
   scope: 'gpc:write',
   destructive: false,
+  openWorld: false,
   handler: 'shared-openapi-handler',
   schemaSource: 'openapi-zod-registry',
   resultMode: 'compact-mutation-ack',
@@ -211,6 +212,10 @@ describe('MCP canonical schema conversion', () => {
         query: { section: 'skills', search: 'spear', limit: 10, offset: 20 },
       }),
     ).toBe(true);
+    expect(library.inputSchema.properties).not.toHaveProperty('idempotencyKey');
+    const create = tools.find((entry) => entry.policy.tool === 'gpc_create_character');
+    if (!create) throw new Error('missing gpc_create_character');
+    expect(create.inputSchema.properties).toHaveProperty('idempotencyKey');
   });
 
   test('preserves nullable refs, unconstrained values, enums and exclusive numeric bounds', () => {

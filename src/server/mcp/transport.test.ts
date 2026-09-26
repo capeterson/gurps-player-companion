@@ -156,6 +156,19 @@ describe('MCP protocol and OAuth transport', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
+  test('marks only email invitations as open-world operations', () => {
+    const annotations = new Map(
+      buildToolCatalog(document).map((tool) => [
+        tool.policy.tool,
+        describeMcpTool(tool).annotations,
+      ]),
+    );
+    expect(annotations.get('gpc_list_characters')?.openWorldHint).toBe(false);
+    expect(annotations.get('gpc_update_character')?.openWorldHint).toBe(false);
+    expect(annotations.get('gpc_add_campaign_member')?.openWorldHint).toBe(false);
+    expect(annotations.get('gpc_invite_campaign_member')?.openWorldHint).toBe(true);
+  });
+
   test('stateless SDK supports successive list/call requests and typed output', async () => {
     const fixture = handler();
     expect((await fixture.handle(request(listing))).status).toBe(200);

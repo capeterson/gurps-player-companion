@@ -6,6 +6,7 @@ import { CharacterHeaderChromeContext } from './components/CharacterHeaderChrome
 import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { AppIcon } from './components/ui/AppIcon.tsx';
+import { BrandMark } from './components/ui/BrandMark.tsx';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
@@ -225,12 +226,7 @@ export function App() {
         >
           <div className="app-header-normal flex min-w-0 items-center gap-3 sm:gap-6">
             <Link to="/" className="flex items-center gap-2 no-cap sm:gap-3">
-              <span
-                aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-primary font-display text-base font-bold text-primary-content"
-              >
-                G
-              </span>
+              <BrandMark />
               <span className="hidden font-display text-base font-semibold sm:inline">
                 Player Companion
               </span>

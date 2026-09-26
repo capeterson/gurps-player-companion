@@ -102,6 +102,7 @@ function bundled(schema: JsonSchema, definitions: Record<string, JsonSchema>): J
 function requestSchema(
   operation: OpenApiOperation,
   definitions: Record<string, JsonSchema>,
+  policy: IncludedOperation,
 ): JsonSchema {
   const properties: JsonSchema = {};
   const required: string[] = [];
@@ -132,12 +133,14 @@ function requestSchema(
     properties.body = content.schema;
     if (operation.requestBody?.required) required.push('body');
   }
-  properties.idempotencyKey = {
-    type: 'string',
-    minLength: 1,
-    maxLength: 200,
-    description: 'Stable mutation retry key. Reuse only with identical input.',
-  };
+  if (policy.method !== 'GET') {
+    properties.idempotencyKey = {
+      type: 'string',
+      minLength: 1,
+      maxLength: 200,
+      description: 'Stable mutation retry key. Reuse only with identical input.',
+    };
+  }
   return bundled(
     { type: 'object', properties, required, additionalProperties: false },
     definitions,
@@ -296,7 +299,7 @@ export function buildToolCatalog(
         entry.route?.method.toUpperCase() === policy.method &&
         entry.route.path === policy.path,
     )?.route;
-    const inputSchema = requestSchema(operation, definitions);
+    const inputSchema = requestSchema(operation, definitions, policy);
     const output = outputSchema(operation, definitions, policy);
     // Compile the advertised output too: a valid response validator is not
     // enough if clients cannot compile the actual tools/list definition.

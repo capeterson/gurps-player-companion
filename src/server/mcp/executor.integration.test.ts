@@ -15,6 +15,7 @@ const operation: IncludedOperation = {
   tool: 'gpc_test_operation',
   scope: 'gpc:write',
   destructive: false,
+  openWorld: false,
   handler: 'shared-openapi-handler',
   schemaSource: 'openapi-zod-registry',
   resultMode: 'compact-mutation-ack',
