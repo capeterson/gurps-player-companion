@@ -483,10 +483,6 @@ export function operationKey(method: string, path: string): string {
   return `${method.toUpperCase()} ${path}`;
 }
 
-export const POLICY_BY_KEY = new Map(
-  OPERATION_POLICY.map((entry) => [operationKey(entry.method, entry.path), entry]),
-);
-
 export const TOOLS = OPERATION_POLICY.filter(
   (entry): entry is IncludedOperation => entry.kind === 'tool',
 );

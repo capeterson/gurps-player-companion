@@ -32,8 +32,6 @@ import {
 import { requireActiveUser } from '../auth/middleware.ts';
 import { getDb } from '../db/client.ts';
 import {
-  type DbCampaign,
-  type DbCampaignMembership,
   type DbCharacter,
   campaignMemberships,
   campaigns,
@@ -872,13 +870,5 @@ function serializeRow(data: unknown): unknown {
   }
   return out;
 }
-
-// Touch unused-import noise so biome doesn't complain.
-export const _internalCampaign: typeof campaigns | undefined = undefined as
-  | typeof campaigns
-  | undefined;
-export const _internalDbCampaign: DbCampaign | undefined = undefined;
-export const _internalDbMembership: DbCampaignMembership | undefined = undefined;
-export const _internalDbCharacter: DbCharacter | undefined = undefined;
 
 export const syncRouter = router;
