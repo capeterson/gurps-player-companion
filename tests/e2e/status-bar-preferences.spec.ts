@@ -131,7 +131,22 @@ test('user preferences control the Current Status height and visible controls at
       }
       await page.keyboard.press('Escape');
       await expect(menu).toBeHidden();
-      if (width === 320) {
+      // The extreme-value check seeds local rows through the app's own Dexie
+      // module, which only the Vite dev server serves as source. A built
+      // server answers that path with the SPA shell instead.
+      const devSourceServed =
+        width === 320 &&
+        (await page.evaluate(async () => {
+          const response = await fetch('/db/dexie.ts');
+          return /javascript/.test(response.headers.get('content-type') ?? '');
+        }));
+      if (width === 320 && !devSourceServed) {
+        test.info().annotations.push({
+          type: 'skip-step',
+          description: 'extreme HP/FP seeding needs the dev server source modules',
+        });
+      }
+      if (devSourceServed) {
         await page.evaluate(async () => {
           await import('/db/dexie.ts');
         });
