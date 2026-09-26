@@ -28,9 +28,9 @@ import { computeDerived } from '../../shared/domain/characterCalc.ts';
 import { characterCreate, characterSyncPatch } from '../../shared/schemas/character.ts';
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
-import { languageCreate, languageUpdate } from '../../shared/schemas/language.ts';
-import { skillCreate, skillUpdate } from '../../shared/schemas/skill.ts';
-import { spellCreate, spellUpdate } from '../../shared/schemas/spell.ts';
+import { languageUpdate } from '../../shared/schemas/language.ts';
+import { skillUpdate } from '../../shared/schemas/skill.ts';
+import { spellUpdate } from '../../shared/schemas/spell.ts';
 import {
   type EntityClass,
   LIBRARY_ENTITY_CLASSES,
@@ -39,8 +39,8 @@ import {
   type OperationOutcome,
   isLibraryEntityClass,
 } from '../../shared/schemas/sync.ts';
-import { techniqueCreate, techniqueUpdate } from '../../shared/schemas/technique.ts';
-import { traitCreate, traitUpdate } from '../../shared/schemas/trait.ts';
+import { techniqueUpdate } from '../../shared/schemas/technique.ts';
+import { traitUpdate } from '../../shared/schemas/trait.ts';
 import {
   type CharacterAccess,
   assertWrite,
@@ -54,11 +54,6 @@ import { isUniqueViolation } from '../db/errors.ts';
 import {
   campaignMemberships,
   campaigns,
-  characterLanguages,
-  characterSkills,
-  characterSpells,
-  characterTechniques,
-  characterTraits,
   characters,
   combatStates,
   inventoryItems,
@@ -74,16 +69,21 @@ import {
   assertAttributeCaps,
   touchesAttributeCaps,
 } from './attributeCapValidation.ts';
+import {
+  type AnyLibraryLinkedChild,
+  CHARACTER_CHILD_TABLES,
+  LIBRARY_LINKED_CHILDREN,
+  type LibraryLinkedChildClass,
+  childRowWhere,
+  deleteCharacterChild,
+  insertCharacterChild,
+  isCharacterChildClass,
+} from './characterChildren.ts';
 import { characterAttrsFromRow } from './characterSummary.ts';
 import {
   characterInsertValues,
   combatUpsertValues,
   inventoryInsertValues,
-  languageInsertValues,
-  skillInsertValues,
-  spellInsertValues,
-  techniqueInsertValues,
-  traitInsertValues,
 } from './entityWrites.ts';
 import { publishLibraryInvalidation } from './libraryInvalidation.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
@@ -491,79 +491,17 @@ async function resolveReplayedCreate(
         const [row] = await db.select().from(characters).where(eq(characters.id, op.entityId));
         return row && row.ownerId === userId ? appliedOutcome(op, Number(row.revision)) : null;
       }
-      case 'character_trait': {
-        const characterId = requireParentId(op);
-        assertWrite(await loadCharacterOr403(characterId, userId));
-        const [row] = await db
-          .select()
-          .from(characterTraits)
-          .where(
-            and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
-          );
-        return row ? appliedOutcome(op, Number(row.revision)) : null;
-      }
-      case 'character_skill': {
-        const characterId = requireParentId(op);
-        assertWrite(await loadCharacterOr403(characterId, userId));
-        const [row] = await db
-          .select()
-          .from(characterSkills)
-          .where(
-            and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
-          );
-        return row ? appliedOutcome(op, Number(row.revision)) : null;
-      }
-      case 'character_spell': {
-        const characterId = requireParentId(op);
-        assertWrite(await loadCharacterOr403(characterId, userId));
-        const [row] = await db
-          .select()
-          .from(characterSpells)
-          .where(
-            and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
-          );
-        return row ? appliedOutcome(op, Number(row.revision)) : null;
-      }
-      case 'character_language': {
-        const characterId = requireParentId(op);
-        assertWrite(await loadCharacterOr403(characterId, userId));
-        const [row] = await db
-          .select()
-          .from(characterLanguages)
-          .where(
-            and(
-              eq(characterLanguages.id, op.entityId),
-              eq(characterLanguages.characterId, characterId),
-            ),
-          );
-        return row ? appliedOutcome(op, Number(row.revision)) : null;
-      }
-      case 'character_technique': {
-        const characterId = requireParentId(op);
-        assertWrite(await loadCharacterOr403(characterId, userId));
-        const [row] = await db
-          .select()
-          .from(characterTechniques)
-          .where(
-            and(
-              eq(characterTechniques.id, op.entityId),
-              eq(characterTechniques.characterId, characterId),
-            ),
-          );
-        return row ? appliedOutcome(op, Number(row.revision)) : null;
-      }
-      case 'character_inventory': {
-        const characterId = requireParentId(op);
-        assertWrite(await loadCharacterOr403(characterId, userId));
-        const [row] = await db
-          .select()
-          .from(inventoryItems)
-          .where(
-            and(eq(inventoryItems.id, op.entityId), eq(inventoryItems.characterId, characterId)),
-          );
-        return row ? appliedOutcome(op, Number(row.revision)) : null;
-      }
       default: {
+        if (isCharacterChildClass(op.entityClass)) {
+          const characterId = requireParentId(op);
+          assertWrite(await loadCharacterOr403(characterId, userId));
+          const table = CHARACTER_CHILD_TABLES[op.entityClass];
+          const [row] = await db
+            .select({ revision: table.revision })
+            .from(table)
+            .where(childRowWhere(table, characterId, op.entityId));
+          return row ? appliedOutcome(op, Number(row.revision)) : null;
+        }
         if (!isLibraryEntityClass(op.entityClass)) {
           // character_combat creates are upserts (no unique violation);
           // other classes have no create dispatcher.
@@ -598,15 +536,11 @@ async function dispatchOperationInner(
     case 'character':
       return dispatchCharacter(ctx, op, tx);
     case 'character_trait':
-      return dispatchTrait(ctx, op, tx);
     case 'character_skill':
-      return dispatchSkill(ctx, op, tx);
     case 'character_spell':
-      return dispatchSpell(ctx, op, tx);
     case 'character_language':
-      return dispatchLanguage(ctx, op, tx);
     case 'character_technique':
-      return dispatchTechnique(ctx, op, tx);
+      return dispatchCharacterChild(ctx, op, tx, op.entityClass);
     case 'character_inventory':
       return dispatchInventory(ctx, op, tx);
     case 'character_combat':
@@ -822,289 +756,49 @@ async function dispatchLibrary(
   return appliedOutcome(op, Number((result.row as { revision: unknown }).revision));
 }
 
-// ---------- character_trait ----------
+// ---------- library-linked children (trait/skill/spell/language/technique) ----------
 
-async function dispatchTrait(
+async function dispatchCharacterChild(
   ctx: DispatchContext,
   op: OperationEnvelope,
   tx: AuditTx,
+  entityClass: LibraryLinkedChildClass,
 ): Promise<OperationOutcome> {
+  const cfg: AnyLibraryLinkedChild = LIBRARY_LINKED_CHILDREN[entityClass];
   return dispatchLibraryChild(ctx, op, tx, {
     create: async (characterId) => {
-      const body = traitCreate.parse(op.attemptedValue);
-      const [created] = await tx
-        .insert(characterTraits)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'traits',
-            traitInsertValues(body, { characterId, id: op.entityId }),
-          ),
-        )
-        .returning();
-      if (!created) throw new HTTPException(500, { message: 'insert failed' });
+      const body = cfg.createSchema.parse(op.attemptedValue);
+      const created = await insertCharacterChild(
+        tx,
+        ctx.userId,
+        cfg,
+        characterId,
+        body,
+        op.entityId,
+      );
       return Number(created.revision);
     },
     remove: async (characterId) => {
-      await tx
-        .delete(characterTraits)
-        .where(
-          and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
-        );
+      await deleteCharacterChild(tx, cfg, characterId, op.entityId);
     },
     patch: async (characterId) =>
       patchEntity({
         op,
         userId: ctx.userId,
-        entityClass: 'character_trait',
+        entityClass,
         tx,
-        table: characterTraits,
+        table: cfg.table,
         prepareUpdates: async (updates) => {
           await prepareLibraryReference(
             tx,
             ctx.userId,
             characterId,
-            'traits',
+            cfg.referenceKind,
             updates,
             op.entityId,
           );
         },
-        childWhere: () =>
-          and(eq(characterTraits.id, op.entityId), eq(characterTraits.characterId, characterId)),
-      }),
-  });
-}
-
-// ---------- character_skill ----------
-
-async function dispatchSkill(
-  ctx: DispatchContext,
-  op: OperationEnvelope,
-  tx: AuditTx,
-): Promise<OperationOutcome> {
-  return dispatchLibraryChild(ctx, op, tx, {
-    create: async (characterId) => {
-      const body = skillCreate.parse(op.attemptedValue);
-      const [created] = await tx
-        .insert(characterSkills)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'skills',
-            skillInsertValues(body, { characterId, id: op.entityId }),
-          ),
-        )
-        .returning();
-      if (!created) throw new HTTPException(500, { message: 'insert failed' });
-      return Number(created.revision);
-    },
-    remove: async (characterId) => {
-      await tx
-        .delete(characterSkills)
-        .where(
-          and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
-        );
-    },
-    patch: async (characterId) =>
-      patchEntity({
-        op,
-        userId: ctx.userId,
-        entityClass: 'character_skill',
-        tx,
-        table: characterSkills,
-        prepareUpdates: async (updates) => {
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'skills',
-            updates,
-            op.entityId,
-          );
-        },
-        childWhere: () =>
-          and(eq(characterSkills.id, op.entityId), eq(characterSkills.characterId, characterId)),
-      }),
-  });
-}
-
-// ---------- character_spell ----------
-
-async function dispatchSpell(
-  ctx: DispatchContext,
-  op: OperationEnvelope,
-  tx: AuditTx,
-): Promise<OperationOutcome> {
-  return dispatchLibraryChild(ctx, op, tx, {
-    create: async (characterId) => {
-      const body = spellCreate.parse(op.attemptedValue);
-      const [created] = await tx
-        .insert(characterSpells)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'spells',
-            spellInsertValues(body, { characterId, id: op.entityId }),
-          ),
-        )
-        .returning();
-      if (!created) throw new HTTPException(500, { message: 'insert failed' });
-      return Number(created.revision);
-    },
-    remove: async (characterId) => {
-      await tx
-        .delete(characterSpells)
-        .where(
-          and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
-        );
-    },
-    patch: async (characterId) =>
-      patchEntity({
-        op,
-        userId: ctx.userId,
-        entityClass: 'character_spell',
-        tx,
-        table: characterSpells,
-        prepareUpdates: async (updates) => {
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'spells',
-            updates,
-            op.entityId,
-          );
-        },
-        childWhere: () =>
-          and(eq(characterSpells.id, op.entityId), eq(characterSpells.characterId, characterId)),
-      }),
-  });
-}
-
-// ---------- character_language ----------
-
-async function dispatchLanguage(
-  ctx: DispatchContext,
-  op: OperationEnvelope,
-  tx: AuditTx,
-): Promise<OperationOutcome> {
-  return dispatchLibraryChild(ctx, op, tx, {
-    create: async (characterId) => {
-      const body = languageCreate.parse(op.attemptedValue);
-      const [created] = await tx
-        .insert(characterLanguages)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'languages',
-            languageInsertValues(body, { characterId, id: op.entityId }),
-          ),
-        )
-        .returning();
-      if (!created) throw new HTTPException(500, { message: 'insert failed' });
-      return Number(created.revision);
-    },
-    remove: async (characterId) => {
-      await tx
-        .delete(characterLanguages)
-        .where(
-          and(
-            eq(characterLanguages.id, op.entityId),
-            eq(characterLanguages.characterId, characterId),
-          ),
-        );
-    },
-    patch: async (characterId) =>
-      patchEntity({
-        op,
-        userId: ctx.userId,
-        entityClass: 'character_language',
-        tx,
-        table: characterLanguages,
-        prepareUpdates: async (updates) => {
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'languages',
-            updates,
-            op.entityId,
-          );
-        },
-        childWhere: () =>
-          and(
-            eq(characterLanguages.id, op.entityId),
-            eq(characterLanguages.characterId, characterId),
-          ),
-      }),
-  });
-}
-
-// ---------- character_technique ----------
-
-async function dispatchTechnique(
-  ctx: DispatchContext,
-  op: OperationEnvelope,
-  tx: AuditTx,
-): Promise<OperationOutcome> {
-  return dispatchLibraryChild(ctx, op, tx, {
-    create: async (characterId) => {
-      const body = techniqueCreate.parse(op.attemptedValue);
-      const [created] = await tx
-        .insert(characterTechniques)
-        .values(
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'techniques',
-            techniqueInsertValues(body, { characterId, id: op.entityId }),
-          ),
-        )
-        .returning();
-      if (!created) throw new HTTPException(500, { message: 'insert failed' });
-      return Number(created.revision);
-    },
-    remove: async (characterId) => {
-      await tx
-        .delete(characterTechniques)
-        .where(
-          and(
-            eq(characterTechniques.id, op.entityId),
-            eq(characterTechniques.characterId, characterId),
-          ),
-        );
-    },
-    patch: async (characterId) =>
-      patchEntity({
-        op,
-        userId: ctx.userId,
-        entityClass: 'character_technique',
-        tx,
-        table: characterTechniques,
-        prepareUpdates: async (updates) => {
-          await prepareLibraryReference(
-            tx,
-            ctx.userId,
-            characterId,
-            'techniques',
-            updates,
-            op.entityId,
-          );
-        },
-        childWhere: () =>
-          and(
-            eq(characterTechniques.id, op.entityId),
-            eq(characterTechniques.characterId, characterId),
-          ),
+        childWhere: () => childRowWhere(cfg.table, characterId, op.entityId),
       }),
   });
 }

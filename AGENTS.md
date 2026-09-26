@@ -326,7 +326,10 @@ A new sync-participating entity class MUST be added to **all** of:
 5. The server dispatcher in
    [src/server/services/syncDispatch.ts](src/server/services/syncDispatch.ts)
    and the cursor reader in
-   [src/server/routes/sync.ts](src/server/routes/sync.ts).
+   [src/server/routes/sync.ts](src/server/routes/sync.ts). An id-keyed
+   character child also goes in `CHARACTER_CHILD_TABLES` (and, when
+   library-linked, `LIBRARY_LINKED_CHILDREN`) in
+   [src/server/services/characterChildren.ts](src/server/services/characterChildren.ts).
 6. The purge list in `orchestrator.purge` so logout wipes it.
 7. A tombstone trigger on the table, so deletes reach other devices.
 8. Envelope `parentId`: the parent **character** id for character
