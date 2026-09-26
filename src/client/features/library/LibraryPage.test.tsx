@@ -293,7 +293,11 @@ it('creates and deletes a trait through the outbox', async () => {
     expect(screen.queryByRole('button', { name: 'Night Vision' })).not.toBeInTheDocument(),
   );
   await waitFor(() => expect(dialog).not.toBeVisible());
-  const ops = await getLocalDb().outbox.toArray();
+  // Primary keys are random UUIDs; order by enqueue time, then command, as the drain does.
+  const rank = { create: 0, patch: 1, delete: 2 } as const;
+  const ops = (await getLocalDb().outbox.toArray()).sort(
+    (a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt) || rank[a.command] - rank[b.command],
+  );
   expect(ops.map((op) => [op.command, op.parentId])).toEqual([
     ['create', CAMPAIGN],
     ['delete', CAMPAIGN],
