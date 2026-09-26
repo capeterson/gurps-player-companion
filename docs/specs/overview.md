@@ -939,7 +939,8 @@ src/
                  libraryTablePreferences, useLibraryGroupFolds, librarySearch
                  (cached human-readable-field matcher), plus EffectsEditor, the
                  reusable ordered effect authoring UI shared with
-                 character-owned trait mechanics
+                 character-owned trait mechanics, and LibraryFormFooter
+                 (the Cancel/Add-or-Save actions every entry form shares)
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
       characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
@@ -957,6 +958,7 @@ src/
                  useAddEntityForm
                  (the add form), useEntityRowPatch (per-row field patch
                  dispatch, incl. useEntityEnumField for enum <select>s),
+                 useConfirmedEntityDelete (row delete confirmation),
                  useClampedJsonbBumper (powerstone/magic-item charge
                   steppers), useTempEffects (the temporary-effects list
                   backing the Attributes panel's modifier popovers), shared
