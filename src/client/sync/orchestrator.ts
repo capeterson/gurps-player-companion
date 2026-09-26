@@ -41,6 +41,7 @@ import {
   type OutboxEntry,
   type RejectionRecord,
   SYNCED_ENTITY_CLASSES,
+  type TombstoneRow,
   coalesceKey,
   getLocalDb,
   storeForEntityClass,
@@ -87,6 +88,16 @@ import {
 } from './syncLog.ts';
 
 const ALL_ENTITY_CLASSES: readonly EntityClass[] = SYNCED_ENTITY_CLASSES;
+
+interface ServerRowOptions {
+  readonly ignoreOutboxConflict?: boolean;
+  /** The local row and tombstone the caller already read for this entity. */
+  readonly known?: {
+    readonly entityId: string;
+    readonly row: Record<string, unknown> | undefined;
+    readonly tombstone: TombstoneRow | undefined;
+  };
+}
 
 /** A whole-entry patch (AGENTS.md S13): no fieldPath, the full body in attemptedValue. */
 function isEntityPatch(op: OutboxEntry): boolean {
@@ -1532,7 +1543,9 @@ class SyncOrchestrator {
             });
           }
         } else if (!staleChange && change.data && typeof change.data === 'object') {
-          await this.applyServerRow(change.entityClass, change.data as Record<string, unknown>, {});
+          await this.applyServerRow(change.entityClass, change.data as Record<string, unknown>, {
+            known: { entityId: change.entityId, row: before, tombstone: priorTombstone },
+          });
         }
         const after = await this.readLocalEntity(change.entityClass, change.entityId);
         pullLogEntries.push(pullLogEntry(change, before, after));
@@ -1722,7 +1735,7 @@ class SyncOrchestrator {
   private async applyServerRow(
     entityClass: EntityClass,
     row: Record<string, unknown>,
-    opts: { ignoreOutboxConflict?: boolean },
+    opts: ServerRowOptions,
   ): Promise<void> {
     const db = getLocalDb();
     await db.transaction(
@@ -1743,7 +1756,7 @@ class SyncOrchestrator {
   private async mergeServerRow(
     entityClass: EntityClass,
     row: Record<string, unknown>,
-    opts: { ignoreOutboxConflict?: boolean },
+    opts: ServerRowOptions,
   ): Promise<void> {
     const db = getLocalDb();
     const id =
@@ -1751,9 +1764,12 @@ class SyncOrchestrator {
         ? (row.characterId as string | undefined)
         : (row.id as string | undefined);
     if (!id) return;
-    const existingRow = await this.readLocalEntity(entityClass, id);
+    // A cursor page already read this row and its tombstone in the same
+    // transaction; reuse them instead of reading each twice more.
+    const known = opts.known?.entityId === id ? opts.known : undefined;
+    const existingRow = known ? known.row : await this.readLocalEntity(entityClass, id);
     const incomingRevision = row.revision;
-    const tombstone = await db.tombstones.get([entityClass, id]);
+    const tombstone = known ? known.tombstone : await db.tombstones.get([entityClass, id]);
     if (
       typeof incomingRevision === 'number' &&
       ((typeof existingRow?.revision === 'number' && incomingRevision < existingRow.revision) ||
@@ -1882,7 +1898,7 @@ class SyncOrchestrator {
     }
     switch (entityClass) {
       case 'character': {
-        const existing = await db.characters.get(id);
+        const existing = existingRow as LocalCharacter | undefined;
         if (merged.activeEffects !== undefined)
           merged.activeEffects = activeEffectsField
             .parse(merged.activeEffects)
@@ -1897,7 +1913,7 @@ class SyncOrchestrator {
       }
       case 'character_combat': {
         const characterId = (row.characterId as string) ?? id;
-        const existing = await db.characterCombat.get(characterId);
+        const existing = existingRow;
         await db.characterCombat.put({
           ...(existing ?? {}),
           ...merged,
@@ -1910,7 +1926,7 @@ class SyncOrchestrator {
           merged.activeEffectDefinitions = activeEffectDefinitionOut
             .array()
             .parse(merged.activeEffectDefinitions);
-        const existing = await db.campaigns.get(id);
+        const existing = existingRow;
         await db.campaigns.put({ ...(existing ?? {}), ...merged } as Record<
           string,
           unknown
@@ -1927,8 +1943,7 @@ class SyncOrchestrator {
     // merges the server row over the local one in its own store.
     const table = syncEntityTable(entityClass);
     if (!table) return;
-    const existing = await table.get(id);
-    await table.put({ ...(existing ?? {}), ...merged } as never);
+    await table.put({ ...(existingRow ?? {}), ...merged } as never);
   }
 
   private async replayRejectionToasts(): Promise<void> {
