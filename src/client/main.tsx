@@ -8,24 +8,13 @@ import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
 import { AppErrorPage } from './components/AppErrorPage.tsx';
 import { SwUpdatePrompt } from './components/SwUpdatePrompt.tsx';
-import { AboutPage } from './features/about/AboutPage.tsx';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { OAuthConsentPage } from './features/auth/OAuthConsentPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
-import { CampaignDetailPage } from './features/campaigns/CampaignDetailPage.tsx';
-import { CampaignLibraryPage } from './features/campaigns/CampaignLibraryPage.tsx';
-import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
-import { GmCampaignDashboardPage } from './features/campaigns/GmCampaignDashboardPage.tsx';
-import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
-import { CharactersPage } from './features/characters/CharactersPage.tsx';
-import { EncounterPage } from './features/encounters/EncounterPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
-import { LibraryPage } from './features/library/LibraryPage.tsx';
-import { LogPage } from './features/log/LogPage.tsx';
-import { SettingsPage } from './features/settings/SettingsPage.tsx';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessionQueryCache.tsx';
 import { applyTheme, readStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
@@ -50,6 +39,19 @@ window.addEventListener('contextmenu', (e) => {
   }
 });
 
+/**
+ * Route-level code splitting: each authenticated page (and heavy
+ * dependencies only it uses, like the markdown editor or YAML parser)
+ * loads as its own chunk. Workbox precaches every chunk, so offline
+ * navigation still works.
+ */
+function page<M, N extends keyof M>(
+  load: () => Promise<M>,
+  name: N,
+): () => Promise<{ Component: M[N] }> {
+  return async () => ({ Component: (await load())[name] });
+}
+
 const queryClient = createSessionQueryClient();
 
 const router = createBrowserRouter([
@@ -72,17 +74,65 @@ const router = createBrowserRouter([
             element: <App />,
             children: [
               { path: '/', element: <HomePage /> },
-              { path: '/characters', element: <CharactersPage /> },
-              { path: '/characters/:id', element: <CharacterSheetPage /> },
-              { path: '/campaigns', element: <CampaignsPage /> },
-              { path: '/campaigns/:id', element: <CampaignDetailPage /> },
-              { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },
-              { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
-              { path: '/campaigns/:id/encounters/:encounterId', element: <EncounterPage /> },
-              { path: '/log', element: <LogPage /> },
-              { path: '/library', element: <LibraryPage /> },
-              { path: '/about', element: <AboutPage /> },
-              { path: '/settings', element: <SettingsPage /> },
+              {
+                path: '/characters',
+                lazy: page(
+                  () => import('./features/characters/CharactersPage.tsx'),
+                  'CharactersPage',
+                ),
+              },
+              {
+                path: '/characters/:id',
+                lazy: page(
+                  () => import('./features/characters/CharacterSheetPage.tsx'),
+                  'CharacterSheetPage',
+                ),
+              },
+              {
+                path: '/campaigns',
+                lazy: page(() => import('./features/campaigns/CampaignsPage.tsx'), 'CampaignsPage'),
+              },
+              {
+                path: '/campaigns/:id',
+                lazy: page(
+                  () => import('./features/campaigns/CampaignDetailPage.tsx'),
+                  'CampaignDetailPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/library',
+                lazy: page(
+                  () => import('./features/campaigns/CampaignLibraryPage.tsx'),
+                  'CampaignLibraryPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/gm',
+                lazy: page(
+                  () => import('./features/campaigns/GmCampaignDashboardPage.tsx'),
+                  'GmCampaignDashboardPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/encounters/:encounterId',
+                lazy: page(
+                  () => import('./features/encounters/EncounterPage.tsx'),
+                  'EncounterPage',
+                ),
+              },
+              { path: '/log', lazy: page(() => import('./features/log/LogPage.tsx'), 'LogPage') },
+              {
+                path: '/library',
+                lazy: page(() => import('./features/library/LibraryPage.tsx'), 'LibraryPage'),
+              },
+              {
+                path: '/about',
+                lazy: page(() => import('./features/about/AboutPage.tsx'), 'AboutPage'),
+              },
+              {
+                path: '/settings',
+                lazy: page(() => import('./features/settings/SettingsPage.tsx'), 'SettingsPage'),
+              },
             ],
           },
         ],
