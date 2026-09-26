@@ -94,6 +94,25 @@ export function mcpResource(config: AppConfig): string {
   return `${publicOrigin(config)}/mcp`;
 }
 
+const GRANT_LAST_USED_THROTTLE_MS = 60_000;
+
+/**
+ * The token hot path reconciles configured clients only when their
+ * configuration changed since the last successful reconcile, instead of
+ * re-upserting every configured client on every MCP call. Narrowing a
+ * configured client's scopes still invalidates its tokens on the next
+ * call. Authorization, registration and token exchange reconcile on
+ * every request.
+ */
+const syncedConfiguredClients = new WeakMap<AppConfig, string>();
+
+async function syncConfiguredOAuthClientsIfChanged(config: AppConfig): Promise<void> {
+  const fingerprint = JSON.stringify(config.oauthClients);
+  if (syncedConfiguredClients.get(config) === fingerprint) return;
+  await syncConfiguredOAuthClients(config);
+  syncedConfiguredClients.set(config, fingerprint);
+}
+
 export async function syncConfiguredOAuthClients(config: AppConfig): Promise<void> {
   const db = getDb();
   const now = Date.now();
@@ -613,7 +632,7 @@ export async function resolveOAuthAccessToken(
 ): Promise<OAuthPrincipal> {
   if (!rawToken.startsWith('gpco_'))
     throw new OAuthError('invalid_token', 'not an OAuth access token');
-  await syncConfiguredOAuthClients(config);
+  await syncConfiguredOAuthClientsIfChanged(config);
   const now = new Date();
   const [row] = await getDb()
     .select({ access: oauthAccessTokens, grant: oauthGrants, client: oauthClients, user: users })
@@ -641,10 +660,15 @@ export async function resolveOAuthAccessToken(
   }
   const scopes = row.access.scopes.map((scope) => oauthScope.parse(scope));
   const used = new Date();
-  await getDb()
-    .update(oauthGrants)
-    .set({ lastUsedAt: used })
-    .where(eq(oauthGrants.id, row.grant.id));
+  // Every MCP call resolves its token; recording use once a minute is
+  // enough for the connected-clients list and avoids a write per call.
+  const lastUsed = row.grant.lastUsedAt;
+  if (!lastUsed || used.getTime() - lastUsed.getTime() > GRANT_LAST_USED_THROTTLE_MS) {
+    await getDb()
+      .update(oauthGrants)
+      .set({ lastUsedAt: used })
+      .where(eq(oauthGrants.id, row.grant.id));
+  }
   return {
     user: {
       id: row.user.id,
