@@ -939,8 +939,15 @@ class SyncOrchestrator {
   private async applyOutcomes(ops: OutboxEntry[], outcomes: OperationOutcome[]): Promise<void> {
     const db = getLocalDb();
     const byOpId = new Map(outcomes.map((o) => [o.clientOpId, o]));
+    // Consecutive applied ops are settled as one group, flushed before any
+    // other outcome is handled so per-op ordering is unchanged.
+    let appliedRun: { op: OutboxEntry; outcome: OperationOutcome }[] = [];
     for (const op of ops) {
       const outcome = byOpId.get(op.clientOpId);
+      if (!outcome || outcome.status !== 'applied') {
+        await this.settleApplied(appliedRun);
+        appliedRun = [];
+      }
       if (!outcome) {
         // Server didn't return an outcome for this op.  Treat as
         // transient -- the ack got lost; we'll retry the same op.
@@ -972,28 +979,11 @@ class SyncOrchestrator {
         continue;
       }
       switch (outcome.status) {
-        case 'applied': {
-          // Stamp the new server revision into the local row so future
-          // patches use it as their baseRevision.  Then drop the op.
-          if (typeof outcome.newRevision === 'number') {
-            await this.stampRevision(op.entityClass, op.entityId, outcome.newRevision);
-          }
-          await appendSyncLog({
-            direction: 'push',
-            result: 'synced',
-            entityClass: op.entityClass,
-            entityId: op.entityId,
-            parentId: op.parentId,
-            command: op.command,
-            fieldPath: op.fieldPath,
-            humanName: op.humanName,
-            previousValue: snapshotValue(op.prevValue),
-            newValue: snapshotValue(op.attemptedValue),
-            details: snapshotValue(outcome),
-          });
-          await db.outbox.delete(op.clientOpId);
+        case 'applied':
+          // Settled together with any adjacent applied ops (see
+          // settleApplied) instead of three auto-committed writes each.
+          appliedRun.push({ op, outcome });
           break;
-        }
         case 'rejected':
         case 'unauthorized':
         case 'conflict':
@@ -1145,6 +1135,43 @@ class SyncOrchestrator {
         }
       }
     }
+    await this.settleApplied(appliedRun);
+  }
+
+  /**
+   * Stamp each applied op's new server revision into its local row (so
+   * future patches use it as their baseRevision) and drop the ops, in one
+   * transaction. Per-op auto-committed writes woke every live query --
+   * including the full character-detail rebuild -- three times per op.
+   */
+  private async settleApplied(
+    run: readonly { op: OutboxEntry; outcome: OperationOutcome }[],
+  ): Promise<void> {
+    if (run.length === 0) return;
+    const db = getLocalDb();
+    await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      for (const { op, outcome } of run) {
+        if (typeof outcome.newRevision === 'number') {
+          await this.stampRevision(op.entityClass, op.entityId, outcome.newRevision);
+        }
+      }
+      await db.outbox.bulkDelete(run.map(({ op }) => op.clientOpId));
+    });
+    await appendSyncLogEntries(
+      run.map(({ op, outcome }) => ({
+        direction: 'push' as const,
+        result: 'synced' as const,
+        entityClass: op.entityClass,
+        entityId: op.entityId,
+        parentId: op.parentId,
+        command: op.command,
+        fieldPath: op.fieldPath,
+        humanName: op.humanName,
+        previousValue: snapshotValue(op.prevValue),
+        newValue: snapshotValue(op.attemptedValue),
+        details: snapshotValue(outcome),
+      })),
+    );
   }
 
   /**
