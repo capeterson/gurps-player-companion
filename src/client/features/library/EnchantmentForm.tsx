@@ -5,6 +5,7 @@ import type {
 } from '../../../shared/schemas/campaignLibrary.ts';
 import type { EnchantmentEffectTarget } from '../../../shared/schemas/inventory.ts';
 import { SkillReferenceCombobox } from '../../components/ui/SkillReferenceCombobox.tsx';
+import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 
 const ENCHANTMENT_TARGETS: readonly EnchantmentEffectTarget[] = [
   'weapon_attack',
@@ -256,37 +257,32 @@ export function EnchantmentForm({
           </fieldset>
         ))}
       </div>
-      <div className="flex justify-end gap-2">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          disabled={isPending || !valid}
-          onClick={() =>
-            onSubmit({
-              name: name.trim(),
-              description: description.trim() || null,
-              source: source.trim() || null,
-              tags: tags
-                .split(',')
-                .map((tag) => tag.trim())
-                .filter(Boolean),
-              applicability,
-              effects,
-              levels,
-              stackingPolicy:
-                stackingKind === 'highest'
-                  ? { kind: 'highest', key: stackingKey.trim() }
-                  : { kind: 'stack' },
-            })
-          }
-        >
-          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add enchantment'}
-        </button>
-      </div>
-      {error && <p className="alert alert-error text-sm">{error}</p>}
+      <LibraryFormFooter
+        noun="enchantment"
+        editing={Boolean(initial)}
+        isPending={isPending}
+        canSubmit={Boolean(valid)}
+        error={error}
+        onCancel={onCancel}
+        onSubmit={() =>
+          onSubmit({
+            name: name.trim(),
+            description: description.trim() || null,
+            source: source.trim() || null,
+            tags: tags
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+            applicability,
+            effects,
+            levels,
+            stackingPolicy:
+              stackingKind === 'highest'
+                ? { kind: 'highest', key: stackingKey.trim() }
+                : { kind: 'stack' },
+          })
+        }
+      />
     </div>
   );
 }

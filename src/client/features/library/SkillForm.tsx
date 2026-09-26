@@ -10,6 +10,7 @@ import { skillProcedures } from '../../../shared/schemas/skillProcedures.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { EffectsEditor } from './EffectsEditor.tsx';
+import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 
 interface SkillFormProps {
   campaignId: string | null;
@@ -429,33 +430,23 @@ export function SkillForm({
           placeholder="Description (Markdown supported)…"
         />
       </div>
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={onCancel}
-          disabled={isPending}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={handleSubmit}
-          disabled={
-            isPending ||
-            !name.trim() ||
-            !effectsValid ||
-            ((specializationKind === 'required_catalog' ||
+      <LibraryFormFooter
+        noun="skill"
+        editing={Boolean(initial)}
+        isPending={isPending}
+        canSubmit={
+          Boolean(name.trim()) &&
+          effectsValid &&
+          !(
+            (specializationKind === 'required_catalog' ||
               specializationKind === 'optional_catalog') &&
-              (specializations.length === 0 ||
-                specializations.some((option) => !option.name.trim())))
-          }
-        >
-          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add skill'}
-        </button>
-      </div>
-      {(error || rulesError) && <p className="alert alert-error text-sm">{error || rulesError}</p>}
+            (specializations.length === 0 || specializations.some((option) => !option.name.trim()))
+          )
+        }
+        error={error || rulesError}
+        onCancel={onCancel}
+        onSubmit={handleSubmit}
+      />
     </fieldset>
   );
 }
