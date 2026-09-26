@@ -22,6 +22,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { selectCharacterSection } from './character-navigation';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,8 +79,11 @@ test.describe('BUG-1: canWrite is correct offline', () => {
     // Create a character while online so it's in Dexie + server.
     await createCharacter(page, 'Offline Hero');
 
-    // Wait for the sync indicator to settle on "Synced".
-    await expect(page.getByLabel(/all changes saved/i)).toBeVisible({ timeout: 15_000 });
+    // Wait for the sync indicator to settle on "Synced". Character pages also
+    // mount the status-row copy, hidden at one breakpoint or the other.
+    await expect(page.getByLabel(/all changes saved/i).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Simulate offline for the *API*, not the whole browser network stack.
     // The suite runs against `bun run dev` (Vite dev server), which has no
@@ -137,7 +141,9 @@ test.describe('BUG-1: canWrite is correct offline', () => {
     // Should navigate to the sheet
     await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
 
-    // ST input must be editable — not a read-only span.
+    // ST input must be editable — not a read-only span. The sheet opens on
+    // Combat, so switch to the attributes' section first.
+    await selectCharacterSection(page, 'Overview');
     const stInput = page.getByRole('textbox', { name: /st base/i });
     await expect(stInput).toBeVisible({ timeout: 5_000 });
     await expect(stInput).not.toBeDisabled();
@@ -221,7 +227,9 @@ test.describe('BUG-3: server changes appear promptly after reconnect drain', () 
     const pageA = await ctxA.newPage();
     await registerAndLogin(pageA, email);
     await createCharacter(pageA, 'Sync Target');
-    await expect(pageA.getByLabel(/all changes saved/i)).toBeVisible({ timeout: 15_000 });
+    await expect(pageA.getByLabel(/all changes saved/i).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
     const charUrl = pageA.url();
 
     // Session B: log in with the same account on a different "device".
@@ -246,7 +254,9 @@ test.describe('BUG-3: server changes appear promptly after reconnect drain', () 
     await nameInputA.fill(newName);
     await nameInputA.blur();
     // Wait for session A to sync its edit.
-    await expect(pageA.getByLabel(/all changes saved/i)).toBeVisible({ timeout: 15_000 });
+    await expect(pageA.getByLabel(/all changes saved/i).filter({ visible: true })).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Bring session B back online.
     await goOnline(pageB);
