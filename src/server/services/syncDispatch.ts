@@ -33,6 +33,7 @@ import { skillCreate, skillUpdate } from '../../shared/schemas/skill.ts';
 import { spellCreate, spellUpdate } from '../../shared/schemas/spell.ts';
 import {
   type EntityClass,
+  LIBRARY_ENTITY_CLASSES,
   type LibraryEntityClass,
   type OperationEnvelope,
   type OperationOutcome,
@@ -41,6 +42,7 @@ import {
 import { techniqueCreate, techniqueUpdate } from '../../shared/schemas/technique.ts';
 import { traitCreate, traitUpdate } from '../../shared/schemas/trait.ts';
 import {
+  type CharacterAccess,
   assertWrite,
   loadCampaignOr403,
   loadCharacterOr403,
@@ -142,6 +144,46 @@ const NUMERIC_INVENTORY_FIELDS = new Set(['weightLbs', 'cost', 'hideawayCapacity
 interface DispatchContext {
   readonly userId: string;
   readonly batchId?: string | undefined;
+  /** Per-request state shared by every op in one /sync/operations batch. */
+  readonly batch?: DispatchBatch | undefined;
+}
+
+/**
+ * State shared by the ops of one /sync/operations request.
+ *
+ * - Character access decisions are reused by child-class ops. Every
+ *   character-class op bypasses the cache and clears it, because only
+ *   those ops (ownership, campaign assignment, attributes) change what a
+ *   cached decision or row would say within the batch.
+ * - WS invalidations are collected and published once, after the loop,
+ *   instead of re-resolving recipients and sending a frame per op.
+ */
+export interface DispatchBatch {
+  readonly access: Map<string, Promise<CharacterAccess>>;
+  readonly invalidations: Invalidation[];
+}
+
+type Invalidation =
+  | { readonly kind: 'library'; readonly campaignId: string }
+  | { readonly kind: 'character'; readonly op: OperationEnvelope };
+
+export function createDispatchBatch(): DispatchBatch {
+  return { access: new Map(), invalidations: [] };
+}
+
+function loadChildParentAccess(
+  ctx: DispatchContext,
+  characterId: string,
+): Promise<CharacterAccess> {
+  if (!ctx.batch) return loadCharacterOr403(characterId, ctx.userId);
+  let access = ctx.batch.access.get(characterId);
+  if (!access) {
+    access = loadCharacterOr403(characterId, ctx.userId);
+    // A failed lookup (403/404) is not cached: the next op re-checks.
+    access.catch(() => ctx.batch?.access.delete(characterId));
+    ctx.batch.access.set(characterId, access);
+  }
+  return access;
 }
 
 /** Entity classes that have a write dispatcher below. */
@@ -224,11 +266,18 @@ export async function dispatchOperation(
   // Use the op's batchId if present, fall back to clientOpId so even
   // singleton edits have a stable non-null batch_id in entity_history.
   const batchId = op.batchId ?? op.clientOpId;
+  if (op.entityClass === 'character') ctx.batch?.access.clear();
   try {
     const outcome = await withAudit(ctx.userId, batchId, (tx) =>
       dispatchOperationInner({ ...ctx, batchId }, op, tx),
     );
-    if (outcome.status === 'applied' && isLibraryEntityClass(op.entityClass)) {
+    if (outcome.status === 'applied' && ctx.batch) {
+      ctx.batch.invalidations.push(
+        isLibraryEntityClass(op.entityClass)
+          ? { kind: 'library', campaignId: op.parentId as string }
+          : { kind: 'character', op },
+      );
+    } else if (outcome.status === 'applied' && isLibraryEntityClass(op.entityClass)) {
       // Every campaign member reads the library; nudge them all (and the
       // owner's other devices). The cursor pull remains the source of truth.
       await publishLibraryInvalidation(op.parentId as string);
@@ -298,6 +347,21 @@ export async function dispatchOperation(
  * members converge via the periodic pull plus the accessible-set prune.
  */
 async function publishSyncInvalidation(actorId: string, op: OperationEnvelope): Promise<void> {
+  const recipients = await characterInvalidationRecipients(actorId, op);
+  const message = {
+    kind: 'sync_invalidate' as const,
+    entityClasses: [op.entityClass],
+    emittedAt: new Date().toISOString(),
+  };
+  for (const userId of recipients) {
+    wsPublish(userId, message);
+  }
+}
+
+async function characterInvalidationRecipients(
+  actorId: string,
+  op: OperationEnvelope,
+): Promise<Set<string>> {
   const recipients = new Set<string>([actorId]);
   if (DISPATCHABLE_CLASSES.has(op.entityClass)) {
     try {
@@ -310,16 +374,9 @@ async function publishSyncInvalidation(actorId: string, op: OperationEnvelope): 
       if (charRow) {
         recipients.add(charRow.ownerId);
         if (charRow.campaignId) {
-          const [campaignRow] = await db
-            .select({ ownerId: campaigns.ownerId })
-            .from(campaigns)
-            .where(eq(campaigns.id, charRow.campaignId));
-          if (campaignRow) recipients.add(campaignRow.ownerId);
-          const members = await db
-            .select({ userId: campaignMemberships.userId })
-            .from(campaignMemberships)
-            .where(eq(campaignMemberships.campaignId, charRow.campaignId));
-          for (const m of members) recipients.add(m.userId);
+          for (const userId of await campaignRecipients(charRow.campaignId)) {
+            recipients.add(userId);
+          }
         }
       }
     } catch {
@@ -328,13 +385,90 @@ async function publishSyncInvalidation(actorId: string, op: OperationEnvelope): 
       // set already seeded above.
     }
   }
-  const message = {
-    kind: 'sync_invalidate' as const,
-    entityClasses: [op.entityClass],
-    emittedAt: new Date().toISOString(),
+  return recipients;
+}
+
+/** The campaign owner (GM) and every member. */
+async function campaignRecipients(campaignId: string): Promise<string[]> {
+  const db = getDb();
+  const [campaignRow] = await db
+    .select({ ownerId: campaigns.ownerId })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId));
+  const members = await db
+    .select({ userId: campaignMemberships.userId })
+    .from(campaignMemberships)
+    .where(eq(campaignMemberships.campaignId, campaignId));
+  return [...(campaignRow ? [campaignRow.ownerId] : []), ...members.map((m) => m.userId)];
+}
+
+const LIBRARY_INVALIDATION_CLASSES: readonly string[] = [
+  'character_trait',
+  'character_skill',
+  ...LIBRARY_ENTITY_CLASSES,
+];
+
+/**
+ * Publish one merged `sync_invalidate` per recipient for everything a
+ * /sync/operations batch applied. Recipients are resolved once per
+ * affected character and campaign rather than once per op. Post-commit
+ * acceleration only (rule S8): a failure here never affects outcomes.
+ */
+export async function publishBatchInvalidations(
+  actorId: string,
+  batch: DispatchBatch,
+): Promise<void> {
+  if (batch.invalidations.length === 0) return;
+  const byUser = new Map<string, { classes: Set<string>; campaignIds: Set<string> }>();
+  const add = (userId: string, classes: Iterable<string>, campaignId?: string) => {
+    let entry = byUser.get(userId);
+    if (!entry) {
+      entry = { classes: new Set(), campaignIds: new Set() };
+      byUser.set(userId, entry);
+    }
+    for (const cls of classes) entry.classes.add(cls);
+    if (campaignId) entry.campaignIds.add(campaignId);
   };
-  for (const userId of recipients) {
-    wsPublish(userId, message);
+
+  const libraryCampaigns = new Set<string>();
+  const characterOps = new Map<string, { op: OperationEnvelope; classes: Set<string> }>();
+  for (const invalidation of batch.invalidations) {
+    if (invalidation.kind === 'library') {
+      libraryCampaigns.add(invalidation.campaignId);
+      continue;
+    }
+    const { op } = invalidation;
+    const key = op.entityClass === 'character' ? op.entityId : (op.parentId ?? op.entityId);
+    const group = characterOps.get(key);
+    if (group) group.classes.add(op.entityClass);
+    else characterOps.set(key, { op, classes: new Set([op.entityClass]) });
+  }
+
+  for (const { op, classes } of characterOps.values()) {
+    for (const userId of await characterInvalidationRecipients(actorId, op)) {
+      add(userId, classes);
+    }
+  }
+  for (const campaignId of libraryCampaigns) {
+    add(actorId, LIBRARY_INVALIDATION_CLASSES, campaignId);
+    try {
+      for (const userId of await campaignRecipients(campaignId)) {
+        add(userId, LIBRARY_INVALIDATION_CLASSES, campaignId);
+      }
+    } catch {
+      // A failed optional nudge cannot turn a committed edit into a failure.
+    }
+  }
+
+  const emittedAt = new Date().toISOString();
+  for (const [userId, { classes, campaignIds }] of byUser) {
+    const [onlyCampaignId] = campaignIds.size === 1 ? [...campaignIds] : [];
+    wsPublish(userId, {
+      kind: 'sync_invalidate',
+      entityClasses: [...classes],
+      ...(onlyCampaignId ? { campaignId: onlyCampaignId } : {}),
+      emittedAt,
+    });
   }
 }
 
@@ -610,7 +744,7 @@ async function dispatchLibraryChild(
   },
 ): Promise<OperationOutcome> {
   const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
+  const access = await loadChildParentAccess(ctx, characterId);
   assertWrite(access);
   if (op.command === 'create') {
     const revision = await handlers.create(characterId);
@@ -985,7 +1119,7 @@ async function dispatchInventory(
   if (op.command === 'create') {
     const body = inventoryItemCreate.parse(op.attemptedValue);
     const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
+    const access = await loadChildParentAccess(ctx, characterId);
     assertWrite(access);
     // Lock the character row to prevent race conditions on inventory parent
     // validation, then validate the parent item if specified.
@@ -1021,7 +1155,7 @@ async function dispatchInventory(
 
   if (op.command === 'delete') {
     const characterId = requireParentId(op);
-    const access = await loadCharacterOr403(characterId, ctx.userId);
+    const access = await loadChildParentAccess(ctx, characterId);
     assertWrite(access);
     // Use the same character-scoped tree lock as REST create/patch/delete
     // and the sync create/patch paths. The lock is held through reparenting
@@ -1050,7 +1184,7 @@ async function dispatchInventory(
 
   // patch
   const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
+  const access = await loadChildParentAccess(ctx, characterId);
   assertWrite(access);
   // Serialize inventory-tree checks with REST mutations for this character.
   // Validation and the write must share this transaction; otherwise two
@@ -1150,7 +1284,7 @@ async function dispatchCombat(
     };
   }
   const characterId = requireParentId(op);
-  const access = await loadCharacterOr403(characterId, ctx.userId);
+  const access = await loadChildParentAccess(ctx, characterId);
   assertWrite(access);
 
   // Combat state is 1:1 keyed on character_id.  Whether the client

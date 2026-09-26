@@ -47,7 +47,11 @@ import {
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { withLibraryMechanics } from '../services/libraryMechanics.ts';
-import { dispatchOperation } from '../services/syncDispatch.ts';
+import {
+  createDispatchBatch,
+  dispatchOperation,
+  publishBatchInvalidations,
+} from '../services/syncDispatch.ts';
 import { libraryEntityConfig, libraryRowOut } from './campaignLibraryEntities.ts';
 
 const router = createOpenApiApp();
@@ -98,12 +102,17 @@ router.openapi(
     // normal -- the client's stale_base self-heal remains the fallback
     // for that case and for bursts spanning more than one 50-op batch.
     const chains = createBatchRevisionChains();
+    const batch = createDispatchBatch();
     for (const op of operations) {
       const effective = chains.rewrite(op);
-      const outcome = await dispatchOperation({ userId: user.id, batchId: op.batchId }, effective);
+      const outcome = await dispatchOperation(
+        { userId: user.id, batchId: op.batchId, batch },
+        effective,
+      );
       chains.record(op, outcome);
       outcomes.push(outcome);
     }
+    await publishBatchInvalidations(user.id, batch);
     return c.json({ outcomes }, 200);
   },
 );

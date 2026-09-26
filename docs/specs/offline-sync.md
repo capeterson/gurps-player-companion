@@ -263,6 +263,15 @@ works offline.**
    normally — the client's `stale_base` self-heal (below) remains the
    fallback for that case and for bursts spanning more than one 50-op batch.
 
+   One request also shares a `DispatchBatch` (`createDispatchBatch()` in
+   `src/server/services/syncDispatch.ts`) across its ops. Child-class ops reuse
+   the parent character's access decision instead of reloading it per op; a
+   failed lookup is not cached, and every `character`-class op clears the
+   cache because ownership, campaign assignment or attributes may change.
+   Applied ops record their invalidations, and after the loop
+   `publishBatchInvalidations` resolves recipients once per affected character
+   and campaign and sends each recipient one merged `sync_invalidate`.
+
    Database revisions are also commit-safe across requests. Migration `0040`
    routes every sync-visible INSERT default, UPDATE trigger, DELETE tombstone,
    and history revision through `next_sync_revision()`. Its transaction-scoped
