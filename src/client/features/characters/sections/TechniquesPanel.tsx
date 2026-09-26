@@ -20,6 +20,7 @@ import { enqueueDelete } from '../../../sync/outbox.ts';
 import { RollSheet } from './RollSheet.tsx';
 import type { RollRequest } from './rollTypes.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
+import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityDefaultModifierField,
   useEntityEnumField,
@@ -278,9 +279,6 @@ function TechniqueRow({
   canWrite,
   onRoll,
 }: TechniqueRowProps) {
-  const toasts = useToasts();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   const rowPatch = useEntityRowPatch(
     'character_technique',
     technique.id,
@@ -316,19 +314,13 @@ function TechniqueRow({
     technique.defaultModifier ?? 0,
   );
 
-  const removeTechnique = async () => {
-    try {
-      await enqueueDelete({
-        entityClass: 'character_technique',
-        entityId: technique.id,
-        humanName: `technique "${technique.name}"`,
-        characterId,
-        prevValue: technique,
-      });
-    } catch (err) {
-      toasts.push(`Couldn't delete technique — ${(err as Error).message}`, { kind: 'error' });
-    }
-  };
+  const deletion = useConfirmedEntityDelete({
+    entityClass: 'character_technique',
+    noun: 'technique',
+    label: technique.name,
+    entity: technique,
+    characterId,
+  });
 
   const bonus = techniqueBonus(technique.points, technique.difficulty, technique.maxLevel);
   const defaultSkillDisplayName = skillReferenceDisplayName(technique.defaultSkillName);
@@ -436,23 +428,13 @@ function TechniqueRow({
         <button
           type="button"
           className="btn btn-ghost btn-xs col-span-2 justify-self-end sm:col-span-1"
-          onClick={() => setConfirmDelete(true)}
+          onClick={deletion.request}
           aria-label={`Delete technique ${technique.name}`}
         >
           ✕
         </button>
       )}
-      <ConfirmDialog
-        open={confirmDelete}
-        title={`Delete technique "${technique.name}"?`}
-        confirmLabel="Delete"
-        tone="error"
-        onConfirm={() => {
-          setConfirmDelete(false);
-          void removeTechnique();
-        }}
-        onCancel={() => setConfirmDelete(false)}
-      />
+      {deletion.dialog}
     </li>
   );
 }

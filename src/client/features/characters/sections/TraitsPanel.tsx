@@ -28,6 +28,7 @@ import {
   saveTraitTablePreferences,
 } from './traitTablePreferences.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
+import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityNameField,
   useEntityPointsField,
@@ -674,9 +675,6 @@ function TraitRow({
   onDrop,
   onMove,
 }: TraitRowProps) {
-  const toasts = useToasts();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   const rowPatch = useEntityRowPatch('character_trait', trait.id, characterId, trait.name);
 
   const nameField = useEntityNameField(rowPatch, trait.name);
@@ -700,19 +698,13 @@ function TraitRow({
   const hasCustomEffects = (trait.customEffects?.length ?? 0) > 0;
   const canExpand = canWrite || Boolean(trait.notes) || hasSourceRules || hasCustomEffects;
 
-  const removeTrait = async () => {
-    try {
-      await enqueueDelete({
-        entityClass: 'character_trait',
-        entityId: trait.id,
-        humanName: `trait "${trait.name}"`,
-        characterId,
-        prevValue: trait,
-      });
-    } catch (err) {
-      toasts.push(`Couldn't delete trait — ${(err as Error).message}`, { kind: 'error' });
-    }
-  };
+  const deletion = useConfirmedEntityDelete({
+    entityClass: 'character_trait',
+    noun: 'trait',
+    label: trait.name,
+    entity: trait,
+    characterId,
+  });
 
   return (
     <tbody
@@ -875,7 +867,7 @@ function TraitRow({
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm text-error"
-                    onClick={() => setConfirmDelete(true)}
+                    onClick={deletion.request}
                   >
                     Delete trait
                   </button>
@@ -883,17 +875,7 @@ function TraitRow({
                     Done
                   </button>
                 </footer>
-                <ConfirmDialog
-                  open={confirmDelete}
-                  title={`Delete trait "${trait.name}"?`}
-                  confirmLabel="Delete"
-                  tone="error"
-                  onConfirm={() => {
-                    setConfirmDelete(false);
-                    void removeTrait();
-                  }}
-                  onCancel={() => setConfirmDelete(false)}
-                />
+                {deletion.dialog}
               </div>
             ) : (
               <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
