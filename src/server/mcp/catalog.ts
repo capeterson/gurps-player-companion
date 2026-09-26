@@ -153,10 +153,70 @@ const sharedErrorBody: JsonSchema = {
   required: ['error'],
 };
 
+/**
+ * MCP mutations deliberately acknowledge the committed write without echoing
+ * the REST resource representation. Many REST writes return an entire
+ * character or campaign so browser callers can refresh immediately; embedding
+ * those schemas in every delegated write made tools/list repeat tens of
+ * kilobytes per operation and pushed unrelated state into the model context.
+ *
+ * The shared handler response is still validated against its complete OpenAPI
+ * and Zod contract before the transport projects it to this acknowledgement.
+ */
+const mutationAcknowledgementBody: JsonSchema = {
+  type: 'object',
+  properties: {
+    acknowledged: {
+      const: true,
+      description: 'The delegated mutation committed successfully.',
+    },
+    resourceId: {
+      type: 'string',
+      format: 'uuid',
+      description: 'The most specific affected resource id, when one is available.',
+    },
+    revision: {
+      type: 'integer',
+      minimum: 0,
+      description: 'The affected resource revision, when the REST result exposes one.',
+    },
+  },
+  required: ['acknowledged'],
+  additionalProperties: false,
+};
+
 function outputSchema(
   operation: OpenApiOperation,
   definitions: Record<string, JsonSchema>,
+  policy: IncludedOperation,
 ): JsonSchema {
+  if (policy.method !== 'GET') {
+    return {
+      type: 'object',
+      properties: {
+        status: { type: 'integer', minimum: 100, maximum: 599 },
+        contentType: { type: ['string', 'null'] },
+        body: {},
+      },
+      required: ['status', 'contentType', 'body'],
+      additionalProperties: false,
+      anyOf: [
+        {
+          properties: {
+            status: { type: 'integer', minimum: 200, maximum: 299 },
+            contentType: { const: 'application/json' },
+            body: mutationAcknowledgementBody,
+          },
+        },
+        {
+          properties: {
+            status: { type: 'integer', minimum: 400, maximum: 599 },
+            body: sharedErrorBody,
+          },
+        },
+      ],
+    };
+  }
   const variants: JsonSchema[] = [];
   for (const [status, response] of Object.entries(operation.responses ?? {})) {
     const statusSchema = /^\d{3}$/.test(status) ? { const: Number(status) } : { type: 'integer' };
@@ -237,7 +297,7 @@ export function buildToolCatalog(
         entry.route.path === policy.path,
     )?.route;
     const inputSchema = requestSchema(operation, definitions);
-    const output = outputSchema(operation, definitions);
+    const output = outputSchema(operation, definitions, policy);
     // Compile the advertised output too: a valid response validator is not
     // enough if clients cannot compile the actual tools/list definition.
     compile(output);

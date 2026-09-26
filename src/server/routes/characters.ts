@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   type CharacterMinimalOut,
@@ -11,7 +11,7 @@ import {
   characterUpdate,
   dismissWarningRequest,
 } from '../../shared/schemas/character.ts';
-import { uuid } from '../../shared/schemas/common.ts';
+import { listQuery, uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
@@ -70,7 +70,8 @@ router.openapi(
     path: '/characters',
     tags: ['characters'],
     security: [{ bearerAuth: [] }],
-    summary: 'List the user’s characters and characters in their campaigns',
+    summary: 'List/search the user’s characters and characters in their campaigns',
+    request: { query: listQuery },
     responses: {
       200: {
         description: 'List',
@@ -81,21 +82,22 @@ router.openapi(
   }),
   async (c) => {
     const user = c.get('user');
+    const { search, limit, offset } = c.req.valid('query');
     const db = getDb();
     const accessibleCampaigns = await db
       .select({ id: campaignMemberships.campaignId })
       .from(campaignMemberships)
       .where(eq(campaignMemberships.userId, user.id));
     const campaignIds = accessibleCampaigns.map((m) => m.id);
-    const where =
+    const accessWhere =
       campaignIds.length === 0
         ? eq(characters.ownerId, user.id)
         : or(eq(characters.ownerId, user.id), inArray(characters.campaignId, campaignIds));
     const rows = await db
       .select()
       .from(characters)
-      .where(where)
-      .orderBy(desc(characters.updatedAt));
+      .where(search ? and(accessWhere, ilike(characters.name, `%${search}%`)) : accessWhere)
+      .orderBy(desc(characters.updatedAt), desc(characters.id));
     // Same share gate as GET /characters/{id} and /sync/cursor. Per
     // docs/specs/campaign-content-sharing.md the list endpoint EXCLUDES
     // rows the viewer may only see in minimal form — campaign-shared
@@ -129,23 +131,21 @@ router.openapi(
       characters: rows,
       campaigns: campaignRows,
     });
-    return c.json(
-      rows
-        .filter((r) => accessModes.get(r.id) !== 'minimal')
-        .map((r) => ({
-          id: r.id,
-          ownerId: r.ownerId,
-          campaignId: r.campaignId,
-          name: r.name,
-          st: r.st,
-          dx: r.dx,
-          iq: r.iq,
-          ht: r.ht,
-          updatedAt: r.updatedAt.toISOString(),
-          revision: Number(r.revision),
-        })),
-      200,
-    );
+    const visibleRows = rows
+      .filter((r) => accessModes.get(r.id) !== 'minimal')
+      .map((r) => ({
+        id: r.id,
+        ownerId: r.ownerId,
+        campaignId: r.campaignId,
+        name: r.name,
+        st: r.st,
+        dx: r.dx,
+        iq: r.iq,
+        ht: r.ht,
+        updatedAt: r.updatedAt.toISOString(),
+        revision: Number(r.revision),
+      }));
+    return c.json(visibleRows.slice(offset, offset + limit), 200);
   },
 );
 

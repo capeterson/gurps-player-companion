@@ -15,6 +15,7 @@ const policy: IncludedOperation = {
   destructive: false,
   handler: 'shared-openapi-handler',
   schemaSource: 'openapi-zod-registry',
+  resultMode: 'compact-mutation-ack',
   parityTests: [
     'src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential',
     'src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope',
@@ -178,6 +179,40 @@ describe('MCP canonical schema conversion', () => {
     }
   });
 
+  test('advertises bounded read filters for agent-facing collection tools', () => {
+    const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
+    const id = '0198aa77-1111-7111-8111-111111111111';
+    for (const name of [
+      'gpc_list_characters',
+      'gpc_list_campaigns',
+      'gpc_list_adventure_log',
+      'gpc_list_encounters',
+    ]) {
+      const tool = tools.find((entry) => entry.policy.tool === name);
+      if (!tool) throw new Error(`missing ${name}`);
+      const path =
+        name === 'gpc_list_adventure_log' || name === 'gpc_list_encounters' ? { path: { id } } : {};
+      expect(
+        tool.validateInput({ ...path, query: { search: 'dragon', limit: 25, offset: 50 } }),
+        name,
+      ).toBe(true);
+      expect(tool.validateInput({ ...path, query: { limit: 0 } }), name).toBe(false);
+    }
+    const notifications = tools.find((entry) => entry.policy.tool === 'gpc_list_notifications');
+    if (!notifications) throw new Error('missing gpc_list_notifications');
+    expect(
+      notifications.validateInput({ query: { unreadOnly: 'true', limit: 25, offset: 50 } }),
+    ).toBe(true);
+    const library = tools.find((entry) => entry.policy.tool === 'gpc_get_campaign_library');
+    if (!library) throw new Error('missing gpc_get_campaign_library');
+    expect(
+      library.validateInput({
+        path: { id },
+        query: { section: 'skills', search: 'spear', limit: 10, offset: 20 },
+      }),
+    ).toBe(true);
+  });
+
   test('preserves nullable refs, unconstrained values, enums and exclusive numeric bounds', () => {
     const ajv = new Ajv({ strict: false });
     const schema = toJsonSchema({
@@ -242,7 +277,7 @@ describe('MCP canonical schema conversion', () => {
     expect(tool.validateInput({ ...input, body: { at: input.body.at, count: 0 } })).toBe(false);
   });
 
-  test('advertises operation-specific success shapes and keeps API error payloads', async () => {
+  test('advertises compact mutation acknowledgements while validating full handler responses', async () => {
     const tool = runtime({
       type: 'object',
       properties: { name: { type: 'string' } },
@@ -251,10 +286,14 @@ describe('MCP canonical schema conversion', () => {
     const ajv = new Ajv({ strict: false });
     addFormats(ajv);
     const output = ajv.compile(tool.outputSchema);
+    expect(
+      output({
+        status: 200,
+        contentType: 'application/json',
+        body: { acknowledged: true, resourceId: '0198aa77-1111-7111-8111-111111111111' },
+      }),
+    ).toBe(true);
     expect(output({ status: 200, contentType: 'application/json', body: { name: 'Ada' } })).toBe(
-      true,
-    );
-    expect(output({ status: 200, contentType: 'application/json', body: { other: 1 } })).toBe(
       false,
     );
     expect(await tool.validateResponse(200, 'application/json', null)).not.toBeNull();
@@ -271,6 +310,31 @@ describe('MCP canonical schema conversion', () => {
       }),
     ).toBeNull();
     expect(await tool.validateResponse(500, 'text/html', '<html>')).not.toBeNull();
+  });
+
+  test('does not advertise full REST success definitions on mutation tools', () => {
+    const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
+    const tools = buildToolCatalog(snapshot);
+    const mutations = tools.filter((tool) => tool.policy.method !== 'GET');
+    expect(mutations.length).toBeGreaterThan(70);
+    for (const tool of mutations) {
+      const output = JSON.stringify(tool.outputSchema);
+      expect(tool.policy.resultMode, tool.policy.tool).toBe('compact-mutation-ack');
+      expect(output, tool.policy.tool).toContain('acknowledged');
+      expect(output, tool.policy.tool).not.toContain('$defs');
+      expect(output.length, tool.policy.tool).toBeLessThan(2_000);
+    }
+    const outputBytes = tools.reduce(
+      (total, tool) => total + JSON.stringify(tool.outputSchema).length,
+      0,
+    );
+    const completeSchemaBytes = tools.reduce(
+      (total, tool) =>
+        total + JSON.stringify(tool.inputSchema).length + JSON.stringify(tool.outputSchema).length,
+      0,
+    );
+    expect(outputBytes).toBeLessThan(250_000);
+    expect(completeSchemaBytes).toBeLessThan(500_000);
   });
 
   test('uses original Zod refinements that cannot be represented in OpenAPI', async () => {

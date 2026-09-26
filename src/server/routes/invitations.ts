@@ -20,11 +20,11 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { HTTPException } from 'hono/http-exception';
 import { type InvitationOut, invitationOut, inviteRequest } from '../../shared/schemas/campaign.ts';
-import { uuid } from '../../shared/schemas/common.ts';
+import { listQuery, uuid } from '../../shared/schemas/common.ts';
 import { campaignInvitationNotificationPayload } from '../../shared/schemas/notification.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin, tryLoadCampaignRole } from '../auth/permissions.ts';
@@ -256,7 +256,10 @@ router.openapi(
     tags: ['invitations'],
     summary: 'List pending invitations for a campaign (owner or manager)',
     security: [{ bearerAuth: [] }],
-    request: { params: z.object({ id: uuid }) },
+    request: {
+      params: z.object({ id: uuid }),
+      query: listQuery.pick({ limit: true, offset: true }),
+    },
     responses: {
       200: {
         description: 'List',
@@ -269,6 +272,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id: campaignId } = c.req.valid('param');
+    const { limit, offset } = c.req.valid('query');
     await requireCampaignAdmin(campaignId, user.id);
     const db = getDb();
     const inviterAlias = alias(users, 'inviter');
@@ -289,7 +293,10 @@ router.openapi(
           eq(campaignInvitations.campaignId, campaignId),
           eq(campaignInvitations.status, 'pending'),
         ),
-      );
+      )
+      .orderBy(desc(campaignInvitations.createdAt), desc(campaignInvitations.id))
+      .limit(limit)
+      .offset(offset);
     const out = rows.map((r) => buildInvitationOut(r.invitation, r.campaign, r.inviter, r.invitee));
     return c.json(out, 200);
   },
@@ -357,6 +364,7 @@ router.openapi(
     tags: ['invitations'],
     summary: 'List the current user’s pending invitations',
     security: [{ bearerAuth: [] }],
+    request: { query: listQuery.pick({ limit: true, offset: true }) },
     responses: {
       200: {
         description: 'List',
@@ -366,6 +374,7 @@ router.openapi(
   }),
   async (c) => {
     const user = c.get('user');
+    const { limit, offset } = c.req.valid('query');
     const db = getDb();
     const inviterAlias = alias(users, 'inviter');
     const inviteeAlias = alias(users, 'invitee');
@@ -382,7 +391,10 @@ router.openapi(
       .innerJoin(inviteeAlias, eq(inviteeAlias.id, campaignInvitations.inviteeId))
       .where(
         and(eq(campaignInvitations.inviteeId, user.id), eq(campaignInvitations.status, 'pending')),
-      );
+      )
+      .orderBy(desc(campaignInvitations.createdAt), desc(campaignInvitations.id))
+      .limit(limit)
+      .offset(offset);
     const out = rows.map((r) => buildInvitationOut(r.invitation, r.campaign, r.inviter, r.invitee));
     return c.json(out, 200);
   },

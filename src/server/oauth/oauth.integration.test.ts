@@ -440,7 +440,11 @@ describe('delegated OAuth and MCP', () => {
       idempotencyKey,
     });
     expect(created.result.isError).not.toBe(true);
-    const createdBody = created.result.structuredContent.body as { id: string };
+    const createdBody = created.result.structuredContent.body as {
+      acknowledged: true;
+      resourceId: string;
+      revision: number;
+    };
     const replayed = await callTool('gpc_create_character', {
       body: { name: 'Agent Character' },
       idempotencyKey,
@@ -453,7 +457,7 @@ describe('delegated OAuth and MCP', () => {
     expect(conflict.result.isError).toBe(true);
     expect(conflict.result.structuredContent.status).toBe(409);
 
-    const history = await app.request(`/api/v1/characters/${createdBody.id}/history`, {
+    const history = await app.request(`/api/v1/characters/${createdBody.resourceId}/history`, {
       headers: { authorization: `Bearer ${session.accessToken}` },
     });
     expect(history.status).toBe(200);

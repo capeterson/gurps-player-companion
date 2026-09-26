@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { type OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { upgradeWebSocket, websocket } from 'hono/bun';
 import { cors } from 'hono/cors';
@@ -28,6 +29,19 @@ import { durableIdempotency } from './services/idempotency.ts';
 import { mutationInvalidation } from './services/mutationInvalidation.ts';
 import { attachStaticHandler } from './static.ts';
 
+function acceptsGzip(value: string): boolean {
+  const qualities = new Map<string, number>();
+  for (const part of value.split(',')) {
+    const [rawCoding, ...parameters] = part.split(';');
+    const coding = rawCoding?.trim().toLowerCase();
+    if (!coding) continue;
+    const qualityParameter = parameters.find((parameter) => parameter.trim().startsWith('q='));
+    const quality = qualityParameter ? Number(qualityParameter.trim().slice(2)) : 1;
+    qualities.set(coding, Number.isFinite(quality) ? quality : 0);
+  }
+  return (qualities.get('gzip') ?? qualities.get('*') ?? 0) > 0;
+}
+
 export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   const app = createOpenApiApp();
 
@@ -43,6 +57,45 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
 
   app.use('/api/v1/*', durableIdempotency);
   app.use('/api/v1/*', mutationInvalidation);
+
+  // Tool discovery can carry a substantial JSON Schema catalog. Hono's stock
+  // middleware relies on CompressionStream, which is absent in the supported
+  // Bun runtime, so compress JSON responses with node:zlib compatibility.
+  if (config.environment !== 'development') {
+    app.use('/mcp', async (c, next) => {
+      await next();
+      const response = c.res;
+      if (
+        !response.body ||
+        response.headers.has('content-encoding') ||
+        !response.headers.get('content-type')?.includes('json') ||
+        !acceptsGzip(c.req.header('accept-encoding') ?? '')
+      ) {
+        return;
+      }
+      const bytes = new Uint8Array(await response.clone().arrayBuffer());
+      if (bytes.byteLength < 1_024) return;
+      const compressed = Uint8Array.from(gzipSync(bytes));
+      const headers = new Headers(response.headers);
+      headers.set('content-encoding', 'gzip');
+      headers.delete('content-length');
+      const vary = headers.get('vary');
+      if (
+        !vary
+          ?.toLowerCase()
+          .split(',')
+          .map((item) => item.trim())
+          .includes('accept-encoding')
+      ) {
+        headers.set('vary', vary ? `${vary}, Accept-Encoding` : 'Accept-Encoding');
+      }
+      c.res = new Response(compressed.buffer, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    });
+  }
 
   if (config.corsOrigins.length > 0) {
     app.use(

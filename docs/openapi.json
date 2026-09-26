@@ -5034,6 +5034,47 @@
             "bearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Case-insensitive name/text filter."
+            },
+            "required": false,
+            "description": "Case-insensitive name/text filter.",
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "description": "Maximum rows."
+            },
+            "required": false,
+            "description": "Maximum rows.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0,
+              "description": "Rows to skip."
+            },
+            "required": false,
+            "description": "Rows to skip.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Campaign list",
@@ -7754,6 +7795,33 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "description": "Maximum rows."
+            },
+            "required": false,
+            "description": "Maximum rows.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0,
+              "description": "Rows to skip."
+            },
+            "required": false,
+            "description": "Rows to skip.",
+            "name": "offset",
+            "in": "query"
           }
         ],
         "responses": {
@@ -7942,6 +8010,35 @@
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "description": "Maximum rows."
+            },
+            "required": false,
+            "description": "Maximum rows.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0,
+              "description": "Rows to skip."
+            },
+            "required": false,
+            "description": "Rows to skip.",
+            "name": "offset",
+            "in": "query"
           }
         ],
         "responses": {
@@ -8331,6 +8428,27 @@
             },
             "required": false,
             "name": "unreadOnly",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000
+            },
+            "required": false,
+            "name": "offset",
             "in": "query"
           }
         ],
@@ -9658,7 +9776,7 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Get the campaign library (member or owner)",
+        "summary": "Get/filter the campaign library (member or owner)",
         "parameters": [
           {
             "schema": {
@@ -9668,6 +9786,64 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "traits",
+                "skills",
+                "spells",
+                "items",
+                "languages",
+                "techniques",
+                "styles",
+                "enchantments",
+                "activeEffects"
+              ],
+              "description": "Return only this library section; every other section is an empty array."
+            },
+            "required": false,
+            "description": "Return only this library section; every other section is an empty array.",
+            "name": "section",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Name substring filter."
+            },
+            "required": false,
+            "description": "Name substring filter.",
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "description": "Maximum rows per section."
+            },
+            "required": false,
+            "description": "Maximum rows per section.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000,
+              "description": "Rows to skip."
+            },
+            "required": false,
+            "description": "Rows to skip.",
+            "name": "offset",
+            "in": "query"
           }
         ],
         "responses": {
@@ -21941,7 +22117,7 @@
         "tags": [
           "adventure-log"
         ],
-        "summary": "List log entries (members see campaign-visible + their own private)",
+        "summary": "List/search log entries (members see campaign-visible + their own private)",
         "security": [
           {
             "bearerAuth": []
@@ -21956,6 +22132,45 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Case-insensitive name/text filter."
+            },
+            "required": false,
+            "description": "Case-insensitive name/text filter.",
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "description": "Maximum rows."
+            },
+            "required": false,
+            "description": "Maximum rows.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0,
+              "description": "Rows to skip."
+            },
+            "required": false,
+            "description": "Rows to skip.",
+            "name": "offset",
+            "in": "query"
           }
         ],
         "responses": {
@@ -22607,6 +22822,45 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Case-insensitive name/text filter."
+            },
+            "required": false,
+            "description": "Case-insensitive name/text filter.",
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "description": "Maximum rows."
+            },
+            "required": false,
+            "description": "Maximum rows.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0,
+              "description": "Rows to skip."
+            },
+            "required": false,
+            "description": "Rows to skip.",
+            "name": "offset",
+            "in": "query"
           }
         ],
         "responses": {
@@ -25914,7 +26168,48 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List the user’s characters and characters in their campaigns",
+        "summary": "List/search the user’s characters and characters in their campaigns",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "Case-insensitive name/text filter."
+            },
+            "required": false,
+            "description": "Case-insensitive name/text filter.",
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 200,
+              "description": "Maximum rows."
+            },
+            "required": false,
+            "description": "Maximum rows.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 100000,
+              "default": 0,
+              "description": "Rows to skip."
+            },
+            "required": false,
+            "description": "Rows to skip.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "List",

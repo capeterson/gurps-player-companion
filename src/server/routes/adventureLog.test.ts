@@ -99,6 +99,23 @@ describe('adventure-log sessionNumber + location', () => {
     expect(withoutMeta?.location).toBeNull();
   });
 
+  it('supports bounded search and offset pagination', async () => {
+    const { accessToken } = await registerUser('log-filter');
+    const campaignId = await createCampaign(accessToken);
+    await createEntry(accessToken, campaignId, { title: 'Dragon one' });
+    await createEntry(accessToken, campaignId, { title: 'Quiet interlude' });
+    await createEntry(accessToken, campaignId, { title: 'Dragon two' });
+
+    const response = await app.request(
+      `/api/v1/campaigns/${campaignId}/log?search=dragon&limit=1&offset=1`,
+      { headers: jsonHeaders(accessToken) },
+    );
+    expect(response.status).toBe(200);
+    const entries = (await response.json()) as Array<{ title: string }>;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.title.toLowerCase()).toContain('dragon');
+  });
+
   it('PATCH updates the fields and preserves them on later partial edits', async () => {
     const { accessToken } = await registerUser('log-patch');
     const campaignId = await createCampaign(accessToken);
