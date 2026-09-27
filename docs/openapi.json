@@ -44,14 +44,16 @@
             "enum": [
               "gilded-tome",
               "midnight-gilt",
-              "verdigris-brass"
+              "verdigris-brass",
+              "arcane-dark"
             ]
           },
           "lightTheme": {
             "type": "string",
             "enum": [
               "illuminated-manuscript",
-              "heraldic-vellum"
+              "heraldic-vellum",
+              "arcane-light"
             ]
           }
         },
@@ -68,14 +70,16 @@
             "enum": [
               "gilded-tome",
               "midnight-gilt",
-              "verdigris-brass"
+              "verdigris-brass",
+              "arcane-dark"
             ]
           },
           "lightTheme": {
             "type": "string",
             "enum": [
               "illuminated-manuscript",
-              "heraldic-vellum"
+              "heraldic-vellum",
+              "arcane-light"
             ]
           }
         },
@@ -26278,6 +26282,12 @@
                           "private"
                         ]
                       },
+                      "pointsGained": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
                       "xpAwards": {
                         "type": "array",
                         "items": {
@@ -26409,6 +26419,23 @@
                     ],
                     "default": "campaign"
                   },
+                  "pointsGained": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "description": "Points per recipient; omit for notes only, null clears an award. Increases character point caps, not the campaign starting target."
+                  },
+                  "awardCharacterIds": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 500,
+                    "description": "Recipient subset; null or omitted on create awards all current campaign characters. Amount-only edits retain the saved recipients. Only campaign owners may award other players characters."
+                  },
                   "xpAwards": {
                     "type": "array",
                     "items": {
@@ -26429,7 +26456,7 @@
                         "amount"
                       ]
                     },
-                    "maxItems": 50,
+                    "maxItems": 500,
                     "default": []
                   }
                 },
@@ -26493,6 +26520,12 @@
                         "campaign",
                         "private"
                       ]
+                    },
+                    "pointsGained": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 1000
                     },
                     "xpAwards": {
                       "type": "array",
@@ -26645,6 +26678,23 @@
                     ],
                     "default": "campaign"
                   },
+                  "pointsGained": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "description": "Points per recipient; omit for notes only, null clears an award. Increases character point caps, not the campaign starting target."
+                  },
+                  "awardCharacterIds": {
+                    "type": "array",
+                    "nullable": true,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 500,
+                    "description": "Recipient subset; null or omitted on create awards all current campaign characters. Amount-only edits retain the saved recipients. Only campaign owners may award other players characters."
+                  },
                   "xpAwards": {
                     "type": "array",
                     "items": {
@@ -26665,7 +26715,7 @@
                         "amount"
                       ]
                     },
-                    "maxItems": 50,
+                    "maxItems": 500,
                     "default": []
                   }
                 }
@@ -26725,6 +26775,12 @@
                         "campaign",
                         "private"
                       ]
+                    },
+                    "pointsGained": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 1000
                     },
                     "xpAwards": {
                       "type": "array",
@@ -26786,6 +26842,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid point recipients or awards",
             "content": {
               "application/json": {
                 "schema": {
@@ -30590,6 +30656,9 @@
                       ],
                       "default": "full"
                     },
+                    "earnedPoints": {
+                      "type": "integer"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -34221,6 +34290,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",
@@ -38125,6 +38197,9 @@
                       ],
                       "default": "full"
                     },
+                    "earnedPoints": {
+                      "type": "integer"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -41835,6 +41910,9 @@
                         "full"
                       ],
                       "default": "full"
+                    },
+                    "earnedPoints": {
+                      "type": "integer"
                     },
                     "id": {
                       "type": "string",
@@ -46392,6 +46470,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",
@@ -50971,6 +51052,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -54624,6 +54708,9 @@
                         "full"
                       ],
                       "default": "full"
+                    },
+                    "earnedPoints": {
+                      "type": "integer"
                     },
                     "id": {
                       "type": "string",
@@ -58808,6 +58895,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",
@@ -63013,6 +63103,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -66666,6 +66759,9 @@
                         "full"
                       ],
                       "default": "full"
+                    },
+                    "earnedPoints": {
+                      "type": "integer"
                     },
                     "id": {
                       "type": "string",
@@ -70486,6 +70582,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",
@@ -74329,6 +74428,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -77982,6 +78084,9 @@
                         "full"
                       ],
                       "default": "full"
+                    },
+                    "earnedPoints": {
+                      "type": "integer"
                     },
                     "id": {
                       "type": "string",
@@ -81747,6 +81852,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",
@@ -85535,6 +85643,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -89188,6 +89299,9 @@
                         "full"
                       ],
                       "default": "full"
+                    },
+                    "earnedPoints": {
+                      "type": "integer"
                     },
                     "id": {
                       "type": "string",
@@ -92972,6 +93086,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",
@@ -96778,6 +96895,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -100431,6 +100551,9 @@
                         "full"
                       ],
                       "default": "full"
+                    },
+                    "earnedPoints": {
+                      "type": "integer"
                     },
                     "id": {
                       "type": "string",
@@ -106144,6 +106267,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",
@@ -111880,6 +112006,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -115533,6 +115662,9 @@
                         "full"
                       ],
                       "default": "full"
+                    },
+                    "earnedPoints": {
+                      "type": "integer"
                     },
                     "id": {
                       "type": "string",
@@ -119279,6 +119411,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -122936,6 +123071,9 @@
                           ],
                           "default": "full"
                         },
+                        "earnedPoints": {
+                          "type": "integer"
+                        },
                         "id": {
                           "type": "string",
                           "format": "uuid"
@@ -126590,6 +126728,9 @@
                             "full"
                           ],
                           "default": "full"
+                        },
+                        "earnedPoints": {
+                          "type": "integer"
                         },
                         "id": {
                           "type": "string",

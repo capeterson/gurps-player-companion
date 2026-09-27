@@ -32331,6 +32331,18 @@
                         "private"
                       ]
                     },
+                    "pointsGained": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "xpAwards": {
                       "type": "array",
                       "items": {
@@ -32522,6 +32534,35 @@
                 ],
                 "default": "campaign"
               },
+              "pointsGained": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "description": "Points per recipient; omit for notes only, null clears an award. Increases character point caps, not the campaign starting target."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "awardCharacterIds": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 500,
+                    "description": "Recipient subset; null or omitted on create awards all current campaign characters. Amount-only edits retain the saved recipients. Only campaign owners may award other players characters."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "xpAwards": {
                 "type": "array",
                 "items": {
@@ -32542,7 +32583,7 @@
                     "amount"
                   ]
                 },
-                "maxItems": 50,
+                "maxItems": 500,
                 "default": []
               }
             },
@@ -32875,6 +32916,35 @@
                 ],
                 "default": "campaign"
               },
+              "pointsGained": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000,
+                    "description": "Points per recipient; omit for notes only, null clears an award. Increases character point caps, not the campaign starting target."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "awardCharacterIds": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 500,
+                    "description": "Recipient subset; null or omitted on create awards all current campaign characters. Amount-only edits retain the saved recipients. Only campaign owners may award other players characters."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "xpAwards": {
                 "type": "array",
                 "items": {
@@ -32895,7 +32965,7 @@
                     "amount"
                   ]
                 },
-                "maxItems": 50,
+                "maxItems": 500,
                 "default": []
               }
             }
@@ -37449,6 +37519,9 @@
                           "full"
                         ],
                         "default": "full"
+                      },
+                      "earnedPoints": {
+                        "type": "integer"
                       },
                       "id": {
                         "type": "string",

@@ -5,20 +5,21 @@ root README links those exact files; the unauthenticated landing page serves
 those same assets at `/screenshots/`. Refresh them together by replacing the
 canonical files, never by adding a second copy under `docs/`.
 
-Captured on 2026-09-26 from `257e4fb` plus the Overview, theme-picker,
+Captured on 2026-09-26 from `d5bc613` plus the Overview, theme-picker,
 campaign-transfer confirmation, adventure-point awards, and landing-page changes
 in this change. These are real Chromium screenshots, not mockups, captured from
 this checkout's isolated `gpc-179510909` development stack at
-`http://localhost:20909`. All pictured accounts, characters, and campaigns come
+`http://localhost:20909`, using a freshly migrated and seeded
+`gpc_player_experience` database. All pictured accounts, characters, and campaigns come
 from the fictional [standard seed](../../bootstrap/README.md); no production
 account or campaign was used.
 
 | Canonical file | Surface | Theme | Image size |
 | --- | --- | --- | --- |
-| `armor-desktop.png` | Complete Incoming attack panel: torso protection, coverage map, active defenses, and cutting-damage controls | Gilded Tome | 1224 × 1284 |
+| `armor-desktop.png` | Complete Incoming attack panel: torso protection, coverage map, active defenses, and cutting-damage controls | Gilded Tome | 1224 × 1283 |
 | `combat-mobile.png` | Kestrel Vale's Combat section, current HP/FP, weapon attacks, and mobile navigation | Gilded Tome | 430 × 932 |
 | `damage-mobile.png` | Incoming-damage preview: 10 cutting damage against torso DR 5 yields 7 injury | Gilded Tome | 430 × 932 |
-| `inventory-desktop.png` | Complete Inventory panel, worn/equipped equipment, and expanded three-level trail-pack contents | Illuminated Manuscript | 1224 × 1458 |
+| `inventory-desktop.png` | Complete Inventory panel, worn/equipped equipment, and expanded three-level trail-pack contents | Illuminated Manuscript | 1224 × 1483 |
 | `campaign-desktop.png` | Lantern Coast campaign overview, rules, roster, and workspace navigation | Illuminated Manuscript | 1440 × 920 |
 
 Desktop panel captures use a 1440-pixel browser width and a tall viewport so the

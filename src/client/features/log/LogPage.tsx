@@ -153,7 +153,7 @@ function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
     visibility: entry.visibility,
     xpAwards: entry.xpAwards,
     pointsGained: pointsForEntry(entry),
-    awardCharacterIds: entry.xpAwards.map((award) => award.characterId),
+    awardCharacterIds: [...new Set(entry.xpAwards.map((award) => award.characterId))],
   };
 }
 
@@ -362,6 +362,11 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     const snapshot = snapshotOf(draft, trimmed, trimmedLocation);
     if (editor.kind === 'edit') {
       const original = entries.data?.find((entry) => entry.id === editor.entryId);
+      const originalDraft = original ? draftFromEntry(original) : null;
+      const unchangedAwards =
+        originalDraft &&
+        draft.pointsGained === originalDraft.pointsGained &&
+        JSON.stringify(draft.awardCharacterIds) === JSON.stringify(originalDraft.awardCharacterIds);
       update.mutate({
         entryId: editor.entryId,
         snapshot,
@@ -370,6 +375,10 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           title: trimmed,
           location,
           sessionNumber,
+          // Leave historical concrete awards alone for ordinary text edits,
+          // including legacy entries with duplicate recipient rows.
+          xpAwards: undefined,
+          ...(unchangedAwards ? { pointsGained: undefined, awardCharacterIds: undefined } : {}),
           // Heterogeneous legacy awards have no single amount to display; keep
           // their concrete list when the optional amount is left blank.
           ...(draft.pointsGained == null && original && pointsForEntry(original) === null

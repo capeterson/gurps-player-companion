@@ -13,24 +13,37 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
-    ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}),
+    ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+    : {}),
   args: ['--no-sandbox'],
 });
-const page = await browser.newPage({ baseURL, viewport: { width: 1440, height: 3000 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({
+  baseURL,
+  viewport: { width: 1440, height: 3000 },
+  deviceScaleFactor: 1,
+});
 page.setDefaultTimeout(20_000);
 try {
   await page.addInitScript(() => localStorage.setItem('gpc.theme', 'dark'));
   await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.getByLabel(/email/i).fill('rowan@example.invalid');
-  await page.getByLabel(/password/i).fill(process.env.SCREENSHOT_SEED_PASSWORD ?? 'change-me-please-this-is-a-seed-account');
+  await page
+    .getByLabel(/password/i)
+    .fill(process.env.SCREENSHOT_SEED_PASSWORD ?? 'change-me-please-this-is-a-seed-account');
   await page.getByRole('button', { name: /sign in/i }).click();
   await page.waitForURL('/');
   console.log('Signed in to local demo');
   await page.goto('/characters');
-  await page.getByRole('link', { name: /Kestrel Vale/ }).first().click();
+  await page
+    .getByRole('link', { name: /Kestrel Vale/ })
+    .first()
+    .click();
   await section('Combat');
   await page.getByText("Wayfarer's sword", { exact: true }).waitFor();
-  await page.getByRole('region', { name: 'Incoming attack' }).getByLabel(/^Damage type/).selectOption('cut');
+  await page
+    .getByRole('region', { name: 'Incoming attack' })
+    .getByLabel(/^Damage type/)
+    .selectOption('cut');
   await ready();
   const armor = page.getByRole('region', { name: 'Incoming attack' }).locator('../..');
   await armor.scrollIntoViewIfNeeded();
@@ -54,19 +67,34 @@ try {
   const expand = page.getByRole('button', { name: 'Expand contents', exact: true });
   while (await expand.count()) await expand.first().click();
   await ready();
-  const inventory = page.getByRole('heading', { name: 'Inventory', exact: true }).last().locator('..');
+  const inventory = page
+    .getByRole('heading', { name: 'Inventory', exact: true })
+    .last()
+    .locator('..');
   await inventory.scrollIntoViewIfNeeded();
-  await inventory.screenshot({ path: resolve(output, 'inventory-desktop.png'), animations: 'disabled' });
+  await inventory.screenshot({
+    path: resolve(output, 'inventory-desktop.png'),
+    animations: 'disabled',
+  });
   console.log('Inventory captured');
   await page.setViewportSize({ width: 1440, height: 920 });
   await page.goto('/campaigns');
-  await page.getByRole('link', { name: /The Lantern Coast/ }).first().click();
+  await page
+    .getByRole('link', { name: /The Lantern Coast/ })
+    .first()
+    .click();
   await page.getByRole('heading', { name: 'Characters', exact: true }).waitFor();
   await page.getByText('Bram Stonebridge', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Switch to Light mode', exact: true }).click();
   await ready();
   await page.screenshot({ path: resolve(output, 'campaign-desktop.png'), animations: 'disabled' });
-  for (const file of ['armor-desktop', 'combat-mobile', 'damage-mobile', 'inventory-desktop', 'campaign-desktop']) {
+  for (const file of [
+    'armor-desktop',
+    'combat-mobile',
+    'damage-mobile',
+    'inventory-desktop',
+    'campaign-desktop',
+  ]) {
     const bytes = await readFile(resolve(output, `${file}.png`));
     console.log(`${file}.png: ${bytes.readUInt32BE(16)} × ${bytes.readUInt32BE(20)}`);
   }

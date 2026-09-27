@@ -85,6 +85,25 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   ).toHaveCount(0);
   await expect(page.getByRole('link', { name: /explore the project on github/i })).toBeVisible();
 
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    const screenshots = page.getByRole('img');
+    await expect(screenshots).toHaveCount(3);
+    for (let index = 0; index < 3; index += 1) {
+      const image = screenshots.nth(index);
+      await image.scrollIntoViewIfNeeded();
+      await expect(image).toBeVisible();
+      const box = await image.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.x).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? 0) + (box?.width ?? width)).toBeLessThanOrEqual(width);
+    }
+  }
+
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/register');
   await page.getByLabel(/email/i).fill(createAccountEmail());
   await page.getByLabel(/display name/i).fill('Landing and Campaign QA');
@@ -96,7 +115,13 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   const darkTheme = page.getByLabel('Dark theme');
   await expect(darkTheme).toBeVisible();
   await darkTheme.selectOption('arcane-dark');
+  await page.getByRole('button', { name: /switch to dark mode/i }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'arcane-dark');
+  const lightTheme = page.getByLabel('Light theme');
+  await expect(lightTheme).toContainText('Arcane Purple');
+  await lightTheme.selectOption('arcane-light');
+  await page.getByRole('button', { name: /switch to light mode/i }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'arcane-light');
 
   const firstCampaignName = `Campaign A ${suffix()}`;
   await createCampaign(page, firstCampaignName);
@@ -208,4 +233,28 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await expectCharacterNavigationReady(page);
   const earnedPointsLine = page.getByText('Earned points', { exact: true }).locator('xpath=..');
   await expect(earnedPointsLine).toContainText('4');
+
+  const finalCampaignSelect = page.getByLabel('campaign');
+  for (const width of [320, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    await finalCampaignSelect.selectOption('');
+    const leaveDialog = page.getByRole('dialog', { name: 'Change character campaign?' });
+    await expect(leaveDialog).toBeVisible();
+    await expectDialogInsideViewport(page, width, 900);
+    if (width === 320) await page.screenshot({ path: 'test-results/campaign-leave-320.png' });
+    await leaveDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(finalCampaignSelect).toHaveValue(
+      (await finalCampaignSelect
+        .locator('option', { hasText: secondCampaignName })
+        .getAttribute('value')) ?? '',
+    );
+  }
+
+  await finalCampaignSelect.selectOption('');
+  const leaveConfirmed = page.getByRole('dialog', { name: 'Change character campaign?' });
+  await expect(leaveConfirmed).toBeVisible();
+  await expectDialogInsideViewport(page, 768, 900);
+  await page.screenshot({ path: 'test-results/campaign-leave-768.png' });
+  await leaveConfirmed.getByRole('button', { name: 'Change campaign' }).click();
+  await expect(finalCampaignSelect).toHaveValue('');
 });

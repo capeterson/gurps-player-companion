@@ -8,9 +8,11 @@
 
 import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
+import type { XpAward } from '../../shared/schemas/adventureLog.ts';
 import { createApp } from '../app.ts';
-import { withAudit } from '../db/auditContext.ts';
+import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { adventureLogEntries, characters } from '../db/schema.ts';
+import { lockLogCampaign, resolveLogAwards } from '../services/adventureLogAwards.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
 configureIntegrationTestEnvironment();
@@ -527,3 +529,116 @@ it('reverses every historical duplicate award when a legacy log entry is deleted
   expect(deleted.status).toBe(204);
   expect(await earnedPoints(accessToken, character.id)).toBe(0);
 });
+
+it('locks transferred historical and new recipients together without cross-campaign deadlock', async () => {
+  const { accessToken } = await registerUser('points-cross-campaign');
+  const campaignA = await createCampaign(accessToken);
+  const campaignB = await createCampaign(accessToken);
+  const x = await createCharacter(accessToken, campaignA, 'Cross-campaign X');
+  const y = await createCharacter(accessToken, campaignB, 'Cross-campaign Y');
+  const entryA = await createEntry(accessToken, campaignA, { pointsGained: 3 });
+  const entryB = await createEntry(accessToken, campaignB, { pointsGained: 5 });
+  for (const [characterId, campaignId] of [
+    [x.id, campaignB],
+    [y.id, campaignA],
+  ]) {
+    const response = await app.request(`/api/v1/characters/${characterId}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ campaignId }),
+    });
+    expect(response.status).toBe(200);
+  }
+  const me = await app.request('/api/v1/auth/me', { headers: jsonHeaders(accessToken) });
+  const actor = (await me.json()) as { id: string };
+
+  // Hold both edits just after their roster lookup. If that lookup also
+  // locked rows, each transaction would now hold the other's next recipient
+  // before both tried to lock the full union, deterministically deadlocking.
+  let arrivals = 0;
+  let release = () => {};
+  let rejectBarrier = (_error: Error) => {};
+  const barrier = new Promise<void>((resolve, reject) => {
+    release = resolve;
+    rejectBarrier = reject;
+  });
+  const barrierTimeout = setTimeout(
+    () => rejectBarrier(new Error('Both roster snapshots must complete before recipient locks')),
+    5000,
+  );
+  const withRosterBarrier = (tx: AuditTx): AuditTx => {
+    let characterLookups = 0;
+    const wrapQuery = (query: object, roster = false): object =>
+      new Proxy(query, {
+        get(target, property) {
+          const value: unknown = Reflect.get(target, property, target);
+          if (property === 'then' && roster) {
+            return (resolve: (rows: unknown) => unknown, reject: (error: unknown) => unknown) =>
+              new Promise<unknown>((done, fail) => {
+                if (typeof value !== 'function')
+                  throw new Error('Expected thenable database query');
+                Reflect.apply(value, target, [done, fail]);
+              })
+                .then(async (rows) => {
+                  arrivals += 1;
+                  if (arrivals === 2) {
+                    clearTimeout(barrierTimeout);
+                    release();
+                  }
+                  await barrier;
+                  return rows;
+                })
+                .then(resolve, reject);
+          }
+          if (typeof value !== 'function') return value;
+          return (...args: unknown[]) => {
+            const result: unknown = Reflect.apply(value, target, args);
+            const isRoster =
+              roster || (property === 'from' && args[0] === characters && characterLookups++ === 0);
+            return result !== null && typeof result === 'object'
+              ? wrapQuery(result, isRoster)
+              : result;
+          };
+        },
+      });
+    return new Proxy(tx, {
+      get(target, property) {
+        const value: unknown = Reflect.get(target, property, target);
+        if (property === 'select' && typeof value === 'function') {
+          return (...args: unknown[]) => wrapQuery(Reflect.apply(value, target, args) as object);
+        }
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  };
+  try {
+    await Promise.all(
+      [
+        { campaignId: campaignA, entry: entryA, recipient: y.id, points: 7 },
+        { campaignId: campaignB, entry: entryB, recipient: x.id, points: 9 },
+      ].map(({ campaignId, entry, recipient, points }) =>
+        withAudit(actor.id, crypto.randomUUID(), async (tx) => {
+          const campaign = await lockLogCampaign(tx, campaignId, actor.id);
+          const xpAwards = await resolveLogAwards(
+            withRosterBarrier(tx),
+            campaignId,
+            actor.id,
+            campaign.ownerId,
+            { pointsGained: points, awardCharacterIds: [recipient] },
+            entry.xpAwards as XpAward[],
+            entry.pointsGained as number,
+          );
+          await tx
+            .update(adventureLogEntries)
+            .set({ pointsGained: points, xpAwards })
+            .where(eq(adventureLogEntries.id, entry.id as string));
+        }),
+      ),
+    );
+  } finally {
+    clearTimeout(barrierTimeout);
+  }
+  expect(arrivals).toBe(2);
+  expect(await earnedPoints(accessToken, x.id)).toBe(9);
+  expect(await earnedPoints(accessToken, y.id)).toBe(7);
+}, 10000);
