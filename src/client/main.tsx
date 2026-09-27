@@ -16,13 +16,13 @@ import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessionQueryCache.tsx';
-import { applyTheme, readStoredTheme } from './lib/theme.ts';
+import { applyStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
 import { RequireSessionOnly } from './routes/RequireSessionOnly.tsx';
 import './styles/theme.css';
 
-applyTheme(readStoredTheme());
+applyStoredTheme();
 registerSwLifecycle();
 
 // Touch-device support for the inventory's HTML5 drag-and-drop.

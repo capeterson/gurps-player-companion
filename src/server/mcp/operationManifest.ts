@@ -101,6 +101,8 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   excluded('POST', '/api/v1/auth/logout', 'app-session infrastructure'),
   excluded('POST', '/api/v1/auth/password', 'credential infrastructure'),
   tool('GET', '/api/v1/auth/me', 'gpc_get_current_user', 'gpc:read'),
+  excluded('GET', '/api/v1/auth/preferences', 'browser display-preference infrastructure'),
+  excluded('PATCH', '/api/v1/auth/preferences', 'browser display-preference infrastructure'),
   excluded('POST', '/api/v1/auth/forgot-password', 'account recovery infrastructure'),
   excluded('POST', '/api/v1/auth/reset-password', 'account recovery infrastructure'),
   excluded('GET', '/api/v1/auth/api-keys', 'credential infrastructure'),

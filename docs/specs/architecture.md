@@ -97,7 +97,7 @@ or dynamically registered and stores CIMD cache expiry.
 | Client | React 19, React Router 7, TanStack Query 5 |
 | Local store | Dexie 4 package (IndexedDB), application schema version 10 |
 | PWA | vite-plugin-pwa + Workbox |
-| Styling | Tailwind 4 + DaisyUI 5 ("Arcane" theme) |
+| Styling | Tailwind 4 + DaisyUI 5 (gold themes: Gilded Tome, Midnight Gilt, Verdigris & Brass, Illuminated Manuscript, Heraldic Vellum — `src/client/styles/theme.css`) |
 | Auth | JWT (`jose`) + refresh tokens; WebAuthn passkeys verified by `@simplewebauthn/server`; API keys |
 | Email | Resend |
 | Tests | `bun:test` (server/shared), Vitest (client), Playwright (e2e) |
@@ -223,7 +223,8 @@ see `0026_languages.sql` for the current template.
 
 Tables (grouped):
 
-- **Identity/auth**: `users`, `passkey_credentials`, `passkey_challenges`,
+- **Identity/auth**: `users` (including the CHECK-constrained `dark_theme` /
+  `light_theme` palette preferences), `passkey_credentials`, `passkey_challenges`,
   `refresh_tokens`, `password_reset_tokens`, `api_keys`, and durable
   `auth_rate_limits` counters. Public login, registration, password-reset, and
   passkey-login challenge requests consume bounded source and normalized-account

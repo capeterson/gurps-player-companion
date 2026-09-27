@@ -108,6 +108,7 @@ tools. The current covered surface is:
 | History | Character and campaign history, filters/pagination, existing privacy and role restrictions. |
 | Sync cursor/operations and WebSocket | Transport infrastructure excluded as tools; equivalent domain operations remain covered. MCP commits still propagate through the normal cursor/invalidation mechanisms. |
 | Login/register/recovery/refresh/logout, passwords, passkeys, API keys, OAuth consent/token management | Browser/security infrastructure excluded, except the safe current-user read above. |
+| Theme preferences (`GET`/`PATCH /auth/preferences`) | Browser display preference; excluded, and gated to interactive JWT sessions (`requireActiveJwt`). |
 | Admin, health, OpenAPI, static assets, MCP/OAuth discovery and transport | Infrastructure/admin excluded from player tools. |
 
 Device-only roll history and solo encounter scratchpads are not raw API

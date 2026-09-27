@@ -21,6 +21,7 @@ import {
   tokenPair,
   userOut,
 } from '../../shared/schemas/auth.ts';
+import { themePreferences, themePreferencesPatch } from '../../shared/schemas/themePreferences.ts';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
 import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
@@ -650,6 +651,74 @@ router.openapi(
     const user = rows[0];
     if (!user) throw new HTTPException(401, { message: 'unknown_user' });
     return c.json(userToOut(user), 200);
+  },
+);
+
+// Display preferences are a browser concern: interactive sessions only, never
+// API keys or delegated MCP tokens (see the MCP operation manifest exclusion).
+router.use('/auth/preferences', requireActiveJwt);
+router.openapi(
+  createRoute({
+    method: 'get',
+    path: '/auth/preferences',
+    tags: ['auth'],
+    summary: 'Return the authenticated user theme preferences',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Theme preferences',
+        content: { 'application/json': { schema: themePreferences } },
+      },
+      401: errorResponse('Unauthorized'),
+    },
+  }),
+  async (c) => {
+    const principal = c.get('user');
+    const [row] = await getDb()
+      .select({ darkTheme: users.darkTheme, lightTheme: users.lightTheme })
+      .from(users)
+      .where(eq(users.id, principal.id));
+    if (!row) throw new HTTPException(401, { message: 'unknown_user' });
+    return c.json(row, 200);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/auth/preferences',
+    tags: ['auth'],
+    summary: 'Update the authenticated user theme preferences',
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: { 'application/json': { schema: themePreferencesPatch } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Updated theme preferences',
+        content: { 'application/json': { schema: themePreferences } },
+      },
+      401: errorResponse('Unauthorized'),
+      422: errorResponse('Validation error'),
+    },
+  }),
+  async (c) => {
+    const body = c.req.valid('json');
+    const principal = c.get('user');
+    const [row] = await getDb()
+      .update(users)
+      .set({
+        ...(body.darkTheme ? { darkTheme: body.darkTheme } : {}),
+        ...(body.lightTheme ? { lightTheme: body.lightTheme } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, principal.id))
+      .returning({ darkTheme: users.darkTheme, lightTheme: users.lightTheme });
+    if (!row) throw new HTTPException(401, { message: 'unknown_user' });
+    return c.json(row, 200);
   },
 );
 
