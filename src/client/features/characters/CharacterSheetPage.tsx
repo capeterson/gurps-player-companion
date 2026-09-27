@@ -675,7 +675,7 @@ function IdentityPanel({
               onChange={(e) => {
                 const next = e.target.value || null;
                 if (next === character.campaignId) return;
-                if (character.campaignId !== null) {
+                if (character.campaignId != null) {
                   setPendingCampaign({ from: character.campaignId, to: next });
                 } else {
                   void saveCampaign(next);

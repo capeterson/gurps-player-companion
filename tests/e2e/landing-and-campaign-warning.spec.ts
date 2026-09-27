@@ -4,6 +4,8 @@ import { expect, test } from '@playwright/test';
 import { expectCharacterNavigationReady } from './character-navigation';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+const missedCharacterName =
+  'A Very Long Character Name For Someone Who Missed Session And Earned No Points';
 
 function createAccountEmail() {
   return `landing-flow-${suffix()}@example.com`;
@@ -185,7 +187,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
 
   const awardedCharacterUrl = page.url();
   await page.goto('/characters');
-  await page.getByLabel(/new character name/i).fill('Missed Session QA');
+  await page.getByLabel(/new character name/i).fill(missedCharacterName);
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
   await page.getByLabel('campaign').selectOption({ label: secondCampaignName });
@@ -222,7 +224,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await page.getByRole('button', { name: 'Choose characters' }).click();
   const recipients = page.getByRole('dialog', { name: 'Apply points to characters' });
   const missedSessionLabel = recipients
-    .getByText('Missed Session QA', { exact: true })
+    .getByText(missedCharacterName, { exact: true })
     .locator('xpath=..');
   await missedSessionLabel.getByRole('checkbox').uncheck();
   await recipients.getByRole('button', { name: 'Use selected characters' }).click();

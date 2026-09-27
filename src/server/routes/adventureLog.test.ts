@@ -480,7 +480,7 @@ it('awards the whole current roster once and adjusts amounts and subset edits by
       body: JSON.stringify(body),
     });
     expect(response.status).toBe(200);
-    expect(await balances()).toEqual(expected);
+    expect(await balances()).toEqual([...expected]);
   }
   const foreignCampaign = await createCampaign(accessToken);
   const foreign = await createCharacter(accessToken, foreignCampaign, 'Foreign');

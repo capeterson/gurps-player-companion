@@ -471,7 +471,7 @@ describe('LogPage', () => {
           const patch = adventureLogUpdate.parse(wireBody);
           // The mock applies the validated text-only request, preserving the
           // historical rows just as the shared route handler does.
-          entry = { ...entry, ...patch };
+          entry = { ...entry, body: patch.body ?? entry.body };
           return entry;
         }
         return undefined;
