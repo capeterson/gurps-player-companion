@@ -188,9 +188,15 @@ export function TableHeader({
   column,
   label,
   filterable = true,
+  indicatorClassName = '',
   children,
   ...props
-}: ComponentProps<'th'> & { column: string; label: string; filterable?: boolean }) {
+}: ComponentProps<'th'> & {
+  column: string;
+  label: string;
+  filterable?: boolean;
+  indicatorClassName?: string;
+}) {
   const table = useContext(TableContext);
   const setEnabled = table?.setColumnEnabled;
   useLayoutEffect(() => {
@@ -205,6 +211,7 @@ export function TableHeader({
   return (
     <th
       {...props}
+      className={`relative ${props.className ?? ''}`}
       scope="col"
       title={enabled ? 'Right-click, Alt-click or Shift+F10 to filter this column' : undefined}
       onContextMenu={(event) => {
@@ -239,7 +246,10 @@ export function TableHeader({
           label
         ))}
       {active && (
-        <span className="text-primary" aria-label={`${label} filtered`}>
+        <span
+          className={`pointer-events-none absolute right-1 top-0 text-[8px] leading-none text-primary ${indicatorClassName}`}
+          aria-label={`${label} filtered`}
+        >
           {' '}
           ⏷
         </span>

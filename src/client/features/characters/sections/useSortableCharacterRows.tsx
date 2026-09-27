@@ -135,6 +135,7 @@ export function SortableHeader<Sort extends string>({
   return (
     <TableHeader
       filterable={filterable}
+      indicatorClassName={hideButtonOnMobile ? 'hidden sm:inline' : ''}
       column={sort}
       label={label}
       scope="col"

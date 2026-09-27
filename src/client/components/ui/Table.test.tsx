@@ -115,14 +115,14 @@ it('combines selected values as OR within a column and AND across columns', () =
   expect(screen.getByRole('row', { name: /Ash/ })).toBeVisible();
   expect(screen.getByRole('row', { name: /Birch/ })).toBeVisible();
   expect(screen.getByRole('row', { name: /Cedar/ })).toBeVisible();
-  expect(screen.getByRole('row', { name: /Empty/, hidden: true })).not.toBeVisible();
+  expect(screen.getByLabelText('Empty unsaved editor').closest('tbody')).toHaveAttribute('hidden');
 
   const points = openFilter('Points');
   choose(points, '5');
   fireEvent.keyDown(points, { key: 'Escape' });
   expect(screen.getByRole('row', { name: /Ash/ })).toBeVisible();
   expect(screen.getByRole('row', { name: /Birch/ })).toBeVisible();
-  expect(screen.getByRole('row', { name: /Cedar/, hidden: true })).not.toBeVisible();
+  expect(screen.getByLabelText('Cedar unsaved editor').closest('tbody')).toHaveAttribute('hidden');
 });
 
 it('offers blank and null values and recovers from a zero-row result by clearing filters', () => {
@@ -137,6 +137,11 @@ it('offers blank and null values and recovers from a zero-row result by clearing
   choose(points, '—');
   fireEvent.keyDown(points, { key: 'Escape' });
   expect(screen.getByRole('row', { name: /Empty/ })).toBeVisible();
+  const fivePoints = openFilter('Points');
+  fireEvent.click(within(fivePoints).getByRole('button', { name: 'Clear column filter' }));
+  choose(fivePoints, '5');
+  fireEvent.keyDown(fivePoints, { key: 'Escape' });
+  expect(screen.getByText('No rows match the column filters.')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Clear all filters' }));
   expect(screen.getByRole('row', { name: /Ash/ })).toBeVisible();
   expect(screen.getByRole('row', { name: /Birch/ })).toBeVisible();
@@ -147,22 +152,33 @@ it('persists per preference key, reloads saved filters and changes scope when th
   const type = openFilter('Type');
   choose(type, 'Advantage');
   fireEvent.keyDown(type, { key: 'Escape' });
-  expect(screen.getByRole('row', { name: /Birch/, hidden: true })).not.toBeVisible();
+  expect(screen.getByLabelText('Birch unsaved editor').closest('tbody')).toHaveAttribute('hidden');
   view.unmount();
-  render(<Fixture />);
-  expect(screen.getByRole('row', { name: /Birch/, hidden: true })).not.toBeVisible();
+  const reloadedView = render(<Fixture />);
+  expect(screen.getByLabelText('Birch unsaved editor').closest('tbody')).toHaveAttribute('hidden');
   expect(localStorage.getItem('gpc:table-filters:v1:test:traits')).toContain('Advantage');
-  view.rerender(<Fixture preferenceKey="test:skills" />);
+  reloadedView.rerender(<Fixture preferenceKey="test:skills" />);
   expect(screen.getByRole('row', { name: /Birch/ })).toBeVisible();
 });
 
 it('keeps filtering disabled when opted out', () => {
+  localStorage.setItem('gpc:table-filters:v1:test:traits', JSON.stringify({ kind: ['Advantage'] }));
   render(<Fixture filterable={false} />);
   expect(screen.getByRole('columnheader', { name: 'Trait' })).toHaveTextContent('Trait');
   expect(screen.queryByRole('button', { name: 'Trait' })).not.toBeInTheDocument();
   fireEvent.contextMenu(screen.getByRole('columnheader', { name: 'Trait' }));
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.getByRole('row', { name: /Birch/ })).toBeVisible();
+});
+
+it('opens a filter with the keyboard and leaves default header behavior available', () => {
+  render(<Fixture />);
+  const header = screen.getByRole('columnheader', { name: 'Type' });
+  fireEvent.keyDown(header, { key: 'F10', shiftKey: true });
+  expect(screen.getByRole('dialog', { name: 'Filter Type' })).toBeVisible();
+  fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+  fireEvent.click(header, { altKey: true });
+  expect(screen.getByRole('dialog', { name: 'Filter Type' })).toBeVisible();
 });
 
 it('uses the complete source value set when only a page of rows is mounted', () => {
@@ -232,17 +248,17 @@ it('ignores malformed stored preferences and remains usable when storage reads o
   const view = render(<Fixture />);
   expect(screen.getByRole('row', { name: /Ash/ })).toBeVisible();
   view.unmount();
-  const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+  const getItem = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
     throw new Error('blocked');
   });
-  const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+  const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
     throw new Error('blocked');
   });
-  render(<Fixture />);
+  render(<Fixture preferenceKey="blocked" />);
   const dialog = openFilter('Type');
   choose(dialog, 'Advantage');
   fireEvent.keyDown(dialog, { key: 'Escape' });
-  expect(screen.getByRole('row', { name: /Birch/, hidden: true })).not.toBeVisible();
+  expect(screen.getByLabelText('Birch unsaved editor').closest('tbody')).toHaveAttribute('hidden');
   expect(screen.getByText(/could not remember table filters/i)).toBeVisible();
   getItem.mockRestore();
   setItem.mockRestore();

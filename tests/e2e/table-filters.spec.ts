@@ -23,7 +23,9 @@ async function openSeedCharacter(page: Page) {
   });
   const character = characters.find((candidate) => candidate.name === 'Kestrel Vale');
   expect(character, 'Kestrel Vale is missing from the seeded character list').toBeDefined();
-  return character?.id ?? '';
+  const id = character?.id ?? '';
+  await page.goto(`/characters/${id}`);
+  return id;
 }
 
 async function addLongTrait(page: Page, characterId: string, name: string) {
@@ -79,6 +81,37 @@ async function expectInsideViewport(page: Page, locator: Locator) {
   expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
 }
 
+async function expectMarkerInsideHeaderAndClearOfNeighbors(header: Locator, label: string) {
+  const marker = header.getByLabel(`${label} filtered`);
+  await expect(marker).toBeVisible();
+  const headerBox = await header.boundingBox();
+  const markerBox = await marker.boundingBox();
+  expect(headerBox).not.toBeNull();
+  expect(markerBox).not.toBeNull();
+  if (!headerBox || !markerBox) return;
+  expect(markerBox.x).toBeGreaterThanOrEqual(headerBox.x);
+  expect(markerBox.y).toBeGreaterThanOrEqual(headerBox.y);
+  expect(markerBox.x + markerBox.width).toBeLessThanOrEqual(headerBox.x + headerBox.width);
+  expect(markerBox.y + markerBox.height).toBeLessThanOrEqual(headerBox.y + headerBox.height);
+
+  for (const neighbor of [
+    header.locator('xpath=preceding-sibling::th[1]'),
+    header.locator('xpath=following-sibling::th[1]'),
+  ]) {
+    const sortButton = neighbor.getByRole('button', { name: /^Sort by / });
+    if (!(await sortButton.isVisible())) continue;
+    const buttonBox = await sortButton.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    if (!buttonBox) continue;
+    const overlaps =
+      markerBox.x < buttonBox.x + buttonBox.width &&
+      markerBox.x + markerBox.width > buttonBox.x &&
+      markerBox.y < buttonBox.y + buttonBox.height &&
+      markerBox.y + markerBox.height > buttonBox.y;
+    expect(overlaps, `${label} filter marker overlaps an adjacent sort button`).toBe(false);
+  }
+}
+
 test('column filters stay in the viewport, persist, compose with search and sorting, and clear', async ({
   page,
 }) => {
@@ -105,6 +138,11 @@ test('column filters stay in the viewport, persist, compose with search and sort
       await dialog.getByLabel('Search Trait values').fill(longName);
       await expect(dialog.getByText(longName, { exact: true })).toBeVisible();
       await dialog.getByLabel(longName).check();
+      await expectInsideViewport(page, dialog);
+      await expectMarkerInsideHeaderAndClearOfNeighbors(header, 'Trait');
+      if (width === 320 || width === 390) {
+        await page.screenshot({ path: `/tmp/table-filter-menu-${width}.png`, fullPage: false });
+      }
       await dialog.getByRole('button', { name: 'Close filter' }).click();
       await expect(table.getByRole('rowgroup', { name: longName })).toBeVisible();
       await expect(page.getByText('1 column filter active')).toBeVisible();
@@ -115,7 +153,15 @@ test('column filters stay in the viewport, persist, compose with search and sort
       await expect(reopened.getByLabel(longName)).toBeChecked();
       await reopened.getByRole('button', { name: 'Close filter' }).click();
       if (width === 320) {
-        await page.screenshot({ path: '/tmp/table-filter-menu-320x240.png', fullPage: false });
+        const pointsHeader = table.getByRole('columnheader', { name: /Points/ });
+        await pointsHeader.click({ button: 'right' });
+        const pointsDialog = page.getByRole('dialog', { name: 'Filter Points' });
+        await expectInsideViewport(page, pointsDialog);
+        await pointsDialog.locator('input[type="checkbox"]').first().check();
+        await pointsDialog.getByRole('button', { name: 'Close filter' }).click();
+        await expectMarkerInsideHeaderAndClearOfNeighbors(pointsHeader, 'Points');
+        await page.screenshot({ path: '/tmp/table-filter-points-320.png', fullPage: false });
+        await page.getByRole('button', { name: 'Clear all filters' }).click();
       }
     }
 
