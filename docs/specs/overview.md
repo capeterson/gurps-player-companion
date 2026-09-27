@@ -54,8 +54,9 @@ checklists for extending sync/history) live in
 ## Delegated agent access
 
 [MCP agent access](mcp-agent-access.md) provides remote Streamable HTTP at `/mcp`
-and OAuth delegation on the same app server. Settings lists and revokes connected
-clients, while `/oauth/consent` grants plain-language read/write/manage scopes.
+and OAuth delegation on the same app server. Settings lists connected clients
+and confirms destructive revocation before invalidating their grants, while
+`/oauth/consent` grants plain-language read/write/manage scopes.
 If the player's primary sign-in is no longer recent, the authorization flow
 returns to an explanatory login screen before rendering any approval controls,
 then resumes the complete consent request after login.

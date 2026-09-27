@@ -383,12 +383,51 @@ test.describe('delegated MCP OAuth acceptance', () => {
       );
       expect(converged.body).toMatchObject({ st: 11, dx: 12 });
 
+      await page.setViewportSize({ width: 320, height: 640 });
       await page.goto('/settings');
       await expect(page.getByRole('heading', { name: 'Connected apps' })).toBeVisible();
       const appName = page.getByText(CLIENT_NAME, { exact: true });
       await expect(appName).toBeVisible();
       const appCard = appName.locator('..').locator('..');
       await appCard.getByRole('button', { name: 'Revoke', exact: true }).click();
+      const revokeDialog = page.getByRole('dialog', { name: 'Revoke connected app?' });
+      await expect(revokeDialog).toBeVisible();
+      await expect(revokeDialog).toContainText(CLIENT_NAME);
+      await expect(revokeDialog).toContainText('invalidates all of its access and refresh tokens');
+      const modalBox = revokeDialog.locator('.modal-box');
+      await expect
+        .poll(() => modalBox.evaluate((element) => getComputedStyle(element).opacity))
+        .toBe('1');
+      const dialogBox = await modalBox.boundingBox();
+      const viewport = page.viewportSize();
+      expect(dialogBox).not.toBeNull();
+      expect(viewport).not.toBeNull();
+      if (!dialogBox || !viewport) throw new Error('revoke dialog geometry unavailable');
+      expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+      expect(dialogBox.y).toBeGreaterThanOrEqual(0);
+      expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(viewport.width);
+      expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(viewport.height);
+      await expect
+        .poll(() =>
+          modalBox.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            const topmost = document.elementFromPoint(
+              box.x + box.width / 2,
+              box.y + box.height / 2,
+            );
+            return topmost !== null && element.contains(topmost);
+          }),
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: 'test-results/connected-app-revoke-confirmation-320.png',
+        fullPage: false,
+      });
+      await revokeDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(revokeDialog).not.toBeVisible();
+      await expect(appName).toBeVisible();
+      await appCard.getByRole('button', { name: 'Revoke', exact: true }).click();
+      await revokeDialog.getByRole('button', { name: 'Revoke', exact: true }).click();
       await expect(page.getByText('Connected app revoked', { exact: true })).toBeVisible();
       await expect(appName).toHaveCount(0);
 
