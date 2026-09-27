@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
 
@@ -20,6 +22,7 @@ const labels = {
 export function ConnectedAppsSection() {
   const queryClient = useQueryClient();
   const toasts = useToasts();
+  const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string } | null>(null);
   const grants = useQuery({
     queryKey: ['oauth-grants'],
     queryFn: () => api<Grant[]>('/oauth/grants'),
@@ -27,6 +30,7 @@ export function ConnectedAppsSection() {
   const revoke = useMutation({
     mutationFn: (id: string) => api(`/oauth/grants/${id}`, { method: 'DELETE' }),
     onSuccess: async () => {
+      setRevokeTarget(null);
       await queryClient.invalidateQueries({ queryKey: ['oauth-grants'] });
       toasts.push('Connected app revoked', { kind: 'success' });
     },
@@ -68,7 +72,7 @@ export function ConnectedAppsSection() {
                 type="button"
                 className="btn btn-ghost btn-sm self-end text-error sm:self-auto"
                 disabled={revoke.isPending}
-                onClick={() => revoke.mutate(grant.id)}
+                onClick={() => setRevokeTarget({ id: grant.id, name: grant.clientName })}
               >
                 Revoke
               </button>
@@ -82,6 +86,25 @@ export function ConnectedAppsSection() {
             </ul>
           </div>
         ))}
+        <ConfirmDialog
+          open={revokeTarget !== null}
+          title="Revoke connected app?"
+          tone="error"
+          confirmLabel="Revoke"
+          pending={revoke.isPending}
+          pendingLabel="Revoking…"
+          onConfirm={() => {
+            if (revokeTarget && !revoke.isPending) {
+              revoke.mutate(revokeTarget.id);
+            }
+          }}
+          onCancel={() => setRevokeTarget(null)}
+        >
+          <p>
+            Revoke access for &ldquo;<strong>{revokeTarget?.name}</strong>&rdquo;? This immediately
+            disconnects it and invalidates all of its access and refresh tokens.
+          </p>
+        </ConfirmDialog>
       </div>
     </section>
   );

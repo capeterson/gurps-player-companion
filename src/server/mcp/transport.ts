@@ -104,7 +104,7 @@ export function describeMcpTool(entry: RuntimeTool) {
       readOnlyHint: entry.policy.method === 'GET',
       destructiveHint: entry.policy.destructive,
       idempotentHint: entry.policy.method === 'GET',
-      openWorldHint: true, // Invites can send email and shared campaign writes affect other players.
+      openWorldHint: entry.policy.openWorld,
     },
     _meta: {
       requiredScope: entry.policy.scope,

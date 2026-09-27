@@ -27,7 +27,7 @@ function mount() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/oauth/consent']}>
+      <MemoryRouter initialEntries={[`/oauth/consent${search}`]}>
         <Routes>
           <Route path="/oauth/consent" element={<OAuthConsentPage />} />
           <Route path="/login" element={<LoginTarget />} />
@@ -46,11 +46,9 @@ function configure(decide: () => Promise<unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  window.history.replaceState({}, '', `/oauth/consent${search}`);
 });
 afterEach(() => {
   vi.restoreAllMocks();
-  window.history.replaceState({}, '', '/');
 });
 
 describe('OAuth consent', () => {
@@ -100,14 +98,30 @@ describe('OAuth consent', () => {
     expect(screen.getByRole('button', { name: 'Authorize' })).not.toBeDisabled();
   });
 
-  it('offers reauthentication with the complete consent return path', async () => {
+  it('returns to login without showing approval when consent preparation requires reauthentication', async () => {
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/auth/me') {
+        return { displayName: 'Ada', email: 'ada@example.com' } as never;
+      }
+      throw new ApiError(403, 'recent authentication required');
+    });
+    mount();
+    expect(await screen.findByText(`Login return: /oauth/consent${search}`)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Authorize' })).not.toBeInTheDocument();
+    expect(api).not.toHaveBeenCalledWith(
+      '/oauth/authorization',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('returns directly to login if authentication becomes stale before approval', async () => {
     configure(async () => {
       throw new ApiError(403, 'recent authentication required');
     });
     mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Authorize' }));
-    fireEvent.click(await screen.findByRole('link', { name: 'Sign in again to continue' }));
     expect(await screen.findByText(`Login return: /oauth/consent${search}`)).toBeInTheDocument();
+    expect(screen.queryByText('recent authentication required')).not.toBeInTheDocument();
   });
 
   it('never offers approval for invalid consent details', async () => {

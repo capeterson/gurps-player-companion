@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
 import { createApp } from '../app.ts';
+import { signAccessToken, verifyAccessToken } from '../auth/jwt.ts';
 import type { AppConfig } from '../config.ts';
 import { closeDb } from '../db/client.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
@@ -87,6 +88,62 @@ async function issueGrant(scopes = 'gpc:read gpc:write') {
 
 describe('delegated OAuth and MCP', () => {
   afterAll(closeDb);
+
+  it('requires recent primary authentication before returning consent details', async () => {
+    const app = createApp(config);
+    const email = `oauth-reauth-${randomUUID()}@example.com`;
+    const registered = await app.request('/api/v1/auth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: 'TestPassword1!', displayName: 'OAuth Player' }),
+    });
+    expect(registered.status).toBe(201);
+    const session = (await registered.json()) as { accessToken: string };
+    const payload = await verifyAccessToken(session.accessToken);
+    const stale = await signAccessToken(
+      payload.sub,
+      payload.authVersion,
+      Math.floor(Date.now() / 1000) - 601,
+    );
+    const verifier = 'r'.repeat(43);
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: 'oauth-integration-client',
+      redirect_uri: redirectUri,
+      code_challenge: challenge(verifier),
+      code_challenge_method: 'S256',
+      scope: 'gpc:read',
+      state: randomUUID(),
+      resource: 'http://localhost:3001/mcp',
+    });
+
+    const staleDetails = await app.request(`/api/v1/oauth/authorization?${query}`, {
+      headers: { authorization: `Bearer ${stale.token}` },
+    });
+    expect(staleDetails.status).toBe(403);
+    expect(await staleDetails.json()).toEqual({ error: 'recent authentication required' });
+
+    const freshDetails = await app.request(`/api/v1/oauth/authorization?${query}`, {
+      headers: { authorization: `Bearer ${session.accessToken}` },
+    });
+    expect(freshDetails.status).toBe(200);
+    const consent = (await freshDetails.json()) as { csrfToken: string };
+
+    const staleApproval = await app.request('/api/v1/oauth/authorization', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${stale.token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...Object.fromEntries(query),
+        csrf_token: consent.csrfToken,
+        decision: 'approve',
+      }),
+    });
+    expect(staleApproval.status).toBe(403);
+    expect(await staleApproval.json()).toEqual({ error: 'recent authentication required' });
+  });
 
   it('publishes canonical discovery and rejects app API use of OAuth tokens', async () => {
     const { app, tokens } = await issueGrant('gpc:read');

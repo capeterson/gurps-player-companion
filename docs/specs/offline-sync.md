@@ -12,8 +12,9 @@ The service worker owns only the app-shell precache and navigation fallback; it
 does not cache authenticated API data or replay the outbox. Its navigation
 fallback excludes `/api/*`, `/admin/*`, `/mcp`, `/.well-known/*`, and OAuth
 protocol endpoints so those requests always reach the Bun server. The mutable
-`sw.js`, registration bootstrap, manifest, and HTML shells are served with
-browser/CDN `no-store` headers, while content-hashed assets remain cacheable.
+`sw.js`, registration bootstrap, manifest, HTML shells, and unversioned app-icon
+files are served with browser/CDN `no-store` headers, while content-hashed assets
+remain cacheable.
 This prevents a deployed but edge-cached old worker from serving the player SPA
 for a newly introduced server route.
 

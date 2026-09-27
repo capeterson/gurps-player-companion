@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { isRouteErrorResponse, useLocation, useRouteError } from 'react-router-dom';
 import { ApiError } from '../lib/api.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
+import { BrandMark } from './ui/BrandMark.tsx';
 
 function newErrorReference(): string {
   const id = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -49,12 +50,7 @@ export function AppErrorPage({ homeHref = '/' }: { homeHref?: string }) {
       >
         <div className="border-b border-base-300 bg-base-200/50 px-5 py-4 sm:px-7">
           <a href={homeHref} className="flex w-fit items-center gap-3 no-cap">
-            <span
-              aria-hidden="true"
-              className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-primary font-display text-lg font-bold text-primary-content"
-            >
-              G
-            </span>
+            <BrandMark className="h-8 w-8" />
             <span className="font-display font-semibold">Player Companion</span>
           </a>
         </div>

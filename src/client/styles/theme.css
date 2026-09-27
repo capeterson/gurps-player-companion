@@ -471,9 +471,8 @@ body {
    ::first-letter pseudo only matches block containers, so inline
    spans with .font-display (like the topnav wordmark) are unaffected.
 
-   Opt out per-element with .no-cap — used when an element only has
-   one character (e.g. the "G" logo) where the cap collapses to the
-   whole word, or when accent-on-accent would be invisible. */
+   Opt out per-element with .no-cap — used for compact brand wordmarks
+   and wherever accent-on-accent would be invisible. */
 .font-display::first-letter {
   color: var(--color-primary);
   font-weight: 700;

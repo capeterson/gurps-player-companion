@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
 
 interface Details {
@@ -12,7 +12,10 @@ interface Details {
 }
 
 export function OAuthConsentPage() {
-  const search = window.location.search;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const search = location.search;
+  const returnTo = `${location.pathname}${search}`;
   const query = useMemo(() => new URLSearchParams(search), [search]);
   const details = useQuery({
     queryKey: ['oauth-authorization', search],
@@ -33,7 +36,25 @@ export function OAuthConsentPage() {
       });
     },
     onSuccess: ({ redirectTo }) => window.location.assign(redirectTo),
+    onError: (error) => {
+      if (requiresRecentAuthentication(error)) {
+        navigate('/login', {
+          replace: true,
+          state: { returnTo, reason: 'oauth-consent-reauthentication' },
+        });
+      }
+    },
   });
+
+  if (requiresRecentAuthentication(details.error)) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ returnTo, reason: 'oauth-consent-reauthentication' }}
+      />
+    );
+  }
 
   return (
     <main className="arcane-edge flex min-h-screen items-center justify-center bg-base-200 p-6">
@@ -70,15 +91,6 @@ export function OAuthConsentPage() {
                 <span>
                   {decide.error instanceof Error ? decide.error.message : 'Authorization failed'}
                 </span>
-                {decide.error instanceof ApiError && decide.error.status === 403 && (
-                  <Link
-                    className="link"
-                    to="/login"
-                    state={{ returnTo: `/oauth/consent${search}` }}
-                  >
-                    Sign in again to continue
-                  </Link>
-                )}
               </div>
             )}
             <div className="flex justify-end gap-3">
@@ -103,5 +115,13 @@ export function OAuthConsentPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function requiresRecentAuthentication(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 403 &&
+    error.message === 'recent authentication required'
   );
 }

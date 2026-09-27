@@ -61,12 +61,12 @@ Implemented modules:
 
 | ID | Required behavior |
 |---|---|
-| AUTH-1 | Authorization-code flow with PKCE S256 for public clients. Login and consent happen on GPC using existing password/passkey authentication; agents never receive player passwords, app refresh tokens, or newly minted API keys. Require recent primary authentication when approving a new grant. |
+| AUTH-1 | Authorization-code flow with PKCE S256 for public clients. Login and consent happen on GPC using existing password/passkey authentication; agents never receive player passwords, app refresh tokens, or newly minted API keys. Require recent primary authentication before rendering approval controls for a new grant; a stale session returns directly to login with the complete authorization request preserved. Recheck freshness when approval is submitted. |
 | AUTH-2 | Publish `/.well-known/oauth-protected-resource/mcp` with the canonical `/mcp` resource and authorization server, and `/.well-known/oauth-authorization-server` with issuer, authorization/token endpoints, scopes, and PKCE support. Unauthenticated MCP requests return 401 with a discoverable `WWW-Authenticate` challenge. Canonical URLs come from trusted deployment configuration, never arbitrary Host/forwarded headers. |
 | AUTH-3 | Provide `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, and `/oauth/register`. Bind one-time, short-lived codes to player, client, exact redirect URI, PKCE challenge, granted scopes, and resource. Validate the requested resource at authorization and token exchange; reject a mismatched audience on MCP calls. Protect browser consent against CSRF, preserve client state, and reject unregistered redirects before redirecting anywhere. No implicit or password grant. |
 | AUTH-4 | Support Client ID Metadata Documents (CIMD), Dynamic Client Registration (DCR), and optional operator-configured clients. Advertise CIMD and DCR in authorization-server metadata so standards-compatible public clients need no per-client server configuration. Resolve CIMD only from public HTTPS port 443 with pinned public DNS, no redirects, bounded/time-limited JSON responses, exact client-ID and safe redirect validation, and a capped cache. DCR accepts only public clients using authorization code + PKCE and safe HTTPS or loopback callbacks; it is body/rate limited and returns no client secret. |
 | AUTH-5 | Issue separate short-lived, audience-bound OAuth access tokens and rotating refresh tokens. Persist grants and token-family state in Postgres; store opaque token/code secrets only as hashes. Check revocation, user suspension/deletion, authentication version, and current permissions on every call. Password change/recovery invalidates delegated sessions too. Refresh cannot widen scope or change resource/client; replay revokes the family. |
-| AUTH-6 | Settings lists connected clients, scopes, creation/last-use time, and a revoke action. Revocation invalidates the entire grant, including outstanding access and refresh tokens, on the next request. Ordinary app logout clears local account state but leaves explicitly approved grants; show this distinction to players. Account recovery revokes all grants. |
+| AUTH-6 | Settings lists connected clients, scopes, creation/last-use time, and a revoke action. Revocation requires an explicit confirmation that names the app and explains the immediate loss of access. Confirmed revocation invalidates the entire grant, including outstanding access and refresh tokens, on the next request; cancellation leaves the grant untouched. Ordinary app logout clears local account state but leaves explicitly approved grants; show this distinction to players. Account recovery revokes all grants. |
 | AUTH-7 | Effective authority is the intersection of the user's current GPC permissions and granted scopes. No client-selected actor ID, impersonation, superuser elevation, or scope bypass through REST/sync. OAuth tokens for `/mcp` are rejected by existing app-session/API-key endpoints; shared handlers receive a trusted actor context rather than a forwarded token. |
 
 The scope vocabulary is `gpc:read` for player-domain reads (including the
@@ -136,7 +136,10 @@ serialized copy. Failed calls retain their complete domain error text and
 structured payload, including field errors, conflicts and retry guidance;
 protocol failures and OAuth failures retain their protocol/HTTP meanings. Set
 read-only, destructive, and idempotency annotations accurately; annotations are
-hints, not enforcement.
+hints, not enforcement. Account- and campaign-bounded operations advertise
+`openWorldHint: false` even though the service is remotely hosted. The campaign
+invitation tool alone advertises `openWorldHint: true` because it sends email to
+an arbitrary external recipient.
 See [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
 
 ### Drift must fail CI
@@ -185,6 +188,8 @@ MCP request IDs are not mutation deduplication keys. Define a shared mutation
 idempotency contract for REST and MCP: persist the key, actor/client, operation,
 input fingerprint, and outcome transactionally; identical retries replay the
 outcome, differing input rejects key reuse. Set a documented retention window.
+Only mutation tools advertise the optional `idempotencyKey` input; read tools do
+not expose a meaningless retry field.
 Test lost-response retries for create, import, XP awards, and turn advancement.
 Use existing revision/turn checks; any added precondition must be shared by REST
 and MCP. Never silently retry a conflict with freshly fetched values. Return a
@@ -304,6 +309,14 @@ repeated at token exchange. Public clients use authorization code with PKCE S256
 and no secret. Direct browser clients must also list their origin in
 `CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth requests do not require a
 CORS entry.
+
+The checked-in `plugins/gurps-player-companion-dev/` portable plugin package is
+bound only to `https://gurps-dev.abundant.zip/mcp` and is for developer-mode and
+local package testing. It deliberately uses a `-dev` identity. The public
+production plugin must be created separately against
+`https://gurps.abundant.zip/mcp`; a published MCP origin cannot be promoted from
+the dev hostname to production in place. The package's `PUBLISHING.md` tracks
+the remaining directory-review prerequisites and metadata risks.
 
 Client setup uses the `/mcp` resource URL. Discovery supplies the authorization
 server and endpoints. The client sends its registered ID, exact callback,

@@ -28,14 +28,14 @@ vi.mock('../../lib/tokenStore.ts', () => ({
   },
 }));
 
-function renderLogin(returnTo?: string) {
+function renderLogin(returnTo?: string, reason?: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter
-        initialEntries={[{ pathname: '/login', state: returnTo ? { returnTo } : null }]}
+        initialEntries={[{ pathname: '/login', state: returnTo ? { returnTo, reason } : null }]}
       >
         <LoginPage />
       </MemoryRouter>
@@ -135,6 +135,13 @@ describe('LoginPage', () => {
         replace: true,
       }),
     );
+  });
+
+  it('explains OAuth reauthentication before the consent screen is shown', () => {
+    renderLogin('/oauth/consent?client_id=safe&state=abc', 'oauth-consent-reauthentication');
+    expect(
+      screen.getByText('Sign in again before reviewing and authorizing this connected app.'),
+    ).toBeVisible();
   });
 
   it('rejects an external return target after login', async () => {
