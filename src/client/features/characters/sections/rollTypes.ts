@@ -22,6 +22,8 @@ export interface DamageRollSpec {
 }
 
 export interface RollRequest {
+  /** Defense rolls may continue a failed check into the incoming-damage dialog. */
+  readonly onIncomingDamage?: () => void;
   readonly rules?: readonly SkillModifierRule[];
   readonly ruleContext?: RuleContext;
   readonly action?: SkillAction;

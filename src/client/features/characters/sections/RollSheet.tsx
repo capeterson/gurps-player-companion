@@ -406,6 +406,18 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
                   : 'Very high mana turns this failure into a critical failure. Resolve the spell critical-failure consequences.'}
               </p>
             )}
+            {!result.success && request.onIncomingDamage && (
+              <button
+                type="button"
+                className="btn w-full"
+                onClick={() => {
+                  onClose();
+                  request.onIncomingDamage?.();
+                }}
+              >
+                Incoming damage…
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -207,9 +207,6 @@ export function ArmorLocationMap({
           </button>
         ))}
       </div>
-      <p className="text-xs text-muted text-center">
-        Select a zone or use Hit location. Hatched zones have no DR.
-      </p>
     </div>
   );
 }

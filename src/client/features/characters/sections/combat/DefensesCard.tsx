@@ -609,8 +609,7 @@ function DefenseTable({
       />
       <p className="text-[11px] text-base-content/50">
         Active trait bonuses and recorded combat restrictions are included. Add situational
-        modifiers when rolling; shield DB assumes a covered attack. Double defense grants a second,
-        different defense after the first fails; it adds no numerical bonus.
+        modifiers when rolling; shield DB assumes a covered attack.
       </p>
     </div>
   );

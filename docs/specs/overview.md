@@ -543,7 +543,10 @@ shows the synced campaign name as a separate link to that campaign.
     Known empty effect definitions remain distinguishable from missing entries.
     An **"Incoming damage…"** button carries the one selected location, facing,
     damage type, and penetration into a dialog that displays this context read-only
-    and asks for basic damage. Presets include armor divisors and Ignore DR;
+    and asks for basic damage. Failed active-defense rolls also offer **Incoming damage…**,
+    which closes the roll sheet and opens that same dialog with the selected attack
+    context. Successful defenses and other checks do not offer this action.
+    Presets include armor divisors and Ignore DR;
     custom types and divisors are edited in the workspace. The campaign's **House rules**
     setting `protectNaturalDr` defaults **on** for existing/new campaigns and
     campaignless characters: divisors above 1 (including Ignore DR) affect worn

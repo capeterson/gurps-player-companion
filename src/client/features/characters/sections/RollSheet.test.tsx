@@ -17,6 +17,51 @@ afterEach(() => {
 });
 
 describe('RollSheet', () => {
+  it.each([0.5, 0.99])('offers incoming damage after a failed defense (dice %s)', (random) => {
+    vi.spyOn(Math, 'random').mockReturnValue(random);
+    const onClose = vi.fn();
+    const onIncomingDamage = vi.fn();
+    render(
+      <RollSheet
+        request={{ label: 'Dodge', baseTarget: 9, onIncomingDamage }}
+        characterId="char-1"
+        onClose={onClose}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Incoming damage…' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    expect(screen.getByText(/^Failure · margin/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Incoming damage…' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onIncomingDamage).toHaveBeenCalledOnce();
+    expect(onClose.mock.invocationCallOrder[0]).toBeLessThan(
+      onIncomingDamage.mock.invocationCallOrder[0] ?? 0,
+    );
+    fireEvent.click(screen.getByLabelText('Increase modifier'));
+    expect(screen.queryByRole('button', { name: 'Incoming damage…' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['successful defense', 0, true],
+    ['failed skill check', 0.99, false],
+  ] as const)('does not offer incoming damage for a %s', (_label, random, defense) => {
+    vi.spyOn(Math, 'random').mockReturnValue(random);
+    render(
+      <RollSheet
+        request={{
+          label: defense ? 'Dodge' : 'Broadsword',
+          baseTarget: 9,
+          ...(defense ? { onIncomingDamage: vi.fn() } : {}),
+        }}
+        characterId="char-1"
+        onClose={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    expect(screen.getByText(defense ? /^Success · margin/ : /^Failure · margin/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Incoming damage…' })).not.toBeInTheDocument();
+  });
+
   it.each([
     ['very_high', 0.5, 10, 'failure', 'turns this failure into a critical failure'],
     ['very_high', 0.99, 10, 'failure', 'spectacular disaster'],
