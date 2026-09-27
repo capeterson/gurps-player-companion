@@ -230,10 +230,12 @@ Tables (grouped):
 - **Identity/auth**: `users` (including the CHECK-constrained `dark_theme` /
   `light_theme` palette preferences), `passkey_credentials`, `passkey_challenges`,
   `refresh_tokens`, `password_reset_tokens`, `api_keys`, and durable
-  `auth_rate_limits` counters. Public login, registration, password-reset, and
-  passkey-login challenge requests consume bounded source and normalized-account
-  buckets before expensive hashing, email, or challenge work. Source checks
-  run first; a blocked source never allocates or consumes account buckets.
+  `auth_rate_limits` counters. Registration consumes a source-IP bucket only.
+  Password login consumes a source-IP bucket before hashing; failed password
+  checks also consume a normalized-account bucket shared across source IPs.
+  Successful logins do not consume that account bucket. Password-reset and
+  passkey-login challenge requests retain source and normalized-account budgets.
+  Source checks run first; a blocked source never consumes account buckets.
   The counters are shared through Postgres, reset after their fixed window,
   and expired rows are deleted during subsequent limiter requests. Throttling
   returns JSON `429` with a `Retry-After` header. Source addresses come from

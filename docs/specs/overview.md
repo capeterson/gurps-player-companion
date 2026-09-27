@@ -114,9 +114,11 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registr
   `@simplewebauthn/server` (origin/RP, challenge, type, flags, COSE algorithm,
   signature, and counter), not by an application-owned binary parser.
 - **Password reset** by emailed token (`/forgot-password` → `/reset-password`).
-- **Public-auth rate limits**: durable Postgres counters bound login,
-  registration, recovery, and passkey requests by source and (when supplied)
-  normalized account. Throttled requests return JSON `429` with `Retry-After`.
+- **Public-auth rate limits**: durable Postgres counters bound registration by
+  source IP and password login by source IP plus a normalized account budget
+  consumed only by failed logins across source IPs. Recovery and passkey requests
+  retain source and (when supplied) account budgets. Throttled requests return
+  JSON `429` with `Retry-After`.
 - **API keys** for programmatic access, created and revoked from Settings.
 - JWT access tokens + rotating refresh tokens. Password changes and recovery
   advance a server-checked authentication version so every older JWT is rejected;

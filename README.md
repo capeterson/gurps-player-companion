@@ -156,8 +156,8 @@ The supplied Compose files set container variables explicitly: `.env` supplies `
 | `OAUTH_CLIENTS` | `[]` | Optional JSON array of operator-defined public OAuth clients. Supported clients can register/discover themselves without an entry. See `.env.example` for the shape. |
 | `TRUST_PROXY` | `false` | Trust forwarded client IPs only behind a proxy that overwrites `X-Forwarded-For`. |
 | `AUTH_RATE_LIMIT_WINDOW_SECONDS` | `600` | Shared public-auth rate-limit window in seconds, from 1 to 86,400. |
-| `AUTH_RATE_LIMIT_LOGIN_MAX` | `10` | Login-attempt limit per window. |
-| `AUTH_RATE_LIMIT_REGISTER_MAX` | `5` | Registration-attempt limit per window. |
+| `AUTH_RATE_LIMIT_LOGIN_MAX` | `10` | Login-attempt limit per source IP and failed-login limit per normalized account across IPs, per window. |
+| `AUTH_RATE_LIMIT_REGISTER_MAX` | `5` | Registration-attempt limit per source IP per window. |
 | `AUTH_RATE_LIMIT_RESET_MAX` | `3` | Password-recovery attempt limit per window. |
 | `AUTH_RATE_LIMIT_CHALLENGE_MAX` | `10` | Passkey-challenge attempt limit per window. |
 
