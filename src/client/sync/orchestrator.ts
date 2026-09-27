@@ -2107,6 +2107,7 @@ class SyncOrchestrator {
             dx: 10,
             iq: 10,
             ht: 10,
+            earnedPoints: 0,
             hpMod: 0,
             willMod: 0,
             perMod: 0,

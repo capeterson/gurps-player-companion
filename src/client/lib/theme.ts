@@ -62,6 +62,8 @@ export const THEME_FIELD_LABELS: Record<ThemePreferenceField, string> = {
 
 /** Browser chrome colour (address bar, PWA title bar) for each theme's page background. */
 const THEME_COLORS: Record<ThemeName, string> = {
+  'arcane-dark': '#1d1526',
+  'arcane-light': '#f6f4f1',
   'gilded-tome': '#16110d',
   'midnight-gilt': '#0d1220',
   'verdigris-brass': '#0c1715',

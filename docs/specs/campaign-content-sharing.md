@@ -412,7 +412,9 @@ Provisional mechanics retain the picked definition's actual campaign provenance.
 Deletion detaches owned copies and retains
 their last effects and source
 version. YAML replacement with a renamed natural key follows the same path;
-recreating the old name cannot reconnect a different UUID. Campaign transfers
+recreating the old name cannot reconnect a different UUID. The character assignment UI confirms any move/removal from an existing campaign before
+queueing it, warning that a later rejoin cannot restore detached links. First assignment
+from no campaign does not prompt. Campaign transfers
 detach all six live library reference types and preserve owned trait/skill rules,
 paid points, levels, variants, modifiers and skill specialties. Retained source
 IDs/campaigns are provenance only. Missing legacy copies remain visibly unresolved.
@@ -591,7 +593,26 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
 - **Write:** the entry's **author or the campaign owner**. The author or owner
   may also **edit** (`PATCH`) and **delete** (`DELETE`) entries; the client
   `LogPage` exposes Edit/Delete controls on entries the viewer may modify.
-- Entries carry `sessionDate`, `title`, `body`, `visibility`, and `xpAwards`.
+- Entries carry `sessionDate`, `title`, `body`, `visibility`, optional `pointsGained`, and `xpAwards`.
+  `pointsGained` is a nullable integer from 0 to 1000. Creating an award snapshots all current
+  campaign characters unless `awardCharacterIds` selects a subset (including an empty list).
+  The form defaults to all for campaign owners, and to owned characters for other members;
+  **Choose characters** opens a bounded checkbox dialog for missed sessions and other exceptions.
+  `xpAwards` stores the concrete recipients/amounts; later joins do not retroactively earn points.
+  An amount-only API edit retains recipients, and a body-only edit leaves awards unchanged.
+  Legacy API callers may still send individual `xpAwards` (unique character IDs, at most 500).
+  Owners may credit any character in their campaign; members may credit only their own.
+  New/changed recipients must belong to the campaign. Unchanged historical recipients may have
+  left; clearing/deleting an award reverses their earlier credit. Missing/deleted recipients are
+  retained in historical snapshots and skipped when reversing credit.
+  Log writes and `characters.earned_points` deltas share one audited transaction, campaign lock,
+  sorted character locks, normal revision/history triggers, and post-commit invalidation nudges.
+  Editing, removing recipients, clearing points, or deleting an entry adjusts the previous award
+  instead of granting credit twice. Migration 0057 applies preexisting stored XP awards once.
+  The shared detail builder and local-first sheet calculate the cap and warnings from campaign
+  starting `pointTarget + earnedPoints`; a null campaign target remains uncapped. Earned points
+  survive character transfers. This is a read-only character field, carried by full cursor rows
+  and masked to zero on every minimal projection/sweep; arbitrary REST/sync patches cannot set it.
   Their optional integer `sessionNumber` starts at zero. Opening the create form
   suggests zero for the first numbered entry, then one above the greatest
   visible posted number; authors may freely edit or clear that suggestion.

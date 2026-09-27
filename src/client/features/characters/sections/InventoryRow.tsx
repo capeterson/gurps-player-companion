@@ -246,7 +246,9 @@ export function InventoryRow(props: InventoryRowProps) {
               <span className="font-medium">{item.name}</span>
             </span>
             <span className="flex flex-wrap items-center gap-1 pl-7 sm:pl-0">
-              {isRoot && item.worn && <span className="badge badge-sm badge-primary">Worn</span>}
+              {isRoot && item.worn && (
+                <span className="badge badge-sm badge-soft badge-secondary">Worn</span>
+              )}
               {item.equipped && <span className="badge badge-sm badge-secondary">Equipped</span>}
               {item.isContainer &&
                 categoryChip(

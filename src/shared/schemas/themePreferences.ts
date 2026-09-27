@@ -5,8 +5,13 @@ import { z } from '@hono/zod-openapi';
  * light mode on each device; these pick which palette each mode uses, and are
  * stored on the server so every device shows the same palettes.
  */
-export const DARK_THEMES = ['gilded-tome', 'midnight-gilt', 'verdigris-brass'] as const;
-export const LIGHT_THEMES = ['illuminated-manuscript', 'heraldic-vellum'] as const;
+export const DARK_THEMES = [
+  'gilded-tome',
+  'midnight-gilt',
+  'verdigris-brass',
+  'arcane-dark',
+] as const;
+export const LIGHT_THEMES = ['illuminated-manuscript', 'heraldic-vellum', 'arcane-light'] as const;
 
 export const darkThemeName = z.enum(DARK_THEMES);
 export const lightThemeName = z.enum(LIGHT_THEMES);
@@ -18,6 +23,8 @@ export const DEFAULT_DARK_THEME: DarkThemeName = 'gilded-tome';
 export const DEFAULT_LIGHT_THEME: LightThemeName = 'illuminated-manuscript';
 
 export const THEME_LABELS: Record<ThemeName, string> = {
+  'arcane-dark': 'Arcane Purple',
+  'arcane-light': 'Arcane Purple',
   'gilded-tome': 'Gilded Tome',
   'midnight-gilt': 'Midnight Gilt',
   'verdigris-brass': 'Verdigris & Brass',

@@ -240,3 +240,56 @@ describe('character skill effect specialization', () => {
     expect(defaulted.skills.map((skill) => skill.effectiveLevel)).toEqual([14, 9]);
   });
 });
+
+describe('earned adventure points and character caps', () => {
+  const base: CharacterDetailInput = {
+    character: {
+      ...characterCreate.parse({ name: 'Adventurer', st: 11 }),
+      id: 'character',
+      ownerId: 'owner',
+      campaignId: 'campaign',
+      height: null,
+      weight: null,
+      age: null,
+      birthdate: null,
+      appearance: null,
+      dismissedWarnings: [],
+      revision: 1,
+      createdAt: '',
+      updatedAt: '',
+    },
+    traits: [],
+    skills: [],
+    spells: [],
+    languages: [],
+    techniques: [],
+    inventory: [],
+    combat: null,
+    campaign: { pointTarget: 150, disadvantageCap: 50, quirkCap: 5 },
+  };
+  it.each([0, 3, 1000, -5])(
+    'adds earned points %s to the campaign cap without changing purchased points',
+    (earnedPoints) => {
+      const original = buildCharacterDetail(base);
+      const detail = buildCharacterDetail({
+        ...base,
+        character: { ...base.character, earnedPoints },
+      });
+      expect(detail.earnedPoints).toBe(earnedPoints);
+      expect(detail.points.total).toBe(original.points.total);
+      expect(detail.points.unspent).toBe(original.points.unspent + earnedPoints);
+    },
+  );
+  it.each([null, { pointTarget: null, disadvantageCap: null, quirkCap: null }])(
+    'keeps characters without a campaign target uncapped',
+    (campaign) => {
+      const detail = buildCharacterDetail({
+        ...base,
+        campaign,
+        character: { ...base.character, earnedPoints: 12 },
+      });
+      expect(detail.earnedPoints).toBe(12);
+      expect(detail.points.unspent).toBe(0);
+    },
+  );
+});

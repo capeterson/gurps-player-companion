@@ -269,8 +269,15 @@ procedure changes travel with the existing library and owned-mechanics audit row
 ## Source editions and pricing
 
 Sources and modifiers are campaign-family audited classes with revision and
-tombstone triggers (migration 0053), SYNCABLE_TABLES registration and dedicated
+tombstone triggers (migration 0054), SYNCABLE_TABLES registration and dedicated
 human-readable summaries. CRUD, sync and imports share withAudit transactions.
 Pricing snapshots on character traits/inventory change only with a purchase or
 explicit re-resolution; its values and snapshot form one row update/history
 event. Library price edits never generate automatic character price updates.
+
+## Adventure-log point awards
+
+Adventure-log point awards share one server-generated audit batch across the entry
+and recipient character updates. Character history labels `earned_points` as Earned
+points; log entries retain concrete recipient snapshots. Editing or deleting an award
+records the corresponding point credit adjustment through the existing triggers.

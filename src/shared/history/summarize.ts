@@ -22,6 +22,7 @@ const ATTR_LABELS: Record<string, string> = {
   fpMod: 'FP mod',
   speedQuarterMod: 'Speed mod',
   moveMod: 'Move mod',
+  earnedPoints: 'Earned points',
 };
 
 /**

@@ -23,6 +23,7 @@ import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { type DbAdventureLogEntry, adventureLogEntries, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { lockLogCampaign, resolveLogAwards } from '../services/adventureLogAwards.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
@@ -47,6 +48,7 @@ function entryToOut(row: DbAdventureLogEntry, author: AuthorRow) {
     location: row.location,
     body: row.body,
     visibility: row.visibility,
+    pointsGained: row.pointsGained,
     xpAwards: row.xpAwards,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -137,7 +139,9 @@ router.openapi(
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
     await requireCampaignMember(id, user.id);
-    const created = await withAudit(user.id, undefined, async (tx) => {
+    const created = await withAudit(user.id, crypto.randomUUID(), async (tx) => {
+      const campaign = await lockLogCampaign(tx, id, user.id);
+      const xpAwards = await resolveLogAwards(tx, id, user.id, campaign.ownerId, body);
       const [row] = await tx
         .insert(adventureLogEntries)
         .values({
@@ -149,7 +153,8 @@ router.openapi(
           location: body.location ?? null,
           body: body.body,
           visibility: body.visibility,
-          xpAwards: body.xpAwards,
+          pointsGained: body.pointsGained ?? null,
+          xpAwards,
         })
         .returning();
       if (!row) throw new HTTPException(500, { message: 'insert failed' });
@@ -177,6 +182,7 @@ router.openapi(
       },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      422: errorResponse('Invalid point recipients or awards'),
     },
   }),
   async (c) => {
@@ -195,10 +201,19 @@ router.openapi(
     if (existing.authorId !== user.id && campaign.ownerId !== user.id) {
       throw new HTTPException(403, { message: 'author or owner only' });
     }
-    const updated = await withAudit(user.id, undefined, async (tx) => {
+    const updated = await withAudit(user.id, crypto.randomUUID(), async (tx) => {
+      const lockedCampaign = await lockLogCampaign(tx, id, user.id);
+      const [current] = await tx.select().from(adventureLogEntries)
+        .where(and(eq(adventureLogEntries.id, entryId), eq(adventureLogEntries.campaignId, id))).for('update');
+      if (!current) throw new HTTPException(404, { message: 'entry not found' });
+      if (current.authorId !== user.id && lockedCampaign.ownerId !== user.id) {
+        throw new HTTPException(403, { message: 'author or owner only' });
+      }
+      const xpAwards = await resolveLogAwards(tx, id, user.id, lockedCampaign.ownerId, body, current.xpAwards, current.pointsGained);
+      const { awardCharacterIds: _recipients, ...patch } = body;
       const [row] = await tx
         .update(adventureLogEntries)
-        .set(buildPatchSet(body))
+        .set(buildPatchSet({ ...patch, xpAwards }))
         .where(eq(adventureLogEntries.id, entryId))
         .returning();
       if (!row) throw new HTTPException(500, { message: 'update failed' });
@@ -244,7 +259,15 @@ router.openapi(
     if (existing.authorId !== user.id && campaign.ownerId !== user.id) {
       throw new HTTPException(403, { message: 'author or owner only' });
     }
-    await withAudit(user.id, undefined, async (tx) => {
+    await withAudit(user.id, crypto.randomUUID(), async (tx) => {
+      const lockedCampaign = await lockLogCampaign(tx, id, user.id);
+      const [current] = await tx.select().from(adventureLogEntries)
+        .where(and(eq(adventureLogEntries.id, entryId), eq(adventureLogEntries.campaignId, id))).for('update');
+      if (!current) throw new HTTPException(404, { message: 'entry not found' });
+      if (current.authorId !== user.id && lockedCampaign.ownerId !== user.id) {
+        throw new HTTPException(403, { message: 'author or owner only' });
+      }
+      await resolveLogAwards(tx, id, user.id, lockedCampaign.ownerId, { pointsGained: null }, current.xpAwards, current.pointsGained);
       await tx.delete(adventureLogEntries).where(eq(adventureLogEntries.id, entryId));
     });
     return c.body(null, 204);

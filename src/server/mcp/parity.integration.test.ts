@@ -1306,4 +1306,59 @@ describe('delegated operation behavioral parity', () => {
       }),
     );
   });
+
+  it('keeps adventure point awards and character cap changes identical through REST and MCP', async () => {
+    const [client] = await getDb()
+      .insert(oauthClients)
+      .values({
+        clientId: `mcp-points-${randomUUID()}`,
+        name: 'Award parity',
+        redirectUris: ['http://127.0.0.1:49152/callback'],
+        allowedScopes: ['gpc:read', 'gpc:write', 'gpc:manage'],
+      })
+      .returning({ id: oauthClients.id });
+    if (!client) throw new Error('client insert failed');
+    const owner = await registerActor('points-owner', client.id);
+    const campaign = (
+      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+        body: { name: 'Award parity campaign', pointTarget: 150 },
+      })
+    ).body;
+    const first = (
+      await call<{ id: string }>(owner, 'gpc_create_character', {
+        body: { name: 'Awarded PC', campaignId: campaign.id },
+      })
+    ).body;
+    const second = (
+      await call<{ id: string }>(owner, 'gpc_create_character', {
+        body: { name: 'Absent PC', campaignId: campaign.id },
+      })
+    ).body;
+    const entry = (
+      await call<{ id: string; xpAwards: unknown[] }>(owner, 'gpc_create_adventure_log_entry', {
+        ...path(campaign.id),
+        body: { sessionDate: '2026-09-12', title: 'Award session', pointsGained: 3 },
+      })
+    ).body;
+    expect(entry.xpAwards).toHaveLength(2);
+    const read = async (id: string) =>
+      (
+        await call<{ earnedPoints: number; points: { unspent: number } }>(
+          owner,
+          'gpc_get_character',
+          path(id),
+        )
+      ).body;
+    expect((await read(first.id)).earnedPoints).toBe(3);
+    expect((await read(second.id)).earnedPoints).toBe(3);
+    await call(owner, 'gpc_update_adventure_log_entry', {
+      ...path(campaign.id, { entryId: entry.id }),
+      body: { pointsGained: 6, awardCharacterIds: [first.id] },
+    });
+    expect((await read(first.id)).earnedPoints).toBe(6);
+    expect((await read(first.id)).points.unspent).toBe(156);
+    expect((await read(second.id)).earnedPoints).toBe(0);
+    await call(owner, 'gpc_delete_adventure_log_entry', path(campaign.id, { entryId: entry.id }));
+    expect((await read(first.id)).earnedPoints).toBe(0);
+  });
 });
