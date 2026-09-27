@@ -1,8 +1,33 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { safeJoin, shouldRevalidateStaticPath } from './static.ts';
 
 const BASE = resolve('/srv/dist/client');
+
+function pngMetadata(path: string): {
+  bytes: Buffer;
+  width: number;
+  height: number;
+  hasTransparencyChunk: boolean;
+} {
+  const bytes = readFileSync(path);
+  expect(bytes.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  let offset = 8;
+  let hasTransparencyChunk = false;
+  while (offset + 12 <= bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.toString('ascii', offset + 4, offset + 8);
+    if (type === 'tRNS') hasTransparencyChunk = true;
+    offset += length + 12;
+  }
+  return {
+    bytes,
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+    hasTransparencyChunk,
+  };
+}
 
 describe('safeJoin', () => {
   it('accepts a normal asset path', () => {
@@ -40,16 +65,36 @@ describe('safeJoin', () => {
 });
 
 describe('static cache policy', () => {
-  it('forces mutable worker and app-shell entrypoints to revalidate', () => {
+  it('forces mutable worker, app-shell, and icon entrypoints to revalidate', () => {
     expect(shouldRevalidateStaticPath('/sw.js')).toBe(true);
     expect(shouldRevalidateStaticPath('/registerSW.js')).toBe(true);
     expect(shouldRevalidateStaticPath('/manifest.webmanifest')).toBe(true);
     expect(shouldRevalidateStaticPath('/index.html')).toBe(true);
     expect(shouldRevalidateStaticPath('/admin.html')).toBe(true);
+    expect(shouldRevalidateStaticPath('/icon-192.png')).toBe(true);
+    expect(shouldRevalidateStaticPath('/icon-256.png')).toBe(true);
+    expect(shouldRevalidateStaticPath('/icon-512.png')).toBe(true);
   });
 
   it('leaves content-hashed assets cacheable', () => {
     expect(shouldRevalidateStaticPath('/assets/main-QpTixWqe.js')).toBe(false);
-    expect(shouldRevalidateStaticPath('/icon-192.png')).toBe(false);
+  });
+});
+
+describe('app icon assets', () => {
+  it('ships opaque PWA sizes and the exact compact plugin icon', () => {
+    for (const size of [192, 256, 512]) {
+      const icon = pngMetadata(resolve(`public/icon-${size}.png`));
+      expect(icon.width).toBe(size);
+      expect(icon.height).toBe(size);
+      expect(icon.hasTransparencyChunk).toBe(false);
+    }
+
+    const publicIcon = pngMetadata(resolve('public/icon-256.png')).bytes;
+    const pluginIcon = pngMetadata(
+      resolve('plugins/gurps-player-companion-dev/assets/icon-256.png'),
+    ).bytes;
+    expect(publicIcon.byteLength).toBeLessThan(10_000);
+    expect(pluginIcon.equals(publicIcon)).toBe(true);
   });
 });

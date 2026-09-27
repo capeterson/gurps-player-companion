@@ -18,6 +18,9 @@ import type { AppEnv } from './openapi/app.ts';
 const ROOT = resolve('dist/client');
 const REVALIDATED_STATIC_PATHS = new Set([
   '/admin.html',
+  '/icon-192.png',
+  '/icon-256.png',
+  '/icon-512.png',
   '/index.html',
   '/manifest.webmanifest',
   '/registerSW.js',

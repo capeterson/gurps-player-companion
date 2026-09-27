@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { type Page, expect, test } from '@playwright/test';
+import { SignJWT, decodeJwt } from 'jose';
 import { selectCharacterSection } from './character-navigation';
 
 /**
@@ -21,6 +22,7 @@ const REDIRECT_URI =
   process.env.MCP_E2E_REDIRECT_URI ?? new URL('/oauth/callback', BASE_URL).toString();
 const RESOURCE = new URL('/mcp', BASE_URL).toString();
 const PASSWORD = 'CorrectHorseBatteryStaple1';
+const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-only-secret-replace-me-replace-me-replace-me';
 
 interface AuthorizationAttempt {
   readonly state: string;
@@ -89,6 +91,34 @@ async function requireBuiltServiceWorker(page: Page): Promise<void> {
       timeout: 15_000,
     })
     .toBe(true);
+}
+
+async function makeBrowserSessionStale(page: Page): Promise<void> {
+  const stored = await page.evaluate(() => localStorage.getItem('gpc.tokenPair.v1'));
+  if (!stored) throw new Error('registered browser session is missing');
+  const pair = JSON.parse(stored) as { accessToken: string } & Record<string, unknown>;
+  const current = decodeJwt(pair.accessToken);
+  if (typeof current.sub !== 'string') throw new Error('browser access token is missing its user');
+  const now = Math.floor(Date.now() / 1000);
+  const staleAccessToken = await new SignJWT({
+    type: 'access',
+    av: Number.isInteger(current.av) ? Number(current.av) : 0,
+    auth_time: now - 601,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(current.sub)
+    .setIssuedAt(now)
+    .setExpirationTime(now + 15 * 60)
+    .sign(new TextEncoder().encode(JWT_SECRET));
+  await page.evaluate(
+    ({ original, accessToken }) => {
+      localStorage.setItem(
+        'gpc.tokenPair.v1',
+        JSON.stringify({ ...(JSON.parse(original) as object), accessToken }),
+      );
+    },
+    { original: stored, accessToken: staleAccessToken },
+  );
 }
 
 async function beginAuthorization(page: Page, attempt: AuthorizationAttempt): Promise<void> {
@@ -168,17 +198,14 @@ test.describe('delegated MCP OAuth acceptance', () => {
     await register(page, email);
     await requireBuiltServiceWorker(page);
 
-    // Exercise the actual browser login return path instead of carrying the
-    // registration session directly into consent.
-    await page.evaluate(() => {
-      localStorage.removeItem('gpc.tokenPair.v1');
-      localStorage.removeItem('gpc.access');
-      localStorage.removeItem('gpc.refresh');
-    });
+    // A valid but no-longer-recent browser session must return to login before
+    // any consent controls render, while retaining the complete OAuth request.
+    await makeBrowserSessionStale(page);
 
     const denied = pkceAttempt();
     await page.goto(denied.url);
     await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole('button', { name: 'Authorize', exact: true })).toHaveCount(0);
     await page.getByLabel(/email/i).fill(email);
     await page.getByLabel(/^password$/i).fill(PASSWORD);
     await page.getByRole('button', { name: /sign in/i }).click();
@@ -356,12 +383,51 @@ test.describe('delegated MCP OAuth acceptance', () => {
       );
       expect(converged.body).toMatchObject({ st: 11, dx: 12 });
 
+      await page.setViewportSize({ width: 320, height: 640 });
       await page.goto('/settings');
       await expect(page.getByRole('heading', { name: 'Connected apps' })).toBeVisible();
       const appName = page.getByText(CLIENT_NAME, { exact: true });
       await expect(appName).toBeVisible();
       const appCard = appName.locator('..').locator('..');
       await appCard.getByRole('button', { name: 'Revoke', exact: true }).click();
+      const revokeDialog = page.getByRole('dialog', { name: 'Revoke connected app?' });
+      await expect(revokeDialog).toBeVisible();
+      await expect(revokeDialog).toContainText(CLIENT_NAME);
+      await expect(revokeDialog).toContainText('invalidates all of its access and refresh tokens');
+      const modalBox = revokeDialog.locator('.modal-box');
+      await expect
+        .poll(() => modalBox.evaluate((element) => getComputedStyle(element).opacity))
+        .toBe('1');
+      const dialogBox = await modalBox.boundingBox();
+      const viewport = page.viewportSize();
+      expect(dialogBox).not.toBeNull();
+      expect(viewport).not.toBeNull();
+      if (!dialogBox || !viewport) throw new Error('revoke dialog geometry unavailable');
+      expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+      expect(dialogBox.y).toBeGreaterThanOrEqual(0);
+      expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(viewport.width);
+      expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(viewport.height);
+      await expect
+        .poll(() =>
+          modalBox.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            const topmost = document.elementFromPoint(
+              box.x + box.width / 2,
+              box.y + box.height / 2,
+            );
+            return topmost !== null && element.contains(topmost);
+          }),
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: 'test-results/connected-app-revoke-confirmation-320.png',
+        fullPage: false,
+      });
+      await revokeDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(revokeDialog).not.toBeVisible();
+      await expect(appName).toBeVisible();
+      await appCard.getByRole('button', { name: 'Revoke', exact: true }).click();
+      await revokeDialog.getByRole('button', { name: 'Revoke', exact: true }).click();
       await expect(page.getByText('Connected app revoked', { exact: true })).toBeVisible();
       await expect(appName).toHaveCount(0);
 

@@ -122,7 +122,7 @@ export default defineConfig({
     adminEntryRewriteDev(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['icon-256.png'],
       manifest: {
         name: 'GURPS Player Companion',
         short_name: 'GURPS PC',

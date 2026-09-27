@@ -7,7 +7,7 @@ import {
   oauthScope,
   parseOAuthScopes,
 } from '../../shared/schemas/oauth.ts';
-import type { AuthenticatedUser } from '../auth/session.ts';
+import { type AuthenticatedUser, hasRecentAuthentication } from '../auth/session.ts';
 import type { AppConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import {
@@ -49,6 +49,13 @@ export class OAuthError extends Error {
   ) {
     super(message);
     this.name = 'OAuthError';
+  }
+}
+
+export class RecentAuthenticationRequiredError extends Error {
+  constructor() {
+    super('recent authentication required');
+    this.name = 'RecentAuthenticationRequiredError';
   }
 }
 
@@ -314,6 +321,12 @@ export async function beginAuthorization(
   query: OAuthAuthorizationQuery,
 ) {
   const { client, scopes } = await validatedClientAndScopes(config, query);
+  // Validate the client, callback and scopes before asking the player to sign
+  // in again, but do not create a CSRF-bound consent request or reveal the
+  // approval UI until that primary authentication ceremony is recent.
+  if (!hasRecentAuthentication(user)) {
+    throw new RecentAuthenticationRequiredError();
+  }
   const csrfToken = opaque('gpccsrf_');
   await getDb()
     .insert(oauthAuthorizationRequests)

@@ -9,6 +9,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { BrandMark } from '../components/ui/BrandMark.tsx';
 import { ApiError, api } from '../lib/api.ts';
 import { clearSessionQueryCache } from '../lib/sessionQueryCache.tsx';
 import { tokenStore } from '../lib/tokenStore.ts';
@@ -57,12 +58,7 @@ export function AdminLayout() {
       <header className="sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 bg-base-100/95 px-3 py-3 backdrop-blur sm:gap-6 sm:px-7">
         <div className="flex min-w-0 flex-wrap items-center gap-1 sm:gap-6">
           <a href="/" className="flex items-center gap-2 no-cap sm:gap-3">
-            <span
-              aria-hidden="true"
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-primary font-display text-base font-bold text-primary-content"
-            >
-              G
-            </span>
+            <BrandMark />
             <span className="hidden font-display text-base font-semibold sm:inline">
               Player Companion · Admin
             </span>

@@ -9,6 +9,7 @@ export interface IncludedOperation {
   tool: string;
   scope: OAuthScope;
   destructive: boolean;
+  openWorld: boolean;
   handler: 'shared-openapi-handler';
   schemaSource: 'openapi-zod-registry';
   resultMode: 'canonical-read' | 'compact-mutation-ack';
@@ -51,6 +52,7 @@ const tool = (
   name: string,
   scope: OAuthScope,
   destructive = method === 'DELETE',
+  openWorld = false,
 ): IncludedOperation => ({
   kind: 'tool',
   method,
@@ -58,6 +60,7 @@ const tool = (
   tool: name,
   scope,
   destructive,
+  openWorld,
   handler: 'shared-openapi-handler',
   schemaSource: 'openapi-zod-registry',
   resultMode: method === 'GET' ? 'canonical-read' : 'compact-mutation-ack',
@@ -133,6 +136,7 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
     '/api/v1/campaigns/{id}/invitations',
     'gpc_invite_campaign_member',
     'gpc:manage',
+    true,
     true,
   ),
   tool(

@@ -11,12 +11,15 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const candidate = (location.state as { returnTo?: unknown } | null)?.returnTo;
+  const loginState = location.state as { returnTo?: unknown; reason?: unknown } | null;
+  const candidate = loginState?.returnTo;
   const returnTo =
     typeof candidate === 'string' &&
     (candidate === '/oauth/consent' || candidate.startsWith('/oauth/consent?'))
       ? candidate
       : '/';
+  const isOAuthReauthentication =
+    returnTo !== '/' && loginState?.reason === 'oauth-consent-reauthentication';
 
   const passkeyLogin = useMutation({
     mutationFn: async () => {
@@ -72,6 +75,11 @@ export function LoginPage() {
       >
         <p className="label-eyebrow">Player Companion</p>
         <h1 className="font-display text-3xl font-semibold">Sign in</h1>
+        {isOAuthReauthentication && (
+          <p className="text-sm text-muted">
+            Sign in again before reviewing and authorizing this connected app.
+          </p>
+        )}
         <label className="form-control">
           <span className="label-text">Email</span>
           <input
