@@ -41,6 +41,7 @@ import {
   encounterEffects,
   encounters,
 } from '../db/schema.ts';
+import { escapeLikePattern } from '../db/search.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { loadCharacterDetail } from '../services/characterSummary.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
@@ -448,7 +449,7 @@ router.openapi(
       .where(
         and(
           eq(encounters.campaignId, id),
-          search ? ilike(encounters.name, `%${search}%`) : undefined,
+          search ? ilike(encounters.name, `%${escapeLikePattern(search)}%`) : undefined,
         ),
       )
       .orderBy(asc(encounters.createdAt), asc(encounters.id))

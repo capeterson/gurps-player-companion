@@ -5,6 +5,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { type LocalLibrarySkill, type LocalLibraryTrait, getLocalDb } from '../../db/dexie.ts';
 import { api } from '../../lib/api.ts';
 import { LibraryPage } from './LibraryPage.tsx';
+import { plainExcerpt } from './LibrarySection.tsx';
 
 vi.mock('../../lib/api.ts', async (original) => ({
   ...(await original<typeof import('../../lib/api.ts')>()),
@@ -128,6 +129,12 @@ beforeEach(() => {
   } catch {}
 });
 
+it('preserves excerpt punctuation and does not split a Unicode character at the limit', () => {
+  const prose = 'Damage > 10; HP < 5; 2 * 3 * 4; foo_bar_baz | # note.';
+  expect(plainExcerpt(prose)).toBe(prose);
+  expect(plainExcerpt(`${'x'.repeat(299)}😀Z`)).toBe(`${'x'.repeat(299)}😀`);
+});
+
 function setup(initialEntry = '/') {
   return render(
     <QueryClientProvider
@@ -209,7 +216,7 @@ it('renders markdown only for an expanded entry, even in a large library', async
   expect(await screen.findByText('500 of 500 skills.', { exact: false })).toBeVisible();
   expect(renderMarkdown).not.toHaveBeenCalled();
   // Collapsed rows show a plain-text excerpt instead.
-  expect(screen.getByText('Bold description 7')).toBeVisible();
+  expect(screen.getByText('**Bold** description 7')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Skill 007' }));
   await waitFor(() =>
     expect(document.querySelector('.markdown-body strong')).toHaveTextContent('Bold'),

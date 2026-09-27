@@ -79,6 +79,9 @@ Character, campaign, encounter, adventure-log, invitation, notification, and
 campaign-library reads offer bounded search/limit/offset controls, with library
 section selection, so agents can avoid loading unrelated context. History feeds
 remain cursor-paginated. Compatible clients also receive compressed MCP responses.
+Character, campaign, encounter and adventure-log text filters, plus admin user
+and campaign searches, treat `%`, `_` and backslash as literal characters rather
+than SQL pattern syntax. These searches remain case-insensitive.
 
 ## User-facing features
 
@@ -206,7 +209,8 @@ shows the synced campaign name as a separate link to that campaign.
   specialization description overrides) use the shared formatting toolbar and
   raw-markdown mode. Character skill/spell copied notes have expandable markdown
   descriptions. Trait notes render markdown for readers and offer a markdown
-  preview beside the compact source editor for owners.
+  preview beside the compact source editor for owners. Only safe links retain
+  link styling and navigation after sanitization.
 - **Overview section's Identity panel.** Name, height, weight, age, **birthdate** (free-form
   text, e.g. "3/7/0402"), campaign assignment, and
   a **Description** field (stored in the existing `appearance` column). No
@@ -818,8 +822,10 @@ there is no decorative cover slot or implied image-upload feature.
   light category groups that fold (traits by kind, skills by attribute, spells
   by college, items by category, languages by spoken/sign form, techniques by
   default skill, styles by first component skill, enchantments by applicability,
-  active effects by first tag) and a jump strip to any group. Rows show the name, key numbers
-  and a one-line plain-text excerpt; opening a row renders its full Markdown
+  active effects by first tag) and a jump strip to any group. Group anchors retain
+  distinct identities for Unicode, case and punctuation variations. Rows show the name, key numbers
+  and a one-line source excerpt that preserves punctuation (including comparison
+  symbols and literal Markdown characters); opening a row renders its full Markdown
   entry in place. The category chips, search and jump strip stay pinned under
   the app header. Search matches every word across names, descriptions, sources
   and categories. `?section=`, `?q=` and `?open=` make a category, search or

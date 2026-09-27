@@ -48,6 +48,7 @@ interface RawNode {
 interface Node {
   type: string;
   value?: string;
+  properties?: Record<string, unknown>;
   children?: Node[];
 }
 
@@ -77,11 +78,35 @@ function rehypeEscapeRaw() {
   }
 }
 
+/**
+ * URI schemes are case-insensitive, but rehype-sanitize's allowlist check
+ * expects canonical lower-case schemes. Normalize only the scheme token so
+ * HTTPS/HTTP/MAILTO URLs retain the same path, query, fragment and case while
+ * the existing sanitizer still decides which protocols are allowed.
+ */
+function rehypeNormalizeUrlScheme() {
+  return (tree: Node) => walk(tree);
+  function walk(node: Node): void {
+    if (node.type === 'element' && node.properties) {
+      for (const property of ['href', 'src']) {
+        const value = node.properties[property];
+        if (typeof value !== 'string') continue;
+        node.properties[property] = value.replace(
+          /^([A-Za-z][A-Za-z0-9+.-]*):/,
+          (_match, scheme: string) => `${scheme.toLowerCase()}:`,
+        );
+      }
+    }
+    node.children?.forEach(walk);
+  }
+}
+
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeEscapeRaw)
+  .use(rehypeNormalizeUrlScheme)
   // Defense-in-depth: even though raw HTML is now inert text, keep the
   // sanitizer in the pipeline so any element nodes the markdown itself
   // produces stay within the safe allowlist (e.g. it rewrites dangerous

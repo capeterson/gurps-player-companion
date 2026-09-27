@@ -568,14 +568,18 @@ pricing snapshots/re-resolution, source preference and independent weapon modes.
 
 The YAML import section folds closed by default and remembers its state on this
 device. Entry titles take their own row on mobile, with metadata/actions beneath.
-The library management UI filters the current Traits, Skills, Spells or Items
-category as the user types in **Search library**. Matching is case-insensitive:
+The library management UI filters the current category as the user types in
+**Search library**. Matching is case-insensitive:
 every query word must appear in the human-readable fields (name, description,
 source, kind, attribute/difficulty, college, prerequisites or specialization
 policy). Category totals and the matching count remain visible, with an explicit
 empty result and Clear search. Search changes never affect exports or imports.
 An entry being edited stays visible even when it does not match; category changes
 hide rather than unmount editors, preserving unsaved drafts and save failures.
+Group jump targets remain distinct for Unicode and punctuation-only labels.
+Collapsed description excerpts retain source punctuation rather than stripping
+comparison symbols or literal Markdown characters; expanded descriptions render
+the Markdown. Excerpt truncation does not split a UTF-16 surrogate pair.
 
 Trait, skill and spell descriptions render through the existing sanitized
 `Markdown` component. Add/edit descriptions and skill specialization description
@@ -583,6 +587,8 @@ overrides use `RichTextEditor`, with formatting toolbar and raw markdown mode.
 The stored/API/YAML value remains a markdown string; no new schema or HTML field
 is introduced. Pending description submissions disable editor interaction.
 Copied descriptions on character sheets render with the same sanitizer.
+Only rendered anchors with a permitted `href` receive link styling; text whose
+unsafe link target was removed appears as ordinary text.
 
 ## Adventure log
 
@@ -621,7 +627,9 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   column. Rendering is sanitized at render time only:
   `src/client/components/markdown/markdownProcessor.ts` runs
   `remark-parse → remark-gfm → remark-rehype(allowDangerousHtml) →
-  rehypeEscapeRaw → rehype-sanitize → rehype-stringify`. Raw HTML/scripts in
+  rehypeEscapeRaw → rehypeNormalizeUrlScheme → rehype-sanitize → rehype-stringify`.
+  URL normalization lowercases only the scheme token, preserving path/query case
+  and leaving the sanitizer's protocol allowlist unchanged. Raw HTML/scripts in
   the source are **never interpreted** — `<script>` becomes escaped literal
   text (`&#x3C;script&gt;…`) and `rehype-sanitize` runs as defense-in-depth.
   There is no server-side HTML stripping; the contract is enforced at the

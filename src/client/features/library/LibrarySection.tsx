@@ -115,19 +115,27 @@ interface Group<R> {
 /** Zero-width below `sm`; the column keeps its slot so colSpans stay aligned. */
 const COLLAPSED_ON_MOBILE = 'w-0 overflow-hidden p-0 sm:px-2';
 
-function slug(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'group';
+function groupIdSegment(value: string): string {
+  // Encode UTF-16 code units instead of slugging the label. Labels such as
+  // distinct Unicode colleges or punctuation-only groups must keep distinct
+  // DOM ids, and encoding code units also handles lone surrogates safely.
+  if (value.length === 0) return 'empty';
+  return Array.from({ length: value.length }, (_, index) =>
+    value.charCodeAt(index).toString(16).padStart(4, '0'),
+  ).join('-');
 }
 
-/** First line of a Markdown description as plain text, for the collapsed row. */
+/** Short description preview; preserve source punctuation rather than parse Markdown per row. */
 export function plainExcerpt(markdown: string | null | undefined): string {
   if (!markdown) return '';
-  return markdown
-    .slice(0, 300)
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[`*_~#>|]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let end = 0;
+  let codePoints = 0;
+  for (const character of markdown) {
+    if (codePoints === 300) break;
+    end += character.length;
+    codePoints += 1;
+  }
+  return markdown.slice(0, end).replace(/\s+/g, ' ').trim();
 }
 
 function usePreferences(
@@ -216,7 +224,7 @@ export function LibrarySection<R extends LibraryListRow>({
       .map(([label, rows]) => ({
         label,
         rows,
-        domId: `library-group-${config.key}-${slug(label)}`,
+        domId: `library-group-${config.key}-${groupIdSegment(label)}`,
       }));
     return { groups: ordered, matchCount: matching.length };
   }, [active, entries, words, editId, config, preferences]);

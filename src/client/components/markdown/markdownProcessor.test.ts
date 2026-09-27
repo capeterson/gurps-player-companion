@@ -27,6 +27,91 @@ describe('renderMarkdown — security', () => {
     expect(out).toContain('hi');
   });
 
+  it('keeps raw HTML attack shapes as inert text across attributes and namespaces', async () => {
+    const cases = [
+      '<img src=x onerror="window.__markdownCanary = 1">image canary',
+      '<svg onload="window.__markdownCanary = 2"><a href="javascript:alert(1)">svg canary</a></svg>',
+      '<a href="data:text/html,<script>alert(1)</script>" onclick="alert(1)">attribute canary</a>',
+      '<ScRiPt>alert("mixed case")</ScRiPt>',
+      '<iframe srcdoc="<script>alert(1)</script>">frame canary</iframe>',
+      '<div title="x" autofocus onfocus=alert(1) \' y">malformed attribute canary',
+    ];
+
+    for (const source of cases) {
+      const out = await renderMarkdown(source);
+      const parsed = document.createElement('div');
+      parsed.innerHTML = out;
+
+      expect(
+        parsed.querySelector(
+          'script, img, svg, iframe, a[onclick], [onerror], [onload], [onfocus]',
+        ),
+      ).toBeNull();
+      expect(parsed.textContent).toContain(source);
+    }
+  });
+
+  it('neutralizes encoded or mixed-case executable link protocols while retaining safe links', async () => {
+    const out = await renderMarkdown(
+      '[plain](javascript:alert(1)) [mixed](JaVaScRiPt:alert(2)) [entity](java&#x73;cript:alert(3)) [data](data:text/html,hello) [safe](https://example.com/path?q=one&amp;two) [upper](HTTPS://Example.com/Cased/Path?q=Case#Frag) [mixed-safe](hTtPs://example.com/MiXeD?Q=Value)',
+    );
+    const parsed = document.createElement('div');
+    parsed.innerHTML = out;
+
+    expect([...parsed.querySelectorAll('a')].map((link) => link.getAttribute('href'))).toEqual([
+      null,
+      null,
+      null,
+      null,
+      'https://example.com/path?q=one&two',
+      'https://Example.com/Cased/Path?q=Case#Frag',
+      'https://example.com/MiXeD?Q=Value',
+    ]);
+  });
+
+  it('removes dangerous Markdown image sources and retains safe HTTPS sources', async () => {
+    const out = await renderMarkdown(
+      '![unsafe script](javascript:alert(1))\n\n![unsafe SVG](data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=)\n\n![uppercase safe](HTTPS://Example.com/Cased/Path.png?Q=Case)\n\n![safe image](https://example.com/safe.png)',
+    );
+    const parsed = document.createElement('div');
+    parsed.innerHTML = out;
+    const images = [...parsed.querySelectorAll('img')];
+
+    expect(images).toHaveLength(4);
+    expect(images.map((image) => image.getAttribute('src'))).toEqual([
+      null,
+      null,
+      'https://Example.com/Cased/Path.png?Q=Case',
+      'https://example.com/safe.png',
+    ]);
+    expect(images.map((image) => image.getAttribute('alt'))).toEqual([
+      'unsafe script',
+      'unsafe SVG',
+      'uppercase safe',
+      'safe image',
+    ]);
+  });
+
+  it('preserves punctuation, Unicode, RTL text, emoji, and fenced markup as text', async () => {
+    const source = [
+      'Quotes: "double" \'single\' &ampersand; \\ slash — café 東京 مرحبا 🐉',
+      '',
+      '```html',
+      '<img src=x onerror="alert(1)">',
+      '```',
+    ].join('\n');
+    const out = await renderMarkdown(source);
+    const parsed = document.createElement('div');
+    parsed.innerHTML = out;
+
+    expect(parsed.querySelector('img, script')).toBeNull();
+    expect(parsed.textContent).toContain(
+      'Quotes: "double" \'single\' &ampersand; \\ slash — café 東京 مرحبا 🐉',
+    );
+    expect(parsed.textContent).toContain('<img src=x onerror="alert(1)">');
+    expect(out).toContain('<pre><code class="language-html">');
+  });
+
   it('strips dangerous link protocols via the sanitizer', async () => {
     const out = await renderMarkdown('[click](javascript:alert(1))');
     expect(out).not.toMatch(/javascript:/i);
