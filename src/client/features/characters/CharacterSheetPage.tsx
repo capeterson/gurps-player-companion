@@ -584,9 +584,15 @@ function IdentityPanel({
   const campaignFlashKey = makeFlashKey('character', character.id, 'campaignId');
   const campaignFlash = useFieldFlash(campaignFlashKey);
   const [pendingCampaign, setPendingCampaign] = useState<{
+    characterId: string;
     from: string;
     to: string | null;
   } | null>(null);
+  useEffect(() => {
+    void character.id;
+    void character.campaignId;
+    setPendingCampaign(null);
+  }, [character.id, character.campaignId]);
   const saveCampaign = (next: string | null) =>
     enqueueFieldPatch({
       entityClass: 'character',
@@ -676,7 +682,11 @@ function IdentityPanel({
                 const next = e.target.value || null;
                 if (next === character.campaignId) return;
                 if (character.campaignId != null) {
-                  setPendingCampaign({ from: character.campaignId, to: next });
+                  setPendingCampaign({
+                    characterId: character.id,
+                    from: character.campaignId,
+                    to: next,
+                  });
                 } else {
                   void saveCampaign(next);
                 }
@@ -718,7 +728,11 @@ function IdentityPanel({
         confirmLabel="Change campaign"
         onCancel={() => setPendingCampaign(null)}
         onConfirm={() => {
-          if (pendingCampaign && character.campaignId === pendingCampaign.from) {
+          if (
+            pendingCampaign &&
+            character.id === pendingCampaign.characterId &&
+            character.campaignId === pendingCampaign.from
+          ) {
             void saveCampaign(pendingCampaign.to);
           }
           setPendingCampaign(null);

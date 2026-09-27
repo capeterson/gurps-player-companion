@@ -202,7 +202,7 @@ shows the synced campaign name as a separate link to that campaign.
   `src/client/components/markdown/`) used by the adventure log, with a
   raw-markdown/source toggle and sanitized rendering. It has no separate
   Notes destination or duplicate editing surface.
-- **Campaign assignment confirmation.** Moving or removing a character already in a campaign requires confirmation before enqueueing the local-first campaign patch. The dialog explains that owned library copies remain but live links are detached; rejoining does not reconnect them. First assignment from no campaign and unchanged selections do not prompt.
+- **Campaign assignment confirmation.** Moving or removing a character already in a campaign requires confirmation before enqueueing the local-first campaign patch. The dialog explains that owned library copies remain but live links are detached; rejoining does not reconnect them. First assignment from no campaign and unchanged selections do not prompt. Pending confirmation clears when the displayed character or its campaign changes.
 - **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
   Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary** card
@@ -486,8 +486,8 @@ shows the synced campaign name as a separate link to that campaign.
   Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
-- **Current Status and Combat tab (live-gameplay surfaces)**. Combat is the
-  initial sheet view, with Overview first in the navigation
+- **Current Status and Combat tab (live-gameplay surfaces)**. Combat follows
+  Overview in the navigation
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the

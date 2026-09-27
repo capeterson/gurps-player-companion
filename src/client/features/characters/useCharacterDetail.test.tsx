@@ -270,6 +270,9 @@ describe('durable character mechanics', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Open character navigation' })).toBeEnabled(),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
+    expect(screen.getByRole('button', { name: /^Sheet overview/ })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Combat' }));
     expect(screen.queryByRole('button', { name: /^Sheet overview/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
