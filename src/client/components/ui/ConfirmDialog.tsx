@@ -58,7 +58,7 @@ export function ConfirmDialog({
           {title}
         </h3>
         {children && <div className="py-3 text-sm">{children}</div>}
-        <div className="modal-action">
+        <div className="modal-action flex-wrap">
           <button type="button" onClick={onCancel} disabled={pending} className="btn btn-ghost">
             {cancelLabel}
           </button>

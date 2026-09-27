@@ -17,6 +17,10 @@ async function createCampaign(page: import('@playwright/test').Page, name: strin
   await page.getByLabel(/campaign name/i).fill(name);
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page.getByRole('link', { name })).toBeVisible();
+  await page.getByRole('button', { name: `Settings for ${name}` }).click();
+  await page.getByLabel('Point target').fill('150');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByLabel('Point target')).toHaveCount(0);
   return page.getByRole('link', { name });
 }
 
@@ -26,12 +30,32 @@ async function expectDialogInsideViewport(
   height: number,
 ) {
   const dialog = page.getByRole('dialog');
+  await dialog.evaluate(async (element) => {
+    await Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished.catch(() => {})),
+    );
+  });
+  await expect(dialog.locator('.modal-box')).toHaveCSS('opacity', '1');
   const modalBox = await dialog.locator('.modal-box').boundingBox();
   expect(modalBox).not.toBeNull();
   expect(modalBox?.x).toBeGreaterThanOrEqual(0);
   expect(modalBox?.y).toBeGreaterThanOrEqual(0);
   expect((modalBox?.x ?? 0) + (modalBox?.width ?? width)).toBeLessThanOrEqual(width);
   expect((modalBox?.y ?? 0) + (modalBox?.height ?? height)).toBeLessThanOrEqual(height);
+  for (const button of await dialog.locator('.modal-action').getByRole('button').all()) {
+    const buttonBox = await button.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    expect(buttonBox?.x).toBeGreaterThanOrEqual(modalBox?.x ?? 0);
+    expect(buttonBox?.y).toBeGreaterThanOrEqual(modalBox?.y ?? 0);
+    expect((buttonBox?.x ?? 0) + (buttonBox?.width ?? 0)).toBeLessThanOrEqual(
+      (modalBox?.x ?? 0) + (modalBox?.width ?? width),
+    );
+    expect((buttonBox?.y ?? 0) + (buttonBox?.height ?? 0)).toBeLessThanOrEqual(
+      (modalBox?.y ?? 0) + (modalBox?.height ?? height),
+    );
+  }
 }
 
 async function openPointLedger(page: import('@playwright/test').Page) {
@@ -97,6 +121,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
 
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 900 });
+    await page.screenshot({ path: `test-results/landing-${width}.png`, fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
@@ -148,7 +173,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
 
-  const campaignSelect = page.getByLabel('campaign');
+  const campaignSelect = page.getByLabel('campaign', { exact: true });
   await campaignSelect.selectOption({ label: firstCampaignName });
   await expect(campaignSelect).toHaveValue(
     (await campaignSelect
@@ -177,7 +202,11 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     await expect(dialog).toContainText(/rejoining the campaign later/i);
     await expectDialogInsideViewport(page, width, height);
     if (width === 320 || width === 768) {
-      await page.screenshot({ path: `test-results/campaign-warning-${width}.png` });
+      await page.waitForTimeout(350);
+      await page.screenshot({
+        path: `test-results/campaign-warning-${width}.png`,
+        animations: 'disabled',
+      });
     }
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(dialog).toHaveCount(0);
@@ -208,10 +237,10 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
   const missedCharacterUrl = page.url();
-  await page.getByLabel('campaign').selectOption({ label: secondCampaignName });
-  await expect(page.getByLabel('campaign')).toHaveValue(
+  await page.getByLabel('campaign', { exact: true }).selectOption({ label: secondCampaignName });
+  await expect(page.getByLabel('campaign', { exact: true })).toHaveValue(
     (await page
-      .getByLabel('campaign')
+      .getByLabel('campaign', { exact: true })
       .locator('option', { hasText: secondCampaignName })
       .getAttribute('value')) ?? '',
   );
@@ -233,7 +262,11 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     await expect(recipients).toContainText('Leave out characters whose players missed the session');
     await expectDialogInsideViewport(page, width, height);
     if (width === 320 || width === 768) {
-      await page.screenshot({ path: `test-results/recipient-subset-${width}.png` });
+      await page.waitForTimeout(350);
+      await page.screenshot({
+        path: `test-results/recipient-subset-${width}.png`,
+        animations: 'disabled',
+      });
     }
     await recipients.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(recipients).toHaveCount(0);
@@ -258,14 +291,20 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   const awardedPointCap = page.getByText('Point cap', { exact: true }).locator('xpath=..');
   await expect(awardedPointCap).toContainText(String(initialPointCap + 4));
 
-  const finalCampaignSelect = page.getByLabel('campaign');
+  const finalCampaignSelect = page.getByLabel('campaign', { exact: true });
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 900 });
     await finalCampaignSelect.selectOption('');
     const leaveDialog = page.getByRole('dialog', { name: 'Change character campaign?' });
     await expect(leaveDialog).toBeVisible();
     await expectDialogInsideViewport(page, width, 900);
-    if (width === 320) await page.screenshot({ path: 'test-results/campaign-leave-320.png' });
+    if (width === 320) {
+      await page.waitForTimeout(350);
+      await page.screenshot({
+        path: 'test-results/campaign-leave-320.png',
+        animations: 'disabled',
+      });
+    }
     await leaveDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(finalCampaignSelect).toHaveValue(
       (await finalCampaignSelect
@@ -278,18 +317,24 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   const leaveConfirmed = page.getByRole('dialog', { name: 'Change character campaign?' });
   await expect(leaveConfirmed).toBeVisible();
   await expectDialogInsideViewport(page, 768, 900);
-  await page.screenshot({ path: 'test-results/campaign-leave-768.png' });
+  await page.waitForTimeout(350);
+  await page.screenshot({
+    path: 'test-results/campaign-leave-768.png',
+    animations: 'disabled',
+  });
   await leaveConfirmed.getByRole('button', { name: 'Change campaign' }).click();
   await expect(finalCampaignSelect).toHaveValue('');
 
   await page.goto(missedCharacterUrl);
   await expectCharacterNavigationReady(page);
   await openPointLedger(page);
-  await expect(page.getByRole('heading', { name: missedCharacterName })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'character name' }).first()).toHaveValue(
+    missedCharacterName,
+  );
   await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toHaveCount(0);
-  await expect(page.getByLabel('campaign')).toHaveValue(
+  await expect(page.getByLabel('campaign', { exact: true })).toHaveValue(
     (await page
-      .getByLabel('campaign')
+      .getByLabel('campaign', { exact: true })
       .locator('option', { hasText: secondCampaignName })
       .getAttribute('value')) ?? '',
   );
@@ -302,7 +347,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await page.getByRole('link', { name: /all characters/i }).click();
   await page.getByRole('link', { name: 'Campaign Assignment QA' }).click();
   await expectCharacterNavigationReady(page);
-  const returningCampaignSelect = page.getByLabel('campaign');
+  const returningCampaignSelect = page.getByLabel('campaign', { exact: true });
   const secondCampaignValue = await returningCampaignSelect
     .locator('option', { hasText: secondCampaignName })
     .getAttribute('value');
@@ -315,11 +360,13 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await expect(page).toHaveURL(missedCharacterUrl);
   await expectCharacterNavigationReady(page);
   await openPointLedger(page);
-  await expect(page.getByRole('heading', { name: missedCharacterName })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'character name' }).first()).toHaveValue(
+    missedCharacterName,
+  );
   await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toHaveCount(0);
-  await expect(page.getByLabel('campaign')).toHaveValue(
+  await expect(page.getByLabel('campaign', { exact: true })).toHaveValue(
     (await page
-      .getByLabel('campaign')
+      .getByLabel('campaign', { exact: true })
       .locator('option', { hasText: secondCampaignName })
       .getAttribute('value')) ?? '',
   );
