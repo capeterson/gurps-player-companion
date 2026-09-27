@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { appBreadcrumbPage, useAppEntityBreadcrumb } from './components/AppBreadcrumbs.ts';
 import { CharacterHeaderChromeContext } from './components/CharacterHeaderChromeContext.tsx';
@@ -16,8 +16,14 @@ import { clearAllLibraryTablePreferences } from './features/library/libraryTable
 import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
 import { clearSessionQueryCache } from './lib/sessionQueryCache.tsx';
-import { applyTheme, oppositeTheme, readStoredTheme, storeTheme, themeLabel } from './lib/theme.ts';
-import type { ThemeName } from './lib/theme.ts';
+import {
+  clearPendingThemePreferences,
+  modeLabel,
+  oppositeMode,
+  setThemeMode,
+  useThemeState,
+} from './lib/theme.ts';
+import { useThemePreferenceSync } from './lib/themeSync.ts';
 import { tokenStore } from './lib/tokenStore.ts';
 import { getSyncOrchestrator } from './sync/orchestrator.ts';
 
@@ -42,7 +48,7 @@ export function App() {
   const characterDetail = /^\/characters\/[^/]+\/?$/.test(location.pathname);
   const campaignActive =
     CAMPAIGN_PATHS.has(location.pathname) || entityBreadcrumb?.kind === 'campaign';
-  const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
+  const { mode } = useThemeState();
   const mobileCharacterMenuRef = useRef<HTMLDetailsElement>(null);
   const userMenuRef = useRef<HTMLDetailsElement>(null);
   const mobileCharacterMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
@@ -52,10 +58,7 @@ export function App() {
     queryFn: () => api<MeResponse>('/auth/me'),
   });
 
-  useEffect(() => {
-    applyTheme(theme);
-    storeTheme(theme);
-  }, [theme]);
+  useThemePreferenceSync();
 
   // Close header dropdowns when the route changes — the <details> element
   // doesn't auto-close, so navigating from a menu item leaves it open otherwise.
@@ -104,6 +107,7 @@ export function App() {
       }).catch(() => {});
     }
     clearSessionQueryCache(queryClient);
+    clearPendingThemePreferences();
     tokenStore.clear();
     // Wipe the local Dexie before navigating so account switching on
     // the same device never leaks the previous user's rows into a
@@ -121,7 +125,7 @@ export function App() {
   }
 
   function toggleTheme() {
-    setTheme((current) => oppositeTheme(current));
+    setThemeMode(oppositeMode(mode));
   }
 
   const characterName = entityBreadcrumb?.kind === 'character' ? entityBreadcrumb.name : null;
@@ -164,7 +168,7 @@ export function App() {
           </li>
           <li>
             <button type="button" onClick={toggleTheme}>
-              Switch to {themeLabel(oppositeTheme(theme))} mode
+              Switch to {modeLabel(oppositeMode(mode))} mode
             </button>
           </li>
           <li className="menu-title px-3 py-2">
@@ -309,11 +313,11 @@ export function App() {
               type="button"
               className="btn btn-ghost btn-sm gap-2 px-2 sm:px-3"
               onClick={toggleTheme}
-              aria-label={`Switch to ${themeLabel(oppositeTheme(theme))} mode`}
-              title={`Switch to ${themeLabel(oppositeTheme(theme))} mode`}
+              aria-label={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
+              title={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
             >
-              <AppIcon name={themeLabel(theme) === 'Dark' ? 'sun' : 'moon'} size={20} />
-              <span className="hidden sm:inline">{themeLabel(theme)} mode</span>
+              <AppIcon name={mode === 'dark' ? 'sun' : 'moon'} size={20} />
+              <span className="hidden sm:inline">{modeLabel(mode)} mode</span>
             </button>
             <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
               <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">

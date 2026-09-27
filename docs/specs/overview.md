@@ -891,14 +891,22 @@ there is no decorative cover slot or implied image-upload feature.
   persistent "A new version of the app is available" toast with a Reload
   button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
 - **Styled error recovery**: unknown routes and unexpected router/render errors
-  use the Arcane app shell rather than React Router's developer fallback. The
+  use the app shell rather than React Router's developer fallback. The
   page offers home/reload actions and shows a unique error reference, server
   request ID when available, current-user ID when available, route, and time for
   support correlation without exposing raw error details.
-- **Themeable** (light/dark; "Arcane" DaisyUI theme), installable PWA, works
-  offline for the character surface.
-- **Settings** page: account-scoped device-local Current Status display switches,
-  profile, password, passkeys, API keys. Long credential and
+- **Themes**: the header toggles dark/light mode per device (defaulting to the
+  OS preference). Settings → **Appearance** picks the palette for each mode —
+  dark: **Gilded Tome** (default), **Midnight Gilt** or **Verdigris & Brass**; light: **Illuminated
+  Manuscript** (default) or **Heraldic Vellum**. The palette choices are saved
+  to the account (`GET`/`PATCH /auth/preferences`, `users.dark_theme` /
+  `light_theme`) so every device matches; changes apply immediately, are kept
+  locally while offline and pushed when back online, and a server rejection
+  rolls the picker back with a toast and flash. The app icon is a fixed image
+  that does not change with the theme.
+- Installable PWA; works offline for the character surface.
+- **Settings** page: theme palettes (synced), account-scoped device-local
+  Current Status display switches, profile, password, passkeys, API keys. Long credential and
   connected-app names wrap inside their cards, with destructive actions stacked
   below them on narrow screens rather than overlapping the metadata.
 
@@ -992,6 +1000,9 @@ src/
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
     lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
+    lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
+                 palette preferences store, server read/push and rejection toasts
+    features/settings/AppearanceSection.tsx  Settings theme pickers
     features/library/  Category form files (Trait/Skill/Spell/Item/Enchantment/
                  ActiveEffectForm) used by the sync-backed library sections
     components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
@@ -1120,7 +1131,7 @@ work. Re-read project instructions and relevant specs changed by that update.
 The armor-location design study at [prototypes/armor-preview.html](../prototypes/armor-preview.html)
 opens directly in a browser without dependencies or a build. It previews all 15
 standard hit locations, character-relative left/right, linked silhouette/label
-selection, sample DR breakdowns, keyboard controls, and Arcane dark/light palettes.
+selection, sample DR breakdowns, keyboard controls, and the original Arcane dark/light palettes.
 Three live head-shape alternatives (Rounded, Angular, Inset face) preserve the
 separate skull, face, and eye targets; upper arms have clear shoulder gaps even
 with their selection strokes visible.

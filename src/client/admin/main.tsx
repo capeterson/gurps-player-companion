@@ -20,7 +20,7 @@ import { LoginPage } from '../features/auth/LoginPage.tsx';
 import { RegisterPage } from '../features/auth/RegisterPage.tsx';
 import { SuspendedPage } from '../features/auth/SuspendedPage.tsx';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from '../lib/sessionQueryCache.tsx';
-import { applyTheme, readStoredTheme } from '../lib/theme.ts';
+import { applyStoredTheme } from '../lib/theme.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { RequireAuth } from '../routes/RequireAuth.tsx';
 import '../styles/theme.css';
@@ -30,7 +30,7 @@ import { CampaignsPage } from './pages/CampaignsPage.tsx';
 import { UserDetailPage } from './pages/UserDetailPage.tsx';
 import { UsersPage } from './pages/UsersPage.tsx';
 
-applyTheme(readStoredTheme());
+applyStoredTheme();
 
 const queryClient = createSessionQueryClient();
 

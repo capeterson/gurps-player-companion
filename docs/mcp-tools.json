@@ -133,6 +133,18 @@
     },
     {
       "kind": "excluded",
+      "method": "GET",
+      "path": "/api/v1/auth/preferences",
+      "reason": "browser display-preference infrastructure"
+    },
+    {
+      "kind": "excluded",
+      "method": "PATCH",
+      "path": "/api/v1/auth/preferences",
+      "reason": "browser display-preference infrastructure"
+    },
+    {
+      "kind": "excluded",
       "method": "POST",
       "path": "/api/v1/auth/forgot-password",
       "reason": "account recovery infrastructure"

@@ -44,6 +44,13 @@ Everything else is either read-only in the local store or fully online:
 - **Online-only** (HTTP + React Query, no offline support): adventure log,
   invitations, notifications, settings, admin, and the library **YAML
   import** (see [Campaign library](#campaign-library)).
+- **Theme palette preferences** are outside the outbox but local-first: the
+  choice applies and persists in `localStorage` (`gpc.themePreferences`, with a
+  `pending` flag) immediately, and `src/client/lib/theme.ts` pushes it to
+  `PATCH /auth/preferences` one request at a time (latest wins). Network
+  failures stay pending and retry on `online` or the next server read; a
+  server read never overwrites a pending choice; an explicit rejection rolls
+  back with a toast and flash. Logout drops unsent choices.
 
 Delegated MCP calls are online server operations. They never fabricate Dexie
 rows or enter a browser outbox, and they cannot see unsynced browser edits.

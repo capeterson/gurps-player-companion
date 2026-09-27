@@ -58,6 +58,7 @@ import type { SkillPrerequisite, SkillTechLevelPolicy } from '../../shared/schem
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
 import type { SkillProcedures } from '../../shared/schemas/skillProcedures.ts';
 import { TECHNIQUE_DIFFICULTIES } from '../../shared/schemas/technique.ts';
+import type { DarkThemeName, LightThemeName } from '../../shared/schemas/themePreferences.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
 
 // ---------- enums ----------
@@ -140,6 +141,16 @@ export const users = pgTable(
      * column itself is the contract.
      */
     purgeScheduledAt: timestamp('purge_scheduled_at', { withTimezone: true }),
+    /** Palette used in dark mode; CHECK-constrained to DARK_THEMES. */
+    darkTheme: varchar('dark_theme', { length: 32 })
+      .$type<DarkThemeName>()
+      .notNull()
+      .default('gilded-tome'),
+    /** Palette used in light mode; CHECK-constrained to LIGHT_THEMES. */
+    lightTheme: varchar('light_theme', { length: 32 })
+      .$type<LightThemeName>()
+      .notNull()
+      .default('illuminated-manuscript'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

@@ -11,6 +11,7 @@ import { useToasts } from '../../lib/toast.tsx';
 import { tokenStore } from '../../lib/tokenStore.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 import { ApiKeysSection } from './ApiKeysSection.tsx';
+import { AppearanceSection } from './AppearanceSection.tsx';
 import { ConnectedAppsSection } from './ConnectedAppsSection.tsx';
 
 export function SettingsPage() {
@@ -111,9 +112,11 @@ export function SettingsPage() {
         <p className="label-eyebrow">Account</p>
         <h1 className="font-display text-3xl">Settings</h1>
         <p className="max-w-2xl text-sm text-muted">
-          Manage your character sheet display and sign-in credentials.
+          Manage your theme, character sheet display and sign-in credentials.
         </p>
       </header>
+
+      <AppearanceSection />
 
       <section className="max-w-lg">
         <div className="card gap-4 p-card">

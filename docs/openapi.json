@@ -36,6 +36,51 @@
           "error"
         ]
       },
+      "ThemePreferences": {
+        "type": "object",
+        "properties": {
+          "darkTheme": {
+            "type": "string",
+            "enum": [
+              "gilded-tome",
+              "midnight-gilt",
+              "verdigris-brass"
+            ]
+          },
+          "lightTheme": {
+            "type": "string",
+            "enum": [
+              "illuminated-manuscript",
+              "heraldic-vellum"
+            ]
+          }
+        },
+        "required": [
+          "darkTheme",
+          "lightTheme"
+        ]
+      },
+      "ThemePreferencesPatch": {
+        "type": "object",
+        "properties": {
+          "darkTheme": {
+            "type": "string",
+            "enum": [
+              "gilded-tome",
+              "midnight-gilt",
+              "verdigris-brass"
+            ]
+          },
+          "lightTheme": {
+            "type": "string",
+            "enum": [
+              "illuminated-manuscript",
+              "heraldic-vellum"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "SkillTechLevelPolicy": {
         "oneOf": [
           {
@@ -4656,6 +4701,94 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/preferences": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Return the authenticated user theme preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Theme preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemePreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Update the authenticated user theme preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemePreferencesPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated theme preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemePreferences"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
             "content": {
               "application/json": {
                 "schema": {

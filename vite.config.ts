@@ -127,8 +127,8 @@ export default defineConfig({
         name: 'GURPS Player Companion',
         short_name: 'GURPS PC',
         description: 'Local-first GURPS character + campaign companion',
-        theme_color: '#0e1116',
-        background_color: '#0e1116',
+        theme_color: '#16110d',
+        background_color: '#16110d',
         display: 'standalone',
         start_url: '/',
         icons: [
