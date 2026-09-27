@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { appBreadcrumbPage, useAppEntityBreadcrumb } from './components/AppBreadcrumbs.ts';
 import { CharacterHeaderChromeContext } from './components/CharacterHeaderChromeContext.tsx';
 import { NotificationsBell } from './components/NotificationsBell.tsx';
@@ -21,12 +21,7 @@ import { tokenStore } from './lib/tokenStore.ts';
 import { getSyncOrchestrator } from './sync/orchestrator.ts';
 
 const CAMPAIGN_ROOT = '/campaigns';
-const CAMPAIGN_SUBNAV = [
-  { to: '/log', label: 'Log' },
-  { to: '/library', label: 'Library' },
-] as const;
-
-const CAMPAIGN_PATHS = new Set<string>([CAMPAIGN_ROOT, ...CAMPAIGN_SUBNAV.map((t) => t.to)]);
+const CAMPAIGN_PATHS = new Set<string>([CAMPAIGN_ROOT, '/log', '/library']);
 
 interface MeResponse {
   id: string;
@@ -47,10 +42,8 @@ export function App() {
   const campaignActive =
     CAMPAIGN_PATHS.has(location.pathname) || entityBreadcrumb?.kind === 'campaign';
   const [theme, setTheme] = useState<ThemeName>(() => readStoredTheme());
-  const campaignMenuRef = useRef<HTMLDetailsElement>(null);
   const mobileCharacterMenuRef = useRef<HTMLDetailsElement>(null);
   const userMenuRef = useRef<HTMLDetailsElement>(null);
-  const campaignMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
   const mobileCharacterMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
   const userMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
   const me = useQuery({
@@ -68,7 +61,6 @@ export function App() {
   const pathname = location.pathname;
   useEffect(() => {
     void pathname;
-    if (campaignMenuRef.current) campaignMenuRef.current.open = false;
     if (mobileCharacterMenuRef.current) mobileCharacterMenuRef.current.open = false;
     if (userMenuRef.current) userMenuRef.current.open = false;
   }, [pathname]);
@@ -77,9 +69,6 @@ export function App() {
   useEffect(() => {
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node | null;
-      if (campaignMenuRef.current?.open && !campaignMenuRef.current.contains(target)) {
-        campaignMenuRef.current.open = false;
-      }
       if (
         mobileCharacterMenuRef.current?.open &&
         !mobileCharacterMenuRef.current.contains(target)
@@ -92,7 +81,6 @@ export function App() {
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
-      if (campaignMenuRef.current) campaignMenuRef.current.open = false;
       if (mobileCharacterMenuRef.current) mobileCharacterMenuRef.current.open = false;
       if (userMenuRef.current) userMenuRef.current.open = false;
     }
@@ -166,12 +154,6 @@ export function App() {
           </li>
           <li>
             <Link to="/campaigns">Campaigns</Link>
-          </li>
-          <li>
-            <Link to="/log">Log</Link>
-          </li>
-          <li>
-            <Link to="/library">Library</Link>
           </li>
           <li>
             <Link to="/settings">Settings</Link>
@@ -321,40 +303,6 @@ export function App() {
                     </span>
                   </>
                 )}
-                <details ref={campaignMenuRef} className="dropdown dropdown-end relative z-50">
-                  <summary
-                    className={`flex cursor-pointer list-none items-center rounded-field px-2 py-2 text-sm transition ${
-                      campaignActive
-                        ? 'text-base-content'
-                        : 'text-muted hover:bg-base-200 hover:text-base-content'
-                    }`}
-                    aria-label="Campaign sub-menu"
-                  >
-                    <AppIcon name="chevronDown" size={14} />
-                  </summary>
-                  <ul
-                    ref={campaignMenuPanelRef}
-                    style={{
-                      marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))',
-                    }}
-                    className="menu dropdown-content z-50 mt-2 w-40 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
-                  >
-                    {CAMPAIGN_SUBNAV.map((tab) => (
-                      <li key={tab.to}>
-                        <NavLink
-                          to={
-                            entityBreadcrumb?.kind === 'campaign'
-                              ? `${tab.to}?campaign=${encodeURIComponent(entityBreadcrumb.id)}`
-                              : tab.to
-                          }
-                          className={({ isActive }) => (isActive ? 'active' : undefined)}
-                        >
-                          {tab.label}
-                        </NavLink>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
               </div>
             </nav>
           </div>

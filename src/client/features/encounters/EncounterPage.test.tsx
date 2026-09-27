@@ -36,7 +36,8 @@ vi.mock('./encountersApi.ts', () => ({
     updateEffect: vi.fn(),
   },
 }));
-vi.mock('../../lib/api.ts', () => ({
+vi.mock('../../lib/api.ts', async (original) => ({
+  ...(await original<typeof import('../../lib/api.ts')>()),
   api: vi.fn(async (path: string) =>
     path === '/auth/me'
       ? { id: 'owner' }

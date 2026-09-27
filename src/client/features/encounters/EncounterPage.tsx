@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { COMMON_CONDITIONS } from '../../../shared/constants/combat.ts';
 import { EFFECT_TEMPLATES } from '../../../shared/constants/effectTemplates.ts';
 import { parseSpellDurationText } from '../../../shared/domain/effectDuration.ts';
@@ -10,7 +10,6 @@ import {
   isEffectExpired,
   needsMaintenance,
 } from '../../../shared/domain/encounterEffects.ts';
-import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import type {
   CombatantCreate,
   CombatantUpdate,
@@ -21,8 +20,9 @@ import type {
 } from '../../../shared/schemas/encounter.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { type LocalCharacter, type LocalCharacterSpell, getLocalDb } from '../../db/dexie.ts';
-import { api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { CampaignWorkspaceHeader } from '../campaigns/CampaignWorkspaceHeader.tsx';
+import { useCampaignWorkspace } from '../campaigns/useCampaignWorkspace.ts';
 import { useCampaignCharactersList } from '../characters/useCharacterDetail.ts';
 import { PlayerCharacterQuickActions } from './PlayerCharacterQuickActions.tsx';
 import { cleanupLinkedSheetEffect } from './effectSheetCleanup.ts';
@@ -75,17 +75,9 @@ export function EncounterPage() {
   }, [id, encounterId]);
   const encounter = useEncounter(id, encounterId);
   const npcHpIntents = useRef(new Map<string, NpcHpIntent>());
-  const campaign = useQuery({
-    queryKey: ['campaigns', id],
-    queryFn: () => api<CampaignOut>(`/campaigns/${id}`),
-    enabled: !!id,
-  });
+  const workspace = useCampaignWorkspace(id);
   const roster = useCampaignCharactersList(id || undefined);
-  const me = useQuery({ queryKey: ['auth', 'me'], queryFn: () => api<{ id: string }>('/auth/me') });
-  const membership = campaign.data?.members.find((member) => member.userId === me.data?.id);
-  const canManage = campaign.data
-    ? me.data?.id === campaign.data.ownerId || membership?.role === 'manager'
-    : false;
+  const canManage = workspace.canManage;
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: encounterKeys.detail(id, encounterId) });
     void queryClient.invalidateQueries({ queryKey: encounterKeys.list(id) });
@@ -148,20 +140,22 @@ export function EncounterPage() {
     void save();
   };
   if (!id || !encounterId) return <p className="alert alert-error">Missing encounter.</p>;
-  if (encounter.isLoading || campaign.isLoading)
+  if (encounter.isLoading || workspace.isLoading)
     return <p className="text-sm text-base-content/60">Loading encounter...</p>;
-  if (!campaign.data?.experimentalTurnTracker)
+  if (!workspace.campaign)
+    return <p className="alert alert-error">{workspace.error?.message ?? 'Campaign not found.'}</p>;
+  if (!workspace.campaign?.experimentalTurnTracker)
     return (
-      <section className="card p-5 space-y-3">
-        <h1 className="font-display text-xl">Turn tracker is disabled</h1>
-        <p className="text-sm">
-          The campaign owner can enable this experimental feature in campaign settings. Saved
-          encounters are kept.
-        </p>
-        <Link className="btn btn-sm" to={`/campaigns/${id}`}>
-          Back to campaign
-        </Link>
-      </section>
+      <div className="mx-auto max-w-[96rem] space-y-6">
+        <CampaignWorkspaceHeader campaignId={id} workspace={workspace} />
+        <section className="card max-w-5xl p-5 space-y-3">
+          <h2 className="font-display text-xl">Turn tracker is disabled</h2>
+          <p className="text-sm">
+            The campaign owner can enable this experimental feature in campaign settings. Saved
+            encounters are kept.
+          </p>
+        </section>
+      </div>
     );
   if (!encounter.data)
     return (
@@ -197,9 +191,9 @@ export function EncounterPage() {
       effect,
       data.combatants.find((row) => row.id === effect.targetCombatantId),
       {
-        viewerId: me.data?.id,
+        viewerId: workspace.viewerId ?? undefined,
         isStaff: canManage,
-        allowGmCharacterEditing: campaign.data?.allowGmCharacterEditing ?? false,
+        allowGmCharacterEditing: workspace.campaign?.allowGmCharacterEditing ?? false,
       },
     );
   const confirmDestructiveAction = () => {
@@ -240,13 +234,12 @@ export function EncounterPage() {
     );
   };
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3 card border border-base-300 p-4">
+    <div className="mx-auto max-w-[96rem] space-y-5 [&>section]:max-w-5xl">
+      <CampaignWorkspaceHeader campaignId={id} workspace={workspace} />
+      <header className="card card-border flex max-w-5xl flex-wrap items-center justify-between gap-3 p-4">
         <div>
-          <Link to={`/campaigns/${id}`} className="label-eyebrow link">
-            ← Campaign
-          </Link>
-          <h1 className="font-display text-3xl">{data.name}</h1>
+          <p className="label-eyebrow">Encounter</p>
+          <h2 className="font-display text-3xl">{data.name}</h2>
           <p className="text-sm text-base-content/60">
             Round {data.round} · {activeName}
           </p>
@@ -415,7 +408,7 @@ export function EncounterPage() {
               {combatant.kind === 'pc' && (
                 <PlayerCharacterQuickActions
                   characterId={combatant.characterId}
-                  meId={me.data?.id}
+                  meId={workspace.viewerId ?? undefined}
                 />
               )}
             </article>

@@ -1,108 +1,41 @@
-import { useQuery } from '@tanstack/react-query';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { MANA_LEVEL_LABELS } from '../../../shared/constants/magic.ts';
-import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
-import { getLocalDb } from '../../db/dexie.ts';
-import { ApiError, api } from '../../lib/api.ts';
-import { readUserIdFromToken } from '../../lib/tokenStore.ts';
-import { useMirrorCampaigns } from '../characters/useMirrorCampaigns.ts';
-import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
+import { useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { CampaignPageHeading, CampaignWorkspaceHeader } from './CampaignWorkspaceHeader.tsx';
 import { GmChangeFeed } from './GmChangeFeed.tsx';
 import { GmCharacterCard } from './GmCharacterCard.tsx';
 import { SkillLookupDialog } from './SkillLookupDialog.tsx';
 import { useCampaignCharacterDetails } from './useCampaignCharacterDetails.ts';
+import { useCampaignWorkspace } from './useCampaignWorkspace.ts';
 
 export function GmCampaignDashboardPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [dense, setDense] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookup, setLookup] = useState<string | null>(null);
-  const me = useQuery({ queryKey: ['auth', 'me'], queryFn: () => api<{ id: string }>('/auth/me') });
-  const campaign = useQuery({
-    queryKey: ['campaigns', id],
-    queryFn: () => api<CampaignOut>(`/campaigns/${id}`),
-    enabled: id.length > 0,
-  });
+  const workspace = useCampaignWorkspace(id);
   const characters = useCampaignCharacterDetails(id);
-  const localCampaign = useLiveQuery(() => getLocalDb().campaigns.get(id), [id]);
-  // Refresh the read-only campaign mirror after settings edits. The cursor
-  // also populates it, allowing the dashboard to reopen without HTTP access.
-  // The local campaign subscription re-renders this page after a mirror write.
-  // Keep the REST projection stable until fetched data actually changes so it
-  // cannot restart that write and starve the character live query indefinitely.
-  const campaignMirror = useMemo(
-    () => (campaign.data ? [campaign.data] : undefined),
-    [campaign.data],
-  );
-  useMirrorCampaigns(campaignMirror);
 
   if (!id) return <p className="alert alert-error">Missing campaign id.</p>;
-  const denied =
-    campaign.error instanceof ApiError && [401, 403, 404].includes(campaign.error.status);
-  const c = denied ? undefined : (campaign.data ?? localCampaign);
-  if (!c && campaign.isLoading)
+  const c = workspace.campaign;
+  if (!c && workspace.isLoading)
     return <p className="text-sm text-base-content/60">Loading campaign…</p>;
   if (!c)
-    return (
-      <p className="alert alert-error">
-        {(campaign.error as Error)?.message ?? 'Campaign not found.'}
-      </p>
-    );
+    return <p className="alert alert-error">{workspace.error?.message ?? 'Campaign not found.'}</p>;
 
-  const viewerId = me.data?.id ?? readUserIdFromToken();
-  const membership = campaign.data?.members.find((member) => member.userId === viewerId);
-  const viewerRole =
-    viewerId === c.ownerId ? 'owner' : (membership?.role ?? localCampaign?.viewerRole ?? 'member');
-  const canManage = viewerRole === 'owner' || viewerRole === 'manager';
+  const canManage = workspace.canManage;
   const names = new Map(characters?.map((character) => [character.id, character.name]));
 
   return (
-    <div className="mx-auto max-w-[96rem] space-y-4">
-      <header className="card border border-base-300 bg-base-100 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <Link to={`/campaigns/${id}`} className="label-eyebrow link">
-              ← Campaign
-            </Link>
-            <h1 className="font-display text-3xl truncate">{c.name}</h1>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className="chip on text-xs">
-                {viewerRole === 'owner' ? 'Owner' : viewerRole === 'manager' ? 'Manager' : 'Player'}
-              </span>
-              <span className="chip text-xs">
-                {MANA_LEVEL_LABELS[c.manaLevel ?? 'normal']} mana
-              </span>
-              <span className="chip text-xs">
-                Sheets {c.shareCharacterSheets ? 'shared' : 'private'}
-              </span>
-              <span className="chip text-xs">
-                GM editing {c.allowGmCharacterEditing ? 'on' : 'off'}
-              </span>
-            </div>
-          </div>
-          <nav className="flex flex-wrap items-center gap-2">
-            <Link to={`/campaigns/${id}/library`} className="btn btn-ghost btn-sm">
-              Library
-            </Link>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setLookupOpen(true)}
-            >
+    <div className="mx-auto max-w-[96rem] space-y-6">
+      <CampaignWorkspaceHeader campaignId={id} workspace={workspace} />
+      <CampaignPageHeading
+        title="GM dashboard"
+        description="Monitor the party and review recent character activity."
+        actions={
+          <>
+            <button type="button" className="btn btn-sm" onClick={() => setLookupOpen(true)}>
               Skill lookup
             </button>
-            {canManage && campaign.data && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => setSettingsOpen(true)}
-              >
-                Settings
-              </button>
-            )}
             <label className="flex cursor-pointer items-center gap-2 text-xs">
               <span>Dense</span>
               <input
@@ -112,9 +45,9 @@ export function GmCampaignDashboardPage() {
                 onChange={(event) => setDense(event.target.checked)}
               />
             </label>
-          </nav>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <section>
@@ -147,15 +80,6 @@ export function GmCampaignDashboardPage() {
           </div>
         )}
       </main>
-
-      {settingsOpen && campaign.data && (
-        <CampaignSettingsDialog
-          open
-          campaign={campaign.data}
-          viewerRole={viewerRole}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
 
       {lookupOpen && (
         <SkillLookupDialog

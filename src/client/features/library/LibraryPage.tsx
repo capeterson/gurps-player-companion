@@ -305,10 +305,16 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     <div className="mx-auto max-w-5xl space-y-6" style={pageStyle}>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="label-eyebrow">
-            Campaign · {currentCampaign?.name ?? 'No campaign selected'}
-          </p>
-          <h1 className="font-display text-4xl font-semibold leading-none">Library</h1>
+          {!campaignIdProp && (
+            <p className="label-eyebrow">
+              Campaign · {currentCampaign?.name ?? 'No campaign selected'}
+            </p>
+          )}
+          {campaignIdProp ? (
+            <h2 className="font-display text-2xl font-semibold leading-none">Library</h2>
+          ) : (
+            <h1 className="font-display text-4xl font-semibold leading-none">Library</h1>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {/* Hide campaign switcher when the parent already scoped us to a campaign */}

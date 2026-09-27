@@ -29,6 +29,7 @@ async function createCampaign(page: import('@playwright/test').Page, name: strin
   await expect(campaign).toBeVisible();
   await campaign.click();
   await expect(page).toHaveURL(/\/campaigns\/[a-f0-9-]+$/, { timeout: 10_000 });
+  const campaignId = page.url().split('/').at(-1) ?? '';
   // Tracking is experimental and must be explicitly enabled by the owner.
   await expect(page.getByRole('button', { name: /new encounter/i })).toHaveCount(0);
   await page.getByRole('button', { name: /settings/i }).click();
@@ -36,8 +37,14 @@ async function createCampaign(page: import('@playwright/test').Page, name: strin
   await expect(tracker).not.toBeChecked();
   await tracker.check();
   await page.getByRole('button', { name: /Save/ }).click();
+  const encounters = page
+    .getByRole('navigation', { name: 'Campaign sections' })
+    .getByRole('link', { name: 'Encounters' });
+  await expect(encounters).toBeVisible();
+  await encounters.click();
+  await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/encounters$`));
   await expect(page.getByRole('button', { name: /new encounter/i })).toBeVisible();
-  return page.url().split('/').at(-1) ?? '';
+  return campaignId;
 }
 
 async function accessToken(page: import('@playwright/test').Page) {
@@ -68,7 +75,7 @@ test('GM runs an NPC encounter through expiry acknowledgement and ending', async
   await page.getByRole('button', { name: /new encounter/i }).click();
   await expect(page).toHaveURL(/\/encounters\/[a-f0-9-]+$/, { timeout: 10_000 });
   const encounterId = page.url().split('/').at(-1) ?? '';
-  await expect(page.getByRole('heading', { name: 'Encounter' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Encounter', exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Detailed NPC' }).click();
   const createNpcDialog = page.locator('dialog');
@@ -144,7 +151,7 @@ test('player encounter view omits a hidden NPC', async ({ browser }) => {
   });
   expect(addMember.status()).toBe(200);
 
-  await gm.goto(`/campaigns/${campaignId}`);
+  await gm.goto(`/campaigns/${campaignId}/encounters`);
   await gm.getByRole('button', { name: /new encounter/i }).click();
   await expect(gm).toHaveURL(/\/encounters\/[a-f0-9-]+$/, { timeout: 10_000 });
   const encounterId = gm.url().split('/').at(-1) ?? '';

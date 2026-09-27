@@ -33,12 +33,15 @@ describe('appEntityBreadcrumbTarget', () => {
   });
 
   it('labels every routed campaign subpage', () => {
-    expect(appBreadcrumbPage('/log')).toBe('Log');
+    expect(appBreadcrumbPage('/campaigns/camp-1')).toBe('Overview');
+    expect(appBreadcrumbPage('/log')).toBe('Adventure log');
     expect(appBreadcrumbPage('/library')).toBe('Library');
+    expect(appBreadcrumbPage('/campaigns/camp-1/log')).toBe('Adventure log');
     expect(appBreadcrumbPage('/campaigns/camp-1/library')).toBe('Library');
-    expect(appBreadcrumbPage('/campaigns/camp-1/gm')).toBe('GM View');
+    expect(appBreadcrumbPage('/campaigns/camp-1/history')).toBe('History');
+    expect(appBreadcrumbPage('/campaigns/camp-1/gm')).toBe('GM dashboard');
+    expect(appBreadcrumbPage('/campaigns/camp-1/encounters')).toBe('Encounters');
     expect(appBreadcrumbPage('/campaigns/camp-1/encounters/enc-1')).toBe('Encounter');
-    expect(appBreadcrumbPage('/campaigns/camp-1')).toBeNull();
   });
 
   it('does not invent a second level on collection or unrelated routes', () => {

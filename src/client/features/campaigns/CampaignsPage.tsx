@@ -58,7 +58,7 @@ export function CampaignsPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="label-eyebrow">Workspace · {me.data?.displayName ?? '…'}</p>
-          <h1 className="font-display text-4xl font-semibold leading-none">Your Campaigns</h1>
+          <h1 className="font-display text-4xl font-semibold leading-none">Campaigns</h1>
         </div>
         <button
           type="button"
@@ -140,12 +140,6 @@ export function CampaignsPage() {
                 className="absolute inset-0 rounded-[inherit] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                 aria-label={c.name}
               />
-              <div
-                aria-hidden="true"
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-field border border-dashed border-border-strong text-[10px] uppercase tracking-widest text-dim"
-              >
-                cover
-              </div>
               <div className="pointer-events-none min-w-0 flex-1">
                 <div className="font-display text-lg font-semibold truncate">{c.name}</div>
                 <div className="mt-0.5 text-xs text-muted">

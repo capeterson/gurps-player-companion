@@ -140,7 +140,7 @@ function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
  * page picks a campaign from the `?campaign=` query string (or the
  * first one available) and mirrors the selection back into the URL —
  * the legacy /log behaviour.  When a parent route passes the id
- * directly (e.g. /campaigns/:id), the URL-sync logic is skipped and
+ * directly (e.g. /campaigns/:id/log), the URL-sync logic is skipped and
  * the page just renders the log for that campaign.
  */
 export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {

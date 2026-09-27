@@ -16,7 +16,10 @@ import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
 import { CampaignDetailPage } from './features/campaigns/CampaignDetailPage.tsx';
+import { CampaignEncountersPage } from './features/campaigns/CampaignEncountersPage.tsx';
+import { CampaignHistoryPage } from './features/campaigns/CampaignHistoryPage.tsx';
 import { CampaignLibraryPage } from './features/campaigns/CampaignLibraryPage.tsx';
+import { CampaignLogPage } from './features/campaigns/CampaignLogPage.tsx';
 import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
 import { GmCampaignDashboardPage } from './features/campaigns/GmCampaignDashboardPage.tsx';
 import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
@@ -76,7 +79,10 @@ const router = createBrowserRouter([
               { path: '/characters/:id', element: <CharacterSheetPage /> },
               { path: '/campaigns', element: <CampaignsPage /> },
               { path: '/campaigns/:id', element: <CampaignDetailPage /> },
+              { path: '/campaigns/:id/log', element: <CampaignLogPage /> },
               { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },
+              { path: '/campaigns/:id/history', element: <CampaignHistoryPage /> },
+              { path: '/campaigns/:id/encounters', element: <CampaignEncountersPage /> },
               { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
               { path: '/campaigns/:id/encounters/:encounterId', element: <EncounterPage /> },
               { path: '/log', element: <LogPage /> },
