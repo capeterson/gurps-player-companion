@@ -712,11 +712,23 @@ loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
 interaction rules.
 
 ### Campaigns
-Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/gm`, `/campaigns/:id/library`.
-The campaign detail page (`/campaigns/:id`) hosts the browseable character
-roster for the campaign — every member character in the campaign is listed
-there, regardless of the share gate; rows a viewer only sees minimally deep-link
-to `/characters/:id`, which renders `CharacterMinimalView`.
+Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/log`,
+`/campaigns/:id/library`, `/campaigns/:id/history`, `/campaigns/:id/encounters`,
+and `/campaigns/:id/gm` form one campaign workspace. Every destination uses the
+same campaign identity header and sibling navigation; the app-header breadcrumb
+continues to show `Campaign > campaign name > destination`. The workspace uses
+the local campaign mirror as its fallback, so the navigation and sync-backed
+library remain available offline. The legacy top-level `/log` and `/library`
+routes remain as campaign-switching entry points.
+
+The Overview (`/campaigns/:id`) holds campaign facts and the browseable character
+roster rather than embedding unrelated tools in one long page. Every member
+character in the campaign is listed there, regardless of the share gate; rows a
+viewer only sees minimally deep-link to `/characters/:id`, which renders
+`CharacterMinimalView`. Adventure Log and History have dedicated sibling routes.
+Encounters appears when the experimental turn tracker is enabled, and GM dashboard
+appears for owners and managers. Campaign cards contain only real campaign data;
+there is no decorative cover slot or implied image-upload feature.
 
 - Owner-editable **House rule sets** in campaign settings: None, J Talisar, or
   Custom. Named sets load their bundles; moving to Custom preserves all loaded
@@ -769,9 +781,10 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   and a draft the client can already tell is invalid (schema, specialization
   rule, duplicate name) stays open with the reason. The whole catalog is also
   **importable/exportable as versioned YAML**
-  for sharing between campaigns. The top-nav **Library** page (`/library`,
-  `features/library/LibraryPage.tsx`) is the primary home for the YAML
-  import/export flow. Import validates the chosen file and shows a confirmation
+  for sharing between campaigns. The campaign workspace's **Library** page
+  (`/campaigns/:id/library`, backed by `features/library/LibraryPage.tsx`) is the
+  primary home for the YAML import/export flow; `/library` remains a legacy
+  campaign-switching entry point. Import validates the chosen file and shows a confirmation
   preview before Merge or Replace; Replace never runs on file selection alone.
   Import is the one online-only library action; the page pulls its result into
   Dexie on success.
@@ -783,7 +796,7 @@ to `/characters/:id`, which renders `CharacterMinimalView`.
   Hollow Beneath Greymoor"), and an optional **XP award** list per entry.
   Opening the create form suggests session 0 when no numbered entries exist,
   otherwise one above the greatest posted session number; the suggestion is
-  editable. The embedded log on a campaign detail page never shows a campaign
+  editable. The campaign-scoped `/campaigns/:id/log` page never shows a campaign
   selector because the route already fixes its campaign.
   The body is **markdown** (CommonMark + GFM) rendered through a sanitized
   pipeline that never interprets raw HTML or scripts. The create/edit form
@@ -938,6 +951,8 @@ src/
   client/        React 19 PWA
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
+      campaigns/ Campaign workspace identity/navigation, overview, scoped
+                 Log/Library/History/Encounters routes, and GM dashboard
       library/   LibraryPage (page shell: import/export, sticky category/search
                  toolbar, URL state), LibrarySection (generic sortable, grouped,
                  foldable table with memoized expandable rows),

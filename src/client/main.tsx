@@ -127,10 +127,31 @@ const router = createBrowserRouter([
                 ),
               },
               {
+                path: '/campaigns/:id/log',
+                element: page(
+                  () => import('./features/campaigns/CampaignLogPage.tsx'),
+                  'CampaignLogPage',
+                ),
+              },
+              {
                 path: '/campaigns/:id/library',
                 element: page(
                   () => import('./features/campaigns/CampaignLibraryPage.tsx'),
                   'CampaignLibraryPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/history',
+                element: page(
+                  () => import('./features/campaigns/CampaignHistoryPage.tsx'),
+                  'CampaignHistoryPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/encounters',
+                element: page(
+                  () => import('./features/campaigns/CampaignEncountersPage.tsx'),
+                  'CampaignEncountersPage',
                 ),
               },
               {

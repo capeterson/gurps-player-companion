@@ -11,10 +11,18 @@ describes the three sharing mechanisms as they exist today:
    versioned YAML.
 
 Plus the **adventure log** (per-entry visibility) and **invitations**
-(how people join). Sharing is an **online-only, REST + React-Query** surface —
-none of it flows through the offline outbox (campaigns are pulled read-only
-into Dexie for the share gate, campaign names, mana, and house rules). See
+(how people join). Memberships, settings, invitations, and adventure-log entries
+are online-only REST + React Query surfaces. Campaigns are pulled read-only into
+Dexie for the share gate, campaign names, mana, and house rules, while the
+campaign library is fully local-first and flows through the offline outbox. See
 [offline-sync.md](offline-sync.md) S0.
+
+Campaign pages share one workspace header and sibling navigation: Overview,
+Adventure log, Library, History, optional Encounters, and the staff-only GM
+dashboard. The app header retains the clickable campaign breadcrumb and labels
+the current destination. The shared header reads from the local campaign mirror
+when REST is unavailable so navigating and browsing the library do not acquire
+an online dependency.
 
 The same player-domain operations are available to delegated MCP clients.
 OAuth scope is an additional ceiling; it never replaces current campaign role,
@@ -599,9 +607,10 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   "Markdown" tab toggle. The stored source of truth is always the markdown
   string — the editor never produces or persists HTML. Strict CommonMark line
   breaks (single newlines do not become `<br>`).
-- Client surface: `LogPage` (single-column `max-w-3xl` layout), also embedded
-  in `CampaignDetailPage`. Embedded mode is fixed to the parent campaign and
-  therefore does not render the standalone page's campaign selector.
+- Client surface: `LogPage` (single-column `max-w-3xl` layout), mounted at the
+  campaign-scoped `/campaigns/:id/log` route. Scoped mode is fixed to the parent
+  campaign and therefore does not render the legacy standalone page's campaign
+  selector.
 
 ## Auditing
 

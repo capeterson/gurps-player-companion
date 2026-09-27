@@ -29,10 +29,14 @@ export function appEntityBreadcrumbTarget(
 }
 
 export function appBreadcrumbPage(pathname: string): string | null {
-  if (/^\/log\/?$/.test(pathname) || /^\/campaigns\/[^/]+\/log\/?$/.test(pathname)) return 'Log';
+  if (/^\/campaigns\/[^/]+\/?$/.test(pathname)) return 'Overview';
+  if (/^\/log\/?$/.test(pathname) || /^\/campaigns\/[^/]+\/log\/?$/.test(pathname))
+    return 'Adventure log';
   if (/^\/library\/?$/.test(pathname) || /^\/campaigns\/[^/]+\/library\/?$/.test(pathname))
     return 'Library';
-  if (/^\/campaigns\/[^/]+\/gm\/?$/.test(pathname)) return 'GM View';
+  if (/^\/campaigns\/[^/]+\/history\/?$/.test(pathname)) return 'History';
+  if (/^\/campaigns\/[^/]+\/gm\/?$/.test(pathname)) return 'GM dashboard';
+  if (/^\/campaigns\/[^/]+\/encounters\/?$/.test(pathname)) return 'Encounters';
   if (/^\/campaigns\/[^/]+\/encounters\/[^/]+\/?$/.test(pathname)) return 'Encounter';
   return null;
 }

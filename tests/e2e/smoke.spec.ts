@@ -67,7 +67,7 @@ test('roll history moves from Combat into the History tab and survives reload lo
   await expect(page.getByRole('list', { name: 'Roll history entries' })).toContainText('Dodge');
 });
 
-test('campaign sub-menu stays inside a 320px viewport', async ({ page }) => {
+test('campaign workspace navigation and breadcrumbs stay usable at 320px', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('/register');
   const email = `e2e-menu-${TIMESTAMP_SUFFIX()}@example.com`;
@@ -77,16 +77,8 @@ test('campaign sub-menu stays inside a 320px viewport', async ({ page }) => {
   await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
   await expect(page.getByRole('navigation')).toBeVisible({ timeout: 10_000 });
 
-  await page.getByLabel('Campaign sub-menu').click();
-  const menu = page.getByRole('link', { name: 'Library', exact: true }).locator('..').locator('..');
-  await expect(menu).toBeVisible();
-  const bounds = await menu.boundingBox();
-  expect(bounds).not.toBeNull();
-  expect(bounds?.x).toBeGreaterThanOrEqual(0);
-  expect(bounds ? bounds.x + bounds.width : 0).toBeLessThanOrEqual(320);
-
   await page.goto('/campaigns');
-  const campaignName = `Breadcrumb ${TIMESTAMP_SUFFIX()}`;
+  const campaignName = `Breadcrumb navigation for new players ${TIMESTAMP_SUFFIX()}`;
   await page.getByRole('button', { name: /new campaign/i }).click();
   await page.getByLabel(/campaign name/i).fill(campaignName);
   await page.getByRole('button', { name: /^create$/i }).click();
@@ -94,24 +86,52 @@ test('campaign sub-menu stays inside a 320px viewport', async ({ page }) => {
   const campaignId = page.url().split('/').at(-1);
   const primary = page.getByRole('navigation', { name: 'Primary navigation' });
   await expect(primary.getByRole('link', { name: campaignName })).toBeVisible({ timeout: 15_000 });
+  await expect(primary.locator('span[aria-current="page"]')).toHaveText('Overview');
 
-  await page.getByLabel('Campaign sub-menu').click();
-  const campaignMenu = primary.locator('.dropdown-content');
-  await expect(campaignMenu).toBeVisible();
-  const campaignMenuBounds = await campaignMenu.boundingBox();
-  expect(campaignMenuBounds).not.toBeNull();
-  expect(campaignMenuBounds?.x).toBeGreaterThanOrEqual(0);
-  expect(
-    campaignMenuBounds ? campaignMenuBounds.x + campaignMenuBounds.width : 0,
-  ).toBeLessThanOrEqual(320);
-  await primary.getByRole('link', { name: 'Log', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/log\\?campaign=${campaignId}$`));
-  await expect(primary.getByRole('link', { name: campaignName })).toBeVisible({ timeout: 15_000 });
-  await expect(primary.locator('span[aria-current="page"]')).toHaveText('Log');
+  const workspace = page.getByRole('navigation', { name: 'Campaign sections' });
+  await expect(workspace.getByRole('link', { name: 'Overview' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(workspace.getByRole('link', { name: 'Adventure log' })).toBeVisible();
+  await expect(workspace.getByRole('link', { name: 'Library' })).toBeAttached();
+  await expect(workspace.getByRole('link', { name: 'History' })).toBeAttached();
+  await expect(workspace.getByRole('link', { name: 'GM dashboard' })).toBeAttached();
+  const workspaceBounds = await workspace.boundingBox();
+  expect(workspaceBounds).not.toBeNull();
+  expect(workspaceBounds?.x).toBeGreaterThanOrEqual(0);
+  expect(workspaceBounds ? workspaceBounds.x + workspaceBounds.width : 0).toBeLessThanOrEqual(320);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 
-  await page.getByLabel('Campaign sub-menu').click();
-  await primary.getByRole('link', { name: 'Library', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/library\\?campaign=${campaignId}$`));
+  await workspace.getByRole('link', { name: 'Adventure log' }).click();
+  await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/log$`));
   await expect(primary.getByRole('link', { name: campaignName })).toBeVisible({ timeout: 15_000 });
+  await expect(primary.locator('span[aria-current="page"]')).toHaveText('Adventure log');
+  await expect(page.getByRole('heading', { name: 'Adventure Log' })).toBeVisible();
+
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}$`));
+  await expect(primary.locator('span[aria-current="page"]')).toHaveText('Overview');
+
+  await workspace.getByRole('link', { name: 'Library' }).click();
+  await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/library$`));
   await expect(primary.locator('span[aria-current="page"]')).toHaveText('Library');
+
+  await page
+    .getByRole('navigation', { name: 'Campaign sections' })
+    .getByRole('link', {
+      name: 'History',
+    })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/history$`));
+  await expect(primary.locator('span[aria-current="page"]')).toHaveText('History');
+
+  await page
+    .getByRole('navigation', { name: 'Campaign sections' })
+    .getByRole('link', {
+      name: 'GM dashboard',
+    })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/gm$`));
+  await expect(primary.locator('span[aria-current="page"]')).toHaveText('GM dashboard');
 });
