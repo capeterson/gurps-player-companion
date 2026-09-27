@@ -101,6 +101,9 @@ describe('literal special characters in server search filters', () => {
           return row;
         }),
       );
+      if (!targetAccountRow || !distractorAccountRow) {
+        throw new Error('Both search fixture accounts must exist');
+      }
 
       const targetCampaign = await createCampaign(adminToken, targetName);
       const distractorCampaign = await createCampaign(adminToken, distractorName);
