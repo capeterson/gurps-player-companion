@@ -353,9 +353,9 @@ seeds the character row's written fluency to `n/a`.
   doors share one service layer (`createLibraryEntry` / `updateLibraryEntry` /
   `deleteLibraryEntry`). The PWA editor always uses the outbox, with whole-entry
   patches, so the owner can edit offline; see offline-sync.md "Campaign
-  library". Traits/skills/spells/items/enchantments/active effects have
-  dedicated editor forms; languages/techniques/styles are authored through the
-  YAML import flow and consumed on the character sheet.
+  library". All eleven categories have dedicated editor forms. Languages and
+  techniques are consumed on the character sheet; styles describe their component
+  skills, perks and techniques without creating a separate character style row.
 - Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor)
   and the top-nav `LibraryPage` (`/library`, the primary home for YAML
   import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
@@ -580,14 +580,18 @@ pricing snapshots/re-resolution, source preference and independent weapon modes.
 
 The YAML import section folds closed by default and remembers its state on this
 device. Entry titles take their own row on mobile, with metadata/actions beneath.
-The library management UI filters the current Traits, Skills, Spells or Items
-category as the user types in **Search library**. Matching is case-insensitive:
+The library management UI filters the current category as the user types in
+**Search library**. Matching is case-insensitive:
 every query word must appear in the human-readable fields (name, description,
 source, kind, attribute/difficulty, college, prerequisites or specialization
 policy). Category totals and the matching count remain visible, with an explicit
 empty result and Clear search. Search changes never affect exports or imports.
 An entry being edited stays visible even when it does not match; category changes
 hide rather than unmount editors, preserving unsaved drafts and save failures.
+Group jump targets remain distinct for Unicode and punctuation-only labels.
+Collapsed description excerpts retain source punctuation rather than stripping
+comparison symbols or literal Markdown characters; expanded descriptions render
+the Markdown. Excerpt truncation does not split a UTF-16 surrogate pair.
 
 Trait, skill and spell descriptions render through the existing sanitized
 `Markdown` component. Add/edit descriptions and skill specialization description
@@ -595,6 +599,8 @@ overrides use `RichTextEditor`, with formatting toolbar and raw markdown mode.
 The stored/API/YAML value remains a markdown string; no new schema or HTML field
 is introduced. Pending description submissions disable editor interaction.
 Copied descriptions on character sheets render with the same sanitizer.
+Only rendered anchors with a permitted `href` receive link styling; text whose
+unsafe link target was removed appears as ordinary text.
 
 ## Adventure log
 
@@ -633,7 +639,9 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   column. Rendering is sanitized at render time only:
   `src/client/components/markdown/markdownProcessor.ts` runs
   `remark-parse → remark-gfm → remark-rehype(allowDangerousHtml) →
-  rehypeEscapeRaw → rehype-sanitize → rehype-stringify`. Raw HTML/scripts in
+  rehypeEscapeRaw → rehypeNormalizeUrlScheme → rehype-sanitize → rehype-stringify`.
+  URL normalization lowercases only the scheme token, preserving path/query case
+  and leaving the sanitizer's protocol allowlist unchanged. Raw HTML/scripts in
   the source are **never interpreted** — `<script>` becomes escaped literal
   text (`&#x3C;script&gt;…`) and `rehype-sanitize` runs as defense-in-depth.
   There is no server-side HTML stripping; the contract is enforced at the
@@ -671,3 +679,27 @@ transfer, while edits refresh live links transactionally. Their private instance
 are excluded from minimal detail/list/cursor/history surfaces. Campaign cursor rows
 carry only reusable definitions, which are visible to campaign members.
 See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).
+
+### In-app authoring help
+
+`/help/campaign-library` is an authenticated, bundled Markdown guide linked from
+the library toolbar in a new tab so existing drafts remain open. Its table of
+contents links to focusable headings with the live header scroll offset. It covers
+source identity, completeness, basic authoring and adoption, bounded calculations,
+advanced mechanical rules, import/prune and deliberate updates. The article uses
+original examples rather than distributing rulebook content. Optional editor
+sections retain mounted drafts while folded; invalid advanced fields reopen their
+section. Source metadata validates in place and keeps its correction visible until
+repaired. Source forms present named validation errors, required labels and first-error
+focus. Skill prerequisites/defaults offer common guided rules and preserve nested or
+conditional definitions in their advanced JSON editor.
+
+Item armor authoring offers guided base/crushing/typed DR, DB, flexibility, coverage
+(including removable custom locations), facing and notes. Advanced YAML round-trips
+the complete schema; invalid input stays editable and opens its section. Facing
+controls prevent simultaneous front-only/back-only selection and explain conflicting
+imported data; saving contradictory facing YAML is blocked until repaired.
+Language/technique/style editors use the same whole-entry outbox
+validation as the other categories, disable edits while a submit is pending, and
+preserve commas inside newline-separated style component names. Styles remain
+reference packages: players learn constituent entries individually.

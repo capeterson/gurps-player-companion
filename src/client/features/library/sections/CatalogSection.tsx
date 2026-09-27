@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { parse, stringify } from 'yaml';
 import { fixedCalculation } from '../../../../shared/domain/calculation.ts';
 import {
@@ -11,6 +11,7 @@ import type { LocalLibraryModifier, LocalLibrarySource } from '../../../db/dexie
 import { CalculationEditor } from '../CalculationEditor.tsx';
 import { LibraryMetadataEditor } from '../LibraryMetadataEditor.tsx';
 import type { LibrarySectionConfig } from '../LibrarySection.tsx';
+import { libraryFormError, libraryValidationIssues } from '../libraryFormErrors.ts';
 import { useLibraryEntryMutations } from '../useLocalLibrary.ts';
 import { CrudLibrarySection, type LibrarySectionShellProps } from './CrudLibrarySection.tsx';
 
@@ -50,7 +51,19 @@ function CatalogForm({
   const [tags, setTags] = useState(() => modifier.tags.join(', '));
   const [valid, setValid] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [sourceErrors, setSourceErrors] = useState<Record<string, string>>({});
+  const formRef = useRef<HTMLFieldSetElement>(null);
+  const errorId = useId();
+  function patchSource(next: Partial<LibrarySourceCreate>) {
+    setSource((current) => ({ ...current, ...next }));
+    setSourceErrors((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => !(key in next))),
+    );
+    setLocalError(null);
+  }
   function submit() {
+    setLocalError(null);
+    setSourceErrors({});
     try {
       const schema = section === 'sources' ? librarySourceCreate : libraryModifierCreate;
       const {
@@ -74,61 +87,127 @@ function CatalogForm({
       ) as Record<string, unknown>;
       onSubmit(schema.parse(body));
     } catch (e) {
-      setLocalError((e as Error).message);
+      const labels = { name: 'Publication title', key: 'Source key', abbreviation: 'Abbreviation' };
+      const issues = libraryValidationIssues(e);
+      if (section === 'sources' && issues.length) {
+        const errors = Object.fromEntries(
+          issues.map((issue) => {
+            const key = String(issue.path[0] ?? '');
+            const label = labels[key as keyof typeof labels] ?? key;
+            const missing =
+              key in source && String(source[key as keyof typeof source] ?? '').trim() === '';
+            return [key, missing ? `Enter ${label.toLowerCase()}.` : issue.message];
+          }),
+        );
+        setSourceErrors(errors);
+        const firstField = issues[0]?.path[0];
+        if (typeof firstField === 'string')
+          formRef.current?.querySelector<HTMLInputElement>(`[name="${firstField}"]`)?.focus();
+        setLocalError(`Check the source fields: ${Object.values(errors).join(' ')}`);
+      } else {
+        setLocalError(libraryFormError(e));
+      }
     }
   }
   return (
-    <fieldset disabled={pending} className="fieldset min-w-0 p-3">
+    <fieldset ref={formRef} disabled={pending} className="fieldset min-w-0 p-3">
       {section === 'sources' ? (
         <>
           <label>
-            Publication title
+            Publication title <span aria-hidden="true">*</span>
             <input
+              name="name"
+              maxLength={160}
+              aria-label="Publication title"
+              aria-required="true"
+              aria-invalid={Boolean(sourceErrors.name)}
+              aria-describedby={sourceErrors.name ? `${errorId}-name` : undefined}
               className="input w-full"
               value={source.name}
-              onChange={(e) => setSource({ ...source, name: e.target.value })}
+              onChange={(e) => patchSource({ name: e.target.value })}
             />
+            {sourceErrors.name && (
+              <span id={`${errorId}-name`} className="text-error">
+                {sourceErrors.name}
+              </span>
+            )}
           </label>
           <label>
-            Source key
+            Source key <span aria-hidden="true">*</span>
             <input
+              name="key"
+              maxLength={160}
+              aria-label="Source key"
+              aria-required="true"
+              aria-invalid={Boolean(sourceErrors.key)}
+              aria-describedby={sourceErrors.key ? `${errorId}-key` : undefined}
               className="input w-full"
               value={source.key}
-              onChange={(e) => setSource({ ...source, key: e.target.value })}
+              onChange={(e) => patchSource({ key: e.target.value })}
             />
+            {sourceErrors.key && (
+              <span id={`${errorId}-key`} className="text-error">
+                {sourceErrors.key}
+              </span>
+            )}
           </label>
           <label>
-            Abbreviation
+            Abbreviation <span aria-hidden="true">*</span>
             <input
+              name="abbreviation"
+              maxLength={40}
+              aria-label="Abbreviation"
+              aria-required="true"
+              aria-invalid={Boolean(sourceErrors.abbreviation)}
+              aria-describedby={sourceErrors.abbreviation ? `${errorId}-abbreviation` : undefined}
               className="input w-full"
               value={source.abbreviation}
-              onChange={(e) => setSource({ ...source, abbreviation: e.target.value })}
+              onChange={(e) => patchSource({ abbreviation: e.target.value })}
             />
+            {sourceErrors.abbreviation && (
+              <span id={`${errorId}-abbreviation`} className="text-error">
+                {sourceErrors.abbreviation}
+              </span>
+            )}
           </label>
           <label>
             Edition
             <input
+              name="edition"
+              maxLength={160}
               className="input w-full"
               value={source.edition ?? ''}
-              onChange={(e) => setSource({ ...source, edition: e.target.value })}
+              onChange={(e) => patchSource({ edition: e.target.value })}
             />
           </label>
           <label>
             Priority (lower first)
             <input
+              name="priority"
+              aria-invalid={Boolean(sourceErrors.priority)}
+              aria-describedby={sourceErrors.priority ? `${errorId}-priority` : undefined}
               className="input w-full"
               type="number"
               min={0}
+              max={100000}
+              step={1}
               value={source.priority}
-              onChange={(e) => setSource({ ...source, priority: Number(e.target.value) })}
+              onChange={(e) => patchSource({ priority: Number(e.target.value) })}
             />
+            {sourceErrors.priority && (
+              <span id={`${errorId}-priority`} className="text-error">
+                {sourceErrors.priority}
+              </span>
+            )}
           </label>
           <label>
             Notes
             <textarea
+              name="notes"
+              maxLength={20000}
               className="textarea w-full"
               value={source.notes ?? ''}
-              onChange={(e) => setSource({ ...source, notes: e.target.value })}
+              onChange={(e) => patchSource({ notes: e.target.value })}
             />
           </label>
         </>
@@ -217,6 +296,7 @@ function CatalogForm({
             />
           </label>
           <CalculationEditor
+            allowBasic={false}
             value={modifier.calculation}
             onChange={(calculation) => setModifier({ ...modifier, calculation })}
             onValidityChange={setValid}

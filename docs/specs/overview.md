@@ -20,6 +20,9 @@ current desktop/mobile screenshots and self-hosting/environment documentation
 at the end. Screenshot provenance and refresh notes live in
 [screenshots/README.md](../screenshots/README.md).
 
+A first download that fails displays its reason and a retry action; an ended session
+before that download completes offers sign-in instead of an indefinite loading state.
+
 The defining product promise is **edits never disappear**. Every character
 mutation is written to IndexedDB and journaled to a durable outbox *before*
 anything touches the network, so a player can keep editing a stale tab with no
@@ -76,8 +79,18 @@ Character, campaign, encounter, adventure-log, invitation, notification, and
 campaign-library reads offer bounded search/limit/offset controls, with library
 section selection, so agents can avoid loading unrelated context. History feeds
 remain cursor-paginated. Compatible clients also receive compressed MCP responses.
+Character, campaign, encounter and adventure-log text filters, plus admin user
+and campaign searches, treat `%`, `_` and backslash as literal characters rather
+than SQL pattern syntax. These searches remain case-insensitive.
 
 ## User-facing features
+
+### Library selection
+
+Library autocomplete menus render above sheet navigation, outside their form's
+stacking context (inside the enclosing native dialog when applicable). They stay
+within the visual viewport, follow scrolling/resizing, and close when their
+containing form is folded away.
 
 ### Table column filters
 
@@ -143,6 +156,11 @@ items inside closed containers. Weapon names in Attacks, armor layers and DB
 sources in Incoming attack, and equipment named in active defenses
 link to their inventory entries without a page reload.
 
+First-time users without characters see a **Create your first character** action and
+campaign-invitation guidance instead of returning-user copy. Character creation trims
+names, prevents duplicate pending submits, and preserves a new draft typed while an
+earlier creation finishes.
+
 The home page's recent-character cards and the `/characters` listing resolve
 from the local mirror. Each card links to its character and, when assigned,
 shows the synced campaign name as a separate link to that campaign.
@@ -191,7 +209,8 @@ shows the synced campaign name as a separate link to that campaign.
   specialization description overrides) use the shared formatting toolbar and
   raw-markdown mode. Character skill/spell copied notes have expandable markdown
   descriptions. Trait notes render markdown for readers and offer a markdown
-  preview beside the compact source editor for owners.
+  preview beside the compact source editor for owners. Only safe links retain
+  link styling and navigation after sanitization.
 - **Overview section's Identity panel.** Name, height, weight, age, **birthdate** (free-form
   text, e.g. "3/7/0402"), campaign assignment, and
   a **Description** field (stored in the existing `appearance` column). No
@@ -251,7 +270,7 @@ shows the synced campaign name as a separate link to that campaign.
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, but the character sheet does not expose an active-effects editor. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v13. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v13. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -436,7 +455,8 @@ shows the synced campaign name as a separate link to that campaign.
   Each cast/maintenance gesture shares one audit batch across its
   FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
-  encumbrance, armor and weapon data, cost/weight rollups. A compact filter
+  encumbrance, armor and weapon data, cost/weight rollups. Both encumbrance summaries
+  use player-carried weight, excluding stashed items; the raw weight total covers all items. A compact filter
   combines case-insensitive item-name substring matching with a category/status
   tag (weapon, armor, container, powerstone, magic item, enchanted, worn, or
   equipped). Results retain the ancestor containers needed to locate matching
@@ -786,6 +806,7 @@ there is no decorative cover slot or implied image-upload feature.
   characters are **excluded from `/characters`** and browsable only from the
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
+- **Library authoring guidance.** `/help/campaign-library` explains first entries, sources/editions, completeness, character adoption, advanced rules and safe bulk maintenance. The Library guide link opens separately to preserve an unfinished form. Optional metadata, calculated pricing and mechanical fields use disclosures that retain drafts. Common skill prerequisites/defaults have guided controls with a lossless advanced JSON editor. Item armor has guided DR, coverage and facing fields with a lossless YAML mode. Source validation labels required fields and focuses the first invalid input.
 - **Faithful library pricing and editions.** Sources and standalone modifiers share the local-first library. Complete definitions resolve bounded declarative points, percentage, cost and weight rules; character purchases retain pricing snapshots and require explicit re-resolution after source changes. Incomplete/example/reference records stay searchable but cannot be adopted. Source-qualified editions coexist, with campaign priority and preferred overrides. Items support independent stable weapon modes and simultaneous facets. See [calculation rules](library-calculation-rules.md).
 - **New-campaign sourcebooks.** Campaign creation seeds 17 common GURPS Fourth Edition source records with familiar page-reference abbreviations. The owner can delete any source they want to exclude; existing campaigns are not changed.
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
@@ -794,18 +815,18 @@ there is no decorative cover slot or implied image-upload feature.
   the owner's creates, edits and deletes go through the outbox (edits are
   whole-entry patches, AGENTS.md S13) with the standard rejection toast and row
   flash. The in-app catalog editor (`/campaigns/:id/library`) offers dedicated
-  CRUD forms for **traits, skills, spells, items, mechanical enchantments and
-  active effects**; **languages, techniques, and styles** are authored via the
-  versioned YAML import/export flow (or the owner-only
-  `.../library/{languages|techniques|styles}` REST routes the generic
-  factory registers) — the dedicated character-sheet Languages and
-  Techniques panels consume them through their autocompletes. Built for
+  CRUD forms for all eleven categories, including **languages, techniques and styles**.
+  The dedicated character-sheet Languages and Techniques panels consume their
+  definitions through autocompletes; styles remain library reference packages. Built for
   libraries with hundreds of entries: each category is one compact table with
   sortable column headings (device-remembered per campaign and category),
   light category groups that fold (traits by kind, skills by attribute, spells
-  by college, items by category, enchantments by applicability, active effects
-  by first tag) and a jump strip to any group. Rows show the name, key numbers
-  and a one-line plain-text excerpt; opening a row renders its full Markdown
+  by college, items by category, languages by spoken/sign form, techniques by
+  default skill, styles by first component skill, enchantments by applicability,
+  active effects by first tag) and a jump strip to any group. Group anchors retain
+  distinct identities for Unicode, case and punctuation variations. Rows show the name, key numbers
+  and a one-line source excerpt that preserves punctuation (including comparison
+  symbols and literal Markdown characters); opening a row renders its full Markdown
   entry in place. The category chips, search and jump strip stay pinned under
   the app header. Search matches every word across names, descriptions, sources
   and categories. `?section=`, `?q=` and `?open=` make a category, search or
@@ -1007,6 +1028,7 @@ src/
                  reusable ordered effect authoring UI shared with
                  character-owned trait mechanics, and LibraryFormFooter
                  (the Cancel/Add-or-Save actions every entry form shares)
+      help/      CampaignLibraryHelpPage and campaign-library.md (in-app authoring guide)
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
       characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
@@ -1040,7 +1062,9 @@ src/
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
-                 LibraryMetadataEditor and source/modifier CatalogSection; category form files (Trait/Skill/Spell/Item/Enchantment/
+                 LibraryMetadataEditor, LibraryAdvancedFields, SkillRequirementsEditor,
+                 ArmorFacetEditor, LibraryPackagesForms (language/technique/style authoring),
+                 libraryFormErrors and source/modifier CatalogSection; category form files (Trait/Skill/Spell/Item/Enchantment/
                  ActiveEffectForm) used by the sync-backed library sections
     components/ui/Table.tsx  Default-enabled client-only column filter framework:
                  Table, TableHeader, TableBody/TableRow, source-value labels,

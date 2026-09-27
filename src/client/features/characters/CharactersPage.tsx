@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { enqueueCreate, newClientId } from '../../sync/outbox.ts';
@@ -9,14 +9,17 @@ export function CharactersPage() {
   const characters = useCharactersList();
 
   const [name, setName] = useState('');
+  const latestName = useRef('');
+  const createInFlight = useRef(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || createInFlight.current) return;
     const trimmed = name.trim();
     const localId = newClientId();
+    createInFlight.current = true;
     setCreating(true);
     setCreateError(null);
     try {
@@ -52,13 +55,15 @@ export function CharactersPage() {
       // Per AGENTS.md rule 1: only navigate / clear if the input still
       // matches what we submitted.  If the user has started typing the
       // next character's name, leave it alone.
-      if (name === trimmed) {
+      if (latestName.current === name) {
+        latestName.current = '';
         setName('');
         navigate(`/characters/${localId}`);
       }
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'create failed');
     } finally {
+      createInFlight.current = false;
       setCreating(false);
     }
   }
@@ -79,7 +84,10 @@ export function CharactersPage() {
           <input
             className="input input-bordered"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              latestName.current = e.target.value;
+              setName(e.target.value);
+            }}
             placeholder="Sir Lancelot"
           />
         </label>

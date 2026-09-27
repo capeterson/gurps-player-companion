@@ -39,6 +39,7 @@ import {
   refreshTokens,
   users,
 } from '../db/schema.ts';
+import { escapeLikePattern } from '../db/search.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 
 const router = createOpenApiApp();
@@ -123,8 +124,8 @@ router.openapi(
     const db = getDb();
     const where = q
       ? or(
-          like(sql`lower(${users.email})`, `%${q.toLowerCase()}%`),
-          like(sql`lower(${users.displayName})`, `%${q.toLowerCase()}%`),
+          like(sql`lower(${users.email})`, `%${escapeLikePattern(q.toLowerCase())}%`),
+          like(sql`lower(${users.displayName})`, `%${escapeLikePattern(q.toLowerCase())}%`),
         )
       : undefined;
 
@@ -382,9 +383,9 @@ router.openapi(
     const db = getDb();
     const where = q
       ? or(
-          like(sql`lower(${campaigns.name})`, `%${q.toLowerCase()}%`),
-          like(sql`lower(${users.displayName})`, `%${q.toLowerCase()}%`),
-          like(sql`lower(${users.email})`, `%${q.toLowerCase()}%`),
+          like(sql`lower(${campaigns.name})`, `%${escapeLikePattern(q.toLowerCase())}%`),
+          like(sql`lower(${users.displayName})`, `%${escapeLikePattern(q.toLowerCase())}%`),
+          like(sql`lower(${users.email})`, `%${escapeLikePattern(q.toLowerCase())}%`),
         )
       : undefined;
 

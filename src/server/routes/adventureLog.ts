@@ -22,6 +22,7 @@ import { loadCampaignOr403, requireCampaignMember } from '../auth/permissions.ts
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { type DbAdventureLogEntry, adventureLogEntries, users } from '../db/schema.ts';
+import { escapeLikePattern } from '../db/search.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { lockLogCampaign, resolveLogAwards } from '../services/adventureLogAwards.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
@@ -92,9 +93,9 @@ router.openapi(
           ),
           search
             ? or(
-                ilike(adventureLogEntries.title, `%${search}%`),
-                ilike(adventureLogEntries.body, `%${search}%`),
-                ilike(adventureLogEntries.location, `%${search}%`),
+                ilike(adventureLogEntries.title, `%${escapeLikePattern(search)}%`),
+                ilike(adventureLogEntries.body, `%${escapeLikePattern(search)}%`),
+                ilike(adventureLogEntries.location, `%${escapeLikePattern(search)}%`),
               )
             : undefined,
         ),

@@ -10,7 +10,7 @@ function item(
   id: string,
   name: string,
   parentId: string | null,
-  options: { container?: boolean; weapon?: boolean } = {},
+  options: { container?: boolean; weapon?: boolean; worn?: boolean } = {},
 ): InventoryItemOut {
   return {
     id,
@@ -22,7 +22,7 @@ function item(
     notes: null,
     parentId,
     externalLocation: null,
-    worn: parentId === null,
+    worn: options.worn ?? parentId === null,
     equipped: false,
     isContainer: options.container ?? false,
     hideawayCapacityLbs: 0,
@@ -59,14 +59,14 @@ function renderPanel(anchorItemId?: string) {
     item('pouch', 'Small pouch', 'pack', { container: true }),
     item('gem', 'Moon Gem', 'pouch'),
     item('sword', 'Broadsword', 'pack', { weapon: true }),
-    item('tent', 'Tent', null),
+    item('tent', 'Tent', null, { worn: false }),
   ];
   const character = {
     id: 'character',
     campaignId: null,
     inventory,
     skills: [],
-    libraryEffectsKnown: false,
+    libraryEffectsKnown: true,
     encumbrance: { playerWeightLbs: 0, basicLift: 20, level: 0 },
   } as unknown as CharacterDetail;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -99,6 +99,14 @@ describe('Inventory container disclosure', () => {
     expect(screen.queryByText('Apple')).not.toBeInTheDocument();
     expect(screen.queryByText('Small pouch')).not.toBeInTheDocument();
     expect(screen.getByLabelText('4 contained items')).toHaveTextContent('4 items');
+  });
+
+  it('excludes stashed equipment from the carried encumbrance total', () => {
+    renderPanel();
+
+    expect(screen.getByText('0.0 lbs')).toBeVisible();
+    expect(screen.getByText('Tent')).toBeVisible();
+    expect(screen.getByText('1.0 lb')).toBeVisible();
   });
 
   it('remembers expansion on this device without forcing nested containers open', () => {

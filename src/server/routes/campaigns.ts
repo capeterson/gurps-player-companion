@@ -30,6 +30,7 @@ import {
   characters,
   users,
 } from '../db/schema.ts';
+import { escapeLikePattern } from '../db/search.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { DEFAULT_CAMPAIGN_SOURCES } from '../services/defaultCampaignSources.ts';
 import { advanceCampaignProjectionRevision } from '../services/libraryInvalidation.ts';
@@ -127,7 +128,7 @@ router.openapi(
       .where(
         and(
           or(eq(campaigns.ownerId, user.id), eq(campaignMemberships.userId, user.id)),
-          search ? ilike(campaigns.name, `%${search}%`) : undefined,
+          search ? ilike(campaigns.name, `%${escapeLikePattern(search)}%`) : undefined,
         ),
       )
       .orderBy(asc(campaigns.name), asc(campaigns.id))

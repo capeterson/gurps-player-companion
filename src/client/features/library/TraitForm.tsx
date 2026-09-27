@@ -19,8 +19,10 @@ import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { CalculationEditor } from './CalculationEditor.tsx';
 import { EffectsEditor } from './EffectsEditor.tsx';
+import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
+import { libraryFormError } from './libraryFormErrors.ts';
 import { pricingDisplayValue } from './pricingDisplay.ts';
 
 // ── Trait form ──────────────────────────────────────────────────────────────
@@ -140,22 +142,35 @@ export function TraitForm({
       </div>
       <LibraryMetadataEditor value={metadata} onChange={setMetadata} />
       <CalculationEditor
+        defaultAmount={Number(basePointsDraft) || 0}
         value={calculation}
         onChange={setCalculation}
         onValidityChange={setCalculationValid}
       />
-      <ModifierSubEditor
-        modifiers={modifiers}
-        onChange={setModifiers}
-        onValidityChange={setModifiersValid}
-      />
-      <EffectsEditor
-        campaignId={campaignId}
-        effects={effects}
-        libraryItems={libraryItems}
-        onChange={setEffects}
-        onValidityChange={setEffectsValid}
-      />
+      <LibraryAdvancedFields
+        title="Enhancements and limitations"
+        defaultOpen={modifiers.length > 0}
+        error={modifiersValid ? null : 'Invalid modifier'}
+      >
+        <ModifierSubEditor
+          modifiers={modifiers}
+          onChange={setModifiers}
+          onValidityChange={setModifiersValid}
+        />
+      </LibraryAdvancedFields>
+      <LibraryAdvancedFields
+        title="Mechanical effects"
+        defaultOpen={effects.length > 0}
+        error={effectsValid ? null : 'Invalid effect'}
+      >
+        <EffectsEditor
+          campaignId={campaignId}
+          effects={effects}
+          libraryItems={libraryItems}
+          onChange={setEffects}
+          onValidityChange={setEffectsValid}
+        />
+      </LibraryAdvancedFields>
       <LibraryFormFooter
         noun="trait"
         editing={Boolean(initial)}
@@ -243,7 +258,7 @@ function ModifierSubEditor({
                 setSourceError(null);
               } catch (error) {
                 onValidityChange(false);
-                setSourceError((error as Error).message);
+                setSourceError(libraryFormError(error));
               }
             }}
           />

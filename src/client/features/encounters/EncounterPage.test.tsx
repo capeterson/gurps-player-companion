@@ -108,6 +108,22 @@ function renderPage() {
 }
 
 describe('EncounterPage', () => {
+  it('renders encounter and combatant names as inert text', async () => {
+    const encounterName = `Wizard's plan <img src=x onerror="alert(1)"> & café 東京`;
+    const combatantName = `O'Brien <svg onload="alert(2)"> & scout`;
+    const combatant = makeEncounter().combatants[0];
+    if (!combatant) throw new Error('missing encounter test combatant');
+    encounter.data = makeEncounter({
+      name: encounterName,
+      combatants: [{ ...combatant, name: combatantName }],
+    });
+    const { container } = renderPage();
+
+    expect(await screen.findByRole('heading', { name: encounterName })).toBeVisible();
+    expect(screen.getByText(combatantName, { exact: true })).toBeVisible();
+    expect(container.querySelector('img, svg[onload], script')).toBeNull();
+  });
+
   it('drops an open destructive confirmation when navigating to another encounter', async () => {
     function SwitchEncounter() {
       const navigate = useNavigate();

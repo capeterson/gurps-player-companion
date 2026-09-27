@@ -11,8 +11,11 @@ import { skillProcedures } from '../../../shared/schemas/skillProcedures.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { EffectsEditor } from './EffectsEditor.tsx';
+import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
+import { SkillRequirementsEditor } from './SkillRequirementsEditor.tsx';
+import { libraryFormError } from './libraryFormErrors.ts';
 
 interface SkillFormProps {
   campaignId: string | null;
@@ -92,7 +95,7 @@ export function SkillForm({
       structuredPrerequisites = prerequisiteRules.trim() ? JSON.parse(prerequisiteRules) : null;
       structuredDefaults = defaults.trim() ? JSON.parse(defaults) : null;
     } catch (error) {
-      setRulesError(`Invalid skill rules: ${(error as Error).message}`);
+      setRulesError(`Invalid skill rules: ${libraryFormError(error)}`);
       return;
     }
     const specializationPolicy: LibrarySkillSpecializationPolicy =
@@ -272,8 +275,7 @@ export function SkillForm({
           )}
         </div>
       </div>
-      <details className="rounded border border-base-300 p-3">
-        <summary>Modifiers, actions and level benefits</summary>
+      <LibraryAdvancedFields title="Modifiers, actions and level benefits" error={rulesError}>
         <p className="text-xs">
           Define bounded rules using modifiers, actions and benefits. Source text remains alongside
           each rule. Unknown context is always left for the player to choose.
@@ -288,7 +290,7 @@ export function SkillForm({
             onChange={(e) => setProcedures(e.target.value)}
           />
         </label>
-      </details>
+      </LibraryAdvancedFields>
       {(specializationKind === 'required_catalog' || specializationKind === 'optional_catalog') && (
         <div className="space-y-2 rounded border border-base-300 p-3">
           <div className="flex items-center justify-between">
@@ -372,59 +374,62 @@ export function SkillForm({
           )}
         </div>
       )}
-      <EffectsEditor
-        campaignId={campaignId}
-        effects={effects}
-        libraryItems={libraryItems}
-        onChange={setEffects}
-        onValidityChange={setEffectsValid}
-      />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="form-control">
-          <span className="label-text">Prerequisite source text</span>
-          <textarea
-            className="textarea textarea-bordered textarea-sm"
-            value={prerequisites}
-            onChange={(event) => setPrerequisites(event.target.value)}
-          />
-        </label>
-        <label className="form-control">
-          <span className="label-text">Structured prerequisites (JSON)</span>
-          <textarea
-            className="textarea textarea-bordered textarea-sm font-mono text-xs"
-            value={prerequisiteRules}
-            onChange={(event) => setPrerequisiteRules(event.target.value)}
-            placeholder='{"kind":"trait","name":"Magery","minimumLevel":1}'
-          />
-        </label>
-        <label className="form-control">
-          <span className="label-text">Default rules (JSON)</span>
-          <textarea
-            className="textarea textarea-bordered textarea-sm font-mono text-xs"
-            value={defaults}
-            onChange={(event) => setDefaults(event.target.value)}
-            placeholder='[{"kind":"attribute","attribute":"IQ","modifier":-6}]'
-          />
-        </label>
-        <div className="grid gap-2">
+      <LibraryAdvancedFields
+        title="Mechanical effects"
+        defaultOpen={effects.length > 0}
+        error={effectsValid ? null : 'Invalid effect'}
+      >
+        <EffectsEditor
+          campaignId={campaignId}
+          effects={effects}
+          libraryItems={libraryItems}
+          onChange={setEffects}
+          onValidityChange={setEffectsValid}
+        />
+      </LibraryAdvancedFields>
+      <LibraryAdvancedFields
+        title="Prerequisites, defaults and tags"
+        defaultOpen={Boolean(
+          initial?.prerequisites || initial?.prerequisiteRules || initial?.defaults?.length,
+        )}
+        error={rulesError || error || null}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="form-control">
-            <span className="label-text">Groups (comma-separated)</span>
-            <input
-              className="input input-bordered input-sm"
-              value={groups}
-              onChange={(event) => setGroups(event.target.value)}
+            <span className="label-text">Prerequisite source text</span>
+            <textarea
+              className="textarea textarea-bordered textarea-sm"
+              value={prerequisites}
+              onChange={(event) => setPrerequisites(event.target.value)}
             />
           </label>
-          <label className="form-control">
-            <span className="label-text">Tags (comma-separated)</span>
-            <input
-              className="input input-bordered input-sm"
-              value={tags}
-              onChange={(event) => setTags(event.target.value)}
-            />
-          </label>
+          <div className="grid gap-2">
+            <label className="form-control">
+              <span className="label-text">Groups (comma-separated)</span>
+              <input
+                className="input input-bordered input-sm"
+                value={groups}
+                onChange={(event) => setGroups(event.target.value)}
+              />
+            </label>
+            <label className="form-control">
+              <span className="label-text">Tags (comma-separated)</span>
+              <input
+                className="input input-bordered input-sm"
+                value={tags}
+                onChange={(event) => setTags(event.target.value)}
+              />
+            </label>
+          </div>
         </div>
-      </div>
+        <SkillRequirementsEditor
+          prerequisites={prerequisiteRules}
+          defaults={defaults}
+          onPrerequisitesChange={setPrerequisiteRules}
+          onDefaultsChange={setDefaults}
+          error={rulesError || error || null}
+        />
+      </LibraryAdvancedFields>
       <div className="form-control" inert={isPending}>
         <span className="label-text">Description</span>
         <RichTextEditor

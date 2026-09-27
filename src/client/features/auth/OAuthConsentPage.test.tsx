@@ -130,4 +130,27 @@ describe('OAuth consent', () => {
     await screen.findByText('This authorization request is invalid or expired.');
     expect(screen.queryByRole('button', { name: 'Authorize' })).not.toBeInTheDocument();
   });
+
+  it('renders consent metadata and account identity as inert text', async () => {
+    const clientName = `Helper "><img src=x onerror="alert(1)">`;
+    const scopeDescription = `Read & review <svg onload="alert(2)">東京</svg>`;
+    const displayName = `O'Brien <script>alert(3)</script>`;
+    const email = `player&<img src=x onerror="alert(4)">@example.invalid`;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/auth/me') return { displayName, email } as never;
+      return {
+        ...details,
+        clientName,
+        scopeDescriptions: { 'gpc:read': scopeDescription },
+      } as never;
+    });
+    const { container } = mount();
+
+    const heading = await screen.findByRole('heading', { name: `Authorize ${clientName}` });
+    expect(heading).toBeVisible();
+    expect(screen.getByText(scopeDescription)).toBeVisible();
+    expect(screen.getByText(/Signed in as/)).toHaveTextContent(displayName);
+    expect(screen.getByText(/Signed in as/)).toHaveTextContent(email);
+    expect(container.querySelector('img, script, svg[onload]')).toBeNull();
+  });
 });

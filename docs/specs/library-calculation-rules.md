@@ -175,3 +175,14 @@ Implementation: `shared/schemas/{calculation,libraryMetadata}.ts`,
 `client/features/library/{CalculationEditor,PricingResolver,RepriceEntry,WeaponModesEditor}.tsx`.
 
 Item cost and weight use unconstrained PostgreSQL `numeric` storage (API bounds still apply), so a rule's declared rounding is not silently replaced by a two-decimal database scale. Existing paid values are unchanged.
+
+### Editor disclosure and presets
+
+Calculated pricing is optional and folds away for simple fixed-price entries. An
+existing calculation starts expanded, while raw YAML has its own disclosure.
+Pattern controls are drafts until **Use pattern** explicitly replaces the rule.
+Blank/nonfinite amounts, invalid bounds and nonpositive steps are explained before
+replacement. Item presets retain the current basic or constant calculated weight
+unless the author edits it. Returning to **Use basic price fields** clears the
+calculation and restores the basic-value controls. Modifier catalog entries use
+the calculation editor directly and do not offer absent basic-price fields.

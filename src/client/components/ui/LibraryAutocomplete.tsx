@@ -24,6 +24,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props<T> {
   /** Current text value of the input. */
@@ -85,6 +86,10 @@ export function LibraryAutocomplete<T>({
       const element = overlayRef.current;
       const anchor = inputRef.current;
       if (!element || !anchor) return;
+      if (anchor.closest('details:not([open]), [hidden]')) {
+        setOpen(false);
+        return;
+      }
       const rect = anchor.getBoundingClientRect();
       const visual = window.visualViewport;
       const top = visual?.offsetTop ?? 0;
@@ -95,13 +100,20 @@ export function LibraryAutocomplete<T>({
       element.style.top = `${Math.max(top + 8, Math.min(rect.bottom + 4, top + height - element.getBoundingClientRect().height - 8))}px`;
     };
     place();
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
+    if (inputRef.current) resizeObserver?.observe(inputRef.current);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
+    document.addEventListener('toggle', place, true);
     window.visualViewport?.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('scroll', place);
     return () => {
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
+      document.removeEventListener('toggle', place, true);
       window.visualViewport?.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('scroll', place);
     };
   }, [open, options, overlayRef]);
 
@@ -146,11 +158,12 @@ export function LibraryAutocomplete<T>({
     function onClickOutside(e: MouseEvent) {
       if (!containerRef.current) return;
       if (e.target instanceof Node && containerRef.current.contains(e.target)) return;
+      if (e.target instanceof Node && overlayRef.current?.contains(e.target)) return;
       setOpen(false);
     }
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [open]);
+  }, [open, overlayRef]);
 
   const pick = useCallback(
     (opt: T) => {
@@ -231,60 +244,63 @@ export function LibraryAutocomplete<T>({
           Other sources
         </button>
       )}
-      {open && options.length > 0 && (
-        /*
-         * ARIA combobox/listbox idiom: the listbox lives outside the
-         * input's keyboard tab order (tabIndex=-1) and is driven via
-         * the input's onKeyDown above + aria-activedescendant.  Each
-         * option is a real `<button>` so the click is a native
-         * interaction — that gives us keyboard parity for free.
-         *
-         * `role="listbox"` and `role="option"` are exactly the ARIA
-         * pattern for a combobox; biome's `useSemanticElements` rule
-         * doesn't have a native HTML element it can suggest here, so
-         * we suppress it inline rather than fight the spec.
-         */
-        <div
-          id={listId}
-          ref={overlayRef}
-          // biome-ignore lint/a11y/useSemanticElements: ARIA listbox is the spec for combobox dropdowns; <select> doesn't support free-text input.
-          role="listbox"
-          tabIndex={-1}
-          className="fixed z-50 max-w-[calc(100dvw-1rem)] max-h-[calc(100dvh-1rem)] translate-x-[var(--viewport-overlay-shift-x,0px)] overflow-auto break-words rounded-md border border-base-300 bg-base-100 py-1 shadow-lg"
-        >
-          {options.map((opt, i) => {
-            const highlighted = i === highlight;
-            return (
-              <button
-                type="button"
-                key={getOptionKey(opt)}
-                id={`${listId}-opt-${getOptionKey(opt)}`}
-                // biome-ignore lint/a11y/useSemanticElements: ARIA option is the spec for listbox children; <button role="option"> is the standard combobox idiom.
-                role="option"
-                aria-selected={highlighted}
-                className={`block w-full cursor-pointer text-left px-3 py-1.5 text-sm ${
-                  highlighted ? 'bg-primary/10 text-base-content' : ''
-                }`}
-                onMouseEnter={() => setHighlight(i)}
-                onMouseDown={(e) => {
-                  // mousedown not click, so the input doesn't lose focus
-                  // and trigger an unrelated blur-handler before we pick.
-                  e.preventDefault();
-                  pick(opt);
-                }}
-              >
-                {renderOption(opt, highlighted)}
-                {typeof opt === 'object' &&
-                  opt !== null &&
-                  'sourceKey' in opt &&
-                  typeof opt.sourceKey === 'string' && (
-                    <span className="block text-xs text-dim">{opt.sourceKey}</span>
-                  )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {open &&
+        options.length > 0 &&
+        createPortal(
+          /*
+           * ARIA combobox/listbox idiom: the listbox lives outside the
+           * input's keyboard tab order (tabIndex=-1) and is driven via
+           * the input's onKeyDown above + aria-activedescendant.  Each
+           * option is a real `<button>` so the click is a native
+           * interaction — that gives us keyboard parity for free.
+           *
+           * `role="listbox"` and `role="option"` are exactly the ARIA
+           * pattern for a combobox; biome's `useSemanticElements` rule
+           * doesn't have a native HTML element it can suggest here, so
+           * we suppress it inline rather than fight the spec.
+           */
+          <div
+            id={listId}
+            ref={overlayRef}
+            // biome-ignore lint/a11y/useSemanticElements: ARIA listbox is the spec for combobox dropdowns; <select> doesn't support free-text input.
+            role="listbox"
+            tabIndex={-1}
+            className="fixed z-[100] max-w-[calc(100dvw-1rem)] max-h-[calc(100dvh-1rem)] translate-x-[var(--viewport-overlay-shift-x,0px)] overflow-auto break-words rounded-md border border-base-300 bg-base-100 py-1 shadow-lg"
+          >
+            {options.map((opt, i) => {
+              const highlighted = i === highlight;
+              return (
+                <button
+                  type="button"
+                  key={getOptionKey(opt)}
+                  id={`${listId}-opt-${getOptionKey(opt)}`}
+                  // biome-ignore lint/a11y/useSemanticElements: ARIA option is the spec for listbox children; <button role="option"> is the standard combobox idiom.
+                  role="option"
+                  aria-selected={highlighted}
+                  className={`block w-full cursor-pointer text-left px-3 py-1.5 text-sm ${
+                    highlighted ? 'bg-primary/10 text-base-content' : ''
+                  }`}
+                  onMouseEnter={() => setHighlight(i)}
+                  onMouseDown={(e) => {
+                    // mousedown not click, so the input doesn't lose focus
+                    // and trigger an unrelated blur-handler before we pick.
+                    e.preventDefault();
+                    pick(opt);
+                  }}
+                >
+                  {renderOption(opt, highlighted)}
+                  {typeof opt === 'object' &&
+                    opt !== null &&
+                    'sourceKey' in opt &&
+                    typeof opt.sourceKey === 'string' && (
+                      <span className="block text-xs text-dim">{opt.sourceKey}</span>
+                    )}
+                </button>
+              );
+            })}
+          </div>,
+          inputRef.current?.closest('dialog') ?? document.body,
+        )}
       {loading && options.length === 0 && value.length >= minChars && (
         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-base-content/50">
           …

@@ -312,12 +312,12 @@
   padding: 0;
   font-size: 0.85em;
 }
-.markdown-body a {
+.markdown-body a[href] {
   color: var(--color-primary);
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
-.markdown-body a:hover {
+.markdown-body a[href]:hover {
   opacity: 0.85;
 }
 .markdown-body table {

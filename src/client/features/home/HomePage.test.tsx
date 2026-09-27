@@ -77,4 +77,14 @@ describe('HomePage', () => {
       '/campaigns/campaign-1',
     );
   });
+
+  it('offers a direct first-character action when the local list is empty', async () => {
+    vi.mocked(useCharactersList).mockReturnValue([]);
+
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Create your first character' }),
+    ).toHaveAttribute('href', '/characters');
+  });
 });

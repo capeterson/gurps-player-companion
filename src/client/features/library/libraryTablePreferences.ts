@@ -9,6 +9,8 @@ export const LIBRARY_SORTS = [
   'cost',
   'stacking',
   'duration',
+  'kind',
+  'techniqueCount',
 ] as const;
 export type LibrarySort = (typeof LIBRARY_SORTS)[number];
 

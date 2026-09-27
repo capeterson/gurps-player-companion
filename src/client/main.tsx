@@ -177,6 +177,13 @@ const router = createBrowserRouter([
                 element: page(() => import('./features/library/LibraryPage.tsx'), 'LibraryPage'),
               },
               {
+                path: '/help/campaign-library',
+                element: page(
+                  () => import('./features/help/CampaignLibraryHelpPage.tsx'),
+                  'CampaignLibraryHelpPage',
+                ),
+              },
+              {
                 path: '/about',
                 element: page(() => import('./features/about/AboutPage.tsx'), 'AboutPage'),
               },

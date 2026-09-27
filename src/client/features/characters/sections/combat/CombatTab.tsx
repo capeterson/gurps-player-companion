@@ -14,6 +14,7 @@
  */
 
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
+import { ActiveEffectsPanel } from './ActiveEffectsPanel.tsx';
 import { AttacksCard } from './AttacksCard.tsx';
 import { useCombatStatus } from './CombatStatusProvider.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
@@ -43,6 +44,7 @@ export function CombatTab({
         bumpHp={bumpers.bumpHp}
         openRoll={openRoll}
       />
+      <ActiveEffectsPanel character={character} canWrite={canWrite} />
       {experimentalTurnTracker && (
         <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
       )}

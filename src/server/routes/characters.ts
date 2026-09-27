@@ -17,6 +17,7 @@ import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/perm
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { campaignMemberships, campaigns, characters } from '../db/schema.ts';
+import { escapeLikePattern } from '../db/search.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { prepareActiveEffects } from '../services/activeEffects.ts';
 import { assertAttributeCaps, touchesAttributeCaps } from '../services/attributeCapValidation.ts';
@@ -108,7 +109,11 @@ router.openapi(
         revision: characters.revision,
       })
       .from(characters)
-      .where(search ? and(accessWhere, ilike(characters.name, `%${search}%`)) : accessWhere)
+      .where(
+        search
+          ? and(accessWhere, ilike(characters.name, `%${escapeLikePattern(search)}%`))
+          : accessWhere,
+      )
       .orderBy(desc(characters.updatedAt), desc(characters.id));
     // Same share gate as GET /characters/{id} and /sync/cursor. Per
     // docs/specs/campaign-content-sharing.md the list endpoint EXCLUDES

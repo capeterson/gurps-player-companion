@@ -880,3 +880,14 @@ prerequisite is retrying. Removing a definition also waits for preceding edits
 that remove references to it. This preserves graph-valid replay while unrelated
 entries drain in parallel. Resolver catalogs mark locally edited pricing rows as
 speculative; snapshots bind their exact rule until a durable revision exists.
+
+### First-download recovery
+
+Before a device has a completed bootstrap, `SyncBootstrapGate` keeps character
+and library views hidden. It now surfaces download failures with the underlying
+reason and a **Retry download** action, and explains why first-time setup requires
+a connection. A rejected session shows **Sign in again**, preserving the requested
+route. Token changes are observed while the gate is closed; they no longer leave
+an unauthenticated first load on an indefinite spinner. The gate does not clear
+local data or change cursor/outbox recovery; previously bootstrapped offline views
+continue to render normally.

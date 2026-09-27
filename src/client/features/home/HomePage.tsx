@@ -29,7 +29,19 @@ export function HomePage() {
           <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
             {me.data?.displayName ?? 'Adventurer'}
           </h1>
-          <p className="text-sm text-muted">Pick up where you left off.</p>
+          {characters?.length === 0 ? (
+            <>
+              <p className="text-sm text-muted">
+                Start with a character, then choose its campaign on the sheet. You can also create a
+                campaign or ask your GM to invite you.
+              </p>
+              <Link to="/characters" className="btn btn-primary">
+                Create your first character
+              </Link>
+            </>
+          ) : (
+            <p className="text-sm text-muted">Pick up where you left off.</p>
+          )}
         </div>
       </section>
 
