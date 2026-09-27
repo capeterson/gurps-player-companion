@@ -20,6 +20,9 @@ numbers win. Preferred editions resolve by explicit entry override, source
 priority, then stable source-key order. Multiple explicit overrides of the same
 concept are rejected. Source-less legacy entries are a single legacy edition:
 citations are never guessed or parsed into source identities.
+New campaigns begin with 17 common Fourth Edition source records (all priority
+100), listed in [campaign content sharing](campaign-content-sharing.md); owners
+can delete any of them. This seed runs only when the campaign is created.
 
 Only `status: complete` with role `definition` or `template` is adoptable.
 `needs_review`, `reference_only`, examples and references remain searchable in

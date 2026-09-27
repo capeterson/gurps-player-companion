@@ -126,6 +126,7 @@ describe('library classes through /sync/operations', () => {
       const campaignId = await createCampaign(owner.accessToken);
       const otherCampaignId = await createCampaign(owner.accessToken);
       await addMember(owner.accessToken, campaignId, member.email);
+      const initialRows = (await library(owner.accessToken, campaignId))[section];
       const id = crypto.randomUUID();
       const created = await send(owner.accessToken, {
         entityClass,
@@ -136,7 +137,8 @@ describe('library classes through /sync/operations', () => {
       });
       expect(created.status).toBe('applied');
       const sectionRows = (await library(owner.accessToken, campaignId))[section];
-      expect(sectionRows).toEqual([expect.objectContaining({ id, name: body.name })]);
+      expect(sectionRows).toHaveLength(initialRows.length + 1);
+      expect(sectionRows.find((row) => row.id === id)).toMatchObject({ name: body.name });
       const cursorClass = entityClass;
       expect((await pull(owner.accessToken, cursorClass)).changes).toContainEqual(
         expect.objectContaining({ entityClass, entityId: id }),
@@ -172,9 +174,9 @@ describe('library classes through /sync/operations', () => {
           attemptedValue: patchedBody,
         }),
       ).toMatchObject({ status: 'applied' });
-      expect((await library(owner.accessToken, campaignId))[section]).toEqual([
-        expect.objectContaining({ id, name: patchedBody.name }),
-      ]);
+      const patchedRows = (await library(owner.accessToken, campaignId))[section];
+      expect(patchedRows).toHaveLength(initialRows.length + 1);
+      expect(patchedRows.find((row) => row.id === id)).toMatchObject({ name: patchedBody.name });
       expect(
         await send(owner.accessToken, {
           entityClass,
@@ -183,7 +185,7 @@ describe('library classes through /sync/operations', () => {
           parentId: campaignId,
         }),
       ).toMatchObject({ status: 'applied' });
-      expect((await library(owner.accessToken, campaignId))[section]).toEqual([]);
+      expect((await library(owner.accessToken, campaignId))[section]).toEqual(initialRows);
     },
   );
 

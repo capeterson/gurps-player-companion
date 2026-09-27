@@ -787,6 +787,7 @@ there is no decorative cover slot or implied image-upload feature.
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
 - **Faithful library pricing and editions.** Sources and standalone modifiers share the local-first library. Complete definitions resolve bounded declarative points, percentage, cost and weight rules; character purchases retain pricing snapshots and require explicit re-resolution after source changes. Incomplete/example/reference records stay searchable but cannot be adopted. Source-qualified editions coexist, with campaign priority and preferred overrides. Items support independent stable weapon modes and simultaneous facets. See [calculation rules](library-calculation-rules.md).
+- **New-campaign sourcebooks.** Campaign creation seeds 17 common GURPS Fourth Edition source records with familiar page-reference abbreviations. The owner can delete any source they want to exclude; existing campaigns are not changed.
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
   items, enchantments, active effects, languages, techniques, and styles. It is
   **fully sync-backed**: every member browses it from Dexie (offline too), and
@@ -842,7 +843,7 @@ there is no decorative cover slot or implied image-upload feature.
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.
    Newly observed changes remain highlighted for 30 seconds. Cards open the full
-   sheet in a new tab; a dense-display toggle fits larger parties. The REST
+   sheet in a new tab. The REST
    campaign mirror input stays stable across local subscription renders so
    the party query can settle instead of being invalidated by repeated mirror writes.
 - **Experimental turn tracking**: the owner enables **Campaign settings →
@@ -970,7 +971,8 @@ src/
                  opaque token rotation/revocation, discovery + consent routes
     mcp/         exact operation manifest/catalog, SDK transport, checked
                  snapshot, and same-process shared-handler executor
-    services/    syncDispatch (the write chokepoint), wsBus, characterSummary
+    services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
+                 defaultCampaignSources (new-campaign GURPS 4e source list),
                  libraryReferences (transactional source authorization for all
                  six character reference types plus nested item enchantments), ownedLibraryMechanics (saved
                  declarations, live updates and detachment),

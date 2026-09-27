@@ -318,13 +318,26 @@ campaign's past-encounter list with an on-page final-round summary.
 
 ## The campaign library
 
-A per-campaign catalog of reusable content, backed by eight tables:
+A per-campaign catalog of reusable content, backed by eleven tables:
 `campaign_library_traits`, `campaign_library_skills`,
 `campaign_library_spells`, `campaign_library_items`,
 `campaign_library_languages`, `campaign_library_techniques`,
-`campaign_library_styles`, and `campaign_library_enchantments`. It's what lets a GM define campaign-specific
+`campaign_library_styles`, `campaign_library_enchantments`,
+`campaign_library_active_effects`, `campaign_library_sources`, and
+`campaign_library_modifiers`. It's what lets a GM define campaign-specific
 advantages, skills, spells, gear, languages, and martial-arts content
 once and have players pull them onto their sheets.
+
+Creating a campaign inserts the owner membership and 17 common GURPS Fourth
+Edition source records in the same audited transaction. The books are Basic Set:
+Characters and Campaigns, Magic, Martial Arts, Powers, Fantasy, Space, Low-Tech,
+High-Tech, Ultra-Tech, Bio-Tech, Thaumatology, Social Engineering, Horror,
+Supers, Psionic Powers, and Mass Combat. Their abbreviations follow the
+[GURPS Character Sheet page-reference list](https://gurpscharactersheet.com/page_references)
+(`B`, `BX`, `M`, `MA`, `P`, `F`, `S`, `LT`, `HT`, `UT`, `BT`, `T`, `SE`, `H`, `SU`,
+`PSI`, `MC`). They are ordinary campaign-owned sources: the owner may edit or
+delete them to control the campaign's allowed books. Creation does not add
+entries to existing campaigns.
 
 Library languages carry only the book definition — `name`, `description`,
 `source`, and `isSignLanguage`. Fluency and point cost are per-character and

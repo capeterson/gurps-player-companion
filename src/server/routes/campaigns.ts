@@ -24,12 +24,14 @@ import { isUniqueViolation } from '../db/errors.ts';
 import {
   type DbCampaign,
   type DbCampaignMembership,
+  campaignLibrarySources,
   campaignMemberships,
   campaigns,
   characters,
   users,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { DEFAULT_CAMPAIGN_SOURCES } from '../services/defaultCampaignSources.ts';
 import { advanceCampaignProjectionRevision } from '../services/libraryInvalidation.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
@@ -184,7 +186,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const body = c.req.valid('json');
-    const created = await withAudit(user.id, undefined, async (tx) => {
+    const created = await withAudit(user.id, crypto.randomUUID(), async (tx) => {
       const [row] = await tx
         .insert(campaigns)
         .values({
@@ -220,6 +222,13 @@ router.openapi(
         userId: user.id,
         role: 'owner',
       });
+      await tx.insert(campaignLibrarySources).values(
+        DEFAULT_CAMPAIGN_SOURCES.map((source) => ({
+          ...source,
+          campaignId: row.id,
+          edition: '4th Edition',
+        })),
+      );
       return row;
     });
     const members = await loadMembers(created.id);

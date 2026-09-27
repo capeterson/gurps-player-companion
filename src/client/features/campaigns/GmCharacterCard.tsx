@@ -5,12 +5,11 @@ import { resolveSkillLookup } from './skillLookup.ts';
 
 interface Props {
   character: CharacterDetail;
-  dense: boolean;
   /** Name of the skill or stat currently selected via the GM skill lookup, if any. */
   lookup?: string | null;
 }
 
-export function GmCharacterCard({ character, dense, lookup }: Props) {
+export function GmCharacterCard({ character, lookup }: Props) {
   if (character.libraryEffectsKnown === false)
     return (
       <article className="card p-4 gap-3">
@@ -29,7 +28,7 @@ export function GmCharacterCard({ character, dense, lookup }: Props) {
   const lookupResult = lookup ? resolveSkillLookup(character, lookup) : null;
 
   return (
-    <article className={`card border border-base-300 bg-base-100 ${dense ? 'p-3' : 'p-4'} gap-3`}>
+    <article className="card gap-3 border border-base-300 bg-base-100 p-4">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="font-display text-xl font-semibold truncate">{character.name}</h2>

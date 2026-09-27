@@ -134,4 +134,6 @@ test('campaign workspace navigation and breadcrumbs stay usable at 320px', async
     .click();
   await expect(page).toHaveURL(new RegExp(`/campaigns/${campaignId}/gm$`));
   await expect(primary.locator('span[aria-current="page"]')).toHaveText('GM dashboard');
+  await expect(page.getByRole('button', { name: 'Skill lookup' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Dense' })).toHaveCount(0);
 });

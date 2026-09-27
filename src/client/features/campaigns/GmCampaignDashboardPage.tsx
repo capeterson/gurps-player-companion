@@ -9,7 +9,6 @@ import { useCampaignWorkspace } from './useCampaignWorkspace.ts';
 
 export function GmCampaignDashboardPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const [dense, setDense] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [lookup, setLookup] = useState<string | null>(null);
   const workspace = useCampaignWorkspace(id);
@@ -32,20 +31,9 @@ export function GmCampaignDashboardPage() {
         title="GM dashboard"
         description="Monitor the party and review recent character activity."
         actions={
-          <>
-            <button type="button" className="btn btn-sm" onClick={() => setLookupOpen(true)}>
-              Skill lookup
-            </button>
-            <label className="flex cursor-pointer items-center gap-2 text-xs">
-              <span>Dense</span>
-              <input
-                type="checkbox"
-                className="toggle toggle-sm"
-                checked={dense}
-                onChange={(event) => setDense(event.target.checked)}
-              />
-            </label>
-          </>
+          <button type="button" className="btn btn-sm" onClick={() => setLookupOpen(true)}>
+            Skill lookup
+          </button>
         }
       />
 
@@ -59,16 +47,9 @@ export function GmCampaignDashboardPage() {
               No characters have joined this campaign.
             </div>
           )}
-          <div
-            className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 ${dense ? 'gap-2' : 'gap-4'}`}
-          >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {characters?.map((character) => (
-              <GmCharacterCard
-                key={character.id}
-                character={character}
-                dense={dense}
-                lookup={lookup}
-              />
+              <GmCharacterCard key={character.id} character={character} lookup={lookup} />
             ))}
           </div>
         </section>
