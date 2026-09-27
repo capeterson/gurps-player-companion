@@ -29,7 +29,7 @@ describe('RollSheet', () => {
       />,
     );
     expect(screen.queryByRole('button', { name: 'Incoming damage…' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll vs 9' }));
     expect(screen.getByText(/^Failure · margin/)).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Incoming damage…' }));
     expect(onClose).toHaveBeenCalledOnce();
@@ -57,7 +57,7 @@ describe('RollSheet', () => {
         onClose={() => {}}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll vs 9' }));
     expect(screen.getByText(defense ? /^Success · margin/ : /^Failure · margin/)).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Incoming damage…' })).not.toBeInTheDocument();
   });
@@ -79,7 +79,7 @@ describe('RollSheet', () => {
         />,
       );
       const history = renderHook(() => useRollHistory('mage'));
-      fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Roll vs 10' }));
       expect(history.result.current[0]?.crit).toBe(crit);
       expect(history.result.current[0]?.manaDisaster).toBe(notice === 'spectacular disaster');
       if (notice) expect(screen.getByText(new RegExp(notice))).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe('RollSheet', () => {
     const request: RollRequest = { label: 'Broadsword', baseTarget: 12 };
     render(<RollSheet request={request} characterId="char-1" onClose={() => {}} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll vs 12' }));
 
     expect(screen.getByText('3')).toBeInTheDocument(); // total
     expect(screen.getByText(/margin \+9/)).toBeInTheDocument(); // 12 - 3
@@ -121,14 +121,14 @@ describe('RollSheet', () => {
     const request: RollRequest = { label: 'Broadsword', baseTarget: 12 };
     render(<RollSheet request={request} characterId="char-1" onClose={() => {}} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Roll vs 12' }));
     expect(screen.getByText('vs 12')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Increase modifier'));
 
     expect(screen.queryByText('vs 12')).not.toBeInTheDocument();
     expect(screen.queryByText('Critical success')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Roll 3d6' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll vs 13' })).toBeInTheDocument();
   });
 
   it('the modifier stepper changes the effective target display', () => {
@@ -173,6 +173,63 @@ describe('RollSheet', () => {
 
     fireEvent.click(screen.getByText('150 yd (−11)'));
     expect(screen.getByLabelText('Effective target 3')).toBeInTheDocument();
+  });
+
+  it('combines range, multiple Aim seconds, hit location, and Other without exceeding weapon Max', () => {
+    const request: RollRequest = {
+      label: 'Guns/Pistol',
+      baseTarget: 24,
+      attack: {
+        ranged: true,
+        range: { halfDamageYards: 100, maxYards: 150, minimumYards: null },
+        accuracy: 3,
+        canTargetVitals: true,
+      },
+    };
+    render(<RollSheet request={request} characterId="char-1" onClose={() => {}} />);
+    expect(screen.getByText('Max 150 yd')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Roll vs 24' })).toBeVisible();
+    const slider = screen.getByRole('slider', { name: 'Range band' });
+    fireEvent.change(slider, { target: { value: slider.getAttribute('max') } });
+    expect(screen.getByLabelText('Distance')).toHaveValue(150);
+    expect(screen.getByRole('button', { name: 'Roll vs 13' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Distance'), { target: { value: '30' } });
+    expect(screen.getByRole('button', { name: 'Roll vs 17' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '3+ sec' }));
+    expect(screen.getByRole('button', { name: 'Roll vs 22' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /Choose on map/ }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Skull -7' })[1] as HTMLElement);
+    expect(screen.getByRole('button', { name: 'Roll vs 15' })).toBeVisible();
+    fireEvent.click(screen.getByLabelText('Increase modifier'));
+    expect(screen.getByRole('button', { name: 'Roll vs 16' })).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Distance'), { target: { value: '151' } });
+    expect(screen.getByRole('button', { name: /Roll vs/ })).toBeDisabled();
+  });
+
+  it('keeps sub-yard ST-multiplier Max ranges reachable', () => {
+    render(
+      <RollSheet
+        request={{
+          label: 'Tiny dart',
+          baseTarget: 12,
+          attack: {
+            ranged: true,
+            range: { halfDamageYards: null, maxYards: 0.5, minimumYards: null },
+            accuracy: 0,
+            canTargetVitals: false,
+          },
+        }}
+        characterId="char-1"
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByText('Max 0.5 yd')).toBeVisible();
+    expect(screen.getByLabelText('Distance')).toHaveValue(0.5);
+    expect(screen.getByRole('button', { name: 'Roll vs 12' })).toBeEnabled();
+    expect(screen.getByLabelText('Range band')).toHaveAttribute(
+      'aria-valuetext',
+      '0.5 yards, +0 range penalty',
+    );
   });
 
   it('rolls damage dice when the request carries a damage payload', () => {

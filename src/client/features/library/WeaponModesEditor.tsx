@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { parse, stringify } from 'yaml';
 import { normalizeWeaponData } from '../../../shared/domain/weaponModes.ts';
 import { type WeaponData, weaponData } from '../../../shared/schemas/inventory.ts';
+import { RangedRangeInputs } from '../characters/sections/inventory/RangedRangeField.tsx';
 
 /** A single editor, with lossless source mode for imported structures. */
 export function WeaponModesEditor({
@@ -142,30 +143,34 @@ export function WeaponModesEditor({
                     </label>
                     {mode.ranged && (
                       <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-                        {(['acc', 'range', 'rof', 'shots', 'bulk', 'recoil'] as const).map(
-                          (field) => (
-                            <label key={field}>
-                              {field}
-                              <input
-                                className="input input-sm w-full"
-                                value={mode.ranged?.[field] ?? ''}
-                                onChange={(e) =>
-                                  change({
-                                    ranged: {
-                                      ...mode.ranged,
-                                      [field]:
-                                        e.target.value === ''
-                                          ? null
-                                          : ['acc', 'bulk', 'recoil'].includes(field)
-                                            ? Number(e.target.value)
-                                            : e.target.value,
-                                    },
-                                  })
-                                }
-                              />
-                            </label>
-                          ),
-                        )}
+                        {(['acc', 'rof', 'shots', 'bulk', 'recoil'] as const).map((field) => (
+                          <label key={field}>
+                            {field}
+                            <input
+                              className="input input-sm w-full"
+                              value={mode.ranged?.[field] ?? ''}
+                              onChange={(e) =>
+                                change({
+                                  ranged: {
+                                    ...mode.ranged,
+                                    [field]:
+                                      e.target.value === ''
+                                        ? null
+                                        : ['acc', 'bulk', 'recoil'].includes(field)
+                                          ? Number(e.target.value)
+                                          : e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </label>
+                        ))}
+                        <div className="sm:col-span-2">
+                          <RangedRangeInputs
+                            value={mode.ranged.range}
+                            onChange={(range) => change({ ranged: { ...mode.ranged, range } })}
+                          />
+                        </div>
                       </div>
                     )}
                     <label>

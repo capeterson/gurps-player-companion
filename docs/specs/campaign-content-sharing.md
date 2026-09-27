@@ -450,7 +450,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 11`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 13`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
@@ -556,7 +556,7 @@ Names are display labels and duplicate names can coexist under distinct canonica
 keys or editions. Sources use their own canonical key. The final source/reference
 graph is validated before import writes, including entries retained by omitted
 sections. Source and modifier sections follow the omission-versus-empty replace
-rule. Export is canonical YAML v12; v1–v11 remain valid compatibility inputs.
+rule. Export is canonical YAML v13; v1–v12 remain valid compatibility inputs. Older weapon Range strings convert on import; v13 requires structured Range objects.
 
 See [library-calculation-rules.md](library-calculation-rules.md) for standalone
 modifiers, completeness/adoption gates, calculation rules, explicit character

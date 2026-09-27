@@ -289,7 +289,7 @@ test('Current Status stays available and combat stays compact across mobile and 
     const defenseRoll = page.getByRole('dialog', { name: 'Roll Dodge' });
     await expect(defenseRoll.getByRole('button', { name: 'Incoming damage…' })).toHaveCount(0);
     // Limit the RNG override to the click so account IDs and other UI work retain real randomness.
-    await defenseRoll.getByRole('button', { name: 'Roll 3d6' }).evaluate((button) => {
+    await defenseRoll.getByRole('button', { name: /Roll vs \d+/ }).evaluate((button) => {
       const originalRandom = Math.random;
       Math.random = () => 0;
       try {

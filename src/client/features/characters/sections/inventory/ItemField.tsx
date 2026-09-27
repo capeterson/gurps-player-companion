@@ -3,12 +3,13 @@ import type { InventoryItemOut } from '../../../../../shared/schemas/inventory.t
 import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
 import { useDraftField } from '../../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
+import { RangedRangeField } from './RangedRangeField.tsx';
 import { readItemPath, readPath, writeItemPath } from './itemMutations.ts';
 
 export interface ItemFieldSpec {
   path: string;
   label: string;
-  kind?: 'number' | 'boolean' | 'text';
+  kind?: 'number' | 'boolean' | 'text' | 'range';
   optional?: boolean;
   advanced?: boolean;
   choices?: readonly string[];
@@ -32,6 +33,32 @@ export function ItemField({
   more: boolean;
   campaignId?: string | null | undefined;
   skillNames?: readonly string[];
+}) {
+  if (spec.kind === 'range')
+    return <RangedRangeField item={item} path={spec.path} label={spec.label} />;
+  return (
+    <ScalarItemField
+      item={item}
+      spec={spec}
+      more={more}
+      campaignId={campaignId}
+      skillNames={skillNames}
+    />
+  );
+}
+
+function ScalarItemField({
+  item,
+  spec,
+  more,
+  campaignId,
+  skillNames,
+}: {
+  item: InventoryItemOut;
+  spec: ItemFieldSpec;
+  more: boolean;
+  campaignId?: string | null | undefined;
+  skillNames: readonly string[];
 }) {
   const id = useId();
   const [focused, setFocused] = useState(false);

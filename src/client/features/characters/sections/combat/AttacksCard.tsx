@@ -1,11 +1,5 @@
 import { useState } from 'react';
 import { formatDamageDice, parseDerivedDamage } from '../../../../../shared/constants/damage.ts';
-import {
-  HIT_LOCATIONS,
-  HIT_LOCATION_AIM_PENALTY,
-  type HitLocation,
-} from '../../../../../shared/constants/hitLocations.ts';
-import { RANGE_PENALTY_STEPS } from '../../../../../shared/constants/rangePenalty.ts';
 import { combatAdjustments } from '../../../../../shared/domain/combatAdjustments.ts';
 import {
   canTargetVitals,
@@ -17,15 +11,15 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { formatRangedRange, resolveRangedRange } from '../../../../../shared/domain/rangedRange.ts';
 import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
-import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { Table, TableBody, TableHeader } from '../../../../components/ui/Table.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
-import type { RollPreset, RollRequest } from '../rollTypes.ts';
+import type { RollRequest } from '../rollTypes.ts';
 import {
   type AttackSort,
   type AttackTablePreferences,
@@ -40,55 +34,11 @@ import {
   weaponEffectsForRow,
 } from './weaponEffectView.tsx';
 
-function capitalize(s: string): string {
-  return s.length === 0 ? s : (s[0] as string).toUpperCase() + s.slice(1);
-}
-
-/** All the penalty table's values are <= 0; render "0" or "−N". */
-function fmtPenalty(n: number): string {
-  return n === 0 ? '0' : `−${Math.abs(n)}`;
-}
-
-/** 'arm_left' -> "Left Arm (−2)"; single-word locations pass through untouched. */
-function hitLocationLabel(loc: HitLocation): string {
-  const parts = loc.split('_');
-  const words =
-    parts.length === 2 && (parts[1] === 'left' || parts[1] === 'right')
-      ? [capitalize(parts[1] as string), capitalize(parts[0] as string)]
-      : parts.map(capitalize);
-  return `${words.join(' ')} (${fmtPenalty(HIT_LOCATION_AIM_PENALTY[loc])})`;
-}
-
-const HIT_LOCATION_PRESETS: readonly RollPreset[] = HIT_LOCATIONS.map((loc) => ({
-  label: hitLocationLabel(loc),
-  mod: HIT_LOCATION_AIM_PENALTY[loc],
-}));
-
-// Vitals and eye presets, excluded per-weapon when none of the weapon's
-// damage modes can target them (B399: only imp/pi attacks, or a
-// tight-beam burn we can't infer from free text — see canTargetVitals).
-const VITALS_ONLY_LOCATIONS = new Set<HitLocation>(['vitals', 'eye']);
-const HIT_LOCATION_PRESETS_NO_VITALS: readonly RollPreset[] = HIT_LOCATIONS.filter(
-  (loc) => !VITALS_ONLY_LOCATIONS.has(loc),
-).map((loc) => ({
-  label: hitLocationLabel(loc),
-  mod: HIT_LOCATION_AIM_PENALTY[loc],
-}));
-
-// Speed/range penalties as presets (B550), same single-select chip model
-// as hit locations. The 0-penalty band is omitted — it changes nothing.
-const RANGE_PRESETS: readonly RollPreset[] = RANGE_PENALTY_STEPS.filter((s) => s.penalty !== 0).map(
-  (s) => ({
-    label: `${s.maxYards} yd (${fmtPenalty(s.penalty)})`,
-    mod: s.penalty,
-  }),
-);
-
 /** "Acc 3 · 100/150 · RoF 1 · Shots 9+1(3) · Bulk −4 · Rcl 2" from present fields only. */
 function rangedStatLine(r: RangedData): string {
   const parts: string[] = [];
   if (r.acc != null) parts.push(`Acc ${r.acc}`);
-  if (r.range) parts.push(r.range);
+  if (r.range) parts.push(formatRangedRange(r.range) ?? '');
   if (r.rof) parts.push(`RoF ${r.rof}`);
   if (r.shots) parts.push(`Shots ${r.shots}`);
   if (r.bulk != null) parts.push(`Bulk ${r.bulk === 0 ? '0' : `−${Math.abs(r.bulk)}`}`);
@@ -337,36 +287,6 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
             }));
             const allModes = parsedByLine.flatMap((p) => p.modes);
 
-            // Only offer the vitals/eye presets when at least one of the
-            // weapon's parsed damage modes -- across EVERY attack mode --
-            // can target them (B399). A weapon with no parseable modes at
-            // all (free-text homebrew damage) keeps the full preset list
-            // rather than being punished for not parsing.
-            const canHitVitals =
-              allModes.length === 0 || allModes.some((m) => canTargetVitals(m.type));
-            const locationPresets = canHitVitals
-              ? HIT_LOCATION_PRESETS
-              : HIT_LOCATION_PRESETS_NO_VITALS;
-            // Ranged weapons get Aim (+Acc) and the speed/range penalties
-            // ahead of hit locations. Single-select like every preset —
-            // range + location stacking composes via the ± steppers.
-            const primaryAttackEffects = weaponEffectsForRow(
-              effects,
-              w.id,
-              'weapon_attack',
-              'primary',
-              weaponModes(wd)[0]?.key,
-              weaponModes(wd)[0]?.skill ?? null,
-            );
-            const primaryAccuracyEffects = weaponEffectsForRow(
-              effects,
-              w.id,
-              'weapon_accuracy',
-              'primary',
-              weaponModes(wd)[0]?.key,
-              weaponModes(wd)[0]?.skill ?? null,
-            );
-
             const rows = parsedByLine.flatMap(({ line, modes }) =>
               (modes.length ? modes : [null]).map((mode, index) => ({
                 line,
@@ -430,6 +350,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
               >
                 {rows.map(({ line, mode, key }, rowIndex) => {
                   const modeName = line.modeName ?? 'primary';
+                  const canHitVitals = mode === null || canTargetVitals(mode.type);
                   const currentMode = line.weaponMode;
                   const ranged = currentMode?.ranged;
                   const resolution = resolveWeaponSkill(
@@ -470,30 +391,8 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     currentMode ? (currentMode.skill ?? null) : (wd.skill ?? null),
                   );
                   const accuracy = (ranged?.acc ?? 0) + effectTotal(accuracyEffects);
-                  const presets: readonly RollPreset[] = ranged
-                    ? [
-                        ...(ranged.acc != null || accuracyEffects.length > 0
-                          ? [
-                              {
-                                label: `Aim (${formatSigned(accuracy)})`,
-                                mod: accuracy,
-                              },
-                            ]
-                          : []),
-                        ...RANGE_PRESETS,
-                        ...locationPresets,
-                      ]
-                    : locationPresets;
                   const firstOfLine = rows[rowIndex - 1]?.line.key !== line.key;
-                  const showSkill =
-                    rowIndex === 0 ||
-                    (firstOfLine && Boolean(wd.modes?.length)) ||
-                    (firstOfLine &&
-                      line.modeName &&
-                      (attackEffects.length > 0 ||
-                        accuracyEffects.length > 0 ||
-                        primaryAttackEffects.length > 0 ||
-                        primaryAccuracyEffects.length > 0));
+                  const showSkill = firstOfLine;
                   const attackLabel =
                     resolution.kind === 'matched'
                       ? `${resolution.name}${line.modeName ? ` · ${line.modeName}` : ''}`
@@ -564,7 +463,16 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                                   openRoll({
                                     label: attackLabel,
                                     baseTarget: finalTarget,
-                                    presets,
+                                    attack: {
+                                      ranged: !!ranged,
+                                      range: resolveRangedRange(
+                                        ranged?.range,
+                                        state.strength(character.derived.effectiveSt),
+                                        currentMode?.stRequired,
+                                      ),
+                                      accuracy,
+                                      canTargetVitals: canHitVitals,
+                                    },
                                   })
                                 }
                               >

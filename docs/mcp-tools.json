@@ -9893,15 +9893,7 @@
                                                     ]
                                                   },
                                                   "range": {
-                                                    "anyOf": [
-                                                      {
-                                                        "type": "string",
-                                                        "maxLength": 40
-                                                      },
-                                                      {
-                                                        "type": "null"
-                                                      }
-                                                    ]
+                                                    "$ref": "#/$defs/RangedRange"
                                                   },
                                                   "rof": {
                                                     "anyOf": [
@@ -10113,15 +10105,7 @@
                                               ]
                                             },
                                             "range": {
-                                              "anyOf": [
-                                                {
-                                                  "type": "string",
-                                                  "maxLength": 40
-                                                },
-                                                {
-                                                  "type": "null"
-                                                }
-                                              ]
+                                              "$ref": "#/$defs/RangedRange"
                                             },
                                             "rof": {
                                               "anyOf": [
@@ -10239,15 +10223,7 @@
                                                     ]
                                                   },
                                                   "range": {
-                                                    "anyOf": [
-                                                      {
-                                                        "type": "string",
-                                                        "maxLength": 40
-                                                      },
-                                                      {
-                                                        "type": "null"
-                                                      }
-                                                    ]
+                                                    "$ref": "#/$defs/RangedRange"
                                                   },
                                                   "rof": {
                                                     "anyOf": [
@@ -14134,6 +14110,139 @@
               "when"
             ],
             "additionalProperties": false
+          },
+          "RangedRange": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fixed"
+                    ]
+                  },
+                  "halfDamageYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxYards": {
+                    "type": "integer",
+                    "maximum": 1000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageYards",
+                  "maxYards"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "st_multiplier"
+                    ]
+                  },
+                  "halfDamageFactor": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "maximum": 1000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxFactor": {
+                    "type": "number",
+                    "maximum": 1000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "strengthSource": {
+                    "type": "string",
+                    "enum": [
+                      "wielder",
+                      "weapon"
+                    ]
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageFactor",
+                  "maxFactor",
+                  "strengthSource"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "legacy"
+                    ]
+                  },
+                  "notation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "kind",
+                  "notation"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ]
           },
           "ActiveEffectDefinitionOut": {
             "type": "object",
@@ -23477,15 +23586,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -23697,15 +23798,7 @@
                                 ]
                               },
                               "range": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "maxLength": 40
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
+                                "$ref": "#/$defs/RangedRange"
                               },
                               "rof": {
                                 "anyOf": [
@@ -23823,15 +23916,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -25013,6 +25098,139 @@
               "key"
             ],
             "additionalProperties": false
+          },
+          "RangedRange": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fixed"
+                    ]
+                  },
+                  "halfDamageYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxYards": {
+                    "type": "integer",
+                    "maximum": 1000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageYards",
+                  "maxYards"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "st_multiplier"
+                    ]
+                  },
+                  "halfDamageFactor": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "maximum": 1000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxFactor": {
+                    "type": "number",
+                    "maximum": 1000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "strengthSource": {
+                    "type": "string",
+                    "enum": [
+                      "wielder",
+                      "weapon"
+                    ]
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageFactor",
+                  "maxFactor",
+                  "strengthSource"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "legacy"
+                    ]
+                  },
+                  "notation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "kind",
+                  "notation"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ]
           }
         }
       },
@@ -25649,15 +25867,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -25869,15 +26079,7 @@
                                 ]
                               },
                               "range": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "maxLength": 40
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
+                                "$ref": "#/$defs/RangedRange"
                               },
                               "rof": {
                                 "anyOf": [
@@ -25995,15 +26197,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -27182,6 +27376,139 @@
               "key"
             ],
             "additionalProperties": false
+          },
+          "RangedRange": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fixed"
+                    ]
+                  },
+                  "halfDamageYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxYards": {
+                    "type": "integer",
+                    "maximum": 1000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageYards",
+                  "maxYards"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "st_multiplier"
+                    ]
+                  },
+                  "halfDamageFactor": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "maximum": 1000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxFactor": {
+                    "type": "number",
+                    "maximum": 1000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "strengthSource": {
+                    "type": "string",
+                    "enum": [
+                      "wielder",
+                      "weapon"
+                    ]
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageFactor",
+                  "maxFactor",
+                  "strengthSource"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "legacy"
+                    ]
+                  },
+                  "notation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "kind",
+                  "notation"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ]
           }
         }
       },
@@ -40062,15 +40389,7 @@
                                                     ]
                                                   },
                                                   "range": {
-                                                    "anyOf": [
-                                                      {
-                                                        "type": "string",
-                                                        "maxLength": 40
-                                                      },
-                                                      {
-                                                        "type": "null"
-                                                      }
-                                                    ]
+                                                    "$ref": "#/$defs/RangedRange"
                                                   },
                                                   "rof": {
                                                     "anyOf": [
@@ -40281,15 +40600,7 @@
                                               ]
                                             },
                                             "range": {
-                                              "anyOf": [
-                                                {
-                                                  "type": "string",
-                                                  "maxLength": 40
-                                                },
-                                                {
-                                                  "type": "null"
-                                                }
-                                              ]
+                                              "$ref": "#/$defs/RangedRange"
                                             },
                                             "rof": {
                                               "anyOf": [
@@ -40407,15 +40718,7 @@
                                                     ]
                                                   },
                                                   "range": {
-                                                    "anyOf": [
-                                                      {
-                                                        "type": "string",
-                                                        "maxLength": 40
-                                                      },
-                                                      {
-                                                        "type": "null"
-                                                      }
-                                                    ]
+                                                    "$ref": "#/$defs/RangedRange"
                                                   },
                                                   "rof": {
                                                     "anyOf": [
@@ -41188,15 +41491,7 @@
                                                     ]
                                                   },
                                                   "range": {
-                                                    "anyOf": [
-                                                      {
-                                                        "type": "string",
-                                                        "maxLength": 40
-                                                      },
-                                                      {
-                                                        "type": "null"
-                                                      }
-                                                    ]
+                                                    "$ref": "#/$defs/RangedRange"
                                                   },
                                                   "rof": {
                                                     "anyOf": [
@@ -41408,15 +41703,7 @@
                                               ]
                                             },
                                             "range": {
-                                              "anyOf": [
-                                                {
-                                                  "type": "string",
-                                                  "maxLength": 40
-                                                },
-                                                {
-                                                  "type": "null"
-                                                }
-                                              ]
+                                              "$ref": "#/$defs/RangedRange"
                                             },
                                             "rof": {
                                               "anyOf": [
@@ -41534,15 +41821,7 @@
                                                     ]
                                                   },
                                                   "range": {
-                                                    "anyOf": [
-                                                      {
-                                                        "type": "string",
-                                                        "maxLength": 40
-                                                      },
-                                                      {
-                                                        "type": "null"
-                                                      }
-                                                    ]
+                                                    "$ref": "#/$defs/RangedRange"
                                                   },
                                                   "rof": {
                                                     "anyOf": [
@@ -45228,6 +45507,139 @@
                   "kind"
                 ],
                 "additionalProperties": false
+              }
+            ]
+          },
+          "RangedRange": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fixed"
+                    ]
+                  },
+                  "halfDamageYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxYards": {
+                    "type": "integer",
+                    "maximum": 1000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageYards",
+                  "maxYards"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "st_multiplier"
+                    ]
+                  },
+                  "halfDamageFactor": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "maximum": 1000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxFactor": {
+                    "type": "number",
+                    "maximum": 1000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "strengthSource": {
+                    "type": "string",
+                    "enum": [
+                      "wielder",
+                      "weapon"
+                    ]
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageFactor",
+                  "maxFactor",
+                  "strengthSource"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "legacy"
+                    ]
+                  },
+                  "notation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "kind",
+                  "notation"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             ]
           },
@@ -52233,15 +52645,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -52453,15 +52857,7 @@
                                 ]
                               },
                               "range": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "maxLength": 40
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
+                                "$ref": "#/$defs/RangedRange"
                               },
                               "rof": {
                                 "anyOf": [
@@ -52579,15 +52975,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -53830,6 +54218,139 @@
                 "additionalProperties": false
               }
             ]
+          },
+          "RangedRange": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fixed"
+                    ]
+                  },
+                  "halfDamageYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxYards": {
+                    "type": "integer",
+                    "maximum": 1000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageYards",
+                  "maxYards"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "st_multiplier"
+                    ]
+                  },
+                  "halfDamageFactor": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "maximum": 1000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxFactor": {
+                    "type": "number",
+                    "maximum": 1000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "strengthSource": {
+                    "type": "string",
+                    "enum": [
+                      "wielder",
+                      "weapon"
+                    ]
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageFactor",
+                  "maxFactor",
+                  "strengthSource"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "legacy"
+                    ]
+                  },
+                  "notation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "kind",
+                  "notation"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ]
           }
         }
       },
@@ -54445,15 +54966,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -54665,15 +55178,7 @@
                                 ]
                               },
                               "range": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "maxLength": 40
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
+                                "$ref": "#/$defs/RangedRange"
                               },
                               "rof": {
                                 "anyOf": [
@@ -54791,15 +55296,7 @@
                                       ]
                                     },
                                     "range": {
-                                      "anyOf": [
-                                        {
-                                          "type": "string",
-                                          "maxLength": 40
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
+                                      "$ref": "#/$defs/RangedRange"
                                     },
                                     "rof": {
                                       "anyOf": [
@@ -56037,6 +56534,139 @@
                   "arguments"
                 ],
                 "additionalProperties": false
+              }
+            ]
+          },
+          "RangedRange": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "fixed"
+                    ]
+                  },
+                  "halfDamageYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxYards": {
+                    "type": "integer",
+                    "maximum": 1000000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageYards",
+                  "maxYards"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "st_multiplier"
+                    ]
+                  },
+                  "halfDamageFactor": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "maximum": 1000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "maxFactor": {
+                    "type": "number",
+                    "maximum": 1000000,
+                    "exclusiveMinimum": 0
+                  },
+                  "strengthSource": {
+                    "type": "string",
+                    "enum": [
+                      "wielder",
+                      "weapon"
+                    ]
+                  },
+                  "minimumYards": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "maximum": 1000000000,
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "kind",
+                  "halfDamageFactor",
+                  "maxFactor",
+                  "strengthSource"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "legacy"
+                    ]
+                  },
+                  "notation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "kind",
+                  "notation"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "anyOf": [
+                  {},
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             ]
           }

@@ -369,7 +369,7 @@ describe('SkillsPanel', () => {
     expect(screen.getByText('Guns/Rifle / TL8')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Roll Guns/Pistol' }));
     expect(screen.getByRole('dialog', { name: 'Roll Guns/Pistol' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: /Roll vs \d+/ }));
     const history = JSON.parse(localStorage.getItem('gurps:rollHistory:char-1') ?? '[]');
     expect(history[0].label).toBe('Guns/Pistol');
   });

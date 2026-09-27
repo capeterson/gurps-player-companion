@@ -490,6 +490,7 @@ export const libraryYamlVersion = z.union([
   z.literal(10),
   z.literal(11),
   z.literal(12),
+  z.literal(13),
 ]);
 
 export const libraryYamlDoc = z

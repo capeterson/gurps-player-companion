@@ -20,6 +20,58 @@ import { getLocalDb, migrateLegacyTempScalarsRow, resetLocalDb } from './dexie.t
 
 const DB_NAME = 'gurps-pc-local';
 
+it('v13 upgrades cached and queued weapon Range values before offline reads', async () => {
+  await resetLocalDb();
+  const legacy = new Dexie(DB_NAME);
+  legacy.version(12).stores({
+    characterInventory: 'id, characterId, parentId, updatedAt, revision',
+    campaignLibraryItems: 'id, campaignId, revision',
+    outbox: 'clientOpId, status, coalesceKey, enqueuedAt, entityId, [status+enqueuedAt]',
+  });
+  const weaponData = {
+    skill: 'Bow',
+    ranged: { range: 'x10/x15' },
+    modes: [{ key: 'primary', name: 'Primary', skill: 'Bow', ranged: { range: 'x10/x15' } }],
+  };
+  await legacy
+    .table('characterInventory')
+    .put({ id: 'old-item', characterId: 'char', revision: 1, weaponData });
+  await legacy
+    .table('campaignLibraryItems')
+    .put({ id: 'old-library-item', campaignId: 'campaign', revision: 1, weaponData });
+  await legacy.table('outbox').put({
+    clientOpId: 'old-op',
+    entityClass: 'character_inventory',
+    entityId: 'old-item',
+    command: 'patch',
+    fieldPath: 'weaponData',
+    attemptedValue: weaponData,
+    prevValue: weaponData,
+    status: 'pending',
+    enqueuedAt: '2026-01-01T00:00:00Z',
+  });
+  legacy.close();
+  const db = getLocalDb();
+  await db.open();
+  const expected = {
+    kind: 'st_multiplier',
+    halfDamageFactor: 10,
+    maxFactor: 15,
+    strengthSource: 'weapon',
+  };
+  const cached = (await db.characterInventory.get('old-item'))?.weaponData as
+    | { ranged?: { range?: unknown } }
+    | undefined;
+  expect(cached?.ranged?.range).toEqual(expected);
+  const libraryCached = (await db.campaignLibraryItems.get('old-library-item'))?.weaponData as
+    | { modes?: Array<{ ranged?: { range?: unknown } }> }
+    | undefined;
+  expect(libraryCached?.modes?.[0]?.ranged?.range).toEqual(expected);
+  const queued = await db.outbox.get('old-op');
+  expect((queued?.attemptedValue as { ranged: { range: unknown } }).ranged.range).toEqual(expected);
+  expect((queued?.prevValue as { ranged: { range: unknown } }).ranged.range).toEqual(expected);
+});
+
 it.each(['applied', 'rejected'] as const)(
   'v10 sequences an intermediate-campaign create when its prerequisite is %s',
   async (outcome) => {

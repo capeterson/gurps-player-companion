@@ -17,10 +17,9 @@ import type { RollRequest } from '../rollTypes.ts';
 import { AttacksCard } from './AttacksCard.tsx';
 import { clearAllAttackTablePreferences } from './attackTablePreferences.ts';
 
-/** Pull the `presets` array out of an openRoll mock's first call. */
-function presetsFrom(openRoll: ReturnType<typeof vi.fn>): readonly { label: string }[] {
+function attackFrom(openRoll: ReturnType<typeof vi.fn>) {
   const call = openRoll.mock.calls[0] as [RollRequest] | undefined;
-  return call?.[0]?.presets ?? [];
+  return call?.[0]?.attack;
 }
 
 interface WeaponOverrides {
@@ -216,7 +215,7 @@ describe('AttacksCard', () => {
     expect(openRoll.mock.calls[0]?.[0].damage.dice).toEqual({ dice: 1, adds: 0 });
     fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
     expect(openRoll.mock.calls[1]?.[0].baseTarget).toBe(15);
-    expect(openRoll.mock.calls[1]?.[0].presets[0]).toEqual({ label: 'Aim (+3)', mod: 3 });
+    expect(openRoll.mock.calls[1]?.[0].attack.accuracy).toBe(3);
     expect(screen.getAllByText('Weapon Bond').length).toBeGreaterThan(0);
     expect(screen.getByText('Accuracy')).toBeInTheDocument();
     expect(screen.getByText('Puissance')).toBeInTheDocument();
@@ -257,12 +256,12 @@ describe('AttacksCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Broadsword 15' }));
     expect(openRoll.mock.calls.at(-1)?.[0]).toMatchObject({
       baseTarget: 15,
-      presets: expect.arrayContaining([{ label: 'Aim (+2)', mod: 2 }]),
+      attack: expect.objectContaining({ accuracy: 2 }),
     });
     fireEvent.click(screen.getByRole('button', { name: 'Broadsword · Thrust 17' }));
     expect(openRoll.mock.calls.at(-1)?.[0]).toMatchObject({
       baseTarget: 17,
-      presets: expect.arrayContaining([{ label: 'Aim (+4)', mod: 4 }]),
+      attack: expect.objectContaining({ accuracy: 4 }),
     });
     fireEvent.click(screen.getByRole('button', { name: '1d+1 cut (5)' }));
     expect(openRoll.mock.calls.at(-1)?.[0].damage).toEqual({
@@ -460,11 +459,7 @@ describe('AttacksCard', () => {
     render(<AttacksCard character={makeCharacter('sw+1 cut')} openRoll={openRoll} />);
 
     fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
-    const presets = presetsFrom(openRoll);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Vitals'))).toBe(false);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Eye'))).toBe(false);
-    // Other locations remain available.
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Torso'))).toBe(true);
+    expect(attackFrom(openRoll)?.canTargetVitals).toBe(false);
   });
 
   it('includes Vitals/Eye presets for an impaling weapon (B399)', () => {
@@ -472,9 +467,7 @@ describe('AttacksCard', () => {
     render(<AttacksCard character={makeCharacter('thr imp')} openRoll={openRoll} />);
 
     fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
-    const presets = presetsFrom(openRoll);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Vitals'))).toBe(true);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Eye'))).toBe(true);
+    expect(attackFrom(openRoll)?.canTargetVitals).toBe(true);
   });
 
   it('includes Vitals/Eye presets for a piercing weapon (B399)', () => {
@@ -482,8 +475,7 @@ describe('AttacksCard', () => {
     render(<AttacksCard character={makeCharacter('1d(2) pi+')} openRoll={openRoll} />);
 
     fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
-    const presets = presetsFrom(openRoll);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Vitals'))).toBe(true);
+    expect(attackFrom(openRoll)?.canTargetVitals).toBe(true);
   });
 
   it('keeps the full preset list for unparseable homebrew damage text', () => {
@@ -491,8 +483,7 @@ describe('AttacksCard', () => {
     render(<AttacksCard character={makeCharacter('special')} openRoll={openRoll} />);
 
     fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
-    const presets = presetsFrom(openRoll);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Vitals'))).toBe(true);
+    expect(attackFrom(openRoll)?.canTargetVitals).toBe(true);
   });
 
   it('an explicit skill binding beats the fuzzy name match', () => {
@@ -565,7 +556,14 @@ describe('AttacksCard', () => {
   it('a ranged weapon offers Aim and range-penalty presets', () => {
     const openRoll = vi.fn();
     const character = makeCharacter('1d+1 imp', {
-      ranged: { acc: 3, range: '100/150', rof: '1', shots: null, bulk: null, recoil: null },
+      ranged: {
+        acc: 3,
+        range: { kind: 'fixed', halfDamageYards: 100, maxYards: 150 },
+        rof: '1',
+        shots: null,
+        bulk: null,
+        recoil: null,
+      },
     });
     render(<AttacksCard character={character} openRoll={openRoll} />);
 
@@ -573,12 +571,11 @@ describe('AttacksCard', () => {
     expect(screen.getByText('Acc 3 · 100/150 · RoF 1')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
-    const presets = presetsFrom(openRoll);
-    expect(presets.some((p) => p.label === 'Aim (+3)')).toBe(true);
-    expect(presets.some((p) => p.label === '10 yd (−4)')).toBe(true);
-    expect(presets.some((p) => p.label === '150 yd (−11)')).toBe(true);
-    // Hit locations still follow the range presets.
-    expect(presets.some((p) => p.label.startsWith('Torso'))).toBe(true);
+    expect(attackFrom(openRoll)).toMatchObject({
+      ranged: true,
+      accuracy: 3,
+      range: { maxYards: 150 },
+    });
   });
 
   it('a damage chip opens a damage roll with resolved dice', () => {
@@ -659,7 +656,7 @@ describe('AttacksCard', () => {
     expect(call[0].label).toBe('Rapier (Thrust) damage');
   });
 
-  it('a weapon with a cut-only primary but impaling alternates still offers Vitals/Eye', () => {
+  it('uses each damage mode to determine hit-location eligibility', () => {
     const openRoll = vi.fn();
     const character = {
       id: 'char-1',
@@ -684,9 +681,9 @@ describe('AttacksCard', () => {
     } as unknown as CharacterDetail;
     render(<AttacksCard character={character} openRoll={openRoll} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
-    const presets = presetsFrom(openRoll);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Vitals'))).toBe(true);
-    expect(presets.some((p: { label: string }) => p.label.startsWith('Eye'))).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Broadsword 14' }));
+    expect(attackFrom(openRoll)?.canTargetVitals).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Broadsword · Thrust 14' }));
+    expect(openRoll.mock.calls[1]?.[0].attack.canTargetVitals).toBe(true);
   });
 });

@@ -84,7 +84,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
     styles: [],
     enchantments: [definition],
   });
-  expect(yaml).toContain('version: 12');
+  expect(yaml).toContain('version: 13');
   expect(yaml).not.toContain('definitionId');
   const parsed = parseLibraryYaml(yaml).library;
   expect(parsed.enchantments).toEqual([definition]);
@@ -206,7 +206,7 @@ it('round-trips specialization catalogs and structured default matchers', () => 
     techniques: [],
     styles: [],
   });
-  expect(yaml).toContain('version: 12');
+  expect(yaml).toContain('version: 13');
   expect(parseLibraryYaml(yaml).library.skills[0]).toEqual(skill);
 });
 
@@ -404,7 +404,7 @@ library:
     expect(cutlass?.weaponData?.db).toBe(1);
     expect(cutlass?.weaponData?.ranged).toEqual({
       acc: 0,
-      range: '10/15',
+      range: { kind: 'fixed', halfDamageYards: 10, maxYards: 15 },
       rof: '1',
       shots: '1',
       bulk: -2,
@@ -517,7 +517,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 12');
+    expect(first).toContain('version: 13');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);
@@ -534,7 +534,11 @@ describe('emitLibraryYaml', () => {
     expect(second).toBe(first);
 
     const cutlass = docB.library.items.find((i) => i.name === 'Boarding Cutlass');
-    expect(cutlass?.weaponData?.ranged?.range).toBe('10/15');
+    expect(cutlass?.weaponData?.ranged?.range).toEqual({
+      kind: 'fixed',
+      halfDamageYards: 10,
+      maxYards: 15,
+    });
     const stone = docB.library.items.find((i) => i.name === 'Charged Powerstone');
     expect(stone?.powerstoneData?.currentEnergy).toBe(15);
   });

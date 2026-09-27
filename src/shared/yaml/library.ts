@@ -1,4 +1,5 @@
 import { libraryEntryKey } from '../domain/libraryIdentity.ts';
+import { upgradeLegacyWeaponRanges } from '../domain/rangedRange.ts';
 import type { ActiveEffectDefinition } from '../schemas/activeEffects.ts';
 import type { LibraryModifierCreate, LibrarySourceCreate } from '../schemas/libraryMetadata.ts';
 /**
@@ -34,10 +35,11 @@ import {
  * default matchers. v9 adds structured prerequisites, TL policies, conditional
  * family defaults, and campaign enforcement policy. v10 adds reusable
  * enchantment definitions and mechanical item snapshots. The parser still accepts
- * v1-v11 docs (new fields absent). v11 adds active effects; v12 adds source
+ * v1-v12 docs (new fields absent). v11 adds active effects; v12 adds source
  * editions, standalone modifiers, calculation rules, and normalized weapon modes.
+ * v13 replaces weapon Range text with structured fixed/ST-multiplier values.
  */
-export const LIBRARY_YAML_VERSION = 12 as const;
+export const LIBRARY_YAML_VERSION = 13 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -59,6 +61,23 @@ export function parseLibraryYaml(rawText: string): LibraryYamlDoc {
     parsed = parse(rawText);
   } catch (e) {
     throw new LibraryYamlError('YAML is not parseable', e);
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const doc = parsed as Record<string, unknown>;
+    if (typeof doc.version === 'number' && doc.version <= 12) {
+      const library = doc.library;
+      if (library && typeof library === 'object' && !Array.isArray(library)) {
+        const items = (library as Record<string, unknown>).items;
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if (item && typeof item === 'object' && !Array.isArray(item)) {
+              const entry = item as Record<string, unknown>;
+              entry.weaponData = upgradeLegacyWeaponRanges(entry.weaponData);
+            }
+          }
+        }
+      }
+    }
   }
   const result = libraryYamlDoc.safeParse(parsed);
   if (!result.success) {

@@ -25,6 +25,10 @@ import { AppIcon } from '../../../components/ui/AppIcon.tsx';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatDamageDice } from '../../../../shared/constants/damage.ts';
+import {
+  HIT_LOCATION_AIM_PENALTY,
+  type HitLocation,
+} from '../../../../shared/constants/hitLocations.ts';
 import { minBasicDamageFor } from '../../../../shared/domain/damageParse.ts';
 import {
   type CritKind,
@@ -32,6 +36,7 @@ import {
   roll3d6,
   rollDamageDice,
 } from '../../../../shared/domain/diceRoll.ts';
+import { rangeBandsThrough, rangePenaltyForYards } from '../../../../shared/domain/rangedRange.ts';
 import {
   type RuleContext,
   evaluateActionOutcomes,
@@ -40,8 +45,11 @@ import {
 import { formatSigned } from '../../../../shared/format/number.ts';
 import { newClientId } from '../../../sync/outbox.ts';
 import { SkillRulePreview } from './SkillRulePreview.tsx';
+import { HitLocationMap } from './combat/ArmorLocationMap.tsx';
+import { locationLabel } from './combat/armorViewOptions.ts';
 import { pushRoll } from './rollHistory.ts';
 import type { RollRequest } from './rollTypes.ts';
+import './combat/armor.css';
 
 export interface RollSheetProps {
   request: RollRequest;
@@ -112,6 +120,13 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [result, setResult] = useState<RollResult | null>(null);
   const [damageResult, setDamageResult] = useState<DamageResult | null>(null);
+  const [distance, setDistance] = useState(() => {
+    const range = request.attack?.range;
+    return range ? Math.min(range.maxYards, Math.max(2, range.minimumYards ?? 0)) : 2;
+  });
+  const [aimSeconds, setAimSeconds] = useState(0);
+  const [hitLocation, setHitLocation] = useState<HitLocation>('torso');
+  const [showHitMap, setShowHitMap] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -122,7 +137,26 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
   }, [onClose]);
 
   const damage = request.damage;
-  const effectiveTarget = Math.floor(request.baseTarget + modifier + ruleBonus);
+  const attack = request.attack;
+  const bands = attack?.range ? rangeBandsThrough(attack.range.maxYards) : [];
+  const selectedBandIndex = bands.findIndex((band) => distance <= band.maxYards);
+  const maxRange = attack?.range?.maxYards ?? null;
+  const rangeValid =
+    !attack?.ranged ||
+    maxRange === null ||
+    (distance > 0 && distance >= (attack.range?.minimumYards ?? 0) && distance <= maxRange);
+  const rangeMod = attack?.ranged && maxRange !== null ? rangePenaltyForYards(distance) : 0;
+  const aimMod =
+    attack?.ranged && aimSeconds > 0
+      ? Math.min(
+          Math.max(0, attack.accuracy) + Math.min(aimSeconds - 1, 2),
+          Math.max(0, attack.accuracy) * 2,
+        )
+      : 0;
+  const locationMod = attack ? HIT_LOCATION_AIM_PENALTY[hitLocation] : 0;
+  const effectiveTarget = Math.floor(
+    request.baseTarget + modifier + ruleBonus + rangeMod + aimMod + locationMod,
+  );
   // For damage rolls the modifier is flat adds on top of the dice.
   const effectiveDice = damage
     ? { dice: damage.dice.dice, adds: damage.dice.adds + modifier }
@@ -157,6 +191,17 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     setDamageResult(null);
     setActivePreset(null);
     setModifier(0);
+  }
+
+  function selectDistance(yards: number) {
+    setDistance(yards);
+    setResult(null);
+  }
+
+  function selectLocation(location: HitLocation) {
+    setHitLocation(location);
+    setResult(null);
+    setShowHitMap(false);
   }
 
   function doRoll() {
@@ -227,199 +272,335 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
         className="absolute inset-0 cursor-default bg-transparent"
       />
       <div
-        className="card relative max-h-[85vh] w-full overflow-auto rounded-t-2xl p-5 shadow-arcane-lg md:w-[26rem] md:max-w-[calc(100vw-3rem)] md:rounded-2xl"
+        className="card relative flex max-h-[min(92dvh,900px)] w-full flex-col overflow-hidden rounded-t-2xl shadow-arcane-lg md:w-[30rem] md:max-w-[calc(100dvw-3rem)] md:rounded-2xl"
         style={{
           background: 'var(--color-base-100)',
-          paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))',
         }}
       >
-        <div className="mb-3 flex items-center justify-between">
-          <p className="label-eyebrow flex items-center gap-2">
-            <AppIcon name="dice" size={18} />
-            {damage ? 'Roll damage' : 'Roll'}
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-ghost btn-sm"
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
-        <h2 className="mb-3 font-display text-2xl font-semibold">{request.label}</h2>
-
-        {(request.rules?.length || request.action) && (
-          <>
-            <SkillRulePreview
-              rules={request.rules ?? []}
-              source={request.label}
-              context={context}
-              choices={choices}
-              onContext={(v) => {
-                setContext(v);
-                setResult(null);
-              }}
-              onChoices={(v) => {
-                setChoices(v);
-                setResult(null);
-              }}
-              {...(request.action ? { action: request.action } : {})}
-            />
-            <p className="text-xs">
-              Base {request.baseTarget} + rules {ruleBonus} + situational {modifier}
+        <div className="min-h-0 overflow-y-auto p-5 pb-3">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="label-eyebrow flex items-center gap-2">
+              <AppIcon name="dice" size={18} />
+              {damage ? 'Roll damage' : 'Roll'}
             </p>
-          </>
-        )}
-        <div className="mb-3 flex items-baseline justify-center rounded-2xl border border-base-300/60 py-4">
-          {damage && effectiveDice ? (
-            <span
-              className="num font-bold leading-none"
-              style={{ fontSize: '2.5rem' }}
-              aria-label={`Damage formula ${formatDamageDice(effectiveDice)}${damageSuffix}`}
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-ghost btn-sm"
+              aria-label="Close"
             >
-              {formatDamageDice(effectiveDice)}
-              {damageSuffix && (
-                <span className="text-base-content/60 text-2xl">{damageSuffix}</span>
-              )}
-            </span>
-          ) : (
-            <span
-              className="num font-bold leading-none"
-              style={{ fontSize: '4rem' }}
-              aria-label={`Effective target ${effectiveTarget}`}
-            >
-              {effectiveTarget}
-            </span>
-          )}
-        </div>
-
-        <div className="mb-3 flex items-center justify-center gap-3">
-          <button
-            type="button"
-            className="btn btn-circle btn-sm"
-            onClick={() => step(-1)}
-            aria-label={damage ? 'Decrease damage adds' : 'Decrease modifier'}
-          >
-            −
-          </button>
-          <span className="num w-20 text-center text-sm text-base-content/70">
-            {damage
-              ? `adds ${formatSigned(modifier)}`
-              : `${request.baseTarget} ${formatSigned(modifier)}`}
-          </span>
-          <button
-            type="button"
-            className="btn btn-circle btn-sm"
-            onClick={() => step(1)}
-            aria-label={damage ? 'Increase damage adds' : 'Increase modifier'}
-          >
-            +
-          </button>
-          {modifier !== 0 && (
-            <button type="button" className="btn btn-ghost btn-xs" onClick={resetModifier}>
-              Reset
+              ×
             </button>
+          </div>
+
+          <h2 className="mb-3 font-display text-2xl font-semibold">{request.label}</h2>
+
+          {(request.rules?.length || request.action) && (
+            <>
+              <SkillRulePreview
+                rules={request.rules ?? []}
+                source={request.label}
+                context={context}
+                choices={choices}
+                onContext={(v) => {
+                  setContext(v);
+                  setResult(null);
+                }}
+                onChoices={(v) => {
+                  setChoices(v);
+                  setResult(null);
+                }}
+                {...(request.action ? { action: request.action } : {})}
+              />
+              <p className="text-xs">
+                Base {request.baseTarget} + rules {ruleBonus} + situational {modifier}
+              </p>
+            </>
+          )}
+          <div className="mb-3 flex items-baseline justify-center rounded-2xl border border-base-300/60 py-4">
+            {damage && effectiveDice ? (
+              <span
+                className="num font-bold leading-none"
+                style={{ fontSize: '2.5rem' }}
+                aria-label={`Damage formula ${formatDamageDice(effectiveDice)}${damageSuffix}`}
+              >
+                {formatDamageDice(effectiveDice)}
+                {damageSuffix && (
+                  <span className="text-base-content/60 text-2xl">{damageSuffix}</span>
+                )}
+              </span>
+            ) : (
+              <span
+                className="num font-bold leading-none"
+                style={{ fontSize: '4rem' }}
+                aria-label={`Effective target ${effectiveTarget}`}
+              >
+                {effectiveTarget}
+              </span>
+            )}
+          </div>
+
+          {attack?.ranged && (
+            <section className="mb-4 space-y-2" aria-label="Range">
+              <div className="flex items-center justify-between gap-2">
+                <span className="label-eyebrow">Range</span>
+                {maxRange !== null && (
+                  <span className="text-xs text-base-content/60">Max {maxRange} yd</span>
+                )}
+              </div>
+              {maxRange !== null && bands.length > 0 ? (
+                <>
+                  <input
+                    className="range range-primary w-full"
+                    type="range"
+                    min={0}
+                    max={bands.length - 1}
+                    value={selectedBandIndex < 0 ? bands.length - 1 : selectedBandIndex}
+                    aria-label="Range band"
+                    aria-valuetext={`${distance} yards, ${formatSigned(rangeMod)} range penalty`}
+                    onChange={(event) =>
+                      selectDistance(bands[Number(event.target.value)]?.maxYards ?? distance)
+                    }
+                  />
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="roll-distance" className="text-sm">
+                      Distance
+                    </label>
+                    <input
+                      id="roll-distance"
+                      className="input input-sm input-bordered w-24"
+                      type="number"
+                      min={attack.range?.minimumYards ?? 0.01}
+                      max={maxRange}
+                      step="any"
+                      value={distance}
+                      onChange={(event) => selectDistance(Number(event.target.value))}
+                    />
+                    <span className="text-sm">yd · {formatSigned(rangeMod)}</span>
+                  </div>
+                  {!rangeValid && (
+                    <p role="alert" className="text-xs text-error">
+                      Distance must be above 0 and no more than {maxRange} yd
+                      {attack.range?.minimumYards
+                        ? ` (minimum ${attack.range.minimumYards} yd)`
+                        : ''}
+                      .
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-warning">
+                  Set weapon Range and required ST, if applicable, to use the slider. Apply a manual
+                  modifier below if needed.
+                </p>
+              )}
+            </section>
+          )}
+
+          {attack?.ranged && (
+            <section className="mb-4 space-y-2" aria-label="Aim">
+              <p className="label-eyebrow">Aim</p>
+              <div className="flex flex-wrap gap-2">
+                {[0, 1, 2, 3].map((seconds) => (
+                  <button
+                    key={seconds}
+                    type="button"
+                    className={`btn btn-sm ${aimSeconds === seconds ? 'btn-primary' : 'btn-outline'}`}
+                    aria-pressed={aimSeconds === seconds}
+                    onClick={() => {
+                      setAimSeconds(seconds);
+                      setResult(null);
+                    }}
+                  >
+                    {seconds === 0 ? 'None' : seconds === 3 ? '3+ sec' : `${seconds} sec`}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-base-content/60">
+                Acc {attack.accuracy} · Aim {formatSigned(aimMod)} (capped at twice Acc).
+              </p>
+            </section>
+          )}
+
+          {attack && (
+            <section className="mb-4 space-y-2" aria-label="Hit location">
+              <p className="label-eyebrow">Hit location</p>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm w-full justify-between"
+                aria-expanded={showHitMap}
+                onClick={() => setShowHitMap((open) => !open)}
+              >
+                <span>
+                  {locationLabel(hitLocation)} {formatSigned(locationMod)}
+                </span>
+                <span>{showHitMap ? 'Hide map' : 'Choose on map'}</span>
+              </button>
+              {showHitMap && (
+                <HitLocationMap
+                  selected={hitLocation}
+                  onSelect={(loc) => selectLocation(loc as HitLocation)}
+                  valueFor={(loc) => formatSigned(HIT_LOCATION_AIM_PENALTY[loc as HitLocation])}
+                  ariaFor={(loc) =>
+                    `${locationLabel(loc)} ${formatSigned(HIT_LOCATION_AIM_PENALTY[loc as HitLocation])}`
+                  }
+                  title="Choose hit location"
+                  className="roll-hit-map"
+                  disabled={(loc) => !attack.canTargetVitals && (loc === 'vitals' || loc === 'eye')}
+                />
+              )}
+            </section>
+          )}
+
+          {attack && (
+            <p className="mb-3 text-xs text-base-content/60">
+              Base {request.baseTarget} · Range {formatSigned(rangeMod)} · Aim{' '}
+              {formatSigned(aimMod)} · {locationLabel(hitLocation)} {formatSigned(locationMod)} ·
+              Other {formatSigned(modifier)}
+              {ruleBonus ? ` · Rules ${formatSigned(ruleBonus)}` : ''}
+            </p>
+          )}
+
+          <div className="mb-3 flex items-center justify-center gap-3">
+            {attack && <span className="text-sm">Other</span>}
+            <button
+              type="button"
+              className="btn btn-circle btn-sm"
+              onClick={() => step(-1)}
+              aria-label={damage ? 'Decrease damage adds' : 'Decrease modifier'}
+            >
+              −
+            </button>
+            <span className="num w-20 text-center text-sm text-base-content/70">
+              {damage
+                ? `adds ${formatSigned(modifier)}`
+                : attack
+                  ? formatSigned(modifier)
+                  : `${request.baseTarget} ${formatSigned(modifier)}`}
+            </span>
+            <button
+              type="button"
+              className="btn btn-circle btn-sm"
+              onClick={() => step(1)}
+              aria-label={damage ? 'Increase damage adds' : 'Increase modifier'}
+            >
+              +
+            </button>
+            {modifier !== 0 && (
+              <button type="button" className="btn btn-ghost btn-xs" onClick={resetModifier}>
+                Reset
+              </button>
+            )}
+          </div>
+
+          {!damage && !attack && request.presets && request.presets.length > 0 && (
+            <div className="mb-3 flex flex-wrap justify-center gap-1.5">
+              {request.presets.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  className={`chip ${activePreset === p.label ? 'on' : ''}`}
+                  onClick={() => applyPreset(p.label, p.mod)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
+        <div
+          className="border-t border-base-300/60 p-4"
+          style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+        >
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            onClick={doRoll}
+            disabled={!rangeValid}
+          >
+            {damage
+              ? damageResult
+                ? 'Roll again'
+                : `Roll ${effectiveDice ? formatDamageDice(effectiveDice) : 'damage'}`
+              : `Roll vs ${effectiveTarget}`}
+          </button>
+        </div>
 
-        {!damage && request.presets && request.presets.length > 0 && (
-          <div className="mb-3 flex flex-wrap justify-center gap-1.5">
-            {request.presets.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                className={`chip ${activePreset === p.label ? 'on' : ''}`}
-                onClick={() => applyPreset(p.label, p.mod)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="min-h-0 overflow-y-auto px-5 pb-4">
+          {damageResult && (
+            <div className="mt-3 space-y-1.5 rounded-2xl border border-base-300/60 p-4 text-center">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                {damageResult.rolls.map((die, i) => (
+                  <span
+                    // biome-ignore lint/suspicious/noArrayIndexKey: dice faces have no identity beyond position.
+                    key={i}
+                    className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold"
+                  >
+                    {die}
+                  </span>
+                ))}
+              </div>
+              <p className="num text-3xl font-bold">{damageResult.total}</p>
+              <p className="text-xs text-base-content/60">{damageResult.formula}</p>
+            </div>
+          )}
 
-        <button type="button" className="btn w-full" onClick={doRoll}>
-          {damage
-            ? damageResult
-              ? 'Roll again'
-              : `Roll ${effectiveDice ? formatDamageDice(effectiveDice) : 'damage'}`
-            : result
-              ? 'Roll again'
-              : 'Roll 3d6'}
-        </button>
-
-        {damageResult && (
-          <div className="mt-3 space-y-1.5 rounded-2xl border border-base-300/60 p-4 text-center">
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
-              {damageResult.rolls.map((die, i) => (
-                <span
-                  // biome-ignore lint/suspicious/noArrayIndexKey: dice faces have no identity beyond position.
-                  key={i}
-                  className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold"
-                >
-                  {die}
+          {result && (
+            <div className="mt-3 space-y-1.5 rounded-2xl border border-base-300/60 p-4 text-center">
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold">
+                  {result.dice[0]}
                 </span>
-              ))}
-            </div>
-            <p className="num text-3xl font-bold">{damageResult.total}</p>
-            <p className="text-xs text-base-content/60">{damageResult.formula}</p>
-          </div>
-        )}
-
-        {result && (
-          <div className="mt-3 space-y-1.5 rounded-2xl border border-base-300/60 p-4 text-center">
-            <div className="flex items-center justify-center gap-1.5">
-              <span className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold">
-                {result.dice[0]}
-              </span>
-              <span className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold">
-                {result.dice[1]}
-              </span>
-              <span className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold">
-                {result.dice[2]}
-              </span>
-            </div>
-            <p className="num text-3xl font-bold">{result.total}</p>
-            <p className="text-xs text-base-content/60">vs {result.target}</p>
-            <p className={`text-sm font-medium ${result.success ? 'text-success' : 'text-error'}`}>
-              {result.success ? 'Success' : 'Failure'} · margin {formatSigned(result.margin)}
-            </p>
-            {result.crit && (
-              <span
-                className={`badge ${result.crit === 'success' ? 'badge-success' : 'badge-error'}`}
+                <span className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold">
+                  {result.dice[1]}
+                </span>
+                <span className="num flex h-9 w-9 items-center justify-center rounded-lg border border-base-300 bg-base-200 font-semibold">
+                  {result.dice[2]}
+                </span>
+              </div>
+              <p className="num text-3xl font-bold">{result.total}</p>
+              <p className="text-xs text-base-content/60">vs {result.target}</p>
+              <p
+                className={`text-sm font-medium ${result.success ? 'text-success' : 'text-error'}`}
               >
-                {result.crit === 'success' ? 'Critical success' : 'Critical failure'}
-              </span>
-            )}
-            {request.action &&
-              evaluateActionOutcomes(request.action, result, context).map((outcome, i) => (
-                <p key={`${outcome.on}:${i}`}>
-                  {outcome.text}
-                  {outcome.amount ? ` (${outcome.resolvedAmount ?? 'Context required'})` : ''}
-                </p>
-              ))}
-            {request.spellManaLevel === 'very_high' && !result.success && (
-              <p className="text-sm text-error">
-                {result.manaDisaster
-                  ? 'Very high mana: this rolled critical failure causes a spectacular disaster. Ask the GM to resolve it.'
-                  : 'Very high mana turns this failure into a critical failure. Resolve the spell critical-failure consequences.'}
+                {result.success ? 'Success' : 'Failure'} · margin {formatSigned(result.margin)}
               </p>
-            )}
-            {!result.success && request.onIncomingDamage && (
-              <button
-                type="button"
-                className="btn w-full"
-                onClick={() => {
-                  onClose();
-                  request.onIncomingDamage?.();
-                }}
-              >
-                Incoming damage…
-              </button>
-            )}
-          </div>
-        )}
+              {result.crit && (
+                <span
+                  className={`badge ${result.crit === 'success' ? 'badge-success' : 'badge-error'}`}
+                >
+                  {result.crit === 'success' ? 'Critical success' : 'Critical failure'}
+                </span>
+              )}
+              {request.action &&
+                evaluateActionOutcomes(request.action, result, context).map((outcome, i) => (
+                  <p key={`${outcome.on}:${i}`}>
+                    {outcome.text}
+                    {outcome.amount ? ` (${outcome.resolvedAmount ?? 'Context required'})` : ''}
+                  </p>
+                ))}
+              {request.spellManaLevel === 'very_high' && !result.success && (
+                <p className="text-sm text-error">
+                  {result.manaDisaster
+                    ? 'Very high mana: this rolled critical failure causes a spectacular disaster. Ask the GM to resolve it.'
+                    : 'Very high mana turns this failure into a critical failure. Resolve the spell critical-failure consequences.'}
+                </p>
+              )}
+              {!result.success && request.onIncomingDamage && (
+                <button
+                  type="button"
+                  className="btn w-full"
+                  onClick={() => {
+                    onClose();
+                    request.onIncomingDamage?.();
+                  }}
+                >
+                  Incoming damage…
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>,
     document.body,

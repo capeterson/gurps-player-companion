@@ -1,5 +1,5 @@
 # Fictional campaign fixtures, not an authoritative rules catalog.
-version: 11
+version: 13
 campaign:
   name: The Lantern Coast
   description: |
@@ -185,7 +185,7 @@ library:
       category: weapon
       weightLbs: 2
       cost: 100
-      weaponData: {damage: thr+1 imp, skill: Bow, stRequired: 10, parry: 'No', ranged: {acc: 2, range: '120/180', rof: '1', shots: '1(2)', bulk: -6, recoil: 1}}
+      weaponData: {damage: thr+1 imp, skill: Bow, stRequired: 10, parry: 'No', ranged: {acc: 2, range: {kind: fixed, halfDamageYards: 120, maxYards: 180}, rof: '1', shots: '1(2)', bulk: -6, recoil: 1}}
     - {name: Mail hauberk, category: armor, weightLbs: 16, cost: 230, isArmor: true, armor: {dr: 4, drCrushing: 2, flexible: true, locations: [torso, groin, arm_left, arm_right]}}
     - {name: Steel cap, category: armor, weightLbs: 2, cost: 100, isArmor: true, armor: {dr: 4, locations: [skull]}}
     - {name: Leather leggings, category: armor, weightLbs: 4, cost: 40, isArmor: true, armor: {dr: 2, locations: [leg_left, leg_right]}}
