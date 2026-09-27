@@ -1,22 +1,35 @@
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { canAdoptLibraryEntry, modifierApplies } from '../../shared/domain/libraryIdentity.ts';
+import {
+  definitionReference,
+  pricingSourceChanged,
+  resolveLibraryPricing,
+  resolveLocalModifier,
+} from '../../shared/domain/libraryPricing.ts';
 import {
   librarySkillCopyNotes,
   resolveLibrarySkillSpecialization,
 } from '../../shared/domain/librarySkillSpecializations.ts';
+import { computeLeveledTraitCost } from '../../shared/domain/modifierMath.ts';
 import {
   evaluateSkillPrerequisite,
   failedPrerequisiteMessages,
 } from '../../shared/domain/skillRules.ts';
+import { normalizeWeaponData } from '../../shared/domain/weaponModes.ts';
+import { pricingResolution } from '../../shared/schemas/calculation.ts';
+import { inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
 import { enchantmentRef } from '../../shared/schemas/inventory.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import type { SkillPrerequisite } from '../../shared/schemas/skill.ts';
+import { traitUpdate } from '../../shared/schemas/trait.ts';
 import { assertWrite, canWriteCharacter } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
   campaignLibraryEnchantments,
   campaignLibraryItems,
   campaignLibraryLanguages,
+  type campaignLibraryModifiers,
   campaignLibrarySkills,
   campaignLibrarySpells,
   campaignLibraryTechniques,
@@ -32,6 +45,7 @@ import {
   inventoryItems,
 } from '../db/schema.ts';
 import { loadCharacterDetail } from './characterSummary.ts';
+import { loadPricingCatalog } from './libraryPricing.ts';
 import { captureLibraryMechanics, reconcileOwnedTraitKind } from './ownedLibraryMechanics.ts';
 
 const references = {
@@ -101,7 +115,7 @@ export async function hydrateItemEnchantmentDefinitions<T extends Record<string,
         ),
       )
       .for('share');
-    if (!definition)
+    if (!definition || !canAdoptLibraryEntry(definition))
       throw new HTTPException(403, {
         message: 'Enchantment definition is unavailable in this campaign',
       });
@@ -192,10 +206,25 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
   values: T,
   existingId?: string,
 ): Promise<T> {
+  if (kind === 'items' && values.weaponData !== undefined) {
+    (values as Record<string, unknown>).weaponData = normalizeWeaponData(
+      values.weaponData as Parameters<typeof normalizeWeaponData>[0],
+    );
+  }
   const cfg = references[kind];
+  if (
+    kind === 'traits' &&
+    Array.isArray(values.modifiers) &&
+    values.modifiers.some((m) => m && typeof m === 'object' && 'pricingResolution' in m) &&
+    values.pricingResolution == null
+  )
+    throw new HTTPException(400, {
+      message: 'Resolved modifiers must be saved with a pricing resolution',
+    });
   const { parent, campaign, membership } = await lockLibraryReferenceScope(tx, characterId, userId);
   if (
     values[cfg.field] === undefined &&
+    values.pricingResolution === undefined &&
     !(kind === 'traits' && values.kind !== undefined) &&
     !(
       kind === 'skills' &&
@@ -278,9 +307,121 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
     .where(and(eq(cfg.source.id, canonicalSourceId), eq(cfg.source.campaignId, campaign.id)))
     .for('share');
   if (!source) throw denied();
+  if (!canAdoptLibraryEntry(source))
+    throw new HTTPException(400, { message: 'This library entry is incomplete or reference-only' });
   if (kind === 'traits' && 'kind' in source) {
     const traitKind = values.kind ?? (existing && 'kind' in existing ? existing.kind : undefined);
     if (source.kind !== traitKind) throw denied();
+  }
+  if (
+    (kind === 'traits' || kind === 'items') &&
+    (!existing || values.pricingResolution !== undefined || values[cfg.field] !== undefined)
+  ) {
+    try {
+      const catalog = await loadPricingCatalog(tx, campaign.id);
+      const request =
+        values.pricingResolution == null ? null : pricingResolution.parse(values.pricingResolution);
+      const ref = definitionReference(kind, source);
+      const inputs =
+        request?.inputs ??
+        (kind === 'traits' && 'pointsPerLevel' in source && source.pointsPerLevel != null
+          ? { level: Number(values.level ?? 1) }
+          : {});
+      const resolution = resolveLibraryPricing(catalog, ref, inputs);
+      if (request && (request.definitionId !== source.id || pricingSourceChanged(catalog, request)))
+        throw new Error('Pricing definition changed; review and resolve again');
+      // Legacy API callers retain explicitly paid values. Only an explicit resolution reprices.
+      if (request) {
+        const mutable = values as Record<string, unknown>;
+        mutable.pricingResolution = resolution;
+        if (kind === 'items') {
+          mutable.cost = String(resolution.outputs.cost);
+          mutable.weightLbs = String(resolution.outputs.weightLbs);
+        } else {
+          const traitSource = source as typeof campaignLibraryTraits.$inferSelect;
+          const modifiers = (
+            Array.isArray(values.modifiers)
+              ? values.modifiers
+              : existing && 'modifiers' in existing
+                ? existing.modifiers
+                : []
+          ) as import('../../shared/schemas/trait.ts').TraitModifier[];
+          for (const modifier of modifiers) {
+            if (!modifier.pricingResolution) continue;
+            const old = modifier.pricingResolution;
+            const definition = old.localModifier
+              ? traitSource.availableModifiers.find((m) => m.name === old.localModifier)
+              : catalog.modifiers.find((row) => row.id === old.definitionId);
+            if (
+              !definition ||
+              (!old.localModifier &&
+                !modifierApplies(
+                  definition as typeof campaignLibraryModifiers.$inferSelect,
+                  traitSource,
+                ))
+            )
+              throw new Error('Modifier is unavailable for this trait');
+            if (
+              pricingSourceChanged(catalog, old) ||
+              (old.localModifier && old.definitionId !== traitSource.id)
+            )
+              throw new Error('Modifier changed; review and resolve again');
+            const resolved = old.localModifier
+              ? resolveLocalModifier(catalog, traitSource, old.localModifier, old.inputs)
+              : resolveLibraryPricing(
+                  catalog,
+                  definitionReference('modifiers', definition),
+                  old.inputs,
+                );
+            modifier.name = definition.name;
+            if (definition.category === 'enhancement' || definition.category === 'limitation')
+              modifier.category = definition.category;
+            if (definition.description) modifier.description = definition.description;
+            else modifier.description = undefined;
+            if (definition.group) modifier.group = definition.group;
+            else modifier.group = undefined;
+            modifier.pricingResolution = resolved;
+            modifier.costValue = resolved.outputs.modifier ?? 0;
+            modifier.costType = definition.costType ?? 'percent';
+          }
+          const identities = modifiers.flatMap((m) =>
+            m.pricingResolution
+              ? [`${m.pricingResolution.definitionId}:${m.pricingResolution.localModifier ?? ''}`]
+              : [],
+          );
+          if (new Set(identities).size !== identities.length)
+            throw new Error('A modifier may be selected only once; use its scaling inputs');
+          mutable.modifiers = modifiers;
+          const groups = modifiers.map((m) => m.group).filter(Boolean);
+          if (new Set(groups).size !== groups.length)
+            throw new Error('Mutually exclusive modifiers cannot be combined');
+          const variant = traitSource.variants.find(
+            (v) =>
+              v.name ===
+              (values.variantName ??
+                (existing && 'variantName' in existing ? existing.variantName : null)),
+          );
+          mutable.points = computeLeveledTraitCost({
+            basePoints: resolution.outputs.points ?? 0,
+            ...(variant ? { variant } : {}),
+            modifiers,
+          }).total;
+          if ('level' in resolution.inputs) mutable.level = resolution.inputs.level;
+        }
+        if (kind === 'traits') traitUpdate.parse(mutable);
+        else
+          inventoryItemUpdate.parse({
+            ...mutable,
+            ...Object.fromEntries(
+              ['cost', 'weightLbs', 'hideawayCapacityLbs']
+                .filter((key) => mutable[key] !== undefined)
+                .map((key) => [key, Number(mutable[key])]),
+            ),
+          });
+      }
+    } catch (error) {
+      throw new HTTPException(400, { message: (error as Error).message });
+    }
   }
   let resolvedSkill: ReturnType<typeof resolveLibrarySkillSpecialization> | undefined;
   let skillGmPermissions: string[] | undefined;

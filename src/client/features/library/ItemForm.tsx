@@ -1,10 +1,21 @@
 import { useState } from 'react';
+import { parse, stringify } from 'yaml';
 import type {
   LibraryEnchantmentOut,
   LibraryItemCreate,
   LibraryItemOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import {
+  armorData,
+  magicItemData,
+  powerstoneData,
+  weaponData as weaponSchema,
+} from '../../../shared/schemas/inventory.ts';
+import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
+import { CalculationEditor } from './CalculationEditor.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
+import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
+import { WeaponModesEditor } from './WeaponModesEditor.tsx';
 
 interface ItemFormProps {
   initial?: LibraryItemOut;
@@ -23,6 +34,22 @@ export function ItemForm({
   onCancel,
   definitions,
 }: ItemFormProps) {
+  const [metadata, setMetadata] = useState(() => libraryMetadata.parse(initial ?? {}));
+  const [calculation, setCalculation] = useState(initial?.calculation ?? null);
+  const [calculationValid, setCalculationValid] = useState(true);
+  const [weaponText, setWeaponText] = useState(() =>
+    initial?.weaponData ? stringify(initial.weaponData) : '',
+  );
+  const [armorText, setArmorText] = useState(() =>
+    initial?.armor ? stringify(initial.armor) : '',
+  );
+  const [powerstoneText, setPowerstoneText] = useState(() =>
+    initial?.powerstoneData ? stringify(initial.powerstoneData) : '',
+  );
+  const [magicItemText, setMagicItemText] = useState(() =>
+    initial?.magicItemData ? stringify(initial.magicItemData) : '',
+  );
+  const [blockError, setBlockError] = useState<string | null>(null);
   const [name, setName] = useState(initial?.name ?? '');
   const [category, setCategory] = useState(initial?.category ?? 'general');
   const [defaultQuantity, setDefaultQuantity] = useState(initial?.defaultQuantity ?? 1);
@@ -40,27 +67,35 @@ export function ItemForm({
 
   function handleSubmit() {
     if (!name.trim()) return;
-    onSubmit({
-      name: name.trim(),
-      category: category.trim() || 'general',
-      defaultQuantity,
-      weightLbs,
-      cost,
-      description: description.trim() || null,
-      source: source.trim() || null,
-      isArmor: initial?.isArmor ?? false,
-      armor: initial?.armor ?? null,
-      weaponData: initial?.weaponData ?? null,
-      isContainer,
-      hideawayCapacityLbs: isContainer ? hideawayCapacityLbs : 0,
-      weightReductionPercent: isContainer ? weightReductionPercent : 0,
-      // Full powerstone / magic-item editors stay YAML-authored for now
-      // (same as armor/weapon); pass through so editing name/cost etc.
-      // doesn't wipe YAML-authored data.
-      powerstoneData: initial?.powerstoneData ?? null,
-      magicItemData: initial?.magicItemData ?? null,
-      enchantments,
-    });
+    try {
+      const weapon = weaponText.trim() ? weaponSchema.parse(parse(weaponText)) : null;
+      const armor = armorText.trim() ? armorData.parse(parse(armorText)) : null;
+      onSubmit({
+        ...metadata,
+        calculation,
+        name: name.trim(),
+        category: category.trim() || 'general',
+        defaultQuantity,
+        weightLbs,
+        cost,
+        description: description.trim() || null,
+        source: source.trim() || null,
+        isArmor: armor !== null,
+        armor,
+        weaponData: weapon,
+        isContainer,
+        hideawayCapacityLbs: isContainer ? hideawayCapacityLbs : 0,
+        weightReductionPercent: isContainer ? weightReductionPercent : 0,
+        // Full powerstone / magic-item editors stay YAML-authored for now
+        // (same as armor/weapon); pass through so editing name/cost etc.
+        // doesn't wipe YAML-authored data.
+        powerstoneData: powerstoneText.trim() ? powerstoneData.parse(parse(powerstoneText)) : null,
+        magicItemData: magicItemText.trim() ? magicItemData.parse(parse(magicItemText)) : null,
+        enchantments,
+      });
+    } catch (error) {
+      setBlockError((error as Error).message);
+    }
   }
 
   return (
@@ -100,28 +135,32 @@ export function ItemForm({
             min={0}
           />
         </label>
-        <label className="form-control w-24">
-          <span className="label-text">Weight (lb)</span>
-          <input
-            type="number"
-            className="input input-bordered input-sm"
-            value={weightLbs}
-            onChange={(e) => setWeightLbs(Number.parseFloat(e.target.value) || 0)}
-            min={0}
-            step={0.1}
-          />
-        </label>
-        <label className="form-control w-24">
-          <span className="label-text">Cost ($)</span>
-          <input
-            type="number"
-            className="input input-bordered input-sm"
-            value={cost}
-            onChange={(e) => setCost(Number.parseFloat(e.target.value) || 0)}
-            min={0}
-            step={0.01}
-          />
-        </label>
+        {!calculation && (
+          <>
+            <label className="form-control w-24">
+              <span className="label-text">Weight (lb)</span>
+              <input
+                type="number"
+                className="input input-bordered input-sm"
+                value={weightLbs}
+                onChange={(e) => setWeightLbs(Number.parseFloat(e.target.value) || 0)}
+                min={0}
+                step={0.1}
+              />
+            </label>
+            <label className="form-control w-24">
+              <span className="label-text">Cost ($)</span>
+              <input
+                type="number"
+                className="input input-bordered input-sm"
+                value={cost}
+                onChange={(e) => setCost(Number.parseFloat(e.target.value) || 0)}
+                min={0}
+                step={0.01}
+              />
+            </label>
+          </>
+        )}
         <label className="form-control w-28">
           <span className="label-text">Source</span>
           <input
@@ -143,6 +182,29 @@ export function ItemForm({
           onChange={(e) => setDescription(e.target.value)}
         />
       </label>
+      <LibraryMetadataEditor value={metadata} onChange={setMetadata} />
+      <CalculationEditor
+        value={calculation}
+        onChange={setCalculation}
+        onValidityChange={setCalculationValid}
+        output="cost"
+        unit="currency"
+      />
+      <WeaponModesEditor text={weaponText} onChange={setWeaponText} />
+      <label>
+        Armor (YAML)
+        <textarea
+          className="textarea w-full font-mono"
+          rows={5}
+          value={armorText}
+          onChange={(e) => setArmorText(e.target.value)}
+        />
+      </label>
+      {blockError && (
+        <p role="alert" className="text-error break-words">
+          {blockError}
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex items-center gap-2">
           <input
@@ -251,18 +313,32 @@ export function ItemForm({
           </div>
         )}
       </div>
-      {(initial?.powerstoneData || initial?.magicItemData) && (
-        <p className="text-xs text-dim">
-          {initial?.powerstoneData && 'This item carries powerstone data. '}
-          {initial?.magicItemData && 'This item carries magic-item data. '}
-          Edit those fields via YAML import/export for now.
-        </p>
-      )}
+      <details>
+        <summary>Magical facets (YAML)</summary>
+        <label>
+          Powerstone data
+          <textarea
+            className="textarea w-full font-mono text-xs"
+            rows={4}
+            value={powerstoneText}
+            onChange={(e) => setPowerstoneText(e.target.value)}
+          />
+        </label>
+        <label>
+          Magic-item data
+          <textarea
+            className="textarea w-full font-mono text-xs"
+            rows={5}
+            value={magicItemText}
+            onChange={(e) => setMagicItemText(e.target.value)}
+          />
+        </label>
+      </details>
       <LibraryFormFooter
         noun="item"
         editing={Boolean(initial)}
         isPending={isPending}
-        canSubmit={Boolean(name.trim())}
+        canSubmit={Boolean(name.trim()) && calculationValid}
         error={error}
         onCancel={onCancel}
         onSubmit={handleSubmit}

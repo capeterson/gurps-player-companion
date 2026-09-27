@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { revision, timestamps, uuid } from './common.ts';
 import { libraryTraitEffect, traitEffect } from './effects.ts';
+import { libraryMetadataShape } from './libraryMetadata.ts';
 
 export const capabilityEffect = z
   .object({
@@ -41,6 +42,7 @@ export const activeEffectStacking = z
   .openapi('ActiveEffectStacking');
 export const activeEffectDefinitionCreate = z
   .object({
+    ...libraryMetadataShape,
     name: z.string().trim().min(1).max(160),
     description: z.string().max(20000).nullable().optional(),
     source: z.string().max(160).nullable().optional(),

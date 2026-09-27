@@ -1,3 +1,8 @@
+import { normalizePricingWrite } from '../../shared/domain/libraryPricing.ts';
+import {
+  validateLibraryDeletion,
+  validateLibraryPricingChange,
+} from '../services/libraryPricing.ts';
 /**
  * Config-driven factory for the campaign-library CRUD routes and the YAML
  * import upsert loop.  `campaignLibrary.ts` calls `registerLibraryCrud`
@@ -217,6 +222,7 @@ export function registerLibraryCrud<
       request: { params: itemParams },
       responses: {
         204: { description: 'Deleted' },
+        400: errorResponse('Referenced definition cannot be deleted'),
         403: errorResponse('Forbidden'),
         404: errorResponse('Not found'),
       },
@@ -271,9 +277,16 @@ export async function createLibraryEntry<TTable extends LibraryTable, TCreate, T
 ): Promise<TTable['$inferSelect']> {
   cfg.validateCreate?.(body);
   await advanceLibraryCampaignRevision(tx, campaignId);
+  const priced = normalizePricingWrite(cfg.yamlKey, body as Record<string, unknown>) as TCreate;
   const prepared = cfg.prepareValues
-    ? ((await cfg.prepareValues(tx, campaignId, body)) as TCreate)
-    : body;
+    ? ((await cfg.prepareValues(tx, campaignId, priced)) as TCreate)
+    : priced;
+  await validateLibraryPricingChange(
+    tx,
+    campaignId,
+    cfg.yamlKey,
+    prepared as Record<string, unknown>,
+  );
   const values = cfg.toInsertValues(campaignId, prepared);
   const [inserted] = (await tx
     .insert(asTable(cfg.table))
@@ -312,10 +325,22 @@ export async function updateLibraryEntry<TTable extends LibraryTable, TCreate, T
   if (options.baseRevision !== undefined && currentRevision > options.baseRevision) {
     return { kind: 'stale', current: existing };
   }
+  const priced = normalizePricingWrite(
+    cfg.yamlKey,
+    body as Record<string, unknown>,
+    existing as Record<string, unknown>,
+  ) as TUpdate;
   const prepared = cfg.prepareValues
-    ? ((await cfg.prepareValues(tx, campaignId, body, existing)) as TUpdate)
-    : body;
+    ? ((await cfg.prepareValues(tx, campaignId, priced, existing)) as TUpdate)
+    : priced;
   const normalized = cfg.normalizePatch ? cfg.normalizePatch(prepared) : prepared;
+  await validateLibraryPricingChange(
+    tx,
+    campaignId,
+    cfg.yamlKey,
+    normalized as Record<string, unknown>,
+    itemId,
+  );
   const updates = buildPatchSet(
     normalized as Record<string, unknown>,
     cfg.stringifyKeys ? { stringifyKeys: cfg.stringifyKeys } : undefined,
@@ -339,6 +364,7 @@ export async function deleteLibraryEntry<TTable extends LibraryTable, TCreate, T
   itemId: string,
 ): Promise<boolean> {
   await advanceLibraryCampaignRevision(tx, campaignId);
+  await validateLibraryDeletion(tx, campaignId, cfg.yamlKey, itemId);
   await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, itemId, true);
   const deleted = (await tx
     .delete(asTable(cfg.table))

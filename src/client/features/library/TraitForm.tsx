@@ -1,20 +1,27 @@
 import { useState } from 'react';
+import { parse, stringify } from 'yaml';
 import {
   MODIFIER_CATEGORIES,
   MODIFIER_COST_TYPES,
   TRAIT_KINDS,
 } from '../../../shared/constants/traits.ts';
+import { validateCalculation } from '../../../shared/domain/calculation.ts';
 import { formatSigned } from '../../../shared/format/number.ts';
 import type {
   LibraryItemOut,
   LibraryTraitCreate,
   LibraryTraitOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
+import { libraryTraitModifier } from '../../../shared/schemas/trait.ts';
 import type { TraitModifier } from '../../../shared/schemas/trait.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
+import { CalculationEditor } from './CalculationEditor.tsx';
 import { EffectsEditor } from './EffectsEditor.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
+import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
+import { pricingDisplayValue } from './pricingDisplay.ts';
 
 // ── Trait form ──────────────────────────────────────────────────────────────
 
@@ -37,6 +44,10 @@ export function TraitForm({
   onCancel,
   libraryItems,
 }: TraitFormProps) {
+  const [metadata, setMetadata] = useState(() => libraryMetadata.parse(initial ?? {}));
+  const [calculation, setCalculation] = useState(initial?.calculation ?? null);
+  const [calculationValid, setCalculationValid] = useState(true);
+  const [modifiersValid, setModifiersValid] = useState(true);
   const [name, setName] = useState(initial?.name ?? '');
   const [kind, setKind] = useState<(typeof TRAIT_KINDS)[number]>(initial?.kind ?? 'advantage');
   // Keep as a string draft so typing a leading '-' isn't immediately clobbered.
@@ -51,6 +62,8 @@ export function TraitForm({
     if (!name.trim()) return;
     const basePoints = Number.parseInt(basePointsDraft, 10);
     onSubmit({
+      ...metadata,
+      calculation,
       name: name.trim(),
       kind,
       basePoints: Number.isNaN(basePoints) ? 0 : basePoints,
@@ -92,16 +105,18 @@ export function TraitForm({
             ))}
           </select>
         </label>
-        <label className="form-control w-24">
-          <span className="label-text">Base pts</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            className="input input-bordered input-sm"
-            value={basePointsDraft}
-            onChange={(e) => setBasePointsDraft(e.target.value)}
-          />
-        </label>
+        {!calculation && (
+          <label className="form-control w-24">
+            <span className="label-text">Base pts</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              className="input input-bordered input-sm"
+              value={basePointsDraft}
+              onChange={(e) => setBasePointsDraft(e.target.value)}
+            />
+          </label>
+        )}
         <label className="form-control w-28">
           <span className="label-text">Source</span>
           <input
@@ -123,7 +138,17 @@ export function TraitForm({
           placeholder="Description (Markdown supported)…"
         />
       </div>
-      <ModifierSubEditor modifiers={modifiers} onChange={setModifiers} />
+      <LibraryMetadataEditor value={metadata} onChange={setMetadata} />
+      <CalculationEditor
+        value={calculation}
+        onChange={setCalculation}
+        onValidityChange={setCalculationValid}
+      />
+      <ModifierSubEditor
+        modifiers={modifiers}
+        onChange={setModifiers}
+        onValidityChange={setModifiersValid}
+      />
       <EffectsEditor
         campaignId={campaignId}
         effects={effects}
@@ -135,7 +160,7 @@ export function TraitForm({
         noun="trait"
         editing={Boolean(initial)}
         isPending={isPending}
-        canSubmit={Boolean(name.trim()) && effectsValid}
+        canSubmit={Boolean(name.trim()) && effectsValid && calculationValid && modifiersValid}
         error={error}
         onCancel={onCancel}
         onSubmit={handleSubmit}
@@ -149,11 +174,16 @@ export function TraitForm({
 function ModifierSubEditor({
   modifiers,
   onChange,
+  onValidityChange,
 }: {
   modifiers: TraitModifier[];
   onChange: (m: TraitModifier[]) => void;
+  onValidityChange: (valid: boolean) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [sourceMode, setSourceMode] = useState(false);
+  const [sourceText, setSourceText] = useState('');
+  const [sourceError, setSourceError] = useState<string | null>(null);
   const [newMod, setNewMod] = useState<Omit<TraitModifier, 'costValue'>>({
     name: '',
     category: 'enhancement',
@@ -164,27 +194,94 @@ function ModifierSubEditor({
 
   function commitModifier() {
     if (!newMod.name.trim()) return;
-    const costValue = Number.parseInt(costValueDraft, 10);
-    onChange([
-      ...modifiers,
-      { ...newMod, name: newMod.name.trim(), costValue: Number.isNaN(costValue) ? 0 : costValue },
-    ]);
+    const costValue = Number(costValueDraft);
+    if (!costValueDraft.trim() || !Number.isFinite(costValue)) {
+      setSourceError('Enter a finite modifier cost');
+      return;
+    }
+    const parsed = libraryTraitModifier.safeParse({
+      ...newMod,
+      name: newMod.name.trim(),
+      costValue,
+    });
+    if (!parsed.success) {
+      setSourceError(parsed.error.issues[0]?.message ?? 'Invalid modifier');
+      return;
+    }
+    setSourceError(null);
+    onChange([...modifiers, parsed.data]);
     setNewMod({ name: '', category: 'enhancement', costType: 'percent' });
     setCostValueDraft('0');
     setAdding(false);
   }
 
+  if (sourceMode)
+    return (
+      <div className="space-y-2">
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs"
+          disabled={!!sourceError}
+          onClick={() => setSourceMode(false)}
+        >
+          Visual modifiers
+        </button>
+        <label className="block">
+          Modifier definitions (YAML)
+          <textarea
+            className="textarea w-full font-mono"
+            rows={12}
+            value={sourceText}
+            onChange={(event) => {
+              setSourceText(event.target.value);
+              try {
+                const next = libraryTraitModifier.array().parse(parse(event.target.value) ?? []);
+                for (const modifier of next)
+                  if (modifier.calculation) validateCalculation(modifier.calculation);
+                onChange(next);
+                onValidityChange(true);
+                setSourceError(null);
+              } catch (error) {
+                onValidityChange(false);
+                setSourceError((error as Error).message);
+              }
+            }}
+          />
+        </label>
+        {sourceError && (
+          <p role="alert" className="text-error break-words">
+            {sourceError}
+          </p>
+        )}
+      </div>
+    );
   return (
     <div className="space-y-2">
       <span className="label-text">Modifiers</span>
+      <button
+        type="button"
+        className="btn btn-ghost btn-xs"
+        onClick={() => {
+          setSourceText(stringify(modifiers));
+          setSourceError(null);
+          setSourceMode(true);
+        }}
+      >
+        Edit modifier YAML
+      </button>
+      {sourceError && (
+        <p role="alert" className="text-error">
+          {sourceError}
+        </p>
+      )}
       {modifiers.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {modifiers.map((m, i) => (
             <span key={`${m.name}-${m.costValue}`} className="chip flex items-center gap-1 text-xs">
               {m.name}{' '}
-              {m.costType === 'percent'
-                ? `${formatSigned(m.costValue, { zero: 'plain' })}%`
-                : `${formatSigned(m.costValue, { zero: 'plain' })} pts`}
+              {pricingDisplayValue(m.calculation, 'modifier', m.costValue) == null
+                ? 'Calculated'
+                : `${formatSigned(pricingDisplayValue(m.calculation, 'modifier', m.costValue) ?? 0, { zero: 'plain' })}${m.costType === 'percent' ? '%' : ' pts'}`}
               <button
                 type="button"
                 className="ml-1 text-error"

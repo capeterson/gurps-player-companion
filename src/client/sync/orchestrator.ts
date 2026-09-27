@@ -2,6 +2,7 @@ import {
   activeEffectDefinitionOut,
   activeEffectsField,
 } from '../../shared/schemas/activeEffects.ts';
+import { patchKeys, patchesOverlap, unsettledPatch } from './patchKeys.ts';
 /**
  * Sync orchestrator -- the long-lived singleton that:
  *   - drains the Dexie outbox into POST /sync/operations,
@@ -711,7 +712,12 @@ class SyncOrchestrator {
           key: op.flashKey ?? makeFlashKey(op.entityClass, op.entityId, op.fieldPath),
           reason: 'Local change reverted by user',
         });
-      } else if (isLibraryEntityClass(op.entityClass) && op.command !== 'create') {
+      } else if (
+        (isLibraryEntityClass(op.entityClass) ||
+          op.entityClass === 'character_trait' ||
+          op.entityClass === 'character_inventory') &&
+        op.command !== 'create'
+      ) {
         flashBus.emit({
           key: makeFlashKey(op.entityClass, op.entityId, 'entry'),
           reason: 'Local change reverted by user',
@@ -1184,12 +1190,13 @@ class SyncOrchestrator {
         );
 
         const newer = await db.outbox
-          .where('coalesceKey')
-          .equals(coalesceKey(op.entityId, fieldPath))
+          .where('entityId')
+          .equals(op.entityId)
           .filter(
             (candidate) =>
               candidate.clientOpId !== op.clientOpId &&
               candidate.entityClass === op.entityClass &&
+              patchKeys(candidate).includes(fieldPath) &&
               (candidate.status === 'pending' ||
                 candidate.status === 'transient_retry' ||
                 candidate.status === 'in_flight'),
@@ -1203,7 +1210,10 @@ class SyncOrchestrator {
         await db.outbox.delete(op.clientOpId);
         if (newer) {
           await db.outbox.update(newer.clientOpId, {
-            prevValue: restored,
+            prevValue:
+              newer.fieldPath === undefined
+                ? { ...asRecord(newer.prevValue), [fieldPath]: restored }
+                : restored,
             localCampaignTransferUndo: mergeCampaignTransferUndo(
               transferUndo,
               newer.localCampaignTransferUndo,
@@ -1266,16 +1276,36 @@ class SyncOrchestrator {
       const latest = asRecord(outcome.latestEntity);
       const previous = asRecord(op.prevValue) ?? {};
       await db.outbox.delete(op.clientOpId);
-      if (newer) {
-        await db.outbox.update(newer.clientOpId, {
-          prevValue: latest ?? previous,
+      const pending = (await db.outbox.where('entityId').equals(op.entityId).toArray()).filter(
+        (candidate) => unsettledPatch(candidate) && patchesOverlap(op, candidate),
+      );
+      const baseline = latest ?? previous;
+      for (const candidate of pending) {
+        const prevValue =
+          candidate.fieldPath !== undefined
+            ? baseline[candidate.fieldPath]
+            : {
+                ...asRecord(candidate.prevValue),
+                ...Object.fromEntries(
+                  entityPatchKeys(op)
+                    .filter((key) => patchKeys(candidate).includes(key))
+                    .map((key) => [key, baseline[key]]),
+                ),
+              };
+        await db.outbox.update(candidate.clientOpId, {
+          prevValue,
           ...(typeof latest?.revision === 'number' ? { baseRevision: latest.revision } : {}),
         });
       }
       if (latest) {
         await this.applyServerRow(op.entityClass, latest, { ignoreOutboxConflict: false });
-      } else if (!newer) {
-        const restored = Object.fromEntries(entityPatchKeys(op).map((key) => [key, previous[key]]));
+      } else {
+        const protectedKeys = new Set(pending.flatMap(patchKeys));
+        const restored = Object.fromEntries(
+          entityPatchKeys(op)
+            .filter((key) => !protectedKeys.has(key))
+            .map((key) => [key, previous[key]]),
+        );
         await updateSyncEntity(op.entityClass, op.entityId, {
           ...restored,
           updatedAt: new Date().toISOString(),
@@ -1302,7 +1332,12 @@ class SyncOrchestrator {
     if (!latest || !previous || !body || newRevision === undefined || !op.parentId) return false;
     if (!entityPatchKeys(op).every((key) => fieldValuesEqual(latest[key], previous[key])))
       return false;
-    if (!isLibraryEntityClass(op.entityClass)) return false;
+    if (
+      !isLibraryEntityClass(op.entityClass) &&
+      op.entityClass !== 'character_trait' &&
+      op.entityClass !== 'character_inventory'
+    )
+      return false;
     const entityClass = op.entityClass;
     const campaignId = op.parentId;
     const db = getLocalDb();
@@ -1333,7 +1368,7 @@ class SyncOrchestrator {
         await enqueueEntityPatch({
           entityClass,
           entityId: op.entityId,
-          campaignId,
+          ...(isLibraryEntityClass(entityClass) ? { campaignId } : { characterId: campaignId }),
           attemptedValue: body,
           prevValue: latest,
           baseRevision: newRevision,
@@ -1369,7 +1404,11 @@ class SyncOrchestrator {
         key: makeFlashKey(op.entityClass, op.parentId, 'create'),
         reason: outcome.reason ?? 'sync rejected',
       });
-    } else if (isLibraryEntityClass(op.entityClass)) {
+    } else if (
+      isLibraryEntityClass(op.entityClass) ||
+      op.entityClass === 'character_trait' ||
+      op.entityClass === 'character_inventory'
+    ) {
       // Whole-entry patches and deletes pulse the entry's row (S5/S13).
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, 'entry'),
@@ -1445,7 +1484,11 @@ class SyncOrchestrator {
         key: makeFlashKey(op.entityClass, op.parentId, 'create'),
         reason: outcome.reason ?? 'sync failed',
       });
-    } else if (isLibraryEntityClass(op.entityClass)) {
+    } else if (
+      isLibraryEntityClass(op.entityClass) ||
+      op.entityClass === 'character_trait' ||
+      op.entityClass === 'character_inventory'
+    ) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, 'entry'),
         reason: outcome.reason ?? 'sync failed',

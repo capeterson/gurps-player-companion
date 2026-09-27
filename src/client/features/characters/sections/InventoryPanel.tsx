@@ -1,3 +1,7 @@
+import type { PricingResolution } from '../../../../shared/schemas/calculation.ts';
+import { Table, TableHeader } from '../../../components/ui/Table.tsx';
+import { PricingResolver } from '../../library/PricingResolver.tsx';
+import { pricingDisplayValue } from '../../library/pricingDisplay.ts';
 /**
  * Literal port of the gurps-player-web (archived) inventory UI:
  *  - "On the player" / "Stashed" sections segregated by `worn` on root items
@@ -153,11 +157,16 @@ export function InventoryPanel({
   });
 
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [pricing, setPricing] = useState<PricingResolution | null>(null);
+  const [resolverOpen, setResolverOpen] = useState(false);
   const [pickedLibraryItem, setPickedLibraryItem] = useState<LibraryItemOut | null>(null);
 
   const containers = useMemo(() => items.filter((i) => i.isContainer), [items]);
 
-  const { fetchOptions } = useLibraryFetcher<LibraryItemOut>('items', campaignId);
+  const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibraryItemOut>(
+    'items',
+    campaignId,
+  );
   const { fetchOptions: fetchEnchantments } = useLibraryFetcher<LibraryEnchantmentOut>(
     'enchantments',
     campaignId,
@@ -165,6 +174,8 @@ export function InventoryPanel({
 
   function onPickLibraryItem(opt: LibraryItemOut) {
     setPickedLibraryItem(opt);
+    setPricing(null);
+    setResolverOpen(true);
     setName(opt.name);
     if (opt.weightLbs != null) setWeight(String(opt.weightLbs));
     if (opt.cost != null) setCost(String(opt.cost));
@@ -244,6 +255,10 @@ export function InventoryPanel({
     e.preventDefault();
     if (!name.trim()) {
       toasts.push('Item name cannot be blank', { kind: 'error' });
+      return;
+    }
+    if (pickedLibraryItem?.calculation && !pricing) {
+      setResolverOpen(true);
       return;
     }
     const parsedQty = Math.floor(Number(qty));
@@ -355,6 +370,7 @@ export function InventoryPanel({
         magicItemData: magicItemFromLibrary,
         enchantments: enchantmentsFromLibrary,
         libraryItemId: linkedLibraryId,
+        pricingResolution: linkedLibraryId ? pricing : null,
       },
       () => {
         setName('');
@@ -516,10 +532,10 @@ export function InventoryPanel({
   const tableHead = (
     <thead>
       <tr className="text-base-content/50 text-[10px] uppercase tracking-wider">
-        <th>Item</th>
-        <th className="text-right">Qty</th>
-        <th className="text-right">Wt</th>
-        <th className="text-right">Cost</th>
+        <TableHeader column="item" label="Item" />
+        <TableHeader column="qty" label="Qty" className="text-right" />
+        <TableHeader column="wt" label="Wt" className="text-right" />
+        <TableHeader column="cost" label="Cost" className="text-right" />
         {canWrite && <th />}
       </tr>
     </thead>
@@ -835,10 +851,23 @@ export function InventoryPanel({
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
-                <table className="table table-zebra inventory-table">
+                <Table
+                  preferenceKey={`${character.id}:inventory:worn`}
+                  filterRows={flattenDFS(
+                    (tree.byParent.get(null) ?? []).filter((item) => item.worn),
+                    tree.byParent,
+                  ).map((item) => ({
+                    item: item.name,
+                    qty: item.quantity,
+                    wt: item.effectiveWeightLbs.toFixed(1),
+                    cost: item.cost.toFixed(0),
+                  }))}
+                  aria-label="Worn inventory"
+                  className="table table-zebra inventory-table"
+                >
                   {tableHead}
                   <tbody>{renderRows(wornRoots)}</tbody>
-                </table>
+                </Table>
               </div>
             )}
           </section>
@@ -912,10 +941,23 @@ export function InventoryPanel({
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
-                <table className="table table-zebra inventory-table">
+                <Table
+                  preferenceKey={`${character.id}:inventory:stashed`}
+                  filterRows={flattenDFS(
+                    (tree.byParent.get(null) ?? []).filter((item) => !item.worn),
+                    tree.byParent,
+                  ).map((item) => ({
+                    item: item.name,
+                    qty: item.quantity,
+                    wt: (item.weightLbs * item.quantity).toFixed(1),
+                    cost: item.cost.toFixed(0),
+                  }))}
+                  aria-label="Stashed inventory"
+                  className="table table-zebra inventory-table"
+                >
                   {tableHead}
                   <tbody>{renderRows(carriedRoots, { inStashed: true })}</tbody>
-                </table>
+                </Table>
               </div>
             )}
           </section>
@@ -949,6 +991,26 @@ export function InventoryPanel({
           onSubmit={(e) => void onCreate(e)}
           className="field-rollback-flash flex flex-col gap-2 border-t border-base-300/60 bg-base-200/40 px-4 py-3"
         >
+          {resolverOpen && pickedLibraryItem && campaignId && (
+            <PricingResolver
+              campaignId={campaignId}
+              section="items"
+              entry={pickedLibraryItem}
+              initial={pricing}
+              onCancel={() => setResolverOpen(false)}
+              onResolve={(resolution) => {
+                setPricing(resolution);
+                setCost(String(resolution.outputs.cost));
+                setWeight(String(resolution.outputs.weightLbs));
+                setResolverOpen(false);
+              }}
+            />
+          )}
+          {pricing && (
+            <button type="button" className="btn btn-sm" onClick={() => setResolverOpen(true)}>
+              Change pricing choices
+            </button>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {campaignId ? (
               <div className="flex-1 min-w-[200px]">
@@ -958,16 +1020,29 @@ export function InventoryPanel({
                     setName(v);
                     if (pickedLibraryItem && v !== pickedLibraryItem.name) {
                       setPickedLibraryItem(null);
+                      setPricing(null);
+                      setResolverOpen(false);
                     }
                   }}
                   onPick={onPickLibraryItem}
                   fetchOptions={fetchOptions}
+                  sourceSelection={
+                    campaignId && setAllSources
+                      ? { allSources, onChange: setAllSources }
+                      : undefined
+                  }
                   getOptionKey={(o) => o.id}
                   renderOption={(o) => (
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="font-medium">{o.name}</span>
                       <span className="text-xs text-base-content/60">
-                        {o.category} · {o.weightLbs} lb · ${o.cost}
+                        {o.category} ·{' '}
+                        {pricingDisplayValue(o.calculation, 'weightLbs', o.weightLbs) ??
+                          'Calculated'}{' '}
+                        lb ·{' '}
+                        {pricingDisplayValue(o.calculation, 'cost', o.cost) == null
+                          ? 'Calculated cost'
+                          : `${pricingDisplayValue(o.calculation, 'cost', o.cost)}`}
                       </span>
                     </div>
                   )}

@@ -19,6 +19,14 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  type LibraryGraph,
+  libraryEditionDecisions,
+  mergeLibraryGraph,
+  validateLibraryGraph,
+} from '../../../shared/domain/libraryGraph.ts';
+import { canAdoptLibraryEntry } from '../../../shared/domain/libraryIdentity.ts';
+import { libraryEntryKey } from '../../../shared/domain/libraryIdentity.ts';
 import type { ImportResult } from '../../../shared/schemas/campaignLibrary.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
@@ -30,6 +38,7 @@ import { readActiveUser } from '../../sync/activeUser.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 import { librarySearchWords } from './librarySearch.ts';
 import { ActiveEffectsSection } from './sections/ActiveEffectsSection.tsx';
+import { CatalogSection } from './sections/CatalogSection.tsx';
 import type { LibrarySectionShellProps } from './sections/CrudLibrarySection.tsx';
 import { EnchantmentsSection } from './sections/EnchantmentsSection.tsx';
 import { ItemsSection } from './sections/ItemsSection.tsx';
@@ -38,9 +47,19 @@ import { SpellsSection } from './sections/SpellsSection.tsx';
 import { TraitsSection } from './sections/TraitsSection.tsx';
 import { type LocalLibrary, emptyLibrary, useLocalLibrary } from './useLocalLibrary.ts';
 
-type SectionKey = 'traits' | 'skills' | 'spells' | 'items' | 'enchantments' | 'activeEffects';
+type SectionKey =
+  | 'sources'
+  | 'modifiers'
+  | 'traits'
+  | 'skills'
+  | 'spells'
+  | 'items'
+  | 'enchantments'
+  | 'activeEffects';
 
 const SECTIONS: readonly { key: SectionKey; label: string }[] = [
+  { key: 'sources', label: 'Sources' },
+  { key: 'modifiers', label: 'Modifiers' },
   { key: 'traits', label: 'Traits' },
   { key: 'skills', label: 'Skills' },
   { key: 'spells', label: 'Spells' },
@@ -86,6 +105,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   const library: LocalLibrary = localLibrary ?? emptyLibrary();
 
   const section = parseSection(params.get('section'));
+  const [sourceFilter, setSourceFilter] = useState('');
   const [search, setSearch] = useState(() => params.get('q') ?? '');
   const deferredSearch = useDeferredValue(search);
   const words = useMemo(() => librarySearchWords(deferredSearch), [deferredSearch]);
@@ -152,6 +172,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     mode: 'merge' | 'replace';
     applyCampaignSettings: boolean;
     counts: { label: string; incoming: number; removed: number | null }[];
+    blocked: number;
+    editionDecisions: ReturnType<typeof libraryEditionDecisions>;
   } | null>(null);
 
   useEffect(() => {
@@ -209,20 +231,24 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         throw new Error('Reload the current library before replacing it');
       }
       const sections = [
-        [
-          'Traits',
-          'traits',
-          (entry: { name: string; kind: string }) => `${entry.kind}:${entry.name.toLowerCase()}`,
-        ],
-        ['Skills', 'skills', (entry: { name: string }) => entry.name.toLowerCase()],
-        ['Spells', 'spells', (entry: { name: string }) => entry.name.toLowerCase()],
-        ['Items', 'items', (entry: { name: string }) => entry.name.toLowerCase()],
-        ['Enchantments', 'enchantments', (entry: { name: string }) => entry.name.toLowerCase()],
-        ['Active effects', 'activeEffects', (entry: { name: string }) => entry.name.toLowerCase()],
-        ['Languages', 'languages', (entry: { name: string }) => entry.name.toLowerCase()],
-        ['Techniques', 'techniques', (entry: { name: string }) => entry.name.toLowerCase()],
-        ['Styles', 'styles', (entry: { name: string }) => entry.name.toLowerCase()],
+        ['Sources', 'sources', (entry: { name: string; key?: string }) => entry.key ?? entry.name],
+        ['Modifiers', 'modifiers', libraryEntryKey],
+        ['Traits', 'traits', libraryEntryKey],
+        ['Skills', 'skills', libraryEntryKey],
+        ['Spells', 'spells', libraryEntryKey],
+        ['Items', 'items', libraryEntryKey],
+        ['Enchantments', 'enchantments', libraryEntryKey],
+        ['Active effects', 'activeEffects', libraryEntryKey],
+        ['Languages', 'languages', libraryEntryKey],
+        ['Techniques', 'techniques', libraryEntryKey],
+        ['Styles', 'styles', libraryEntryKey],
       ] as const;
+      if (!localLibrary)
+        throw new Error('Wait for the current library before validating an import');
+      validateLibraryGraph(mergeLibraryGraph(localLibrary, parsed.library as LibraryGraph, mode));
+      const blocked = Object.values(parsed.library)
+        .flat()
+        .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length;
       const preview = sections.flatMap(([label, key, naturalKey]) => {
         const incoming = parsed.library[key];
         // Omitted optional sections are intentionally untouched by Replace.
@@ -249,6 +275,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         mode,
         applyCampaignSettings: applySettings,
         counts: preview,
+        blocked,
+        editionDecisions: libraryEditionDecisions(localLibrary, parsed.library as LibraryGraph),
       });
     } catch (error) {
       setPendingImport(null);
@@ -289,6 +317,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     campaignId: campaignId ?? '',
     library,
     words,
+    sourceFilter: key === 'sources' ? '' : sourceFilter,
     active: section === key,
     isOwner,
     expandedId,
@@ -439,6 +468,25 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           {pendingImport?.applyCampaignSettings &&
             ' Campaign settings in the file will also be applied.'}
         </p>
+        {pendingImport && (
+          <p>
+            {pendingImport.blocked} incomplete/reference entries will remain blocked from character
+            adoption.
+          </p>
+        )}
+        {pendingImport && pendingImport.editionDecisions.length > 0 && (
+          <details>
+            <summary>Source edition decisions ({pendingImport.editionDecisions.length})</summary>
+            <ul>
+              {pendingImport.editionDecisions.map((decision) => (
+                <li key={JSON.stringify([decision.section, decision.key, decision.sourceKey])}>
+                  {decision.section}: {decision.key} · {decision.sourceKey ?? 'legacy'} —{' '}
+                  {decision.decision.replaceAll('_', ' ')}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
         <ul className="mt-2 space-y-1" aria-label="Import preview">
           {pendingImport?.counts.map((row) => (
             <li key={row.label}>
@@ -473,6 +521,21 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           ))}
         </div>
         <div className="flex items-end gap-2">
+          <label>
+            Source
+            <select
+              className="select select-sm max-w-40"
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+            >
+              <option value="">All sources</option>
+              {library.sources.map((source) => (
+                <option key={source.id} value={source.key}>
+                  {source.abbreviation}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="min-w-0 flex-1">
             <span className="label-eyebrow mb-1 block">Search library</span>
             <input
@@ -496,6 +559,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
       {campaignId && localLibrary && (
         <div className="flex flex-col gap-3">
+          <CatalogSection section="sources" {...shell('sources')} />
+          <CatalogSection section="modifiers" {...shell('modifiers')} />
           <TraitsSection {...shell('traits')} />
           <SkillsSection {...shell('skills')} />
           <SpellsSection {...shell('spells')} />
@@ -510,11 +575,14 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
 function formatImportResult(r: ImportResult): string {
   const totals = (label: SectionKey) => {
-    const s = r[label];
+    const s = r[label] ?? { created: 0, updated: 0, deleted: 0 };
     return `${label}: +${s.created} · ~${s.updated} · −${s.deleted}`;
   };
+  const blockedNote = r.incomplete
+    ? `; ${r.incomplete} incomplete/reference entries blocked from adoption`
+    : '';
   const settingsNote = r.campaignSettingsApplied ? '; campaign settings applied' : '';
-  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('enchantments')}${settingsNote}`;
+  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('enchantments')}, ${totals('sources')}, ${totals('modifiers')}${settingsNote}${blockedNote}`;
 }
 
 function slugify(name: string): string {

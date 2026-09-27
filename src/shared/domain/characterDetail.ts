@@ -1,4 +1,5 @@
 import type { ActiveEffectInstance } from '../schemas/activeEffects.ts';
+import type { PricingResolution } from '../schemas/calculation.ts';
 import { resolveActiveEffects } from './activeEffects.ts';
 import { actionTarget, benefitUnlocked, evaluateModifiers } from './skillProcedures.ts';
 import type { ResolvedEffect } from './traitEffects.ts';
@@ -65,6 +66,7 @@ import {
   skillBonusFor,
 } from './traitEffects.ts';
 import { type CampaignCaps, evaluateWarnings } from './warnings.ts';
+import { normalizeWeaponData } from './weaponModes.ts';
 
 /**
  * Minimal row shape the builder needs.  Both server (Drizzle) rows
@@ -116,6 +118,7 @@ export interface CharacterDetailInputTrait {
   variantName?: string | null;
   notes: string | null;
   modifiers: unknown[] | null;
+  pricingResolution?: PricingResolution | null | undefined;
   libraryTraitId: string | null;
   libraryMechanics?: LibraryMechanics | null;
   customEffects?: TraitEffect[];
@@ -170,6 +173,7 @@ export interface CharacterDetailInputInventory {
   magicItemData: unknown | null;
   enchantments: unknown | null;
   libraryItemId: string | null;
+  pricingResolution?: PricingResolution | null | undefined;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -313,6 +317,7 @@ export function buildTraitOut(trait: CharacterDetailInputTrait): TraitOut {
     variantName: trait.variantName ?? null,
     notes: trait.notes,
     modifiers: (trait.modifiers ?? []) as TraitModifier[],
+    pricingResolution: trait.pricingResolution ?? null,
     libraryTraitId: trait.libraryTraitId,
     libraryMechanics: trait.libraryMechanics ?? null,
     customEffects: trait.customEffects ?? [],
@@ -427,7 +432,8 @@ export function buildInventoryItemOut(
   enchantmentResolution?: ItemEnchantmentResolution,
 ): InventoryItemOut {
   const baseArmor = item.armor == null ? null : armorData.parse(item.armor);
-  const baseWeaponData = item.weaponData == null ? null : weaponData.parse(item.weaponData);
+  const baseWeaponData =
+    item.weaponData == null ? null : normalizeWeaponData(weaponData.parse(item.weaponData));
   const resolved =
     enchantmentResolution ??
     resolveItemEnchantments({
@@ -454,7 +460,7 @@ export function buildInventoryItemOut(
     weightReductionPercent: item.weightReductionPercent,
     isArmor: item.isArmor,
     armor: resolved.armor,
-    weaponData: resolved.weaponData,
+    weaponData: normalizeWeaponData(resolved.weaponData),
     baseArmor,
     baseWeaponData,
     effectiveArmorDivisor: resolved.armorDivisor,
@@ -464,6 +470,7 @@ export function buildInventoryItemOut(
     magicItemData: (item.magicItemData as InventoryItemOut['magicItemData']) ?? null,
     enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
     libraryItemId: item.libraryItemId,
+    pricingResolution: item.pricingResolution ?? null,
     effectiveWeightLbs: perItemEffective.get(item.id) ?? Number(item.weightLbs) * item.quantity,
     createdAt: toIso(item.createdAt),
     updatedAt: toIso(item.updatedAt),
@@ -526,7 +533,7 @@ export function buildCharacterDetail(
       resolveItemEnchantments({
         ...item,
         armor: (item.armor as InventoryItemOut['armor']) ?? null,
-        weaponData: (item.weaponData as InventoryItemOut['weaponData']) ?? null,
+        weaponData: normalizeWeaponData(item.weaponData as InventoryItemOut['weaponData']),
         weightReductionPercent: item.weightReductionPercent,
         enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
       }),

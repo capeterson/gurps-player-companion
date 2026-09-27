@@ -358,6 +358,47 @@ describe('AttacksCard', () => {
     expect(screen.getByRole('button', { name: '103d+3 cut' })).toBeEnabled();
   });
 
+  it('uses each mode’s governing skill for its stable-key attack effect', () => {
+    const character = makeCharacter('thr imp');
+    character.skills = [
+      { id: 's1', name: 'Broadsword', level: 14 },
+      { id: 's2', name: 'Axe/Mace', level: 11 },
+    ] as unknown as CharacterDetail['skills'];
+    const weapon = character.inventory[0];
+    if (!weapon?.weaponData) throw new Error('Missing weapon fixture');
+    weapon.weaponData.modes = [
+      { key: 'thrust', name: 'Thrust', skill: 'Broadsword', damage: 'thr imp' },
+      { key: 'swing', name: 'Swing', skill: 'Axe/Mace', damage: 'sw cut' },
+    ];
+    character.effects = [
+      {
+        sourceId: '0193b3c0-f1f0-7000-8000-00000000f101',
+        sourceName: 'Thrust training',
+        target: 'weapon_attack',
+        value: 1,
+        active: true,
+        weaponSelector: { kind: 'weapon_skill', skillName: 'Broadsword', modeKey: 'thrust' },
+        matchedInventoryItemIds: ['w1'],
+      },
+      {
+        sourceId: '0193b3c0-f1f0-7000-8000-00000000f102',
+        sourceName: 'Swing training',
+        target: 'weapon_attack',
+        value: 2,
+        active: true,
+        weaponSelector: { kind: 'weapon_skill', skillName: 'Axe/Mace', modeKey: 'swing' },
+        matchedInventoryItemIds: ['w1'],
+      },
+    ] as never;
+
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: /Broadsword · Thrust 15/ }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(15);
+    fireEvent.click(screen.getByRole('button', { name: /Axe\/Mace · Swing 13/ }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(13);
+  });
+
   it.each([
     ['thr+1 imp', '1d+3 imp', { dice: 1, adds: 3 }],
     ['sw-1 cut', '2d+2 cut', { dice: 2, adds: 2 }],

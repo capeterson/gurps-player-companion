@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableRow } from '../../components/ui/Table.tsx';
 /**
  * /admin/users — paginated list of users with a search box. Each row
  * links to the per-user detail page where suspend/purge live.
@@ -51,19 +52,33 @@ export function UsersPage() {
       {list.data && (
         <>
           <div className="overflow-x-auto rounded border border-base-300">
-            <table className="table table-zebra">
+            <Table preferenceKey="admin:users" className="table table-zebra">
               <thead>
                 <tr className="text-base-content/50 text-[10px] uppercase tracking-wider">
-                  <th>Email</th>
-                  <th>Display name</th>
-                  <th className="text-right">Characters</th>
-                  <th className="text-right">Campaigns</th>
-                  <th>Status</th>
+                  <TableHeader column="email" label="Email" />
+                  <TableHeader column="name" label="Display name" />
+                  <TableHeader column="characters" label="Characters" className="text-right" />
+                  <TableHeader column="campaigns" label="Campaigns" className="text-right" />
+                  <TableHeader column="status" label="Status" />
                 </tr>
               </thead>
               <tbody>
                 {list.data.items.map((u) => (
-                  <tr key={u.id} className="hover">
+                  <TableRow
+                    filterValues={{
+                      email: u.email,
+                      name: u.displayName,
+                      characters: u.characterCount,
+                      campaigns: u.campaignCount,
+                      status: [
+                        u.isActive ? 'active' : 'suspended',
+                        ...(u.isSuperuser ? ['superuser'] : []),
+                        ...(u.purgeScheduledAt ? ['purge'] : []),
+                      ],
+                    }}
+                    key={u.id}
+                    className="hover"
+                  >
                     <td>
                       <Link to={`/admin/users/${u.id}`} className="link link-primary">
                         {u.email}
@@ -86,7 +101,7 @@ export function UsersPage() {
                         <span className="badge badge-ghost badge-sm">active</span>
                       )}
                     </td>
-                  </tr>
+                  </TableRow>
                 ))}
                 {list.data.items.length === 0 && (
                   <tr>
@@ -96,7 +111,7 @@ export function UsersPage() {
                   </tr>
                 )}
               </tbody>
-            </table>
+            </Table>
           </div>
 
           <div className="flex items-center justify-between text-xs text-base-content/60">

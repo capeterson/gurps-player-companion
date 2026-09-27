@@ -1,4 +1,9 @@
+import { useState } from 'react';
 import { useCallback } from 'react';
+import {
+  canAdoptLibraryEntry,
+  preferredLibraryEditions,
+} from '../../../../shared/domain/libraryIdentity.ts';
 import type { ActiveEffectDefinitionOut } from '../../../../shared/schemas/activeEffects.ts';
 import type {
   LibraryEnchantmentOut,
@@ -10,7 +15,10 @@ import type {
   LibraryTraitOut,
 } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { LibraryEntityClass } from '../../../../shared/schemas/sync.ts';
+import type { LocalLibraryItem } from '../../../db/dexie.ts';
+import { getLocalDb } from '../../../db/dexie.ts';
 import { syncEntityTable } from '../../../db/syncEntityStore.ts';
+import { normalizeLibraryItemRow } from '../../library/useLocalLibrary.ts';
 
 /**
  * `fetchOptions(query)` for `<LibraryAutocomplete>`, reading the campaign's
@@ -62,7 +70,10 @@ export function useLibraryFetcher<T extends LibraryEntry>(
 ): {
   fetchOptions: (query: string) => Promise<T[]>;
   isLoading: boolean;
+  allSources: boolean;
+  setAllSources: (value: boolean) => void;
 } {
+  const [allSources, setAllSources] = useState(false);
   const fetchOptions = useCallback(
     async (q: string): Promise<T[]> => {
       if (!campaignId) return [];
@@ -70,8 +81,20 @@ export function useLibraryFetcher<T extends LibraryEntry>(
       // The caller's `T` is one of the union members; the kind arg
       // discriminates which store we read. TS can't narrow through that
       // mapping, so this cast is necessary at the boundary.
-      const list = ((await table?.where('campaignId').equals(campaignId).toArray()) ??
+      const all = ((await table?.where('campaignId').equals(campaignId).toArray()) ??
         []) as unknown as T[];
+      const sources = await getLocalDb()
+        .campaignLibrarySources.where('campaignId')
+        .equals(campaignId)
+        .toArray();
+      const normalized =
+        kind === 'items'
+          ? all.map(
+              (row) => normalizeLibraryItemRow(row as unknown as LocalLibraryItem) as unknown as T,
+            )
+          : all;
+      const available = normalized.filter(canAdoptLibraryEntry);
+      const list = allSources ? available : preferredLibraryEditions(available, sources);
       if (q.length === 0)
         return [...list].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20);
       const needle = q.toLowerCase();
@@ -93,8 +116,8 @@ export function useLibraryFetcher<T extends LibraryEntry>(
         .map((r) => r.opt);
       return ranked;
     },
-    [kind, campaignId],
+    [kind, campaignId, allSources],
   );
 
-  return { fetchOptions, isLoading: false };
+  return { fetchOptions, isLoading: false, allSources, setAllSources };
 }

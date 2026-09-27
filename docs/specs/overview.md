@@ -38,6 +38,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | **overview.md** (this file) | Product surface, feature catalog, codebase map, orientation notes. |
 | [architecture.md](architecture.md) | Stack, process model, request lifecycle, data model, auth, testing, deploy. |
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
+| [library-calculation-rules.md](library-calculation-rules.md) | Declarative pricing, source editions, completeness, snapshots, modifiers and item modes. |
 | [campaign-content-sharing.md](campaign-content-sharing.md) | Campaigns, roles, invitations, the share gate / minimal view, and the YAML library. |
 | [history-tracking.md](history-tracking.md) | The append-only audit-log subsystem (character + campaign history). |
 | [mcp-agent-access.md](mcp-agent-access.md) | Same-process MCP/OAuth delegation, player API coverage, and parity gates. |
@@ -77,6 +78,31 @@ section selection, so agents can avoid loading unrelated context. History feeds
 remain cursor-paginated. Compatible clients also receive compressed MCP responses.
 
 ## User-facing features
+
+### Table column filters
+
+Every application data table uses the shared `components/ui/Table.tsx` framework.
+Right-click a data column heading (or use Alt-click / Shift+F10 on its button)
+to open a searchable checklist of exact values. Plain, unsorted headings also
+open the checklist on click; existing sorting buttons retain click-to-sort.
+Selected values within one column match any selection; filters across columns
+combine. Headers mark active filters, and a table-level **Clear all filters**
+control stays available even when no rows match. Clearing a column restores all
+its values. Options include the source rows supplied by the table even when search
+or folding hides them; paginated admin tables filter the currently loaded page.
+Grouped summaries and their editors hide together without unmounting drafts.
+Library filters reveal folded groups, and inventory filters open nested contents while active; weapon filters keep a weapon's
+attack modes together. Search, sorting and folds still apply independently.
+
+Filter selections are remembered only in device-local `localStorage`
+(`gpc:table-filters:v1:*`), scoped by character/campaign/table identity, and cleared
+on logout. No API, outbox or server preference is written. Storage failures
+leave filtering usable and show a notice. The framework defaults to filtering on;
+callers may set `filterable={false}` on `Table` or `TableHeader` (including
+`SortableHeader`). Action and reorder columns remain plain headers without filters.
+The portaled menu uses shared viewport collision handling, dynamic viewport size
+limits, internal scrolling, Escape/outside dismissal and keyboard focus management.
+
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
@@ -219,7 +245,7 @@ shows the synced campaign name as a separate link to that campaign.
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, but the character sheet does not expose an active-effects editor. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v11. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, but the character sheet does not expose an active-effects editor. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v12. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -759,6 +785,7 @@ there is no decorative cover slot or implied image-upload feature.
   characters are **excluded from `/characters`** and browsable only from the
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
+- **Faithful library pricing and editions.** Sources and standalone modifiers share the local-first library. Complete definitions resolve bounded declarative points, percentage, cost and weight rules; character purchases retain pricing snapshots and require explicit re-resolution after source changes. Incomplete/example/reference records stay searchable but cannot be adopted. Source-qualified editions coexist, with campaign priority and preferred overrides. Items support independent stable weapon modes and simultaneous facets. See [calculation rules](library-calculation-rules.md).
 - **Campaign library**: per-campaign catalog of traits, skills, spells,
   items, enchantments, active effects, languages, techniques, and styles. It is
   **fully sync-backed**: every member browses it from Dexie (offline too), and
@@ -792,7 +819,7 @@ there is no decorative cover slot or implied image-upload feature.
   Import is the one online-only library action; the page pulls its result into
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
-  policies and per-catalog-option rule overrides; portable YAML v11 retains them.
+  policies and per-catalog-option rule overrides; portable YAML v12 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal starting at 0, e.g. 13) and **location** (free-form text, e.g. "The
@@ -1006,11 +1033,16 @@ src/
     lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
                  palette preferences store, server read/push and rejection toasts
     features/settings/AppearanceSection.tsx  Settings theme pickers
-    features/library/  Category form files (Trait/Skill/Spell/Item/Enchantment/
+    features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
+                 LibraryMetadataEditor and source/modifier CatalogSection; category form files (Trait/Skill/Spell/Item/Enchantment/
                  ActiveEffectForm) used by the sync-backed library sections
+    components/ui/Table.tsx  Default-enabled client-only column filter framework:
+                 Table, TableHeader, TableBody/TableRow, source-value labels,
+                 grouped row hiding, portaled value checklist and persistence
     components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
                  into the portaled Current Status row
-    sync/        orchestrator, outbox, state, flashBus, minimalViewSweep,
+    sync/        orchestrator, outbox, libraryDependencies, patchKeys,
+                 state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts and syncEntityStore.ts — IndexedDB stores and shared
                  sync row lookup/writes (UI source of truth),
@@ -1148,7 +1180,7 @@ Things that repeatedly surprise people working in this repo:
 1. **Sync coverage is partial and deliberate.** The character family
    (`character`, `character_trait`, `character_skill`, `character_spell`,
    `character_language`, `character_technique`, `character_inventory`,
-   `character_combat`) and all nine `campaign_library_*` classes flow through
+   `character_combat`) and all eleven `campaign_library_*` classes flow through
    the outbox; library edits are whole-entry patches (`AGENTS.md` S13) and the
    library YAML import is the one online-only library action. Campaigns
    are pulled **read-only** into Dexie; the adventure log, invitations, and

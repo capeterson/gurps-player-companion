@@ -17,10 +17,12 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
+import { Table, TableBody, TableHeader } from '../../../../components/ui/Table.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
@@ -103,6 +105,8 @@ function rangedStatLine(r: RangedData): string {
  * and a thrust with the same reach only state it once.
  */
 interface DamageLine {
+  readonly modeKey?: string;
+  readonly weaponMode?: ReturnType<typeof weaponModes>[number];
   readonly key: string;
   readonly modeName: string | null;
   readonly damage: string | undefined;
@@ -110,17 +114,14 @@ interface DamageLine {
 }
 
 function damageLinesFor(weaponName: string, wd: WeaponData): DamageLine[] {
-  const lines: DamageLine[] = [
-    { key: `${weaponName}:primary`, modeName: null, damage: wd.damage, reach: wd.reach },
-  ];
-  for (const [i, mode] of (wd.alternateModes ?? []).entries()) {
-    lines.push({
-      key: `${weaponName}:mode:${i}:${mode.name}`,
-      modeName: mode.name,
-      damage: mode.damage,
-      reach: mode.reach ?? wd.reach,
-    });
-  }
+  const lines: DamageLine[] = weaponModes(wd).map((mode, i) => ({
+    key: `${weaponName}:mode:${mode.key}`,
+    modeKey: mode.key,
+    modeName: i === 0 && mode.name === 'Primary' ? null : mode.name,
+    damage: mode.damage,
+    reach: mode.reach,
+    weaponMode: mode,
+  }));
   // A weapon whose primary line carries no damage at all (alternates-only
   // data entry) shouldn't render an empty leading row.
   return lines.filter((line, i) => i > 0 || line.damage !== undefined || lines.length === 1);
@@ -232,7 +233,9 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
   function sortHeader(label: string, sort: Exclude<AttackSort, 'custom'>) {
     const active = preferences.sort === sort;
     return (
-      <th
+      <TableHeader
+        column={sort}
+        label={label}
         scope="col"
         aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
       >
@@ -244,7 +247,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
           {label}{' '}
           <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
         </button>
-      </th>
+      </TableHeader>
     );
   }
 
@@ -302,7 +305,11 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
         inventory={character.inventory}
       />
       <div className="overflow-x-auto">
-        <table className="table table-sm w-full">
+        <Table
+          preferenceKey={`${character.id}:attacks`}
+          aria-label="Attacks"
+          className="table table-sm w-full"
+        >
           <caption className="sr-only">
             Equipped weapon attacks. Sort columns or choose Custom to reorder weapons.
           </caption>
@@ -315,9 +322,9 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
               )}
               {sortHeader('Weapon', 'weapon')}
               {sortHeader('Governing skill', 'skill')}
-              <th scope="col">Damage</th>
+              <TableHeader column="damage" label="Damage" />
               {sortHeader('Type', 'type')}
-              <th scope="col">Reach</th>
+              <TableHeader column="reach" label="Reach" />
             </tr>
           </thead>
           {sortedWeapons.map((w, weaponIndex) => {
@@ -329,11 +336,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
               modes: line.damage ? parseDamageSpec(line.damage) : [],
             }));
             const allModes = parsedByLine.flatMap((p) => p.modes);
-            const stPenalty = stShortfallPenalty(
-              wd.stRequired,
-              state.strength(character.derived.effectiveSt),
-            );
-            const resolution = resolveWeaponSkill(w.name, wd.skill, skillCandidates);
+
             // Only offer the vitals/eye presets when at least one of the
             // weapon's parsed damage modes -- across EVERY attack mode --
             // can target them (B399). A weapon with no parseable modes at
@@ -347,21 +350,22 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
             // Ranged weapons get Aim (+Acc) and the speed/range penalties
             // ahead of hit locations. Single-select like every preset —
             // range + location stacking composes via the ± steppers.
-            const ranged = wd.ranged;
             const primaryAttackEffects = weaponEffectsForRow(
               effects,
               w.id,
               'weapon_attack',
               'primary',
+              weaponModes(wd)[0]?.key,
+              weaponModes(wd)[0]?.skill ?? null,
             );
             const primaryAccuracyEffects = weaponEffectsForRow(
               effects,
               w.id,
               'weapon_accuracy',
               'primary',
+              weaponModes(wd)[0]?.key,
+              weaponModes(wd)[0]?.skill ?? null,
             );
-            const skillEffects =
-              resolution.kind === 'matched' ? skillEffectsForRow(effects, resolution.name) : [];
 
             const rows = parsedByLine.flatMap(({ line, modes }) =>
               (modes.length ? modes : [null]).map((mode, index) => ({
@@ -371,7 +375,36 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
               })),
             );
             return (
-              <tbody
+              <TableBody
+                filterValues={{
+                  weapon: w.name,
+                  skill: lines.map((line) => {
+                    const skill = line.weaponMode ? line.weaponMode.skill : wd.skill;
+                    const resolution = resolveWeaponSkill(w.name, skill, skillCandidates);
+                    return resolution.kind === 'matched' ? resolution.name : (skill ?? '—');
+                  }),
+                  type: allModes.length
+                    ? [...new Set(allModes.map((mode) => mode.type ?? '—'))]
+                    : ['—'],
+                  damage: rows.map(({ line, mode }) => {
+                    if (!mode) return line.damage ?? '—';
+                    const resolved = resolveDamage(mode, thrust, swing);
+                    if (!resolved) return line.damage ?? '—';
+                    const damageEffects = weaponEffectsForRow(
+                      effects,
+                      w.id,
+                      'weapon_damage',
+                      line.modeName ?? 'primary',
+                      line.modeKey,
+                      line.weaponMode ? (line.weaponMode.skill ?? null) : (wd.skill ?? null),
+                    );
+                    return formatDamageDice({
+                      ...resolved.dice,
+                      adds: resolved.dice.adds + effectTotal(damageEffects),
+                    });
+                  }),
+                  reach: lines.map((line) => line.reach ?? '—'),
+                }}
                 key={w.id}
                 aria-label={w.name}
                 className={`border-t border-base-300/60 ${draggingId === w.id ? 'opacity-40' : ''} ${dropTarget === w.id ? 'bg-base-200' : ''}`}
@@ -397,23 +430,44 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
               >
                 {rows.map(({ line, mode, key }, rowIndex) => {
                   const modeName = line.modeName ?? 'primary';
+                  const currentMode = line.weaponMode;
+                  const ranged = currentMode?.ranged;
+                  const resolution = resolveWeaponSkill(
+                    w.name,
+                    currentMode ? currentMode.skill : wd.skill,
+                    skillCandidates,
+                  );
+                  const stPenalty = stShortfallPenalty(
+                    currentMode?.stRequired,
+                    state.strength(character.derived.effectiveSt),
+                  );
+                  const skillEffects =
+                    resolution.kind === 'matched'
+                      ? skillEffectsForRow(effects, resolution.name)
+                      : [];
                   const damageEffects = weaponEffectsForRow(
                     effects,
                     w.id,
                     'weapon_damage',
                     modeName,
+                    line.modeKey,
+                    currentMode ? (currentMode.skill ?? null) : (wd.skill ?? null),
                   );
                   const attackEffects = weaponEffectsForRow(
                     effects,
                     w.id,
                     'weapon_attack',
                     modeName,
+                    line.modeKey,
+                    currentMode ? (currentMode.skill ?? null) : (wd.skill ?? null),
                   );
                   const accuracyEffects = weaponEffectsForRow(
                     effects,
                     w.id,
                     'weapon_accuracy',
                     modeName,
+                    line.modeKey,
+                    currentMode ? (currentMode.skill ?? null) : (wd.skill ?? null),
                   );
                   const accuracy = (ranged?.acc ?? 0) + effectTotal(accuracyEffects);
                   const presets: readonly RollPreset[] = ranged
@@ -433,6 +487,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                   const firstOfLine = rows[rowIndex - 1]?.line.key !== line.key;
                   const showSkill =
                     rowIndex === 0 ||
+                    (firstOfLine && Boolean(wd.modes?.length)) ||
                     (firstOfLine &&
                       line.modeName &&
                       (attackEffects.length > 0 ||
@@ -491,19 +546,14 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                           >
                             {w.name}
                           </InventoryAnchorLink>
-                          {stPenalty > 0 && (
-                            <span className="badge badge-warning badge-outline badge-xs mt-1 whitespace-nowrap">
-                              ST {wd.stRequired} (−{stPenalty})
-                            </span>
-                          )}
-                          {ranged && rangedStatLine(ranged) !== '' && (
-                            <p className="num mt-1 text-[11px] text-base-content/50">
-                              {rangedStatLine(ranged)}
-                            </p>
-                          )}
                         </th>
                       )}
                       <td className="align-top">
+                        {firstOfLine && stPenalty > 0 && (
+                          <span className="badge badge-warning badge-outline badge-xs">
+                            ST {currentMode?.stRequired} (−{stPenalty})
+                          </span>
+                        )}
                         {showSkill &&
                           (resolution.kind === 'matched' ? (
                             <>
@@ -554,6 +604,9 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                           ))}
                       </td>
                       <td className="whitespace-nowrap">
+                        {firstOfLine && ranged && (
+                          <p className="text-xs whitespace-normal">{rangedStatLine(ranged)}</p>
+                        )}
                         {line.modeName && (
                           <span className="mb-0.5 block text-[10px] text-base-content/50">
                             {line.modeName}
@@ -603,10 +656,10 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     </tr>
                   );
                 })}
-              </tbody>
+              </TableBody>
             );
           })}
-        </table>
+        </Table>
       </div>
     </FoldSection>
   );

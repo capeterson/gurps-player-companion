@@ -7,6 +7,7 @@ import { NotificationsBell } from './components/NotificationsBell.tsx';
 import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { AppIcon } from './components/ui/AppIcon.tsx';
 import { BrandMark } from './components/ui/BrandMark.tsx';
+import { clearAllTableFilters } from './components/ui/Table.tsx';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
@@ -121,6 +122,7 @@ export function App() {
     clearAllSkillTablePreferences();
     clearAllTraitTablePreferences();
     clearAllLibraryTablePreferences();
+    clearAllTableFilters();
     navigate('/login');
   }
 

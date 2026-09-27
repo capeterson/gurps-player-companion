@@ -19,9 +19,11 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import type { LibraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import type { LibraryEntityClass } from '../../../shared/schemas/sync.ts';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
+import { Table, TableBody, TableFilterScope, tableCellText } from '../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { useFlashState } from '../../hooks/useFlashState.ts';
@@ -40,7 +42,7 @@ import {
 import { useLibraryGroupFolds } from './useLibraryGroupFolds.ts';
 import type { LibrarySectionKey } from './useLocalLibrary.ts';
 
-export interface LibraryListRow {
+export interface LibraryListRow extends LibraryMetadata {
   readonly id: string;
   readonly name: string;
   readonly description?: string | null | undefined;
@@ -83,6 +85,7 @@ export interface LibrarySectionProps<R extends LibraryListRow> {
   readonly config: LibrarySectionConfig<R>;
   readonly campaignId: string;
   readonly entries: readonly R[];
+  readonly defaultIds?: ReadonlySet<string>;
   /** Normalized, deferred search words. */
   readonly words: readonly string[];
   readonly active: boolean;
@@ -158,6 +161,7 @@ export function LibrarySection<R extends LibraryListRow>({
   config,
   campaignId,
   entries,
+  defaultIds,
   words,
   active,
   isOwner,
@@ -275,10 +279,20 @@ export function LibrarySection<R extends LibraryListRow>({
 
       {groups.length > 0 && (
         <div className="card overflow-hidden p-0">
-          <table className="table table-sm w-full table-fixed" aria-label={config.plural}>
+          <Table
+            preferenceKey={`${campaignId}:library:${config.key}`}
+            filterRows={entries.map((row) => ({
+              name: row.name,
+              ...Object.fromEntries(
+                config.columns.map((column) => [column.sort, tableCellText(column.cell(row))]),
+              ),
+            }))}
+            className="table table-sm w-full table-fixed"
+            aria-label={config.plural}
+          >
             <caption className="sr-only">
-              Campaign library {config.plural}, grouped. Sort with the column headings; open an
-              entry to read it.
+              Campaign library {config.plural}, grouped. Sort with the column headings or
+              right-click to filter values; open an entry to read it.
             </caption>
             <thead>
               <tr>
@@ -307,64 +321,69 @@ export function LibrarySection<R extends LibraryListRow>({
                 )}
               </tr>
             </thead>
-            {groups.map((group) => {
-              const open = searching || folds.isOpen(group.label);
-              return (
-                <Fragment key={group.domId}>
-                  <tbody>
-                    <tr>
-                      <th
-                        id={group.domId}
-                        scope="colgroup"
-                        colSpan={colSpan}
-                        className="library-group-heading"
-                      >
-                        {searching ? (
-                          <span className="flex items-center gap-2 px-1 py-1">
-                            <span className="label-eyebrow">{group.label}</span>{' '}
-                            <span className="num text-xs text-dim">{group.rows.length}</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-1 py-1 text-left"
-                            aria-expanded={open}
-                            onClick={() => folds.toggle(group.label)}
+            <TableFilterScope>
+              {(filtering) =>
+                groups.map((group) => {
+                  const open = filtering || searching || folds.isOpen(group.label);
+                  return (
+                    <Fragment key={group.domId}>
+                      <tbody>
+                        <tr>
+                          <th
+                            id={group.domId}
+                            scope="colgroup"
+                            colSpan={colSpan}
+                            className="library-group-heading"
                           >
-                            <AppIcon
-                              name={open ? 'chevronDown' : 'chevronRight'}
-                              size={14}
-                              className="text-muted"
-                            />
-                            <span className="label-eyebrow">{group.label}</span>{' '}
-                            <span className="num text-xs text-dim">{group.rows.length}</span>
-                          </button>
-                        )}
-                      </th>
-                    </tr>
-                  </tbody>
-                  {group.rows.map((row) =>
-                    open || row.id === editId ? (
-                      <LibraryRow
-                        key={row.id}
-                        row={row}
-                        config={config}
-                        colSpan={colSpan}
-                        hidden={!open}
-                        expanded={expandedId === row.id}
-                        editing={editId === row.id}
-                        isOwner={isOwner}
-                        onToggle={onToggleExpanded}
-                        onEdit={onEdit}
-                        onDelete={onDeleteRequest}
-                        form={editId === row.id ? renderForm(row) : undefined}
-                      />
-                    ) : null,
-                  )}
-                </Fragment>
-              );
-            })}
-          </table>
+                            {searching ? (
+                              <span className="flex items-center gap-2 px-1 py-1">
+                                <span className="label-eyebrow">{group.label}</span>{' '}
+                                <span className="num text-xs text-dim">{group.rows.length}</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-1 py-1 text-left"
+                                aria-expanded={open}
+                                onClick={() => folds.toggle(group.label)}
+                              >
+                                <AppIcon
+                                  name={open ? 'chevronDown' : 'chevronRight'}
+                                  size={14}
+                                  className="text-muted"
+                                />
+                                <span className="label-eyebrow">{group.label}</span>{' '}
+                                <span className="num text-xs text-dim">{group.rows.length}</span>
+                              </button>
+                            )}
+                          </th>
+                        </tr>
+                      </tbody>
+                      {group.rows.map((row) =>
+                        open || row.id === editId ? (
+                          <LibraryRow
+                            key={row.id}
+                            row={row}
+                            config={config}
+                            colSpan={colSpan}
+                            hidden={!open}
+                            defaultEdition={defaultIds?.has(row.id) ?? false}
+                            expanded={expandedId === row.id}
+                            editing={editId === row.id}
+                            isOwner={isOwner}
+                            onToggle={onToggleExpanded}
+                            onEdit={onEdit}
+                            onDelete={onDeleteRequest}
+                            form={editId === row.id ? renderForm(row) : undefined}
+                          />
+                        ) : null,
+                      )}
+                    </Fragment>
+                  );
+                })
+              }
+            </TableFilterScope>
+          </Table>
         </div>
       )}
 
@@ -392,6 +411,7 @@ interface LibraryRowProps<R extends LibraryListRow> {
   readonly config: LibrarySectionConfig<R>;
   readonly colSpan: number;
   readonly hidden: boolean;
+  readonly defaultEdition: boolean;
   readonly expanded: boolean;
   readonly editing: boolean;
   readonly isOwner: boolean;
@@ -406,6 +426,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
   config,
   colSpan,
   hidden,
+  defaultEdition,
   expanded,
   editing,
   isOwner,
@@ -420,7 +441,15 @@ function LibraryRowImpl<R extends LibraryListRow>({
   const meta = config.meta(row);
   const excerpt = expanded || editing ? '' : plainExcerpt(row.description);
   return (
-    <tbody hidden={hidden}>
+    <TableBody
+      hidden={hidden}
+      filterValues={{
+        name: row.name,
+        ...Object.fromEntries(
+          config.columns.map((column) => [column.sort, tableCellText(column.cell(row))]),
+        ),
+      }}
+    >
       <tr
         id={`library-entry-${row.id}`}
         className={`library-entry-row${expanded || editing ? ' bg-primary/5' : ''}`}
@@ -438,7 +467,27 @@ function LibraryRowImpl<R extends LibraryListRow>({
               size={14}
               className="mt-1 text-muted"
             />
-            <span className="min-w-0 break-words font-medium">{row.name}</span>
+            <span className="min-w-0 break-words font-medium">
+              {row.name}
+              <span className="mt-1 flex flex-wrap gap-1 text-xs font-normal">
+                {row.sourceKey && <span className="badge badge-sm">{row.sourceKey}</span>}
+                {row.status && row.status !== 'complete' && (
+                  <span className="badge badge-sm badge-warning">
+                    {row.status.replaceAll('_', ' ')}
+                  </span>
+                )}
+                {row.role && row.role !== 'definition' && (
+                  <span className="badge badge-sm">{row.role}</span>
+                )}
+                {config.key !== 'sources' &&
+                  defaultEdition &&
+                  (row.sourceKey || row.preferredEdition) && (
+                    <span className="badge badge-sm">
+                      {row.preferredEdition ? 'Preferred' : 'Default edition'}
+                    </span>
+                  )}
+              </span>
+            </span>
           </button>
           {meta && (
             <span className="block pl-5 text-[10px] uppercase tracking-wider text-base-content/60 sm:hidden">
@@ -500,13 +549,28 @@ function LibraryRowImpl<R extends LibraryListRow>({
                     {meta}
                   </p>
                 )}
+                <div className="flex flex-wrap gap-2">
+                  <span className="badge">{row.sourceKey ?? 'Legacy source'}</span>
+                  <span className="badge">{row.status ?? 'complete'}</span>
+                  <span className="badge">{row.role ?? 'definition'}</span>
+                  {row.preferredEdition && <span className="badge">Preferred edition</span>}
+                </div>
+                {row.sourceLocator && <p>{row.sourceLocator}</p>}
                 {config.detail(row)}
+                {row.extraction?.rawText && (
+                  <pre className="whitespace-pre-wrap break-words text-xs">
+                    {row.extraction.rawText}
+                  </pre>
+                )}
+                {row.extraction?.reviewNotes && (
+                  <p className="whitespace-pre-wrap break-words">{row.extraction.reviewNotes}</p>
+                )}
               </div>
             )}
           </td>
         </tr>
       )}
-    </tbody>
+    </TableBody>
   );
 }
 

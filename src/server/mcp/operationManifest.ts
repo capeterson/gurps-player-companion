@@ -162,6 +162,37 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   excluded('POST', '/api/v1/admin/users/{userId}/cancel-purge', 'instance administration'),
   excluded('GET', '/api/v1/admin/campaigns', 'instance administration'),
   excluded('GET', '/api/v1/admin/campaigns/{campaignId}', 'instance administration'),
+  tool('POST', '/api/v1/campaigns/{id}/library/sources', 'gpc_create_library_source', 'gpc:write'),
+  tool(
+    'PATCH',
+    '/api/v1/campaigns/{id}/library/sources/{sourceId}',
+    'gpc_update_library_source',
+    'gpc:write',
+  ),
+  tool(
+    'DELETE',
+    '/api/v1/campaigns/{id}/library/sources/{sourceId}',
+    'gpc_delete_library_source',
+    'gpc:write',
+  ),
+  tool(
+    'POST',
+    '/api/v1/campaigns/{id}/library/modifiers',
+    'gpc_create_library_modifier',
+    'gpc:write',
+  ),
+  tool(
+    'PATCH',
+    '/api/v1/campaigns/{id}/library/modifiers/{modifierId}',
+    'gpc_update_library_modifier',
+    'gpc:write',
+  ),
+  tool(
+    'DELETE',
+    '/api/v1/campaigns/{id}/library/modifiers/{modifierId}',
+    'gpc_delete_library_modifier',
+    'gpc:write',
+  ),
   tool('GET', '/api/v1/campaigns/{id}/library', 'gpc_get_campaign_library', 'gpc:read'),
   tool('POST', '/api/v1/campaigns/{id}/library/traits', 'gpc_create_library_trait', 'gpc:write'),
   tool(

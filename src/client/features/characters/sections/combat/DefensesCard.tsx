@@ -15,12 +15,14 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import { formatSigned } from '../../../../../shared/format/number.ts';
 import type {
   CharacterDetail,
   ResolvedEffectOut,
 } from '../../../../../shared/schemas/character.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
+import { Table, TableBody, TableHeader } from '../../../../components/ui/Table.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { RollRequest } from '../rollTypes.ts';
 import {
@@ -49,6 +51,7 @@ export interface DefensesCardProps {
 }
 
 interface ParryRow {
+  itemId: string;
   readonly key: string;
   readonly name: string;
   readonly skill: string;
@@ -204,6 +207,20 @@ function DefenseTable({
   }));
 
   const parryRows: ParryRow[] = weapons
+    .flatMap((item) => {
+      if (!item.weaponData) return [];
+      const distinct = new Map(
+        weaponModes(item.weaponData)
+          .filter((mode) => mode.parry != null && mode.parry.trim() !== '')
+          .map((mode) => [JSON.stringify([mode.skill, mode.parry, mode.stRequired]), mode]),
+      );
+      return [...distinct.values()].map((mode) => ({
+        ...item,
+        defenseKey: `${item.id}:${mode.key}`,
+        defenseName: distinct.size > 1 ? `${item.name} (${mode.name})` : item.name,
+        weaponData: { ...item.weaponData, ...mode },
+      }));
+    })
     .filter((item) => item.weaponData?.parry != null && item.weaponData.parry.trim() !== '')
     .map((item) => {
       const weaponData = item.weaponData;
@@ -211,8 +228,9 @@ function DefenseTable({
       const parsed = parseParryString(raw);
       if (parsed == null || parsed.kind === 'no') {
         return {
-          key: item.id,
-          name: item.name,
+          key: item.defenseKey,
+          itemId: item.id,
+          name: item.defenseName,
           skill: weaponData?.skill?.trim() || '—',
           value: null,
           caption: undefined,
@@ -226,12 +244,20 @@ function DefenseTable({
         const adjusted =
           resolution.level -
           stShortfallPenalty(weaponData?.stRequired, state.strength(character.derived.effectiveSt));
-        const weaponEffects = weaponEffectsForRow(effects, item.id, 'weapon_parry');
+        const weaponEffects = weaponEffectsForRow(
+          effects,
+          item.id,
+          'weapon_parry',
+          weaponData?.name,
+          weaponData?.key,
+          weaponData?.skill ?? null,
+        );
         const skillEffects = skillEffectsForRow(effects, resolution.name);
         const baseValue = parryFromSkill(adjusted, parsed.mod);
         return {
-          key: item.id,
-          name: item.name,
+          key: item.defenseKey,
+          itemId: item.id,
+          name: item.defenseName,
           skill: resolution.name,
           value: parryFromSkill(
             adjusted,
@@ -246,8 +272,9 @@ function DefenseTable({
         };
       }
       return {
-        key: item.id,
-        name: item.name,
+        key: item.defenseKey,
+        itemId: item.id,
+        name: item.defenseName,
         skill: resolution.kind === 'missing' ? resolution.skillName : '—',
         value: null,
         caption:
@@ -282,7 +309,7 @@ function DefenseTable({
       const reason = row.value == null ? null : state.reason('parry');
       return {
         id: `parry:${row.key}`,
-        itemId: row.key,
+        itemId: row.itemId,
         label: `Parry (${row.name})`,
         skill: row.skill,
         beforeDb: row.value ?? '—',
@@ -433,36 +460,57 @@ function DefenseTable({
       <p className="text-xs text-muted">Scores include the selected hit location and facing.</p>
 
       <div className="overflow-x-auto rounded-xl border border-base-300">
-        <table className="table table-sm w-full" aria-label="Defenses">
+        <Table
+          preferenceKey={`${character.id}:defenses`}
+          className="table table-sm w-full"
+          aria-label="Defenses"
+        >
           <thead>
             <tr>
               <th className="w-8 max-sm:w-6 max-sm:px-1" aria-label="Custom order" />
-              <th
+              <TableHeader
+                column="defense"
+                label="Defense"
                 className="max-sm:px-1"
                 aria-sort={sort === 'defense' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Defense', 'defense')}
-              </th>
-              <th
+              </TableHeader>
+              <TableHeader
+                column="skill"
+                label="Governing skill"
                 className="max-sm:hidden"
                 aria-sort={sort === 'skill' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Governing skill', 'skill')}
-              </th>
-              <th className="text-right whitespace-nowrap max-sm:hidden">Before DB</th>
-              <th className="text-right">DB</th>
-              <th
+              </TableHeader>
+              <TableHeader
+                column="beforeDb"
+                label="Before DB"
+                className="text-right whitespace-nowrap max-sm:hidden"
+              />
+              <TableHeader column="db" label="DB" className="text-right" />
+              <TableHeader
+                column="final"
+                label="Final"
                 className="text-right max-sm:px-1"
                 aria-sort={sort === 'final' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Final', 'final', 'w-full justify-end')}
-              </th>
+              </TableHeader>
             </tr>
           </thead>
           {visibleRows.map((row) => {
             const customIndex = orderedRows.findIndex((candidate) => candidate.id === row.id);
             return (
-              <tbody
+              <TableBody
+                filterValues={{
+                  defense: row.label,
+                  skill: row.skill,
+                  beforeDb: row.beforeDb,
+                  db: row.db == null ? '—' : formatSigned(row.db, { zero: 'plain' }),
+                  final: row.final,
+                }}
                 key={row.id}
                 aria-label={row.label}
                 onDragOver={(event) => {
@@ -554,10 +602,10 @@ function DefenseTable({
                     )}
                   </td>
                 </tr>
-              </tbody>
+              </TableBody>
             );
           })}
-        </table>
+        </Table>
       </div>
 
       {saveFailed && (

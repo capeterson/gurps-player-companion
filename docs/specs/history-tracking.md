@@ -264,3 +264,13 @@ character effects uses the existing character trigger with readable array-change
 summaries. One array gesture is one outbox patch/history event; definition refresh
 and detachment remain inside the library writer's audit transaction. Skill
 procedure changes travel with the existing library and owned-mechanics audit rows.
+
+
+## Source editions and pricing
+
+Sources and modifiers are campaign-family audited classes with revision and
+tombstone triggers (migration 0053), SYNCABLE_TABLES registration and dedicated
+human-readable summaries. CRUD, sync and imports share withAudit transactions.
+Pricing snapshots on character traits/inventory change only with a purchase or
+explicit re-resolution; its values and snapshot form one row update/history
+event. Library price edits never generate automatic character price updates.

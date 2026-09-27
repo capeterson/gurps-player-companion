@@ -207,6 +207,10 @@ newer one still gets through.
    snapshots and emits post-commit WebSocket `sync_invalidate` nudges for REST
    and delegated writes so every affected viewer pulls sooner.
 
+## Library pricing and source editions
+
+The shared pure TypeScript calculation engine evaluates bounded declarative graphs with exact decimal arithmetic. Sources and modifiers join the existing library registry; metadata identifies canonical concepts and source editions independently of display names. Character pricing snapshots are immutable until explicit re-resolution, unlike live mechanics refresh. Typed rules, source evidence and snapshots are catalogued in [json-fields.md](json-fields.md). Full semantics and migration details: [library-calculation-rules.md](library-calculation-rules.md).
+
 ## Data model (Postgres 18)
 
 **Postgres 18 only** — no SQLite, no other backend (`AGENTS.md` — "Postgres 18
@@ -254,7 +258,7 @@ Tables (grouped):
   `character_skills`, `inventory_items` (self-FK for nesting),
   `character_spells`, `character_languages`, `character_techniques`,
   `combat_states` (1:1 by `character_id`).
-- **Campaign content**: `adventure_log_entries`, `campaign_library_traits`,
+- **Campaign content**: `campaign_library_sources`, `campaign_library_modifiers`, `adventure_log_entries`, `campaign_library_traits`,
   `campaign_library_skills`, `campaign_library_spells`,
   `campaign_library_items`, `campaign_library_languages`,
   `campaign_library_techniques`, `campaign_library_styles`,
@@ -311,6 +315,15 @@ Key PG18 / trigger machinery, layered by migration:
    frame contains no combat data. The `soloEncounters` store (introduced in
    application schema version 6, currently schema version 10), keyed by
    `characterId`, is explicitly device-only and is included in the logout purge.
+- **Shared data tables**: `components/ui/Table.tsx` owns exact-value column
+  filtering and browser-only preferences. `TableHeader` extends sort interactions;
+  `TableBody` / `TableRow` receive semantic `filterValues` rather than reading cell
+  or editor DOM. `filterRows` supplies complete value options when mounted rows are
+  limited by search/folding. Grouped details stay mounted while filtered. Table
+  identity scopes storage and resets state when the owning entity changes.
+  `filterable={false}` disables the default behavior per table/header; utility
+  headers use ordinary `th`. Source guards require future data tables to use the
+  framework. Admin pagination applies filters to the current fetched page.
 - **Draft inputs**: `useDraftField.ts` is the canonical draft-on-blur hook (do
   not fork it). It queues same-field edits, per-field syncs from the server only
   when clean, and fires toast+flash on rollback.

@@ -335,7 +335,7 @@ seeds the character row's written fluency to `n/a`.
   (REST/MCP) and, in the PWA, the `campaign_library_*` sync cursor classes. The
   app reads the library only from Dexie, so browsing works offline.
 - **Write** (per-entity CRUD): campaign **owner** only, through REST
-  (`POST/PATCH/DELETE /campaigns/{id}/library/{traits|skills|spells|items|enchantments|active-effects|languages|techniques|styles}[/{id}]`
+  (`POST/PATCH/DELETE /campaigns/{id}/library/{sources|modifiers|traits|skills|spells|items|enchantments|active-effects|languages|techniques|styles}[/{id}]`
   in `src/server/routes/campaignLibrary.ts`) or `/sync/operations`. Both
   doors share one service layer (`createLibraryEntry` / `updateLibraryEntry` /
   `deleteLibraryEntry`). The PWA editor always uses the outbox, with whole-entry
@@ -513,7 +513,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   therefore leave the target campaign's current setting unchanged on import.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
-  campaign settings, and all eight library sections are read on one read-only
+  campaign settings, and all eleven library sections are read on one read-only
   `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
   document assembled from different database moments.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. The UI parses
@@ -522,7 +522,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   never submits it. The chosen mode and settings option are captured with the
   file, so changing those controls later cannot alter the pending operation.
   Two modes:
-  - `merge` (default) — upsert incoming rows by name/kind key, leave others.
+  - `merge` (default) — upsert incoming rows by section/canonical key/source edition (plus trait kind), leave others.
   - `replace` — additionally delete existing rows not present in the document.
     **Careful edge case, encoded in the importer:** a `replace` import only
     prunes spells when the document actually carried a `spells:` section, so a
@@ -548,16 +548,18 @@ mechanism for sharing content between campaigns or seeding a new one.
   writes. Existing Lantern play state is preserved on repeat runs. See the
   [seed guide](../../bootstrap/README.md).
 
-Keys used for upsert matching: traits by `kind::lower(name)`; skills, spells,
-items, enchantments, languages, techniques, and styles by `lower(name)`. The natural-key
-unique indexes on all eight `campaign_library_*` tables are
-**case-insensitive** (`UNIQUE (campaign_id,
-lower(name))`, traits additionally scoped by `kind`; see migration 0021), so
-`POST`/`PATCH` reject a case-insensitive duplicate with `409` and an import's
-name match can never be shadowed by a differently-cased row created through
-the CRUD editor. A case-insensitive import match updates the existing row in
-place (preserving its id) and adopts the incoming `name` spelling/casing along
-with its other fields.
+Keys used for upsert matching are section + canonical portable key + source key,
+with trait kind additionally included. Source-less rows remain legacy editions.
+Names are display labels and duplicate names can coexist under distinct canonical
+keys or editions. Sources use their own canonical key. The final source/reference
+graph is validated before import writes, including entries retained by omitted
+sections. Source and modifier sections follow the omission-versus-empty replace
+rule. Export is canonical YAML v12; v1–v11 remain valid compatibility inputs.
+
+See [library-calculation-rules.md](library-calculation-rules.md) for standalone
+modifiers, completeness/adoption gates, calculation rules, explicit character
+pricing snapshots/re-resolution, source preference and independent weapon modes.
+
 
 ## Library search and description editing
 

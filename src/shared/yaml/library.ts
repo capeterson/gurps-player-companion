@@ -1,4 +1,6 @@
+import { libraryEntryKey } from '../domain/libraryIdentity.ts';
 import type { ActiveEffectDefinition } from '../schemas/activeEffects.ts';
+import type { LibraryModifierCreate, LibrarySourceCreate } from '../schemas/libraryMetadata.ts';
 /**
  * Campaign library YAML codec.  Round-trippable: import → export → diff
  * yields the same bytes (canonical sort + ordered keys).
@@ -32,9 +34,10 @@ import {
  * default matchers. v9 adds structured prerequisites, TL policies, conditional
  * family defaults, and campaign enforcement policy. v10 adds reusable
  * enchantment definitions and mechanical item snapshots. The parser still accepts
- * v1-v9 docs (new fields absent).
+ * v1-v11 docs (new fields absent). v11 adds active effects; v12 adds source
+ * editions, standalone modifiers, calculation rules, and normalized weapon modes.
  */
-export const LIBRARY_YAML_VERSION = 11 as const;
+export const LIBRARY_YAML_VERSION = 12 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -72,57 +75,67 @@ export function parseLibraryYaml(rawText: string): LibraryYamlDoc {
 }
 
 function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
+  for (const [section, rows] of [
+    ['sources', doc.library.sources],
+    ['modifiers', doc.library.modifiers],
+  ] as const) {
+    const keys = rows?.map((row) =>
+      section === 'sources' ? row.key?.toLowerCase() : libraryEntryKey(row),
+    );
+    if (keys && new Set(keys).size !== keys.length)
+      throw new LibraryYamlError(`duplicate ${section} key`);
+  }
   const traitKeys = new Set<string>();
   for (const t of doc.library.traits) {
-    const k = `${t.kind}::${t.name.toLowerCase()}`;
+    const k = libraryEntryKey(t);
     if (traitKeys.has(k)) throw new LibraryYamlError(`duplicate trait (${t.kind}, ${t.name})`);
     traitKeys.add(k);
   }
   const skillKeys = new Set<string>();
   for (const s of doc.library.skills) {
-    const k = s.name.toLowerCase();
+    const k = libraryEntryKey(s);
     if (skillKeys.has(k)) throw new LibraryYamlError(`duplicate skill (${s.name})`);
     skillKeys.add(k);
   }
   const spellKeys = new Set<string>();
   for (const s of doc.library.spells ?? []) {
-    const k = s.name.toLowerCase();
+    const k = libraryEntryKey(s);
     if (spellKeys.has(k)) throw new LibraryYamlError(`duplicate spell (${s.name})`);
     spellKeys.add(k);
   }
   const itemKeys = new Set<string>();
   for (const i of doc.library.items) {
-    const k = i.name.toLowerCase();
+    const k = libraryEntryKey(i);
     if (itemKeys.has(k)) throw new LibraryYamlError(`duplicate item (${i.name})`);
     itemKeys.add(k);
   }
   const languageKeys = new Set<string>();
   for (const l of doc.library.languages ?? []) {
-    const k = l.name.toLowerCase();
+    const k = libraryEntryKey(l);
     if (languageKeys.has(k)) throw new LibraryYamlError(`duplicate language (${l.name})`);
     languageKeys.add(k);
   }
   const techniqueKeys = new Set<string>();
   for (const t of doc.library.techniques ?? []) {
-    const k = t.name.toLowerCase();
+    const k = libraryEntryKey(t);
     if (techniqueKeys.has(k)) throw new LibraryYamlError(`duplicate technique (${t.name})`);
     techniqueKeys.add(k);
   }
   const styleKeys = new Set<string>();
   for (const st of doc.library.styles ?? []) {
-    const k = st.name.toLowerCase();
+    const k = libraryEntryKey(st);
     if (styleKeys.has(k)) throw new LibraryYamlError(`duplicate style (${st.name})`);
     styleKeys.add(k);
   }
   const effectKeys = new Set<string>();
   for (const entry of doc.library.activeEffects ?? []) {
-    const key = entry.name.toLowerCase();
+    const key = libraryEntryKey(entry);
     if (effectKeys.has(key)) throw new LibraryYamlError(`duplicate active effect (${entry.name})`);
     effectKeys.add(key);
   }
   const enchantmentKeys = new Set<string>();
   for (const enchantment of doc.library.enchantments ?? []) {
-    const key = enchantment.name.toLowerCase();
+    const key = libraryEntryKey(enchantment);
     if (enchantmentKeys.has(key))
       throw new LibraryYamlError(`duplicate enchantment (${enchantment.name})`);
     enchantmentKeys.add(key);
@@ -130,6 +143,8 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
 }
 
 export interface LibraryYamlExportInput {
+  readonly sources?: readonly LibrarySourceCreate[];
+  readonly modifiers?: readonly LibraryModifierCreate[];
   readonly campaign?: LibraryYamlDoc['campaign'];
   readonly traits: readonly LibraryTraitCreate[];
   readonly skills: readonly LibrarySkillCreate[];
@@ -143,19 +158,23 @@ export interface LibraryYamlExportInput {
 }
 
 /** Stable ordering for byte-stable round trip. */
+const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 function sortedTraits(traits: readonly LibraryTraitCreate[]): LibraryTraitCreate[] {
   return [...traits].sort(
     (a, b) =>
-      a.kind.localeCompare(b.kind) ||
-      a.name.toLowerCase().localeCompare(b.name.toLowerCase()) ||
-      a.name.localeCompare(b.name),
+      compareText(a.kind, b.kind) ||
+      compareText(a.name.toLowerCase(), b.name.toLowerCase()) ||
+      compareText(a.name, b.name) ||
+      compareText(libraryEntryKey(a), libraryEntryKey(b)),
   );
 }
 
 function sortedByName<T extends { name: string }>(rows: readonly T[]): T[] {
   return [...rows].sort(
     (a, b) =>
-      a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.name.localeCompare(b.name),
+      compareText(a.name.toLowerCase(), b.name.toLowerCase()) ||
+      compareText(a.name, b.name) ||
+      compareText(libraryEntryKey(a), libraryEntryKey(b)),
   );
 }
 
@@ -207,6 +226,8 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };
   if (input.campaign) payload.campaign = compactCampaign(input.campaign);
   payload.library = {
+    sources: sortedByName(input.sources ?? []).map((entry) => compact(entry)),
+    modifiers: sortedByName(input.modifiers ?? []).map((entry) => compact(entry)),
     traits,
     skills,
     spells,
