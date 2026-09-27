@@ -635,6 +635,8 @@ async function fetchClassUpserts(args: {
     case 'campaign_library_style':
     case 'campaign_library_enchantment':
     case 'campaign_library_active_effect':
+    case 'campaign_library_source':
+    case 'campaign_library_modifier':
       return await fetchLibraryClass(entityClass, sinceRevision, limit, accessibleCampaignIds);
     default:
       // Other entity classes (campaign membership, adventure log) are not

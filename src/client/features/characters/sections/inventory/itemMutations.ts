@@ -1,4 +1,5 @@
 import { buildInventoryItemOut } from '../../../../../shared/domain/characterDetail.ts';
+import { normalizeWeaponData } from '../../../../../shared/domain/weaponModes.ts';
 import {
   type InventoryItemOut,
   type InventoryItemUpdate,
@@ -66,6 +67,7 @@ export async function mutateItem(
       weaponData: displayed.baseWeaponData,
     });
     const patch = inventoryItemUpdate.parse(update(current));
+    if (patch.weaponData !== undefined) patch.weaponData = normalizeWeaponData(patch.weaponData);
     if (
       patch.isContainer === false &&
       (await db.characterInventory.where('parentId').equals(id).count())
@@ -119,11 +121,42 @@ export function writeItemPath(id: string, path: string, value: unknown, label: s
     target[keys[keys.length - 1] as string] = value;
     if (field === 'weaponData') {
       const weapon = root as unknown as Record<string, unknown>;
+      if (keys[0] === 'alternateModes' && Array.isArray(weapon.modes)) {
+        weapon.modes = [
+          weapon.modes[0],
+          ...(Array.isArray(weapon.alternateModes) ? weapon.alternateModes : []),
+        ];
+      }
+      if (
+        Array.isArray(weapon.modes) &&
+        weapon.modes[0] &&
+        keys[0] !== 'modes' &&
+        keys[0] !== 'alternateModes'
+      ) {
+        const primary = weapon.modes[0] as Record<string, unknown>;
+        const primaryField = keys[0];
+        if (
+          primaryField &&
+          ['damage', 'reach', 'parry', 'skill', 'stRequired', 'ranged', 'notes'].includes(
+            primaryField,
+          )
+        )
+          primary[primaryField] = structuredClone(weapon[primaryField]);
+      }
       if (
         weapon.ranged &&
         Object.values(weapon.ranged).every((entry) => entry == null || entry === '')
       )
         weapon.ranged = null;
+      if (Array.isArray(weapon.modes)) {
+        for (const mode of weapon.modes) {
+          if (
+            mode.ranged &&
+            Object.values(mode.ranged).every((entry) => entry == null || entry === '')
+          )
+            mode.ranged = null;
+        }
+      }
     }
     return { [field]: root };
   });

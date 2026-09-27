@@ -46,7 +46,7 @@ export function ActiveEffectsPanel({
   const [sourceInventoryId, setSourceInventoryId] = useState<string | null>(null);
   const [custom, setCustom] = useState(false);
   const [query, setQuery] = useState('');
-  const { fetchOptions } = useLibraryFetcher<ActiveEffectDefinitionOut>(
+  const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<ActiveEffectDefinitionOut>(
     'activeEffects',
     character.campaignId ?? null,
   );
@@ -224,6 +224,11 @@ export function ActiveEffectsPanel({
               value={query}
               onChange={setQuery}
               fetchOptions={fetchOptions}
+              sourceSelection={
+                character.campaignId && setAllSources
+                  ? { allSources, onChange: setAllSources }
+                  : undefined
+              }
               getOptionKey={(e) => e.id}
               renderOption={(e) => e.name}
               onPick={(e) => {

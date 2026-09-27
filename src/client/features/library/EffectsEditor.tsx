@@ -123,7 +123,8 @@ export function effectPreview(effect: TraitEffect): string {
     } else if (selector.kind === 'weapon_name') target += ` for “${selector.weaponName}”`;
     else if (selector.kind === 'library_item') target += ` for “${selector.libraryItemName}”`;
     else target += ' for selected inventory item';
-    if (selector.modeName) target += ` · ${selector.modeName} mode`;
+    if (selector.modeKey || selector.modeName)
+      target += ` · ${selector.modeKey ?? selector.modeName} mode`;
   }
   const condition = effect.conditionLabel ?? effect.conditionGroup;
   return `${signed}${scale} to ${target}${condition ? ` while ${condition}` : ''}`;
@@ -221,8 +222,11 @@ export function EffectsEditor<T extends TraitEffect>({
         : null;
       // Parry/Block are item-level defenses. Clear a now-hidden attack mode
       // immediately so changing target never strands an invalid hidden value.
-      if ((target === 'weapon_parry' || target === 'weapon_block') && selector?.modeName) {
-        const { modeName: _modeName, ...itemSelector } = selector;
+      if (
+        (target === 'weapon_parry' || target === 'weapon_block') &&
+        (selector?.modeName || selector?.modeKey)
+      ) {
+        const { modeName: _modeName, modeKey: _modeKey, ...itemSelector } = selector;
         selector = itemSelector as WeaponSelector;
       }
       return {
@@ -244,25 +248,41 @@ export function EffectsEditor<T extends TraitEffect>({
           ? {
               kind,
               skillName: '',
-              ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
+              ...(draft.selector?.modeKey
+                ? { modeKey: draft.selector.modeKey }
+                : draft.selector?.modeName
+                  ? { modeName: draft.selector.modeName }
+                  : {}),
             }
           : kind === 'weapon_name'
             ? {
                 kind,
                 weaponName: '',
-                ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
+                ...(draft.selector?.modeKey
+                  ? { modeKey: draft.selector.modeKey }
+                  : draft.selector?.modeName
+                    ? { modeName: draft.selector.modeName }
+                    : {}),
               }
             : kind === 'inventory_item'
               ? {
                   kind,
                   inventoryItemId: '',
-                  ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
+                  ...(draft.selector?.modeKey
+                    ? { modeKey: draft.selector.modeKey }
+                    : draft.selector?.modeName
+                      ? { modeName: draft.selector.modeName }
+                      : {}),
                 }
               : {
                   kind,
                   libraryItemId: weaponItems[0]?.id,
                   libraryItemName: weaponItems[0]?.name ?? '',
-                  ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
+                  ...(draft.selector?.modeKey
+                    ? { modeKey: draft.selector.modeKey }
+                    : draft.selector?.modeName
+                      ? { modeName: draft.selector.modeName }
+                      : {}),
                 },
     }));
   }
@@ -586,15 +606,19 @@ export function EffectsEditor<T extends TraitEffect>({
                 )}
                 {draft.target !== 'weapon_parry' && draft.target !== 'weapon_block' && (
                   <label className="form-control sm:col-span-3">
-                    <span className="label-text text-xs">Attack mode (optional, exact)</span>
+                    <span className="label-text text-xs">Stable attack mode key (optional)</span>
                     <input
                       className="input input-bordered input-sm"
-                      value={selector.modeName ?? ''}
-                      placeholder="Primary or exact alternate mode; blank applies to every mode"
+                      value={selector.modeKey ?? selector.modeName ?? ''}
+                      placeholder="Mode key; blank applies to every mode"
                       onChange={(event) =>
                         update(index, (row) => ({
                           ...row,
-                          selector: { ...selector, modeName: event.target.value || undefined },
+                          selector: {
+                            ...selector,
+                            modeName: undefined,
+                            modeKey: event.target.value || undefined,
+                          },
                         }))
                       }
                     />

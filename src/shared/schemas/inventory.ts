@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pricingResolution } from './calculation.ts';
 import { timestamps, uuid } from './common.ts';
 
 /**
@@ -65,19 +66,18 @@ export const rangedData = z
   .strict();
 
 /**
- * One alternate attack mode on a weapon (Basic Set p. 271 weapon tables
- * list several rows per weapon: a rapier swings AND thrusts, a spear can
- * be thrown).  The weapon's own top-level `damage` / `reach` / `parry`
- * are the PRIMARY mode; these are the extra rows.
- *
- * `reach` / `parry` are optional per mode: an alternate that leaves them
- * unset inherits the weapon's primary values (a swing and a thrust with
- * the same reach only has to state it once).  Defence math always uses
- * the primary parry -- you parry with the weapon, not with one of its
- * damage lines.
+ * An independent attack mode. The authoritative modes list requires stable
+ * keys and never inherits missing fields from another mode. Legacy primary
+ * fields and alternateModes remain compatibility inputs; normalization copies
+ * inherited legacy values once. Each mode can supply its own defense skill.
  */
 export const weaponMode = z
   .object({
+    key: z.string().min(1).max(40).optional(),
+    skill: z.string().max(160).nullable().optional(),
+    stRequired: z.number().int().min(0).max(99).nullable().optional(),
+    ranged: rangedData.nullable().optional(),
+    sourceRow: z.string().max(2000).nullable().optional(),
     /** "Swing", "Thrust", "Thrown", ... */
     name: z.string().min(1).max(40).trim(),
     damage: z.string().max(160).optional(),
@@ -89,6 +89,15 @@ export const weaponMode = z
 
 export const weaponData = z
   .object({
+    modes: z
+      .array(weaponMode.extend({ key: z.string().min(1).max(40) }))
+      .min(1)
+      .max(20)
+      .refine(
+        (modes) => new Set(modes.map((m) => m.key)).size === modes.length,
+        'Mode keys must be unique',
+      )
+      .optional(),
     damage: z.string().max(160).optional(),
     reach: z.string().max(40).nullable().optional(),
     parry: z.string().max(40).nullable().optional(),
@@ -123,7 +132,7 @@ export const weaponData = z
      * Extra attack modes beyond the primary one (swing/thrust/thrown).
      * Defaults to `[]`, so every pre-existing weapon row parses unchanged.
      */
-    alternateModes: z.array(weaponMode).max(10).default([]),
+    alternateModes: z.array(weaponMode).max(20).default([]),
   })
   .strict();
 
@@ -324,6 +333,7 @@ export const enchantmentContribution = z.object({
 });
 
 export const inventoryItemOut = z.object({
+  pricingResolution: pricingResolution.nullable().optional(),
   id: uuid,
   characterId: uuid,
   name: z.string().min(1).max(160),
@@ -357,6 +367,7 @@ export const inventoryItemOut = z.object({
 });
 
 export const inventoryItemCreate = z.object({
+  pricingResolution: pricingResolution.nullable().optional(),
   name: z.string().min(1).max(160).trim(),
   quantity: z.number().int().min(0).max(1_000_000).default(1),
   weightLbs: z.number().min(0).max(1_000_000).default(0),

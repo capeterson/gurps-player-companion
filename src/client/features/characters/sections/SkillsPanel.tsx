@@ -98,7 +98,10 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
     setTechLevel('');
   };
 
-  const { fetchOptions } = useLibraryFetcher<LibrarySkillOut>('skills', campaignId);
+  const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibrarySkillOut>(
+    'skills',
+    campaignId,
+  );
   const {
     creating,
     submit: submitEntity,
@@ -226,6 +229,9 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
               setTechLevel(fixedPickedTechLevel(opt)?.toString() ?? '');
             }}
             fetchOptions={fetchOptions}
+            sourceSelection={
+              campaignId && setAllSources ? { allSources, onChange: setAllSources } : undefined
+            }
             getOptionKey={(o) => o.id}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">

@@ -25,6 +25,8 @@ export const entityClass = z.enum([
   'campaign_library_style',
   'campaign_library_enchantment',
   'campaign_library_active_effect',
+  'campaign_library_source',
+  'campaign_library_modifier',
   'adventure_log',
 ]);
 export type EntityClass = z.infer<typeof entityClass>;
@@ -44,6 +46,8 @@ export const LIBRARY_ENTITY_CLASSES = [
   'campaign_library_style',
   'campaign_library_enchantment',
   'campaign_library_active_effect',
+  'campaign_library_source',
+  'campaign_library_modifier',
 ] as const satisfies readonly EntityClass[];
 export type LibraryEntityClass = (typeof LIBRARY_ENTITY_CLASSES)[number];
 

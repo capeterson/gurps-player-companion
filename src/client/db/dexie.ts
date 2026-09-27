@@ -2,6 +2,8 @@ import type {
   ActiveEffectDefinitionOut,
   ActiveEffectInstance,
 } from '../../shared/schemas/activeEffects.ts';
+import type { PricingResolution } from '../../shared/schemas/calculation.ts';
+import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
 /**
  * Local Dexie database — the source of truth for the UI.
  *
@@ -117,6 +119,7 @@ export interface LocalCharacterTrait {
   variantName: string | null;
   notes: string | null;
   modifiers: unknown[];
+  pricingResolution?: PricingResolution | null | undefined;
   libraryTraitId: string | null;
   /** Validated read-only declaration projection from the sync cursor; absent on legacy rows. */
   libraryMechanics?: LibraryMechanics | null;
@@ -218,6 +221,7 @@ export interface LocalCharacterInventory {
   magicItemData: unknown | null;
   enchantments: unknown | null;
   libraryItemId: string | null;
+  pricingResolution?: PricingResolution | null | undefined;
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -278,6 +282,8 @@ export interface LocalCampaign {
  * of each entry plus its sync `revision`, exactly as `/sync/cursor` emits it.
  */
 type LocalLibraryRow<T> = T & { revision: number };
+export type LocalLibrarySource = LocalLibraryRow<LibrarySourceOut>;
+export type LocalLibraryModifier = LocalLibraryRow<LibraryModifierOut>;
 export type LocalLibraryTrait = LocalLibraryRow<LibraryTraitOut>;
 export type LocalLibrarySkill = LocalLibraryRow<LibrarySkillOut>;
 export type LocalLibrarySpell = LocalLibraryRow<LibrarySpellOut>;
@@ -574,6 +580,8 @@ class LocalDb extends Dexie {
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
   campaigns!: Table<LocalCampaign, string>;
+  campaignLibrarySources!: Table<LocalLibrarySource, string>;
+  campaignLibraryModifiers!: Table<LocalLibraryModifier, string>;
   campaignLibraryTraits!: Table<LocalLibraryTrait, string>;
   campaignLibrarySkills!: Table<LocalLibrarySkill, string>;
   campaignLibrarySpells!: Table<LocalLibrarySpell, string>;
@@ -703,6 +711,10 @@ class LocalDb extends Dexie {
       });
     // v11 makes the campaign library sync-backed (S0/S6). New stores start
     // empty; their cursors are absent, so the next pull backfills from 0.
+    this.version(12).stores({
+      campaignLibrarySources: 'id, campaignId, revision',
+      campaignLibraryModifiers: 'id, campaignId, revision',
+    });
     this.version(11).stores({
       campaignLibraryTraits: 'id, campaignId, revision',
       campaignLibrarySkills: 'id, campaignId, revision',
@@ -742,6 +754,8 @@ export async function resetLocalDb(): Promise<void> {
 
 /** Campaign-library stores, in `LIBRARY_ENTITY_CLASSES` order. */
 export const LIBRARY_STORE_NAMES = [
+  'campaignLibrarySources',
+  'campaignLibraryModifiers',
   'campaignLibraryTraits',
   'campaignLibrarySkills',
   'campaignLibrarySpells',
@@ -791,6 +805,8 @@ const STORE_BY_ENTITY_CLASS: Readonly<Record<EntityClass, keyof LocalDb | null>>
   character_combat: 'characterCombat',
   campaign: 'campaigns',
   campaign_membership: null,
+  campaign_library_source: 'campaignLibrarySources',
+  campaign_library_modifier: 'campaignLibraryModifiers',
   campaign_library_trait: 'campaignLibraryTraits',
   campaign_library_skill: 'campaignLibrarySkills',
   campaign_library_spell: 'campaignLibrarySpells',

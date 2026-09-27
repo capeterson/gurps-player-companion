@@ -17,9 +17,9 @@ export interface TraitModifier {
   readonly costType: ModifierCostType;
   /** Signed.  Limitations are typically stored as negative values. */
   readonly costValue: number;
-  readonly description?: string;
+  readonly description?: string | undefined;
   /** Optional mutex group; only one selected modifier per group is allowed. */
-  readonly group?: string;
+  readonly group?: string | undefined;
 }
 
 export interface ModifiedCost {
@@ -60,8 +60,8 @@ export interface LeveledTraitCostInput {
    * `computeModifiedCost`.
    */
   readonly variant?: {
-    readonly pointCostMultiplier?: number;
-    readonly pointCostDelta?: number;
+    readonly pointCostMultiplier?: number | undefined;
+    readonly pointCostDelta?: number | undefined;
   };
   readonly modifiers?: readonly TraitModifier[];
 }

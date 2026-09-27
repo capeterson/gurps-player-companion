@@ -19,6 +19,7 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import type { LibraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import type { LibraryEntityClass } from '../../../shared/schemas/sync.ts';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
@@ -40,7 +41,7 @@ import {
 import { useLibraryGroupFolds } from './useLibraryGroupFolds.ts';
 import type { LibrarySectionKey } from './useLocalLibrary.ts';
 
-export interface LibraryListRow {
+export interface LibraryListRow extends LibraryMetadata {
   readonly id: string;
   readonly name: string;
   readonly description?: string | null | undefined;
@@ -83,6 +84,7 @@ export interface LibrarySectionProps<R extends LibraryListRow> {
   readonly config: LibrarySectionConfig<R>;
   readonly campaignId: string;
   readonly entries: readonly R[];
+  readonly defaultIds?: ReadonlySet<string>;
   /** Normalized, deferred search words. */
   readonly words: readonly string[];
   readonly active: boolean;
@@ -158,6 +160,7 @@ export function LibrarySection<R extends LibraryListRow>({
   config,
   campaignId,
   entries,
+  defaultIds,
   words,
   active,
   isOwner,
@@ -351,6 +354,7 @@ export function LibrarySection<R extends LibraryListRow>({
                         config={config}
                         colSpan={colSpan}
                         hidden={!open}
+                        defaultEdition={defaultIds?.has(row.id) ?? false}
                         expanded={expandedId === row.id}
                         editing={editId === row.id}
                         isOwner={isOwner}
@@ -392,6 +396,7 @@ interface LibraryRowProps<R extends LibraryListRow> {
   readonly config: LibrarySectionConfig<R>;
   readonly colSpan: number;
   readonly hidden: boolean;
+  readonly defaultEdition: boolean;
   readonly expanded: boolean;
   readonly editing: boolean;
   readonly isOwner: boolean;
@@ -406,6 +411,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
   config,
   colSpan,
   hidden,
+  defaultEdition,
   expanded,
   editing,
   isOwner,
@@ -438,7 +444,27 @@ function LibraryRowImpl<R extends LibraryListRow>({
               size={14}
               className="mt-1 text-muted"
             />
-            <span className="min-w-0 break-words font-medium">{row.name}</span>
+            <span className="min-w-0 break-words font-medium">
+              {row.name}
+              <span className="mt-1 flex flex-wrap gap-1 text-xs font-normal">
+                {row.sourceKey && <span className="badge badge-sm">{row.sourceKey}</span>}
+                {row.status && row.status !== 'complete' && (
+                  <span className="badge badge-sm badge-warning">
+                    {row.status.replaceAll('_', ' ')}
+                  </span>
+                )}
+                {row.role && row.role !== 'definition' && (
+                  <span className="badge badge-sm">{row.role}</span>
+                )}
+                {config.key !== 'sources' &&
+                  defaultEdition &&
+                  (row.sourceKey || row.preferredEdition) && (
+                    <span className="badge badge-sm">
+                      {row.preferredEdition ? 'Preferred' : 'Default edition'}
+                    </span>
+                  )}
+              </span>
+            </span>
           </button>
           {meta && (
             <span className="block pl-5 text-[10px] uppercase tracking-wider text-base-content/60 sm:hidden">
@@ -500,7 +526,22 @@ function LibraryRowImpl<R extends LibraryListRow>({
                     {meta}
                   </p>
                 )}
+                <div className="flex flex-wrap gap-2">
+                  <span className="badge">{row.sourceKey ?? 'Legacy source'}</span>
+                  <span className="badge">{row.status ?? 'complete'}</span>
+                  <span className="badge">{row.role ?? 'definition'}</span>
+                  {row.preferredEdition && <span className="badge">Preferred edition</span>}
+                </div>
+                {row.sourceLocator && <p>{row.sourceLocator}</p>}
                 {config.detail(row)}
+                {row.extraction?.rawText && (
+                  <pre className="whitespace-pre-wrap break-words text-xs">
+                    {row.extraction.rawText}
+                  </pre>
+                )}
+                {row.extraction?.reviewNotes && (
+                  <p className="whitespace-pre-wrap break-words">{row.extraction.reviewNotes}</p>
+                )}
               </div>
             )}
           </td>

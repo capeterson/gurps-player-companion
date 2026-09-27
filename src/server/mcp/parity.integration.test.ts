@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
+import { fixedCalculation } from '../../shared/domain/calculation.ts';
 import type { LibraryTraitEffect, TraitEffect } from '../../shared/schemas/effects.ts';
 import type { HistoryEventOut } from '../../shared/schemas/history.ts';
 import type { OAuthScope } from '../../shared/schemas/oauth.ts';
@@ -226,7 +227,10 @@ async function call<T = unknown>(
   if (!tool) throw new Error(`missing manifest tool ${name}`);
   const rest = await previewRest(actor, name, args);
   const result = await callAny(actor, name, args);
-  expect(result.isError, `${name}: ${result.message}`).not.toBe(true);
+  expect(
+    result.isError,
+    `${name}: ${result.message}; raw=${JSON.stringify(lastExecutionResult)}`,
+  ).not.toBe(true);
   expect(result.structured.status, name).toBeGreaterThanOrEqual(200);
   expect(result.structured.status, name).toBeLessThan(300);
   expect(result.structured.status, `${name} REST status parity`).toBe(rest.status);
@@ -471,6 +475,20 @@ describe('delegated operation behavioral parity', () => {
       ['language', { name: `Language ${suffix}` }],
       ['technique', { name: `Technique ${suffix}`, defaultSkillName: 'Broadsword' }],
       ['style', { name: `Style ${suffix}` }],
+      [
+        'source',
+        { name: `Source ${suffix}`, key: `source-${suffix}`, abbreviation: 'MX', priority: 1 },
+      ],
+      [
+        'modifier',
+        {
+          name: `Modifier ${suffix}`,
+          category: 'enhancement',
+          costType: 'percent',
+          calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
+          applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
+        },
+      ],
     ] as const;
     const libraryPathKeys: Record<string, string> = {
       trait: 'traitId',
@@ -482,6 +500,8 @@ describe('delegated operation behavioral parity', () => {
       language: 'languageId',
       technique: 'techniqueId',
       style: 'styleId',
+      source: 'sourceId',
+      modifier: 'modifierId',
     };
     for (const [kind, body] of libraryKinds) {
       const created = (
@@ -495,7 +515,12 @@ describe('delegated operation behavioral parity', () => {
       const itemPath = path(campaignId, { [idKey]: created.id });
       await call(owner, `gpc_update_library_${kind}`, {
         ...itemPath,
-        body: { name: `${body.name} updated` },
+        body:
+          kind === 'source'
+            ? { priority: 2 }
+            : kind === 'modifier'
+              ? { calculation: fixedCalculation({ modifier: { value: 15, unit: 'percentage' } }) }
+              : { name: `${body.name} updated` },
       });
       if (kind === 'trait') {
         const narrowed = await call<{ traits: Array<{ id: string }>; skills: unknown[] }>(
@@ -911,7 +936,7 @@ describe('delegated operation behavioral parity', () => {
   });
 
   // Manifest anchor: effects-authoring-parity.
-  it('preserves library and owned effects, YAML v11 portability, retries and refinement errors', async () => {
+  it('preserves library and owned effects, YAML v12 portability, retries and refinement errors', async () => {
     const [client] = await getDb()
       .insert(oauthClients)
       .values({
@@ -1033,7 +1058,7 @@ describe('delegated operation behavioral parity', () => {
     });
     const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaign.id));
     const yaml = parseLibraryYaml(exported.body);
-    expect(yaml.version).toBe(11);
+    expect(yaml.version).toBe(12);
     expect(exported.body).not.toContain('libraryItemId');
     expect(yaml.library.traits[0]?.effects).toEqual([
       portableEffects[1],

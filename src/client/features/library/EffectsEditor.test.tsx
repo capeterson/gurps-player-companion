@@ -94,17 +94,15 @@ describe('EffectsEditor', () => {
     fireEvent.change(screen.getByPlaceholderText('Broadsword'), {
       target: { value: 'Broadsword' },
     });
-    fireEvent.change(screen.getByPlaceholderText(/Primary or exact alternate mode/), {
-      target: { value: 'Thrust' },
+    fireEvent.change(screen.getByLabelText('Stable attack mode key (optional)'), {
+      target: { value: 'thrust' },
     });
     fireEvent.change(screen.getByLabelText('Effect 1 target'), {
       target: { value: 'weapon_parry' },
     });
     expect(screen.getByText('Governing skill')).toBeInTheDocument();
     expect(screen.queryByText('Exact inventory item')).not.toBeInTheDocument();
-    expect(
-      screen.queryByPlaceholderText(/Primary or exact alternate mode/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Stable attack mode key (optional)')).not.toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith([
       {
         target: 'weapon_parry',

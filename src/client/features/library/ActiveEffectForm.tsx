@@ -3,7 +3,9 @@ import {
   type ActiveEffectDefinition,
   activeEffectDefinitionCreate,
 } from '../../../shared/schemas/activeEffects.ts';
+import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import { EffectsEditor } from './EffectsEditor.tsx';
+import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
 
 export function ActiveEffectForm({
   campaignId,
@@ -16,6 +18,7 @@ export function ActiveEffectForm({
   onSave: (value: ActiveEffectDefinition) => Promise<void>;
   onCancel: () => void;
 }) {
+  const [metadata, setMetadata] = useState(() => libraryMetadata.parse(initial ?? {}));
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [source, setSource] = useState(initial?.source ?? '');
@@ -37,6 +40,7 @@ export function ActiveEffectForm({
   const [pending, setPending] = useState(false);
   async function save() {
     const parsed = activeEffectDefinitionCreate.safeParse({
+      ...metadata,
       name,
       description: description || null,
       source: source || null,
@@ -221,6 +225,7 @@ export function ActiveEffectForm({
           Add capability
         </button>
       </div>
+      <LibraryMetadataEditor value={metadata} onChange={setMetadata} />
       {error && (
         <p role="alert" className="text-error">
           {error}

@@ -69,6 +69,8 @@ export const SYNCABLE_TABLES: Record<string, { table: string; family: 'character
     character_combat: { table: 'combat_states', family: 'character' },
     campaign: { table: 'campaigns', family: 'campaign' },
     campaign_membership: { table: 'campaign_memberships', family: 'campaign' },
+    campaign_library_source: { table: 'campaign_library_sources', family: 'campaign' },
+    campaign_library_modifier: { table: 'campaign_library_modifiers', family: 'campaign' },
     campaign_library_trait: { table: 'campaign_library_traits', family: 'campaign' },
     campaign_library_skill: { table: 'campaign_library_skills', family: 'campaign' },
     campaign_library_spell: { table: 'campaign_library_spells', family: 'campaign' },

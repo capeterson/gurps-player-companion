@@ -339,7 +339,10 @@ describe('MCP canonical schema conversion', () => {
       0,
     );
     expect(outputBytes).toBeLessThan(250_000);
-    expect(completeSchemaBytes).toBeLessThan(500_000);
+    // Calculator inputs plus source/modifier metadata are bounded, first-class
+    // portable fields; reserve a measured 550 KB for the complete catalog while
+    // still guarding against accidental schema duplication or unbounded growth.
+    expect(completeSchemaBytes).toBeLessThan(550_000);
   });
 
   test('uses original Zod refinements that cannot be represented in OpenAPI', async () => {
