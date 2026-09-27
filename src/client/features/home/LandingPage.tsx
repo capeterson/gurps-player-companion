@@ -93,7 +93,7 @@ export function LandingPage() {
               src="/screenshots/armor-desktop.png"
               alt="GPC Combat section showing armor coverage, active defenses, and damage protection in Gilded Tome."
               width="1224"
-              height="1283"
+              height="1284"
               loading="lazy"
             />
             <figcaption className="px-6 py-4 text-sm text-muted">
@@ -106,7 +106,7 @@ export function LandingPage() {
               src="/screenshots/inventory-desktop.png"
               alt="GPC inventory in Illuminated Manuscript with worn equipment and nested containers."
               width="1224"
-              height="1483"
+              height="1506"
               loading="lazy"
             />
             <figcaption className="px-6 py-4 text-sm text-muted">
