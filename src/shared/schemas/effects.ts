@@ -71,6 +71,7 @@ export const WEAPON_EFFECT_TARGETS = [
 export const weaponEffectTarget = z.enum(WEAPON_EFFECT_TARGETS);
 export type WeaponEffectTarget = z.infer<typeof weaponEffectTarget>;
 
+const modeKey = z.string().trim().min(1).max(40).optional();
 const modeName = z.string().trim().min(1).max(40).optional();
 
 /**
@@ -81,7 +82,12 @@ const modeName = z.string().trim().min(1).max(40).optional();
 export const weaponSelector = z
   .discriminatedUnion('kind', [
     z
-      .object({ kind: z.literal('inventory_item'), inventoryItemId: z.string().uuid(), modeName })
+      .object({
+        kind: z.literal('inventory_item'),
+        inventoryItemId: z.string().uuid(),
+        modeName,
+        modeKey,
+      })
       .strict(),
     z
       .object({
@@ -90,6 +96,7 @@ export const weaponSelector = z
         libraryItemId: z.string().uuid().optional(),
         libraryItemName: z.string().trim().min(1).max(160),
         modeName,
+        modeKey,
       })
       .strict(),
     z
@@ -98,6 +105,7 @@ export const weaponSelector = z
         skillName: z.string().trim().min(1).max(160),
         skillSpecialty: z.string().trim().min(1).max(160).optional(),
         modeName,
+        modeKey,
       })
       .strict(),
     z
@@ -105,6 +113,7 @@ export const weaponSelector = z
         kind: z.literal('weapon_name'),
         weaponName: z.string().trim().min(1).max(160),
         modeName,
+        modeKey,
       })
       .strict(),
   ])
@@ -192,7 +201,7 @@ export const traitEffect = z
     }
     if (
       (eff.target === 'weapon_parry' || eff.target === 'weapon_block') &&
-      eff.weaponSelector?.modeName
+      (eff.weaponSelector?.modeName || eff.weaponSelector?.modeKey)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

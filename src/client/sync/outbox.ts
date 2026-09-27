@@ -1,3 +1,5 @@
+import { libraryDependencyHeld } from './libraryDependencies.ts';
+import { patchesOverlap, unsettledPatch } from './patchKeys.ts';
 /**
  * Outbox: the durable queue of pending mutations.
  *
@@ -138,7 +140,7 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
   }
   const db = getLocalDb();
   const ckey = coalesceKey(args.entityId, args.fieldPath);
-  const now = new Date().toISOString();
+  const now = await nextPatchTime(args.entityId);
   // 1. Find any pending/transient_retry op(s) for the same field so we
   //    can coalesce them away -- AND, critically, carry forward the
   //    OLDEST one's prevValue instead of re-reading the local row.
@@ -287,13 +289,29 @@ async function coalesceSameKeyOps(dupes: readonly OutboxEntry[]): Promise<{
   carriedPrev: { value: unknown } | undefined;
   predecessorClientOpId: string | undefined;
 }> {
+  const mixed = (await getLocalDb().outbox.toArray()).filter(unsettledPatch);
+  const protectedIds = new Set(
+    dupes
+      .filter((d) =>
+        mixed.some(
+          (other) =>
+            other.fieldPath !== d.fieldPath &&
+            other.enqueuedAt > d.enqueuedAt &&
+            patchesOverlap(d, other),
+        ),
+      )
+      .map((d) => d.clientOpId),
+  );
   const coalescable = dupes.filter(
     (d) =>
-      d.status === 'pending' || (d.status === 'transient_retry' && d.deliveryUncertain === false),
+      !protectedIds.has(d.clientOpId) &&
+      (d.status === 'pending' || (d.status === 'transient_retry' && d.deliveryUncertain === false)),
   );
   const predecessors = dupes.filter(
     (d) =>
-      d.status === 'in_flight' || (d.status === 'transient_retry' && d.deliveryUncertain !== false),
+      protectedIds.has(d.clientOpId) ||
+      d.status === 'in_flight' ||
+      (d.status === 'transient_retry' && d.deliveryUncertain !== false),
   );
   let carriedPrev: { value: unknown } | undefined;
   let predecessorClientOpId = [...predecessors]
@@ -324,10 +342,11 @@ async function coalesceSameKeyOps(dupes: readonly OutboxEntry[]): Promise<{
 }
 
 export interface EnqueueEntityPatchArgs {
-  readonly entityClass: LibraryEntityClass;
+  readonly entityClass: LibraryEntityClass | 'character_trait' | 'character_inventory';
   readonly entityId: string;
   /** Owning campaign; carried as the envelope's `parentId`. */
-  readonly campaignId: string;
+  readonly campaignId?: string;
+  readonly characterId?: string;
   /**
    * The entry's full update body. The server validates it as one unit, and
    * every key stays protected from cursor overwrites until the op settles.
@@ -351,6 +370,8 @@ export interface EnqueueEntityPatchArgs {
 export async function enqueueEntityPatch(args: EnqueueEntityPatchArgs): Promise<void> {
   const db = getLocalDb();
   const table = writableSyncEntityTable(args.entityClass);
+  const parentId = parentIdFor(args.entityClass, args.characterId, args.entityId, args.campaignId);
+  if (!parentId) throw new Error('An owning character or campaign is required');
   await db.transaction('rw', [db.outbox, table], async () => {
     const current = await table.get(args.entityId);
     if (!current) throw new Error(`${args.humanName ?? 'This entry'} no longer exists`);
@@ -359,7 +380,7 @@ export async function enqueueEntityPatch(args: EnqueueEntityPatchArgs): Promise<
       (op) => op.command === 'patch' && op.fieldPath === undefined,
     );
     const { carriedPrev, predecessorClientOpId } = await coalesceSameKeyOps(dupes);
-    const now = new Date().toISOString();
+    const now = await nextPatchTime(args.entityId);
     await table.put({ ...current, ...args.attemptedValue, updatedAt: now });
     await db.outbox.add({
       clientOpId: newClientId(),
@@ -370,7 +391,7 @@ export async function enqueueEntityPatch(args: EnqueueEntityPatchArgs): Promise<
       attemptedValue: args.attemptedValue,
       prevValue: args.prevValue ?? (carriedPrev ? carriedPrev.value : current),
       baseRevision: args.baseRevision ?? (current.revision === -1 ? undefined : current.revision),
-      parentId: args.campaignId,
+      parentId,
       validationVersion: 1,
       status: 'pending',
       enqueuedAt: now,
@@ -792,6 +813,10 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
       .map((candidate) => candidate.entityId),
   );
   const unsettledClientOpIds = new Set(unsettled.map((candidate) => candidate.clientOpId));
+  const libraryWrites = unsettled.filter((candidate) =>
+    isLibraryEntityClass(candidate.entityClass),
+  );
+  const campaignsByCharacter = new Map<string, string | undefined>();
   const ready: OutboxEntry[] = [];
   for (const op of all) {
     const backingOff = op.nextEarliestAttemptAt !== undefined && op.nextEarliestAttemptAt > now;
@@ -814,7 +839,28 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
           ? (op.attemptedValue as { parentId: string }).parentId
           : (op.attemptedValue as string)
         : undefined;
+    const mixedPatchHeld =
+      op.command === 'patch' &&
+      unsettled.some(
+        (previous) =>
+          previous.clientOpId !== op.clientOpId &&
+          unsettledPatch(previous) &&
+          previous.enqueuedAt < op.enqueuedAt &&
+          (previous.fieldPath === undefined || op.fieldPath === undefined) &&
+          patchesOverlap(previous, op),
+      );
+    let libraryCampaignId = isLibraryEntityClass(op.entityClass) ? op.parentId : undefined;
+    if (libraryWrites.length && !isLibraryEntityClass(op.entityClass) && op.parentId) {
+      if (!campaignsByCharacter.has(op.parentId))
+        campaignsByCharacter.set(
+          op.parentId,
+          (await db.characters.get(op.parentId))?.campaignId ?? undefined,
+        );
+      libraryCampaignId = op.localRequiredCampaignId ?? campaignsByCharacter.get(op.parentId);
+    }
     const dependencyHeld =
+      (libraryWrites.length > 0 && libraryDependencyHeld(op, libraryWrites, libraryCampaignId)) ||
+      mixedPatchHeld ||
       (op.predecessorClientOpId !== undefined &&
         unsettledClientOpIds.has(op.predecessorClientOpId)) ||
       op.localCampaignDependencyUnknown === true ||
@@ -1073,3 +1119,14 @@ export function backoffMs(attemptCount: number): number {
 }
 
 export const MAX_ATTEMPTS = 8;
+
+/** Preserve gesture order across whole-entry and field patches even within one millisecond. */
+async function nextPatchTime(entityId: string): Promise<string> {
+  const prior = await getLocalDb().outbox.where('entityId').equals(entityId).toArray();
+  return new Date(
+    Math.max(
+      Date.now(),
+      ...prior.filter(unsettledPatch).map((op) => Date.parse(op.enqueuedAt) + 1),
+    ),
+  ).toISOString();
+}

@@ -10,6 +10,7 @@ import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts'
 import { type OutboxEntry, getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { flashBus } from './flashBus.ts';
+import { libraryDependencyHeld } from './libraryDependencies.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
 import {
   MAX_ATTEMPTS,
@@ -17,6 +18,7 @@ import {
   claimDrainableOps,
   enqueueCreate,
   enqueueDeletes,
+  enqueueEntityPatch,
   enqueueFieldPatch,
   enqueueFieldPatches,
   newClientId,
@@ -101,6 +103,88 @@ async function seedCharacter() {
 }
 
 describe('enqueueFieldPatch', () => {
+  it('serializes mixed whole-entry and overlapping field patches without coalescing across the boundary', async () => {
+    const db = getLocalDb();
+    const traitId = '0193b3c0-f1f0-7000-8000-00000000e201';
+    await db.characterTraits.put({
+      id: traitId,
+      characterId: CHAR_ID,
+      name: 'Alertness',
+      points: 5,
+      notes: 'old note',
+      revision: 3,
+    } as never);
+
+    await enqueueEntityPatch({
+      entityClass: 'character_trait',
+      entityId: traitId,
+      characterId: CHAR_ID,
+      attemptedValue: { points: 6, notes: 'whole edit' },
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character_trait',
+      entityId: traitId,
+      characterId: CHAR_ID,
+      fieldPath: 'points',
+      attemptedValue: 7,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character_trait',
+      entityId: traitId,
+      characterId: CHAR_ID,
+      fieldPath: 'notes',
+      attemptedValue: 'independent note',
+    });
+
+    const ops = await db.outbox.orderBy('enqueuedAt').toArray();
+    expect(ops).toHaveLength(3);
+    expect(ops.map((op) => op.fieldPath)).toEqual([undefined, 'points', 'notes']);
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([ops[0]?.clientOpId]);
+    const wholePatch = ops[0];
+    if (!wholePatch) throw new Error('whole-entry patch missing');
+    await db.outbox.delete(wholePatch.clientOpId);
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      ops[1]?.clientOpId,
+      ops[2]?.clientOpId,
+    ]);
+    expect((await db.characterTraits.get(traitId))?.points).toBe(7);
+    expect((await db.characterTraits.get(traitId))?.notes).toBe('independent note');
+  });
+
+  it('keeps a preceding field edit as a dependency of a later whole-entry patch', async () => {
+    const db = getLocalDb();
+    const itemId = '0193b3c0-f1f0-7000-8000-00000000e202';
+    await db.characterInventory.put({
+      id: itemId,
+      characterId: CHAR_ID,
+      name: 'Rations',
+      quantity: 2,
+      notes: 'old note',
+      revision: 4,
+    } as never);
+
+    await enqueueFieldPatch({
+      entityClass: 'character_inventory',
+      entityId: itemId,
+      characterId: CHAR_ID,
+      fieldPath: 'quantity',
+      attemptedValue: 3,
+    });
+    await enqueueEntityPatch({
+      entityClass: 'character_inventory',
+      entityId: itemId,
+      characterId: CHAR_ID,
+      attemptedValue: { quantity: 4, notes: 'whole edit' },
+    });
+
+    const ops = await db.outbox.orderBy('enqueuedAt').toArray();
+    expect(ops).toHaveLength(2);
+    expect(ops[0]?.fieldPath).toBe('quantity');
+    expect(ops[1]?.fieldPath).toBeUndefined();
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([ops[0]?.clientOpId]);
+    expect(ops[1]?.prevValue).toMatchObject({ quantity: 3 });
+  });
+
   it('rolls back an entire multi-field gesture when durable queueing fails', async () => {
     await seedCharacter();
     const db = getLocalDb();
@@ -1185,6 +1269,15 @@ function opRow(overrides: Partial<OutboxEntry> & Pick<OutboxEntry, 'clientOpId'>
   };
 }
 
+function createRow(overrides: Partial<OutboxEntry> & Pick<OutboxEntry, 'clientOpId'>): OutboxEntry {
+  return opRow({
+    ...overrides,
+    command: 'create',
+    coalesceKey: `${overrides.entityId}|:create`,
+    fieldPath: undefined,
+  });
+}
+
 describe('readDrainableOps', () => {
   const TRAIT_ID = '0193b3c0-f1f0-7000-8000-00000000e001';
   const future = new Date(Date.now() + 60_000).toISOString();
@@ -1346,6 +1439,321 @@ describe('readDrainableOps', () => {
       'child-create',
       'reparent',
     ]);
+  });
+
+  it('holds a source-qualified modifier create while its source create backs off', async () => {
+    const db = getLocalDb();
+    const campaignId = '0193b3c0-f1f0-7000-8000-00000000e104';
+    const sourceId = '0193b3c0-f1f0-7000-8000-00000000e105';
+    const modifierId = '0193b3c0-f1f0-7000-8000-00000000e106';
+    const otherCampaignId = '0193b3c0-f1f0-7000-8000-00000000e107';
+    const independentId = '0193b3c0-f1f0-7000-8000-00000000e10a';
+    await db.outbox.bulkPut([
+      createRow({
+        clientOpId: 'source-create',
+        entityClass: 'campaign_library_source',
+        entityId: sourceId,
+        parentId: campaignId,
+        attemptedValue: { name: 'Addon rules', key: 'addon' },
+        status: 'transient_retry',
+        nextEarliestAttemptAt: future,
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      createRow({
+        clientOpId: 'trait-create',
+        entityClass: 'campaign_library_trait',
+        entityId: '0193b3c0-f1f0-7000-8000-00000000e115',
+        parentId: campaignId,
+        attemptedValue: {
+          name: 'Acute Vision',
+          key: 'acute-vision',
+          sourceKey: 'core',
+          kind: 'advantage',
+        },
+        status: 'transient_retry',
+        nextEarliestAttemptAt: future,
+        enqueuedAt: '2026-01-01T00:00:00.500Z',
+      }),
+      createRow({
+        clientOpId: 'modifier-create',
+        entityClass: 'campaign_library_modifier',
+        entityId: modifierId,
+        parentId: campaignId,
+        attemptedValue: {
+          name: 'Fine',
+          key: 'fine',
+          sourceKey: 'addon',
+          calculation: {
+            version: 1,
+            inputs: [],
+            tables: [],
+            nodes: [
+              {
+                id: 'cost',
+                op: 'call',
+                reference: {
+                  section: 'traits',
+                  key: 'acute-vision',
+                  sourceKey: 'core',
+                  kind: 'advantage',
+                },
+                output: 'points',
+                arguments: {},
+              },
+            ],
+            outputs: [],
+          },
+        },
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+      createRow({
+        clientOpId: 'independent-create',
+        entityClass: 'campaign_library_item',
+        entityId: independentId,
+        parentId: campaignId,
+        attemptedValue: { name: 'Rope', key: 'rope' },
+        enqueuedAt: '2026-01-01T00:00:02.000Z',
+      }),
+      createRow({
+        clientOpId: 'other-campaign-create',
+        entityClass: 'campaign_library_item',
+        entityId: '0193b3c0-f1f0-7000-8000-00000000e10b',
+        parentId: otherCampaignId,
+        attemptedValue: { name: 'Other source', key: 'other-source' },
+        enqueuedAt: '2026-01-01T00:00:03.000Z',
+      }),
+    ]);
+
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      'independent-create',
+      'other-campaign-create',
+    ]);
+    await db.outbox.delete('source-create');
+    const remaining = await db.outbox.toArray();
+    const modifier = remaining.find((op) => op.clientOpId === 'modifier-create');
+    if (!modifier) throw new Error('modifier create missing');
+    expect(libraryDependencyHeld(modifier, remaining, campaignId)).toBe(true);
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      'independent-create',
+      'other-campaign-create',
+    ]);
+    await db.outbox.delete('trait-create');
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      'modifier-create',
+      'independent-create',
+      'other-campaign-create',
+    ]);
+  });
+
+  it('holds a character inventory create until its referenced library item is acknowledged', async () => {
+    const db = getLocalDb();
+    const campaignId = '0193b3c0-f1f0-7000-8000-00000000e107';
+    const libraryItemId = '0193b3c0-f1f0-7000-8000-00000000e108';
+    const inventoryId = '0193b3c0-f1f0-7000-8000-00000000e109';
+    await db.outbox.bulkPut([
+      createRow({
+        clientOpId: 'library-item-create',
+        entityClass: 'campaign_library_item',
+        entityId: libraryItemId,
+        parentId: campaignId,
+        attemptedValue: { name: 'Training sword', key: 'training-sword' },
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      createRow({
+        clientOpId: 'inventory-create',
+        entityClass: 'character_inventory',
+        entityId: inventoryId,
+        parentId: CHAR_ID,
+        attemptedValue: { name: 'Training sword', libraryItemId },
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+    ]);
+
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      'library-item-create',
+    ]);
+    await db.outbox.delete('library-item-create');
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual(['inventory-create']);
+  });
+
+  it('holds a snapshot copy until its earlier library pricing edit is acknowledged', async () => {
+    const db = getLocalDb();
+    const campaignId = '0193b3c0-f1f0-7000-8000-00000000e10c';
+    const traitId = '0193b3c0-f1f0-7000-8000-00000000e10d';
+    const copyId = '0193b3c0-f1f0-7000-8000-00000000e10e';
+    await seedCharacter();
+    await db.characters.update(CHAR_ID, { campaignId });
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'trait-rule-edit',
+        entityClass: 'campaign_library_trait',
+        entityId: traitId,
+        command: 'patch',
+        coalesceKey: `${traitId}|entry`,
+        fieldPath: undefined,
+        parentId: campaignId,
+        attemptedValue: { name: 'Night Vision', key: 'night-vision', sourceKey: 'core' },
+        prevValue: { name: 'Night Vision', key: 'night-vision', sourceKey: 'core' },
+        status: 'transient_retry',
+        nextEarliestAttemptAt: future,
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      createRow({
+        clientOpId: 'trait-snapshot-create',
+        entityClass: 'character_trait',
+        entityId: copyId,
+        parentId: CHAR_ID,
+        localRequiredCampaignId: campaignId,
+        attemptedValue: {
+          name: 'Night Vision',
+          libraryTraitId: traitId,
+          pricingResolution: {
+            definitionId: traitId,
+            reference: {
+              section: 'traits',
+              key: 'night-vision',
+              sourceKey: 'core',
+              kind: 'advantage',
+            },
+          },
+        },
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+    ]);
+
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([]);
+    await db.outbox.delete('trait-rule-edit');
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([
+      'trait-snapshot-create',
+    ]);
+  });
+
+  it('holds a library definition delete until a prior edit removes its rule reference', async () => {
+    const db = getLocalDb();
+    const campaignId = '0193b3c0-f1f0-7000-8000-00000000e10f';
+    const traitId = '0193b3c0-f1f0-7000-8000-00000000e110';
+    const modifierId = '0193b3c0-f1f0-7000-8000-00000000e111';
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'remove-rule-reference',
+        entityClass: 'campaign_library_trait',
+        entityId: traitId,
+        command: 'patch',
+        coalesceKey: `${traitId}|entry`,
+        fieldPath: undefined,
+        parentId: campaignId,
+        prevValue: {
+          name: 'Night Vision',
+          key: 'night-vision',
+          sourceKey: 'core',
+          calculation: {
+            version: 1,
+            inputs: [],
+            tables: [],
+            nodes: [
+              {
+                id: 'modifier',
+                op: 'call',
+                reference: { section: 'modifiers', key: 'accurate', sourceKey: 'core' },
+                output: 'modifier',
+                arguments: {},
+              },
+            ],
+            outputs: [],
+          },
+        },
+        attemptedValue: {
+          name: 'Night Vision',
+          key: 'night-vision',
+          sourceKey: 'core',
+          calculation: null,
+        },
+        status: 'transient_retry',
+        nextEarliestAttemptAt: future,
+        enqueuedAt: '2026-01-01T00:00:00.000Z',
+      }),
+      opRow({
+        clientOpId: 'delete-modifier',
+        entityClass: 'campaign_library_modifier',
+        entityId: modifierId,
+        command: 'delete',
+        coalesceKey: `${modifierId}|:delete`,
+        fieldPath: undefined,
+        parentId: campaignId,
+        prevValue: { name: 'Accurate', key: 'accurate', sourceKey: 'core' },
+        enqueuedAt: '2026-01-01T00:00:01.000Z',
+      }),
+    ]);
+
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual([]);
+    await db.outbox.delete('remove-rule-reference');
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual(['delete-modifier']);
+  });
+
+  it('breaks same-millisecond advisory rule dependencies deterministically', async () => {
+    const db = getLocalDb();
+    const campaignId = '0193b3c0-f1f0-7000-8000-00000000e112';
+    const sameInstant = '2026-01-01T00:00:00.000Z';
+    const call = (section: 'traits' | 'modifiers', key: string) => ({
+      version: 1,
+      inputs: [],
+      tables: [],
+      nodes: [
+        {
+          id: 'other',
+          op: 'call',
+          reference: {
+            section,
+            key,
+            sourceKey: 'core',
+            ...(section === 'traits' ? { kind: 'advantage' } : {}),
+          },
+          output: section === 'traits' ? 'points' : 'modifier',
+          arguments: {},
+        },
+      ],
+      outputs: [],
+    });
+    await db.outbox.bulkPut([
+      opRow({
+        clientOpId: 'patch-a',
+        entityClass: 'campaign_library_trait',
+        entityId: '0193b3c0-f1f0-7000-8000-00000000e113',
+        coalesceKey: 'alpha|entry',
+        fieldPath: undefined,
+        parentId: campaignId,
+        prevValue: { name: 'Alpha', key: 'alpha', sourceKey: 'core', kind: 'advantage' },
+        attemptedValue: {
+          name: 'Alpha',
+          key: 'alpha',
+          sourceKey: 'core',
+          kind: 'advantage',
+          calculation: call('modifiers', 'beta'),
+        },
+        enqueuedAt: sameInstant,
+      }),
+      opRow({
+        clientOpId: 'patch-b',
+        entityClass: 'campaign_library_modifier',
+        entityId: '0193b3c0-f1f0-7000-8000-00000000e114',
+        coalesceKey: 'beta|entry',
+        fieldPath: undefined,
+        parentId: campaignId,
+        prevValue: { name: 'Beta', key: 'beta', sourceKey: 'core', kind: 'advantage' },
+        attemptedValue: {
+          name: 'Beta',
+          key: 'beta',
+          sourceKey: 'core',
+          kind: 'advantage',
+          applicability: {
+            traits: [{ section: 'traits', key: 'alpha', sourceKey: 'core', kind: 'advantage' }],
+          },
+        },
+        enqueuedAt: sameInstant,
+      }),
+    ]);
+
+    expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toEqual(['patch-a']);
   });
 });
 

@@ -9,6 +9,8 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { stringify } from 'yaml';
+import { fixedCalculation } from '../../shared/domain/calculation.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
@@ -136,6 +138,8 @@ it.each([
   'techniques',
   'styles',
   'enchantments',
+  'sources',
+  'modifiers',
 ])(
   '%s CRUD and YAML import advance the campaign HTTP cursor without any owned copies',
   async (kind) => {
@@ -170,6 +174,15 @@ it.each([
       ...(kind === 'traits' ? { kind: 'advantage' } : {}),
       ...(kind === 'skills' ? { attribute: 'DX', difficulty: 'A' } : {}),
       ...(kind === 'techniques' ? { defaultSkillName: 'Fencing' } : {}),
+      ...(kind === 'sources' ? { key: 'cursor-source', abbreviation: 'CS' } : {}),
+      ...(kind === 'modifiers'
+        ? {
+            category: 'enhancement',
+            costType: 'percent',
+            calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
+            applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
+          }
+        : {}),
     });
     expect(createdResponse.status).toBe(201);
     const created = (await createdResponse.json()) as { id: string };
@@ -235,6 +248,90 @@ describe('library trait CRUD', () => {
       { method: 'DELETE', headers: bearer(owner.accessToken) },
     );
     expect(delRes.status).toBe(204);
+  });
+});
+
+describe('library source and modifier CRUD authorization', () => {
+  const modifierCreate = {
+    name: 'Reliable',
+    category: 'enhancement',
+    costType: 'percent',
+    calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
+    applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
+  };
+
+  it.each([
+    {
+      section: 'sources',
+      body: { name: 'Core Rules', key: 'core', abbreviation: 'CR', priority: 1 },
+    },
+    { section: 'modifiers', body: modifierCreate },
+  ])('$section allows owner CRUD and denies member/manager writes', async ({ section, body }) => {
+    const owner = await registerUser(`owner-${section}`);
+    const member = await registerUser(`member-${section}`);
+    const manager = await registerUser(`manager-${section}`);
+    const campaign = await createCampaign(owner.accessToken);
+    await addMember(owner.accessToken, String(campaign.id), member.email);
+    await addMember(owner.accessToken, String(campaign.id), manager.email, 'manager');
+    const collection = `/api/v1/campaigns/${campaign.id}/library/${section}`;
+    const createdResponse = await app.request(collection, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify(body),
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()) as { id: string };
+    expect(
+      (
+        await app.request(`/api/v1/campaigns/${campaign.id}/library?section=${section}`, {
+          headers: jsonHeaders(member.accessToken),
+        })
+      ).status,
+    ).toBe(200);
+    for (const token of [member.accessToken, manager.accessToken]) {
+      expect(
+        (
+          await app.request(collection, {
+            method: 'POST',
+            headers: jsonHeaders(token),
+            body: JSON.stringify(body),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await app.request(`${collection}/${created.id}`, {
+            method: 'PATCH',
+            headers: jsonHeaders(token),
+            body: JSON.stringify({ name: 'Unauthorized edit' }),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await app.request(`${collection}/${created.id}`, {
+            method: 'DELETE',
+            headers: jsonHeaders(token),
+          })
+        ).status,
+      ).toBe(403);
+    }
+    const patched = await app.request(`${collection}/${created.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify(
+        section === 'sources' ? { priority: 2 } : { description: 'Owner update' },
+      ),
+    });
+    expect(patched.status).toBe(200);
+    expect(
+      (
+        await app.request(`${collection}/${created.id}`, {
+          method: 'DELETE',
+          headers: jsonHeaders(owner.accessToken),
+        })
+      ).status,
+    ).toBe(204);
   });
 });
 
@@ -730,12 +827,186 @@ describe('YAML export/import round trip', () => {
     return res.text();
   }
 
+  it('imports v12 edition identities by source, merges/replaces editions, and rolls back unresolved references', async () => {
+    const owner = await registerUser('yaml-editions');
+    const campaign = await createCampaign(owner.accessToken);
+    const base = `/api/v1/campaigns/${campaign.id}/library`;
+    const createSource = async (name: string, key: string, priority: number) => {
+      const res = await app.request(`${base}/sources`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({
+          name,
+          key,
+          abbreviation: key.toUpperCase(),
+          priority,
+          edition: '1st',
+        }),
+      });
+      expect(res.status).toBe(201);
+      return (await res.json()) as { id: string; key: string };
+    };
+    const createEdition = async (
+      sourceKey: string,
+      basePoints: number,
+      preferredEdition: boolean,
+    ) => {
+      const { res, body } = await createTrait(owner.accessToken, String(campaign.id), {
+        name: 'Acute Vision',
+        key: 'acute-vision',
+        sourceKey,
+        status: 'complete',
+        role: 'definition',
+        preferredEdition,
+        basePoints,
+      });
+      expect(res.status).toBe(201);
+      return body as { id: string };
+    };
+    const core = await createSource('Core Rules', 'core', 1);
+    const alternate = await createSource('Alternate Rules', 'alternate', 20);
+    const coreTrait = await createEdition('core', 4, false);
+    await createEdition('alternate', 6, true);
+    const modifierCalculation = fixedCalculation({ modifier: { value: 10, unit: 'percentage' } });
+    const applicability = {
+      universal: false,
+      traitKinds: [],
+      traitTags: [],
+      traits: [{ section: 'traits', key: 'acute-vision', sourceKey: 'core', kind: 'advantage' }],
+    };
+    const modifierCreate = {
+      name: 'Reliable',
+      key: 'reliable',
+      sourceKey: 'core',
+      status: 'complete',
+      role: 'definition',
+      category: 'enhancement',
+      costType: 'percent',
+      calculation: modifierCalculation,
+      applicability,
+    };
+    const modifierResponse = await app.request(`${base}/modifiers`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify(modifierCreate),
+    });
+    expect(modifierResponse.status).toBe(201);
+    const modifier = (await modifierResponse.json()) as { id: string };
+    const exportBefore = await exportYaml(owner.accessToken, String(campaign.id));
+    expect(exportBefore).toContain('version: 12');
+    expect(exportBefore).toContain('preferredEdition: true');
+
+    const doc = (sources: unknown[], traits: unknown[], modifiers: unknown[]) =>
+      stringify({
+        version: 12,
+        library: {
+          sources,
+          modifiers,
+          traits,
+        },
+      });
+    const coreSourceYaml = {
+      name: 'Core Rules Revised',
+      key: 'core',
+      abbreviation: 'CR',
+      priority: 1,
+      edition: '2nd',
+    };
+    const coreTraitYaml = {
+      name: 'Acute Vision',
+      key: 'acute-vision',
+      sourceKey: 'core',
+      status: 'complete',
+      role: 'definition',
+      preferredEdition: false,
+      kind: 'advantage',
+      basePoints: 9,
+    };
+    const modifierYaml = { ...modifierCreate, description: 'Updated by v12 import' };
+    const mergeRes = await app.request(`${base}/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        yaml: doc([coreSourceYaml], [coreTraitYaml], [modifierYaml]),
+        mode: 'merge',
+      }),
+    });
+    expect(mergeRes.status).toBe(200);
+    const mergeList = (await (
+      await app.request(base, { headers: bearer(owner.accessToken) })
+    ).json()) as {
+      sources: { id: string; key: string; name: string; edition: string | null }[];
+      traits: {
+        id: string;
+        sourceKey: string | null;
+        basePoints: number;
+        preferredEdition: boolean;
+      }[];
+      modifiers: { id: string; description: string | null }[];
+    };
+    expect(mergeList.sources).toHaveLength(2);
+    expect(mergeList.sources.find((row) => row.key === 'core')).toMatchObject({
+      id: core.id,
+      name: 'Core Rules Revised',
+      edition: '2nd',
+    });
+    expect(mergeList.traits).toHaveLength(2);
+    expect(mergeList.traits.find((row) => row.sourceKey === 'core')).toMatchObject({
+      id: coreTrait.id,
+      basePoints: 9,
+      preferredEdition: false,
+    });
+    expect(mergeList.modifiers).toEqual([
+      expect.objectContaining({ id: modifier.id, description: 'Updated by v12 import' }),
+    ]);
+
+    const invalidSourceRename = await app.request(`${base}/sources/${core.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ key: 'renamed-core' }),
+    });
+    expect(invalidSourceRename.status).toBe(400);
+
+    const failedReplace = await app.request(`${base}/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        yaml: doc([], [{ ...coreTraitYaml, sourceKey: 'missing-source' }], []),
+        mode: 'replace',
+      }),
+    });
+    expect(failedReplace.status).toBe(400);
+    const afterRollback = (await (
+      await app.request(base, { headers: bearer(owner.accessToken) })
+    ).json()) as typeof mergeList;
+    expect(afterRollback.sources).toHaveLength(2);
+    expect(afterRollback.traits).toHaveLength(2);
+    expect(afterRollback.modifiers).toHaveLength(1);
+
+    const replaceRes = await app.request(`${base}/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        yaml: doc([coreSourceYaml], [coreTraitYaml], [modifierYaml]),
+        mode: 'replace',
+      }),
+    });
+    expect(replaceRes.status).toBe(200);
+    const replaced = (await (
+      await app.request(base, { headers: bearer(owner.accessToken) })
+    ).json()) as typeof mergeList;
+    expect(replaced.sources).toHaveLength(1);
+    expect(replaced.traits).toHaveLength(1);
+    expect(replaced.modifiers).toHaveLength(1);
+    expect(alternate.id).not.toBe(core.id);
+  });
+
   it('exports a YAML doc containing the seeded entities', async () => {
     const owner = await registerUser('export-basic');
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 11');
+    expect(yaml).toContain('version: 12');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
@@ -830,8 +1101,8 @@ describe('YAML export/import round trip', () => {
 
     // A yaml with a brand-new trait name inserts a second row (not a rename).
     const yamlPlusNew = yamlWithOriginal.replace(
-      'library:\n  traits:\n',
-      'library:\n  traits:\n    - name: Wealth\n      kind: advantage\n',
+      '  traits:\n',
+      '  traits:\n    - name: Wealth\n      kind: advantage\n',
     );
     const secondImportRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
       method: 'POST',
@@ -1209,7 +1480,7 @@ library:
     expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
 
     const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(firstYaml).toContain('version: 11');
+    expect(firstYaml).toContain('version: 12');
     expect(firstYaml).toContain('enchantments:');
 
     const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
@@ -1224,7 +1495,7 @@ library:
   });
 });
 
-describe('case-insensitive natural keys (migration 0021)', () => {
+describe('canonical library identities', () => {
   it('POST "Sword" then "sword" conflicts with 409', async () => {
     const owner = await registerUser('ci-key-conflict');
     const campaign = await createCampaign(owner.accessToken);
@@ -1242,7 +1513,7 @@ describe('case-insensitive natural keys (migration 0021)', () => {
     expect(secondRes.status).toBe(409);
   });
 
-  it('PATCH to a case-insensitive duplicate name conflicts with 409', async () => {
+  it('renaming preserves an explicit identity key even when the display name matches another row', async () => {
     const owner = await registerUser('ci-key-patch-conflict');
     const campaign = await createCampaign(owner.accessToken);
     await app.request(`/api/v1/campaigns/${campaign.id}/library/skills`, {
@@ -1264,7 +1535,26 @@ describe('case-insensitive natural keys (migration 0021)', () => {
         body: JSON.stringify({ name: 'STEALTH' }),
       },
     );
-    expect(patchRes.status).toBe(409);
+    expect(patchRes.status).toBe(200);
+    const rows = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}/library?section=skills`, {
+        headers: bearer(owner.accessToken),
+      })
+    ).json()) as { skills: { name: string; key?: string }[] };
+    expect(rows.skills.filter((row) => row.name.toLowerCase() === 'stealth')).toHaveLength(2);
+  });
+
+  it('duplicate explicit key plus source conflicts even when names differ', async () => {
+    const owner = await registerUser('identity-explicit-key-conflict');
+    const campaign = await createCampaign(owner.accessToken);
+    const create = (name: string) =>
+      app.request(`/api/v1/campaigns/${campaign.id}/library/skills`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ name, key: 'same-skill', attribute: 'DX', difficulty: 'A' }),
+      });
+    expect((await create('Stealth')).status).toBe(201);
+    expect((await create('Fencing')).status).toBe(409);
   });
 
   it('importing a doc with a differently-cased name updates the existing row rather than creating a shadow duplicate', async () => {

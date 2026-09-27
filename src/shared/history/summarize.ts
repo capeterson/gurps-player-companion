@@ -649,6 +649,18 @@ const EVENT_SUMMARIZERS = {
   character_combat: summarizeCombat,
   campaign: summarizeCampaign,
   campaign_membership: summarizeMembership,
+  campaign_library_source: (op, old, next) =>
+    op === 'insert'
+      ? `Added library source ${next?.name}`
+      : op === 'delete'
+        ? `Removed library source ${old?.name}`
+        : describeFieldChanges(`Library source ${next?.name}`, diffRows(old, next)),
+  campaign_library_modifier: (op, old, next) =>
+    op === 'insert'
+      ? `Added library modifier ${next?.name}`
+      : op === 'delete'
+        ? `Removed library modifier ${old?.name}`
+        : describeFieldChanges(`Library modifier ${next?.name}`, diffRows(old, next)),
   campaign_library_trait: summarizeLibraryTrait,
   campaign_library_skill: summarizeLibrarySkill,
   campaign_library_spell: summarizeLibrarySpell,

@@ -56,7 +56,10 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
   // carries book fields (maintenance, casting time, ...) into the create.
   const [picked, setPicked] = useState<LibrarySpellOut | null>(null);
 
-  const { fetchOptions } = useLibraryFetcher<LibrarySpellOut>('spells', campaignId);
+  const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibrarySpellOut>(
+    'spells',
+    campaignId,
+  );
   const {
     creating,
     submit: submitEntity,
@@ -150,6 +153,9 @@ function AddSpellForm({ characterId, campaignId, canWrite }: AddSpellFormProps) 
               setPicked(opt);
             }}
             fetchOptions={fetchOptions}
+            sourceSelection={
+              campaignId && setAllSources ? { allSources, onChange: setAllSources } : undefined
+            }
             getOptionKey={(o) => o.id}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">

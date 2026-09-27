@@ -3,6 +3,7 @@ import type { LocalLibraryItem } from '../../../db/dexie.ts';
 import { compareOptionalLevel } from '../../characters/sections/useSortableCharacterRows.tsx';
 import { ItemForm } from '../ItemForm.tsx';
 import type { LibrarySectionConfig } from '../LibrarySection.tsx';
+import { pricingDisplayValue } from '../pricingDisplay.ts';
 import { useLibraryEntryMutations } from '../useLocalLibrary.ts';
 import { CrudLibrarySection, type LibrarySectionShellProps } from './CrudLibrarySection.tsx';
 
@@ -22,20 +23,33 @@ export const itemsConfig: LibrarySectionConfig<LocalLibraryItem> = {
       label: 'Weight',
       shortLabel: 'Lb',
       className: 'w-16 text-right sm:w-20',
-      compare: (a, b) => compareOptionalLevel(Number(a.weightLbs), Number(b.weightLbs)),
-      cell: (row) => `${row.weightLbs} lb`,
+      compare: (a, b) =>
+        compareOptionalLevel(
+          pricingDisplayValue(a.calculation, 'weightLbs', Number(a.weightLbs)),
+          pricingDisplayValue(b.calculation, 'weightLbs', Number(b.weightLbs)),
+        ),
+      cell: (row) =>
+        `${pricingDisplayValue(row.calculation, 'weightLbs', Number(row.weightLbs)) ?? 'Calculated'} lb`,
     },
     {
       sort: 'cost',
       label: 'Cost',
       className: 'text-right sm:w-24',
       hideOnMobile: true,
-      compare: (a, b) => compareOptionalLevel(Number(a.cost), Number(b.cost)),
-      cell: (row) => `$${row.cost}`,
+      compare: (a, b) =>
+        compareOptionalLevel(
+          pricingDisplayValue(a.calculation, 'cost', Number(a.cost)),
+          pricingDisplayValue(b.calculation, 'cost', Number(b.cost)),
+        ),
+      cell: (row) =>
+        pricingDisplayValue(row.calculation, 'cost', Number(row.cost)) == null
+          ? 'Calculated'
+          : `${pricingDisplayValue(row.calculation, 'cost', Number(row.cost))}`,
     },
   ],
   group: (row) => categoryLabel(row.category),
-  meta: (row) => `${categoryLabel(row.category)} · ${row.weightLbs} lb · $${row.cost}`,
+  meta: (row) =>
+    `${categoryLabel(row.category)} · ${pricingDisplayValue(row.calculation, 'weightLbs', Number(row.weightLbs)) ?? 'Calculated'} lb · ${pricingDisplayValue(row.calculation, 'cost', Number(row.cost)) == null ? 'Calculated cost' : `${pricingDisplayValue(row.calculation, 'cost', Number(row.cost))}`}`,
   detail: (row) => (
     <>
       {row.description && <p className="text-sm text-muted">{row.description}</p>}

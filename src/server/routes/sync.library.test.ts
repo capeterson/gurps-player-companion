@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { fixedCalculation } from '../../shared/domain/calculation.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
@@ -90,12 +91,136 @@ async function library(token: string, campaignId: string) {
   const res = await app.request(`/api/v1/campaigns/${campaignId}/library`, {
     headers: jsonHeaders(token),
   });
-  return (await res.json()) as { skills: Array<Record<string, unknown>> };
+  return (await res.json()) as {
+    skills: Array<Record<string, unknown>>;
+    sources: Array<Record<string, unknown>>;
+    modifiers: Array<Record<string, unknown>>;
+  };
 }
 
 const skillBody = (name: string) => ({ name, attribute: 'DX', difficulty: 'A' });
 
 describe('library classes through /sync/operations', () => {
+  it.each([
+    {
+      entityClass: 'campaign_library_source',
+      section: 'sources',
+      body: { name: 'Core Rules', key: 'core', abbreviation: 'CR', priority: 2 },
+    },
+    {
+      entityClass: 'campaign_library_modifier',
+      section: 'modifiers',
+      body: {
+        name: 'Reliable',
+        category: 'enhancement',
+        costType: 'percent',
+        calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
+        applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
+      },
+    },
+  ] as const)(
+    'matches REST create/patch/delete authorization for $section',
+    async ({ entityClass, section, body }) => {
+      const owner = await registerUser(`new-${section}-owner`);
+      const member = await registerUser(`new-${section}-member`);
+      const campaignId = await createCampaign(owner.accessToken);
+      const otherCampaignId = await createCampaign(owner.accessToken);
+      await addMember(owner.accessToken, campaignId, member.email);
+      const id = crypto.randomUUID();
+      const created = await send(owner.accessToken, {
+        entityClass,
+        entityId: id,
+        command: 'create',
+        parentId: campaignId,
+        attemptedValue: body,
+      });
+      expect(created.status).toBe('applied');
+      const sectionRows = (await library(owner.accessToken, campaignId))[section];
+      expect(sectionRows).toEqual([expect.objectContaining({ id, name: body.name })]);
+      const cursorClass = entityClass;
+      expect((await pull(owner.accessToken, cursorClass)).changes).toContainEqual(
+        expect.objectContaining({ entityClass, entityId: id }),
+      );
+
+      for (const operation of [
+        { command: 'create', entityId: crypto.randomUUID(), attemptedValue: body },
+        { command: 'patch', entityId: id, attemptedValue: body },
+        { command: 'delete', entityId: id },
+      ]) {
+        expect(
+          await send(member.accessToken, { entityClass, parentId: campaignId, ...operation }),
+        ).toMatchObject({ status: 'unauthorized' });
+      }
+      expect(
+        await send(owner.accessToken, {
+          entityClass,
+          entityId: id,
+          command: 'patch',
+          parentId: otherCampaignId,
+          attemptedValue: body,
+        }),
+      ).toMatchObject({ status: 'unauthorized' });
+
+      const patchedBody = { ...body, name: `${body.name} revised` };
+      expect(
+        await send(owner.accessToken, {
+          entityClass,
+          entityId: id,
+          command: 'patch',
+          parentId: campaignId,
+          baseRevision: created.newRevision,
+          attemptedValue: patchedBody,
+        }),
+      ).toMatchObject({ status: 'applied' });
+      expect((await library(owner.accessToken, campaignId))[section]).toEqual([
+        expect.objectContaining({ id, name: patchedBody.name }),
+      ]);
+      expect(
+        await send(owner.accessToken, {
+          entityClass,
+          entityId: id,
+          command: 'delete',
+          parentId: campaignId,
+        }),
+      ).toMatchObject({ status: 'applied' });
+      expect((await library(owner.accessToken, campaignId))[section]).toEqual([]);
+    },
+  );
+
+  it('rejects invalid source references without persisting a REST or sync modifier write', async () => {
+    const owner = await registerUser('modifier-reference-owner');
+    const campaignId = await createCampaign(owner.accessToken);
+    const rest = await app.request(`/api/v1/campaigns/${campaignId}/library/modifiers`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Dangling',
+        category: 'enhancement',
+        costType: 'percent',
+        calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
+        sourceKey: 'missing-source',
+        applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
+      }),
+    });
+    expect(rest.status).toBe(400);
+    const sync = await send(owner.accessToken, {
+      entityClass: 'campaign_library_modifier',
+      entityId: crypto.randomUUID(),
+      command: 'create',
+      parentId: campaignId,
+      attemptedValue: {
+        name: 'Dangling',
+        category: 'enhancement',
+        costType: 'percent',
+        sourceKey: 'missing-source',
+        calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
+        applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
+      },
+    });
+    expect(sync).toMatchObject({ status: 'rejected' });
+    expect((await library(owner.accessToken, campaignId)).modifiers).toEqual([]);
+  });
+
   it('lets the owner create with the client id, whole-entry patch and delete', async () => {
     const owner = await registerUser('owner');
     const campaignId = await createCampaign(owner.accessToken);

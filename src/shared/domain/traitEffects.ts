@@ -170,7 +170,16 @@ interface WeaponItemForEffects {
   readonly libraryItemId?: string | null;
   readonly weaponData?: {
     readonly skill?: string | null | undefined;
-    readonly alternateModes?: ReadonlyArray<{ readonly name: string }> | undefined;
+    readonly modes?:
+      | ReadonlyArray<{
+          readonly key: string;
+          readonly name: string;
+          readonly skill?: string | null | undefined;
+        }>
+      | undefined;
+    readonly alternateModes?:
+      | ReadonlyArray<{ readonly key?: string | undefined; readonly name: string }>
+      | undefined;
   } | null;
 }
 
@@ -186,8 +195,32 @@ function splitSkillName(value: string): { name: string; specialty: string } {
   };
 }
 
+/** Match a governing-skill selector against this independent attack mode. */
+export function weaponSelectorMatchesSkill(
+  selector: WeaponSelector | undefined,
+  skill?: string | null,
+): boolean {
+  if (selector?.kind !== 'weapon_skill' || skill === undefined) return true;
+  if (!skill) return false;
+  const wanted = splitSkillName(selector.skillName);
+  const candidate = splitSkillName(skill);
+  const specialty = normalizeMechanicalName(selector.skillSpecialty ?? wanted.specialty);
+  return (
+    (wanted.name === '*' || candidate.name === wanted.name) &&
+    (!specialty || specialty === '*' || candidate.specialty === specialty)
+  );
+}
+
 function selectorMatchesItem(selector: WeaponSelector, item: WeaponItemForEffects): boolean {
   if (!item.equipped || !item.weaponData) return false;
+  const modes = item.weaponData.modes ?? [
+    { key: 'primary', name: 'Primary', skill: item.weaponData.skill },
+    ...(item.weaponData.alternateModes ?? []).map((mode, index) => ({
+      ...mode,
+      key: mode.key ?? `alternate-${index + 1}`,
+      skill: item.weaponData?.skill,
+    })),
+  ];
   let matches = false;
   switch (selector.kind) {
     case 'inventory_item':
@@ -204,22 +237,24 @@ function selectorMatchesItem(selector: WeaponSelector, item: WeaponItemForEffect
       matches = normalizeMechanicalName(item.name) === normalizeMechanicalName(selector.weaponName);
       break;
     case 'weapon_skill': {
-      if (!item.weaponData.skill) break;
-      const candidate = splitSkillName(item.weaponData.skill);
-      const wanted = splitSkillName(selector.skillName);
-      const wantedName = wanted.name;
-      const wantedSpecialty = normalizeMechanicalName(selector.skillSpecialty ?? wanted.specialty);
-      matches =
-        (wantedName === '*' || candidate.name === wantedName) &&
-        (!wantedSpecialty || wantedSpecialty === '*' || candidate.specialty === wantedSpecialty);
+      matches = modes.some(
+        (mode) =>
+          (!selector.modeKey || mode.key === selector.modeKey) &&
+          (!selector.modeName ||
+            normalizeMechanicalName(mode.name) === normalizeMechanicalName(selector.modeName)) &&
+          weaponSelectorMatchesSkill(selector, mode.skill ?? null),
+      );
       break;
     }
   }
-  if (!matches || !selector.modeName) return matches;
-  const wantedMode = normalizeMechanicalName(selector.modeName);
+  if (!matches || (!selector.modeName && !selector.modeKey)) return matches;
+  if (selector.modeKey) return modes.some((mode) => mode.key === selector.modeKey);
+  const wantedMode = normalizeMechanicalName(selector.modeName ?? '');
   if (wantedMode === 'primary') return true;
-  return (item.weaponData.alternateModes ?? []).some(
-    (mode) => normalizeMechanicalName(mode.name) === wantedMode,
+  return modes.some(
+    (mode) =>
+      normalizeMechanicalName(mode.key ?? mode.name) === wantedMode ||
+      normalizeMechanicalName(mode.name) === wantedMode,
   );
 }
 
@@ -258,6 +293,8 @@ export function weaponEffectsFor(
   inventoryItemId: string,
   target: WeaponEffectTarget,
   modeName?: string | null,
+  modeKey?: string | null,
+  skill?: string | null,
 ): ResolvedEffect[] {
   const normalizedMode = normalizeMechanicalName(modeName ?? 'primary');
   return matches.flatMap((match) => {
@@ -268,6 +305,9 @@ export function weaponEffectsFor(
     ) {
       return [];
     }
+    if (!weaponSelectorMatchesSkill(match.effect.weaponSelector, skill)) return [];
+    const key = match.effect.weaponSelector?.modeKey;
+    if (key && key !== modeKey) return [];
     const wantedMode = normalizeMechanicalName(match.effect.weaponSelector?.modeName ?? '');
     return wantedMode && wantedMode !== normalizedMode ? [] : [match.effect];
   });

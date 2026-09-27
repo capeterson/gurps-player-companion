@@ -4,8 +4,10 @@ import type {
   LibraryEnchantmentOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
 import type { EnchantmentEffectTarget } from '../../../shared/schemas/inventory.ts';
+import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import { SkillReferenceCombobox } from '../../components/ui/SkillReferenceCombobox.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
+import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
 
 const ENCHANTMENT_TARGETS: readonly EnchantmentEffectTarget[] = [
   'weapon_attack',
@@ -35,6 +37,7 @@ export function EnchantmentForm({
   onSubmit: (body: LibraryEnchantmentCreate) => void;
   onCancel: () => void;
 }) {
+  const [metadata, setMetadata] = useState(() => libraryMetadata.parse(initial ?? {}));
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [source, setSource] = useState(initial?.source ?? '');
@@ -257,6 +260,7 @@ export function EnchantmentForm({
           </fieldset>
         ))}
       </div>
+      <LibraryMetadataEditor value={metadata} onChange={setMetadata} />
       <LibraryFormFooter
         noun="enchantment"
         editing={Boolean(initial)}
@@ -266,6 +270,7 @@ export function EnchantmentForm({
         onCancel={onCancel}
         onSubmit={() =>
           onSubmit({
+            ...metadata,
             name: name.trim(),
             description: description.trim() || null,
             source: source.trim() || null,

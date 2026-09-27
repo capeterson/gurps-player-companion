@@ -269,7 +269,7 @@ it('keeps the draft open with the reason when the edit is already known to be in
   });
   fireEvent.change(screen.getByLabelText('Kind'), { target: { value: 'advantage' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
-  expect(await screen.findByText('A trait with that name already exists')).toBeVisible();
+  expect(await screen.findByText('Duplicate traits edition: Night Vision')).toBeVisible();
   expect(screen.getByRole('textbox', { name: 'Name *' })).toHaveValue('Night Vision');
   expect(await getLocalDb().outbox.count()).toBe(0);
 });

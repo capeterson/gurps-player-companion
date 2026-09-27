@@ -1,3 +1,4 @@
+import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 /**
  * Roll-our-own combobox for picking library entries.
  *
@@ -18,12 +19,15 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react';
 
 interface Props<T> {
   /** Current text value of the input. */
+  sourceSelection?: { allSources: boolean; onChange: (value: boolean) => void } | undefined;
   value: string;
   /** Called whenever the user types. */
   onChange: (v: string) => void;
@@ -50,6 +54,7 @@ interface Props<T> {
 
 export function LibraryAutocomplete<T>({
   value,
+  sourceSelection,
   onChange,
   onPick,
   fetchOptions,
@@ -68,8 +73,37 @@ export function LibraryAutocomplete<T>({
   const [highlight, setHighlight] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const listId = useId();
+  const overlayRef = useViewportBoundedOverlay<HTMLDivElement>(open && options.length > 0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: option text changes the measured overlay height.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const element = overlayRef.current;
+      const anchor = inputRef.current;
+      if (!element || !anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const visual = window.visualViewport;
+      const top = visual?.offsetTop ?? 0;
+      const height = visual?.height ?? window.innerHeight;
+      element.style.width = `${rect.width}px`;
+      element.style.left = `${rect.left}px`;
+      element.style.maxHeight = `${Math.max(0, Math.min(256, height - 16))}px`;
+      element.style.top = `${Math.max(top + 8, Math.min(rect.bottom + 4, top + height - element.getBoundingClientRect().height - 8))}px`;
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    window.visualViewport?.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+      window.visualViewport?.removeEventListener('resize', place);
+    };
+  }, [open, options, overlayRef]);
 
   // Debounced fetch.  Each keystroke schedules a timer; the previous
   // timer is cleared so only the last keystroke's request fires.
@@ -169,10 +203,10 @@ export function LibraryAutocomplete<T>({
         aria-label={ariaLabel}
         aria-autocomplete="list"
         aria-expanded={open}
-        aria-controls={open ? 'library-autocomplete-listbox' : undefined}
+        aria-controls={open ? listId : undefined}
         aria-activedescendant={
           open && options[highlight]
-            ? `library-autocomplete-opt-${getOptionKey(options[highlight])}`
+            ? `${listId}-opt-${getOptionKey(options[highlight])}`
             : undefined
         }
         autoComplete="off"
@@ -187,6 +221,16 @@ export function LibraryAutocomplete<T>({
         placeholder={placeholder}
         disabled={disabled}
       />
+      {sourceSelection && (
+        <button
+          type="button"
+          className="btn btn-ghost btn-xs"
+          aria-pressed={sourceSelection.allSources}
+          onClick={() => sourceSelection.onChange(!sourceSelection.allSources)}
+        >
+          Other sources
+        </button>
+      )}
       {open && options.length > 0 && (
         /*
          * ARIA combobox/listbox idiom: the listbox lives outside the
@@ -201,11 +245,12 @@ export function LibraryAutocomplete<T>({
          * we suppress it inline rather than fight the spec.
          */
         <div
-          id="library-autocomplete-listbox"
+          id={listId}
+          ref={overlayRef}
           // biome-ignore lint/a11y/useSemanticElements: ARIA listbox is the spec for combobox dropdowns; <select> doesn't support free-text input.
           role="listbox"
           tabIndex={-1}
-          className="absolute left-0 right-0 z-50 mt-1 max-h-64 overflow-auto rounded-md border border-base-300 bg-base-100 py-1 shadow-lg"
+          className="fixed z-50 max-w-[calc(100dvw-1rem)] max-h-[calc(100dvh-1rem)] translate-x-[var(--viewport-overlay-shift-x,0px)] overflow-auto break-words rounded-md border border-base-300 bg-base-100 py-1 shadow-lg"
         >
           {options.map((opt, i) => {
             const highlighted = i === highlight;
@@ -213,7 +258,7 @@ export function LibraryAutocomplete<T>({
               <button
                 type="button"
                 key={getOptionKey(opt)}
-                id={`library-autocomplete-opt-${getOptionKey(opt)}`}
+                id={`${listId}-opt-${getOptionKey(opt)}`}
                 // biome-ignore lint/a11y/useSemanticElements: ARIA option is the spec for listbox children; <button role="option"> is the standard combobox idiom.
                 role="option"
                 aria-selected={highlighted}
@@ -229,6 +274,12 @@ export function LibraryAutocomplete<T>({
                 }}
               >
                 {renderOption(opt, highlighted)}
+                {typeof opt === 'object' &&
+                  opt !== null &&
+                  'sourceKey' in opt &&
+                  typeof opt.sourceKey === 'string' && (
+                    <span className="block text-xs text-dim">{opt.sourceKey}</span>
+                  )}
               </button>
             );
           })}

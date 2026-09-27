@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
 import {
   libraryEnchantmentCreate,
   libraryItemCreate,
@@ -11,6 +12,7 @@ import {
   libraryTraitCreate,
   libraryYamlDoc,
 } from '../schemas/campaignLibrary.ts';
+import { libraryModifierCreate, librarySourceCreate } from '../schemas/libraryMetadata.ts';
 import {
   LIBRARY_YAML_MAX_BYTES,
   LibraryYamlError,
@@ -22,6 +24,9 @@ describe('library portability field manifest', () => {
   it('exhaustively matches every portable schema shape', () => {
     const shapes = {
       campaign: libraryYamlDoc.shape.campaign.unwrap().shape,
+      sources: librarySourceCreate.shape,
+      modifiers: libraryModifierCreate.shape,
+      activeEffects: activeEffectDefinitionCreate.shape,
       traits: libraryTraitCreate.shape,
       skills: librarySkillCreate.shape,
       spells: librarySpellCreate.shape,
@@ -79,7 +84,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
     styles: [],
     enchantments: [definition],
   });
-  expect(yaml).toContain('version: 11');
+  expect(yaml).toContain('version: 12');
   expect(yaml).not.toContain('definitionId');
   const parsed = parseLibraryYaml(yaml).library;
   expect(parsed.enchantments).toEqual([definition]);
@@ -201,7 +206,7 @@ it('round-trips specialization catalogs and structured default matchers', () => 
     techniques: [],
     styles: [],
   });
-  expect(yaml).toContain('version: 11');
+  expect(yaml).toContain('version: 12');
   expect(parseLibraryYaml(yaml).library.skills[0]).toEqual(skill);
 });
 
@@ -512,7 +517,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 11');
+    expect(first).toContain('version: 12');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

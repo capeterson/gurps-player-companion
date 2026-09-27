@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { canAdoptLibraryEntry } from '../../shared/domain/libraryIdentity.ts';
 import { activeEffectsField } from '../../shared/schemas/activeEffects.ts';
 import { requireCampaignMember } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
@@ -58,7 +59,7 @@ export async function prepareActiveEffects(
         ),
       )
       .for('share');
-    if (!source)
+    if (!source || !canAdoptLibraryEntry(source))
       throw new HTTPException(403, {
         message: 'Active effect definition unavailable in this campaign',
       });

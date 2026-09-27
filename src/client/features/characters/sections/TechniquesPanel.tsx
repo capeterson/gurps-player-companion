@@ -69,7 +69,10 @@ function AddTechniqueForm({
   const [pointsError, setPointsError] = useState<string | null>(null);
   const [defaultError, setDefaultError] = useState<string | null>(null);
 
-  const { fetchOptions } = useLibraryFetcher<LibraryTechniqueOut>('techniques', campaignId);
+  const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibraryTechniqueOut>(
+    'techniques',
+    campaignId,
+  );
   const {
     creating,
     flashProps,
@@ -180,6 +183,9 @@ function AddTechniqueForm({
               setDefaultModifier(opt.defaultModifier === 0 ? '' : String(opt.defaultModifier));
             }}
             fetchOptions={fetchOptions}
+            sourceSelection={
+              campaignId && setAllSources ? { allSources, onChange: setAllSources } : undefined
+            }
             getOptionKey={(o) => o.id}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">

@@ -1,3 +1,4 @@
+import { normalizeWeaponData } from '../../shared/domain/weaponModes.ts';
 /**
  * Shared insert/upsert-values builders for the character-family entities.
  *
@@ -95,6 +96,7 @@ export function traitInsertValues(
     variantName: body.variantName ?? null,
     notes: body.notes ?? null,
     modifiers: body.modifiers ?? [],
+    pricingResolution: body.pricingResolution ?? null,
     libraryTraitId: body.libraryTraitId ?? null,
     customEffects: body.customEffects ?? [],
   };
@@ -205,11 +207,12 @@ export function inventoryInsertValues(
     weightReductionPercent: body.weightReductionPercent ?? 0,
     isArmor: body.isArmor ?? false,
     armor: body.armor ?? null,
-    weaponData: body.weaponData ?? null,
+    weaponData: normalizeWeaponData(body.weaponData),
     powerstoneData: body.powerstoneData ?? null,
     magicItemData: body.magicItemData ?? null,
     enchantments: body.enchantments ?? [],
     libraryItemId: body.libraryItemId ?? null,
+    pricingResolution: body.pricingResolution ?? null,
   };
 }
 

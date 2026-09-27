@@ -1,4 +1,16 @@
+import {
+  type LibraryGraph,
+  libraryEditionDecisions,
+  mergeLibraryGraph,
+  validateLibraryGraph,
+} from '../../shared/domain/libraryGraph.ts';
+import { canAdoptLibraryEntry, libraryEntryKey } from '../../shared/domain/libraryIdentity.ts';
+import { validatePricingCatalog } from '../../shared/domain/libraryPricing.ts';
 import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
+import { libraryModifierOut, librarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
+import { loadLibraryGraph } from '../services/libraryPricing.ts';
+import { loadPricingCatalog } from '../services/libraryPricing.ts';
+import { modifierEntity, sourceEntity } from './campaignLibraryEntities.ts';
 /**
  * Campaign library CRUD + YAML import/export.
  *
@@ -71,6 +83,8 @@ router.use('/campaigns/*', requireActiveUser);
 const libraryReadQuery = z.object({
   section: z
     .enum([
+      'sources',
+      'modifiers',
       'traits',
       'skills',
       'spells',
@@ -117,6 +131,8 @@ router.openapi(
         content: {
           'application/json': {
             schema: z.object({
+              sources: z.array(librarySourceOut),
+              modifiers: z.array(libraryModifierOut),
               traits: z.array(libraryTraitOut),
               skills: z.array(librarySkillOut),
               spells: z.array(librarySpellOut),
@@ -141,6 +157,10 @@ router.openapi(
     await requireCampaignMember(id, user.id);
     const db = getDb();
     const includes = (candidate: string) => section === undefined || section === candidate;
+    const sources = includes('sources') ? await selectLibrarySection(db, sourceEntity, id) : [];
+    const modifiers = includes('modifiers')
+      ? await selectLibrarySection(db, modifierEntity, id)
+      : [];
     const traits = includes('traits') ? await selectLibrarySection(db, traitEntity, id) : [];
     const skills = includes('skills') ? await selectLibrarySection(db, skillEntity, id) : [];
     const spells = includes('spells') ? await selectLibrarySection(db, spellEntity, id) : [];
@@ -160,6 +180,8 @@ router.openapi(
       : [];
     return c.json(
       {
+        sources: narrowLibraryRows(sources.map(sourceEntity.toOut), search, limit, offset),
+        modifiers: narrowLibraryRows(modifiers.map(modifierEntity.toOut), search, limit, offset),
         traits: narrowLibraryRows(traits.map(traitEntity.toOut), search, limit, offset),
         skills: narrowLibraryRows(skills.map(skillEntity.toOut), search, limit, offset),
         spells: narrowLibraryRows(spells.map(spellEntity.toOut), search, limit, offset),
@@ -187,6 +209,8 @@ router.openapi(
 
 // ===================== PER-ENTITY CRUD =====================
 
+registerLibraryCrud(router, sourceEntity);
+registerLibraryCrud(router, modifierEntity);
 registerLibraryCrud(router, traitEntity);
 registerLibraryCrud(router, skillEntity);
 registerLibraryCrud(router, spellEntity);
@@ -238,6 +262,8 @@ router.openapi(
         const { campaign } = await requireCampaignMember(id, user.id, tx);
         // A node-postgres transaction owns one connection; keep its statements
         // sequential while REPEATABLE READ supplies the cross-section snapshot.
+        const sources = await selectLibrarySection(tx, sourceEntity, id);
+        const modifiers = await selectLibrarySection(tx, modifierEntity, id);
         const traits = await selectLibrarySection(tx, traitEntity, id);
         const skills = await selectLibrarySection(tx, skillEntity, id);
         const spells = await selectLibrarySection(tx, spellEntity, id);
@@ -249,6 +275,8 @@ router.openapi(
         const activeEffects = await selectLibrarySection(tx, activeEffectEntity, id);
         return {
           campaign,
+          sources,
+          modifiers,
           traits,
           skills,
           spells,
@@ -264,6 +292,8 @@ router.openapi(
     );
     const {
       campaign,
+      sources,
+      modifiers,
       traits,
       skills,
       spells,
@@ -287,6 +317,8 @@ router.openapi(
         skillPrerequisitePolicy: campaign.skillPrerequisitePolicy,
         enforceAttributeCaps: campaign.enforceAttributeCaps,
       },
+      sources: sources.map(sourceEntity.rowToCreate),
+      modifiers: modifiers.map(modifierEntity.rowToCreate),
       traits: traits.map(traitEntity.rowToCreate),
       skills: skills.map(skillEntity.rowToCreate),
       spells: spells.map(spellEntity.rowToCreate),
@@ -408,7 +440,20 @@ router.openapi(
     }
 
     const result = await withAudit(user.id, undefined, async (tx) => {
+      await tx
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .for('update');
+      const currentGraph = await loadLibraryGraph(tx, id);
+      try {
+        validateLibraryGraph(mergeLibraryGraph(currentGraph, doc.library as LibraryGraph, mode));
+      } catch (error) {
+        throw new HTTPException(400, { message: (error as Error).message });
+      }
       await advanceLibraryCampaignRevision(tx, id);
+      const sources = await upsertByKey(tx, sourceEntity, id, doc.library.sources, mode);
+      const modifiers = await upsertByKey(tx, modifierEntity, id, doc.library.modifiers, mode);
       const traits = await upsertByKey(tx, traitEntity, id, doc.library.traits, mode);
       const skills = await upsertByKey(tx, skillEntity, id, doc.library.skills, mode);
       // Only prune spells when the document actually carried a spells
@@ -458,6 +503,12 @@ router.openapi(
 
       return {
         mode,
+        sources,
+        modifiers,
+        editionDecisions: libraryEditionDecisions(currentGraph, doc.library as LibraryGraph),
+        incomplete: Object.values(doc.library)
+          .flat()
+          .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length,
         traits,
         skills,
         spells,

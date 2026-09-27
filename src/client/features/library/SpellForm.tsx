@@ -4,9 +4,11 @@ import type {
   LibrarySpellCreate,
   LibrarySpellOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
+import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
 
 interface SpellFormProps {
   initial?: LibrarySpellOut;
@@ -17,6 +19,7 @@ interface SpellFormProps {
 }
 
 export function SpellForm({ initial, isPending, error, onSubmit, onCancel }: SpellFormProps) {
+  const [metadata, setMetadata] = useState(() => libraryMetadata.parse(initial ?? {}));
   const [name, setName] = useState(initial?.name ?? '');
   const [college, setCollege] = useState(initial?.college ?? '');
   const [difficulty, setDifficulty] = useState<(typeof SPELL_DIFFICULTIES)[number]>(
@@ -37,6 +40,7 @@ export function SpellForm({ initial, isPending, error, onSubmit, onCancel }: Spe
     const cost = Number.parseInt(baseEnergyCost, 10);
     const upkeep = maintenanceCost.trim() !== '' ? Number.parseInt(maintenanceCost, 10) : null;
     onSubmit({
+      ...metadata,
       name: name.trim(),
       college: college.trim() || null,
       difficulty,
@@ -166,6 +170,7 @@ export function SpellForm({ initial, isPending, error, onSubmit, onCancel }: Spe
           placeholder="Description (Markdown supported)…"
         />
       </div>
+      <LibraryMetadataEditor value={metadata} onChange={setMetadata} />
       <LibraryFormFooter
         noun="spell"
         editing={Boolean(initial)}

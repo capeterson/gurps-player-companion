@@ -100,7 +100,8 @@ export function ItemField({
                 </option>
               ))}
             </select>
-          ) : spec.path === 'weaponData.skill' ? (
+          ) : spec.path === 'weaponData.skill' ||
+            (spec.path.startsWith('weaponData.') && spec.path.endsWith('.skill')) ? (
             <SkillReferenceCombobox
               aria-label={spec.label}
               value={draft.value}

@@ -130,6 +130,11 @@ small acknowledgement shape (`acknowledged`, plus `resourceId` from the result
 or target path and `revision` when the canonical result exposes it) instead of
 repeating the REST resource schema. The complete REST response is still
 validated before projection.
+The complete generated input/output catalog has a regression budget of 550 KB;
+the current bounded calculator, source, and modifier contracts account for
+about 535 KB. Compact mutation acknowledgements remain independently capped at
+2 KB per tool and aggregate read outputs at 250 KB, so future schema growth
+must remain bounded and avoid duplicating shared definitions.
 Keep stable tool names; descriptions explain field meaning and effects. Successful
 calls keep the authoritative payload only in `structuredContent`; their text
 content is a short HTTP-status pointer so model context does not contain a second
@@ -378,3 +383,15 @@ active effects and condition groups use the existing character write tools. Skil
 procedure schemas and owned snapshots are exposed by the existing library/skill
 operations. All share REST validation and authorization; the per-operation parity
 matrix includes active-effect CRUD and the generated catalogs reflect YAML v11.
+
+
+## Library v12 parity
+
+Source and modifier CRUD have exact operation-manifest entries and generated
+OpenAPI/MCP schemas. Aggregate reads include common source/completeness/evidence
+metadata and authoritative calculation rules. Source-qualified rule references,
+normalized weapon modes and pricing snapshots are shared REST/MCP/sync shapes.
+All owner-only library writes and member reads retain the standard handler,
+scope, audit and sync guards. New operations must satisfy the existing raw-API
+parity and delegated OAuth release gates; no private importer-only write path is
+introduced. See [library-calculation-rules.md](library-calculation-rules.md).

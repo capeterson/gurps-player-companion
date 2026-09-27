@@ -136,6 +136,8 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_library_style: null,
   campaign_library_enchantment: null,
   campaign_library_active_effect: null,
+  campaign_library_source: null,
+  campaign_library_modifier: null,
   adventure_log: null,
 };
 
@@ -205,6 +207,8 @@ const DISPATCHABLE_CLASSES = new Set<EntityClass>([
   'campaign_library_style',
   'campaign_library_enchantment',
   'campaign_library_active_effect',
+  'campaign_library_source',
+  'campaign_library_modifier',
 ]);
 
 /**
@@ -554,6 +558,8 @@ async function dispatchOperationInner(
     case 'campaign_library_style':
     case 'campaign_library_enchantment':
     case 'campaign_library_active_effect':
+    case 'campaign_library_source':
+    case 'campaign_library_modifier':
       return dispatchLibrary(ctx, op, op.entityClass, tx);
     default:
       return {
