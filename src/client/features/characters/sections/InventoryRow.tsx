@@ -1,3 +1,4 @@
+import { TableRow, useTableFiltersActive } from '../../../components/ui/Table.tsx';
 import './inventory/inventory.css';
 import { type DragEvent, Fragment, type MouseEvent, type ReactNode, useRef, useState } from 'react';
 import { formatSigned } from '../../../../shared/format/number.ts';
@@ -14,6 +15,8 @@ import { descendantsOf } from './inventoryTree.ts';
 
 export interface InventoryRowProps {
   item: InventoryItemOut;
+  /** Keep previously revealed descendant editors mounted when an ancestor closes. */
+  ancestorHidden?: boolean;
   depth: number;
   byParent: Map<string | null, InventoryItemOut[]>;
   isSelected: (id: string) => boolean;
@@ -44,6 +47,7 @@ function locationSummary(locations: string[]): string {
 export function InventoryRow(props: InventoryRowProps) {
   const {
     item,
+    ancestorHidden = false,
     depth,
     byParent,
     isSelected,
@@ -62,7 +66,11 @@ export function InventoryRow(props: InventoryRowProps) {
   const isRoot = item.parentId === null;
   const hasChildren = item.isContainer && children.length > 0;
   const [open, setOpen] = useState(() => readContainerExpanded(item.characterId, item.id));
-  const contentsOpen = expandContainers || revealContainers?.has(item.id) || open;
+  const columnFiltersActive = useTableFiltersActive();
+  const contentsOpen =
+    columnFiltersActive || expandContainers || revealContainers?.has(item.id) || open;
+  const contentsVisited = useRef(false);
+  if (contentsOpen) contentsVisited.current = true;
   const descendantCount = hasChildren ? descendantsOf(item.id, byParent).size : 0;
   const sel = isSelected(item.id);
   const highlighted = highlightItemId === item.id;
@@ -172,7 +180,14 @@ export function InventoryRow(props: InventoryRowProps) {
 
   return (
     <Fragment>
-      <tr
+      <TableRow
+        hidden={ancestorHidden}
+        filterValues={{
+          item: item.name,
+          qty: item.quantity,
+          wt: netWeight.toFixed(1),
+          cost: item.cost.toFixed(0),
+        }}
         id={sheetAnchor('inventory', item.id)}
         onClick={canEdit ? (e) => onRowClick(item.id, e) : undefined}
         draggable={canEdit && !!drag}
@@ -428,9 +443,19 @@ export function InventoryRow(props: InventoryRowProps) {
             </button>
           </td>
         )}
-      </tr>
+      </TableRow>
       {canEdit && visited.length > 0 && (
-        <tr className="inventory-editor-row" hidden={section === null} id={editorId}>
+        <TableRow
+          filterValues={{
+            item: item.name,
+            qty: item.quantity,
+            wt: netWeight.toFixed(1),
+            cost: item.cost.toFixed(0),
+          }}
+          className="inventory-editor-row"
+          hidden={ancestorHidden || section === null}
+          id={editorId}
+        >
           <td colSpan={5} className="!p-2 sm:!p-3">
             {visited.map((entry) => (
               <div key={entry} hidden={section !== entry}>
@@ -451,12 +476,18 @@ export function InventoryRow(props: InventoryRowProps) {
               </div>
             ))}
           </td>
-        </tr>
+        </TableRow>
       )}
       {hasChildren &&
-        contentsOpen &&
+        contentsVisited.current &&
         children.map((child) => (
-          <InventoryRow key={child.id} {...props} item={child} depth={depth + 1} />
+          <InventoryRow
+            key={child.id}
+            {...props}
+            item={child}
+            depth={depth + 1}
+            ancestorHidden={ancestorHidden || !contentsOpen}
+          />
         ))}
     </Fragment>
   );

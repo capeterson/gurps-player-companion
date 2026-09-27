@@ -10,6 +10,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { BrandMark } from '../components/ui/BrandMark.tsx';
+import { clearAllTableFilters } from '../components/ui/Table.tsx';
 import { ApiError, api } from '../lib/api.ts';
 import { clearSessionQueryCache } from '../lib/sessionQueryCache.tsx';
 import { tokenStore } from '../lib/tokenStore.ts';
@@ -49,6 +50,7 @@ export function AdminLayout() {
       });
     }
     clearSessionQueryCache(queryClient);
+    clearAllTableFilters();
     tokenStore.clear();
     navigate('/login', { replace: true });
   }

@@ -23,6 +23,7 @@ import type { LibraryMetadata } from '../../../shared/schemas/libraryMetadata.ts
 import type { LibraryEntityClass } from '../../../shared/schemas/sync.ts';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
+import { Table, TableBody, TableFilterScope, tableCellText } from '../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { useFlashState } from '../../hooks/useFlashState.ts';
@@ -278,10 +279,20 @@ export function LibrarySection<R extends LibraryListRow>({
 
       {groups.length > 0 && (
         <div className="card overflow-hidden p-0">
-          <table className="table table-sm w-full table-fixed" aria-label={config.plural}>
+          <Table
+            preferenceKey={`${campaignId}:library:${config.key}`}
+            filterRows={entries.map((row) => ({
+              name: row.name,
+              ...Object.fromEntries(
+                config.columns.map((column) => [column.sort, tableCellText(column.cell(row))]),
+              ),
+            }))}
+            className="table table-sm w-full table-fixed"
+            aria-label={config.plural}
+          >
             <caption className="sr-only">
-              Campaign library {config.plural}, grouped. Sort with the column headings; open an
-              entry to read it.
+              Campaign library {config.plural}, grouped. Sort with the column headings or
+              right-click to filter values; open an entry to read it.
             </caption>
             <thead>
               <tr>
@@ -310,65 +321,69 @@ export function LibrarySection<R extends LibraryListRow>({
                 )}
               </tr>
             </thead>
-            {groups.map((group) => {
-              const open = searching || folds.isOpen(group.label);
-              return (
-                <Fragment key={group.domId}>
-                  <tbody>
-                    <tr>
-                      <th
-                        id={group.domId}
-                        scope="colgroup"
-                        colSpan={colSpan}
-                        className="library-group-heading"
-                      >
-                        {searching ? (
-                          <span className="flex items-center gap-2 px-1 py-1">
-                            <span className="label-eyebrow">{group.label}</span>{' '}
-                            <span className="num text-xs text-dim">{group.rows.length}</span>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-1 py-1 text-left"
-                            aria-expanded={open}
-                            onClick={() => folds.toggle(group.label)}
+            <TableFilterScope>
+              {(filtering) =>
+                groups.map((group) => {
+                  const open = filtering || searching || folds.isOpen(group.label);
+                  return (
+                    <Fragment key={group.domId}>
+                      <tbody>
+                        <tr>
+                          <th
+                            id={group.domId}
+                            scope="colgroup"
+                            colSpan={colSpan}
+                            className="library-group-heading"
                           >
-                            <AppIcon
-                              name={open ? 'chevronDown' : 'chevronRight'}
-                              size={14}
-                              className="text-muted"
-                            />
-                            <span className="label-eyebrow">{group.label}</span>{' '}
-                            <span className="num text-xs text-dim">{group.rows.length}</span>
-                          </button>
-                        )}
-                      </th>
-                    </tr>
-                  </tbody>
-                  {group.rows.map((row) =>
-                    open || row.id === editId ? (
-                      <LibraryRow
-                        key={row.id}
-                        row={row}
-                        config={config}
-                        colSpan={colSpan}
-                        hidden={!open}
-                        defaultEdition={defaultIds?.has(row.id) ?? false}
-                        expanded={expandedId === row.id}
-                        editing={editId === row.id}
-                        isOwner={isOwner}
-                        onToggle={onToggleExpanded}
-                        onEdit={onEdit}
-                        onDelete={onDeleteRequest}
-                        form={editId === row.id ? renderForm(row) : undefined}
-                      />
-                    ) : null,
-                  )}
-                </Fragment>
-              );
-            })}
-          </table>
+                            {searching ? (
+                              <span className="flex items-center gap-2 px-1 py-1">
+                                <span className="label-eyebrow">{group.label}</span>{' '}
+                                <span className="num text-xs text-dim">{group.rows.length}</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-1 py-1 text-left"
+                                aria-expanded={open}
+                                onClick={() => folds.toggle(group.label)}
+                              >
+                                <AppIcon
+                                  name={open ? 'chevronDown' : 'chevronRight'}
+                                  size={14}
+                                  className="text-muted"
+                                />
+                                <span className="label-eyebrow">{group.label}</span>{' '}
+                                <span className="num text-xs text-dim">{group.rows.length}</span>
+                              </button>
+                            )}
+                          </th>
+                        </tr>
+                      </tbody>
+                      {group.rows.map((row) =>
+                        open || row.id === editId ? (
+                          <LibraryRow
+                            key={row.id}
+                            row={row}
+                            config={config}
+                            colSpan={colSpan}
+                            hidden={!open}
+                            defaultEdition={defaultIds?.has(row.id) ?? false}
+                            expanded={expandedId === row.id}
+                            editing={editId === row.id}
+                            isOwner={isOwner}
+                            onToggle={onToggleExpanded}
+                            onEdit={onEdit}
+                            onDelete={onDeleteRequest}
+                            form={editId === row.id ? renderForm(row) : undefined}
+                          />
+                        ) : null,
+                      )}
+                    </Fragment>
+                  );
+                })
+              }
+            </TableFilterScope>
+          </Table>
         </div>
       )}
 
@@ -426,7 +441,15 @@ function LibraryRowImpl<R extends LibraryListRow>({
   const meta = config.meta(row);
   const excerpt = expanded || editing ? '' : plainExcerpt(row.description);
   return (
-    <tbody hidden={hidden}>
+    <TableBody
+      hidden={hidden}
+      filterValues={{
+        name: row.name,
+        ...Object.fromEntries(
+          config.columns.map((column) => [column.sort, tableCellText(column.cell(row))]),
+        ),
+      }}
+    >
       <tr
         id={`library-entry-${row.id}`}
         className={`library-entry-row${expanded || editing ? ' bg-primary/5' : ''}`}
@@ -547,7 +570,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
           </td>
         </tr>
       )}
-    </tbody>
+    </TableBody>
   );
 }
 

@@ -18,6 +18,7 @@ import { DragHandle } from '../../../components/ui/DragHandle.tsx';
 import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
+import { Table, TableBody } from '../../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
@@ -588,7 +589,13 @@ function SkillRow({
   });
 
   return (
-    <tbody
+    <TableBody
+      filterValues={{
+        name: displayName,
+        basis: `${skill.attribute}/${skill.difficulty}`,
+        points: skill.points,
+        level: skill.effectiveLevel ?? skill.level,
+      }}
       aria-label={displayName}
       className={dragging ? 'opacity-50' : undefined}
       onDragOver={(event) => event.preventDefault()}
@@ -812,7 +819,7 @@ function SkillRow({
           </td>
         </tr>
       )}
-    </tbody>
+    </TableBody>
   );
 }
 
@@ -946,7 +953,17 @@ function SkillsTable({
             </label>
           </div>
           <div className="border-t border-base-300">
-            <table className="table table-sm w-full table-fixed" aria-label="Skills">
+            <Table
+              preferenceKey={`${character.id}:skills`}
+              filterRows={character.skills.map((skill) => ({
+                name: skillDisplayName(skill.name, skill.specialization),
+                basis: `${skill.attribute}/${skill.difficulty}`,
+                points: skill.points,
+                level: skill.effectiveLevel ?? skill.level,
+              }))}
+              className="table table-sm w-full table-fixed"
+              aria-label="Skills"
+            >
               <caption className="sr-only">
                 Character skills. Sort with column headings or use row handles for custom order.
               </caption>
@@ -1019,7 +1036,7 @@ function SkillsTable({
                   />
                 );
               })}
-            </table>
+            </Table>
           </div>
           {visibleSkills.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-base-content/60">
@@ -1027,8 +1044,8 @@ function SkillsTable({
             </p>
           )}
           <div className="border-t border-base-300 px-4 py-2 text-[10px] text-base-content/50 sm:px-5">
-            Click a column heading to sort. Drag a row handle or focus it and use ↑/↓ for custom
-            order.
+            Click a column heading to sort; right-click to filter values. Drag a row handle or focus
+            it and use ↑/↓ for custom order.
           </div>
           {saveFailed && (
             <output className="block px-4 pb-3 text-xs text-warning sm:px-5">

@@ -315,6 +315,15 @@ Key PG18 / trigger machinery, layered by migration:
    frame contains no combat data. The `soloEncounters` store (introduced in
    application schema version 6, currently schema version 10), keyed by
    `characterId`, is explicitly device-only and is included in the logout purge.
+- **Shared data tables**: `components/ui/Table.tsx` owns exact-value column
+  filtering and browser-only preferences. `TableHeader` extends sort interactions;
+  `TableBody` / `TableRow` receive semantic `filterValues` rather than reading cell
+  or editor DOM. `filterRows` supplies complete value options when mounted rows are
+  limited by search/folding. Grouped details stay mounted while filtered. Table
+  identity scopes storage and resets state when the owning entity changes.
+  `filterable={false}` disables the default behavior per table/header; utility
+  headers use ordinary `th`. Source guards require future data tables to use the
+  framework. Admin pagination applies filters to the current fetched page.
 - **Draft inputs**: `useDraftField.ts` is the canonical draft-on-blur hook (do
   not fork it). It queues same-field edits, per-field syncs from the server only
   when clean, and fires toast+flash on rollback.

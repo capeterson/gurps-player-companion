@@ -79,6 +79,31 @@ remain cursor-paginated. Compatible clients also receive compressed MCP response
 
 ## User-facing features
 
+### Table column filters
+
+Every application data table uses the shared `components/ui/Table.tsx` framework.
+Right-click a data column heading (or use Alt-click / Shift+F10 on its button)
+to open a searchable checklist of exact values. Plain, unsorted headings also
+open the checklist on click; existing sorting buttons retain click-to-sort.
+Selected values within one column match any selection; filters across columns
+combine. Headers mark active filters, and a table-level **Clear all filters**
+control stays available even when no rows match. Clearing a column restores all
+its values. Options include the source rows supplied by the table even when search
+or folding hides them; paginated admin tables filter the currently loaded page.
+Grouped summaries and their editors hide together without unmounting drafts.
+Library filters reveal folded groups, and inventory filters open nested contents while active; weapon filters keep a weapon's
+attack modes together. Search, sorting and folds still apply independently.
+
+Filter selections are remembered only in device-local `localStorage`
+(`gpc:table-filters:v1:*`), scoped by character/campaign/table identity, and cleared
+on logout. No API, outbox or server preference is written. Storage failures
+leave filtering usable and show a notice. The framework defaults to filtering on;
+callers may set `filterable={false}` on `Table` or `TableHeader` (including
+`SortableHeader`). Action and reorder columns remain plain headers without filters.
+The portaled menu uses shared viewport collision handling, dynamic viewport size
+limits, internal scrolling, Escape/outside dismissal and keyboard focus management.
+
+
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
 - **Passkeys / WebAuthn** as an optional second credential — register, list,
@@ -1008,6 +1033,9 @@ src/
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
                  LibraryMetadataEditor and source/modifier CatalogSection; category form files (Trait/Skill/Spell/Item/Enchantment/
                  ActiveEffectForm) used by the sync-backed library sections
+    components/ui/Table.tsx  Default-enabled client-only column filter framework:
+                 Table, TableHeader, TableBody/TableRow, source-value labels,
+                 grouped row hiding, portaled value checklist and persistence
     components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
                  into the portaled Current Status row
     sync/        orchestrator, outbox, libraryDependencies, patchKeys,

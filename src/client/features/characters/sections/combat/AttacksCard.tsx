@@ -22,6 +22,7 @@ import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
+import { Table, TableBody, TableHeader } from '../../../../components/ui/Table.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollPreset, RollRequest } from '../rollTypes.ts';
@@ -232,7 +233,9 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
   function sortHeader(label: string, sort: Exclude<AttackSort, 'custom'>) {
     const active = preferences.sort === sort;
     return (
-      <th
+      <TableHeader
+        column={sort}
+        label={label}
         scope="col"
         aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
       >
@@ -244,7 +247,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
           {label}{' '}
           <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
         </button>
-      </th>
+      </TableHeader>
     );
   }
 
@@ -302,7 +305,11 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
         inventory={character.inventory}
       />
       <div className="overflow-x-auto">
-        <table className="table table-sm w-full">
+        <Table
+          preferenceKey={`${character.id}:attacks`}
+          aria-label="Attacks"
+          className="table table-sm w-full"
+        >
           <caption className="sr-only">
             Equipped weapon attacks. Sort columns or choose Custom to reorder weapons.
           </caption>
@@ -315,9 +322,9 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
               )}
               {sortHeader('Weapon', 'weapon')}
               {sortHeader('Governing skill', 'skill')}
-              <th scope="col">Damage</th>
+              <TableHeader column="damage" label="Damage" />
               {sortHeader('Type', 'type')}
-              <th scope="col">Reach</th>
+              <TableHeader column="reach" label="Reach" />
             </tr>
           </thead>
           {sortedWeapons.map((w, weaponIndex) => {
@@ -368,7 +375,36 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
               })),
             );
             return (
-              <tbody
+              <TableBody
+                filterValues={{
+                  weapon: w.name,
+                  skill: lines.map((line) => {
+                    const skill = line.weaponMode ? line.weaponMode.skill : wd.skill;
+                    const resolution = resolveWeaponSkill(w.name, skill, skillCandidates);
+                    return resolution.kind === 'matched' ? resolution.name : (skill ?? '—');
+                  }),
+                  type: allModes.length
+                    ? [...new Set(allModes.map((mode) => mode.type ?? '—'))]
+                    : ['—'],
+                  damage: rows.map(({ line, mode }) => {
+                    if (!mode) return line.damage ?? '—';
+                    const resolved = resolveDamage(mode, thrust, swing);
+                    if (!resolved) return line.damage ?? '—';
+                    const damageEffects = weaponEffectsForRow(
+                      effects,
+                      w.id,
+                      'weapon_damage',
+                      line.modeName ?? 'primary',
+                      line.modeKey,
+                      line.weaponMode ? (line.weaponMode.skill ?? null) : (wd.skill ?? null),
+                    );
+                    return formatDamageDice({
+                      ...resolved.dice,
+                      adds: resolved.dice.adds + effectTotal(damageEffects),
+                    });
+                  }),
+                  reach: lines.map((line) => line.reach ?? '—'),
+                }}
                 key={w.id}
                 aria-label={w.name}
                 className={`border-t border-base-300/60 ${draggingId === w.id ? 'opacity-40' : ''} ${dropTarget === w.id ? 'bg-base-200' : ''}`}
@@ -620,10 +656,10 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     </tr>
                   );
                 })}
-              </tbody>
+              </TableBody>
             );
           })}
-        </table>
+        </Table>
       </div>
     </FoldSection>
   );
