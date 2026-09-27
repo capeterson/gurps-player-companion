@@ -76,10 +76,9 @@ async function consume(scope: AuthRateLimitScope, key: string, config: AppConfig
   return Math.max(1, Math.ceil((new Date(row.expires_at).getTime() - Date.now()) / 1000));
 }
 
-/**
- * Consume both source and account dimensions before an expensive public-auth
- * operation. Keys are hashed so the limiter never stores raw emails or IPs.
- */
+/** Consume the source budget before public-auth work. Other scopes also have
+ * an account budget; registration and password login handle accounts separately.
+ * Keys are hashed so the limiter never stores raw emails or IPs. */
 export async function enforceAuthRateLimit(
   c: Context,
   config: AppConfig,
@@ -91,10 +90,25 @@ export async function enforceAuthRateLimit(
   // A blocked source must not allocate arbitrary new account rows or exhaust
   // another account's budget. Only admitted sources consume that dimension.
   if (sourceRetryAfter > 0) reject(c, sourceRetryAfter);
-  const accountRetryAfter = account
-    ? await consume(scope, `account:${digest(normalizeRateLimitAccount(account))}`, config)
-    : 0;
+  const accountRetryAfter =
+    account && scope !== 'login' && scope !== 'register'
+      ? await consume(scope, `account:${digest(normalizeRateLimitAccount(account))}`, config)
+      : 0;
   if (accountRetryAfter > 0) reject(c, accountRetryAfter);
+}
+
+/** Only failed password checks consume the cross-source account budget. */
+export async function enforceFailedLoginRateLimit(
+  c: Context,
+  config: AppConfig,
+  account: string,
+): Promise<void> {
+  const retryAfter = await consume(
+    'login',
+    `account:${digest(normalizeRateLimitAccount(account))}`,
+    config,
+  );
+  if (retryAfter > 0) reject(c, retryAfter);
 }
 
 function reject(c: Context, retryAfter: number): never {
