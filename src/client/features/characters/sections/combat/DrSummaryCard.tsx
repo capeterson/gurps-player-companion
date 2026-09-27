@@ -212,7 +212,14 @@ export function DrSummaryCard({
                 </h3>
                 <DefensesCard
                   character={character}
-                  openRoll={openRoll}
+                  openRoll={(request) =>
+                    openRoll({
+                      ...request,
+                      ...(bumpHp && hpMax != null && canWrite && validDivisor && !fatigueType
+                        ? { onIncomingDamage: () => setDamageOpen(true) }
+                        : {}),
+                    })
+                  }
                   hitLocation={location}
                   facing={selectedFacing}
                   onDefenseUsed={(defense) =>
@@ -222,11 +229,11 @@ export function DrSummaryCard({
                   selectedDefenseTarget={selectedDefense?.target ?? null}
                   onDefenseInvalidated={() => setSelectedDefense(null)}
                 />
-                <p aria-live="polite" className="text-xs text-muted">
-                  {selectedDefense
-                    ? `Selected defense: ${selectedDefense.label} ${selectedDefense.target} against ${locationLabel(location)} from the ${selectedFacing}. Resolve the roll and situational modifiers before deciding whether the attack hits.`
-                    : 'Choose a defense score to roll it, or continue to damage if the attack hits.'}
-                </p>
+                {selectedDefense && (
+                  <p aria-live="polite" className="text-xs text-muted">
+                    {`Selected defense: ${selectedDefense.label} ${selectedDefense.target} against ${locationLabel(location)} from the ${selectedFacing}. Resolve the roll and situational modifiers before deciding whether the attack hits.`}
+                  </p>
+                )}
               </div>
             )}
             <ArmorLocationMap

@@ -232,6 +232,13 @@ test('Current Status stays available and combat stays compact across mobile and 
       page.getByLabel('Armor facing').getByRole('option', { name: 'Unknown' }),
     ).toHaveCount(0);
     await expect(page.getByText('Active defenses', { exact: true })).toBeVisible();
+    for (const removedText of [
+      'Select a zone or use Hit location. Hatched zones have no DR.',
+      'Choose a defense score to roll it, or continue to damage if the attack hits.',
+      'Double defense grants a second, different defense after the first fails; it adds no numerical bonus.',
+    ]) {
+      await expect(page.getByText(removedText, { exact: false })).toHaveCount(0);
+    }
     if (width === 320) {
       for (const boundaryWidth of [320, 599, 600, 601, 899, 900, 901, 1199, 1200, 1201]) {
         await page.setViewportSize({ width: boundaryWidth, height: 900 });
@@ -277,6 +284,56 @@ test('Current Status stays available and combat stays compact across mobile and 
     );
     await expect(damageDialog.getByLabel('Basic damage')).toBeVisible();
     await expect(damageDialog.getByRole('combobox')).toHaveCount(0);
+    await damageDialog.getByRole('button', { name: 'Cancel' }).click();
+    await incomingAttack.getByRole('button', { name: /^Dodge \d+$/ }).click();
+    const defenseRoll = page.getByRole('dialog', { name: 'Roll Dodge' });
+    await expect(defenseRoll.getByRole('button', { name: 'Incoming damage…' })).toHaveCount(0);
+    // Limit the RNG override to the click so account IDs and other UI work retain real randomness.
+    await defenseRoll.getByRole('button', { name: 'Roll 3d6' }).evaluate((button) => {
+      const originalRandom = Math.random;
+      Math.random = () => 0;
+      try {
+        (button as HTMLButtonElement).click();
+      } finally {
+        Math.random = originalRandom;
+      }
+    });
+    await expect(defenseRoll.getByText(/^Success · margin/)).toBeVisible();
+    await expect(defenseRoll.getByRole('button', { name: 'Incoming damage…' })).toHaveCount(0);
+    await defenseRoll.getByRole('button', { name: 'Roll again' }).evaluate((button) => {
+      const originalRandom = Math.random;
+      Math.random = () => 0.99;
+      try {
+        (button as HTMLButtonElement).click();
+      } finally {
+        Math.random = originalRandom;
+      }
+    });
+    await expect(defenseRoll.getByText(/^Failure · margin/)).toBeVisible();
+    const failedDefenseDamage = defenseRoll.getByRole('button', { name: 'Incoming damage…' });
+    await expect(failedDefenseDamage).toBeVisible();
+    for (const visibleControl of [defenseRoll.locator('.card'), failedDefenseDamage]) {
+      const box = await visibleControl.boundingBox();
+      expect(box).not.toBeNull();
+      if (box) {
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+        expect(box.y + box.height).toBeLessThanOrEqual(900);
+      }
+    }
+    await failedDefenseDamage.click();
+    await expect(defenseRoll).toHaveCount(0);
+    await expect(damageDialog).toBeVisible();
+    await expect(damageDialog.getByLabel('Incoming attack context')).toContainText(
+      'Torso · back · Crushing (cr) · Normal DR',
+    );
+    await expect(
+      damageDialog.getByText(
+        `Selected defense: Dodge ${backDodge}. Confirm the hit before applying injury.`,
+      ),
+    ).toBeVisible();
+    await expect(damageDialog.getByLabel('Basic damage')).toBeVisible();
     await damageDialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('rowgroup', { name: 'Move' })).toHaveCount(0);
     await expect(page.getByRole('combobox', { name: 'Defense order' })).toHaveCount(0);
