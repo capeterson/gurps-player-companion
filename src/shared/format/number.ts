@@ -4,8 +4,12 @@
  * access). See AGENTS.md's "Shared validation is pure TS" invariant.
  */
 
-/** "+3", "0" → "+0", "-2" — ASCII hyphen-minus. */
-export function formatSigned(n: number): string {
+/**
+ * "+3", "-2" — ASCII hyphen-minus. Zero prints "+0" by default; pass
+ * `{ zero: 'plain' }` where an unsigned "0" reads better (a cost delta).
+ */
+export function formatSigned(n: number, opts?: { zero?: 'plus' | 'plain' }): string {
+  if (n === 0 && opts?.zero === 'plain') return `${n}`;
   return n >= 0 ? `+${n}` : `${n}`;
 }
 

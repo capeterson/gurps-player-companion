@@ -127,8 +127,11 @@ test('GM runs an NPC encounter through expiry acknowledgement and ending', async
   expect(acknowledgement.status()).toBe(200);
   await expect(acknowledgement.json()).resolves.toMatchObject({ expiryAcknowledgedAtRound: 2 });
 
-  page.on('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'End combat' }).click();
+  // Ending is confirmed in the app's own dialog, not a native confirm().
+  const confirmEnd = page.getByRole('dialog', { name: 'End this combat?' });
+  await expect(confirmEnd).toBeVisible();
+  await confirmEnd.getByRole('button', { name: 'End combat' }).click();
   await expect(page.getByText('Combat ended', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'End combat' })).toHaveCount(0);
 });

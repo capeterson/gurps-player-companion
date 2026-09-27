@@ -110,8 +110,10 @@ router.openapi(
     const user = c.get('user');
     const { search, limit, offset } = c.req.valid('query');
     const db = getDb();
+    // The membership join is on its unique (campaign, user) key, so each
+    // campaign appears once; DISTINCT only added a JSONB-wide comparison.
     const rows = await db
-      .selectDistinct()
+      .select()
       .from(campaigns)
       .leftJoin(
         campaignMemberships,

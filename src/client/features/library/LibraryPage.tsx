@@ -20,7 +20,6 @@ import {
   useState,
 } from 'react';
 import type { ImportResult } from '../../../shared/schemas/campaignLibrary.ts';
-import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
 import { getLocalDb } from '../../db/dexie.ts';
@@ -200,6 +199,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     }
     try {
       const yaml = await file.text();
+      // Loaded on demand: the YAML parser is only needed for an import.
+      const { parseLibraryYaml } = await import('../../../shared/yaml/library.ts');
       if (selectedCampaignId !== currentCampaignId.current) return;
       const parsed = parseLibraryYaml(yaml);
       const mode = importMode;

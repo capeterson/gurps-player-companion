@@ -1,34 +1,20 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { polyfill as mobileDragDropPolyfill } from 'mobile-drag-drop';
 import 'mobile-drag-drop/default.css';
-import { StrictMode } from 'react';
+import { type ComponentType, StrictMode, Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { registerSwLifecycle } from '../sw/registerSW.ts';
 import { App } from './App.tsx';
 import { AppErrorPage } from './components/AppErrorPage.tsx';
 import { SwUpdatePrompt } from './components/SwUpdatePrompt.tsx';
-import { AboutPage } from './features/about/AboutPage.tsx';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage.tsx';
 import { LoginPage } from './features/auth/LoginPage.tsx';
 import { OAuthConsentPage } from './features/auth/OAuthConsentPage.tsx';
 import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
-import { CampaignDetailPage } from './features/campaigns/CampaignDetailPage.tsx';
-import { CampaignEncountersPage } from './features/campaigns/CampaignEncountersPage.tsx';
-import { CampaignHistoryPage } from './features/campaigns/CampaignHistoryPage.tsx';
-import { CampaignLibraryPage } from './features/campaigns/CampaignLibraryPage.tsx';
-import { CampaignLogPage } from './features/campaigns/CampaignLogPage.tsx';
-import { CampaignsPage } from './features/campaigns/CampaignsPage.tsx';
-import { GmCampaignDashboardPage } from './features/campaigns/GmCampaignDashboardPage.tsx';
-import { CharacterSheetPage } from './features/characters/CharacterSheetPage.tsx';
-import { CharactersPage } from './features/characters/CharactersPage.tsx';
-import { EncounterPage } from './features/encounters/EncounterPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
-import { LibraryPage } from './features/library/LibraryPage.tsx';
-import { LogPage } from './features/log/LogPage.tsx';
-import { SettingsPage } from './features/settings/SettingsPage.tsx';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessionQueryCache.tsx';
 import { applyTheme, readStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
@@ -53,6 +39,43 @@ window.addEventListener('contextmenu', (e) => {
   }
 });
 
+/**
+ * Route-level code splitting: each authenticated page (and heavy
+ * dependencies only it uses, like the markdown editor or YAML parser)
+ * loads as its own chunk, so the first screen downloads far less. Navigation
+ * is immediate: the router applies updates outside transitions (see
+ * `RouterProvider` below), so a page whose chunk is still loading shows
+ * `PageLoading` rather than leaving the previous page on screen. Every page
+ * chunk is warmed once the app is idle (`preloadPages`), so that spinner is
+ * rare. Workbox precaches every chunk, so offline navigation still works.
+ */
+const pageLoaders: Array<() => Promise<unknown>> = [];
+
+function page<M, N extends keyof M>(load: () => Promise<M>, name: N) {
+  pageLoaders.push(load);
+  const Page = lazy(async () => ({ default: (await load())[name] as ComponentType }));
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <Page />
+    </Suspense>
+  );
+}
+
+function preloadPages() {
+  for (const load of pageLoaders) {
+    // A failed warm-up is retried by the page's own lazy import on navigation.
+    load().catch(() => undefined);
+  }
+}
+
+function PageLoading() {
+  return (
+    <output className="flex justify-center py-16" aria-label="Loading page">
+      <span className="loading loading-spinner loading-lg text-primary" aria-hidden="true" />
+    </output>
+  );
+}
+
 const queryClient = createSessionQueryClient();
 
 const router = createBrowserRouter([
@@ -75,20 +98,92 @@ const router = createBrowserRouter([
             element: <App />,
             children: [
               { path: '/', element: <HomePage /> },
-              { path: '/characters', element: <CharactersPage /> },
-              { path: '/characters/:id', element: <CharacterSheetPage /> },
-              { path: '/campaigns', element: <CampaignsPage /> },
-              { path: '/campaigns/:id', element: <CampaignDetailPage /> },
-              { path: '/campaigns/:id/log', element: <CampaignLogPage /> },
-              { path: '/campaigns/:id/library', element: <CampaignLibraryPage /> },
-              { path: '/campaigns/:id/history', element: <CampaignHistoryPage /> },
-              { path: '/campaigns/:id/encounters', element: <CampaignEncountersPage /> },
-              { path: '/campaigns/:id/gm', element: <GmCampaignDashboardPage /> },
-              { path: '/campaigns/:id/encounters/:encounterId', element: <EncounterPage /> },
-              { path: '/log', element: <LogPage /> },
-              { path: '/library', element: <LibraryPage /> },
-              { path: '/about', element: <AboutPage /> },
-              { path: '/settings', element: <SettingsPage /> },
+              {
+                path: '/characters',
+                element: page(
+                  () => import('./features/characters/CharactersPage.tsx'),
+                  'CharactersPage',
+                ),
+              },
+              {
+                path: '/characters/:id',
+                element: page(
+                  () => import('./features/characters/CharacterSheetPage.tsx'),
+                  'CharacterSheetPage',
+                ),
+              },
+              {
+                path: '/campaigns',
+                element: page(
+                  () => import('./features/campaigns/CampaignsPage.tsx'),
+                  'CampaignsPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id',
+                element: page(
+                  () => import('./features/campaigns/CampaignDetailPage.tsx'),
+                  'CampaignDetailPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/log',
+                element: page(
+                  () => import('./features/campaigns/CampaignLogPage.tsx'),
+                  'CampaignLogPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/library',
+                element: page(
+                  () => import('./features/campaigns/CampaignLibraryPage.tsx'),
+                  'CampaignLibraryPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/history',
+                element: page(
+                  () => import('./features/campaigns/CampaignHistoryPage.tsx'),
+                  'CampaignHistoryPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/encounters',
+                element: page(
+                  () => import('./features/campaigns/CampaignEncountersPage.tsx'),
+                  'CampaignEncountersPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/gm',
+                element: page(
+                  () => import('./features/campaigns/GmCampaignDashboardPage.tsx'),
+                  'GmCampaignDashboardPage',
+                ),
+              },
+              {
+                path: '/campaigns/:id/encounters/:encounterId',
+                element: page(
+                  () => import('./features/encounters/EncounterPage.tsx'),
+                  'EncounterPage',
+                ),
+              },
+              {
+                path: '/log',
+                element: page(() => import('./features/log/LogPage.tsx'), 'LogPage'),
+              },
+              {
+                path: '/library',
+                element: page(() => import('./features/library/LibraryPage.tsx'), 'LibraryPage'),
+              },
+              {
+                path: '/about',
+                element: page(() => import('./features/about/AboutPage.tsx'), 'AboutPage'),
+              },
+              {
+                path: '/settings',
+                element: page(() => import('./features/settings/SettingsPage.tsx'), 'SettingsPage'),
+              },
             ],
           },
         ],
@@ -96,6 +191,12 @@ const router = createBrowserRouter([
     ],
   },
 ]);
+
+if (typeof window.requestIdleCallback === 'function') {
+  window.requestIdleCallback(preloadPages, { timeout: 2_000 });
+} else {
+  setTimeout(preloadPages, 1_000);
+}
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('root element missing');
@@ -109,7 +210,10 @@ createRoot(rootEl).render(
             toast API. Outside the router so the prompt survives
             navigation. */}
         <SwUpdatePrompt />
-        <RouterProvider router={router} />
+        {/* Plain (non-transition) navigation updates: a transition would keep the
+            previous page on screen, still interactive, while a lazy page chunk
+            loads; this shows the page spinner at once instead. */}
+        <RouterProvider router={router} unstable_useTransitions={false} />
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

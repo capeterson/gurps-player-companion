@@ -295,6 +295,41 @@ describe('encounter member projection', () => {
       casterCombatantId: null,
       name: 'Concealed hex',
     });
+
+    // The list projects every encounter in one pass: each keeps its own
+    // combatants and effects, with the same masking as the detail route.
+    const secondResponse = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        name: 'Second skirmish',
+        combatants: [
+          { kind: 'pc', characterId: otherCharacter.id },
+          { kind: 'npc', name: 'Second guard', basicSpeed: 5, dx: 10, maxHp: 10 },
+        ],
+      }),
+    });
+    expect(secondResponse.status).toBe(201);
+    const listResponse = await app.request(`/api/v1/campaigns/${campaign.id}/encounters`, {
+      headers: { Authorization: `Bearer ${viewer.accessToken}` },
+    });
+    expect(listResponse.status).toBe(200);
+    const listed = (await listResponse.json()) as Array<{
+      name: string;
+      combatants: { name: string; characterId: string | null; dx: number | null }[];
+      effects: { name: string }[];
+    }>;
+    const ambush = listed.find((encounter) => encounter.name === 'Ambush');
+    const second = listed.find((encounter) => encounter.name === 'Second skirmish');
+    expect(ambush?.combatants.map((row) => row.name).sort()).toEqual(
+      projected.combatants.map((row) => row.name).sort(),
+    );
+    expect(ambush?.effects.map((effect) => effect.name)).toEqual(['Concealed hex']);
+    expect(second?.combatants.map((row) => row.name).sort()).toEqual(
+      ['Other PC', 'Second guard'].sort(),
+    );
+    expect(second?.effects).toEqual([]);
+    expect(second?.combatants.find((row) => row.characterId === otherCharacter.id)?.dx).toBeNull();
   });
 
   it('does not mask another PC initiative when sheets are shared', async () => {

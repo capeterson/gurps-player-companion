@@ -116,12 +116,17 @@ test('API-seeded campaign effects and skill actions survive offline use and reco
   await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toHaveCount(0);
   await context.setOffline(true);
   await selectCharacterSection(page, 'Skills');
+  // Skill actions live under "Source & rules" in the row's inline editor.
+  await page.getByRole('button', { name: 'Edit Athletics', exact: true }).click();
+  await page.getByText('Source & rules', { exact: true }).click();
   await page.getByRole('button', { name: 'Preview Jump', exact: true }).click();
   await expect(page.getByLabel('Effective target 10')).toBeVisible();
   await page.getByLabel('Underwater', { exact: true }).selectOption('true');
   await expect(page.getByLabel('Effective target 7')).toBeVisible();
   await expect(page.getByText('success: Clear the obstacle')).toBeVisible();
-  await page.getByRole('button', { name: 'Close', exact: true }).last().click();
+  const rollSheet = page.getByRole('dialog', { name: 'Roll Athletics: Jump' });
+  await rollSheet.getByRole('button', { name: 'Close', exact: true }).last().click();
+  await expect(rollSheet).toHaveCount(0);
   await context.setOffline(false);
   await expect
     .poll(async () => {

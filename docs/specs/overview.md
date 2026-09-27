@@ -932,7 +932,10 @@ src/
                  shared full/minimal/forbidden decision), patchSet
                  (buildPatchSet, the shared PATCH-body-to-`.set()` helper),
                  entityWrites (per-entity insert/upsert-values builders
-                 shared by REST and the sync dispatcher — AGENTS.md S12)
+                 shared by REST and the sync dispatcher — AGENTS.md S12),
+                 characterChildren (per-class configs plus insert/update/
+                 delete for library-linked character children and the
+                 child-table map used by the cursor and replay lookups)
     db/          schema.ts (Drizzle), seeds/ (Lantern Coast fixture/data/accounts/tests),
                  migrations/ (hand-written SQL for
                  triggers), auditContext (withAudit), client, migrate, seed
@@ -951,7 +954,8 @@ src/
                  libraryTablePreferences, useLibraryGroupFolds, librarySearch
                  (cached human-readable-field matcher), plus EffectsEditor, the
                  reusable ordered effect authoring UI shared with
-                 character-owned trait mechanics
+                 character-owned trait mechanics, and LibraryFormFooter
+                 (the Cancel/Add-or-Save actions every entry form shares)
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
       characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
@@ -969,6 +973,7 @@ src/
                  useAddEntityForm
                  (the add form), useEntityRowPatch (per-row field patch
                  dispatch, incl. useEntityEnumField for enum <select>s),
+                 useConfirmedEntityDelete (row delete confirmation),
                  useClampedJsonbBumper (powerstone/magic-item charge
                   steppers), useTempEffects (the temporary-effects list
                   backing the Attributes panel's modifier popovers), shared
@@ -1136,13 +1141,15 @@ Things that repeatedly surprise people working in this repo:
 4. **Adding a syncable entity class touches ~6 sites** (schema enum, Dexie,
    orchestrator switches, outbox switches, server dispatcher + cursor reader,
    purge list) **plus** the history checklist (trigger, `SYNCABLE_TABLES`,
-   `summarizeEvent`, `withAudit`). There is no registry that catches a miss —
-   follow the `AGENTS.md` S6 and H1–H5 checklists end-to-end or you get silent
-   data loss.
+   `summarizeEvent`, `withAudit`). Only the client store map
+   (`STORE_BY_ENTITY_CLASS`) fails typechecking on a miss; nothing else catches
+   one — follow the `AGENTS.md` S6 and H1–H5 checklists end-to-end or you get
+   silent data loss.
 
 5. **REST and sync share primitives, not every handler.** Sync writes use
    `dispatchOperation()` in `syncDispatch.ts`; REST routes also perform writes
-   directly using shared services. Both must run inside `withAudit(...)` so DB triggers
+   directly using shared services. Trait, skill, spell, language and technique
+   writes on both doors go through `services/characterChildren.ts`. Both must run inside `withAudit(...)` so DB triggers
    can attribute the change. History capture sits *below* both via Postgres
    triggers.
 

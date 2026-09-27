@@ -32,6 +32,7 @@ import {
   saveSkillTablePreferences,
 } from './skillTablePreferences.ts';
 import { useAddEntityForm } from './useAddEntityForm.ts';
+import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityEnumField,
   useEntityNameField,
@@ -495,9 +496,6 @@ function SkillRow({
   onRoll,
   effects,
 }: SkillRowProps) {
-  const toasts = useToasts();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   const displayName = skillDisplayName(skill.name, skill.specialization);
   const bonusEffects = skillEffectsForRow(effects, skill.name, skill.specialization);
   const modifierTooltip = (
@@ -575,19 +573,13 @@ function SkillRow({
   const hasAdvancedDetails = hasConfiguredRules || skill.techLevel != null;
   const canExpand = canWrite || Boolean(skill.notes) || hasConfiguredRules;
 
-  const removeSkill = async () => {
-    try {
-      await enqueueDelete({
-        entityClass: 'character_skill',
-        entityId: skill.id,
-        humanName: `skill "${displayName}"`,
-        characterId,
-        prevValue: skill,
-      });
-    } catch (err) {
-      toasts.push(`Couldn't delete skill — ${(err as Error).message}`, { kind: 'error' });
-    }
-  };
+  const deletion = useConfirmedEntityDelete({
+    entityClass: 'character_skill',
+    noun: 'skill',
+    label: displayName,
+    entity: skill,
+    characterId,
+  });
 
   return (
     <tbody
@@ -793,7 +785,7 @@ function SkillRow({
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm text-error"
-                    onClick={() => setConfirmDelete(true)}
+                    onClick={deletion.request}
                   >
                     Delete skill
                   </button>
@@ -801,17 +793,7 @@ function SkillRow({
                     Done
                   </button>
                 </footer>
-                <ConfirmDialog
-                  open={confirmDelete}
-                  title={`Delete skill "${displayName}"?`}
-                  confirmLabel="Delete"
-                  tone="error"
-                  onConfirm={() => {
-                    setConfirmDelete(false);
-                    void removeSkill();
-                  }}
-                  onCancel={() => setConfirmDelete(false)}
-                />
+                {deletion.dialog}
               </div>
             ) : (
               <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">

@@ -405,80 +405,35 @@ function parentIdFor(
   return undefined;
 }
 
+/**
+ * Field patches read their prior value and base revision from the local
+ * character-family row. Library entries use whole-entry patches and
+ * campaigns are cursor-only, so neither has a field-patch base here.
+ */
+const FIELD_PATCH_CLASSES: ReadonlySet<EntityClass> = new Set([
+  'character',
+  'character_trait',
+  'character_skill',
+  'character_spell',
+  'character_language',
+  'character_technique',
+  'character_inventory',
+  'character_combat',
+]);
+
+async function readFieldPatchRow(
+  args: EnqueueFieldPatchArgs,
+): Promise<Record<string, unknown> | undefined> {
+  if (!FIELD_PATCH_CLASSES.has(args.entityClass)) return undefined;
+  return readSyncEntity(args.entityClass, args.entityId);
+}
+
 async function readFieldValue(args: EnqueueFieldPatchArgs): Promise<unknown> {
-  const db = getLocalDb();
-  const get = async (): Promise<unknown> => {
-    switch (args.entityClass) {
-      case 'character': {
-        const row = await db.characters.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_trait': {
-        const row = await db.characterTraits.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_skill': {
-        const row = await db.characterSkills.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_spell': {
-        const row = await db.characterSpells.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_language': {
-        const row = await db.characterLanguages.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_technique': {
-        const row = await db.characterTechniques.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_inventory': {
-        const row = await db.characterInventory.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      case 'character_combat': {
-        const row = await db.characterCombat.get(args.entityId);
-        return row ? (row as unknown as Record<string, unknown>)[args.fieldPath] : undefined;
-      }
-      default:
-        return undefined;
-    }
-  };
-  return await get();
+  return (await readFieldPatchRow(args))?.[args.fieldPath];
 }
 
 async function readEntityRevision(args: EnqueueFieldPatchArgs): Promise<number | undefined> {
-  const db = getLocalDb();
-  let rev: number | undefined;
-  switch (args.entityClass) {
-    case 'character':
-      rev = (await db.characters.get(args.entityId))?.revision;
-      break;
-    case 'character_trait':
-      rev = (await db.characterTraits.get(args.entityId))?.revision;
-      break;
-    case 'character_skill':
-      rev = (await db.characterSkills.get(args.entityId))?.revision;
-      break;
-    case 'character_spell':
-      rev = (await db.characterSpells.get(args.entityId))?.revision;
-      break;
-    case 'character_language':
-      rev = (await db.characterLanguages.get(args.entityId))?.revision;
-      break;
-    case 'character_technique':
-      rev = (await db.characterTechniques.get(args.entityId))?.revision;
-      break;
-    case 'character_inventory':
-      rev = (await db.characterInventory.get(args.entityId))?.revision;
-      break;
-    case 'character_combat':
-      rev = (await db.characterCombat.get(args.entityId))?.revision;
-      break;
-    default:
-      return undefined;
-  }
+  const rev = (await readFieldPatchRow(args))?.revision as number | undefined;
   return rev === -1 ? undefined : rev;
 }
 
@@ -763,8 +718,14 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
         op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
     )
     .sort((a, b) => a.enqueuedAt.localeCompare(b.enqueuedAt));
+  const assignmentsByCharacter = new Map<string, OutboxEntry[]>();
+  for (const op of assignmentOps) {
+    const moves = assignmentsByCharacter.get(op.entityId);
+    if (moves) moves.push(op);
+    else assignmentsByCharacter.set(op.entityId, [op]);
+  }
   const assignmentsFor = (parentId: string | undefined) =>
-    assignmentOps.filter((op) => op.entityId === parentId);
+    (parentId === undefined ? undefined : assignmentsByCharacter.get(parentId)) ?? [];
   const campaignCreateReady = new Set<string>();
   for (const op of unsettled) {
     if (op.command !== 'create' || op.localRequiredCampaignId === undefined) continue;
@@ -789,14 +750,21 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
     }
   }
   const all = unsettled.filter((op) => op.status !== 'in_flight');
-  const campaignAssignments = new Set(
-    unsettled
-      .filter(
-        (op) =>
-          op.entityClass === 'character' && op.command === 'patch' && op.fieldPath === 'campaignId',
-      )
-      .map((op) => op.entityId),
-  );
+  const campaignAssignments = new Set(assignmentsByCharacter.keys());
+  // Campaigns that a still-unsettled linked create requires its character
+  // to be in, keyed by that character: a move away from one must wait.
+  const requiredCampaignsByCharacter = new Map<string, Set<unknown>>();
+  for (const child of unsettled) {
+    if (
+      child.command !== 'create' ||
+      child.parentId === undefined ||
+      child.localRequiredCampaignId === undefined
+    )
+      continue;
+    const required = requiredCampaignsByCharacter.get(child.parentId) ?? new Set<unknown>();
+    required.add(child.localRequiredCampaignId);
+    requiredCampaignsByCharacter.set(child.parentId, required);
+  }
   const parentsWithEarlierCreates = new Set(
     unsettled
       .filter(
@@ -853,13 +821,7 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
       (op.entityClass === 'character' &&
         op.fieldPath === 'campaignId' &&
         (parentsWithEarlierCreates.has(op.entityId) ||
-          unsettled.some(
-            (child) =>
-              child.command === 'create' &&
-              child.parentId === op.entityId &&
-              child.localRequiredCampaignId !== undefined &&
-              child.localRequiredCampaignId === op.prevValue,
-          ))) ||
+          requiredCampaignsByCharacter.get(op.entityId)?.has(op.prevValue) === true)) ||
       heldBackCreates.has(op.entityId) ||
       (op.parentId !== undefined && heldBackCreates.has(op.parentId)) ||
       (op.command === 'create' &&

@@ -4,6 +4,7 @@ import {
   MODIFIER_COST_TYPES,
   TRAIT_KINDS,
 } from '../../../shared/constants/traits.ts';
+import { formatSigned } from '../../../shared/format/number.ts';
 import type {
   LibraryItemOut,
   LibraryTraitCreate,
@@ -13,6 +14,7 @@ import type { TraitModifier } from '../../../shared/schemas/trait.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { EffectsEditor } from './EffectsEditor.tsx';
+import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 
 // ── Trait form ──────────────────────────────────────────────────────────────
 
@@ -129,25 +131,15 @@ export function TraitForm({
         onChange={setEffects}
         onValidityChange={setEffectsValid}
       />
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={onCancel}
-          disabled={isPending}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={handleSubmit}
-          disabled={isPending || !name.trim() || !effectsValid}
-        >
-          {isPending ? 'Saving…' : initial ? 'Save changes' : 'Add trait'}
-        </button>
-      </div>
-      {error && <p className="alert alert-error text-sm">{error}</p>}
+      <LibraryFormFooter
+        noun="trait"
+        editing={Boolean(initial)}
+        isPending={isPending}
+        canSubmit={Boolean(name.trim()) && effectsValid}
+        error={error}
+        onCancel={onCancel}
+        onSubmit={handleSubmit}
+      />
     </fieldset>
   );
 }
@@ -191,8 +183,8 @@ function ModifierSubEditor({
             <span key={`${m.name}-${m.costValue}`} className="chip flex items-center gap-1 text-xs">
               {m.name}{' '}
               {m.costType === 'percent'
-                ? `${m.costValue > 0 ? '+' : ''}${m.costValue}%`
-                : `${m.costValue > 0 ? '+' : ''}${m.costValue} pts`}
+                ? `${formatSigned(m.costValue, { zero: 'plain' })}%`
+                : `${formatSigned(m.costValue, { zero: 'plain' })} pts`}
               <button
                 type="button"
                 className="ml-1 text-error"

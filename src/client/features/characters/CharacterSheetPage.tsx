@@ -15,7 +15,7 @@ import {
 } from '../../../shared/domain/attributeTooltips.ts';
 import { hasMagery } from '../../../shared/domain/spellCalc.ts';
 import { getWarningLabel } from '../../../shared/domain/warnings.ts';
-import { formatScaled } from '../../../shared/format/number.ts';
+import { formatScaled, formatSigned } from '../../../shared/format/number.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import {
   MANUAL_TEMP_EFFECT_ID,
@@ -919,7 +919,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
               <span>Parry +</span>
             </InfoTooltip>
           }
-          value={d.parryMod >= 0 ? `+${d.parryMod}` : d.parryMod}
+          value={formatSigned(d.parryMod)}
         />
         <Stat
           label={
@@ -934,7 +934,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
               <span>Block +</span>
             </InfoTooltip>
           }
-          value={d.blockMod >= 0 ? `+${d.blockMod}` : d.blockMod}
+          value={formatSigned(d.blockMod)}
         />
         <Stat
           label={
@@ -975,7 +975,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
               <span>Fright +</span>
             </InfoTooltip>
           }
-          value={d.frightCheckMod >= 0 ? `+${d.frightCheckMod}` : d.frightCheckMod}
+          value={formatSigned(d.frightCheckMod)}
         />
         <Stat
           label={
