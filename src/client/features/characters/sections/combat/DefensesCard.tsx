@@ -21,6 +21,7 @@ import type {
   ResolvedEffectOut,
 } from '../../../../../shared/schemas/character.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
+import { Table, TableBody, TableHeader } from '../../../../components/ui/Table.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import type { RollRequest } from '../rollTypes.ts';
 import {
@@ -433,36 +434,57 @@ function DefenseTable({
       <p className="text-xs text-muted">Scores include the selected hit location and facing.</p>
 
       <div className="overflow-x-auto rounded-xl border border-base-300">
-        <table className="table table-sm w-full" aria-label="Defenses">
+        <Table
+          preferenceKey={`${character.id}:defenses`}
+          className="table table-sm w-full"
+          aria-label="Defenses"
+        >
           <thead>
             <tr>
               <th className="w-8 max-sm:w-6 max-sm:px-1" aria-label="Custom order" />
-              <th
+              <TableHeader
+                column="defense"
+                label="Defense"
                 className="max-sm:px-1"
                 aria-sort={sort === 'defense' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Defense', 'defense')}
-              </th>
-              <th
+              </TableHeader>
+              <TableHeader
+                column="skill"
+                label="Governing skill"
                 className="max-sm:hidden"
                 aria-sort={sort === 'skill' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Governing skill', 'skill')}
-              </th>
-              <th className="text-right whitespace-nowrap max-sm:hidden">Before DB</th>
-              <th className="text-right">DB</th>
-              <th
+              </TableHeader>
+              <TableHeader
+                column="beforeDb"
+                label="Before DB"
+                className="text-right whitespace-nowrap max-sm:hidden"
+              />
+              <TableHeader column="db" label="DB" className="text-right" />
+              <TableHeader
+                column="final"
+                label="Final"
                 className="text-right max-sm:px-1"
                 aria-sort={sort === 'final' ? (descending ? 'descending' : 'ascending') : 'none'}
               >
                 {sortButton('Final', 'final', 'w-full justify-end')}
-              </th>
+              </TableHeader>
             </tr>
           </thead>
           {visibleRows.map((row) => {
             const customIndex = orderedRows.findIndex((candidate) => candidate.id === row.id);
             return (
-              <tbody
+              <TableBody
+                filterValues={{
+                  defense: row.label,
+                  skill: row.skill,
+                  beforeDb: row.beforeDb,
+                  db: row.db == null ? '—' : formatSigned(row.db, { zero: 'plain' }),
+                  final: row.final,
+                }}
                 key={row.id}
                 aria-label={row.label}
                 onDragOver={(event) => {
@@ -554,10 +576,10 @@ function DefenseTable({
                     )}
                   </td>
                 </tr>
-              </tbody>
+              </TableBody>
             );
           })}
-        </table>
+        </Table>
       </div>
 
       {saveFailed && (

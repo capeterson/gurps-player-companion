@@ -16,6 +16,7 @@ import {
   LibraryModifierPicker,
   applyModifierToggle,
 } from '../../../components/ui/LibraryModifierPicker.tsx';
+import { Table, TableBody } from '../../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
@@ -707,7 +708,13 @@ function TraitRow({
   });
 
   return (
-    <tbody
+    <TableBody
+      filterValues={{
+        name: trait.name,
+        kind: traitKindLabel(trait.kind),
+        points: trait.points,
+        level: trait.level,
+      }}
       aria-label={trait.name}
       className={dragging ? 'opacity-50' : undefined}
       hidden={!visible}
@@ -887,7 +894,7 @@ function TraitRow({
           </td>
         </tr>
       )}
-    </tbody>
+    </TableBody>
   );
 }
 
@@ -1010,7 +1017,17 @@ function TraitsTable({
             </label>
           </div>
           <div className="border-t border-base-300">
-            <table className="table table-sm w-full table-fixed" aria-label="Traits">
+            <Table
+              preferenceKey={`${character.id}:traits`}
+              filterRows={character.traits.map((trait) => ({
+                name: trait.name,
+                kind: traitKindLabel(trait.kind),
+                points: trait.points,
+                level: trait.level,
+              }))}
+              className="table table-sm w-full table-fixed"
+              aria-label="Traits"
+            >
               <caption className="sr-only">
                 Character traits. Sort with column headings or use row handles for custom order.
               </caption>
@@ -1083,7 +1100,7 @@ function TraitsTable({
                   onMove={(direction) => moveBy(trait.id, direction)}
                 />
               ))}
-            </table>
+            </Table>
           </div>
           {visibleTraits.length === 0 && (
             <p className="px-4 py-8 text-center text-sm text-base-content/60">
@@ -1091,8 +1108,8 @@ function TraitsTable({
             </p>
           )}
           <div className="border-t border-base-300 px-4 py-2 text-[10px] text-base-content/50 sm:px-5">
-            Click a column heading to sort. Drag a row handle or focus it and use ↑/↓ for custom
-            order.
+            Click a column heading to sort; right-click to filter values. Drag a row handle or focus
+            it and use ↑/↓ for custom order.
           </div>
           {saveFailed && (
             <output className="block px-4 pb-3 text-xs text-warning sm:px-5">

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TableHeader } from '../../../components/ui/Table.tsx';
 import type { TablePreferences } from './tablePreferences.ts';
 
 type Comparator<Row> = (left: Row, right: Row) => number;
@@ -119,6 +120,7 @@ export function SortableHeader<Sort extends string>({
   headerClassName = '',
   shortLabel,
   hideButtonOnMobile = false,
+  filterable = true,
 }: {
   label: string;
   sort: Exclude<Sort, 'custom'>;
@@ -127,10 +129,14 @@ export function SortableHeader<Sort extends string>({
   headerClassName?: string;
   shortLabel?: string;
   hideButtonOnMobile?: boolean;
+  filterable?: boolean;
 }) {
   const active = preferences.sort === sort;
   return (
-    <th
+    <TableHeader
+      filterable={filterable}
+      column={sort}
+      label={label}
       scope="col"
       className={headerClassName}
       aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
@@ -145,6 +151,6 @@ export function SortableHeader<Sort extends string>({
         {shortLabel && <span className="sm:hidden">{shortLabel}</span>}
         <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
       </button>
-    </th>
+    </TableHeader>
   );
 }

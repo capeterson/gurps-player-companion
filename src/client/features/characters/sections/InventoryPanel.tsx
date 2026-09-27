@@ -1,3 +1,4 @@
+import { Table, TableHeader } from '../../../components/ui/Table.tsx';
 /**
  * Literal port of the gurps-player-web (archived) inventory UI:
  *  - "On the player" / "Stashed" sections segregated by `worn` on root items
@@ -516,10 +517,10 @@ export function InventoryPanel({
   const tableHead = (
     <thead>
       <tr className="text-base-content/50 text-[10px] uppercase tracking-wider">
-        <th>Item</th>
-        <th className="text-right">Qty</th>
-        <th className="text-right">Wt</th>
-        <th className="text-right">Cost</th>
+        <TableHeader column="item" label="Item" />
+        <TableHeader column="qty" label="Qty" className="text-right" />
+        <TableHeader column="wt" label="Wt" className="text-right" />
+        <TableHeader column="cost" label="Cost" className="text-right" />
         {canWrite && <th />}
       </tr>
     </thead>
@@ -835,10 +836,23 @@ export function InventoryPanel({
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
-                <table className="table table-zebra inventory-table">
+                <Table
+                  preferenceKey={`${character.id}:inventory:worn`}
+                  filterRows={flattenDFS(
+                    (tree.byParent.get(null) ?? []).filter((item) => item.worn),
+                    tree.byParent,
+                  ).map((item) => ({
+                    item: item.name,
+                    qty: item.quantity,
+                    wt: item.effectiveWeightLbs.toFixed(1),
+                    cost: item.cost.toFixed(0),
+                  }))}
+                  aria-label="Worn inventory"
+                  className="table table-zebra inventory-table"
+                >
                   {tableHead}
                   <tbody>{renderRows(wornRoots)}</tbody>
-                </table>
+                </Table>
               </div>
             )}
           </section>
@@ -912,10 +926,23 @@ export function InventoryPanel({
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
-                <table className="table table-zebra inventory-table">
+                <Table
+                  preferenceKey={`${character.id}:inventory:stashed`}
+                  filterRows={flattenDFS(
+                    (tree.byParent.get(null) ?? []).filter((item) => !item.worn),
+                    tree.byParent,
+                  ).map((item) => ({
+                    item: item.name,
+                    qty: item.quantity,
+                    wt: (item.weightLbs * item.quantity).toFixed(1),
+                    cost: item.cost.toFixed(0),
+                  }))}
+                  aria-label="Stashed inventory"
+                  className="table table-zebra inventory-table"
+                >
                   {tableHead}
                   <tbody>{renderRows(carriedRoots, { inStashed: true })}</tbody>
-                </table>
+                </Table>
               </div>
             )}
           </section>

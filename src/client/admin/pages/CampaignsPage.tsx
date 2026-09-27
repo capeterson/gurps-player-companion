@@ -1,3 +1,4 @@
+import { Table, TableHeader, TableRow } from '../../components/ui/Table.tsx';
 /**
  * /admin/campaigns — paginated campaign list with search across name,
  * owner display name, and owner email.  Each row links to the per-
@@ -52,19 +53,29 @@ export function CampaignsPage() {
       {list.data && (
         <>
           <div className="overflow-x-auto rounded border border-base-300">
-            <table className="table table-zebra">
+            <Table preferenceKey="admin:campaigns" className="table table-zebra">
               <thead>
                 <tr className="text-base-content/50 text-[10px] uppercase tracking-wider">
-                  <th>Campaign</th>
-                  <th>Owner</th>
-                  <th className="text-right">Members</th>
-                  <th className="text-right">Characters</th>
-                  <th>Sheets</th>
+                  <TableHeader column="campaign" label="Campaign" />
+                  <TableHeader column="owner" label="Owner" />
+                  <TableHeader column="members" label="Members" className="text-right" />
+                  <TableHeader column="characters" label="Characters" className="text-right" />
+                  <TableHeader column="sheets" label="Sheets" />
                 </tr>
               </thead>
               <tbody>
                 {list.data.items.map((c) => (
-                  <tr key={c.id} className="hover">
+                  <TableRow
+                    filterValues={{
+                      campaign: c.name,
+                      owner: `${c.ownerDisplayName} ${c.ownerEmail}`,
+                      members: c.memberCount,
+                      characters: c.characterCount,
+                      sheets: c.shareCharacterSheets ? 'shared' : 'private',
+                    }}
+                    key={c.id}
+                    className="hover"
+                  >
                     <td>
                       <Link to={`/admin/campaigns/${c.id}`} className="link link-primary">
                         {c.name}
@@ -85,7 +96,7 @@ export function CampaignsPage() {
                         <span className="badge badge-warning badge-sm">private</span>
                       )}
                     </td>
-                  </tr>
+                  </TableRow>
                 ))}
                 {list.data.items.length === 0 && (
                   <tr>
@@ -95,7 +106,7 @@ export function CampaignsPage() {
                   </tr>
                 )}
               </tbody>
-            </table>
+            </Table>
           </div>
 
           <div className="flex items-center justify-between text-xs text-base-content/60">
